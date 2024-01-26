@@ -13,7 +13,6 @@ let projectName = "Feature"
 
 let dependencies: [TargetDependency] = [
     .Core,
-    
     .TCAArchitecture,
     .TCACoordinator,
     .Kingfisher
@@ -21,7 +20,7 @@ let dependencies: [TargetDependency] = [
 
 let packages: [Package] = [
     .TCA,
-    .TCACoordinator,
+    .TCACoordinator
 ]
 
 let script: [TargetScript] = [.swiftLint]

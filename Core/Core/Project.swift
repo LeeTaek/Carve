@@ -12,13 +12,12 @@ let projectName = "Core"
 
 let dependencies: [TargetDependency] = [
     .Shared,
-    
     .Alamofire,
     .Realm
 ]
 
 let packages: [Package] = [
-    .Realm,
+    .Realm
 ]
 
 let script: [TargetScript] = [.swiftLint]
