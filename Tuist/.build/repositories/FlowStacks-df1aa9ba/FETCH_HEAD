@@ -1,0 +1,75 @@
+5367f5109af4379b225d1cb41045d6e949a2cd77	not-for-merge	branch 'Kondamon/main' of https://github.com/johnpatrickmorgan/FlowStacks
+66914e18b90e3ebe376a4bd6d526f6cd38a2a0ab	not-for-merge	branch 'async-await-update' of https://github.com/johnpatrickmorgan/FlowStacks
+f8f5936f03c279f08c781785534fa6a491d0e843	not-for-merge	branch 'bugfix/prevent-can-push-assertions-for-child-coordinators' of https://github.com/johnpatrickmorgan/FlowStacks
+92dc9bdf904b87fb1e6f2d210baadb9b189ec87a	not-for-merge	branch 'feature/allow-multiple-pushes-with-delays' of https://github.com/johnpatrickmorgan/FlowStacks
+a5010f359f223c05fd21c5b8468a0de9a51c2c81	not-for-merge	branch 'feature/combined-navigation-and-presentation-router' of https://github.com/johnpatrickmorgan/FlowStacks
+269fc9828ab99fe4e603e5fae0e72e6487098deb	not-for-merge	branch 'feature/expose-sheet-and-cover-on-dismiss' of https://github.com/johnpatrickmorgan/FlowStacks
+c20db1725b6421c40bb2ffca517e597dca1a8451	not-for-merge	branch 'feature/flow-navigator' of https://github.com/johnpatrickmorgan/FlowStacks
+4a8204150ba79552a877b219a38dee8016a9e854	not-for-merge	branch 'feature/new-features' of https://github.com/johnpatrickmorgan/FlowStacks
+50527b8fe56a22efbd66d7f54059f9079d4ac50e	not-for-merge	branch 'feature/node-rewrite' of https://github.com/johnpatrickmorgan/FlowStacks
+7e671fd6e4c3d3783c844daa33d4956121d3b556	not-for-merge	branch 'feature/pre-ios-14-5-workaround' of https://github.com/johnpatrickmorgan/FlowStacks
+468de8179d68f9e150ffafcb4574dee52dfa3976	not-for-merge	branch 'main' of https://github.com/johnpatrickmorgan/FlowStacks
+986bdc49b1de6fa15eab34b2d93bce12a679f405	not-for-merge	branch 'new-api' of https://github.com/johnpatrickmorgan/FlowStacks
+5ed70a52a5b671856eb1e33e023870c6dc293d8a	not-for-merge	'refs/pull/1/head' of https://github.com/johnpatrickmorgan/FlowStacks
+f8f5936f03c279f08c781785534fa6a491d0e843	not-for-merge	'refs/pull/11/head' of https://github.com/johnpatrickmorgan/FlowStacks
+7e671fd6e4c3d3783c844daa33d4956121d3b556	not-for-merge	'refs/pull/13/head' of https://github.com/johnpatrickmorgan/FlowStacks
+8e2e38175cde46656037650ce4a759bec97daf51	not-for-merge	'refs/pull/15/head' of https://github.com/johnpatrickmorgan/FlowStacks
+e52b8a83e21eb157036d459d50cb4b6afc221462	not-for-merge	'refs/pull/16/head' of https://github.com/johnpatrickmorgan/FlowStacks
+b88109cefc9d21eb8899a2f765b176d8fdc8f8e5	not-for-merge	'refs/pull/24/head' of https://github.com/johnpatrickmorgan/FlowStacks
+b9a8fad4917c36669ba550cb563195842d0bb46b	not-for-merge	'refs/pull/25/head' of https://github.com/johnpatrickmorgan/FlowStacks
+c51ad161343179c1682f17b041bc8703accc27d7	not-for-merge	'refs/pull/28/head' of https://github.com/johnpatrickmorgan/FlowStacks
+2281a6f432cfa17585e95b212878b65fb48c7e7c	not-for-merge	'refs/pull/29/head' of https://github.com/johnpatrickmorgan/FlowStacks
+b52cbadcc6f0fc32b78ad7c09437df2fa35ad0c2	not-for-merge	'refs/pull/30/head' of https://github.com/johnpatrickmorgan/FlowStacks
+16a933f49000cceb493443fdcf48e63ccee06fae	not-for-merge	'refs/pull/31/head' of https://github.com/johnpatrickmorgan/FlowStacks
+d308f34e9a828f3bda7e42fb957819a4f164ce6a	not-for-merge	'refs/pull/35/head' of https://github.com/johnpatrickmorgan/FlowStacks
+528c54f9f3b4044e5a491f40956bb9d81436f0f0	not-for-merge	'refs/pull/36/head' of https://github.com/johnpatrickmorgan/FlowStacks
+5367f5109af4379b225d1cb41045d6e949a2cd77	not-for-merge	'refs/pull/41/head' of https://github.com/johnpatrickmorgan/FlowStacks
+fc99d45079f8353478f0b6a3ea848602b9ac5521	not-for-merge	'refs/pull/45/head' of https://github.com/johnpatrickmorgan/FlowStacks
+d1d6faa464306364c5f16b6152520f8eb03d2fb7	not-for-merge	'refs/pull/46/head' of https://github.com/johnpatrickmorgan/FlowStacks
+659d4ef97486bd325707bb5256c4484d0de6ddd1	not-for-merge	'refs/pull/47/head' of https://github.com/johnpatrickmorgan/FlowStacks
+f5d4da6482d2f259c2c7f43a654374eabf99d9ba	not-for-merge	'refs/pull/48/head' of https://github.com/johnpatrickmorgan/FlowStacks
+92dc9bdf904b87fb1e6f2d210baadb9b189ec87a	not-for-merge	'refs/pull/5/head' of https://github.com/johnpatrickmorgan/FlowStacks
+0c564027d2f62df0c2466aade411950e9100a9a6	not-for-merge	'refs/pull/54/head' of https://github.com/johnpatrickmorgan/FlowStacks
+dbc23c960d03c873ca069c5af56f091510c6d08a	not-for-merge	'refs/pull/55/head' of https://github.com/johnpatrickmorgan/FlowStacks
+75c9cc5c80cb0f30c03582af7cfa04213bec540d	not-for-merge	'refs/pull/63/head' of https://github.com/johnpatrickmorgan/FlowStacks
+5718088019494ee923ef871fed1453c4d93f7eaf	not-for-merge	'refs/pull/72/head' of https://github.com/johnpatrickmorgan/FlowStacks
+443ef152a961d63093f7e85a929819be6e84ee31	not-for-merge	'refs/pull/72/merge' of https://github.com/johnpatrickmorgan/FlowStacks
+4a8204150ba79552a877b219a38dee8016a9e854	not-for-merge	'refs/pull/9/head' of https://github.com/johnpatrickmorgan/FlowStacks
+95902b16aba10f79bdd18f93fe4885b1fac69448	not-for-merge	tag '0.0.1' of https://github.com/johnpatrickmorgan/FlowStacks
+cb8092870dce10fa11d2bc5a50e9cac489eaafe9	not-for-merge	tag '0.0.10' of https://github.com/johnpatrickmorgan/FlowStacks
+7bfb9a99aba86f4fc1e997563b4461e500a938d7	not-for-merge	tag '0.0.11' of https://github.com/johnpatrickmorgan/FlowStacks
+42124ff64ab8ec7bdb45051333f121717b4f4868	not-for-merge	tag '0.0.12' of https://github.com/johnpatrickmorgan/FlowStacks
+32fbb1886467fa8577eb3d6b6c13018338765155	not-for-merge	tag '0.0.13' of https://github.com/johnpatrickmorgan/FlowStacks
+4aa9948139642dc059aa8ca4bfc1251ae1b419ce	not-for-merge	tag '0.0.14' of https://github.com/johnpatrickmorgan/FlowStacks
+64b67aa35f403ffc9ea46d4bc8aca5dc41fba061	not-for-merge	tag '0.0.2' of https://github.com/johnpatrickmorgan/FlowStacks
+bb7de25c4c9c86e0cc043f2dce6fcea53266887b	not-for-merge	tag '0.0.3' of https://github.com/johnpatrickmorgan/FlowStacks
+d1386114df69b55c6ee2b3265b6e092466d5b047	not-for-merge	tag '0.0.4' of https://github.com/johnpatrickmorgan/FlowStacks
+a95ade8b1b96498459eaa8c98fb63a3ecbf59c7f	not-for-merge	tag '0.0.5' of https://github.com/johnpatrickmorgan/FlowStacks
+b50a49d14d47c52b72f0e656061d636fcda27216	not-for-merge	tag '0.0.7' of https://github.com/johnpatrickmorgan/FlowStacks
+b97fbeed80ce70a485e39c5f9f867801da65a3f2	not-for-merge	tag '0.0.8' of https://github.com/johnpatrickmorgan/FlowStacks
+37bde52b41030b2ec9146511a5e569a1df966bae	not-for-merge	tag '0.0.9' of https://github.com/johnpatrickmorgan/FlowStacks
+0cdb95b27d22d94b78a0a641830d4cdd067cfacf	not-for-merge	tag '0.1.0' of https://github.com/johnpatrickmorgan/FlowStacks
+9a4a4a07e859fda0543af117802b758f5e372bca	not-for-merge	tag '0.1.1' of https://github.com/johnpatrickmorgan/FlowStacks
+44a9032b24c9284d83de6d4a982956de0d236bf8	not-for-merge	tag '0.1.2' of https://github.com/johnpatrickmorgan/FlowStacks
+149932fa05242e3afa3ada39171388bfda78ce2d	not-for-merge	tag '0.1.3' of https://github.com/johnpatrickmorgan/FlowStacks
+d41c631587f1177429c045fc5c9bdf2c52446779	not-for-merge	tag '0.1.4' of https://github.com/johnpatrickmorgan/FlowStacks
+0346f5ce4f505956ecc043a3c2e47f7515bdab58	not-for-merge	tag '0.1.5' of https://github.com/johnpatrickmorgan/FlowStacks
+5fd91efc548c59a49a5e931bb18cac8297ec0b71	not-for-merge	tag '0.1.6' of https://github.com/johnpatrickmorgan/FlowStacks
+531e2ccc6464864e66f70d377f1c0f6f20d38aba	not-for-merge	tag '0.1.7' of https://github.com/johnpatrickmorgan/FlowStacks
+47890bcbac13b1a187cbe9c239f26a4aed90a40d	not-for-merge	tag '0.1.8' of https://github.com/johnpatrickmorgan/FlowStacks
+8736b5bc49c34a14ee5cafd013d449749810bed7	not-for-merge	tag '0.2.0' of https://github.com/johnpatrickmorgan/FlowStacks
+c3927dd55c60b769fc5ad6125660a711abba7db8	not-for-merge	tag '0.2.1' of https://github.com/johnpatrickmorgan/FlowStacks
+532b2fdf36ef569c82891fedde151af152316c96	not-for-merge	tag '0.2.2' of https://github.com/johnpatrickmorgan/FlowStacks
+608e362262d446a776c6f05496ff603b1e4f71e7	not-for-merge	tag '0.2.3' of https://github.com/johnpatrickmorgan/FlowStacks
+5b1b5135c7a7393b3e37c4282bf6e810130a6daf	not-for-merge	tag '0.2.4' of https://github.com/johnpatrickmorgan/FlowStacks
+b83479f775ffcb7447d3dbd0a87d8bb7d169c758	not-for-merge	tag '0.2.5' of https://github.com/johnpatrickmorgan/FlowStacks
+0c6ca4897133c2b6f595286ad0f98c974beb6e7d	not-for-merge	tag '0.3.0' of https://github.com/johnpatrickmorgan/FlowStacks
+ad9fbe45f1c0ac31f365ef38e82757f9b6352ed6	not-for-merge	tag '0.3.1' of https://github.com/johnpatrickmorgan/FlowStacks
+940ba4780685be6d2d01cd27eb29517b9dba0a6b	not-for-merge	tag '0.3.2' of https://github.com/johnpatrickmorgan/FlowStacks
+252cb209c0671f3770c58468b54abc059ca50627	not-for-merge	tag '0.3.3' of https://github.com/johnpatrickmorgan/FlowStacks
+e9fd5ad3dc3bb7cc8f91db2adb1b9da1f016e2a9	not-for-merge	tag '0.3.4' of https://github.com/johnpatrickmorgan/FlowStacks
+f36468b065d728e7f46c239e3afe9dc7f2587df9	not-for-merge	tag '0.3.5' of https://github.com/johnpatrickmorgan/FlowStacks
+87b9f06c126fe7c5ad448192388f47ec8d14a439	not-for-merge	tag '0.3.6' of https://github.com/johnpatrickmorgan/FlowStacks
+b58236c0f19ce7a0085220e0fb3d0799487cc9bb	not-for-merge	tag '0.3.7' of https://github.com/johnpatrickmorgan/FlowStacks
+e7e2aec825a5fc2da5ae817df2995b6017492736	not-for-merge	tag '0.3.8' of https://github.com/johnpatrickmorgan/FlowStacks
+a521205327833801a14c9443e6b1c180ddfe54a2	not-for-merge	tag '0.4.0' of https://github.com/johnpatrickmorgan/FlowStacks

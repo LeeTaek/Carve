@@ -1,0 +1,4 @@
+module GTMSessionFetcherFull {
+    umbrella "/Users/lee_taek/로컬문서/Development💻/Carve/CarveApp/Tuist/.build/checkouts/gtm-session-fetcher/Sources/Full/Public"
+    export *
+}

@@ -1,0 +1,4 @@
+module GoogleAppMeasurementTarget {
+    umbrella "/Users/lee_taek/로컬문서/Development💻/Carve/CarveApp/Tuist/.build/checkouts/GoogleAppMeasurement/GoogleAppMeasurementWrapper/include"
+    export *
+}

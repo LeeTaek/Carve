@@ -8,7 +8,7 @@
 import ProjectDescription
 import ProjectDescriptionHelpers
 
-let projectName = "Shared"
+let projectName = "Common"
 
 let target: [Target] = [
     .makeFrameworkTarget(projName: projectName, target: .debug)

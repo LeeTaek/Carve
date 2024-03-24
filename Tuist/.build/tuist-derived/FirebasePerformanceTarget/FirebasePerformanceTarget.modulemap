@@ -1,0 +1,4 @@
+module FirebasePerformanceTarget {
+    umbrella "/Users/lee_taek/로컬문서/Development💻/Carve/CarveApp/Tuist/.build/checkouts/firebase-ios-sdk/SwiftPM-PlatformExclude/FirebasePerformanceWrap/include"
+    export *
+}

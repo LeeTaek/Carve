@@ -1,0 +1,6 @@
+framework module FirebaseAppCheck {
+  umbrella header "/Users/lee_taek/로컬문서/Development💻/Carve/CarveApp/Tuist/.build/checkouts/firebase-ios-sdk/FirebaseAppCheck/Sources/Public/FirebaseAppCheck/FirebaseAppCheck.h"
+
+  export *
+  module * { export * }
+}

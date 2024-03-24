@@ -7,7 +7,12 @@ public extension Project {
       packages: [Package] = [],
       targets: [Target],
       schemes: [Scheme] = [],
-      settings: Settings? = nil,
+      settings: Settings? = .settings(
+        base: SettingsDictionary()
+            .automaticCodeSigning(devTeam: "H4MSW7FUBB")
+//            .debugInformationFormat(.dwarfWithDsym)
+//            .otherLinkerFlags(["-ObjC -Xlinker -no_warn_duplicate_libraries"])
+    ),
       additionalFiles: [FileElement] = [],
       resourceSynthesizers: [ResourceSynthesizer] = []
     ) -> Project {
@@ -25,4 +30,3 @@ public extension Project {
     }
     
 }
-

@@ -26,7 +26,7 @@ public extension Target {
         settings: Settings? = nil
     )
     -> Target {
-        return Target(
+        return Target.target(
             name: name.rawValue,
             destinations: destination,
             product: product,
@@ -56,7 +56,7 @@ public extension Target {
         script: [TargetScript] = [],
         dependencies: [TargetDependency] = []
     ) -> Target {
-        return Target(
+        return Target.target(
             name: "\(projName)Test",
             destinations: destination,
             product: product,
@@ -81,10 +81,11 @@ public extension Target {
         resources: ResourceFileElements? = nil,
         entitlements: Entitlements? = nil,
         script: [TargetScript] = [],
-        dependencies: [TargetDependency] = []
+        dependencies: [TargetDependency] = [],
+        settings: Settings? = nil
     )
     -> Target {
-        return Target(
+        return Target.target(
             name: projName,
             destinations: destination,
             product: product,
@@ -95,7 +96,8 @@ public extension Target {
             resources: resources,
             entitlements: entitlements,
             scripts: script,
-            dependencies: dependencies
+            dependencies: dependencies,
+            settings: settings
         )
     }
 }

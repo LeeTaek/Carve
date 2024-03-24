@@ -1,0 +1,6 @@
+framework module GoogleDataTransport {
+  umbrella header "/Users/lee_taek/로컬문서/Development💻/Carve/CarveApp/Tuist/.build/checkouts/GoogleDataTransport/GoogleDataTransport/GDTCORLibrary/Public/GoogleDataTransport/GoogleDataTransport.h"
+
+  export *
+  module * { export * }
+}
