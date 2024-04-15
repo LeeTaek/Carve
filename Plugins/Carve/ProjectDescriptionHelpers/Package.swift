@@ -50,6 +50,8 @@ public extension TargetDependency {
     static let CoreRealm: Self = .project(target: "CoreRealm", path: .relativeToRoot("Core/CoreRealm"))
     static let Common: Self = .project(target: "Common", path: .relativeToRoot("Shared/Common"))
     static let CommonUI: Self = .project(target: "CommonUI", path: .relativeToRoot("Shared/CommonUI"))
+    static let Resources: Self = .project(target: "Resources", path: .relativeToRoot("Shared/Resources"))
+
     
     /// 외부 라이브러리: Tuist + SPM
     static let TCAArchitecture: Self = .external(name: "ComposableArchitecture")

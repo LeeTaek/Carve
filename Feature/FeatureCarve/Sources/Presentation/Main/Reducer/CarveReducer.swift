@@ -10,6 +10,7 @@ import Common
 import CommonUI
 import DomainRealm
 import Foundation
+import Resources
 
 import ComposableArchitecture
 
@@ -92,8 +93,9 @@ public struct CarveReducer {
     private func fetchBible(chapter: TitleVO) -> [SentenceVO] {
         let encodingEUCKR = CFStringConvertEncodingToNSStringEncoding(0x0422)
         var sentences: [SentenceVO] = []
-        guard let textPath = Bundle.module.path(forResource: chapter.title.rawValue,
+        guard let textPath = ResourcesResources.bundle.path(forResource: chapter.title.rawValue,
                                                 ofType: nil)
+
         else { return sentences}
         
         do {

@@ -1,6 +1,0 @@
-framework module FirebaseInAppMessaging_iOS {
-  umbrella header "/Users/lee_taek/로컬문서/Development💻/Carve/CarveApp/Tuist/.build/checkouts/firebase-ios-sdk/FirebaseInAppMessaging/iOS/include/FirebaseInAppMessaging_iOS.h"
-
-  export *
-  module * { export * }
-}

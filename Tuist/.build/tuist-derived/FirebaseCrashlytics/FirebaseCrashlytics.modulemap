@@ -1,6 +1,0 @@
-framework module FirebaseCrashlytics {
-  umbrella header "/Users/lee_taek/로컬문서/Development💻/Carve/CarveApp/Tuist/.build/checkouts/firebase-ios-sdk/Crashlytics/Crashlytics/Public/FirebaseCrashlytics/FirebaseCrashlytics.h"
-
-  export *
-  module * { export * }
-}

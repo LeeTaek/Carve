@@ -1,4 +1,0 @@
-module grpcWrapper {
-    umbrella "/Users/lee_taek/로컬문서/Development💻/Carve/CarveApp/Tuist/.build/checkouts/grpc-binary/grpc-Wrapper/include"
-    export *
-}

@@ -1,4 +1,0 @@
-module Capi {
-    umbrella "/Users/lee_taek/로컬문서/Development💻/Carve/CarveApp/Tuist/.build/checkouts/realm-core/src/realm/object-store/c_api"
-    export *
-}

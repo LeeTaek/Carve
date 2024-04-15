@@ -1,6 +1,0 @@
-framework module FirebaseCore {
-  umbrella header "/Users/lee_taek/로컬문서/Development💻/Carve/CarveApp/Tuist/.build/checkouts/firebase-ios-sdk/FirebaseCore/Sources/Public/FirebaseCore/FirebaseCore.h"
-
-  export *
-  module * { export * }
-}

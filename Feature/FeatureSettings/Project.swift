@@ -15,22 +15,25 @@ let dependencies: [TargetDependency] = [
     .DomainRealm,
     .TCAArchitecture,
     .TCACoordinator,
-    .Kingfisher
+    .Kingfisher,
+    .Resources
 ]
 
 let script: [TargetScript] = [.swiftLint]
 
-let settings: Settings = .settings(configurations: [
+let settings: Settings = .settings(
+//  base: ["$(inherited)": "-enable-actor-data-race-checks"],
+  configurations: [
     .debug(name: .debug),
     .release(name: .release)
-])
+  ]
+)
 
 
 let target: [Target] = [
     .makeFrameworkTarget(
         projName: projectName,
         target: .debug,
-        resources: "Resources/**",
         script: script,
         dependencies: dependencies,
         settings: settings
@@ -41,6 +44,5 @@ let target: [Target] = [
 
 let project = Project.makeModule(
     name: projectName,
-    targets: target,
-    resourceSynthesizers: [.assets()]
+    targets: target
 )

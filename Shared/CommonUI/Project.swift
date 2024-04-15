@@ -18,7 +18,16 @@ let target: [Target] = [
     .makeFrameworkTarget(projName: projectName, target: .debug, dependencies: dependencies)
 ]
 
+let settings: Settings = .settings(
+//  base: ["$(inherited)": "-enable-actor-data-race-checks"],
+  configurations: [
+    .debug(name: .debug),
+    .release(name: .release)
+  ]
+)
+
 let project = Project.makeModule(
     name: projectName,
-    targets: target
+    targets: target,
+    settings: settings
 )

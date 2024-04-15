@@ -113,7 +113,7 @@ public struct BibleSentenceReducer {
 public enum FontCase: String, CaseIterable {
     case gothic = "NanumBarunGothic"
     case myeongjo = "NanumMyeongjo"
-    case flower = "나눔손글씨 꽃내음"
+    case flower = "NanumFlowerScent"
     
         
     public func font(size: CGFloat) -> UIFont {

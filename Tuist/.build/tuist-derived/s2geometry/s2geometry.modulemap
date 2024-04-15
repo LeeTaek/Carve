@@ -1,4 +1,0 @@
-module s2geometry {
-    umbrella "/Users/lee_taek/로컬문서/Development💻/Carve/CarveApp/Tuist/.build/checkouts/realm-core/src/external/s2"
-    export *
-}
