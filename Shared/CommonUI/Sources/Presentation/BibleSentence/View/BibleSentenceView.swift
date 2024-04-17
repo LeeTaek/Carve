@@ -12,26 +12,25 @@ import SwiftUI
 import ComposableArchitecture
 
 public struct BibleSentenceView: View {
-    private let store: StoreOf<BibleSentenceReducer>
-    @ObservedObject private var viewStore: ViewStore<BibleSentenceReducer.State,
-                                                     BibleSentenceReducer.ViewAction>
-    
+    private var store: StoreOf<BibleSentenceReducer>
+
     public init(store: StoreOf<BibleSentenceReducer>) {
         self.store = store
-        self.viewStore = ViewStore(self.store, observe: { $0 }, send: { .view($0) })
     }
     
     public var body: some View {
-        VStack {
-            if viewStore.state.chapterTitle != nil {
-                chapterTitleView
+        WithPerceptionTracking {
+            VStack {
+                if store.state.chapterTitle != nil {
+                    chapterTitleView
+                }
+                sentenceDescription
             }
-            sentenceDescription
         }
     }
     
     private var chapterTitleView: some View {
-        Text(viewStore.state.chapterTitle ?? "")
+        Text(store.state.chapterTitle ?? "")
             .font(.system(size: 22))
             .fontWeight(.heavy)
     }
@@ -41,20 +40,20 @@ public struct BibleSentenceView: View {
         
         return Text("\(sectionString)")
             .bold()
-            .padding(.vertical, (viewStore.lineSpace - viewStore.font.font(size: viewStore.fontSize).lineHeight) / 2)
+            .padding(.vertical, (store.lineSpace - store.font.font(size: store.fontSize).lineHeight) / 2)
     }
     
     
     public var sentenceDescription: some View {
         HStack(alignment: .top) {
-            sectionNumberView(viewStore.section)
+            sectionNumberView(store.section)
             
-            Text(viewStore.sentence)
-                .tracking(viewStore.traking)
-                .font(Font(viewStore.font.font(size: viewStore.fontSize)))
-                .lineSpacing(viewStore.lineSpace - viewStore.font.font(size: viewStore.fontSize).lineHeight)
+            Text(store.sentence)
+                .tracking(store.traking)
+                .font(Font(store.font.font(size: store.fontSize)))
+                .lineSpacing(store.lineSpace - store.font.font(size: store.fontSize).lineHeight)
                 .lineLimit(nil)
-                .padding(.vertical, (viewStore.lineSpace - viewStore.font.font(size: viewStore.fontSize).lineHeight) / 2)
+                .padding(.vertical, (store.lineSpace - store.font.font(size: store.fontSize).lineHeight) / 2)
 
             
         }

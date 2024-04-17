@@ -11,6 +11,7 @@ import SwiftUI
 import ComposableArchitecture
 import Firebase
 import RealmSwift
+import FeatureCarve
 
 @main
 struct CarveApp: SwiftUI.App {
@@ -20,13 +21,11 @@ struct CarveApp: SwiftUI.App {
         @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
         
         let store = Store(initialState: .initialState) {
-            TabCoordinator()
-                ._printChanges()
+            CarveReducer()
         }
         
-        
         WindowGroup {
-            TabCoordinatorView(store: store)
+            CarveView(store: store)
             .analyticsScreen(
                 name: "Screen Name",
                 extraParameters: [

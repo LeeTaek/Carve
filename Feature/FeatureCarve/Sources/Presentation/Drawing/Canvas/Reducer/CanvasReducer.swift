@@ -15,6 +15,7 @@ import ComposableArchitecture
 
 @Reducer
 public struct CanvasReducer {
+    @ObservableState
     public struct State: Equatable, Identifiable {
         public var id: String
         public var drawing: DrawingVO
@@ -36,14 +37,15 @@ public struct CanvasReducer {
                                               lineWidth: 4)
     }
     
-    public enum Action {
+    public enum Action: BindableAction {
+        case binding(BindingAction<State>)
         case setTitle(TitleVO, Int)
         case setLine(UIColor, CGFloat)
         case selectDidFinish
-
     }
     
     public var body: some Reducer<State, Action> {
+        BindingReducer()
         Reduce { state, action in
             switch action {
             case .setTitle(let title, let section):

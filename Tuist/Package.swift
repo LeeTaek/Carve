@@ -22,7 +22,7 @@ let packages = Package(
         .package(url: "https://github.com/onevcat/Kingfisher.git", from:  "7.9.1"),
         .package(url: "https://github.com/firebase/firebase-ios-sdk.git", from: "10.15.0"),
         .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.9.2"),
-        .package(url: "https://github.com/johnpatrickmorgan/TCACoordinators", from: "0.8.0"),
+//        .package(url: "https://github.com/johnpatrickmorgan/TCACoordinators", from: "0.8.0"),
         .package(url: "https://github.com/realm/realm-swift", from: "10.47.0")
     ]
 )

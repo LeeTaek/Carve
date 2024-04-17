@@ -11,23 +11,34 @@ import CommonUI
 import DomainRealm
 import Foundation
 import Resources
+import SwiftUI
 
 import ComposableArchitecture
 
 @Reducer
 public struct CarveReducer {
     public init() { }
+    @ObservableState
     public struct State: Equatable {
-        public init() { }
-        public let id: UUID = UUID()
-        public var isScrollDown: Bool = false
-        public var sentences: [SentenceVO] = []
-        public var titleState = TitleReducer.State.initialState
+        public var isScrollDown: Bool
+        public var sentences: [SentenceVO]
+        public var currentTitle: TitleVO
+        public var lastChapter: Int
+        public var isTitlePresent: Bool
+        public var columnVisibility: NavigationSplitViewVisibility
         public var sentenceWithDrawingState: IdentifiedArrayOf<SentencesWithDrawingReducer.State> = []
-        static let initialState = Self()
+        public static let initialState = State(
+            isScrollDown: false,
+            sentences: [],
+            currentTitle: .initialState,
+            lastChapter: 1,
+            isTitlePresent: false,
+            columnVisibility: .detailOnly
+        )
     }
     
-    public enum Action: FeatureAction, CommonUI.ScopeAction {
+    public enum Action: FeatureAction, CommonUI.ScopeAction, BindableAction {
+        case binding(BindingAction<State>)
         case view(ViewAction)
         case inner(InnerAction)
         case scope(ScopeAction)
@@ -37,28 +48,25 @@ public struct CarveReducer {
         case isScrollDown(Bool)
         case moveNextChapter
         case moveBeforeChapter
+        case isPresentTitle(Bool)
+        case titleDidTapped
     }
     
     public enum InnerAction: Equatable {
-        
     }
     
     @CasePathable
     public enum ScopeAction {
-        case titleAction(TitleReducer.Action)
         case sentenceWithDrawingAction(IdentifiedActionOf<SentencesWithDrawingReducer>)
     }
 
     public var body: some Reducer<State, Action> {
-        Scope(state: \.titleState,
-              action: \Action.Cases.scope.titleAction) {
-            TitleReducer()
-        }
+        BindingReducer()
         
         Reduce { state, action in
             switch action {
             case .view(.onAppear):
-                let currentChapter = state.titleState.currentBible
+                let currentChapter = state.currentTitle
                 let sentences = fetchBible(chapter: currentChapter)
                 sentences.forEach {
                     let currentState = SentencesWithDrawingReducer.State(sentence: $0)
@@ -74,10 +82,12 @@ public struct CarveReducer {
             case .view(.moveBeforeChapter):
                 break
                 
-            case .scope(.titleAction(.inner(.selectDidFinish))):
-                let currentChapter = state.titleState.currentBible
-                let sentences = fetchBible(chapter: currentChapter)
-                Log.debug(sentences)
+            case let .view(.isPresentTitle(isPresent)):
+                state.isTitlePresent = isPresent
+                
+            case .view(.titleDidTapped):
+                state.columnVisibility = .all
+                
             default:
                 break
             }

@@ -13,14 +13,10 @@ import ComposableArchitecture
 
 public struct CanvasView: UIViewRepresentable {
     public typealias UIViewType = PKCanvasView
-    private let store: StoreOf<CanvasReducer>
-    @ObservedObject
-    private var viewStore: ViewStore<CanvasReducer.State, CanvasReducer.Action>
-    
+    @Perception.Bindable private var store: StoreOf<CanvasReducer>
     
     init(store: StoreOf<CanvasReducer>) {
         self.store = store
-        self.viewStore = ViewStore(self.store, observe: { $0 })
     }
     
     public func makeUIView(context: Context) -> PKCanvasView {
@@ -32,8 +28,8 @@ public struct CanvasView: UIViewRepresentable {
             canvas.drawingPolicy = .pencilOnly
 #endif
             canvas.tool = PKInkingTool(.pencil, 
-                                       color: self.viewStore.lineColor,
-                                       width: self.viewStore.lineWidth)
+                                       color: self.store.lineColor,
+                                       width: self.store.lineWidth)
             canvas.backgroundColor = .clear
             canvas.isOpaque = false
             canvas.translatesAutoresizingMaskIntoConstraints = false
@@ -41,7 +37,7 @@ public struct CanvasView: UIViewRepresentable {
             
             return canvas
         }()
-        canvas.drawing = viewStore.drawing.lineData
+        canvas.drawing = store.drawing.lineData
         canvas.delegate = context.coordinator
         
         return canvas
@@ -49,15 +45,13 @@ public struct CanvasView: UIViewRepresentable {
     
     public func updateUIView(_ uiView: PKCanvasView, context: Context) {
         uiView.tool = PKInkingTool(.pencil,
-                                   color: self.viewStore.lineColor,
-                                   width: self.viewStore.lineWidth)
+                                   color: self.store.lineColor,
+                                   width: self.store.lineWidth)
     }
     
     public func makeCoordinator() -> Coordinator {
-        Coordinator(lineColor: viewStore.binding(get: \.lineColor,
-                                                 send: .selectDidFinish),
-                    lineWidth: viewStore.binding(get: \.lineWidth,
-                                                 send: .selectDidFinish))
+        Coordinator(lineColor: $store.lineColor,
+                    lineWidth: $store.lineWidth)
     }
     
     final public class Coordinator: NSObject, PKCanvasViewDelegate {
@@ -70,9 +64,12 @@ public struct CanvasView: UIViewRepresentable {
         }
         
         public func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
-            canvasView.tool = PKInkingTool(.pencil,
-                                           color: self.lineColor.wrappedValue,
-                                           width: self.lineWidth.wrappedValue)
+            observe { [weak self] in
+                guard let self else { return }
+                canvasView.tool = PKInkingTool(.pencil,
+                                               color: self.lineColor.wrappedValue,
+                                               width: self.lineWidth.wrappedValue)
+            }
         }
     }
     

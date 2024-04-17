@@ -15,11 +15,14 @@ import ComposableArchitecture
 
 @Reducer
 public struct SentencesWithDrawingReducer {
+    @ObservableState
     public struct State: Equatable, Identifiable {
         public let id: String
         public let sentence: SentenceVO
         public var sentenceState: BibleSentenceReducer.State
-        public var drawingState: DrawingReducer.State
+        public var canvasState: CanvasReducer.State
+        public var underLineCount: Int = 1
+        public var underlineOffset: [CGFloat] = [.zero]
         
         public init(sentence: SentenceVO) {
             self.id = "\(sentence.title).\(sentence.chapter).\(sentence.section)"
@@ -27,32 +30,36 @@ public struct SentencesWithDrawingReducer {
             self.sentenceState = .init(chapterTitle: sentence.chapterTitle,
                                        section: sentence.section,
                                        sentence: sentence.sentenceScript)
-            self.drawingState = .init(title: .init(title: .getTitle(sentence.title),
-                                                   chapter: sentence.chapter),
-                                      section: sentence.chapter)
+            self.canvasState = .initialState
         }
     }
     
     
-    public enum Action: FeatureAction, CommonUI.ScopeAction {
+    public enum Action: FeatureAction, CommonUI.ScopeAction, CommonUI.AsyncAction {
         case view(ViewAction)
         case inner(InnerAction)
+        case async(AsyncAction)
         case scope(ScopeAction)
     }
     
     public enum ViewAction {
         case setHeight(height: CGFloat)
-        case calculateLineOffsets(Int, CGFloat)
+        case calculateLineOffsets(CGRect)
     }
     
     public enum InnerAction { }
     
+    public enum AsyncAction: Equatable {
+        case setSubscription
+        case clearSubscription
+        case updateSubscription
+    }
+    
     @CasePathable
     public enum ScopeAction {
         case sentenceAction(BibleSentenceReducer.Action)
-        case drawingAction(DrawingReducer.Action)
+        case canvasAction(CanvasReducer.Action)
     }
-    
     
     
     public var body: some Reducer<State, Action> {
@@ -60,37 +67,37 @@ public struct SentencesWithDrawingReducer {
               action: \Action.Cases.scope.sentenceAction) {
             BibleSentenceReducer()
         }
-        Scope(state: \.drawingState,
-              action: \Action.Cases.scope.drawingAction) {
-            DrawingReducer()
+        Scope(state: \.canvasState,
+              action: \Action.Cases.scope.canvasAction) {
+            CanvasReducer()
                 ._printChanges()
         }
         
         Reduce { state, action in
             switch action {
-            case .view(.calculateLineOffsets(let lineCount, let frameHeight)):
+            case .view(.calculateLineOffsets(let rect)):
                 let offsetY = calcurateLineOffsets(state: state.sentenceState,
-                                                   lineCount: lineCount,
-                                                   height: frameHeight)
-                return .send(.scope(.drawingAction(.view(.setUnderlineOffset(offset: offsetY)))))
-
+                                                   rect: rect)
+                state.underlineOffset = offsetY
+                state.underLineCount = offsetY.count
+                return .none
             default:
                 return .none
             }
         }
     }
     
+    
     private func calcurateLineOffsets(state: BibleSentenceReducer.State,
-                                      lineCount: Int,
-                                      height: CGFloat) -> [CGFloat] {
+                                      rect: CGRect) -> [CGFloat] {
+        let frameHeight = rect.height
+        let lineCount = Int(frameHeight / state.lineSpace)
         let fontHeight = state.font.font(size: state.fontSize).lineHeight
         let paddingSpace = (state.lineSpace - fontHeight) / 2
         var offsets: [CGFloat] = []
-
         for _ in 1...lineCount {
             offsets.append(paddingSpace + fontHeight)
         }
-        
         return offsets
     }
 }

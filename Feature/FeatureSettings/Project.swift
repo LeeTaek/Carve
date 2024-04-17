@@ -14,7 +14,7 @@ let dependencies: [TargetDependency] = [
     .DependencyInjection,
     .DomainRealm,
     .TCAArchitecture,
-    .TCACoordinator,
+//    .TCACoordinator,
     .Kingfisher,
     .Resources
 ]

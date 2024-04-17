@@ -13,6 +13,7 @@ import ComposableArchitecture
 @Reducer
 public struct BibleSentenceReducer {
     public init() { }
+    @ObservableState
     public struct State: Equatable, Identifiable {
         public var id: String
         public var chapterTitle: String?

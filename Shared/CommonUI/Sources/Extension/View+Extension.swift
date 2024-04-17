@@ -10,13 +10,17 @@ import SwiftUI
 
 public extension View {
     @ViewBuilder
-    func isHidden(_ hidden: Bool, remove: Bool = false) -> some View {
+    func isHidden(_ hidden: Bool, duration: Double = 0.0) -> some View {
         if hidden {
-            if !remove {
-                self.hidden()
-            }
-        } else {
             self
+                .frame(height: 0)
+                .opacity(0)
+                .animation(.easeInOut(duration: duration), value: hidden) // 애
+        }
+        else {
+            self
+                .animation(.easeInOut(duration: duration), value: hidden) // 애
+            
         }
     }
     

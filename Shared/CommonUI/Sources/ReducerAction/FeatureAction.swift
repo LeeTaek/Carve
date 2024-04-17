@@ -7,8 +7,9 @@
 //
 
 import Foundation
+import ComposableArchitecture
 
-public protocol FeatureAction {
+public protocol FeatureAction  {
     associatedtype ViewAction
     associatedtype InnerAction
 

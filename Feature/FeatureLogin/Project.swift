@@ -13,7 +13,7 @@ let projectName = "FeatureLogin"
 let dependencies: [TargetDependency] = [
     .DependencyInjection,
     .TCAArchitecture,
-    .TCACoordinator,
+//    .TCACoordinator,
     .Kingfisher,
     .Resources
 

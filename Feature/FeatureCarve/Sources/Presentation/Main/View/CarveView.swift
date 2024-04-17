@@ -11,64 +11,78 @@ import SwiftUI
 import ComposableArchitecture
 
 public struct CarveView: View {
-    private let store: StoreOf<CarveReducer>
-    @ObservedObject private var viewStore: ViewStore<CarveReducer.State, CarveReducer.ViewAction>
+    @Perception.Bindable private var store: StoreOf<CarveReducer>
     
     public init(store: StoreOf<CarveReducer>) {
         self.store = store
-        self.viewStore = ViewStore(self.store, observe: { $0 }, send: { .view($0) })
     }
     
     public var body: some View {
-        VStack {
-            titleView
-                .isHidden(viewStore.isScrollDown)
-            
-            ScrollView {
-                LazyVStack(pinnedViews: .sectionHeaders) {
-                    Section {
-                        ForEachStore(
-                            store.scope(state: \.sentenceWithDrawingState,
-                                        action: \.scope.sentenceWithDrawingAction)
-                        ) { childStore in
-                            return SentencesWithDrawingView(store: childStore)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .padding(.horizontal, 10)
+        WithPerceptionTracking {
+            NavigationSplitView(columnVisibility: $store.columnVisibility) {
+                Text("list")
+            } content: {
+                Text("content")
+            } detail: {
+                VStack {
+                    title
+                        .isHidden(store.isScrollDown, duration: 3)
+                    
+                    ScrollView {
+                        LazyVStack(pinnedViews: .sectionHeaders) {
+                            Section {
+                                ForEach(
+                                    store.scope(state: \.sentenceWithDrawingState,
+                                                action: \.scope.sentenceWithDrawingAction)
+                                ) { childStore in
+                                    SentencesWithDrawingView(store: childStore)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                        .padding(.horizontal, 10)
+                                }
+                            } header: {
+                                // TODO: - ChapterTitleView
+                            }
                         }
-                    } header: {
-                        // TODO: - ChapterTitleView
+                    }
+                    .background {
+                        CustomGesture { gesture in
+                            handleTabState(gesture)
+                        }
                     }
                 }
-            }
-            .background {
-                CustomGesture { gesture in
-                    handleTabState(gesture)
+                .navigationTitle("타이틀")
+                .toolbar(.hidden, for: .navigationBar)
+                .onAppear {
+                    store.send(.view(.onAppear))
                 }
             }
-        }
-        .onAppear {
-            viewStore.send(.onAppear)
+            .navigationSplitViewStyle(.automatic)
         }
     }
     
-    private var titleView: some View {
-        TitleView(
-            store: self.store.scope(
-                state: \.titleState,
-                action: \.scope.titleAction)
-        )
-    }
     
+    private var title: some View {
+        let titleName = store.currentTitle.title.rawValue
+        return HStack {
+            Button(action: { store.send(.view(.titleDidTapped)) }) {
+                Text("\(titleName) \(store.state.currentTitle.chapter)장")
+                    .font(.system(size: 30))
+                    .padding()
+            }
+            Spacer()
+        }
+    }
+
     private func handleTabState(_ gesture: UIPanGestureRecognizer) {
         let velocityY = gesture.velocity(in: gesture.view).y
         
         if velocityY < 0 {
-            if -(velocityY / 5) > 60 && viewStore.isScrollDown == false {
-                viewStore.send(.isScrollDown(true))
+            if -(velocityY / 5) > 60 && store.isScrollDown == false {
+                store.send(.view(.isScrollDown(true)))
             }
         } else {
-            if (velocityY / 5) > 40 && viewStore.isScrollDown == true {
-                viewStore.send(.isScrollDown(false))
+            if (velocityY / 5) > 40 && store.isScrollDown == true {
+                store.send(.view(.isScrollDown(false)))
             }
         }
     }
