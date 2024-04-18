@@ -19,7 +19,6 @@ let target: [Target] = [
 ]
 
 let settings: Settings = .settings(
-//  base: ["$(inherited)": "-enable-actor-data-race-checks"],
   configurations: [
     .debug(name: .debug),
     .release(name: .release)

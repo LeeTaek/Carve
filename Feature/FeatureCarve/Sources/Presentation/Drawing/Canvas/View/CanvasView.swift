@@ -14,7 +14,6 @@ import ComposableArchitecture
 public struct CanvasView: UIViewRepresentable {
     public typealias UIViewType = PKCanvasView
     @Perception.Bindable private var store: StoreOf<CanvasReducer>
-    
     init(store: StoreOf<CanvasReducer>) {
         self.store = store
     }

@@ -11,9 +11,7 @@ import ProjectDescriptionHelpers
 let projectName = "FeatureLogin"
 
 let dependencies: [TargetDependency] = [
-    .DependencyInjection,
     .TCAArchitecture,
-//    .TCACoordinator,
     .Kingfisher,
     .Resources
 
@@ -22,7 +20,6 @@ let dependencies: [TargetDependency] = [
 let script: [TargetScript] = [.swiftLint]
 
 let settings: Settings = .settings(
-//  base: ["$(inherited)": "-enable-actor-data-race-checks"],
   configurations: [
     .debug(name: .debug),
     .release(name: .release)

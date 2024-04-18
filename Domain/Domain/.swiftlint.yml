@@ -47,4 +47,8 @@ identifier_name:
     - GlobalAPIKey
     - x
     - y
+function_body_length:
+    warning: 150
+    error: 200
+    
 reporter: "xcode" # 보고 유형 (xcode, json, csv, checkstyle, junit, html, emoji, markdown)

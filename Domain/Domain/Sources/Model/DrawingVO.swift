@@ -15,15 +15,15 @@ public class DrawingVO: Equatable {
         (lhs.section == rhs.section) &&
         (lhs.lineData == rhs.lineData)
     }
-    
+
     var author: String
     var name: String
     public var lineData: PKDrawing
     var isWritten: Bool = false
     public var bibleTitle: TitleVO
     public var section: Int
-    
-    public init(author: String, 
+
+    public init(author: String,
                 name: String,
                 lineData: PKDrawing,
                 isWritten: Bool,
@@ -36,7 +36,7 @@ public class DrawingVO: Equatable {
         self.bibleTitle = bibleTitle
         self.section = section
     }
-    
+
     public init(bibleTitle: TitleVO,
                 section: Int,
                 lineData: PKDrawing = .init()
@@ -47,5 +47,5 @@ public class DrawingVO: Equatable {
         self.section = section
         self.lineData = lineData
     }
-    
+
 }

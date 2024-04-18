@@ -50,7 +50,6 @@ public struct CarveView: View {
                         }
                     }
                 }
-                .navigationTitle("타이틀")
                 .toolbar(.hidden, for: .navigationBar)
                 .onAppear {
                     store.send(.view(.onAppear))
@@ -59,10 +58,9 @@ public struct CarveView: View {
             .navigationSplitViewStyle(.automatic)
         }
     }
-    
-    
+
     private var title: some View {
-        let titleName = store.currentTitle.title.rawValue
+        let titleName = store.currentTitle.title.koreanTitle()
         return HStack {
             Button(action: { store.send(.view(.titleDidTapped)) }) {
                 Text("\(titleName) \(store.state.currentTitle.chapter)장")
@@ -75,7 +73,7 @@ public struct CarveView: View {
 
     private func handleTabState(_ gesture: UIPanGestureRecognizer) {
         let velocityY = gesture.velocity(in: gesture.view).y
-        
+
         if velocityY < 0 {
             if -(velocityY / 5) > 60 && store.isScrollDown == false {
                 store.send(.view(.isScrollDown(true)))
@@ -87,7 +85,6 @@ public struct CarveView: View {
         }
     }
 }
-
 
 private struct CustomGesture: UIViewRepresentable {
     var onChange: (UIPanGestureRecognizer) -> Void

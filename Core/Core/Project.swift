@@ -8,13 +8,10 @@
 import ProjectDescription
 import ProjectDescriptionHelpers
 
-let projectName = "CoreRealm"
+let projectName = "Core"
 
 let dependencies: [TargetDependency] = [
-    .Common,
-    .DomainRealm,
-    .Alamofire,
-    .RealmSwift
+    .Alamofire
 ]
 
 let script: [TargetScript] = [.swiftLint]

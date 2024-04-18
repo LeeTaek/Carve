@@ -6,8 +6,8 @@
 //  Copyright © 2024 leetaek. All rights reserved.
 //
 
-import Common
-import DomainRealm
+import Core
+import Domain
 import PencilKit
 import UIKit
 
@@ -21,7 +21,6 @@ public struct CanvasReducer {
         public var drawing: DrawingVO
         public var lineColor: UIColor
         public var lineWidth: CGFloat
-        
         public init(drawing: DrawingVO,
                     lineColor: UIColor,
                     lineWidth: CGFloat) {
@@ -30,20 +29,20 @@ public struct CanvasReducer {
             self.lineColor = lineColor
             self.lineWidth = lineWidth
         }
-        
+
         public static let initialState = Self(drawing: .init(bibleTitle: .initialState,
                                                              section: 1),
                                               lineColor: .black,
                                               lineWidth: 4)
     }
-    
+
     public enum Action: BindableAction {
         case binding(BindingAction<State>)
         case setTitle(TitleVO, Int)
         case setLine(UIColor, CGFloat)
         case selectDidFinish
     }
-    
+
     public var body: some Reducer<State, Action> {
         BindingReducer()
         Reduce { state, action in
@@ -51,19 +50,19 @@ public struct CanvasReducer {
             case .setTitle(let title, let section):
                 state.drawing.bibleTitle = title
                 state.drawing.section = section
-                
+
             case .setLine(let color, let width):
                 state.lineColor = color
                 state.lineWidth = width
-                
+
             case .selectDidFinish:
                 Log.debug("Selected Line", (state.lineColor, state.lineWidth))
-                
+
             default:
                 break
             }
             return .none
         }
     }
-    
+
 }

@@ -9,19 +9,24 @@
 import Foundation
 import Common
 
-public struct TitleVO: Equatable {
-    public var title: BibleTitle
-    public var chapter: Int
+import RealmSwift
 
-    public static let initialState = Self.init(title: .genesis, chapter: 1)
+public class TitleVO: Object {
+    @Persisted(primaryKey: true) private var id: String
+    @Persisted public var title: BibleTitle
+    @Persisted public var chapter: Int
     
-    public init(title: BibleTitle, chapter: Int) {
+    public static let initialState = TitleVO.init(title: .genesis, chapter: 1)
+    
+    public convenience init(title: BibleTitle, chapter: Int) {
+        self.init()
+        self.id = "\(title.rawValue).\(chapter)"
         self.title = title
         self.chapter = chapter
     }
 }
 
-public enum BibleTitle: String, Equatable, CaseIterable {
+public enum BibleTitle: String, Equatable, CaseIterable, PersistableEnum {
     case genesis = "1-01Genesis.txt"
     case exodus = "1-02Exodus.txt"
     case leviticus = "1-03Leviticus.txt"
@@ -106,11 +111,6 @@ public enum BibleTitle: String, Equatable, CaseIterable {
         if self != .genesis {
             self = allCases[currentIndex - 1]
         }
-    }
-
-    public func rawTitle() -> String {
-        guard let title = self.rawValue.components(separatedBy: ".").first else { return "" }
-        return title[4..<title.count]
     }
 
     public var lastChapter: Int {
@@ -250,11 +250,83 @@ public enum BibleTitle: String, Equatable, CaseIterable {
             return 22
         }
     }
-    
+
     public static func getTitle(_ raw: String) -> Self {
         for title in Self.allCases where title.rawValue.contains(raw) {
             return title
         }
         return .genesis
+    }
+
+    public func koreanTitle() -> String {
+        let titles: [Self: String] = [
+            .genesis: "창세기",
+            .exodus: "출애굽기",
+            .leviticus: "레위기",
+            .numbers: "민수기",
+            .deuteronomy: "신명기",
+            .joshua: "여호수아",
+            .judges: "사사기",
+            .ruth: "룻기",
+            .samuel1: "사무엘상",
+            .samuel2: "사무엘하",
+            .kings1: "열왕기상",
+            .kings2: "열왕기하",
+            .chronicles1: "역대상",
+            .chronicles2: "역대하",
+            .ezra: "에스라",
+            .nehemiah: "느헤미야",
+            .esther: "에스더",
+            .job: "욥기",
+            .psalms: "시편",
+            .proverbs: "잠언",
+            .ecclesiasters: "전도서",
+            .songOfSongs: "아가",
+            .isaiah: "이사야",
+            .jeremiah: "예레미야",
+            .lamentations: "예레미야 애가",
+            .ezekiel: "에스겔",
+            .daniel: "다니엘",
+            .hosea: "호세아",
+            .joel: "요엘",
+            .amos: "아모스",
+            .obadiah: "오바댜",
+            .jonah: "요나",
+            .micah: "미가",
+            .nahum: "나훔",
+            .habakkuk: "하박국",
+            .zephaniah: "스바냐",
+            .haggai: "학개",
+            .zechariah: "스가랴",
+            .malachi: "말라기",
+            .matthew: "마태복음",
+            .mark: "마가복음",
+            .luke: "누가복음",
+            .john: "요한복음",
+            .acts: "사도행전",
+            .romans: "로마서",
+            .corinthians1: "고린도전서",
+            .corinthians2: "고린도후서",
+            .galatians: "갈라디아서",
+            .ephesians: "에베소서",
+            .philippians: "빌립보서",
+            .colossians: "골로새서",
+            .thessalonians1: "데살로니가전서",
+            .thessalonians2: "데살로니가후서",
+            .timothy1: "디모데전서",
+            .timothy2: "디모데후서",
+            .titus: "디도서",
+            .philemon: "빌레몬서",
+            .hebrews: "히브리서",
+            .james: "야고보서",
+            .peter1: "베드로전서",
+            .peter2: "베드로후서",
+            .john1: "요한일서",
+            .john2: "요한이서",
+            .john3: "요한삼서",
+            .jude: "유다서",
+            .revelation: "요한계시록"
+        ]
+        return titles[self] ?? ""
     }
 }

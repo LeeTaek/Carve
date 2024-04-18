@@ -6,9 +6,8 @@
 //  Copyright © 2024 leetaek. All rights reserved.
 //
 
-import Common
 import CommonUI
-import DomainRealm
+import Domain
 import SwiftUI
 
 import ComposableArchitecture

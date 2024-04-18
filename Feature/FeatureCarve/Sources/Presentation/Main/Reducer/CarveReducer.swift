@@ -6,10 +6,9 @@
 //  Copyright © 2024 leetaek. All rights reserved.
 //
 
-import Common
+import Core
 import CommonUI
-import DomainRealm
-import Foundation
+import Domain
 import Resources
 import SwiftUI
 
@@ -36,6 +35,8 @@ public struct CarveReducer {
             columnVisibility: .detailOnly
         )
     }
+    
+    @Dependency(\.realmClient) var realmClient
     
     public enum Action: FeatureAction, CommonUI.ScopeAction, BindableAction {
         case binding(BindingAction<State>)
@@ -66,8 +67,8 @@ public struct CarveReducer {
         Reduce { state, action in
             switch action {
             case .view(.onAppear):
-                let currentChapter = state.currentTitle
-                let sentences = fetchBible(chapter: currentChapter)
+                state.currentTitle = realmClient.currentTitle 
+                let sentences = fetchBible(chapter: state.currentTitle)
                 sentences.forEach {
                     let currentState = SentencesWithDrawingReducer.State(sentence: $0)
                     state.sentenceWithDrawingState.append(currentState)
