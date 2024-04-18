@@ -42,6 +42,7 @@ public struct SentencesWithDrawingReducer {
     }
     
     public enum ViewAction {
+        case setBible
         case setHeight(height: CGFloat)
         case calculateLineOffsets(CGRect)
     }

@@ -6,12 +6,15 @@
 //
 
 import CommonUI
+import Domain
 import SwiftUI
 
 import ComposableArchitecture
 
 public struct CarveView: View {
     @Perception.Bindable private var store: StoreOf<CarveReducer>
+    @State var selectedTitle: BibleTitle?
+    @State var selectedChapter: Int?
     
     public init(store: StoreOf<CarveReducer>) {
         self.store = store
@@ -20,45 +23,53 @@ public struct CarveView: View {
     public var body: some View {
         WithPerceptionTracking {
             NavigationSplitView(columnVisibility: $store.columnVisibility) {
-                Text("list")
+                sideBar
             } content: {
-                Text("content")
+                contentList
             } detail: {
                 VStack {
                     title
                         .isHidden(store.isScrollDown, duration: 3)
-                    
-                    ScrollView {
-                        LazyVStack(pinnedViews: .sectionHeaders) {
-                            Section {
-                                ForEach(
-                                    store.scope(state: \.sentenceWithDrawingState,
-                                                action: \.scope.sentenceWithDrawingAction)
-                                ) { childStore in
-                                    SentencesWithDrawingView(store: childStore)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                        .padding(.horizontal, 10)
-                                }
-                            } header: {
-                                // TODO: - ChapterTitleView
+                    detailScroll
+                        .background {
+                            CustomGesture { gesture in
+                                handleTabState(gesture)
                             }
                         }
-                    }
-                    .background {
-                        CustomGesture { gesture in
-                            handleTabState(gesture)
-                        }
-                    }
                 }
                 .toolbar(.hidden, for: .navigationBar)
                 .onAppear {
                     store.send(.view(.onAppear))
                 }
             }
+            .onChange(of: selectedTitle) { newValue in
+                guard let newValue else { return }
+                store.send(.view(.selectTitle(newValue)))
+            }
+            .onChange(of: selectedChapter) { newValue in
+                guard let newValue else { return }
+                store.send(.view(.selectChapter(newValue)))
+            }
             .navigationSplitViewStyle(.automatic)
         }
     }
-
+    
+    private var sideBar: some View {
+        List(BibleTitle.allCases, selection: $selectedTitle) { title in
+            NavigationLink(title.koreanTitle(), value: title)
+        }
+        .navigationTitle("성경")
+    }
+    
+    private var contentList: some View {
+        List(1..<store.currentTitle.title.lastChapter,
+             id: \.self ,
+             selection: $selectedChapter) { chapter in
+            NavigationLink(chapter.description, value: chapter)
+        }
+             .navigationTitle("장")
+    }
+    
     private var title: some View {
         let titleName = store.currentTitle.title.koreanTitle()
         return HStack {
@@ -70,10 +81,29 @@ public struct CarveView: View {
             Spacer()
         }
     }
-
+    
+    private var detailScroll: some View {
+        ScrollView {
+            LazyVStack(pinnedViews: .sectionHeaders) {
+                Section {
+                    ForEach(
+                        store.scope(state: \.sentenceWithDrawingState,
+                                    action: \.scope.sentenceWithDrawingAction)
+                    ) { childStore in
+                        SentencesWithDrawingView(store: childStore)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.horizontal, 10)
+                    }
+                } header: {
+                    // TODO: - ChapterTitleView
+                }
+            }
+        }
+    }
+    
     private func handleTabState(_ gesture: UIPanGestureRecognizer) {
         let velocityY = gesture.velocity(in: gesture.view).y
-
+        
         if velocityY < 0 {
             if -(velocityY / 5) > 60 && store.isScrollDown == false {
                 store.send(.view(.isScrollDown(true)))

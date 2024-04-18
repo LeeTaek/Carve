@@ -26,7 +26,8 @@ public class TitleVO: Object {
     }
 }
 
-public enum BibleTitle: String, Equatable, CaseIterable, PersistableEnum {
+public enum BibleTitle: String, Equatable, CaseIterable, Identifiable, PersistableEnum {
+    public var id: Self { self }
     case genesis = "1-01Genesis.txt"
     case exodus = "1-02Exodus.txt"
     case leviticus = "1-03Leviticus.txt"

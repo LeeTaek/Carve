@@ -51,9 +51,12 @@ public struct CarveReducer {
         case moveBeforeChapter
         case isPresentTitle(Bool)
         case titleDidTapped
+        case selectTitle(BibleTitle)
+        case selectChapter(Int)
     }
     
     public enum InnerAction: Equatable {
+        case fetchSentence
     }
     
     @CasePathable
@@ -68,15 +71,12 @@ public struct CarveReducer {
             switch action {
             case .view(.onAppear):
                 state.currentTitle = realmClient.currentTitle 
-                let sentences = fetchBible(chapter: state.currentTitle)
-                sentences.forEach {
-                    let currentState = SentencesWithDrawingReducer.State(sentence: $0)
-                    state.sentenceWithDrawingState.append(currentState)
-                }
+                return .send(.inner(.fetchSentence))
                 
             case .view(.isScrollDown(let isScrollDown)):
                 state.isScrollDown = isScrollDown
-                
+                return .none
+
             case .view(.moveNextChapter):
                 break
 
@@ -85,12 +85,28 @@ public struct CarveReducer {
                 
             case let .view(.isPresentTitle(isPresent)):
                 state.isTitlePresent = isPresent
-                
+
             case .view(.titleDidTapped):
                 state.columnVisibility = .all
+
+            case .view(.selectTitle(let title)):
+                state.currentTitle.title = title
+                state.columnVisibility = .doubleColumn
                 
-            default:
-                break
+            case .view(.selectChapter(let chapter)):
+                state.currentTitle.chapter = chapter
+                state.columnVisibility = .detailOnly
+                return .send(.inner(.fetchSentence))
+
+            case .inner(.fetchSentence):
+                let sentences = fetchBible(chapter: state.currentTitle)
+                var newSentences: IdentifiedArrayOf<SentencesWithDrawingReducer.State>  = []
+                sentences.forEach {
+                    let currentState = SentencesWithDrawingReducer.State(sentence: $0)
+                    newSentences.append(currentState)
+                    state.sentenceWithDrawingState = newSentences
+                }
+            default: break
             }
             return .none
         }
