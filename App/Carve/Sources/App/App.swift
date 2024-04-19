@@ -25,14 +25,16 @@ struct CarveApp: SwiftUI.App {
         }
         
         WindowGroup {
-            CarveView(store: store)
-            .analyticsScreen(
-                name: "Screen Name",
-                extraParameters: [
-                    AnalyticsParameterScreenName: "\(type(of: self))",
-                    AnalyticsParameterScreenClass: "\(type(of: self))"
-                ]
-            )
+            WithPerceptionTracking {
+                CarveView(store: store)
+                    .analyticsScreen(
+                        name: "Screen Name",
+                        extraParameters: [
+                            AnalyticsParameterScreenName: "\(type(of: self))",
+                            AnalyticsParameterScreenClass: "\(type(of: self))"
+                        ]
+                    )
+            }
         }
     }
 }

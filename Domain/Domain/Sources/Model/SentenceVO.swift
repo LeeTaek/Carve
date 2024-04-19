@@ -9,37 +9,31 @@
 import Foundation
 
 public struct SentenceVO: Equatable {
-    public var title: String
+    public var title: TitleVO
     public var chapterTitle: String?
-    public var chapter: Int
     public var section: Int
     public var sentenceScript: String
 
     public static let initialState = Self(
-        title: "요한계시록",
-        chapter: 4,
+        title: TitleVO(title: .leviticus, chapter: 4),
         section: 1,
         sentence: "이 일 후에 내가 보니"
     )
 
-    public init(title: String,
+    public init(title: TitleVO,
                 chapterTitle: String? = nil,
-                chapter: Int,
                 section: Int,
                 sentence: String) {
         self.title = title
         self.chapterTitle = chapterTitle
-        self.chapter = chapter
         self.section = section
         self.sentenceScript = sentence
     }
 
-    public init(title: String,
+    public init(title: TitleVO,
                 chapterTitle: String? = nil,
-                chapter: Int,
                 sentence: String) {
         self.title = title
-        self.chapter = chapter
 
         if let index = sentence.firstIndex(of: " "),
            let chapterString = sentence.prefix(upTo: index).components(separatedBy: ":").last {

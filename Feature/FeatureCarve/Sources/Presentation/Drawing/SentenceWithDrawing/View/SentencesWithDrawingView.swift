@@ -30,9 +30,11 @@ public struct SentencesWithDrawingView: View {
                 Spacer()
                 ZStack {
                     underLineView
-                    CanvasView(store: Store(initialState: store.canvasState) {
-                        CanvasReducer()
-                    })
+                    WithPerceptionTracking {   
+                        CanvasView(store: Store(initialState: store.canvasState) {
+                            CanvasReducer()
+                        })
+                    }
                 }
                 .frame(width: UIScreen.main.bounds.width / 2,
                        alignment: .topTrailing)

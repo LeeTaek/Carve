@@ -8,14 +8,14 @@
 
 import Foundation
 
-import ComposableArchitecture
+import RealmSwift
 
 protocol StorageKeyType {
     var name: String { get }
 }
 
 
-public enum RealmStorageKeyType: String, StorageKeyType {
+public enum RealmStorageKeyType: String, StorageKeyType, PersistableEnum {
     case bibleTitle
     
     

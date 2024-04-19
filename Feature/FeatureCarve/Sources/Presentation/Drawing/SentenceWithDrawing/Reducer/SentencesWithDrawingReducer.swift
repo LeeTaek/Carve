@@ -24,12 +24,15 @@ public struct SentencesWithDrawingReducer {
         public var underlineOffset: [CGFloat] = [.zero]
         
         public init(sentence: SentenceVO) {
-            self.id = "\(sentence.title).\(sentence.chapter).\(sentence.section)"
+            self.id = "\(sentence.title.title.koreanTitle()).\(sentence.title.chapter).\(sentence.section)"
             self.sentence = sentence
             self.sentenceState = .init(chapterTitle: sentence.chapterTitle,
                                        section: sentence.section,
                                        sentence: sentence.sentenceScript)
-            self.canvasState = .initialState
+            self.canvasState = .init(drawing: .init(bibleTitle: sentence.title,
+                                                    section: sentence.section),
+                                     lineColor: .black,
+                                     lineWidth: 4)
         }
     }
     

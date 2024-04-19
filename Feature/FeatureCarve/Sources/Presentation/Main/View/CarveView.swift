@@ -18,6 +18,8 @@ public struct CarveView: View {
     
     public init(store: StoreOf<CarveReducer>) {
         self.store = store
+        self.selectedTitle = store.currentTitle.title
+        self.selectedChapter = store.currentTitle.chapter
     }
     
     public var body: some View {
@@ -36,13 +38,12 @@ public struct CarveView: View {
                     store.send(.view(.onAppear))
                 }
             }
-            .onChange(of: selectedTitle) { newValue in
-                guard let newValue else { return }
-                store.send(.view(.selectTitle(newValue)))
+            .onChange(of: selectedTitle) { _ in
+                store.send(.view(.selectTitle))
             }
             .onChange(of: selectedChapter) { newValue in
-                guard let newValue else { return }
-                store.send(.view(.selectChapter(newValue)))
+                guard let selectedTitle, let newValue else { return }
+                store.send(.view(.selectChapter(selectedTitle, newValue)))
             }
             .navigationSplitViewStyle(.automatic)
         }
@@ -79,7 +80,7 @@ public struct CarveView: View {
     private var contentList: some View {
         VStack {
             Text(selectedTitle?.koreanTitle() ?? store.currentTitle.title.koreanTitle())
-            List(1..<store.currentTitle.title.lastChapter,
+            List(1..<(store.currentTitle.title.lastChapter ?? 2),
                  id: \.self ,
                  selection: $selectedChapter) { chapter in
                 NavigationLink(chapter.description, value: chapter)
@@ -89,7 +90,7 @@ public struct CarveView: View {
     }
     
     private var title: some View {
-        let titleName = store.currentTitle.title.koreanTitle()
+        let titleName = store.currentTitle.title.koreanTitle() ?? "창세기"
         return HStack {
             Button(action: { store.send(.view(.titleDidTapped)) }) {
                 Text("\(titleName) \(store.state.currentTitle.chapter)장")

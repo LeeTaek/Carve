@@ -51,8 +51,8 @@ public struct CarveReducer {
         case moveBeforeChapter
         case isPresentTitle(Bool)
         case titleDidTapped
-        case selectTitle(BibleTitle)
-        case selectChapter(Int)
+        case selectTitle
+        case selectChapter(BibleTitle, Int)
         case moveToSetting
     }
     
@@ -89,12 +89,11 @@ public struct CarveReducer {
             case .view(.titleDidTapped):
                 state.columnVisibility = .all
 
-            case .view(.selectTitle(let title)):
-                state.currentTitle.title = title
+            case .view(.selectTitle):
                 state.columnVisibility = .doubleColumn
                 
-            case .view(.selectChapter(let chapter)):
-                state.currentTitle.chapter = chapter
+            case .view(.selectChapter(let title, let chapter)):
+                state.currentTitle = TitleVO(title: title, chapter: chapter)
                 state.columnVisibility = .detailOnly
                 return .send(.inner(.fetchSentence))
 
@@ -109,6 +108,10 @@ public struct CarveReducer {
                     newSentences.append(currentState)
                     state.sentenceWithDrawingState = newSentences
                 }
+                if realmClient.currentTitle != state.currentTitle {
+                    realmClient.currentTitle = state.currentTitle
+                }
+
             default: break
             }
             return .none
@@ -131,16 +134,14 @@ public struct CarveReducer {
         do {
             let bible = try String(contentsOfFile: textPath,
                                    encoding: String.Encoding(rawValue: encodingEUCKR))
-                
+            
             sentences = bible.components(separatedBy: "\r")
                 .filter {
                     Int($0.components(separatedBy: ":").first!)! == chapter.chapter
                 }
                 .map { sentence in
-                return SentenceVO.init(title: chapter.title.rawValue,
-                                       chapter: chapter.chapter,
-                                       sentence: sentence)
-            }
+                    return SentenceVO.init(title: chapter, sentence: sentence)
+                }
         } catch let error {
             Log.error(error.localizedDescription)
         }

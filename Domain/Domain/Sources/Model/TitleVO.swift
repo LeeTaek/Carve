@@ -12,14 +12,16 @@ import Common
 import RealmSwift
 
 public class TitleVO: Object {
-    @Persisted(primaryKey: true) private var id: String
+    @Persisted(primaryKey: true) public var key: RealmStorageKeyType
+    @Persisted public var id: String
     @Persisted public var title: BibleTitle
     @Persisted public var chapter: Int
     
-    public static let initialState = TitleVO.init(title: .genesis, chapter: 1)
+    public static let initialState = TitleVO.init(title: .genesis, chapter: 49)
     
     public convenience init(title: BibleTitle, chapter: Int) {
         self.init()
+        self.key = RealmStorageKeyType.bibleTitle
         self.id = "\(title.rawValue).\(chapter)"
         self.title = title
         self.chapter = chapter
