@@ -29,13 +29,7 @@ public struct CarveView: View {
             } detail: {
                 VStack {
                     title
-                        .isHidden(store.isScrollDown, duration: 3)
                     detailScroll
-                        .background {
-                            CustomGesture { gesture in
-                                handleTabState(gesture)
-                            }
-                        }
                 }
                 .toolbar(.hidden, for: .navigationBar)
                 .onAppear {
@@ -55,19 +49,43 @@ public struct CarveView: View {
     }
     
     private var sideBar: some View {
-        List(BibleTitle.allCases, selection: $selectedTitle) { title in
-            NavigationLink(title.koreanTitle(), value: title)
+        VStack(alignment: .trailing) {
+            List(selection: $selectedTitle) {
+                Section(header: Text("구약")) {
+                    ForEach(BibleTitle.allCases[0..<39]) { title in
+                        NavigationLink(title.koreanTitle(), value: title)
+                    }
+                }
+                Section(header: Text("신약")) {
+                    ForEach(BibleTitle.allCases[39..<66]) { title in
+                        NavigationLink(title.koreanTitle(), value: title)
+                    }
+                }
+            }
+            .listStyle(.inset)
+            
+            Button {
+                store.send(.view(.moveToSetting))
+            } label: {
+                Image(systemName: "gear")
+                    .foregroundStyle(.black)
+            }
+            .frame(width: 30, height: 30)
+            .padding(.trailing, 15)
         }
         .navigationTitle("성경")
     }
     
     private var contentList: some View {
-        List(1..<store.currentTitle.title.lastChapter,
-             id: \.self ,
-             selection: $selectedChapter) { chapter in
-            NavigationLink(chapter.description, value: chapter)
+        VStack {
+            Text(selectedTitle?.koreanTitle() ?? store.currentTitle.title.koreanTitle())
+            List(1..<store.currentTitle.title.lastChapter,
+                 id: \.self ,
+                 selection: $selectedChapter) { chapter in
+                NavigationLink(chapter.description, value: chapter)
+            }
         }
-             .navigationTitle("장")
+        .toolbar(.hidden, for: .navigationBar)
     }
     
     private var title: some View {
@@ -80,6 +98,7 @@ public struct CarveView: View {
             }
             Spacer()
         }
+        .isHidden(store.isScrollDown, duration: 3)
     }
     
     private var detailScroll: some View {
@@ -97,6 +116,11 @@ public struct CarveView: View {
                 } header: {
                     // TODO: - ChapterTitleView
                 }
+            }
+        }
+        .background {
+            CustomGesture { gesture in
+                handleTabState(gesture)
             }
         }
     }

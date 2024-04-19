@@ -53,6 +53,7 @@ public struct CarveReducer {
         case titleDidTapped
         case selectTitle(BibleTitle)
         case selectChapter(Int)
+        case moveToSetting
     }
     
     public enum InnerAction: Equatable {
@@ -75,7 +76,6 @@ public struct CarveReducer {
                 
             case .view(.isScrollDown(let isScrollDown)):
                 state.isScrollDown = isScrollDown
-                return .none
 
             case .view(.moveNextChapter):
                 break
@@ -98,6 +98,9 @@ public struct CarveReducer {
                 state.columnVisibility = .detailOnly
                 return .send(.inner(.fetchSentence))
 
+            case .view(.moveToSetting):
+                Log.debug("move To settings")
+                
             case .inner(.fetchSentence):
                 let sentences = fetchBible(chapter: state.currentTitle)
                 var newSentences: IdentifiedArrayOf<SentencesWithDrawingReducer.State>  = []

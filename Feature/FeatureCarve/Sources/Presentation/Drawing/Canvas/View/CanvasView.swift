@@ -11,6 +11,7 @@ import SwiftUI
 
 import ComposableArchitecture
 
+@MainActor
 public struct CanvasView: UIViewRepresentable {
     public typealias UIViewType = PKCanvasView
     @Perception.Bindable private var store: StoreOf<CanvasReducer>
