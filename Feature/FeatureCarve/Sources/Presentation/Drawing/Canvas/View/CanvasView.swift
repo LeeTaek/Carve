@@ -6,6 +6,7 @@
 //  Copyright © 2024 leetaek. All rights reserved.
 //
 
+import Core
 import PencilKit
 import SwiftUI
 
@@ -14,7 +15,7 @@ import ComposableArchitecture
 @MainActor
 public struct CanvasView: UIViewRepresentable {
     public typealias UIViewType = PKCanvasView
-    @Perception.Bindable private var store: StoreOf<CanvasReducer>
+    @Bindable private var store: StoreOf<CanvasReducer>
     init(store: StoreOf<CanvasReducer>) {
         self.store = store
     }
@@ -37,7 +38,7 @@ public struct CanvasView: UIViewRepresentable {
             
             return canvas
         }()
-        canvas.drawing = store.drawing.lineData
+        canvas.drawing = toDrawing(from: store.drawing.lineData)
         canvas.delegate = context.coordinator
         
         return canvas
@@ -71,6 +72,16 @@ public struct CanvasView: UIViewRepresentable {
                                                width: self.lineWidth.wrappedValue)
             }
         }
+    }
+    
+    private func toDrawing(from data: Data) -> PKDrawing {
+        do {
+            let drawing = try PKDrawing.init(data: data)
+            return drawing
+        } catch {
+            Log.debug("Data to Drawing Error", error)
+        }
+        return PKDrawing()
     }
     
 }

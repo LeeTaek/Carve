@@ -5,36 +5,46 @@
 //  Created by 이택성 on 1/22/24.
 //
 
-
+import Domain
+import SwiftData
 import SwiftUI
 
 import ComposableArchitecture
 import Firebase
-import RealmSwift
 import FeatureCarve
 
 @main
 struct CarveApp: SwiftUI.App {
-    let realmApp = RealmSwift.App(id: "application-0-xqvkw")
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
+    public var modelContext: ModelContext
+    public let store: Store<CarveReducer.State, CarveReducer.Action>
     
-    var body: some Scene {
-        @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
-        
-        let store = Store(initialState: .initialState) {
+    init() {
+        self.modelContext = {
+            @Dependency(\.databaseService) var databaseService
+            guard let modelContext = try? databaseService.context() else {
+                fatalError("Could not find modelcontext")
+            }
+            return modelContext
+        }()
+        self.store = Store(initialState: .initialState) {
             CarveReducer()
         }
-        
-        WindowGroup {
-            WithPerceptionTracking {
-                CarveView(store: store)
-                    .analyticsScreen(
-                        name: "Screen Name",
-                        extraParameters: [
-                            AnalyticsParameterScreenName: "\(type(of: self))",
-                            AnalyticsParameterScreenClass: "\(type(of: self))"
-                        ]
-                    )
-            }
-        }
     }
+    
+    
+    var body: some Scene {
+        WindowGroup {
+            CarveView(store: store)
+                .analyticsScreen(
+                    name: "Screen Name",
+                    extraParameters: [
+                        AnalyticsParameterScreenName: "\(type(of: self))",
+                        AnalyticsParameterScreenClass: "\(type(of: self))"
+                    ]
+                )
+        }
+        .modelContext(self.modelContext)
+    }
+    
 }

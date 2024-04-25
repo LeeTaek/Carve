@@ -24,7 +24,7 @@ public struct CanvasReducer {
         public init(drawing: DrawingVO,
                     lineColor: UIColor,
                     lineWidth: CGFloat) {
-            self.id = "drawing.\(drawing.bibleTitle.title.rawValue).\(drawing.bibleTitle.chapter).\(drawing.section)"
+            self.id = "drawingData.\(drawing.bibleTitle!.title.koreanTitle()).\(drawing.bibleTitle!.chapter).\(drawing.section)"
             self.drawing = drawing
             self.lineColor = lineColor
             self.lineWidth = lineWidth

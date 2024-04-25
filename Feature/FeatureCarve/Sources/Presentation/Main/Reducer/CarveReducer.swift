@@ -11,6 +11,7 @@ import CommonUI
 import Domain
 import Resources
 import SwiftUI
+import SwiftData
 
 import ComposableArchitecture
 
@@ -34,9 +35,18 @@ public struct CarveReducer {
             isTitlePresent: false,
             columnVisibility: .detailOnly
         )
+        
+        public mutating func fetchTitle() {
+            @Dependency(\.titleData) var context
+            do {
+                self.currentTitle = try context.fetch()
+            } catch {
+                Log.debug("fetchTitle fail", error)
+            }
+        }
     }
     
-    @Dependency(\.realmClient) var realmClient
+    @Dependency(\.titleData) var titleContext
     
     public enum Action: FeatureAction, CommonUI.ScopeAction, BindableAction {
         case binding(BindingAction<State>)
@@ -57,6 +67,7 @@ public struct CarveReducer {
     }
     
     public enum InnerAction: Equatable {
+        case setCurrentTitle(TitleVO)
         case fetchSentence
     }
     
@@ -71,8 +82,10 @@ public struct CarveReducer {
         Reduce { state, action in
             switch action {
             case .view(.onAppear):
-                state.currentTitle = realmClient.currentTitle 
-                return .send(.inner(.fetchSentence))
+                state.fetchTitle()
+                return .run { send in
+                    await send(.inner(.fetchSentence))
+                }
                 
             case .view(.isScrollDown(let isScrollDown)):
                 state.isScrollDown = isScrollDown
@@ -100,6 +113,12 @@ public struct CarveReducer {
             case .view(.moveToSetting):
                 Log.debug("move To settings")
                 
+            case .inner(.setCurrentTitle(let title)):
+                let storedTitle = try? titleContext.fetch()
+                if title != storedTitle {
+                    try? titleContext.update(title)
+                }
+                
             case .inner(.fetchSentence):
                 let sentences = fetchBible(chapter: state.currentTitle)
                 var newSentences: IdentifiedArrayOf<SentencesWithDrawingReducer.State>  = []
@@ -108,8 +127,8 @@ public struct CarveReducer {
                     newSentences.append(currentState)
                     state.sentenceWithDrawingState = newSentences
                 }
-                if realmClient.currentTitle != state.currentTitle {
-                    realmClient.currentTitle = state.currentTitle
+                return .run { [title = state.currentTitle] send in
+                    await send(.inner(.setCurrentTitle(title)))
                 }
 
             default: break

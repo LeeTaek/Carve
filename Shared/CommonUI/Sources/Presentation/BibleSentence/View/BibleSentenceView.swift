@@ -6,7 +6,6 @@
 //  Copyright © 2024 leetaek. All rights reserved.
 //
 
-import Common
 import SwiftUI
 
 import ComposableArchitecture
@@ -19,13 +18,11 @@ public struct BibleSentenceView: View {
     }
     
     public var body: some View {
-        WithPerceptionTracking {
-            VStack {
-                if store.state.chapterTitle != nil {
-                    chapterTitleView
-                }
-                sentenceDescription
+        VStack {
+            if store.state.chapterTitle != nil {
+                chapterTitleView
             }
+            sentenceDescription
         }
     }
     

@@ -13,33 +13,32 @@ import ComposableArchitecture
 
 public struct SentencesWithDrawingView: View {
     private var store: StoreOf<SentencesWithDrawingReducer>
-
+    
     public init(store: StoreOf<SentencesWithDrawingReducer>) {
         self.store = store
     }
     
     public var body: some View {
-        WithPerceptionTracking {
-            HStack {
-                BibleSentenceView(store: Store(initialState: store.sentenceState) {
-                    BibleSentenceReducer()
-                })
-                .onDescriptionRectSize { rect in
-                    store.send(.view(.calculateLineOffsets(rect)))
-                }
-                Spacer()
-                ZStack {
-                    underLineView
-                    WithPerceptionTracking {   
-                        CanvasView(store: Store(initialState: store.canvasState) {
-                            CanvasReducer()
-                        })
-                    }
-                }
-                .frame(width: UIScreen.main.bounds.width / 2,
-                       alignment: .topTrailing)
+        HStack {
+            BibleSentenceView(store: Store(initialState: store.sentenceState) {
+                BibleSentenceReducer()
+            })
+            .onDescriptionRectSize { rect in
+                store.send(.view(.calculateLineOffsets(rect)))
             }
+            Spacer()
+            ZStack {
+                underLineView
+                
+                CanvasView(store: Store(initialState: store.canvasState) {
+                    CanvasReducer()
+                })
+                
+            }
+            .frame(width: UIScreen.main.bounds.width / 2,
+                   alignment: .topTrailing)
         }
+        
     }
     
     

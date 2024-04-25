@@ -7,28 +7,28 @@
 //
 
 import Foundation
-import Common
+import SwiftData
 
-import RealmSwift
-
-public class TitleVO: Object {
-    @Persisted(primaryKey: true) public var key: RealmStorageKeyType
-    @Persisted public var id: String
-    @Persisted public var title: BibleTitle
-    @Persisted public var chapter: Int
+@Model
+public class TitleVO: Equatable {
+    public static func == (lhs: TitleVO, rhs: TitleVO) -> Bool {
+        (lhs.title == rhs.title) && (lhs.chapter == rhs.chapter)
+    }
     
-    public static let initialState = TitleVO.init(title: .genesis, chapter: 49)
+    public var keyType: SwiftDataStorageKeyType
+    public var title: BibleTitle
+    public var chapter: Int
     
-    public convenience init(title: BibleTitle, chapter: Int) {
-        self.init()
-        self.key = RealmStorageKeyType.bibleTitle
-        self.id = "\(title.rawValue).\(chapter)"
+    public static let initialState = TitleVO.init(title: .genesis, chapter: 1)
+    
+    public init(title: BibleTitle, chapter: Int) {
+        self.keyType = SwiftDataStorageKeyType.bibleTitle
         self.title = title
         self.chapter = chapter
     }
 }
 
-public enum BibleTitle: String, Equatable, CaseIterable, Identifiable, PersistableEnum {
+public enum BibleTitle: String, Equatable, CaseIterable, Identifiable, Codable {
     public var id: Self { self }
     case genesis = "1-01Genesis.txt"
     case exodus = "1-02Exodus.txt"

@@ -12,7 +12,7 @@ import SwiftUI
 import ComposableArchitecture
 
 public struct CarveView: View {
-    @Perception.Bindable private var store: StoreOf<CarveReducer>
+    @Bindable private var store: StoreOf<CarveReducer>
     @State var selectedTitle: BibleTitle?
     @State var selectedChapter: Int?
     
@@ -23,30 +23,28 @@ public struct CarveView: View {
     }
     
     public var body: some View {
-        WithPerceptionTracking {
-            NavigationSplitView(columnVisibility: $store.columnVisibility) {
-                sideBar
-            } content: {
-                contentList
-            } detail: {
-                VStack {
-                    title
-                    detailScroll
-                }
-                .toolbar(.hidden, for: .navigationBar)
-                .onAppear {
-                    store.send(.view(.onAppear))
-                }
+        NavigationSplitView(columnVisibility: $store.columnVisibility) {
+            sideBar
+        } content: {
+            contentList
+        } detail: {
+            VStack {
+                title
+                detailScroll
             }
-            .onChange(of: selectedTitle) { _ in
-                store.send(.view(.selectTitle))
+            .toolbar(.hidden, for: .navigationBar)
+            .onAppear {
+                store.send(.view(.onAppear))
             }
-            .onChange(of: selectedChapter) { newValue in
-                guard let selectedTitle, let newValue else { return }
-                store.send(.view(.selectChapter(selectedTitle, newValue)))
-            }
-            .navigationSplitViewStyle(.automatic)
         }
+        .onChange(of: selectedTitle) { _, _ in
+            store.send(.view(.selectTitle))
+        }
+        .onChange(of: selectedChapter) { _, newValue in
+            guard let selectedTitle, let newValue else { return }
+            store.send(.view(.selectChapter(selectedTitle, newValue)))
+        }
+        .navigationSplitViewStyle(.automatic)
     }
     
     private var sideBar: some View {
@@ -80,7 +78,7 @@ public struct CarveView: View {
     private var contentList: some View {
         VStack {
             Text(selectedTitle?.koreanTitle() ?? store.currentTitle.title.koreanTitle())
-            List(1..<(store.currentTitle.title.lastChapter ?? 2),
+            List(1...(selectedTitle?.lastChapter ?? store.currentTitle.title.lastChapter),
                  id: \.self ,
                  selection: $selectedChapter) { chapter in
                 NavigationLink(chapter.description, value: chapter)
@@ -90,7 +88,7 @@ public struct CarveView: View {
     }
     
     private var title: some View {
-        let titleName = store.currentTitle.title.koreanTitle() ?? "창세기"
+        let titleName = store.currentTitle.title.koreanTitle()
         return HStack {
             Button(action: { store.send(.view(.titleDidTapped)) }) {
                 Text("\(titleName) \(store.state.currentTitle.chapter)장")

@@ -11,18 +11,29 @@ import ProjectDescriptionHelpers
 let projectName = "Domain"
 
 let dependencies: [TargetDependency] = [
-    .Core,
-    .RealmSwift
+    .Core
 ]
 
 let script: [TargetScript] = [.swiftLint]
 
+let settings: Settings = .settings(
+    base: [
+        "SWIFT_STRICT_CONCURRENCY": "complete"
+    ],
+    configurations: [
+        .debug(name: .debug),
+        .release(name: .release)
+    ]
+)
+
+
 let target: [Target] = [
-    .makeFrameworkTarget(projName: projectName, target: .debug, script: script, dependencies: dependencies),
+    .makeFrameworkTarget(projName: projectName, target: .debug, script: script, dependencies: dependencies/*, settings: settings*/),
     .makeTestTarget(projName: projectName, target: .debug, script: script)
 ]
 
 let project = Project.makeModule(
     name: projectName,
-    targets: target
+    targets: target,
+    settings: settings
 )

@@ -11,8 +11,8 @@ import Foundation
 public struct BibleVO: Equatable {
     public var title: TitleVO
     public var sentence: [SentenceVO]
-
+    
     public static let initialState = Self.init(title: .initialState,
                                                sentence: [.initialState])
-
+    
 }
