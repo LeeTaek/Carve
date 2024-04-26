@@ -12,10 +12,10 @@ import SwiftData
 
 import Dependencies
 
-public struct TitleDatabase {
-    public var fetch: @Sendable () throws -> TitleVO
-    public var add: @Sendable (TitleVO) throws -> Void
-    public var update: @Sendable (TitleVO) throws -> Void
+public struct TitleDatabase: Sendable {
+    public var fetch: @Sendable () async throws -> TitleVO
+    public var add: @Sendable (TitleVO) async throws -> Void
+    public var update: @Sendable (TitleVO) async throws -> Void
     
     public enum TitleError: Error {
         case fetch
@@ -26,41 +26,44 @@ public struct TitleDatabase {
 extension TitleDatabase: DependencyKey {
     public static let liveValue: TitleDatabase = Self(
         fetch: {
-            let descriptor = FetchDescriptor<TitleVO>()
+            @Dependency(\.createSwiftDataActor) var createActor
+            let fetchTask = Task.detached { () -> TitleVO in
+                let actor = try await createActor()
+                if let storedTitle: TitleVO = try await actor.fetch().first {
+                    return storedTitle
+                } else {
+                    try await actor.insert(TitleVO.initialState)
+                    return TitleVO.init(title: .genesis, chapter: 1)
+                }
+            }
             do {
-                @Dependency(\.databaseService.context) var context
-                let titleContext = try context()
-                guard let title = try titleContext.fetch(descriptor).first else { return .init(title: .genesis, chapter: 1) }
+                let title = try await fetchTask.result.get()
                 return title
             } catch {
-                @Dependency(\.databaseService.context) var context
-                let titleContext = try context()
-                titleContext.insert(TitleVO.init(title: .genesis, chapter: 1))
-                return .init(title: .genesis, chapter: 1)
+                return .initialState
             }
         },
         add: { title in
-            do {
-                @Dependency(\.databaseService.context) var context
-                let titleContext = try context()
-                titleContext.insert(title)
-            } catch {
-                Log.debug("SwiftData add error", title)
+            @Dependency(\.createSwiftDataActor) var createActor
+            Task.detached {
+                let actor = try await createActor()
+                try await actor.insert(title)
+                try await actor.save()
             }
         },
         update: { title in
-            do {
-                @Dependency(\.databaseService.context) var context
-                let titleContext = try context()
-                let descriptor = FetchDescriptor<TitleVO>()
-                guard let storedTitle = try titleContext.fetch(descriptor).first else {
-                    titleContext.insert(title)
-                    return
+            @Dependency(\.createSwiftDataActor) var createActor
+            Task.detached {
+                let actor = try await createActor()
+                if let storedTitle: TitleVO = try await actor.fetch().first {
+                    try await actor.update(storedTitle.id) { (oldValue: TitleVO) in
+                        oldValue.title = title.title
+                        oldValue.chapter = title.chapter
+                    }
+                } else {
+                    try await actor.insert(title)
                 }
-                storedTitle.title = title.title
-                storedTitle.chapter = title.chapter
-            } catch {
-                Log.debug("SwiftData update error", title)
+                try await actor.save()
             }
         }
     )

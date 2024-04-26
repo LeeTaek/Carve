@@ -8,7 +8,7 @@
 
 import Foundation
 
-public struct SentenceVO: Equatable {
+public struct SentenceVO: Equatable, Sendable {
     public var title: TitleVO
     public var chapterTitle: String?
     public var section: Int

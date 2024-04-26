@@ -18,6 +18,7 @@ public extension Target {
         infoPlist: InfoPlist = .infoPlist,
         sources: SourceFilesList = "Sources/**",
         resources: ResourceFileElements? = [
+            "Resources/**",
             "./Support/GoogleService-Info.plist"
         ],
         entitlements: Entitlements? = nil,

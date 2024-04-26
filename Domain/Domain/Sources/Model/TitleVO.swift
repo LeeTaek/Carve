@@ -10,12 +10,12 @@ import Foundation
 import SwiftData
 
 @Model
-public class TitleVO: Equatable {
+public final class TitleVO: Equatable, Sendable {
     public static func == (lhs: TitleVO, rhs: TitleVO) -> Bool {
         (lhs.title == rhs.title) && (lhs.chapter == rhs.chapter)
     }
     
-    public var keyType: SwiftDataStorageKeyType
+    public let keyType: SwiftDataStorageKeyType
     public var title: BibleTitle
     public var chapter: Int
     
@@ -28,7 +28,7 @@ public class TitleVO: Equatable {
     }
 }
 
-public enum BibleTitle: String, Equatable, CaseIterable, Identifiable, Codable {
+public enum BibleTitle: String, Equatable, CaseIterable, Identifiable, Codable, Sendable {
     public var id: Self { self }
     case genesis = "1-01Genesis.txt"
     case exodus = "1-02Exodus.txt"

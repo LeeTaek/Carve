@@ -8,7 +8,7 @@
 
 import Foundation
 
-public struct BibleVO: Equatable {
+public struct BibleVO: Equatable, Sendable {
     public var title: TitleVO
     public var sentence: [SentenceVO]
     

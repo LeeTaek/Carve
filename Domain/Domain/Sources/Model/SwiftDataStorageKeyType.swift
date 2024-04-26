@@ -8,7 +8,7 @@
 
 import Foundation
 
-public enum SwiftDataStorageKeyType: String, Codable {
+public enum SwiftDataStorageKeyType: String, Codable, Sendable {
     case bibleTitle
     case drawing 
     

@@ -35,15 +35,6 @@ public struct CarveReducer {
             isTitlePresent: false,
             columnVisibility: .detailOnly
         )
-        
-        public mutating func fetchTitle() {
-            @Dependency(\.titleData) var context
-            do {
-                self.currentTitle = try context.fetch()
-            } catch {
-                Log.debug("fetchTitle fail", error)
-            }
-        }
     }
     
     @Dependency(\.titleData) var titleContext
@@ -82,9 +73,9 @@ public struct CarveReducer {
         Reduce { state, action in
             switch action {
             case .view(.onAppear):
-                state.fetchTitle()
                 return .run { send in
-                    await send(.inner(.fetchSentence))
+                    let storedTitle = try await titleContext.fetch()
+                    await send(.inner(.setCurrentTitle(storedTitle)))
                 }
                 
             case .view(.isScrollDown(let isScrollDown)):
@@ -108,15 +99,19 @@ public struct CarveReducer {
             case .view(.selectChapter(let title, let chapter)):
                 state.currentTitle = TitleVO(title: title, chapter: chapter)
                 state.columnVisibility = .detailOnly
-                return .send(.inner(.fetchSentence))
+                return .send(.inner(.setCurrentTitle(TitleVO(title: title, chapter: chapter))))
 
             case .view(.moveToSetting):
                 Log.debug("move To settings")
                 
             case .inner(.setCurrentTitle(let title)):
-                let storedTitle = try? titleContext.fetch()
-                if title != storedTitle {
-                    try? titleContext.update(title)
+                state.currentTitle = title
+                return .run { send in
+                    let storedTitle = try await titleContext.fetch()
+                    if title != storedTitle {
+                        try await titleContext.update(title)
+                    }
+                    await send(.inner(.fetchSentence))
                 }
                 
             case .inner(.fetchSentence):
@@ -126,9 +121,6 @@ public struct CarveReducer {
                     let currentState = SentencesWithDrawingReducer.State(sentence: $0)
                     newSentences.append(currentState)
                     state.sentenceWithDrawingState = newSentences
-                }
-                return .run { [title = state.currentTitle] send in
-                    await send(.inner(.setCurrentTitle(title)))
                 }
 
             default: break
