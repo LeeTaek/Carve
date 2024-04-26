@@ -1,43 +1,21 @@
 //
-//  SwiftDatabase.swift
+//  SwiftDatabaseActor.swift
 //  Domain
 //
-//  Created by 이택성 on 4/25/24.
+//  Created by 이택성 on 4/26/24.
 //  Copyright © 2024 leetaek. All rights reserved.
 //
 
-import Foundation
 import SwiftData
 
 import Dependencies
 
-public struct SwiftDatabase: Sendable {
-    public var context: () throws -> ModelContext
+public protocol Database {
+    associatedtype Item: PersistentModel
+    func fetch() async throws -> Item
+    func add(item: Item) async throws
+    func update(item: Item) async throws
 }
-
-extension SwiftDatabase: DependencyKey {
-    public static let liveValue: SwiftDatabase = Self(
-    context: { appContext }
-    )
-}
-
-extension DependencyValues {
-    public var databaseService: SwiftDatabase {
-        get { self[SwiftDatabase.self] }
-        set { self[SwiftDatabase.self] = newValue}
-    }
-}
-
-private let appContext: ModelContext = {
-    do {
-        let url = URL.applicationSupportDirectory.appending(path: "Carve.sqlite")
-        let config = ModelConfiguration(url: url)
-        let container = try ModelContainer(for: TitleVO.self, configurations: config)
-        return ModelContext(container)
-    } catch {
-        fatalError("Failed to create SwiftData container")
-    }
-}()
 
 
 @ModelActor
@@ -78,7 +56,14 @@ extension SwiftDatabaseActor: DependencyKey {
         let container = try context().container
         return SwiftDatabaseActor(modelContainer: container)
     }
+    
+    public static var testValue: @Sendable () async throws -> SwiftDatabaseActor = {
+        @Dependency(\.databaseService.context) var context
+        let container = try context().container
+        return SwiftDatabaseActor(modelContainer: container)
+    }
 }
+
 
 extension DependencyValues {
     public var createSwiftDataActor: @Sendable () async throws -> SwiftDatabaseActor {

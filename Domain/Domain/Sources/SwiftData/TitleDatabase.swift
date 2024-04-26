@@ -12,10 +12,39 @@ import SwiftData
 
 import Dependencies
 
-public struct TitleDatabase: Sendable {
-    public var fetch: @Sendable () async throws -> TitleVO
-    public var add: @Sendable (TitleVO) async throws -> Void
-    public var update: @Sendable (TitleVO) async throws -> Void
+public struct TitleDatabase: Sendable, Database {
+    public func fetch() async throws -> TitleVO {
+        @Dependency(\.createSwiftDataActor) var createActor
+        let actor = try await createActor()
+        if let storedTitle: TitleVO = try await actor.fetch().first {
+            return storedTitle
+        } else {
+            try await actor.insert(TitleVO.initialState)
+            return TitleVO.init(title: .genesis, chapter: 1)
+        }
+    }
+    
+    public func add(item: TitleVO) async throws {
+        @Dependency(\.createSwiftDataActor) var createActor
+        let actor = try await createActor()
+        try await actor.insert(item)
+        try await actor.save()
+        
+    }
+    
+    public func update(item: TitleVO) async throws {
+        @Dependency(\.createSwiftDataActor) var createActor
+        let actor = try await createActor()
+        if let storedTitle: TitleVO = try await actor.fetch().first {
+            try await actor.update(storedTitle.id) { (oldValue: TitleVO) in
+                oldValue.title = item.title
+                oldValue.chapter = item.chapter
+            }
+        } else {
+            try await actor.insert(item)
+        }
+        try await actor.save()
+    }
     
     public enum TitleError: Error {
         case fetch
@@ -24,49 +53,8 @@ public struct TitleDatabase: Sendable {
 }
 
 extension TitleDatabase: DependencyKey {
-    public static let liveValue: TitleDatabase = Self(
-        fetch: {
-            @Dependency(\.createSwiftDataActor) var createActor
-            let fetchTask = Task.detached { () -> TitleVO in
-                let actor = try await createActor()
-                if let storedTitle: TitleVO = try await actor.fetch().first {
-                    return storedTitle
-                } else {
-                    try await actor.insert(TitleVO.initialState)
-                    return TitleVO.init(title: .genesis, chapter: 1)
-                }
-            }
-            do {
-                let title = try await fetchTask.result.get()
-                return title
-            } catch {
-                return .initialState
-            }
-        },
-        add: { title in
-            @Dependency(\.createSwiftDataActor) var createActor
-            Task.detached {
-                let actor = try await createActor()
-                try await actor.insert(title)
-                try await actor.save()
-            }
-        },
-        update: { title in
-            @Dependency(\.createSwiftDataActor) var createActor
-            Task.detached {
-                let actor = try await createActor()
-                if let storedTitle: TitleVO = try await actor.fetch().first {
-                    try await actor.update(storedTitle.id) { (oldValue: TitleVO) in
-                        oldValue.title = title.title
-                        oldValue.chapter = title.chapter
-                    }
-                } else {
-                    try await actor.insert(title)
-                }
-                try await actor.save()
-            }
-        }
-    )
+    public static let liveValue: TitleDatabase = Self()
+    public static let testValue: TitleDatabase = Self()
 }
 
 extension DependencyValues {

@@ -109,7 +109,7 @@ public struct CarveReducer {
                 return .run { send in
                     let storedTitle = try await titleContext.fetch()
                     if title != storedTitle {
-                        try await titleContext.update(title)
+                        try await titleContext.update(item: title)
                     }
                     await send(.inner(.fetchSentence))
                 }
