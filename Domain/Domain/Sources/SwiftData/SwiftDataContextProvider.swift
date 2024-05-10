@@ -17,11 +17,11 @@ public struct SwiftDataContextProvider: Sendable {
 
 extension SwiftDataContextProvider: DependencyKey {
     public static let liveValue: SwiftDataContextProvider = Self(
-    context: { appContext }
+    context: { appContext(isLive: true) }
     )
     
     public static let testValue: SwiftDataContextProvider = Self(
-        context: { testAppContext }
+        context: { appContext(isLive: false) }
     )
     
 }
@@ -33,9 +33,10 @@ extension DependencyValues {
     }
 }
 
-private let appContext: ModelContext = {
+private func appContext(isLive: Bool) -> ModelContext {
+    let path = isLive ? "Carve.sqlite" : "Carve.test.sqlite"
     do {
-        let url = URL.applicationSupportDirectory.appending(path: "Carve.sqlite")
+        let url = URL.applicationSupportDirectory.appending(path: path)
         let schema = Schema([
             TitleVO.self
         ])
@@ -45,20 +46,4 @@ private let appContext: ModelContext = {
     } catch {
         fatalError("Failed to create SwiftData container")
     }
-}()
-
-private let testAppContext: ModelContext = {
-    do {
-        let url = URL.applicationSupportDirectory.appending(path: "Carve.test.sqlite")
-        let schema = Schema([
-            TitleVO.self
-        ])
-        let config = ModelConfiguration(url: url)
-        let container = try ModelContainer(for: schema, configurations: config)
-        return ModelContext(container)
-    } catch {
-        fatalError("Failed to create SwiftData container")
-    }
-}()
-
-
+}
