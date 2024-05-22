@@ -44,7 +44,6 @@ public extension TargetDependency {
     static let App: Self = .project(target: "App", path: .relativeToRoot("App/Carve"))
     static let FeatureCarve: Self = .project(target: "FeatureCarve", path: .relativeToRoot("Feature/FeatureCarve"))
     static let FeatureSettings: Self = .project(target: "FeatureSettings", path: .relativeToRoot("Feature/FeatureSettings"))
-    static let FeatureLogin: Self = .project(target: "FeatureLogin", path: .relativeToRoot("Feature/FeatureLogin"))
     static let Domain: Self = .project(target: "Domain", path: .relativeToRoot("Domain/Domain"))
     static let Core: Self = .project(target: "Core", path: .relativeToRoot("Core/Core"))
     static let CommonUI: Self = .project(target: "CommonUI", path: .relativeToRoot("Shared/CommonUI"))
@@ -58,7 +57,7 @@ public extension TargetDependency {
     static let FirebaseCrashlytics: Self = .external(name: "FirebaseCrashlytics")
     static let Kingfisher: Self = .external(name: "Kingfisher")
     static let Alamofire: Self = .external(name: "Alamofire")
-    
+    static let TCACoordinator: Self = .external(name: "TCACoordinators")
 }
 
 

@@ -51,30 +51,22 @@ public struct CanvasView: UIViewRepresentable {
     }
     
     public func makeCoordinator() -> Coordinator {
-        Coordinator(lineColor: $store.lineColor,
-                    lineWidth: $store.lineWidth)
+        Coordinator(store: $store)
     }
     
     final public class Coordinator: NSObject, PKCanvasViewDelegate {
-        let lineColor: Binding<UIColor>
-        let lineWidth: Binding<CGFloat>
-        
-        init(lineColor: Binding<UIColor>, lineWidth: Binding<CGFloat>) {
-            self.lineColor = lineColor
-            self.lineWidth = lineWidth
+        let store: Bindable<StoreOf<CanvasReducer>>
+        init(store: Bindable<Store<CanvasReducer.State, CanvasReducer.Action>>) {
+            self.store = store
         }
         
         public func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
-            observe { [weak self] in
-                guard let self else { return }
-                canvasView.tool = PKInkingTool(.pencil,
-                                               color: self.lineColor.wrappedValue,
-                                               width: self.lineWidth.wrappedValue)
-            }
+            self.store.wrappedValue.send(.saveDrawing(canvasView.drawing))
         }
     }
     
-    private func toDrawing(from data: Data) -> PKDrawing {
+    private func toDrawing(from data: Data?) -> PKDrawing {
+        guard let data else { return PKDrawing() }
         do {
             let drawing = try PKDrawing.init(data: data)
             return drawing

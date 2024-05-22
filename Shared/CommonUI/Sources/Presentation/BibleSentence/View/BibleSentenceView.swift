@@ -6,6 +6,7 @@
 //  Copyright © 2024 leetaek. All rights reserved.
 //
 
+import Core
 import SwiftUI
 
 import ComposableArchitecture
@@ -23,6 +24,14 @@ public struct BibleSentenceView: View {
                 chapterTitleView
             }
             sentenceDescription
+                .background(alignment: .center) {
+                    GeometryReader { geometryProxy in
+                        Color.clear
+                            .onAppear {
+                                store.send(.inner(.redrawUnderline(geometryProxy.frame(in: .local))))
+                            }
+                    }
+                }
         }
     }
     
@@ -51,24 +60,8 @@ public struct BibleSentenceView: View {
                 .lineSpacing(store.lineSpace - store.font.font(size: store.fontSize).lineHeight)
                 .lineLimit(nil)
                 .padding(.vertical, (store.lineSpace - store.font.font(size: store.fontSize).lineHeight) / 2)
-
-            
         }
     }
-    
-    
-    public func onDescriptionRectSize(_ perform: @escaping (CGRect) -> Void) -> some View {
-        self.sentenceDescription
-            .customBackground {
-                GeometryReader { geometryProxy in
-                    Color.clear
-                        .preference(key: SizePreferenceKey.self,
-                                    value: geometryProxy.frame(in: .local))
-                }
-            }
-            .onPreferenceChange(SizePreferenceKey.self, perform: perform)
-    }
-    
 }
 
 

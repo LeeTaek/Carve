@@ -8,25 +8,24 @@
 
 import Foundation
 import PencilKit
+import SwiftData
 
-public class DrawingVO: Equatable {
+@Model
+public final class DrawingVO: Equatable, Sendable {
     public static func == (lhs: DrawingVO, rhs: DrawingVO) -> Bool {
         (lhs.id == rhs.id)
     }
-    
-    public var keyType: SwiftDataStorageKeyType
-    public var id: String
-    public var lineData: Data
+    @Attribute(.unique) public let id: String
+    @Relationship public let bibleTitle: TitleVO
+    public let section: Int
+    public var lineData: Data?
     public var isWritten: Bool = false
-    public var bibleTitle: TitleVO?
-    public var section: Int
     
     public init(author: String,
                 lineData: PKDrawing,
                 isWritten: Bool = false,
                 bibleTitle: TitleVO,
                 section: Int) {
-        self.keyType = .drawing
         self.id = "\(bibleTitle.title.koreanTitle()).\(bibleTitle.chapter).\(section)"
         self.lineData = lineData.dataRepresentation()
         self.isWritten = isWritten
@@ -36,11 +35,10 @@ public class DrawingVO: Equatable {
     
     public init(bibleTitle: TitleVO,
                 section: Int,
-                lineData: PKDrawing = .init()
+                lineData: Data? = nil
     ) {
-        self.keyType = .drawing
-        self.id = "\(bibleTitle.title.rawValue).\(bibleTitle.chapter).\(section))"
-        self.lineData = lineData.dataRepresentation()
+        self.id = "\(bibleTitle.title.rawValue).\(bibleTitle.chapter).\(section)"
+        self.lineData = lineData
         self.bibleTitle = bibleTitle
         self.section = section
     }

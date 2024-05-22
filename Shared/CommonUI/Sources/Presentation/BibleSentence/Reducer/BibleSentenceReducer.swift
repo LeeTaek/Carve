@@ -6,6 +6,7 @@
 //  Copyright © 2024 leetaek. All rights reserved.
 //
 
+import Core
 import SwiftUI
 
 import ComposableArchitecture
@@ -68,6 +69,7 @@ public struct BibleSentenceReducer {
     public enum Action: FeatureAction {
         case view(ViewAction)
         case inner(InnerAction)
+//        case redrawUnderline(CGRect)
     }
     
     public enum ViewAction {
@@ -79,6 +81,7 @@ public struct BibleSentenceReducer {
     
     public enum InnerAction { 
         case present
+        case redrawUnderline(CGRect)
     }
     
     
@@ -98,6 +101,8 @@ public struct BibleSentenceReducer {
                 state.traking = tracking
             case .view(.setFont(let font)):
                 state.font = font
+            case .inner(.redrawUnderline(let rect)):
+                return .none
             }
             return .run { send in
                 await send(.inner(.present))
@@ -106,7 +111,9 @@ public struct BibleSentenceReducer {
     }
     
     private func getLine(textHeight: CGFloat, lineSpace: CGFloat, baseLineHeight: CGFloat) -> Int {
-        return Int((textHeight + lineSpace + 25) / (baseLineHeight + lineSpace)) + 1
+        let count = Int((textHeight + lineSpace + 25) / (baseLineHeight + lineSpace)) + 1
+        Log.debug("라인 수", count)
+        return count
     }
     
 }

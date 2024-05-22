@@ -33,16 +33,21 @@ file_length:
 # 네이밍 룰은 경고/에러에 min_length와 max_length를 각각 설정 가능
 # 제외할 이름을 설정할 수 있음
 type_name:
-  min_length: 3 # 경고에만 적용됨
+  min_length: 2 # 경고에만 적용됨
   max_length: # 경고와 에러 둘 다 적용
     warning: 40
     error: 50
   excluded: iPhone # 제외할 문자열 값 사용
 identifier_name:
   min_length: # min_length에서
-    error: 3 # 에러만 적용
+    error: 2 # 에러만 적용
   excluded: # 제외할 문자열 목록 사용
     - id
     - URL
     - GlobalAPIKey
+nesting:
+  type_level:
+    warning: 3
+    error: 6
+
 reporter: "xcode" # 보고 유형 (xcode, json, csv, checkstyle, junit, html, emoji, markdown)

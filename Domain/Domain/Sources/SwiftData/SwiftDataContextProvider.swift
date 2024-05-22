@@ -12,7 +12,7 @@ import SwiftData
 import Dependencies
 
 public struct SwiftDataContextProvider: Sendable {
-    public var context: () throws -> ModelContext
+    public var context: @Sendable () throws -> ModelContext
 }
 
 extension SwiftDataContextProvider: DependencyKey {
@@ -38,7 +38,7 @@ private func appContext(isLive: Bool) -> ModelContext {
     do {
         let url = URL.applicationSupportDirectory.appending(path: path)
         let schema = Schema([
-            TitleVO.self
+            DrawingVO.self
         ])
         let config = ModelConfiguration(url: url)
         let container = try ModelContainer(for: schema, configurations: config)

@@ -6,7 +6,9 @@
 //  Copyright © 2024 leetaek. All rights reserved.
 //
 
+import Foundation
 import SwiftData
+import Core
 
 import Dependencies
 
@@ -17,35 +19,40 @@ public protocol Database {
     func update(item: Item) async throws
 }
 
-
 @ModelActor
 public actor SwiftDatabaseActor {
-    public func fetch<T: PersistentModel>() async throws -> [T] {
-        let descriptor = FetchDescriptor<T>()
-        return try self.modelContext.fetch(descriptor)
+    public enum SwiftDatabaseActorError: Error {
+        case storedDataIsNone
     }
     
-    public func fetch<T: PersistentModel>(id: PersistentIdentifier) async throws -> T {
-        let object: T = self.modelContext.model(for: id) as! T
+    public func fetch<T: PersistentModel>(_ descriptor: FetchDescriptor<T> = .init()) throws -> [T] {
+        let fetched: [T] = try self.modelContext.fetch(descriptor)
+        Log.debug("fetched data's count", fetched.count)
+        return fetched
+    }
+    
+    public func fetch<T: PersistentModel>(id: PersistentIdentifier) -> T? {
+        let object: T? = self.modelContext.model(for: id) as? T
         return object
     }
     
-    public func insert<T: PersistentModel>(_ item: T) async throws {
-        return self.modelContext.insert(item)
+    public func insert<T: PersistentModel>(_ item: T) throws {
+        self.modelContext.insert(item)
+        try self.modelContext.save()
     }
     
     public func update<T: PersistentModel>(_ id: PersistentIdentifier,
-                                           query: @Sendable @escaping (_ oldValue: T) -> Void) async throws {
-        let storedItem: T = try await self.fetch(id: id)
-        query(storedItem)
+                                           query: @Sendable @escaping (_ oldValue: T) async -> Void) async throws {
+        if let storedItem: T = self.fetch(id: id) {
+            await query(storedItem)
+            try self.modelContext.save()
+        } else {
+            throw SwiftDatabaseActorError.storedDataIsNone
+        }
     }
     
-    public func delete<T: PersistentModel>(_ item: T) async {
-        
-        return self.modelContext.delete(item)
-    }
-    
-    public func save() async throws {
+    public func delete<T: PersistentModel>(_ item: T) throws {
+        self.modelContext.delete(item)
         try self.modelContext.save()
     }
 }
@@ -63,7 +70,6 @@ extension SwiftDatabaseActor: DependencyKey {
         return SwiftDatabaseActor(modelContainer: container)
     }
 }
-
 
 extension DependencyValues {
     public var createSwiftDataActor: @Sendable () async throws -> SwiftDatabaseActor {

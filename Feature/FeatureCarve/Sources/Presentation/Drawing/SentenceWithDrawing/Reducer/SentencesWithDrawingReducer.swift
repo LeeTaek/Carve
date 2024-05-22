@@ -23,14 +23,13 @@ public struct SentencesWithDrawingReducer {
         public var underLineCount: Int = 1
         public var underlineOffset: [CGFloat] = [.zero]
         
-        public init(sentence: SentenceVO) {
+        public init(sentence: SentenceVO, drawing: DrawingVO) {
             self.id = "\(sentence.title.title.koreanTitle()).\(sentence.title.chapter).\(sentence.section)"
             self.sentence = sentence
             self.sentenceState = .init(chapterTitle: sentence.chapterTitle,
                                        section: sentence.section,
                                        sentence: sentence.sentenceScript)
-            self.canvasState = .init(drawing: .init(bibleTitle: sentence.title,
-                                                    section: sentence.section),
+            self.canvasState = .init(drawing: drawing,
                                      lineColor: .black,
                                      lineWidth: 4)
         }
@@ -67,13 +66,12 @@ public struct SentencesWithDrawingReducer {
     
     public var body: some Reducer<State, Action> {
         Scope(state: \.sentenceState,
-              action: \Action.Cases.scope.sentenceAction) {
+              action: \.scope.sentenceAction) {
             BibleSentenceReducer()
         }
         Scope(state: \.canvasState,
-              action: \Action.Cases.scope.canvasAction) {
+              action: \.scope.canvasAction) {
             CanvasReducer()
-                ._printChanges()
         }
         
         Reduce { state, action in
@@ -84,6 +82,11 @@ public struct SentencesWithDrawingReducer {
                 state.underlineOffset = offsetY
                 state.underLineCount = offsetY.count
                 return .none
+            case .scope(.sentenceAction(.inner(.redrawUnderline(let rect)))):
+                return .run { send in
+                    await send(.view(.calculateLineOffsets(rect)))
+                }
+                
             default:
                 return .none
             }

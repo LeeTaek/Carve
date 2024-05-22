@@ -20,20 +20,17 @@ public struct SentencesWithDrawingView: View {
     
     public var body: some View {
         HStack {
-            BibleSentenceView(store: Store(initialState: store.sentenceState) {
-                BibleSentenceReducer()
-            })
-            .onDescriptionRectSize { rect in
-                store.send(.view(.calculateLineOffsets(rect)))
-            }
+            BibleSentenceView(
+                store: self.store.scope(state: \.sentenceState,
+                                        action: \.scope.sentenceAction)
+            )
             Spacer()
             ZStack {
                 underLineView
-                
-                CanvasView(store: Store(initialState: store.canvasState) {
-                    CanvasReducer()
-                })
-                
+                CanvasView(
+                    store: self.store.scope(state: \.canvasState,
+                                            action: \.scope.canvasAction)
+                )
             }
             .frame(width: UIScreen.main.bounds.width / 2,
                    alignment: .topTrailing)

@@ -5,10 +5,12 @@ let projectName = "Carve"
 
 let dependencies: [TargetDependency] = [
     .FeatureCarve,
-    .FeatureLogin,
     .FeatureSettings,
     .FirebaseAnalytics,
-    .FirebaseMessaging
+    .FirebaseMessaging,
+    
+    .TCAArchitecture,
+    .TCACoordinator
 ]
 
 let script: [TargetScript] = [.swiftLint, .firebaseCrashlytics]

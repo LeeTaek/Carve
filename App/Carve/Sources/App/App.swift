@@ -17,7 +17,7 @@ import FeatureCarve
 struct CarveApp: SwiftUI.App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
     public var modelContext: ModelContext
-    public let store: Store<CarveReducer.State, CarveReducer.Action>
+    public let store: StoreOf<AppCoordinator>
     
     init() {
         self.modelContext = {
@@ -28,14 +28,14 @@ struct CarveApp: SwiftUI.App {
             return modelContext
         }()
         self.store = Store(initialState: .initialState) {
-            CarveReducer()
+            AppCoordinator()
         }
     }
     
     
     var body: some Scene {
         WindowGroup {
-            CarveView(store: store)
+            AppCoordinatorView(store: store)
                 .analyticsScreen(
                     name: "Screen Name",
                     extraParameters: [

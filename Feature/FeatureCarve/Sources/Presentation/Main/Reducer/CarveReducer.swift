@@ -20,24 +20,35 @@ public struct CarveReducer {
     public init() { }
     @ObservableState
     public struct State: Equatable {
-        public var isScrollDown: Bool
-        public var sentences: [SentenceVO]
-        public var currentTitle: TitleVO
+        @Shared(.appStorage("title")) public var currentTitle: TitleVO = .initialState
+        public var viewProperty: ViewProperty
         public var lastChapter: Int
-        public var isTitlePresent: Bool
         public var columnVisibility: NavigationSplitViewVisibility
         public var sentenceWithDrawingState: IdentifiedArrayOf<SentencesWithDrawingReducer.State> = []
         public static let initialState = State(
-            isScrollDown: false,
-            sentences: [],
-            currentTitle: .initialState,
+            viewProperty: ViewProperty(),
             lastChapter: 1,
-            isTitlePresent: false,
             columnVisibility: .detailOnly
         )
+        
+        public struct ViewProperty: Equatable {
+            public var headerHeight: CGFloat = 0
+            public var headerOffset: CGFloat = 0
+            public var lastHeaderOffset: CGFloat = 0
+            public var direction: SwipeDirection = .none
+            public var shiftOffset: CGFloat = 0
+            public var selectedTitle: BibleTitle?
+            public var selectedChapter: Int?
+            
+            public enum SwipeDirection {
+                case up
+                case down
+                case none
+            }
+        }
     }
     
-    @Dependency(\.titleData) var titleContext
+    @Dependency(\.drawingData) var drawingContext
     
     public enum Action: FeatureAction, CommonUI.ScopeAction, BindableAction {
         case binding(BindingAction<State>)
@@ -46,89 +57,118 @@ public struct CarveReducer {
         case scope(ScopeAction)
     }
     public enum ViewAction: Equatable {
-        case onAppear
-        case isScrollDown(Bool)
+        case headerAnimation(CGFloat, CGFloat)
+        case setHeaderHeight(CGFloat)
         case moveNextChapter
         case moveBeforeChapter
         case isPresentTitle(Bool)
         case titleDidTapped
-        case selectTitle
-        case selectChapter(BibleTitle, Int)
         case moveToSetting
     }
     
     public enum InnerAction: Equatable {
-        case setCurrentTitle(TitleVO)
         case fetchSentence
+        case setSentence([SentenceVO], [DrawingVO])
     }
     
     @CasePathable
     public enum ScopeAction {
         case sentenceWithDrawingAction(IdentifiedActionOf<SentencesWithDrawingReducer>)
     }
-
+    
     public var body: some Reducer<State, Action> {
         BindingReducer()
+            .onChange(of: \.viewProperty.selectedTitle) { _, _ in
+                Reduce { state, _ in
+                    state.columnVisibility = .doubleColumn
+                    return .none
+                }
+            }
+            .onChange(of: \.viewProperty.selectedChapter) { _, newValue in
+                Reduce { state, _ in
+                    guard let selectedTitle = state.viewProperty.selectedTitle,
+                          let selectedChapter = newValue else { return .none }
+                    state.currentTitle = TitleVO(title: selectedTitle, chapter: selectedChapter)
+                    state.columnVisibility = .detailOnly
+                    return .run { send in
+                        await send(.inner(.fetchSentence))
+                    }
+                }
+            }
         
         Reduce { state, action in
             switch action {
-            case .view(.onAppear):
-                return .run { send in
-                    let storedTitle = try await titleContext.fetch()
-                    await send(.inner(.setCurrentTitle(storedTitle)))
+            case .view(.headerAnimation(let previous, let current)):
+                if previous > current {
+                    if state.viewProperty.direction != .up  && current < 0 {
+                        state.viewProperty.shiftOffset = current - state.viewProperty.headerOffset
+                        state.viewProperty.direction = .up
+                        state.viewProperty.lastHeaderOffset = state.viewProperty.headerHeight
+                    }
+                    let offset = current < 0 ? (current - state.viewProperty.shiftOffset) : 0
+                    state.viewProperty.headerOffset = (-offset < state.viewProperty.headerHeight
+                                                        ? (offset < 0 ? offset : 0)
+                                                        : -state.viewProperty.headerHeight)
+                } else {
+                    if state.viewProperty.direction != .down {
+                        state.viewProperty.shiftOffset = current
+                        state.viewProperty.direction = .down
+                        state.viewProperty.lastHeaderOffset = state.viewProperty.headerOffset
+                    }
+                    let offset = state.viewProperty.lastHeaderOffset + (current - state.viewProperty.shiftOffset)
+                    state.viewProperty.headerOffset = (offset > 0 ? 0 : offset)
                 }
                 
-            case .view(.isScrollDown(let isScrollDown)):
-                state.isScrollDown = isScrollDown
-
+            case .view(.setHeaderHeight(let height)):
+                state.viewProperty.headerHeight = height
+                
             case .view(.moveNextChapter):
                 break
-
+                
             case .view(.moveBeforeChapter):
                 break
                 
-            case let .view(.isPresentTitle(isPresent)):
-                state.isTitlePresent = isPresent
-
             case .view(.titleDidTapped):
                 state.columnVisibility = .all
-
-            case .view(.selectTitle):
-                state.columnVisibility = .doubleColumn
                 
-            case .view(.selectChapter(let title, let chapter)):
-                state.currentTitle = TitleVO(title: title, chapter: chapter)
-                state.columnVisibility = .detailOnly
-                return .send(.inner(.setCurrentTitle(TitleVO(title: title, chapter: chapter))))
-
             case .view(.moveToSetting):
                 Log.debug("move To settings")
                 
-            case .inner(.setCurrentTitle(let title)):
-                state.currentTitle = title
-                return .run { send in
-                    let storedTitle = try await titleContext.fetch()
-                    if title != storedTitle {
-                        try await titleContext.update(item: title)
-                    }
-                    await send(.inner(.fetchSentence))
-                }
-                
             case .inner(.fetchSentence):
-                let sentences = fetchBible(chapter: state.currentTitle)
-                var newSentences: IdentifiedArrayOf<SentencesWithDrawingReducer.State>  = []
-                sentences.forEach {
-                    let currentState = SentencesWithDrawingReducer.State(sentence: $0)
-                    newSentences.append(currentState)
-                    state.sentenceWithDrawingState = newSentences
+                let title = state.currentTitle
+                let sentences = fetchBible(chapter: title)
+                return .run { send in
+                    do {
+                        var storedDrawing = try await drawingContext.fetch(title: title)
+                        guard let lastSection = sentences.last?.section
+                        else {
+                            throw CarveReducerError.fetchSentenceError
+                        }
+                        if storedDrawing.count != sentences.count {
+                            try await drawingContext.setDrawing(title: title, to: lastSection)
+                            storedDrawing = try await drawingContext.fetch(title: title)
+                        }
+                        await send(.inner(.setSentence(sentences, storedDrawing)))
+                    } catch {
+                        Log.debug("fetch drawing error", error)
+                        await send(.inner(.setSentence(sentences, [])))
+                    }
                 }
-
+            case .inner(.setSentence(let sentences, let drawings)):
+                state.sentenceWithDrawingState.removeAll()
+                for (index, sentence) in sentences.enumerated() {
+                    let drawing = (drawings.isEmpty)
+                    ? DrawingVO(bibleTitle: sentence.title, section: sentence.section)
+                    : drawings[index]
+                    let currentState = SentencesWithDrawingReducer.State(sentence: sentence, drawing: drawing)
+                    state.sentenceWithDrawingState.append(currentState)
+                }
             default: break
             }
             return .none
         }
         .forEach(\.sentenceWithDrawingState,
-                  action: \Action.Cases.scope.sentenceWithDrawingAction) {
+                  action: \.scope.sentenceWithDrawingAction) {
             SentencesWithDrawingReducer()
         }
     }
@@ -138,14 +178,12 @@ public struct CarveReducer {
         let encodingEUCKR = CFStringConvertEncodingToNSStringEncoding(0x0422)
         var sentences: [SentenceVO] = []
         guard let textPath = ResourcesResources.bundle.path(forResource: chapter.title.rawValue,
-                                                ofType: nil)
-
+                                                            ofType: nil)
         else { return sentences}
         
         do {
             let bible = try String(contentsOfFile: textPath,
                                    encoding: String.Encoding(rawValue: encodingEUCKR))
-            
             sentences = bible.components(separatedBy: "\r")
                 .filter {
                     Int($0.components(separatedBy: ":").first!)! == chapter.chapter
@@ -156,8 +194,11 @@ public struct CarveReducer {
         } catch let error {
             Log.error(error.localizedDescription)
         }
-        
         return sentences
+    }
+    
+    private enum CarveReducerError: Error {
+        case fetchSentenceError
     }
     
 }

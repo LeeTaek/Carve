@@ -24,7 +24,7 @@ public struct CanvasReducer {
         public init(drawing: DrawingVO,
                     lineColor: UIColor,
                     lineWidth: CGFloat) {
-            self.id = "drawingData.\(drawing.bibleTitle!.title.koreanTitle()).\(drawing.bibleTitle!.chapter).\(drawing.section)"
+            self.id = "drawingData.\(drawing.id)"
             self.drawing = drawing
             self.lineColor = lineColor
             self.lineWidth = lineWidth
@@ -35,28 +35,24 @@ public struct CanvasReducer {
                                               lineColor: .black,
                                               lineWidth: 4)
     }
+    
+    @Dependency(\.drawingData) var drawingContext
 
     public enum Action: BindableAction {
         case binding(BindingAction<State>)
-        case setTitle(TitleVO, Int)
-        case setLine(UIColor, CGFloat)
-        case selectDidFinish
+        case saveDrawing(PKDrawing)
     }
 
     public var body: some Reducer<State, Action> {
         BindingReducer()
         Reduce { state, action in
             switch action {
-            case .setTitle(let title, let section):
-                state.drawing.bibleTitle = title
-                state.drawing.section = section
-
-            case .setLine(let color, let width):
-                state.lineColor = color
-                state.lineWidth = width
-
-            case .selectDidFinish:
-                Log.debug("Selected Line", (state.lineColor, state.lineWidth))
+            case .saveDrawing(let newDrawing):
+                var drawing = state.drawing
+                drawing.lineData = newDrawing.dataRepresentation()
+                return .run { [drawing] _ in
+                    try await drawingContext.update(item: drawing)
+                }
 
             default:
                 break

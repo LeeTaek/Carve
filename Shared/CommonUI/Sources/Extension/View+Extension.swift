@@ -23,37 +23,4 @@ public extension View {
             
         }
     }
-    
-    
-    @ViewBuilder
-    func isEmpty(_ empty: Bool) -> some View {
-        if empty {
-            EmptyView()
-        } else {
-            self
-        }
-    }
-    
-    
-    @ViewBuilder
-    func onReadSize(_ perform: @escaping (CGRect) -> Void) -> some View {
-        self.customBackground {
-            GeometryReader { geometryProxy in
-                Color.clear
-                    .preference(key: SizePreferenceKey.self, 
-                                value: geometryProxy.frame(in: .global))
-            }
-        }
-        .onPreferenceChange(SizePreferenceKey.self, perform: perform)
-    }
-    
-    @ViewBuilder
-    func customBackground<V: View>(alignment: Alignment = .center, @ViewBuilder content: () -> V) -> some View {
-        self.background(alignment: alignment, content: content)
-    }
-}
-
-public struct SizePreferenceKey: PreferenceKey {
-    public static var defaultValue: CGRect = .zero
-    public static func reduce(value: inout CGRect, nextValue: () -> CGRect) { }
 }
