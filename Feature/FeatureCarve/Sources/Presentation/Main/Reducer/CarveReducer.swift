@@ -20,32 +20,18 @@ public struct CarveReducer {
     public init() { }
     @ObservableState
     public struct State: Equatable {
-        @Shared(.appStorage("title")) public var currentTitle: TitleVO = .initialState
-        public var viewProperty: ViewProperty
         public var lastChapter: Int
         public var columnVisibility: NavigationSplitViewVisibility
         public var sentenceWithDrawingState: IdentifiedArrayOf<SentencesWithDrawingReducer.State> = []
-        public static let initialState = State(
-            viewProperty: ViewProperty(),
-            lastChapter: 1,
-            columnVisibility: .detailOnly
-        )
+        public var headerState: HeaderReducer.State
+        public var selectedTitle: BibleTitle?
+        public var selectedChapter: Int?
         
-        public struct ViewProperty: Equatable {
-            public var headerHeight: CGFloat = 0
-            public var headerOffset: CGFloat = 0
-            public var lastHeaderOffset: CGFloat = 0
-            public var direction: SwipeDirection = .none
-            public var shiftOffset: CGFloat = 0
-            public var selectedTitle: BibleTitle?
-            public var selectedChapter: Int?
-            
-            public enum SwipeDirection {
-                case up
-                case down
-                case none
-            }
-        }
+        public static let initialState = State(
+            lastChapter: 1,
+            columnVisibility: .detailOnly,
+            headerState: .initialState
+        )
     }
     
     @Dependency(\.drawingData) var drawingContext
@@ -74,53 +60,45 @@ public struct CarveReducer {
     @CasePathable
     public enum ScopeAction {
         case sentenceWithDrawingAction(IdentifiedActionOf<SentencesWithDrawingReducer>)
+        case headerAction(HeaderReducer.Action)
     }
     
     public var body: some Reducer<State, Action> {
         BindingReducer()
-            .onChange(of: \.viewProperty.selectedTitle) { _, _ in
+            .onChange(of: \.selectedTitle) { _, _ in
                 Reduce { state, _ in
                     state.columnVisibility = .doubleColumn
                     return .none
                 }
             }
-            .onChange(of: \.viewProperty.selectedChapter) { _, newValue in
+            .onChange(of: \.selectedChapter) { _, newValue in
                 Reduce { state, _ in
-                    guard let selectedTitle = state.viewProperty.selectedTitle,
+                    guard let selectedTitle = state.selectedTitle,
                           let selectedChapter = newValue else { return .none }
-                    state.currentTitle = TitleVO(title: selectedTitle, chapter: selectedChapter)
+                    let selected =  TitleVO(title: selectedTitle, chapter: selectedChapter)
                     state.columnVisibility = .detailOnly
                     return .run { send in
+                        await send(.scope(.headerAction(.setCurrentTitle(selected))))
                         await send(.inner(.fetchSentence))
                     }
                 }
             }
+        Scope(state: \.headerState,
+              action: \.scope.headerAction) {
+            HeaderReducer()
+        }
         
         Reduce { state, action in
             switch action {
             case .view(.headerAnimation(let previous, let current)):
-                if previous > current {
-                    if state.viewProperty.direction != .up  && current < 0 {
-                        state.viewProperty.shiftOffset = current - state.viewProperty.headerOffset
-                        state.viewProperty.direction = .up
-                        state.viewProperty.lastHeaderOffset = state.viewProperty.headerHeight
-                    }
-                    let offset = current < 0 ? (current - state.viewProperty.shiftOffset) : 0
-                    state.viewProperty.headerOffset = (-offset < state.viewProperty.headerHeight
-                                                        ? (offset < 0 ? offset : 0)
-                                                        : -state.viewProperty.headerHeight)
-                } else {
-                    if state.viewProperty.direction != .down {
-                        state.viewProperty.shiftOffset = current
-                        state.viewProperty.direction = .down
-                        state.viewProperty.lastHeaderOffset = state.viewProperty.headerOffset
-                    }
-                    let offset = state.viewProperty.lastHeaderOffset + (current - state.viewProperty.shiftOffset)
-                    state.viewProperty.headerOffset = (offset > 0 ? 0 : offset)
+                return .run { send in
+                    await send(.scope(.headerAction(.headerAnimation(previous, current))))
                 }
                 
             case .view(.setHeaderHeight(let height)):
-                state.viewProperty.headerHeight = height
+                return .run { send in
+                    await send(.scope(.headerAction(.setHeaderHeight(height))))
+                }
                 
             case .view(.moveNextChapter):
                 break
@@ -128,14 +106,14 @@ public struct CarveReducer {
             case .view(.moveBeforeChapter):
                 break
                 
-            case .view(.titleDidTapped):
+            case .scope(.headerAction(.titleDidTapped)):
                 state.columnVisibility = .all
                 
             case .view(.moveToSetting):
                 Log.debug("move To settings")
                 
             case .inner(.fetchSentence):
-                let title = state.currentTitle
+                let title = state.headerState.currentTitle
                 let sentences = fetchBible(chapter: title)
                 return .run { send in
                     do {

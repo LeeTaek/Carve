@@ -48,9 +48,9 @@ public struct CanvasReducer {
         Reduce { state, action in
             switch action {
             case .saveDrawing(let newDrawing):
-                var drawing = state.drawing
+                let drawing = state.drawing
                 drawing.lineData = newDrawing.dataRepresentation()
-                return .run { [drawing] _ in
+                return .run { _ in
                     try await drawingContext.update(item: drawing)
                 }
 

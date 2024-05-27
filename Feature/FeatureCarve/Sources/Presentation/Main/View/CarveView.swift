@@ -27,8 +27,8 @@ public struct CarveView: View {
         } detail: {
             detailScroll
                 .overlay(alignment: .top) {
-                    header
-                    
+                    HeaderView(store: store.scope(state: \.headerState,
+                                                  action: \.scope.headerAction))
                 }
                 .toolbar(.hidden, for: .navigationBar)
                 .onAppear {
@@ -40,7 +40,7 @@ public struct CarveView: View {
     
     private var sideBar: some View {
         VStack(alignment: .trailing) {
-            List(selection: $store.viewProperty.selectedTitle) {
+            List(selection: $store.selectedTitle) {
                 Section(header: Text("구약")) {
                     ForEach(BibleTitle.allCases[0..<39]) { title in
                         NavigationLink(title.koreanTitle(), value: title)
@@ -68,47 +68,14 @@ public struct CarveView: View {
     
     private var contentList: some View {
         VStack {
-            Text(store.viewProperty.selectedTitle?.koreanTitle() ?? store.currentTitle.title.koreanTitle())
-            List(1...(store.viewProperty.selectedTitle?.lastChapter ?? store.currentTitle.title.lastChapter),
+            Text(store.selectedTitle?.koreanTitle() ?? store.headerState.currentTitle.title.koreanTitle())
+            List(1...(store.selectedTitle?.lastChapter ?? store.headerState.currentTitle.title.lastChapter),
                  id: \.self ,
-                 selection: $store.viewProperty.selectedChapter) { chapter in
+                 selection: $store.selectedChapter) { chapter in
                 NavigationLink(chapter.description, value: chapter)
             }
         }
         .toolbar(.hidden, for: .navigationBar)
-    }
-    
-    public var header: some View {
-        let titleName = store.currentTitle.title.koreanTitle()
-        return HStack {
-            Button(action: { store.send(.view(.titleDidTapped)) }) {
-                Text("\(titleName) \(store.state.currentTitle.chapter)장")
-                    .font(.system(size: 30))
-                    .padding()
-            }
-            Spacer()
-        }
-        .background {
-            Color.white
-                .ignoresSafeArea()
-        }
-        .padding(.top, safeArea().top)
-        .padding(.bottom, 20)
-        .anchorPreference(key: HeaderBoundsKey.self, value: .bounds) { $0 }
-        .overlayPreferenceValue(HeaderBoundsKey.self) { value in
-            GeometryReader { proxy in
-                if let anchor = value {
-                    Color.clear
-                        .onAppear {
-                            store.send(.view(.setHeaderHeight(proxy[anchor].height)))
-                        }
-                }
-            }
-        }
-        .offset(y: -store.viewProperty.headerOffset < store.viewProperty.headerOffset
-                ? store.viewProperty.headerOffset
-                : (store.viewProperty.headerOffset < 0 ? store.viewProperty.headerOffset : 0))
-        .ignoresSafeArea(.all, edges: .top)
     }
     
     private var detailScroll: some View {
@@ -127,7 +94,7 @@ public struct CarveView: View {
                     // TODO: - ChapterTitleView
                 }
             }
-            .padding(.top, store.viewProperty.headerHeight)
+            .padding(.top, store.headerState.headerHeight)
             .offsetY { previous, current in
                 store.send(.view(.headerAnimation(previous, current)))
             }

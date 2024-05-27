@@ -33,6 +33,7 @@ let target: [Target] = [
     .makeFrameworkTarget(
         projName: projectName,
         target: .debug,
+        resources: "Resources/**",
         script: script,
         dependencies: dependencies,
         settings: settings
