@@ -35,7 +35,7 @@ public struct SettingsReducer {
     
     @ObservableState
     public struct State: Equatable {
-        static let initialState = Self()
+        public static let initialState = Self()
         public var selected: DetailSettings?
     }
 

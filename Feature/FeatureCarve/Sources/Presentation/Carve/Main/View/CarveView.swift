@@ -25,15 +25,9 @@ public struct CarveView: View {
         } content: {
             contentList
         } detail: {
-            detailScroll
-                .overlay(alignment: .top) {
-                    HeaderView(store: store.scope(state: \.headerState,
-                                                  action: \.scope.headerAction))
-                }
-                .toolbar(.hidden, for: .navigationBar)
-                .onAppear {
-                    store.send(.inner(.fetchSentence))
-                }
+            CarveDetailView(store: store.scope(state: \.carveDetailState,
+                                               action: \.scope.carveDetailAction))
+            .toolbar(.hidden)
         }
         .navigationSplitViewStyle(.automatic)
     }
@@ -68,37 +62,13 @@ public struct CarveView: View {
     
     private var contentList: some View {
         VStack {
-            Text(store.selectedTitle?.koreanTitle() ?? store.headerState.currentTitle.title.koreanTitle())
-            List(1...(store.selectedTitle?.lastChapter ?? store.headerState.currentTitle.title.lastChapter),
+            Text(store.selectedTitle?.koreanTitle() ?? BibleTitle.genesis.koreanTitle())
+            List(1...(store.selectedTitle?.lastChapter ?? 1),
                  id: \.self ,
                  selection: $store.selectedChapter) { chapter in
                 NavigationLink(chapter.description, value: chapter)
             }
         }
         .toolbar(.hidden, for: .navigationBar)
-    }
-    
-    private var detailScroll: some View {
-        ScrollView {
-            LazyVStack(pinnedViews: .sectionHeaders) {
-                Section {
-                    ForEach(
-                        store.scope(state: \.sentenceWithDrawingState,
-                                    action: \.scope.sentenceWithDrawingAction)
-                    ) { childStore in
-                        SentencesWithDrawingView(store: childStore)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(.horizontal, 10)
-                    }
-                } header: {
-                    // TODO: - ChapterTitleView
-                }
-            }
-            .padding(.top, store.headerState.headerHeight)
-            .offsetY { previous, current in
-                store.send(.view(.headerAnimation(previous, current)))
-            }
-        }
-        .coordinateSpace(name: "Scroll")
     }
 }

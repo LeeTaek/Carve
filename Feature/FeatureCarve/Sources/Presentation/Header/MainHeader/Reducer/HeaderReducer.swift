@@ -6,6 +6,7 @@
 //  Copyright © 2024 leetaek. All rights reserved.
 //
 
+import Core
 import CommonUI
 import Domain
 import Foundation
@@ -38,7 +39,8 @@ public struct HeaderReducer {
         case setCurrentTitle(TitleVO)
         case setHeaderHeight(CGFloat)
         case headerAnimation(CGFloat, CGFloat)
-        
+        case pencilConfigDidTapped
+        case sentenceSettingsDidTapped
     }
     
     public var body: some Reducer<State, Action> {
@@ -69,7 +71,7 @@ public struct HeaderReducer {
                     let offset = state.lastHeaderOffset + (current - state.shiftOffset)
                     state.headerOffset = (offset > 0 ? 0 : offset)
                 }
-                
+            default: break
             }
             return .none
         }

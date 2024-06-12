@@ -57,7 +57,6 @@ public extension TargetDependency {
     static let FirebaseCrashlytics: Self = .external(name: "FirebaseCrashlytics")
     static let Kingfisher: Self = .external(name: "Kingfisher")
     static let Alamofire: Self = .external(name: "Alamofire")
-    static let TCACoordinator: Self = .external(name: "TCACoordinators")
 }
 
 

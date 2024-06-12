@@ -11,7 +11,6 @@ import FeatureSettings
 import SwiftUI
 
 import ComposableArchitecture
-import TCACoordinators
 
 public struct AppCoordinatorView: View {
     private var store: StoreOf<AppCoordinator>
@@ -24,11 +23,11 @@ public struct AppCoordinatorView: View {
         switch store.state {
         case .carve:
             if let store = store.scope(state: \.carve, action: \.carve) {
-                CarveCoordinatorView(store: store)
+                CarveView(store: store)
             }
         case .settings:
             if let store = store.scope(state: \.settings, action: \.settings) {
-                SettingsCoordinatorView(store: store)
+                SettingsView(store: store)
             }
         }
     }

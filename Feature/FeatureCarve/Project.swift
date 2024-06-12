@@ -33,7 +33,9 @@ let target: [Target] = [
     .makeFrameworkTarget(
         projName: projectName,
         target: .debug,
-        resources: "Resources/**",
+        resources: .resources([
+            "Resources/**"
+        ]),
         script: script,
         dependencies: dependencies,
         settings: settings
@@ -44,5 +46,8 @@ let target: [Target] = [
 
 let project = Project.makeModule(
     name: projectName,
-    targets: target
+    targets: target,
+    resourceSynthesizers: [
+        .assets()
+    ]
 )

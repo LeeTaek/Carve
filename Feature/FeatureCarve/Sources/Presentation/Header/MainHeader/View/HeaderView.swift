@@ -25,7 +25,8 @@ public struct HeaderView: View {
                     .padding()
             }
             Spacer()
-            
+            pencilConfigButton
+            sentenceSettingsButton
         }
         .background {
             Color.white
@@ -48,5 +49,28 @@ public struct HeaderView: View {
                 ? store.headerOffset
                 : (store.headerOffset < 0 ? store.headerOffset : 0))
         .ignoresSafeArea(.all, edges: .top)
+    }
+    
+    private var pencilConfigButton: some View {
+        Button {
+            store.send(.pencilConfigDidTapped)
+        } label: {
+            Image(asset: FeatureCarveAsset.pencilConfig)
+                .resizable()
+                .frame(width: 30, height: 30)
+                .padding(10)
+        }
+    }
+    
+    private var sentenceSettingsButton: some View {
+        Button {
+            store.send(.sentenceSettingsDidTapped)
+        } label: {
+            Image(asset: FeatureCarveAsset.sentenceConfig)
+                .resizable()
+                .frame(width: 30, height: 30)
+                .padding([.trailing], 20)
+        }
+
     }
 }
