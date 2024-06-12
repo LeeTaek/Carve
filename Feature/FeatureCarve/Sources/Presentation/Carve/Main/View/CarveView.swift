@@ -6,7 +6,6 @@
 //
 
 import Core
-import CommonUI
 import Domain
 import SwiftUI
 

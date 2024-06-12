@@ -12,7 +12,6 @@ import ProjectDescriptionHelpers
 let projectName = "FeatureCarve"
 
 let dependencies: [TargetDependency] = [
-    .CommonUI,
     .Domain,
     .TCAArchitecture,
     .Kingfisher,

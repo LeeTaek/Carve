@@ -7,7 +7,6 @@
 //
 
 import Core
-import CommonUI
 import Domain
 import Resources
 import SwiftUI
@@ -35,7 +34,7 @@ public struct CarveReducer {
     
     @Dependency(\.drawingData) var drawingContext
     
-    public enum Action: FeatureAction, CommonUI.ScopeAction, BindableAction {
+    public enum Action: FeatureAction, Core.ScopeAction, BindableAction {
         case binding(BindingAction<State>)
         case view(ViewAction)
         case inner(InnerAction)

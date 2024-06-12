@@ -7,7 +7,6 @@
 //
 
 import Core
-import CommonUI
 import Domain
 import Foundation
 import Resources
@@ -28,7 +27,7 @@ public struct CarveDetailReducer {
     @Dependency(\.drawingData) var drawingContext
 
     
-    public enum Action: FeatureAction, CommonUI.ScopeAction {
+    public enum Action: FeatureAction, Core.ScopeAction {
         case view(ViewAction)
         case inner(InnerAction)
         case scope(ScopeAction)

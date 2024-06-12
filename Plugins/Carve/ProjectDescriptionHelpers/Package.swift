@@ -46,7 +46,6 @@ public extension TargetDependency {
     static let FeatureSettings: Self = .project(target: "FeatureSettings", path: .relativeToRoot("Feature/FeatureSettings"))
     static let Domain: Self = .project(target: "Domain", path: .relativeToRoot("Domain/Domain"))
     static let Core: Self = .project(target: "Core", path: .relativeToRoot("Core/Core"))
-    static let CommonUI: Self = .project(target: "CommonUI", path: .relativeToRoot("Shared/CommonUI"))
     static let Resources: Self = .project(target: "Resources", path: .relativeToRoot("Shared/Resources"))
 
     

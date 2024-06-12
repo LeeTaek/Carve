@@ -1,15 +1,14 @@
 //
 //  FeatureAction.swift
-//  CommonUI
+//  Core
 //
-//  Created by 이택성 on 2/21/24.
+//  Created by 이택성 on 6/12/24.
 //  Copyright © 2024 leetaek. All rights reserved.
 //
 
 import Foundation
-import ComposableArchitecture
 
-public protocol FeatureAction  {
+public protocol FeatureAction {
     associatedtype ViewAction
     associatedtype InnerAction
 
@@ -40,7 +39,3 @@ public protocol DelegateAction {
     // 부모 reducer에서 사용되는 action
     static func delegate(_: DelegateAction) -> Self
 }
-
-
-
-

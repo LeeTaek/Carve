@@ -1,8 +1,8 @@
 //
-//  BibleSentenceReducer.swift
-//  CommonUI
+//  SentenceReducer.swift
+//  FeatureCarve
 //
-//  Created by 이택성 on 1/30/24.
+//  Created by 이택성 on 6/12/24.
 //  Copyright © 2024 leetaek. All rights reserved.
 //
 
@@ -12,7 +12,7 @@ import SwiftUI
 import ComposableArchitecture
 
 @Reducer
-public struct BibleSentenceReducer {
+public struct SentenceReducer {
     public init() { }
     @ObservableState
     public struct State: Equatable, Identifiable {
@@ -79,7 +79,7 @@ public struct BibleSentenceReducer {
         case setFont(FontCase)
     }
     
-    public enum InnerAction { 
+    public enum InnerAction {
         case present
         case redrawUnderline(CGRect)
     }

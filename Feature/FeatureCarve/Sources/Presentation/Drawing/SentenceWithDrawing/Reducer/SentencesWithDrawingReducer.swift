@@ -6,7 +6,7 @@
 //  Copyright © 2024 leetaek. All rights reserved.
 //
 
-import CommonUI
+import Core
 import Domain
 import SwiftUI
 
@@ -18,7 +18,7 @@ public struct SentencesWithDrawingReducer {
     public struct State: Equatable, Identifiable {
         public let id: String
         public let sentence: SentenceVO
-        public var sentenceState: BibleSentenceReducer.State
+        public var sentenceState: SentenceReducer.State
         public var canvasState: CanvasReducer.State
         public var underLineCount: Int = 1
         public var underlineOffset: [CGFloat] = [.zero]
@@ -36,7 +36,7 @@ public struct SentencesWithDrawingReducer {
     }
     
     
-    public enum Action: FeatureAction, CommonUI.ScopeAction, CommonUI.AsyncAction {
+    public enum Action: FeatureAction, Core.ScopeAction, Core.AsyncAction {
         case view(ViewAction)
         case inner(InnerAction)
         case async(AsyncAction)
@@ -59,7 +59,7 @@ public struct SentencesWithDrawingReducer {
     
     @CasePathable
     public enum ScopeAction {
-        case sentenceAction(BibleSentenceReducer.Action)
+        case sentenceAction(SentenceReducer.Action)
         case canvasAction(CanvasReducer.Action)
     }
     
@@ -67,7 +67,7 @@ public struct SentencesWithDrawingReducer {
     public var body: some Reducer<State, Action> {
         Scope(state: \.sentenceState,
               action: \.scope.sentenceAction) {
-            BibleSentenceReducer()
+            SentenceReducer()
         }
         Scope(state: \.canvasState,
               action: \.scope.canvasAction) {
@@ -94,7 +94,7 @@ public struct SentencesWithDrawingReducer {
     }
     
     
-    private func calcurateLineOffsets(state: BibleSentenceReducer.State,
+    private func calcurateLineOffsets(state: SentenceReducer.State,
                                       rect: CGRect) -> [CGFloat] {
         let frameHeight = rect.height
         let lineCount = Int(frameHeight / state.lineSpace)

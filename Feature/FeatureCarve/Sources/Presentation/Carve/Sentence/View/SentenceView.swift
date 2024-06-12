@@ -1,8 +1,8 @@
 //
-//  BibleSentenceView.swift
-//  CommonUI
+//  SentenceView.swift
+//  FeatureCarve
 //
-//  Created by 이택성 on 1/30/24.
+//  Created by 이택성 on 6/12/24.
 //  Copyright © 2024 leetaek. All rights reserved.
 //
 
@@ -11,10 +11,10 @@ import SwiftUI
 
 import ComposableArchitecture
 
-public struct BibleSentenceView: View {
-    private var store: StoreOf<BibleSentenceReducer>
+public struct SentenceView: View {
+    private var store: StoreOf<SentenceReducer>
 
-    public init(store: StoreOf<BibleSentenceReducer>) {
+    public init(store: StoreOf<SentenceReducer>) {
         self.store = store
     }
     
@@ -68,9 +68,9 @@ public struct BibleSentenceView: View {
 
 #if DEBUG
 #Preview {
-    let store = Store(initialState: BibleSentenceReducer.State.initialState) {
-        BibleSentenceReducer()
+    let store = Store(initialState: SentenceReducer.State.initialState) {
+        SentenceReducer()
     }
-    return BibleSentenceView(store: store)
+    return SentenceView(store: store)
 }
 #endif
