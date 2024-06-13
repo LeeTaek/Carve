@@ -25,12 +25,14 @@ public struct SentenceView: View {
             }
             sentenceDescription
                 .background(alignment: .center) {
-                    GeometryReader { geometryProxy in
                         Color.clear
-                            .onAppear {
-                                store.send(.inner(.redrawUnderline(geometryProxy.frame(in: .local))))
+                            .onGeometryChange(for: CGRect.self) { proxy in
+                                proxy.frame(in: .local)
+                            } action: { proxySize in
+                                store.send(.inner(.redrawUnderline(proxySize)))
                             }
-                    }
+
+//                    }
                 }
         }
     }
@@ -43,23 +45,26 @@ public struct SentenceView: View {
     
     private func sectionNumberView(_ section: Int) -> some View {
         let sectionString = section > 9 ? section.description : section.description + " "
-        
+        let sentenceSetting = store.sentenceSetting
         return Text("\(sectionString)")
             .bold()
-            .padding(.vertical, (store.lineSpace - store.font.font(size: store.fontSize).lineHeight) / 2)
+            .padding(.vertical, 
+                     (sentenceSetting.lineSpace - sentenceSetting.fontFamily.font(size: sentenceSetting.fontSize).lineHeight) / 2)
     }
     
     
     public var sentenceDescription: some View {
-        HStack(alignment: .top) {
+        let sentenceSetting = store.sentenceSetting
+        return HStack(alignment: .top) {
             sectionNumberView(store.section)
             
             Text(store.sentence)
-                .tracking(store.traking)
-                .font(Font(store.font.font(size: store.fontSize)))
-                .lineSpacing(store.lineSpace - store.font.font(size: store.fontSize).lineHeight)
+                .tracking(sentenceSetting.traking)
+                .font(Font(sentenceSetting.fontFamily.font(size: sentenceSetting.fontSize)))
+                .lineSpacing(sentenceSetting.lineSpace - sentenceSetting.fontFamily.font(size: sentenceSetting.fontSize).lineHeight)
                 .lineLimit(nil)
-                .padding(.vertical, (store.lineSpace - store.font.font(size: store.fontSize).lineHeight) / 2)
+                .padding(.vertical, 
+                         (sentenceSetting.lineSpace - sentenceSetting.fontFamily.font(size: sentenceSetting.fontSize).lineHeight) / 2)
         }
     }
 }

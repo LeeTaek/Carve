@@ -15,7 +15,7 @@ import ComposableArchitecture
 @Reducer
 public struct SentencesWithDrawingReducer {
     @ObservableState
-    public struct State: Equatable, Identifiable {
+    public struct State: Identifiable {
         public let id: String
         public let sentence: SentenceVO
         public var sentenceState: SentenceReducer.State
@@ -97,9 +97,9 @@ public struct SentencesWithDrawingReducer {
     private func calcurateLineOffsets(state: SentenceReducer.State,
                                       rect: CGRect) -> [CGFloat] {
         let frameHeight = rect.height
-        let lineCount = Int(frameHeight / state.lineSpace)
-        let fontHeight = state.font.font(size: state.fontSize).lineHeight
-        let paddingSpace = (state.lineSpace - fontHeight) / 2
+        let lineCount = Int(frameHeight / state.sentenceSetting.lineSpace)
+        let fontHeight = state.sentenceSetting.fontFamily.font(size: state.sentenceSetting.fontSize).lineHeight
+        let paddingSpace = (state.sentenceSetting.lineSpace - fontHeight) / 2
         var offsets: [CGFloat] = []
         for _ in 1...lineCount {
             offsets.append(paddingSpace + fontHeight)

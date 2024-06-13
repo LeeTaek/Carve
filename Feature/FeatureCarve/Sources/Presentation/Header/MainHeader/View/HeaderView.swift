@@ -36,13 +36,13 @@ public struct HeaderView: View {
         .padding(.bottom, 20)
         .anchorPreference(key: HeaderBoundsKey.self, value: .bounds) { $0 }
         .overlayPreferenceValue(HeaderBoundsKey.self) { value in
-            GeometryReader { proxy in
                 if let anchor = value {
                     Color.clear
-                        .onAppear {
-                            store.send(.setHeaderHeight(proxy[anchor].height))
+                        .onGeometryChange(for: CGFloat.self) { proxy in
+                            proxy.size.height
+                        } action: { proxySize in
+                            store.send(.setHeaderHeight(proxySize))
                         }
-                }
             }
         }
         .offset(y: -store.headerOffset < store.headerOffset
