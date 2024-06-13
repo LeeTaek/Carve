@@ -23,7 +23,7 @@ public struct HeaderReducer {
         public var direction: SwipeDirection = .none
         public var shiftOffset: CGFloat
         public var showPalatte: Bool
-        public var palatteSetting: PencilPalatteReducer.State = .init()
+        public var palatteSetting: PencilPalatteReducer.State = .initialState
         
         public enum SwipeDirection {
             case up
