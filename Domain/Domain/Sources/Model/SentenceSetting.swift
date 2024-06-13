@@ -9,7 +9,7 @@
 import SwiftUI
 import Resources
 
-public struct SentenceSetting: Sendable {
+public struct SentenceSetting: Sendable, Codable {
     public var lineSpace: CGFloat
     public var fontSize: CGFloat
     public var traking: CGFloat
@@ -46,7 +46,7 @@ public struct SentenceSetting: Sendable {
     }
 }
 
-public enum FontCase: String, CaseIterable, Sendable {
+public enum FontCase: String, CaseIterable, Sendable, Codable {
     case gothic = "NanumBarunGothic"
     case myeongjo = "NanumMyeongjo"
     case flower = "NanumFlowerScent"

@@ -31,8 +31,6 @@ public struct SentenceView: View {
                             } action: { proxySize in
                                 store.send(.inner(.redrawUnderline(proxySize)))
                             }
-
-//                    }
                 }
         }
     }

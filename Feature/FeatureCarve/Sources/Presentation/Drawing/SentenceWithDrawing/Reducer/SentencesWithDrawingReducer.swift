@@ -101,6 +101,7 @@ public struct SentencesWithDrawingReducer {
         let fontHeight = state.sentenceSetting.fontFamily.font(size: state.sentenceSetting.fontSize).lineHeight
         let paddingSpace = (state.sentenceSetting.lineSpace - fontHeight) / 2
         var offsets: [CGFloat] = []
+        guard lineCount > 0 else { return offsets }
         for _ in 1...lineCount {
             offsets.append(paddingSpace + fontHeight)
         }

@@ -22,8 +22,8 @@ public struct SentenceReducer {
         public var chapterTitle: String?
         public let section: Int
         public let sentence: String
-        public var sentenceSetting: SentenceSetting = .initialState
-        
+        @Shared(.appStorage("sentenceSetting")) public var sentenceSetting: SentenceSetting = .initialState
+       
         public init(chapterTitle: String?,
                     section: Int,
                     sentence: String) {
@@ -45,20 +45,16 @@ public struct SentenceReducer {
     }
     
     public enum ViewAction {
-        case setSentenceSetting(SentenceSetting)
     }
     
     public enum InnerAction {
-        case present
         case redrawUnderline(CGRect)
     }
     
     
     public var body: some Reducer<State, Action> {
-        Reduce { state, action in
+        Reduce { _, action in
             switch action {
-            case .view(.setSentenceSetting(let setting)):
-                state.sentenceSetting = setting
             default: break
             }
             return .none

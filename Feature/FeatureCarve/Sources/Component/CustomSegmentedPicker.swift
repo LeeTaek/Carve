@@ -52,11 +52,6 @@ public struct SegmentedPicker<SelectionValue, Content>: View where SelectionValu
                             }
                         }
                     }
-                    .onAppear {
-                        if let first = items.first {
-                            selection = first
-                        }
-                    }
                 }
                 .padding(.horizontal)
                 .fixedSize(horizontal: false, vertical: true)
