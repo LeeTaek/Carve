@@ -18,15 +18,22 @@ public struct HeaderView: View {
     
     public var body: some View {
         let titleName = store.currentTitle.title.koreanTitle()
-        return HStack {
-            Button(action: { store.send(.titleDidTapped) }) {
-                Text("\(titleName) \(store.state.currentTitle.chapter)장")
-                    .font(.system(size: 30))
-                    .padding()
+        return VStack {
+            HStack {
+                Button(action: { store.send(.titleDidTapped) }) {
+                    Text("\(titleName) \(store.state.currentTitle.chapter)장")
+                        .font(.system(size: 30))
+                        .padding()
+                }
+                Spacer()
+                pencilConfigButton
+                sentenceSettingsButton
             }
-            Spacer()
-            pencilConfigButton
-            sentenceSettingsButton
+            
+            if store.showPalatte {
+                PencilPalatteView(store: store.scope(state: \.palatteSetting,
+                                                     action: \.palatteAction))
+            }
         }
         .background {
             Color.white
@@ -36,13 +43,13 @@ public struct HeaderView: View {
         .padding(.bottom, 20)
         .anchorPreference(key: HeaderBoundsKey.self, value: .bounds) { $0 }
         .overlayPreferenceValue(HeaderBoundsKey.self) { value in
-                if let anchor = value {
-                    Color.clear
-                        .onGeometryChange(for: CGFloat.self) { proxy in
-                            proxy.size.height
-                        } action: { proxySize in
-                            store.send(.setHeaderHeight(proxySize))
-                        }
+            if value != nil {
+                Color.clear
+                    .onGeometryChange(for: CGFloat.self) { proxy in
+                        proxy.size.height
+                    } action: { proxySize in
+                        store.send(.setHeaderHeight(proxySize))
+                    }
             }
         }
         .offset(y: -store.headerOffset < store.headerOffset
@@ -71,6 +78,6 @@ public struct HeaderView: View {
                 .frame(width: 30, height: 30)
                 .padding([.trailing], 20)
         }
-
+        
     }
 }

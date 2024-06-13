@@ -8,20 +8,22 @@
 
 import Core
 import Domain
-import Foundation
+import SwiftUI
 
 import ComposableArchitecture
 
 @Reducer
 public struct HeaderReducer {
     @ObservableState
-    public struct State: Equatable {
+    public struct State {
         @Shared(.appStorage("title")) public var currentTitle: TitleVO = .initialState
         public var headerHeight: CGFloat
         public var headerOffset: CGFloat
         public var lastHeaderOffset: CGFloat
         public var direction: SwipeDirection = .none
         public var shiftOffset: CGFloat
+        public var showPalatte: Bool
+        public var palatteSetting: PencilPalatteReducer.State = .init()
         
         public enum SwipeDirection {
             case up
@@ -31,7 +33,9 @@ public struct HeaderReducer {
         public static let initialState = Self(headerHeight: 0, 
                                               headerOffset: 0,
                                               lastHeaderOffset: 0,
-                                              shiftOffset: 0)
+                                              shiftOffset: 0,
+                                              showPalatte: false
+        )
     }
     public enum Action {
         case titleDidTapped
@@ -40,9 +44,14 @@ public struct HeaderReducer {
         case headerAnimation(CGFloat, CGFloat)
         case pencilConfigDidTapped
         case sentenceSettingsDidTapped
+        case palatteAction(PencilPalatteReducer.Action)
     }
     
     public var body: some Reducer<State, Action> {
+        Scope(state: \.palatteSetting, action: \.palatteAction) {
+            PencilPalatteReducer()
+        }
+        
         Reduce { state, action in
             switch action {
             case .titleDidTapped: break
@@ -59,8 +68,8 @@ public struct HeaderReducer {
                     }
                     let offset = current < 0 ? (current - state.shiftOffset) : 0
                     state.headerOffset = (-offset < state.headerHeight
-                                                        ? (offset < 0 ? offset : 0)
-                                                        : -state.headerHeight)
+                                           ? (offset < 0 ? offset : 0)
+                                           : -state.headerHeight)
                 } else {
                     if state.direction != .down {
                         state.shiftOffset = current
@@ -69,6 +78,10 @@ public struct HeaderReducer {
                     }
                     let offset = state.lastHeaderOffset + (current - state.shiftOffset)
                     state.headerOffset = (offset > 0 ? 0 : offset)
+                }
+            case .pencilConfigDidTapped:
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    state.showPalatte.toggle()
                 }
             default: break
             }
