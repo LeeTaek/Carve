@@ -36,6 +36,7 @@ public struct CarveDetailReducer {
     public enum ViewAction {
         case headerAnimation(CGFloat, CGFloat)
         case navigation(PresentationAction<Destination.Action>)
+        case setTitle(TitleVO)
     }
     public enum InnerAction {
         case fetchSentence
@@ -91,6 +92,11 @@ public struct CarveDetailReducer {
                     : drawings[index]
                     let currentState = SentencesWithDrawingReducer.State(sentence: sentence, drawing: drawing)
                     state.sentenceWithDrawingState.append(currentState)
+                }
+            case .view(.setTitle(let title)):
+                return .run { send in
+                    await send(.scope(.headerAction(.setCurrentTitle(title))))
+                    await send(.inner(.fetchSentence))
                 }
             case .scope(.headerAction(.pencilConfigDidTapped)):
                 Log.debug("pencilConfigDidTapped")

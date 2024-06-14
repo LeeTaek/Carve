@@ -67,7 +67,7 @@ public struct CarveReducer {
                     let selected =  TitleVO(title: selectedTitle, chapter: selectedChapter)
                     state.columnVisibility = .detailOnly
                     return .run { send in
-                        
+                        await send(.scope(.carveDetailAction(.view(.setTitle(selected)))))
                     }
                 }
             }
