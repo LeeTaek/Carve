@@ -92,8 +92,6 @@ public struct CarveDetailReducer {
                     let currentState = SentencesWithDrawingReducer.State(sentence: sentence, drawing: drawing)
                     state.sentenceWithDrawingState.append(currentState)
                 }
-             case .scope(.headerAction(.pencilConfigDidTapped)):
-                Log.debug("pencilConfigDidTapped")
             case .scope(.headerAction(.sentenceSettingsDidTapped)):
                 state.navigation = .sentenceSettings(.initialState)
             default: break

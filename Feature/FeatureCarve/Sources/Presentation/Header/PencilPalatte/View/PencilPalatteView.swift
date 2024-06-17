@@ -14,53 +14,76 @@ public struct PencilPalatteView: View {
     private var store: StoreOf<PencilPalatteReducer>
     public init(store: StoreOf<PencilPalatteReducer>) {
         self.store = store
-        self.store.send(.setColor(store.palatteColors[self.store.pencilConfig.color.rawValue]))
     }
     
     public var body: some View {
         HStack {
-            colorPalatte
             Spacer()
             penTypePalatte
+            devider
+            penLineWidth
+            devider
+            colorPalatte
             Spacer()
         }
-        .frame(height: 50)
+        .frame(height: 30)
         .padding()
     }
     
     private var colorPalatte: some View {
-        let selectedColor = store.palatteColors[store.pencilConfig.color.rawValue]
-        return HStack {
-            RoundedRectangle(cornerRadius: 20)
-                .frame(width: 100, height: 50)
-                .foregroundStyle(Color(uiColor: selectedColor))
-            
-            HStack {
-                ForEach(store.palatteColors) { color in
-                    Circle()
-                        .frame(width: 40, height: 40)
-                        .foregroundStyle(Color(uiColor: color))
-                        .opacity(0.8)
-                        .scaleEffect(selectedColor == color ? 0.8 : 1)
-                        .overlay {
-                            Circle()
-                                .stroke(lineWidth: 3)
-                                .foregroundStyle(selectedColor == color ? .white : .clear)
-                        }
-                        .onTapGesture {
-                            store.send(.setColor(color))
-                        }
-                }
+        HStack {
+            ForEach(Array(store.palatteColors.enumerated()), id: \.offset) { index, color in
+                Circle()
+                    .frame(width: 30, height: 30)
+                    .foregroundStyle(Color(uiColor: color))
+                    .opacity(0.8)
+                    .scaleEffect(index == store.selectedColorIndex ? 0.8 : 1)
+                    .overlay {
+                        Circle()
+                            .stroke(lineWidth: 3)
+                            .foregroundStyle(index == store.selectedColorIndex ? .white : .clear)
+                    }
+                    .padding()
+                    .onTapGesture {
+                        store.send(.setColor(index))
+                    }
             }
-            .frame(height: 100)
         }
-        .padding()
+        .frame(height: 40)
+    }
+                    
+    private var devider: some View {
+        Rectangle()
+            .frame(width: 1, height: 30)
+            .foregroundStyle(.gray)
+            .padding(.horizontal, 20)
+    }
+    
+    private var penLineWidth: some View {
+        HStack {
+            ForEach(Array(store.lineWidths.enumerated()), id: \.offset) { index, width in
+                RoundedRectangle(cornerRadius: 20)
+                    .frame(width: 40, height: 40)
+                    .foregroundStyle(index == store.selectedWidthIndex ? .gray.opacity(0.3) : .clear)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 20)
+                            .frame(width: 40, height: width)
+                            .foregroundStyle(.black)
+                            .scaleEffect(index == store.selectedWidthIndex ? 0.8 : 1)
+                            .opacity(index == store.selectedWidthIndex ? 1 : 0.6)
+                    }
+                    .padding()
+                    .onTapGesture {
+                        store.send(.setLineWidth(index))
+                    }
+            }
+        }
     }
     
     private var penTypePalatte: some View {
         HStack {
             RoundedRectangle(cornerRadius: 20)
-                .frame(width: 50, height: 50)
+                .frame(width: 40, height: 40)
                 .foregroundStyle(store.pencilConfig.pencilType == .pencil ? .gray.opacity(0.3) : .clear)
                 .overlay {
                     FeatureCarveAsset.pencilType.swiftUIImage
@@ -75,7 +98,7 @@ public struct PencilPalatteView: View {
                 }
             
             RoundedRectangle(cornerRadius: 20)
-                .frame(width: 50, height: 50)
+                .frame(width: 40, height: 40)
                 .foregroundStyle(store.pencilConfig.pencilType == .pen ? .gray.opacity(0.3) : .clear)
                 .overlay {
                     FeatureCarveAsset.penType.swiftUIImage
@@ -90,7 +113,7 @@ public struct PencilPalatteView: View {
                 }
             
             RoundedRectangle(cornerRadius: 20)
-                .frame(width: 50, height: 50)
+                .frame(width: 40, height: 40)
                 .foregroundStyle(store.pencilConfig.pencilType == .monoline ? .gray.opacity(0.3) : .clear)
                 .overlay {
                     FeatureCarveAsset.eraserType.swiftUIImage

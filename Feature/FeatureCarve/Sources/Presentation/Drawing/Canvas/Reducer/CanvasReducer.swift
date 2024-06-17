@@ -16,24 +16,17 @@ import ComposableArchitecture
 @Reducer
 public struct CanvasReducer {
     @ObservableState
-    public struct State: Equatable, Identifiable {
+    public struct State: Identifiable {
         public var id: String
         public var drawing: DrawingVO
-        public var lineColor: UIColor
-        public var lineWidth: CGFloat
-        public init(drawing: DrawingVO,
-                    lineColor: UIColor,
-                    lineWidth: CGFloat) {
+        @Shared(.appStorage("pencilConfig")) public var pencilConfig: PencilPalatte = .initialState
+        
+        public init(drawing: DrawingVO) {
             self.id = "drawingData.\(drawing.id)"
             self.drawing = drawing
-            self.lineColor = lineColor
-            self.lineWidth = lineWidth
         }
-
         public static let initialState = Self(drawing: .init(bibleTitle: .initialState,
-                                                             section: 1),
-                                              lineColor: .black,
-                                              lineWidth: 4)
+                                                             section: 1))
     }
     
     @Dependency(\.drawingData) var drawingContext

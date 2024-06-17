@@ -29,17 +29,13 @@ public struct SentencesWithDrawingReducer {
             self.sentenceState = .init(chapterTitle: sentence.chapterTitle,
                                        section: sentence.section,
                                        sentence: sentence.sentenceScript)
-            self.canvasState = .init(drawing: drawing,
-                                     lineColor: .black,
-                                     lineWidth: 4)
+            self.canvasState = .init(drawing: drawing)
         }
     }
     
-    
-    public enum Action: FeatureAction, Core.ScopeAction, Core.AsyncAction {
+    public enum Action: FeatureAction, Core.ScopeAction {
         case view(ViewAction)
         case inner(InnerAction)
-        case async(AsyncAction)
         case scope(ScopeAction)
     }
     
@@ -50,12 +46,6 @@ public struct SentencesWithDrawingReducer {
     }
     
     public enum InnerAction { }
-    
-    public enum AsyncAction: Equatable {
-        case setSubscription
-        case clearSubscription
-        case updateSubscription
-    }
     
     @CasePathable
     public enum ScopeAction {
