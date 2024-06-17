@@ -25,8 +25,6 @@ public struct CarveReducer {
         @Shared(.appStorage("title")) public var currentTitle: TitleVO = .initialState
         public var selectedTitle: BibleTitle?
         public var selectedChapter: Int?
-        public var showOldTestmentSection: Bool = true
-        public var showNewTestmentSection: Bool = true
         
         public static let initialState = State(
             lastChapter: 1,
@@ -43,11 +41,8 @@ public struct CarveReducer {
         case inner(InnerAction)
         case scope(ScopeAction)
     }
-    @CasePathable
     public enum ViewAction: Equatable {
         case moveToSetting
-        case toggleShowOldTestmentSection(Bool)
-        case toggleShowNewTestmentSection(Bool)
     }
     
     public enum InnerAction: Equatable {
@@ -93,10 +88,6 @@ public struct CarveReducer {
                 state.columnVisibility = .all
             case .view(.moveToSetting):
                 Log.debug("move To settings")
-            case .view(.toggleShowOldTestmentSection(let isShow)):
-                    state.showOldTestmentSection = isShow
-            case .view(.toggleShowNewTestmentSection(let isShow)):
-                    state.showNewTestmentSection = isShow
             default: break
             }
             return .none

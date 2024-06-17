@@ -13,9 +13,13 @@ import ComposableArchitecture
 
 public struct CarveView: View {
     @Bindable private var store: StoreOf<CarveReducer>
+    @State private var isShowOldTestment: Bool
+    @State private var isShowNewTestment: Bool
     
     public init(store: StoreOf<CarveReducer>) {
         self.store = store
+        self.isShowOldTestment = store.currentTitle.title.isOldtestment
+        self.isShowNewTestment = !store.currentTitle.title.isOldtestment
     }
     
     public var body: some View {
@@ -34,24 +38,27 @@ public struct CarveView: View {
     private var sideBar: some View {
         VStack(alignment: .trailing) {
             List(selection: $store.selectedTitle) {
-                Section(
-                    isExpanded: $store.showOldTestmentSection.sending(\.view.toggleShowOldTestmentSection),
+                DisclosureGroup(
+                    isExpanded: $isShowOldTestment,
                     content: {
                         ForEach(BibleTitle.allCases[0..<39]) { title in
                             NavigationLink(title.koreanTitle(), value: title)
                         }
-                    },
-                    header: { Text("구약") }
-                )
-                Section(
-                    isExpanded: $store.showNewTestmentSection.sending(\.view.toggleShowNewTestmentSection),
+                    }, label: {
+                        Text("구약")
+                    })
+                .disclosureGroupStyle(SidebarDisclosureGroupStyle())
+                
+                DisclosureGroup(
+                    isExpanded: $isShowNewTestment,
                     content: {
                         ForEach(BibleTitle.allCases[39..<66]) { title in
                             NavigationLink(title.koreanTitle(), value: title)
                         }
-                    },
-                    header: { Text("신약") }
-                )
+                    }, label: {
+                        Text("신약")
+                    })
+                .disclosureGroupStyle(SidebarDisclosureGroupStyle())
             }
             .listStyle(.sidebar)
             
@@ -77,5 +84,29 @@ public struct CarveView: View {
             }
         }
         .toolbar(.hidden, for: .navigationBar)
+    }
+}
+
+
+struct SidebarDisclosureGroupStyle: DisclosureGroupStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack {
+            configuration.label
+                .bold()
+            Spacer()
+            Image(systemName: "chevron.right")
+                .rotationEffect(configuration.isExpanded ? Angle(degrees: 90) : Angle(degrees: 0))
+                .foregroundStyle(.black)
+                .animation(.easeInOut(duration: 0/2), value: configuration.isExpanded)
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            withAnimation {
+                configuration.isExpanded.toggle()
+            }
+        }
+        if configuration.isExpanded {
+            configuration.content
+        }
     }
 }

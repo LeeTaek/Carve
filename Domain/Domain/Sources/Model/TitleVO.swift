@@ -329,4 +329,11 @@ public enum BibleTitle: String, CaseIterable, Identifiable, Codable, Sendable {
         ]
         return titles[self] ?? ""
     }
+    
+    public var isOldtestment: Bool {
+        if let index = Self.allCases.firstIndex(of: self) {
+            return index < 39
+        }
+        return false
+    }
 }
