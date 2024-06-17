@@ -39,7 +39,6 @@ public struct HeaderReducer {
     }
     public enum Action {
         case titleDidTapped
-        case setCurrentTitle(TitleVO)
         case setHeaderHeight(CGFloat)
         case headerAnimation(CGFloat, CGFloat)
         case pencilConfigDidTapped
@@ -54,9 +53,6 @@ public struct HeaderReducer {
         
         Reduce { state, action in
             switch action {
-            case .titleDidTapped: break
-            case .setCurrentTitle(let title):
-                state.currentTitle = title
             case .setHeaderHeight(let height):
                 state.headerHeight = height
             case .headerAnimation(let previous, let current):

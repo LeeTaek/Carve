@@ -22,8 +22,11 @@ public struct CarveReducer {
         public var lastChapter: Int
         public var columnVisibility: NavigationSplitViewVisibility
         public var carveDetailState: CarveDetailReducer.State
+        @Shared(.appStorage("title")) public var currentTitle: TitleVO = .initialState
         public var selectedTitle: BibleTitle?
         public var selectedChapter: Int?
+        public var showOldTestmentSection: Bool = true
+        public var showNewTestmentSection: Bool = true
         
         public static let initialState = State(
             lastChapter: 1,
@@ -40,8 +43,11 @@ public struct CarveReducer {
         case inner(InnerAction)
         case scope(ScopeAction)
     }
+    @CasePathable
     public enum ViewAction: Equatable {
         case moveToSetting
+        case toggleShowOldTestmentSection(Bool)
+        case toggleShowNewTestmentSection(Bool)
     }
     
     public enum InnerAction: Equatable {
@@ -54,20 +60,23 @@ public struct CarveReducer {
     
     public var body: some Reducer<State, Action> {
         BindingReducer()
-            .onChange(of: \.selectedTitle) { _, _ in
+            .onChange(of: \.selectedTitle) { _, newValue in
                 Reduce { state, _ in
-                    state.columnVisibility = .doubleColumn
+                    guard let title = newValue else { return .none }
+                    if state.currentTitle.title != title {
+                        state.selectedChapter = nil
+                    }
+                    state.currentTitle.title = title
                     return .none
                 }
             }
             .onChange(of: \.selectedChapter) { _, newValue in
                 Reduce { state, _ in
-                    guard let selectedTitle = state.selectedTitle,
-                          let selectedChapter = newValue else { return .none }
-                    let selected =  TitleVO(title: selectedTitle, chapter: selectedChapter)
+                    guard let selectedChapter = newValue else { return .none }
+                    state.currentTitle.chapter = selectedChapter
                     state.columnVisibility = .detailOnly
                     return .run { send in
-                        await send(.scope(.carveDetailAction(.view(.setTitle(selected)))))
+                        await send(.scope(.carveDetailAction(.inner(.fetchSentence))))
                     }
                 }
             }
@@ -79,10 +88,15 @@ public struct CarveReducer {
         Reduce { state, action in
             switch action {
             case .scope(.carveDetailAction(.scope(.headerAction(.titleDidTapped)))):
+                state.selectedTitle = state.currentTitle.title
+                state.selectedChapter = state.currentTitle.chapter
                 state.columnVisibility = .all
-                
             case .view(.moveToSetting):
                 Log.debug("move To settings")
+            case .view(.toggleShowOldTestmentSection(let isShow)):
+                    state.showOldTestmentSection = isShow
+            case .view(.toggleShowNewTestmentSection(let isShow)):
+                    state.showNewTestmentSection = isShow
             default: break
             }
             return .none

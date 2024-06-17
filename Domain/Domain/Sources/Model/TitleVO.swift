@@ -14,8 +14,8 @@ public struct TitleVO: Sendable, Codable, Hashable {
         (lhs.title == rhs.title) && (lhs.chapter == rhs.chapter)
     }
     
-    public let title: BibleTitle
-    public let chapter: Int
+    public var title: BibleTitle
+    public var chapter: Int
     
     public static let initialState = TitleVO.init(title: .genesis, chapter: 1)
     

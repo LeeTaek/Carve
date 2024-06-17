@@ -34,18 +34,26 @@ public struct CarveView: View {
     private var sideBar: some View {
         VStack(alignment: .trailing) {
             List(selection: $store.selectedTitle) {
-                Section(header: Text("구약")) {
-                    ForEach(BibleTitle.allCases[0..<39]) { title in
-                        NavigationLink(title.koreanTitle(), value: title)
-                    }
-                }
-                Section(header: Text("신약")) {
-                    ForEach(BibleTitle.allCases[39..<66]) { title in
-                        NavigationLink(title.koreanTitle(), value: title)
-                    }
-                }
+                Section(
+                    isExpanded: $store.showOldTestmentSection.sending(\.view.toggleShowOldTestmentSection),
+                    content: {
+                        ForEach(BibleTitle.allCases[0..<39]) { title in
+                            NavigationLink(title.koreanTitle(), value: title)
+                        }
+                    },
+                    header: { Text("구약") }
+                )
+                Section(
+                    isExpanded: $store.showNewTestmentSection.sending(\.view.toggleShowNewTestmentSection),
+                    content: {
+                        ForEach(BibleTitle.allCases[39..<66]) { title in
+                            NavigationLink(title.koreanTitle(), value: title)
+                        }
+                    },
+                    header: { Text("신약") }
+                )
             }
-            .listStyle(.inset)
+            .listStyle(.sidebar)
             
             Button {
                 store.send(.view(.moveToSetting))
@@ -61,8 +69,8 @@ public struct CarveView: View {
     
     private var contentList: some View {
         VStack {
-            Text(store.selectedTitle?.koreanTitle() ?? BibleTitle.genesis.koreanTitle())
-            List(1...(store.selectedTitle?.lastChapter ?? 1),
+            Text(store.currentTitle.title.koreanTitle())
+            List(1...(store.currentTitle.title.lastChapter),
                  id: \.self ,
                  selection: $store.selectedChapter) { chapter in
                 NavigationLink(chapter.description, value: chapter)
