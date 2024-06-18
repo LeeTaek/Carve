@@ -22,11 +22,14 @@ public struct PencilPalatteReducer {
         public var palatteColors: [UIColor]
         public var palattePencilType: PKInkingTool.InkType
         public var lineWidths: [CGFloat]
+        public var popoverPoint: CGPoint = .zero
+        @Presents var navigation: Destination.State?
         public static var initialState = State(palatteColors: [.black, .blue, .red],
                                                palattePencilType: .pen,
                                                lineWidths: [2.0, 4.0, 6.0]
         )
     }
+
     public enum Action {
         case setConfigPencilColor(UIColor)
         case setConfigPencilType(PKInkingTool.InkType)
@@ -34,7 +37,18 @@ public struct PencilPalatteReducer {
         case setColor(Int)
         case setPencilType(PKInkingTool.InkType)
         case setLineWidth(Int)
+        case popoverLineWidth
+        case popoverColor
+        case setPopoverPoint(CGPoint)
+        case navigation(PresentationAction<Destination.Action>)
     }
+    
+    @Reducer
+    public enum Destination {
+        case lineWidthPalatte(LineWidthPalatteReducer)
+        case colorPalatte(ColorPalatteReducer)
+    }
+    
     public var body: some Reducer<State, Action> {
         Reduce { state, action in
             switch action {
@@ -56,8 +70,16 @@ public struct PencilPalatteReducer {
             case .setLineWidth(let index):
                 state.selectedWidthIndex = index
                 state.pencilConfig.lineWidth = state.lineWidths[index]
+            case .setPopoverPoint(let point):
+                state.popoverPoint = point
+            case .popoverColor:
+                state.navigation = .colorPalatte(.initialState)
+            case .popoverLineWidth:
+                state.navigation = .lineWidthPalatte(.initialState)
+            default: break
             }
             return .none
         }
+        .ifLet(\.$navigation, action: \.navigation)
     }
 }

@@ -11,7 +11,7 @@ import SwiftUI
 import ComposableArchitecture
 
 public struct PencilPalatteView: View {
-    private var store: StoreOf<PencilPalatteReducer>
+    @Bindable private var store: StoreOf<PencilPalatteReducer>
     public init(store: StoreOf<PencilPalatteReducer>) {
         self.store = store
     }
@@ -47,11 +47,28 @@ public struct PencilPalatteView: View {
                     .onTapGesture {
                         store.send(.setColor(index))
                     }
+                    .gesture(
+                        longPressGesture(action: .popoverColor)
+                    )
             }
+            .frame(height: 40)
         }
-        .frame(height: 40)
+        .simultaneousGesture(DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                let point = CGPoint(x: value.location.x,
+                                    y: value.location.y)
+                store.send(.setPopoverPoint(point))
+            }
+        )
+        .popover(
+            item: $store.scope(state: \.navigation?.colorPalatte,
+                               action : \.navigation.colorPalatte),
+            attachmentAnchor: .rect(.rect(CGRect(x: store.popoverPoint.x, y: 40, width: 0, height: 0)))
+        ) { store in
+            ColorPalatteView(store: store)
+        }
     }
-                    
+    
     private var devider: some View {
         Rectangle()
             .frame(width: 1, height: 30)
@@ -76,7 +93,25 @@ public struct PencilPalatteView: View {
                     .onTapGesture {
                         store.send(.setLineWidth(index))
                     }
+                    .gesture(
+                        longPressGesture(action: .popoverLineWidth)
+                    )
             }
+            .frame(height: 40)
+        }
+        .simultaneousGesture(DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                let point = CGPoint(x: value.location.x,
+                                    y: value.location.y)
+                store.send(.setPopoverPoint(point))
+            }
+        )
+        .popover(
+            item: $store.scope(state: \.navigation?.lineWidthPalatte,
+                               action : \.navigation.lineWidthPalatte),
+            attachmentAnchor: .rect(.rect(CGRect(x: store.popoverPoint.x, y: 40, width: 0, height: 0)))
+        ) { store in
+            LineWidthPalatteView(store: store)
         }
     }
     
@@ -127,5 +162,12 @@ public struct PencilPalatteView: View {
                     store.send(.setPencilType(.monoline))
                 }
         }
+    }
+    
+    private func longPressGesture(action: PencilPalatteReducer.Action) -> some Gesture {
+        LongPressGesture(minimumDuration: 0.5)
+            .onEnded { _ in
+                store.send(action)
+            }
     }
 }
