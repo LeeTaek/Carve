@@ -6,6 +6,7 @@
 //  Copyright © 2024 leetaek. All rights reserved.
 //
 
+import Core
 import Domain
 import SwiftUI
 import PencilKit
@@ -19,15 +20,15 @@ public struct PencilPalatteReducer {
         @Shared(.appStorage("pencilConfig")) public var pencilConfig: PencilPalatte = .initialState
         @Shared(.appStorage("selectedColorIndex")) public var selectedColorIndex: Int = 0
         @Shared(.appStorage("selectedWidthIndex")) public var selectedWidthIndex: Int = 0
-        public var palatteColors: [UIColor]
+        @Shared(.appStorage("palatteColorSet")) public var palatteColors: [CodableColor] = [.init(color: .black),
+                                                                                            .init(color: .blue),
+                                                                                            .init(color: .red)]
+        @Shared(.appStorage("lineWidthSet")) public var lineWidths: [CGFloat] = [2.0, 4.0, 6.0]
         public var palattePencilType: PKInkingTool.InkType
-        public var lineWidths: [CGFloat]
         public var popoverPoint: CGPoint = .zero
         @Presents var navigation: Destination.State?
-        public static var initialState = State(palatteColors: [.black, .blue, .red],
-                                               palattePencilType: .pen,
-                                               lineWidths: [2.0, 4.0, 6.0]
-        )
+                
+        public static var initialState = State(palattePencilType: .pen)
     }
 
     public enum Action {
@@ -37,8 +38,8 @@ public struct PencilPalatteReducer {
         case setColor(Int)
         case setPencilType(PKInkingTool.InkType)
         case setLineWidth(Int)
-        case popoverLineWidth
-        case popoverColor
+        case popoverLineWidth(Int)
+        case popoverColor(Int)
         case setPopoverPoint(CGPoint)
         case navigation(PresentationAction<Destination.Action>)
     }
@@ -57,11 +58,11 @@ public struct PencilPalatteReducer {
             case .setConfigPencilType(let type):
                 state.pencilConfig.pencilType = type
             case let .changePencilColor(index, color):
-                state.palatteColors[index] = color
+                state.palatteColors[index] = .init(color: color)
             case .setColor(let index):
                 state.selectedColorIndex = index
                 withAnimation {
-                    state.pencilConfig.lineColor = CodableColor(color: state.palatteColors[index])
+                    state.pencilConfig.lineColor = state.palatteColors[index]
                 }
             case .setPencilType(let type):
                 withAnimation(.easeInOut(duration: 0.1)) {
@@ -72,10 +73,13 @@ public struct PencilPalatteReducer {
                 state.pencilConfig.lineWidth = state.lineWidths[index]
             case .setPopoverPoint(let point):
                 state.popoverPoint = point
-            case .popoverColor:
-                state.navigation = .colorPalatte(.initialState)
-            case .popoverLineWidth:
-                state.navigation = .lineWidthPalatte(.initialState)
+            case .popoverColor(let index):
+                state.navigation = .colorPalatte(.init(index: index, color: state.palatteColors[index]))
+            case .popoverLineWidth(let index):
+                state.navigation = .lineWidthPalatte(.init(lineWidth: state.lineWidths[index], index: index))
+            case .navigation(.dismiss):
+                state.pencilConfig.lineColor = state.palatteColors[state.selectedColorIndex]
+                state.pencilConfig.lineWidth = state.lineWidths[state.selectedWidthIndex]
             default: break
             }
             return .none

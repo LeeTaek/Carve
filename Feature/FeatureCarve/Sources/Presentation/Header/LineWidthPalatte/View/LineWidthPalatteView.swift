@@ -1,5 +1,4 @@
 //
-//  LineWidthPalatteView.swift
 //  FeatureCarve
 //
 //  Created by 이택성 on 6/17/24.
@@ -11,14 +10,26 @@ import SwiftUI
 import ComposableArchitecture
 
 public struct LineWidthPalatteView: View {
-    private var store: StoreOf<LineWidthPalatteReducer>
+    @Bindable private var store: StoreOf<LineWidthPalatteReducer>
     public init(store: StoreOf<LineWidthPalatteReducer>) {
         self.store = store
     }
     
     public var body: some View {
-        Circle()
-            .foregroundStyle(.red)
-            .frame(width: 300, height: 200)
+        Form {
+            Section(
+                header: Text("펜 두께: \(String(format: "%.2f", store.lineWidth))").font(.headline)
+            ) {
+                CustomSlider(
+                    value: $store.lineWidth.sending(\.setWidth),
+                    minValue: 1,
+                    maxValue: 15,
+                    isFloat: true
+                )
+                
+            }
+        }
+        .scrollDisabled(true)
+        .frame(width: 300, height: 100)
     }
 }

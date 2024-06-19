@@ -12,14 +12,27 @@ import ComposableArchitecture
 
 @Reducer
 public struct LineWidthPalatteReducer {
+    @ObservableState
     public struct State {
-        public static var initialState = State()
+        @Shared(.appStorage("lineWidthSet")) public var lineWidths: [CGFloat] = []
+        public let index: Int
+        public var lineWidth: CGFloat
+        
+        public init(lineWidth: CGFloat, index: Int) {
+            self.lineWidth = lineWidth
+            self.index = index
+        }
     }
     public enum Action {
-        
+        case setWidth(CGFloat)
     }
     public var body: some Reducer<State, Action> {
         Reduce { state, action in
+            switch action {
+            case .setWidth(let width) :
+                state.lineWidth = width
+                state.lineWidths[state.index] = width
+            }
             return .none
         }
     }

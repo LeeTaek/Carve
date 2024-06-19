@@ -6,7 +6,8 @@
 //  Copyright © 2024 leetaek. All rights reserved.
 //
 
-import Foundation
+import Domain
+import SwiftUI
 
 import ComposableArchitecture
 
@@ -14,13 +15,33 @@ import ComposableArchitecture
 public struct ColorPalatteReducer {
     @ObservableState
     public struct State {
-        public static var initialState = State()
+        @Shared(.appStorage("palatteColorSet")) public var palatteColors: [CodableColor] = []
+        public var index: Int
+        public var selectedColor: CodableColor
+        public var alpha: CGFloat = 1
+        public var colors: [UIColor] = [.black, .red, .yellow, .blue, .green, .brown, .purple, .cyan]
+        public init(index: Int, color: CodableColor) {
+            self.index = index
+            self.selectedColor = color
+            self.alpha = color.color.alphaValue
+        }
     }
     public enum Action {
-        
+        case setColor(UIColor)
+        case setAlpha(CGFloat)
     }
     public var body: some Reducer<State, Action> {
         Reduce { state, action in
+            switch action {
+            case .setColor(let color):
+                let selectedColor = color.withAlphaComponent(state.alpha)
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    state.selectedColor = .init(color: selectedColor)
+                    state.palatteColors[state.index] = .init(color: selectedColor)
+                }
+            case .setAlpha(let alpha):
+                state.alpha = alpha
+            }
             return .none
         }
     }

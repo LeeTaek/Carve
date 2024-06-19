@@ -19,31 +19,18 @@ public struct SentenceSettingsView: View {
     
     public var body: some View {
         Form {
-            Section("예시 문구") {
+            Section(
+                header: Text("예시 문구").font(.headline).bold()
+            ) {
                 SentenceView(store: self.store.scope(state: \.sampleSentence,
                                                      action: \.sampleSentence)
                 )
                 .frame(height: 300, alignment: .center)
-                
-                VStack(alignment: .leading) {
-                    HStack {
-                 
-                        Text("폰트 크기: \(Int(store.setting.fontSize))")
-                            .fontWeight(.bold)
-                            .padding()
-                        Spacer()
-                        Text("줄 간격: \(Int(store.setting.lineSpace))")
-                            .fontWeight(.bold)
-                            .padding()
-                        Spacer()
-                        Text("글자 간격: \(Int(store.setting.traking))")
-                            .fontWeight(.bold)
-                            .padding()
-                    }
-                }
             }
             
-            Section("폰트") {
+            Section(
+                header: Text("폰트").font(.headline).bold()
+            ) {
                 SegmentedPicker(
                     selection: $store.setting.fontFamily.sending(\.setFontFamily),
                     items: Domain.FontCase.allCases) { font in
@@ -52,29 +39,35 @@ public struct SentenceSettingsView: View {
                     }
             }
             
-            Section("폰트 크기") {
+            Section(
+                header: Text("폰트 크기: \(Int(store.setting.fontSize))").font(.headline).bold()
+            ) {
                 CustomSlider(
                     value: $store.setting.fontSize.sending(\.setFontSize),
                     minValue: 15,
                     maxValue: 40
                 )
-                .frame(height: 80, alignment: .center)
+                .padding(.vertical)
             }
-            Section("줄 간격") {
+            Section(
+                header: Text("줄 간격: \(Int(store.setting.lineSpace))").font(.headline).bold()
+            ) {
                 CustomSlider(
                     value: $store.setting.lineSpace.sending(\.setLineSpace),
                     minValue: 5,
                     maxValue: 70
                 )
-                .frame(height: 80, alignment: .center)
+                .padding(.vertical)
             }
-            Section("글자 간격") {
+            Section(
+                header: Text("글자 간격: \(Int(store.setting.traking))").font(.headline).bold()
+            ) {
                 CustomSlider(
                     value: $store.setting.traking.sending(\.setTraking),
                     minValue: 1,
                     maxValue: 10
                 )
-                .frame(height: 80, alignment: .center)
+                .padding(.vertical)
             }
         }
     }

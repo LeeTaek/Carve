@@ -35,7 +35,7 @@ public struct PencilPalatteView: View {
             ForEach(Array(store.palatteColors.enumerated()), id: \.offset) { index, color in
                 Circle()
                     .frame(width: 30, height: 30)
-                    .foregroundStyle(Color(uiColor: color))
+                    .foregroundStyle(Color(uiColor: color.color))
                     .opacity(0.8)
                     .scaleEffect(index == store.selectedColorIndex ? 0.8 : 1)
                     .overlay {
@@ -48,7 +48,7 @@ public struct PencilPalatteView: View {
                         store.send(.setColor(index))
                     }
                     .gesture(
-                        longPressGesture(action: .popoverColor)
+                        longPressGesture(action: .popoverColor(index))
                     )
             }
             .frame(height: 40)
@@ -94,7 +94,7 @@ public struct PencilPalatteView: View {
                         store.send(.setLineWidth(index))
                     }
                     .gesture(
-                        longPressGesture(action: .popoverLineWidth)
+                        longPressGesture(action: .popoverLineWidth(index))
                     )
             }
             .frame(height: 40)
