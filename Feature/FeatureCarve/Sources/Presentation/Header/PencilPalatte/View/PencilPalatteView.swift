@@ -12,36 +12,47 @@ import ComposableArchitecture
 
 public struct PencilPalatteView: View {
     @Bindable private var store: StoreOf<PencilPalatteReducer>
+    private let iconSize: CGFloat = 20
     public init(store: StoreOf<PencilPalatteReducer>) {
         self.store = store
     }
     
     public var body: some View {
-        HStack {
+        HStack(spacing: 0) {
             Spacer()
             penTypePalatte
+                .frame(maxWidth: .infinity)
+
             devider
             penLineWidth
+                .frame(maxWidth: .infinity)
+
             devider
             colorPalatte
+                .frame(maxWidth: .infinity)
+
+            devider
+            doButtons
+                .frame(maxWidth: .infinity)
+
             Spacer()
         }
-        .frame(height: 30)
-        .padding()
+        .frame(maxWidth: .infinity)
+        .frame(height: 20)
     }
     
     private var colorPalatte: some View {
         HStack {
             ForEach(Array(store.palatteColors.enumerated()), id: \.offset) { index, color in
                 Circle()
-                    .frame(width: 30, height: 30)
+                    .frame(width: iconSize, height: iconSize)
                     .foregroundStyle(Color(uiColor: color.color))
                     .opacity(0.8)
                     .scaleEffect(index == store.selectedColorIndex ? 0.8 : 1)
                     .overlay {
                         Circle()
                             .stroke(lineWidth: 3)
-                            .foregroundStyle(index == store.selectedColorIndex ? .white : .clear)
+                            .foregroundStyle(index == store.selectedColorIndex ? .gray.opacity(0.3) : .clear)
                     }
                     .padding()
                     .onTapGesture {
@@ -51,7 +62,7 @@ public struct PencilPalatteView: View {
                         longPressGesture(action: .popoverColor(index))
                     )
             }
-            .frame(height: 40)
+            .frame(height: iconSize + 10)
         }
         .simultaneousGesture(DragGesture(minimumDistance: 0)
             .onChanged { value in
@@ -63,7 +74,7 @@ public struct PencilPalatteView: View {
         .popover(
             item: $store.scope(state: \.navigation?.colorPalatte,
                                action : \.navigation.colorPalatte),
-            attachmentAnchor: .rect(.rect(CGRect(x: store.popoverPoint.x, y: 40, width: 0, height: 0)))
+            attachmentAnchor: .rect(.rect(CGRect(x: store.popoverPoint.x, y: iconSize + 10, width: 0, height: 0)))
         ) { store in
             ColorPalatteView(store: store)
         }
@@ -71,20 +82,20 @@ public struct PencilPalatteView: View {
     
     private var devider: some View {
         Rectangle()
-            .frame(width: 1, height: 30)
+            .frame(width: 1, height: iconSize)
             .foregroundStyle(.gray)
-            .padding(.horizontal, 20)
+            .padding(.horizontal)
     }
     
     private var penLineWidth: some View {
         HStack {
             ForEach(Array(store.lineWidths.enumerated()), id: \.offset) { index, width in
                 RoundedRectangle(cornerRadius: 20)
-                    .frame(width: 40, height: 40)
+                    .frame(width: iconSize + 10, height: iconSize + 10)
                     .foregroundStyle(index == store.selectedWidthIndex ? .gray.opacity(0.3) : .clear)
                     .overlay {
                         RoundedRectangle(cornerRadius: 20)
-                            .frame(width: 40, height: width)
+                            .frame(width: iconSize + 10, height: width)
                             .foregroundStyle(.black)
                             .scaleEffect(index == store.selectedWidthIndex ? 0.8 : 1)
                             .opacity(index == store.selectedWidthIndex ? 1 : 0.6)
@@ -97,7 +108,7 @@ public struct PencilPalatteView: View {
                         longPressGesture(action: .popoverLineWidth(index))
                     )
             }
-            .frame(height: 40)
+            .frame(height: iconSize + 10)
         }
         .simultaneousGesture(DragGesture(minimumDistance: 0)
             .onChanged { value in
@@ -109,7 +120,7 @@ public struct PencilPalatteView: View {
         .popover(
             item: $store.scope(state: \.navigation?.lineWidthPalatte,
                                action : \.navigation.lineWidthPalatte),
-            attachmentAnchor: .rect(.rect(CGRect(x: store.popoverPoint.x, y: 40, width: 0, height: 0)))
+            attachmentAnchor: .rect(.rect(CGRect(x: store.popoverPoint.x, y: iconSize + 10, width: 0, height: 0)))
         ) { store in
             LineWidthPalatteView(store: store)
         }
@@ -118,12 +129,12 @@ public struct PencilPalatteView: View {
     private var penTypePalatte: some View {
         HStack {
             RoundedRectangle(cornerRadius: 20)
-                .frame(width: 40, height: 40)
+                .frame(width: iconSize + 10, height: iconSize + 10)
                 .foregroundStyle(store.pencilConfig.pencilType == .pencil ? .gray.opacity(0.3) : .clear)
                 .overlay {
                     FeatureCarveAsset.pencilType.swiftUIImage
                         .resizable()
-                        .frame(width: 30, height: 30)
+                        .frame(width: iconSize, height: iconSize)
                         .scaleEffect(store.pencilConfig.pencilType == .pencil ? 0.8 : 1)
                         .opacity(store.pencilConfig.pencilType == .pencil ? 1 : 0.6)
                 }
@@ -133,12 +144,12 @@ public struct PencilPalatteView: View {
                 }
             
             RoundedRectangle(cornerRadius: 20)
-                .frame(width: 40, height: 40)
+                .frame(width: iconSize + 10, height: iconSize + 10)
                 .foregroundStyle(store.pencilConfig.pencilType == .pen ? .gray.opacity(0.3) : .clear)
                 .overlay {
                     FeatureCarveAsset.penType.swiftUIImage
                         .resizable()
-                        .frame(width: 30, height: 30)
+                        .frame(width: iconSize, height: iconSize)
                         .scaleEffect(store.pencilConfig.pencilType == .pen ? 0.8 : 1)
                         .opacity(store.pencilConfig.pencilType == .pen ? 1 : 0.6)
                 }
@@ -148,12 +159,12 @@ public struct PencilPalatteView: View {
                 }
             
             RoundedRectangle(cornerRadius: 20)
-                .frame(width: 40, height: 40)
+                .frame(width: iconSize + 10, height: iconSize + 10)
                 .foregroundStyle(store.pencilConfig.pencilType == .monoline ? .gray.opacity(0.3) : .clear)
                 .overlay {
                     FeatureCarveAsset.eraserType.swiftUIImage
                         .resizable()
-                        .frame(width: 30, height: 30)
+                        .frame(width: iconSize, height: iconSize)
                         .scaleEffect(store.pencilConfig.pencilType == .monoline ? 0.8 : 1)
                         .opacity(store.pencilConfig.pencilType == .monoline ? 1 : 0.6)
                 }
@@ -161,6 +172,28 @@ public struct PencilPalatteView: View {
                 .onTapGesture {
                     store.send(.setPencilType(.monoline))
                 }
+        }
+    }
+    
+    private var doButtons: some View {
+        HStack {
+            Button {
+                store.send(.undo)
+            } label: {
+                FeatureCarveAsset.undo.swiftUIImage
+                    .resizable()
+                    .frame(width: iconSize + 10, height: iconSize + 10)
+                    .padding()
+            }
+            
+            Button {
+                store.send(.redo)
+            } label: {
+                FeatureCarveAsset.redo.swiftUIImage
+                    .resizable()
+                    .frame(width: iconSize + 10, height: iconSize + 10)
+                    .padding()
+            }
         }
     }
     

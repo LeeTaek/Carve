@@ -31,6 +31,8 @@ public struct PencilPalatteReducer {
         public static var initialState = State(palattePencilType: .pen)
     }
 
+    @Dependency(\.undoManager) private var undoManager
+    
     public enum Action {
         case setConfigPencilColor(UIColor)
         case setConfigPencilType(PKInkingTool.InkType)
@@ -42,6 +44,8 @@ public struct PencilPalatteReducer {
         case popoverColor(Int)
         case setPopoverPoint(CGPoint)
         case navigation(PresentationAction<Destination.Action>)
+        case undo
+        case redo
     }
     
     @Reducer
@@ -60,8 +64,8 @@ public struct PencilPalatteReducer {
             case let .changePencilColor(index, color):
                 state.palatteColors[index] = .init(color: color)
             case .setColor(let index):
-                state.selectedColorIndex = index
                 withAnimation {
+                    state.selectedColorIndex = index
                     state.pencilConfig.lineColor = state.palatteColors[index]
                 }
             case .setPencilType(let type):
@@ -80,6 +84,10 @@ public struct PencilPalatteReducer {
             case .navigation(.dismiss):
                 state.pencilConfig.lineColor = state.palatteColors[state.selectedColorIndex]
                 state.pencilConfig.lineWidth = state.lineWidths[state.selectedWidthIndex]
+            case .undo:
+                undoManager.undo()
+            case .redo:
+                undoManager.redo()
             default: break
             }
             return .none
