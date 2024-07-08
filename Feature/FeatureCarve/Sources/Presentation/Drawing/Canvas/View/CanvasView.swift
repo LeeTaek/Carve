@@ -12,7 +12,6 @@ import SwiftUI
 
 import ComposableArchitecture
 
-@MainActor
 public struct CanvasView: UIViewRepresentable {
     public typealias UIViewType = PKCanvasView
     @Bindable private var store: StoreOf<CanvasReducer>
@@ -63,6 +62,7 @@ public struct CanvasView: UIViewRepresentable {
         
         public func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
             self.store.send(.saveDrawing(canvasView.drawing))
+            self.store.send(.registUndoCanvas(canvasView))
         }
         
         public func updateTool(for canvas: PKCanvasView) {

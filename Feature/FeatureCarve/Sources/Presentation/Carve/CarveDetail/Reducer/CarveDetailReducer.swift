@@ -25,8 +25,8 @@ public struct CarveDetailReducer {
         )
     }
     @Dependency(\.drawingData) var drawingContext
+    @Dependency(\.undoManager) var undoManager
 
-    
     public enum Action: FeatureAction, Core.ScopeAction {
         case view(ViewAction)
         case inner(InnerAction)
@@ -92,6 +92,7 @@ public struct CarveDetailReducer {
                     let currentState = SentencesWithDrawingReducer.State(sentence: sentence, drawing: drawing)
                     state.sentenceWithDrawingState.append(currentState)
                 }
+                undoManager.clear()
             case .scope(.headerAction(.sentenceSettingsDidTapped)):
                 state.navigation = .sentenceSettings(.initialState)
             default: break

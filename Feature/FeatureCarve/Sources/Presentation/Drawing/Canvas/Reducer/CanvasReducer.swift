@@ -20,7 +20,8 @@ public struct CanvasReducer {
         public var id: String
         public var drawing: DrawingVO
         @Shared(.appStorage("pencilConfig")) public var pencilConfig: PencilPalatte = .initialState
-        
+        @Shared(.inMemory("canUndo")) public var canUndo: Bool = false
+        @Shared(.inMemory("canRedo")) public var canRedo: Bool = false
         public init(drawing: DrawingVO) {
             self.id = "drawingData.\(drawing.id)"
             self.drawing = drawing
@@ -30,10 +31,12 @@ public struct CanvasReducer {
     }
     
     @Dependency(\.drawingData) var drawingContext
+    @Dependency(\.undoManager) private var undoManager
 
     public enum Action: BindableAction {
         case binding(BindingAction<State>)
         case saveDrawing(PKDrawing)
+        case registUndoCanvas(PKCanvasView)
     }
 
     public var body: some Reducer<State, Action> {
@@ -46,7 +49,10 @@ public struct CanvasReducer {
                 return .run { _ in
                     try await drawingContext.update(item: drawing)
                 }
-
+            case .registUndoCanvas(let canvas):
+                undoManager.registerUndoAction(for: canvas)
+                state.canUndo = undoManager.canUndo
+                state.canRedo = undoManager.canRedo
             default:
                 break
             }

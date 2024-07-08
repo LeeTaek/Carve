@@ -183,8 +183,10 @@ public struct PencilPalatteView: View {
                 FeatureCarveAsset.undo.swiftUIImage
                     .resizable()
                     .frame(width: iconSize + 10, height: iconSize + 10)
+                    .opacity(store.canUndo ? 1 : 0.3)
                     .padding()
             }
+            .disabled(!store.canUndo)
             
             Button {
                 store.send(.redo)
@@ -192,8 +194,10 @@ public struct PencilPalatteView: View {
                 FeatureCarveAsset.redo.swiftUIImage
                     .resizable()
                     .frame(width: iconSize + 10, height: iconSize + 10)
+                    .opacity(store.canRedo ? 1 : 0.3)
                     .padding()
             }
+            .disabled(!store.canRedo)
         }
     }
     

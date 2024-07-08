@@ -24,6 +24,8 @@ public struct PencilPalatteReducer {
                                                                                             .init(color: .blue),
                                                                                             .init(color: .red)]
         @Shared(.appStorage("lineWidthSet")) public var lineWidths: [CGFloat] = [2.0, 4.0, 6.0]
+        @Shared(.inMemory("canUndo")) public var canUndo: Bool = false
+        @Shared(.inMemory("canRedo")) public var canRedo: Bool = false
         public var palattePencilType: PKInkingTool.InkType
         public var popoverPoint: CGPoint = .zero
         @Presents var navigation: Destination.State?
@@ -46,6 +48,7 @@ public struct PencilPalatteReducer {
         case navigation(PresentationAction<Destination.Action>)
         case undo
         case redo
+        case setCanUndo
     }
     
     @Reducer
@@ -86,8 +89,20 @@ public struct PencilPalatteReducer {
                 state.pencilConfig.lineWidth = state.lineWidths[state.selectedWidthIndex]
             case .undo:
                 undoManager.undo()
+                return .run { send in
+                    await send(.setCanUndo)
+                }
             case .redo:
                 undoManager.redo()
+                return .run { send in
+                    await send(.setCanUndo)
+                }
+            case .setCanUndo:
+                state.canUndo = undoManager.canUndo
+                state.canRedo = undoManager.canRedo
+                Log.debug("canUndo", undoManager.canUndo)
+                Log.debug("canRedo", undoManager.canRedo)
+
             default: break
             }
             return .none
