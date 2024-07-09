@@ -50,6 +50,10 @@ public struct CanvasReducer {
                     try await drawingContext.update(item: drawing)
                 }
             case .registUndoCanvas(let canvas):
+                if undoManager.isPerformingUndoRedo {
+                    undoManager.isPerformingUndoRedo = false
+                    return .none
+                }
                 undoManager.registerUndoAction(for: canvas)
                 state.canUndo = undoManager.canUndo
                 state.canRedo = undoManager.canRedo

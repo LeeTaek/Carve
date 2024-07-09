@@ -100,8 +100,6 @@ public struct PencilPalatteReducer {
             case .setCanUndo:
                 state.canUndo = undoManager.canUndo
                 state.canRedo = undoManager.canRedo
-                Log.debug("canUndo", undoManager.canUndo)
-                Log.debug("canRedo", undoManager.canRedo)
 
             default: break
             }

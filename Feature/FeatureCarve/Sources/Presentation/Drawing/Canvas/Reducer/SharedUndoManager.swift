@@ -13,9 +13,9 @@ import PencilKit
 import Dependencies
 
 public class SharedUndoManager {
-    public let canvasUndoManager = UndoManager()
-    var canvases: [PKCanvasView] = []
-    private var currentCanvas: PKCanvasView?
+    private var canvasUndoManager = UndoManager()
+    private var canvases: [PKCanvasView] = []
+    public var isPerformingUndoRedo: Bool = false
     
     public var canUndo: Bool {
         canvasUndoManager.canUndo
@@ -37,7 +37,7 @@ public class SharedUndoManager {
         canvasUndoManager.registerUndo(withTarget: self) { target in
             target.registerUndoAction(for: last)
         }
-    }
+     }
 
     public func clear() {
         canvasUndoManager.removeAllActions()
@@ -45,20 +45,17 @@ public class SharedUndoManager {
     }
     
     public func undo() {
+        isPerformingUndoRedo = true
         guard let lastUndoManager = canvases.last?.undoManager else { return }
         if lastUndoManager.canUndo {
             lastUndoManager.undo()
         }
-
-        if canvasUndoManager.canUndo {
-            canvasUndoManager.undo()
-        }
+        canvasUndoManager.undo()
     }
     
     public func redo() {
-        if canvasUndoManager.canRedo {
-            canvasUndoManager.redo()
-        }
+        isPerformingUndoRedo = true
+        canvasUndoManager.redo()
         guard let lastUndoManager = canvases.last?.undoManager else { return }
         if lastUndoManager.canRedo {
             lastUndoManager.redo()
