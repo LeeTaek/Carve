@@ -6,7 +6,7 @@
 //  Copyright © 2024 leetaek. All rights reserved.
 //
 
-import CommonUI
+import Core
 import Domain
 import SwiftUI
 
@@ -15,10 +15,10 @@ import ComposableArchitecture
 @Reducer
 public struct SentencesWithDrawingReducer {
     @ObservableState
-    public struct State: Equatable, Identifiable {
+    public struct State: Identifiable {
         public let id: String
         public let sentence: SentenceVO
-        public var sentenceState: BibleSentenceReducer.State
+        public var sentenceState: SentenceReducer.State
         public var canvasState: CanvasReducer.State
         public var underLineCount: Int = 1
         public var underlineOffset: [CGFloat] = [.zero]
@@ -29,17 +29,13 @@ public struct SentencesWithDrawingReducer {
             self.sentenceState = .init(chapterTitle: sentence.chapterTitle,
                                        section: sentence.section,
                                        sentence: sentence.sentenceScript)
-            self.canvasState = .init(drawing: drawing,
-                                     lineColor: .black,
-                                     lineWidth: 4)
+            self.canvasState = .init(drawing: drawing)
         }
     }
     
-    
-    public enum Action: FeatureAction, CommonUI.ScopeAction, CommonUI.AsyncAction {
+    public enum Action: FeatureAction, Core.ScopeAction {
         case view(ViewAction)
         case inner(InnerAction)
-        case async(AsyncAction)
         case scope(ScopeAction)
     }
     
@@ -51,15 +47,9 @@ public struct SentencesWithDrawingReducer {
     
     public enum InnerAction { }
     
-    public enum AsyncAction: Equatable {
-        case setSubscription
-        case clearSubscription
-        case updateSubscription
-    }
-    
     @CasePathable
     public enum ScopeAction {
-        case sentenceAction(BibleSentenceReducer.Action)
+        case sentenceAction(SentenceReducer.Action)
         case canvasAction(CanvasReducer.Action)
     }
     
@@ -67,7 +57,7 @@ public struct SentencesWithDrawingReducer {
     public var body: some Reducer<State, Action> {
         Scope(state: \.sentenceState,
               action: \.scope.sentenceAction) {
-            BibleSentenceReducer()
+            SentenceReducer()
         }
         Scope(state: \.canvasState,
               action: \.scope.canvasAction) {
@@ -94,13 +84,14 @@ public struct SentencesWithDrawingReducer {
     }
     
     
-    private func calcurateLineOffsets(state: BibleSentenceReducer.State,
+    private func calcurateLineOffsets(state: SentenceReducer.State,
                                       rect: CGRect) -> [CGFloat] {
         let frameHeight = rect.height
-        let lineCount = Int(frameHeight / state.lineSpace)
-        let fontHeight = state.font.font(size: state.fontSize).lineHeight
-        let paddingSpace = (state.lineSpace - fontHeight) / 2
+        let lineCount = Int(frameHeight / state.sentenceSetting.lineSpace)
+        let fontHeight = state.sentenceSetting.fontFamily.font(size: state.sentenceSetting.fontSize).lineHeight
+        let paddingSpace = (state.sentenceSetting.lineSpace - fontHeight) / 2
         var offsets: [CGFloat] = []
+        guard lineCount > 0 else { return offsets }
         for _ in 1...lineCount {
             offsets.append(paddingSpace + fontHeight)
         }

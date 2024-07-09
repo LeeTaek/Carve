@@ -22,10 +22,12 @@ struct CarveApp: SwiftUI.App {
     init() {
         self.modelContext = {
             @Dependency(\.databaseService) var databaseService
-            guard let modelContext = try? databaseService.context() else {
+            do {
+                let modelContext = try databaseService.context()
+                return modelContext
+            } catch {
                 fatalError("Could not find modelcontext")
             }
-            return modelContext
         }()
         self.store = Store(initialState: .initialState) {
             AppCoordinator()

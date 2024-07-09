@@ -29,19 +29,5 @@ final class SharedStateTest: XCTestCase {
         self.store = nil
     }
 
-    func test_change_shared_state_title() async throws {
-        // givn
-        @Dependency(\.defaultAppStorage) var userDefaults
-        let title = TitleVO(title: .acts, chapter: 2)
-        print("path", userDefaults.volatileDomainNames)
-        
-        // when
-        await store.send(.view(.selectChapter(.acts, 2)))
-        guard let savedData = userDefaults.data(forKey: "title") else { throw SharedStateError.userDefaultsIsNone }
-        let savedTitle = try JSONDecoder().decode(TitleVO.self, from: savedData)
-        
-        // then
-        XCTAssertEqual(store.state.currentTitle, savedTitle)
-    }
     
 }

@@ -9,8 +9,7 @@ let dependencies: [TargetDependency] = [
     .FirebaseAnalytics,
     .FirebaseMessaging,
     
-    .TCAArchitecture,
-    .TCACoordinator
+    .TCAArchitecture
 ]
 
 let script: [TargetScript] = [.swiftLint, .firebaseCrashlytics]

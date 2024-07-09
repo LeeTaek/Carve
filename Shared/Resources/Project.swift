@@ -22,6 +22,9 @@ let targets: [Target] = [
 let project = Project.makeModule(
   name: projectName,
   targets: targets,
-  resourceSynthesizers: [.assets()]
+  resourceSynthesizers: [
+    .assets(),
+    .fonts()
+  ]
 )
 

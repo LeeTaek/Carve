@@ -12,7 +12,6 @@ import ProjectDescriptionHelpers
 let projectName = "FeatureCarve"
 
 let dependencies: [TargetDependency] = [
-    .CommonUI,
     .Domain,
     .TCAArchitecture,
     .Kingfisher,
@@ -33,6 +32,9 @@ let target: [Target] = [
     .makeFrameworkTarget(
         projName: projectName,
         target: .debug,
+        resources: .resources([
+            "Resources/**"
+        ]),
         script: script,
         dependencies: dependencies,
         settings: settings
@@ -43,5 +45,8 @@ let target: [Target] = [
 
 let project = Project.makeModule(
     name: projectName,
-    targets: target
+    targets: target,
+    resourceSynthesizers: [
+        .assets()
+    ]
 )

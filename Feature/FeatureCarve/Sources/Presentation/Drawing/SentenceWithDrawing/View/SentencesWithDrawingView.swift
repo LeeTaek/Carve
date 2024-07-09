@@ -6,7 +6,6 @@
 //  Copyright © 2024 leetaek. All rights reserved.
 //
 
-import CommonUI
 import SwiftUI
 
 import ComposableArchitecture
@@ -20,7 +19,7 @@ public struct SentencesWithDrawingView: View {
     
     public var body: some View {
         HStack {
-            BibleSentenceView(
+            SentenceView(
                 store: self.store.scope(state: \.sentenceState,
                                         action: \.scope.sentenceAction)
             )

@@ -11,33 +11,30 @@ import FeatureCarve
 import FeatureSettings
 
 import ComposableArchitecture
-import TCACoordinators
 
 @Reducer
 public struct AppCoordinator {
     @ObservableState
-    public enum State: Equatable {
+    public enum State {
         public static var initialState: Self = .carve(.initialState)
-        case carve(CarveCoordinator.State)
-        case settings(SettingsCoordinator.State)
+        case carve(CarveReducer.State)
+        case settings(SettingsReducer.State)
     }
     public enum Action {
-        case carve(CarveCoordinator.Action)
-        case settings(SettingsCoordinator.Action)
-        
+        case carve(CarveReducer.Action)
+        case settings(SettingsReducer.Action)
         case present(AppCoordinator.State)
     }
     public var body: some Reducer<State, Action> {
         Scope(state: \.carve, action: \.carve) {
-            CarveCoordinator()
+            CarveReducer()
         }
         Scope(state: \.settings, action: \.settings) {
-            SettingsCoordinator()
+            SettingsReducer()
         }
-        
         Reduce { state, action in
             switch action {
-            case .carve(.moveToSetting):
+            case .carve(.view(.moveToSetting)):
                 return .run { send in
                     await send(.present(.settings(.initialState)))
                 }

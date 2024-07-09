@@ -14,8 +14,8 @@ public struct TitleVO: Sendable, Codable, Hashable {
         (lhs.title == rhs.title) && (lhs.chapter == rhs.chapter)
     }
     
-    public let title: BibleTitle
-    public let chapter: Int
+    public var title: BibleTitle
+    public var chapter: Int
     
     public static let initialState = TitleVO.init(title: .genesis, chapter: 1)
     
@@ -328,5 +328,12 @@ public enum BibleTitle: String, CaseIterable, Identifiable, Codable, Sendable {
             .revelation: "요한계시록"
         ]
         return titles[self] ?? ""
+    }
+    
+    public var isOldtestment: Bool {
+        if let index = Self.allCases.firstIndex(of: self) {
+            return index < 39
+        }
+        return false
     }
 }

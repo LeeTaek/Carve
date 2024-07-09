@@ -8,7 +8,7 @@
 
 import Core
 import SwiftUI
-@preconcurrency import SwiftData
+import SwiftData
 
 import Dependencies
 

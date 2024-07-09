@@ -12,7 +12,6 @@ import SwiftUI
 
 import ComposableArchitecture
 
-@MainActor
 public struct CanvasView: UIViewRepresentable {
     public typealias UIViewType = PKCanvasView
     @Bindable private var store: StoreOf<CanvasReducer>
@@ -29,8 +28,8 @@ public struct CanvasView: UIViewRepresentable {
             canvas.drawingPolicy = .pencilOnly
 #endif
             canvas.tool = PKInkingTool(.pencil, 
-                                       color: self.store.lineColor,
-                                       width: self.store.lineWidth)
+                                       color: self.store.pencilConfig.lineColor.color,
+                                       width: self.store.pencilConfig.lineWidth)
             canvas.backgroundColor = .clear
             canvas.isOpaque = false
             canvas.translatesAutoresizingMaskIntoConstraints = false
@@ -46,22 +45,34 @@ public struct CanvasView: UIViewRepresentable {
     
     public func updateUIView(_ uiView: PKCanvasView, context: Context) {
         uiView.tool = PKInkingTool(.pencil,
-                                   color: self.store.lineColor,
-                                   width: self.store.lineWidth)
+                                   color: self.store.pencilConfig.lineColor.color,
+                                   width: self.store.pencilConfig.lineWidth)
+        context.coordinator.updateTool(for: uiView)
     }
     
     public func makeCoordinator() -> Coordinator {
-        Coordinator(store: $store)
+        Coordinator(store: store)
     }
     
     final public class Coordinator: NSObject, PKCanvasViewDelegate {
-        let store: Bindable<StoreOf<CanvasReducer>>
-        init(store: Bindable<Store<CanvasReducer.State, CanvasReducer.Action>>) {
+        var store: StoreOf<CanvasReducer>
+        init(store: StoreOf<CanvasReducer>) {
             self.store = store
         }
         
         public func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
-            self.store.wrappedValue.send(.saveDrawing(canvasView.drawing))
+            self.store.send(.saveDrawing(canvasView.drawing))
+            self.store.send(.registUndoCanvas(canvasView))
+        }
+        
+        public func updateTool(for canvas: PKCanvasView) {
+            if store.pencilConfig.pencilType == .monoline {
+                canvas.tool = PKEraserTool(.bitmap)
+            } else {
+                canvas.tool = PKInkingTool(.pencil,
+                                           color: store.pencilConfig.lineColor.color,
+                                           width: store.pencilConfig.lineWidth)
+            }
         }
     }
     
