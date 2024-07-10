@@ -15,9 +15,9 @@ public final class DrawingVO: Equatable, Sendable {
     public static func == (lhs: DrawingVO, rhs: DrawingVO) -> Bool {
         (lhs.id == rhs.id)
     }
-    @Attribute(.unique) public let id: String
-    @Relationship public let bibleTitle: TitleVO
-    public let section: Int
+    public let id: String!
+    @Relationship public let bibleTitle: TitleVO!
+    public let section: Int!
     public var lineData: Data?
     public var isWritten: Bool = false
     
