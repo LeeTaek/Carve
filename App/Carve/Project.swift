@@ -17,6 +17,7 @@ let script: [TargetScript] = [.swiftLint, .firebaseCrashlytics]
 let targets: [Target] = [
     .makeAppTarget(
         name: .configuration(projectName),
+        entitlements: .file(path: .relativeToCurrentFile("Support/Carve.entitlements")),
         scripts: script,
         dependencies: dependencies
     )
