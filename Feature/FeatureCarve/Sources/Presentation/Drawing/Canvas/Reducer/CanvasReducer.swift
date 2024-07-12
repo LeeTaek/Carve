@@ -23,7 +23,7 @@ public struct CanvasReducer {
         @Shared(.inMemory("canUndo")) public var canUndo: Bool = false
         @Shared(.inMemory("canRedo")) public var canRedo: Bool = false
         public init(drawing: DrawingVO) {
-            self.id = "drawingData.\(drawing.id)"
+            self.id = "drawingData.\(String(describing: drawing.id))"
             self.drawing = drawing
         }
         public static let initialState = Self(drawing: .init(bibleTitle: .initialState,

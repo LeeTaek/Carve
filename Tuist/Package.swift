@@ -20,7 +20,7 @@ let packages = Package(
     dependencies: [
         .package(url: "https://github.com/Alamofire/Alamofire", from:  "5.8.1"),
         .package(url: "https://github.com/onevcat/Kingfisher.git", from:  "7.9.1"),
-        .package(url: "https://github.com/firebase/firebase-ios-sdk.git", from: "10.15.0"),
-        .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.10.4"),
+        .package(url: "https://github.com/firebase/firebase-ios-sdk.git", from: "10.29.0"),
+        .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.11.2"),
     ]
 )
