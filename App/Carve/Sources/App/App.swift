@@ -14,7 +14,7 @@ import Firebase
 import FeatureCarve
 
 @main
-struct CarveApp: SwiftUI.App {
+struct CarveApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
     public var modelContext: ModelContext
     public let store: StoreOf<AppCoordinator>

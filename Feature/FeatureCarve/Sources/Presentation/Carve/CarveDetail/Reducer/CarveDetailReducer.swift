@@ -8,8 +8,8 @@
 
 import Core
 import Domain
-import Foundation
 import Resources
+import SwiftUI
 
 import ComposableArchitecture
 
@@ -20,6 +20,8 @@ public struct CarveDetailReducer {
         public var headerState: HeaderReducer.State
         public var sentenceWithDrawingState: IdentifiedArrayOf<SentencesWithDrawingReducer.State> = []
         @Presents var navigation: Destination.State?
+        public var proxy: ScrollViewProxy?
+        public var firstItemID: ObjectIdentifier?
         public static let initialState = State(
             headerState: .initialState
         )
@@ -36,6 +38,8 @@ public struct CarveDetailReducer {
     public enum ViewAction {
         case headerAnimation(CGFloat, CGFloat)
         case navigation(PresentationAction<Destination.Action>)
+        case scrollToTop
+        case setProxy(ScrollViewProxy, ObjectIdentifier)
     }
     public enum InnerAction {
         case fetchSentence
@@ -93,8 +97,20 @@ public struct CarveDetailReducer {
                     state.sentenceWithDrawingState.append(currentState)
                 }
                 undoManager.clear()
+                return .run { send in
+                    await send(.view(.scrollToTop))
+                }
             case .scope(.headerAction(.sentenceSettingsDidTapped)):
                 state.navigation = .sentenceSettings(.initialState)
+            case .view(.setProxy(let proxy, let id)):
+                state.proxy = proxy
+                state.firstItemID = id
+            case .view(.scrollToTop):
+                guard let id = state.firstItemID else { return .none }
+                let anchorPoint = state.headerState.headerHeight / UIScreen.main.bounds.height
+                withAnimation(.easeInOut(duration: 0.5)) {
+                    state.proxy?.scrollTo(id, anchor: UnitPoint(x: 0, y: anchorPoint))
+                }
             default: break
             }
             return .none

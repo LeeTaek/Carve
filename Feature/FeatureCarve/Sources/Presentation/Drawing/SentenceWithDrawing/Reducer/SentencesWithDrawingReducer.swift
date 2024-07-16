@@ -15,7 +15,10 @@ import ComposableArchitecture
 @Reducer
 public struct SentencesWithDrawingReducer {
     @ObservableState
-    public struct State: Identifiable {
+    public struct State: Identifiable, Equatable {
+        public static func == (lhs: SentencesWithDrawingReducer.State, rhs: SentencesWithDrawingReducer.State) -> Bool {
+            lhs.id == rhs.id
+        }
         public let id: String
         public let sentence: SentenceVO
         public var sentenceState: SentenceReducer.State
