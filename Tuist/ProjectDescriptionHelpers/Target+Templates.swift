@@ -11,7 +11,7 @@ import ProjectEnvironment
 public extension Target {
     static func makeAppTarget(
         name: ConfigurationName,
-        destination: Destinations = [.iPad, .macWithiPadDesign],
+        destination: Destinations = [.iPad],
         product: Product = .app,
         bundleID: String = .defaultBundleID,
         deploymentTarget: DeploymentTargets = .iOS("17.0"),

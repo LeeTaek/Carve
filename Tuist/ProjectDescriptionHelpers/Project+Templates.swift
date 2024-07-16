@@ -10,7 +10,6 @@ public extension Project {
       settings: Settings? = .settings(
         base: SettingsDictionary()
             .automaticCodeSigning(devTeam: "H4MSW7FUBB")
-//            .debugInformationFormat(.dwarfWithDsym)
             .otherLinkerFlags(["-all_load -Objc"])
     ),
       additionalFiles: [FileElement] = [],
