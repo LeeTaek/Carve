@@ -21,7 +21,7 @@ public struct HeaderView: View {
         return VStack {
             HStack {
                 Button(action: { store.send(.titleDidTapped) }) {
-                    Text("\(titleName) \(store.state.currentTitle.chapter)장")
+                    Text("\(titleName) \(store.currentTitle.chapter)장")
                         .font(.system(size: 30))
                         .padding()
                 }
@@ -40,7 +40,7 @@ public struct HeaderView: View {
                 .ignoresSafeArea()
         }
         .padding(.top, safeArea().top)
-        .padding(.bottom, 20)
+        .padding(.bottom, 10)
         .anchorPreference(key: HeaderBoundsKey.self, value: .bounds) { $0 }
         .overlayPreferenceValue(HeaderBoundsKey.self) { value in
             if value != nil {

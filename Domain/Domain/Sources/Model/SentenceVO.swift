@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import RegexBuilder
 
 public struct SentenceVO: Equatable, Sendable {
     public var title: TitleVO
@@ -34,25 +35,41 @@ public struct SentenceVO: Equatable, Sendable {
                 chapterTitle: String? = nil,
                 sentence: String) {
         self.title = title
-
-        if let index = sentence.firstIndex(of: " "),
-           let chapterString = sentence.prefix(upTo: index).components(separatedBy: ":").last {
-
-            self.section = Int(chapterString)!
-            let restSentence = sentence.suffix(from: sentence.index(after: index))
-
-            if let chapterTitleRange = restSentence.range(of: #"<(.*?)>"#, options: .regularExpression) {
-                self.chapterTitle = String(restSentence[restSentence.startIndex..<chapterTitleRange.lowerBound])
-                self.sentenceScript = String(restSentence[chapterTitleRange.upperBound...])
-            } else {
-                self.chapterTitle = nil
-                self.sentenceScript = String(restSentence)
+        var chapterTitle: String?
+        var chapter: Int?
+        var sentenceScript: String = sentence
+        
+        let titlePattern = Regex {
+            "<"
+            Capture {
+                ZeroOrMore(.any, .reluctant)
             }
-        } else {
-            self.chapterTitle = nil
-            self.section = 0
-            self.sentenceScript = "fetch error"
+            ">"
         }
+        let chapterPattern = Regex {
+            OneOrMore(.digit)
+            ":"
+            Capture {
+                OneOrMore(.digit)
+            }
+        }
+        if let match = try? chapterPattern.firstMatch(in: sentenceScript) {
+            let (_, chapterNum) = match.output
+            chapter = Int(chapterNum)
+            sentenceScript.removeSubrange(match.range)
+            sentenceScript = sentenceScript.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        if let match = try? titlePattern.firstMatch(in: sentenceScript) {
+            let (_, chapterTitleString) = match.output
+            chapterTitle = String(chapterTitleString)
+            sentenceScript.removeSubrange(match.range)
+            sentenceScript = sentenceScript.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+       
+        self.chapterTitle = chapterTitle
+        self.section = chapter ?? 0
+        self.sentenceScript = sentenceScript
     }
+    
 
 }

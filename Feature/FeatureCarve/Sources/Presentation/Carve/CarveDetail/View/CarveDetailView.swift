@@ -40,8 +40,6 @@ public struct CarveDetailView: View {
                                 .fixedSize(horizontal: false, vertical: true)
                                 .padding(.horizontal, 10)
                         }
-                    } header: {
-                        // TODO: - ChapterTitleView
                     }
                 }
                 .padding(.top, store.headerState.headerHeight)

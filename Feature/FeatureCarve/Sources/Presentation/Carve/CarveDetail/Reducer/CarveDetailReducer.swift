@@ -69,8 +69,8 @@ public struct CarveDetailReducer {
                 }
             case .inner(.fetchSentence):
                 let title = state.headerState.currentTitle
-                let sentences = fetchBible(chapter: title)
                 return .run { send in
+                    let sentences = try fetchBible(chapter: title)
                     do {
                         var storedDrawing = try await drawingContext.fetch(title: title)
                         guard let lastSection = sentences.last?.section
@@ -82,9 +82,10 @@ public struct CarveDetailReducer {
                             storedDrawing = try await drawingContext.fetch(title: title)
                         }
                         await send(.inner(.setSentence(sentences, storedDrawing)))
-                    } catch {
+                    }
+                    catch {
                         Log.debug("fetch drawing error", error)
-                        await send(.inner(.setSentence(sentences, [])))
+                        await send(.inner(.setSentence([], [])))
                     }
                 }
             case .inner(.setSentence(let sentences, let drawings)):
@@ -123,31 +124,33 @@ public struct CarveDetailReducer {
     }
     
     
-    private func fetchBible(chapter: TitleVO) -> [SentenceVO] {
+    func fetchBible(chapter: TitleVO) throws(CarveReducerError) -> [SentenceVO] {
         let encodingEUCKR = CFStringConvertEncodingToNSStringEncoding(0x0422)
         var sentences: [SentenceVO] = []
         guard let textPath = ResourcesResources.bundle.path(forResource: chapter.title.rawValue,
                                                             ofType: nil)
         else { return sentences}
-        
         do {
             let bible = try String(contentsOfFile: textPath,
                                    encoding: String.Encoding(rawValue: encodingEUCKR))
-            sentences = bible.components(separatedBy: "\r")
+            sentences = try bible.components(separatedBy: "\r")
                 .filter {
-                    Int($0.components(separatedBy: ":").first!)! == chapter.chapter
+                    guard let num = $0.components(separatedBy: ":").first,
+                          let first = Int(num) else { throw CarveReducerError.chapterConvertError }
+                    return first == chapter.chapter
                 }
                 .map { sentence in
                     return SentenceVO.init(title: chapter, sentence: sentence)
                 }
-        } catch let error {
-            Log.error(error.localizedDescription)
+        } catch {
+            throw .fetchSentenceError
         }
         return sentences
     }
     
     
-    private enum CarveReducerError: Error {
+    enum CarveReducerError: Error {
         case fetchSentenceError
+        case chapterConvertError
     }
 }

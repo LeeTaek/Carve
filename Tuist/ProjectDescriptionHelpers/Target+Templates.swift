@@ -47,7 +47,7 @@ public extension Target {
     
     static func makeTestTarget(
         projName: String,
-        destination: Destinations = [.iPad, .macWithiPadDesign],
+        destination: Destinations = [.iPad],
         target: ConfigurationName,
         product: Product = .unitTests,
         bundleID: String = .defaultBundleID,
@@ -72,7 +72,7 @@ public extension Target {
     
     static func makeFrameworkTarget(
         projName: String,
-        destination: Destinations = [.iPad, .macWithiPadDesign],
+        destination: Destinations = [.iPad],
         target: ConfigurationName,
         product: Product = .staticFramework,
         bundleID: String = .defaultBundleID,

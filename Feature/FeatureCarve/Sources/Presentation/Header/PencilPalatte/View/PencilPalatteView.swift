@@ -39,6 +39,7 @@ public struct PencilPalatteView: View {
         }
         .frame(maxWidth: .infinity)
         .frame(height: 20)
+        .padding(.bottom, 10)
     }
     
     private var colorPalatte: some View {

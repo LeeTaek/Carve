@@ -20,9 +20,6 @@ public struct SentenceView: View {
     
     public var body: some View {
         VStack {
-            if store.state.chapterTitle != nil {
-                chapterTitleView
-            }
             sentenceDescription
                 .background(alignment: .center) {
                         Color.clear
@@ -36,7 +33,7 @@ public struct SentenceView: View {
     }
     
     private var chapterTitleView: some View {
-        Text(store.state.chapterTitle ?? "")
+        Text(store.chapterTitle ?? "")
             .font(.system(size: 22))
             .fontWeight(.heavy)
     }
