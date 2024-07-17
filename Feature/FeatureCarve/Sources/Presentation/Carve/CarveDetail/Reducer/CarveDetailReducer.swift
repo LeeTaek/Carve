@@ -82,8 +82,7 @@ public struct CarveDetailReducer {
                             storedDrawing = try await drawingContext.fetch(title: title)
                         }
                         await send(.inner(.setSentence(sentences, storedDrawing)))
-                    }
-                    catch {
+                    } catch {
                         Log.debug("fetch drawing error", error)
                         await send(.inner(.setSentence([], [])))
                     }
