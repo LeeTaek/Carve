@@ -12,16 +12,9 @@ import Foundation
 import ComposableArchitecture
 
 @Reducer(state: .equatable)
-public enum DetailSettings: CaseIterable, Identifiable {
+public enum DetailSettings: String, CaseIterable, Identifiable {
     public var id: String {
-        switch self {
-        case .iCloud:
-            return "iCloud"
-        case .appVersion:
-            return "appVersion"
-        case .lisence:
-            return "lisence"
-        }
+        return self.rawValue
     }
     case iCloud
     case appVersion

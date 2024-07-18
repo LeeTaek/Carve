@@ -15,38 +15,33 @@ import ComposableArchitecture
 @Reducer
 public struct AppCoordinator {
     @ObservableState
-    public enum State {
-        public static var initialState: Self = .carve(.initialState)
-        case carve(CarveReducer.State)
-        case settings(SettingsReducer.State)
+    public struct State {
+        @Presents public var destination: Destination.State? = .carve(.initialState)
+        public init(destination: AppCoordinator.Destination.State) {
+            self.destination = destination
+        }
     }
     public enum Action {
-        case carve(CarveReducer.Action)
-        case settings(SettingsReducer.Action)
-        case present(AppCoordinator.State)
+        case destination(PresentationAction<Destination.Action>)
     }
+    
+    @Reducer
+    public enum Destination {
+        case carve(CarveReducer)
+        case settings(SettingsReducer)
+    }
+    
     public var body: some Reducer<State, Action> {
-        Scope(state: \.carve, action: \.carve) {
-            CarveReducer()
-        }
-        Scope(state: \.settings, action: \.settings) {
-            SettingsReducer()
-        }
         Reduce { state, action in
             switch action {
-            case .carve(.view(.moveToSetting)):
-                return .run { send in
-                    await send(.present(.settings(.initialState)))
-                }
-            case .settings(.backToCarve):
-                return .run { send in
-                    await send(.present(.carve(.initialState)))
-                }
-            case .present(let screen):
-                state = screen
+            case .destination(.presented(.carve(.view(.moveToSetting)))):
+                state.destination = .settings(.initialState)
+            case .destination(.presented(.settings(.backToCarve))):
+                state.destination = .carve(.initialState)
             default: break
             }
             return .none
         }
+        .ifLet(\.$destination, action: \.destination)
     }
 }

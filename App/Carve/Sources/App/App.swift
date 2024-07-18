@@ -29,7 +29,7 @@ struct CarveApp: App {
                 fatalError("Could not find modelcontext")
             }
         }()
-        self.store = Store(initialState: .initialState) {
+        self.store = Store(initialState: AppCoordinator.State(destination: .carve(.initialState))) {
             AppCoordinator()
         }
     }
