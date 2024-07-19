@@ -30,7 +30,7 @@ public struct AppCoordinatorView: View {
                 SettingsView(store: store)
             }
         default:
-            Text("init")
+            fatalError("Store init Failed")
         }
     }
 }

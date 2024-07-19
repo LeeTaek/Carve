@@ -11,44 +11,42 @@ import Foundation
 
 import ComposableArchitecture
 
-@Reducer(state: .equatable)
-public enum DetailSettings: String, CaseIterable, Identifiable {
-    public var id: String {
-        return self.rawValue
-    }
-    case iCloud
-    case appVersion
-    case lisence
-}
-
-
 @Reducer
 public struct SettingsReducer {
     public init() { }
-    
     @ObservableState
-    public struct State: Equatable {
+    public struct State {
         public static let initialState = Self()
-        public var selected: DetailSettings?
+        public var path = StackState<Path.State>()
     }
-
-    public enum Action: BindableAction {
-        case binding(BindingAction<State>)
-        case presentDetail(DetailSettings)
+    public enum Action {
+        case path(StackActionOf<Path>)
+        case pushToiCloudSettings
+        case pushToAppVersion
+        case pushToLisence
         case backToCarve
     }
-
+    @Reducer
+    public enum Path {
+        case iCloud(CloudSettingsReducer)
+        case appVersion(AppVersionReducer)
+        case lisence(LisenceReducer)
+    }
+    
     public var body: some Reducer<State, Action> {
-        BindingReducer()
         Reduce { state, action in
             switch action {
-            case .presentDetail(let settings):
-                state.selected = settings
-            default:
-                break
+            case .pushToiCloudSettings:
+                state.path.append(.iCloud(.initialState))
+            case .pushToAppVersion:
+                state.path.append(.appVersion(.initialState))
+            case .pushToLisence:
+                state.path.append(.lisence(.initialState))
+            default: break
             }
             return .none
         }
+        .forEach(\.path, action: \.path)
     }
 
 }

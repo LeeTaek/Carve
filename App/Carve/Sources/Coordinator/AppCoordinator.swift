@@ -16,10 +16,8 @@ import ComposableArchitecture
 public struct AppCoordinator {
     @ObservableState
     public struct State {
+        public static var initialState = Self()
         @Presents public var destination: Destination.State? = .carve(.initialState)
-        public init(destination: AppCoordinator.Destination.State) {
-            self.destination = destination
-        }
     }
     public enum Action {
         case destination(PresentationAction<Destination.Action>)

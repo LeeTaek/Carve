@@ -1,8 +1,8 @@
 //
-//  iCloudSettingReducer.swift
+//  LisenceReducer.swift
 //  FeatureSettings
 //
-//  Created by 이택성 on 5/21/24.
+//  Created by 이택성 on 7/19/24.
 //  Copyright © 2024 leetaek. All rights reserved.
 //
 
@@ -11,7 +11,7 @@ import Foundation
 import ComposableArchitecture
 
 @Reducer
-public struct CloudSettingsReducer {
+public struct LisenceReducer {
     public init() { }
     
     @ObservableState
@@ -30,3 +30,4 @@ public struct CloudSettingsReducer {
         }
     }
 }
+
