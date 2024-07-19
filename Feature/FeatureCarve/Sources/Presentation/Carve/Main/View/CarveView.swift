@@ -8,6 +8,7 @@
 import Core
 import Domain
 import SwiftUI
+import Resources
 
 import ComposableArchitecture
 
@@ -72,6 +73,17 @@ public struct CarveView: View {
             .padding(.trailing, 15)
         }
         .navigationTitle("성경")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            Button {
+                store.send(.view(.closeNavigationBar))
+            } label: {
+                Image(asset: ResourcesAsset.xButton)
+                    .resizable()
+                    .frame(width: 25, height: 25)
+                    .padding()
+            }
+        }
     }
     
     private var contentList: some View {

@@ -41,6 +41,7 @@ public struct CarveReducer {
     }
     public enum ViewAction: Equatable {
         case moveToSetting
+        case closeNavigationBar
     }
     
     public enum InnerAction: Equatable {
@@ -106,6 +107,8 @@ public struct CarveReducer {
                 }
             case .view(.moveToSetting):
                 Log.debug("move To settings")
+            case .view(.closeNavigationBar):
+                state.columnVisibility = .detailOnly
             default: break
             }
             return .none
