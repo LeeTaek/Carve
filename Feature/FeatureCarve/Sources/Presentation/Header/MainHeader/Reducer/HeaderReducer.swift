@@ -44,6 +44,8 @@ public struct HeaderReducer {
         case pencilConfigDidTapped
         case sentenceSettingsDidTapped
         case palatteAction(PencilPalatteReducer.Action)
+        case moveToNext
+        case moveToBefore
     }
     
     public var body: some Reducer<State, Action> {

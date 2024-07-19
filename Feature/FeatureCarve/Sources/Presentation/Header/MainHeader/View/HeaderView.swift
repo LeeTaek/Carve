@@ -12,6 +12,7 @@ import ComposableArchitecture
 
 public struct HeaderView: View {
     private var store: StoreOf<HeaderReducer>
+    private let iconSize: CGFloat = 30
     public  init(store: StoreOf<HeaderReducer>) {
         self.store = store
     }
@@ -26,6 +27,9 @@ public struct HeaderView: View {
                         .padding()
                 }
                 Spacer()
+                beforeButton
+                nextButton
+                divider
                 pencilConfigButton
                 sentenceSettingsButton
             }
@@ -64,8 +68,8 @@ public struct HeaderView: View {
         } label: {
             Image(asset: FeatureCarveAsset.pencilConfig)
                 .resizable()
-                .frame(width: 30, height: 30)
-                .padding(10)
+                .frame(width: iconSize, height: iconSize)
+                .padding(15)
         }
     }
     
@@ -75,9 +79,38 @@ public struct HeaderView: View {
         } label: {
             Image(asset: FeatureCarveAsset.sentenceConfig)
                 .resizable()
-                .frame(width: 30, height: 30)
-                .padding([.trailing], 20)
+                .frame(width: iconSize, height: iconSize)
+                .padding(15)
         }
-        
+    }
+    
+    private var nextButton: some View {
+        Button {
+            store.send(.moveToNext)
+        } label: {
+            Image(asset: FeatureCarveAsset.next)
+                .resizable()
+                .frame(width: iconSize, height: iconSize)
+                .padding(15)
+        }
+    }
+    
+    private var beforeButton: some View {
+        Button {
+            store.send(.moveToBefore)
+        } label: {
+            Image(asset: FeatureCarveAsset.before)
+                .resizable()
+                .frame(width: iconSize, height: iconSize)
+                .padding(15)
+        }
+    }
+    
+    
+    private var divider: some View {
+        Rectangle()
+            .frame(width: 1, height: iconSize)
+            .foregroundStyle(.gray)
+            .padding(.horizontal)
     }
 }
