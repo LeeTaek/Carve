@@ -17,16 +17,15 @@ public struct SettingsReducer {
     @ObservableState
     public struct State {
         public static let initialState = Self()
-        public var path = StackState<Path.State>()
+        @Presents public var path: Path.State? = .iCloud(.initialState)
     }
     public enum Action {
-        case path(StackActionOf<Path>)
-        case pushToiCloudSettings
-        case pushToAppVersion
-        case pushToLisence
+        case path(PresentationAction<Path.Action>)
+        case push(Path.State?)
         case backToCarve
     }
-    @Reducer
+    
+    @Reducer(state: .hashable)
     public enum Path {
         case iCloud(CloudSettingsReducer)
         case appVersion(AppVersionReducer)
@@ -36,17 +35,13 @@ public struct SettingsReducer {
     public var body: some Reducer<State, Action> {
         Reduce { state, action in
             switch action {
-            case .pushToiCloudSettings:
-                state.path.append(.iCloud(.initialState))
-            case .pushToAppVersion:
-                state.path.append(.appVersion(.initialState))
-            case .pushToLisence:
-                state.path.append(.lisence(.initialState))
+            case .push(let path):
+                state.path = path
             default: break
             }
             return .none
         }
-        .forEach(\.path, action: \.path)
+        .ifLet(\.$path, action: \.path)
     }
 
 }

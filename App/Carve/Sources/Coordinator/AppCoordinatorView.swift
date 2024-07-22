@@ -20,13 +20,13 @@ public struct AppCoordinatorView: View {
     }
     
     public var body: some View {
-        switch store.destination {
+        switch store.path {
         case .carve:
-            if let store = store.scope(state: \.destination?.carve, action: \.destination.carve) {
+            if let store = store.scope(state: \.path?.carve, action: \.path.carve) {
                 CarveView(store: store)
             }
         case .settings:
-            if let store = store.scope(state: \.destination?.settings, action: \.destination.settings) {
+            if let store = store.scope(state: \.path?.settings, action: \.path.settings) {
                 SettingsView(store: store)
             }
         default:

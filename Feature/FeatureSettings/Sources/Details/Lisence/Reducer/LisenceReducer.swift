@@ -15,11 +15,10 @@ public struct LisenceReducer {
     public init() { }
     
     @ObservableState
-    public struct State {
+    public struct State: Hashable {
         public static let initialState = Self()
     }
     public enum Action {
-        case present
     }
     public var body: some Reducer<State, Action> {
         Reduce { _, action in

@@ -18,63 +18,68 @@ public struct SettingsView: View {
     }
     
     public var body: some View {
-        NavigationStack(
-            path: $store.scope(state: \.path, action: \.path)
-        ) {
+        NavigationSplitView {
+            sideBar()
+        } detail: {
+            VStack {
+                HStack {
+                    Spacer()
+                    Button {
+                        store.send(.backToCarve)
+                    } label: {
+                        Image(asset: ResourcesAsset.xButton)
+                            .resizable()
+                            .frame(width: 35, height: 35)
+                            .padding()
 
-            
-            Form {
+                    }
+                }
+                .padding()
+                detailView()
+                Spacer()
+            }
+            .toolbar(.hidden)
+        }
+
+    }
+    
+    @ViewBuilder
+    private func sideBar() -> some View {
+        VStack {
+            Text("설정")
+                .font(.system(.title3))
+                .fontWeight(.semibold)
+            List(selection: $store.path.sending(\.push)) {
+                Section("환경 설정") {
+                    NavigationLink("iCloud 설정", value: SettingsReducer.Path.State.iCloud(.initialState))
+                }
                 Section("앱 설정") {
-                    Button {
-                        store.send(.pushToiCloudSettings)
-                    } label: {
-                        Text("iCloud 설정")
-                            .foregroundStyle(.black)
-                            .font(.system(size: 16, weight: .semibold))
-                            
-                    }
-                }
-                
-                Section("앱 정보") {
-                    Button {
-                        store.send(.pushToAppVersion)
-                    } label: {
-                        Text("앱 버전")
-                            .foregroundStyle(.black)
-                            .font(.system(size: 16, weight: .semibold))
-                    }
-                    
-                    Button {
-                        store.send(.pushToLisence)
-                    } label: {
-                        Text("라이센스")
-                            .foregroundStyle(.black)
-                            .font(.system(size: 16, weight: .semibold))
-                    }
+                    NavigationLink("앱 버전", value: SettingsReducer.Path.State.appVersion(.initialState))
+                    NavigationLink("라이센스", value: SettingsReducer.Path.State.lisence(.initialState))
                 }
             }
-            .navigationTitle("설정")
-            .navigationBarTitleDisplayMode(.automatic)
-            .toolbar {
-                Button {
-                    store.send(.backToCarve)
-                } label: {
-                    Image(asset: ResourcesAsset.xButton)
-                        .resizable()
-                        .frame(width: 30, height: 30)
-                        .padding()
-                }
-            }
-            .toolbarTitleDisplayMode(.large)
-        } destination: { store in
-            switch store.case {
-            case .iCloud(let store):
+        }
+        .toolbar(.hidden)
+    }
+    
+    
+    @ViewBuilder
+    private func detailView() -> some View {
+        switch store.path {
+        case .iCloud:
+            if let store = store.scope(state: \.path?.iCloud, action: \.path.iCloud) {
                 CloudSettingView(store: store)
-            case .appVersion(let store):
+            }
+        case .appVersion:
+            if let store = store.scope(state: \.path?.appVersion, action: \.path.appVersion) {
                 AppVersionView(store: store)
-            case .lisence(let store):
+            }
+        case .lisence:
+            if let store = store.scope(state: \.path?.lisence, action: \.path.lisence) {
                 LisenceView(store: store)
             }
+        default:
+            fatalError("Not Defined Settings View")
         }
     }
 }

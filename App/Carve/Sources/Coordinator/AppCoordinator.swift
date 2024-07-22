@@ -17,14 +17,14 @@ public struct AppCoordinator {
     @ObservableState
     public struct State {
         public static var initialState = Self()
-        @Presents public var destination: Destination.State? = .carve(.initialState)
+        @Presents public var path: Path.State? = .carve(.initialState)
     }
     public enum Action {
-        case destination(PresentationAction<Destination.Action>)
+        case path(PresentationAction<Path.Action>)
     }
     
     @Reducer
-    public enum Destination {
+    public enum Path {
         case carve(CarveReducer)
         case settings(SettingsReducer)
     }
@@ -32,14 +32,14 @@ public struct AppCoordinator {
     public var body: some Reducer<State, Action> {
         Reduce { state, action in
             switch action {
-            case .destination(.presented(.carve(.view(.moveToSetting)))):
-                state.destination = .settings(.initialState)
-            case .destination(.presented(.settings(.backToCarve))):
-                state.destination = .carve(.initialState)
+            case .path(.presented(.carve(.view(.moveToSetting)))):
+                state.path = .settings(.initialState)
+            case .path(.presented(.settings(.backToCarve))):
+                state.path = .carve(.initialState)
             default: break
             }
             return .none
         }
-        .ifLet(\.$destination, action: \.destination)
+        .ifLet(\.$path, action: \.path)
     }
 }

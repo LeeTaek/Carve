@@ -37,7 +37,10 @@ public struct CarveView: View {
     }
     
     private var sideBar: some View {
-        VStack(alignment: .trailing) {
+        VStack {
+            Text("성경")
+                .font(.system(.title3))
+                .fontWeight(.semibold)
             List(selection: $store.selectedTitle) {
                 DisclosureGroup(
                     isExpanded: $isShowOldTestment,
@@ -63,32 +66,27 @@ public struct CarveView: View {
             }
             .listStyle(.sidebar)
             
-            Button {
-                store.send(.view(.moveToSetting))
-            } label: {
-                Image(systemName: "gear")
-                    .foregroundStyle(.black)
+            HStack {
+                Spacer()
+                Button {
+                    store.send(.view(.moveToSetting))
+                } label: {
+                    Image(systemName: "gear")
+                        .foregroundStyle(.black)
+                }
+                .frame(width: 30, height: 30)
+                .padding(.trailing, 15)
             }
-            .frame(width: 30, height: 30)
-            .padding(.trailing, 15)
+            
         }
-        .navigationTitle("성경")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            Button {
-                store.send(.view(.closeNavigationBar))
-            } label: {
-                Image(asset: ResourcesAsset.xButton)
-                    .resizable()
-                    .frame(width: 25, height: 25)
-                    .padding()
-            }
-        }
+        .toolbar(.hidden, for: .navigationBar)
     }
     
     private var contentList: some View {
         VStack {
             Text(store.currentTitle.title.koreanTitle())
+                .font(.system(.title3))
+                .fontWeight(.semibold)
             List(1...(store.currentTitle.title.lastChapter),
                  id: \.self ,
                  selection: $store.selectedChapter) { chapter in
