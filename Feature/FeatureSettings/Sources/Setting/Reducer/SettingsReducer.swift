@@ -28,8 +28,8 @@ public struct SettingsReducer {
     @Reducer(state: .hashable)
     public enum Path {
         case iCloud(CloudSettingsReducer)
+        case sendFeedback(SendFeedbackReducer)
         case appVersion(AppVersionReducer)
-        case lisence(LisenceReducer)
     }
     
     public var body: some Reducer<State, Action> {

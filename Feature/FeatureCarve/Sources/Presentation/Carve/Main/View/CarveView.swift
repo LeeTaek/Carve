@@ -37,63 +37,55 @@ public struct CarveView: View {
     }
     
     private var sideBar: some View {
-        VStack {
-            Text("성경")
-                .font(.system(.title3))
-                .fontWeight(.semibold)
-            List(selection: $store.selectedTitle) {
-                DisclosureGroup(
-                    isExpanded: $isShowOldTestment,
-                    content: {
-                        ForEach(BibleTitle.allCases[0..<39]) { title in
-                            NavigationLink(title.koreanTitle(), value: title)
-                        }
-                    }, label: {
-                        Text("구약")
-                    })
-                .disclosureGroupStyle(SidebarDisclosureGroupStyle())
-                
-                DisclosureGroup(
-                    isExpanded: $isShowNewTestment,
-                    content: {
-                        ForEach(BibleTitle.allCases[39..<66]) { title in
-                            NavigationLink(title.koreanTitle(), value: title)
-                        }
-                    }, label: {
-                        Text("신약")
-                    })
-                .disclosureGroupStyle(SidebarDisclosureGroupStyle())
-            }
-            .listStyle(.sidebar)
+        List(selection: $store.selectedTitle) {
+            DisclosureGroup(
+                isExpanded: $isShowOldTestment,
+                content: {
+                    ForEach(BibleTitle.allCases[0..<39]) { title in
+                        NavigationLink(title.koreanTitle(), value: title)
+                    }
+                }, label: {
+                    Text("구약")
+                })
+            .disclosureGroupStyle(SidebarDisclosureGroupStyle())
             
-            HStack {
-                Spacer()
-                Button {
-                    store.send(.view(.moveToSetting))
-                } label: {
-                    Image(systemName: "gear")
-                        .foregroundStyle(.black)
-                }
-                .frame(width: 30, height: 30)
-                .padding(.trailing, 15)
-            }
-            
+            DisclosureGroup(
+                isExpanded: $isShowNewTestment,
+                content: {
+                    ForEach(BibleTitle.allCases[39..<66]) { title in
+                        NavigationLink(title.koreanTitle(), value: title)
+                    }
+                }, label: {
+                    Text("신약")
+                })
+            .disclosureGroupStyle(SidebarDisclosureGroupStyle())
         }
-        .toolbar(.hidden, for: .navigationBar)
+        .navigationTitle("성경")
+        .toolbar {
+            ToolbarItem(placement: .bottomBar) {
+                HStack {
+                    Spacer()
+                    Button {
+                        store.send(.view(.moveToSetting))
+                    } label: {
+                        Image(systemName: "gear")
+                            .foregroundStyle(.black)
+                    }
+                    .frame(width: 30, height: 30)
+                    .padding(.trailing, 15)
+                }
+            }
+        }
+        .toolbar(removing: .sidebarToggle)
     }
     
     private var contentList: some View {
-        VStack {
-            Text(store.currentTitle.title.koreanTitle())
-                .font(.system(.title3))
-                .fontWeight(.semibold)
-            List(1...(store.currentTitle.title.lastChapter),
-                 id: \.self ,
-                 selection: $store.selectedChapter) { chapter in
-                NavigationLink(chapter.description, value: chapter)
-            }
+        List(1...(store.currentTitle.title.lastChapter),
+             id: \.self ,
+             selection: $store.selectedChapter) { chapter in
+            NavigationLink(chapter.description, value: chapter)
         }
-        .toolbar(.hidden, for: .navigationBar)
+             .navigationTitle(store.currentTitle.title.koreanTitle())
     }
 }
 
