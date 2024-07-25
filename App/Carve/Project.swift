@@ -20,7 +20,8 @@ let settings: Settings = .settings(
         .otherLinkerFlags(["-all_load -Objc"])
         .merging([
             "ENABLE_USER_SCRIPT_SANDBOXING": "YES",
-            "ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS": "YES"
+            "ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS": "YES",
+            "FEEDBACK_ADDRESS": "retake_joy@naver.com"
         ])
 )
 

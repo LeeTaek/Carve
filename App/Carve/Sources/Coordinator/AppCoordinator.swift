@@ -17,7 +17,7 @@ public struct AppCoordinator {
     @ObservableState
     public struct State {
         public static var initialState = Self()
-        @Presents public var path: Path.State? = .carve(.initialState)
+        @Presents public var path: Path.State? = .settings(.initialState)
     }
     public enum Action {
         case path(PresentationAction<Path.Action>)

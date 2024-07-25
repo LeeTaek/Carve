@@ -9,7 +9,7 @@
 import ProjectDescription
 
 extension PackageSettings {
-    public static var packages: Self = .init(
+    public static let packages: Self = .init(
         productTypes: [
             "Alamofire": .framework,
             "Kingfisher": .framework,
