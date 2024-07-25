@@ -21,28 +21,17 @@ public struct SendFeedbackReducer {
     @ObservableState
     public struct State: Hashable {
         public static let initialState = Self()
-        public var feedbackType: FeedbackType = .inquiry
-        public var emailAddress: String = ""
-        public var emailDomainType: EmailDomainType = .custom
-        public var emailDomain: String = ""
-        public var domainDisabled: Bool = false
-        public var title: String = ""
-        public var description: String = "- 문의 내용:"
+        @Presents public var path: Path.State?
+        public var feedbackInfo: FeedbackVO = .initialState
         public var imageSelection: [PhotosPickerItem] = []
-        public var selectionImageData: [Data] = []
         public var isOnPhotosPicker: Bool = false
         public var isOnFileImporter: Bool = false
-        public var privacyAgreement: Bool = false
-        public var presentPrivacyDescription: Bool = false
-        @Presents public var path: Path.State?
     }
     public enum Action {
-        case setFeedbackType(FeedbackType)
-        case setEmail(String)
-        case setDomain(String)
-        case setDomainType(EmailDomainType)
+        case path(PresentationAction<Path.Action>)
+        case setFeedbackType(FeedbackVO.FeedbackType)
         case setTitle(String)
-        case setDescription(String)
+        case setBody(String)
         case setAttachment(AttachmentType?)
         case presentPhotoPicker(Bool)
         case preesentFileImporter(Bool)
@@ -51,35 +40,18 @@ public struct SendFeedbackReducer {
         case setFileData([URL])
         case removePhoto(Int)
         case togglePrivacyAgreement
-        case togglePrivacyDescription
         case sendFeedback
-        case path(PresentationAction<Path.Action>)
     }
     
     public var body: some Reducer<State, Action> {
         Reduce { state, action in
             switch action {
             case .setFeedbackType(let type):
-                state.feedbackType = type
-            case .setEmail(let email):
-                state.emailAddress = email
-            case .setDomain(let domain):
-                if state.emailDomainType == .custom {
-                    state.emailDomain = domain
-                }
-            case .setDomainType(let domainType):
-                state.emailDomainType = domainType
-                if domainType != .custom {
-                    state.emailDomain = domainType.rawValue
-                    state.domainDisabled = true
-                } else {
-                    state.emailDomain = ""
-                    state.domainDisabled = false
-                }
+                state.feedbackInfo.feedbackType = type
             case .setTitle(let title):
-                state.title = title
-            case .setDescription(let description):
-                state.description = description
+                state.feedbackInfo.title = title
+            case .setBody(let body):
+                state.feedbackInfo.body = body
             case .setAttachment(let type):
                 switch type {
                 case .photo:
@@ -106,7 +78,7 @@ public struct SendFeedbackReducer {
                 }
             case .setEncodedData(let data):
                 withAnimation(.easeInOut(duration: 0.8)) {
-                    state.selectionImageData = data
+                    state.feedbackInfo.attachment = data
                 }
             case .setFileData(let urls):
                 return .run { send in
@@ -121,21 +93,18 @@ public struct SendFeedbackReducer {
                 }
                 
             case .removePhoto(let index):
-                guard state.selectionImageData.count > index else { return .none }
+                guard state.feedbackInfo.attachment.count > index else { return .none }
                 withAnimation(.easeInOut(duration: 0.1)) {
-                    state.selectionImageData.remove(at: index)
+                    state.feedbackInfo.attachment.remove(at: index)
                 }
                 guard state.imageSelection.count > index else { return .none }
                 state.imageSelection.remove(at: index)
                 
             case .togglePrivacyAgreement:
-                state.privacyAgreement.toggle()
-            case .togglePrivacyDescription:
-                state.presentPrivacyDescription.toggle()
-                
+                state.feedbackInfo.agreeToGetDeviceInfo.toggle()
             case .sendFeedback:
                 if MFMailComposeViewController.canSendMail() {
-                    state.path = .email(.initialState)
+                    state.path = .email(.init(mailInfo: state.feedbackInfo))
                 } else {
                     Log.debug("이메일을 보낼 수 없음")
                 }
@@ -148,20 +117,6 @@ public struct SendFeedbackReducer {
 }
 
 extension SendFeedbackReducer {
-    public enum FeedbackType: String, CaseIterable {
-        case inquiry = "일반 문의"
-        case proposal =  "개선 및 제안"
-        case etc = "기타"
-    }
-    
-    public enum EmailDomainType: String, CaseIterable {
-        case custom = "직접 입력"
-        case naver = "naver.com"
-        case google = "gmail.com"
-        case daum = "daum.net"
-        case kakao = "kakao.com"
-    }
-
     public enum AttachmentType: String, CaseIterable {
         case photo = "사진 보관함"
         case file = "파일 선택"

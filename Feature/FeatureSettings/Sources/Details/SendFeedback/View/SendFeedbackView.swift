@@ -7,6 +7,7 @@
 //
 
 import Core
+import Domain
 import SwiftUI
 import PhotosUI
 
@@ -26,13 +27,7 @@ public struct SendFeedbackView: View {
             }
             .listRowInsets(.init())
             .listRowBackground(Color.clear)
-            
-            Section("답변 받을 이메일 주소") {
-                emailView
-            }
-            .listRowInsets(.init())
-            .listRowBackground(Color.clear)
-            
+                        
             Section("문의 제목") {
                 titleView
             }
@@ -43,7 +38,7 @@ public struct SendFeedbackView: View {
                 header: Text("문의 내용"),
                 footer: HStack {
                     Spacer()
-                    Text("\(store.description.count)/3000")
+                    Text("\(store.feedbackInfo.body.count)/3000")
                 }
             ) {
                 inquryDetailsView
@@ -57,11 +52,11 @@ public struct SendFeedbackView: View {
                     HStack {
                         Text("첨부 사진은 5개까지 등록 가능합니다.")
                         Spacer()
-                        Text("\(store.selectionImageData.count)/5")
+                        Text("\(store.feedbackInfo.attachment.count)/5")
                     }
             ) {
                 attachmentView
-                if !store.selectionImageData.isEmpty {
+                if !store.feedbackInfo.attachment.isEmpty {
                     selectedImageList
                 }
             }
@@ -79,15 +74,15 @@ public struct SendFeedbackView: View {
     
     private var feedbackTypeView: some View {
         Menu {
-            Picker(store.feedbackType.rawValue, selection: $store.feedbackType.sending(\.setFeedbackType)) {
-                ForEach(SendFeedbackReducer.FeedbackType.allCases, id: \.self) { type in
+            Picker(store.feedbackInfo.feedbackType.rawValue, selection: $store.feedbackInfo.feedbackType.sending(\.setFeedbackType)) {
+                ForEach(FeedbackVO.FeedbackType.allCases, id: \.self) { type in
                     Text(type.rawValue)
                         .padding()
                 }
             }
         } label: {
             HStack {
-                Text(store.feedbackType.rawValue)
+                Text(store.feedbackInfo.feedbackType.rawValue)
                     .foregroundStyle(.black)
                 Spacer()
                 Image(systemName: "chevron.down")
@@ -100,48 +95,11 @@ public struct SendFeedbackView: View {
         }
     }
     
-    private var emailView: some View {
-        HStack {
-            TextField("이메일 주소", text: $store.emailAddress.sending(\.setEmail))
-                .padding()
-                .frame(maxWidth: .infinity)
-                .background(Color.white)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-            
-            Text("@")
-                .frame(width: 20)
-                .background(Color(uiColor: .systemGroupedBackground))
-            
-            TextField("\(store.emailDomainType.rawValue)", text: $store.emailDomain.sending(\.setDomain))
-                .padding()
-                .disabled(store.domainDisabled)
-                .frame(maxWidth: .infinity)
-                .background(.white)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-                .overlay {
-                    HStack {
-                        Spacer()
-                        Menu {
-                            Picker(store.emailDomainType.rawValue, selection: $store.emailDomainType.sending(\.setDomainType)) {
-                                ForEach(SendFeedbackReducer.EmailDomainType.allCases, id: \.self) { type in
-                                    Text(type.rawValue)
-                                }
-                            }
-                        } label: {
-                            Image(systemName: "chevron.down")
-                                .foregroundStyle(.black)
-                                .padding()
-                        }
-                    }
-                }
-        }
-    }
-    
     private var titleView: some View {
         HStack {
-            TextField("제목을 입력하세요 (20자 이내)", text: $store.title.sending(\.setTitle))
-                .onChange(of: store.title) { _, newValue in
-                    if store.title.count > 20 {
+            TextField("제목을 입력하세요 (20자 이내)", text: $store.feedbackInfo.title.sending(\.setTitle))
+                .onChange(of: store.feedbackInfo.title) { _, newValue in
+                    if store.feedbackInfo.title.count > 20 {
                         store.send(.setTitle(String(newValue.prefix(20))))
                     }
                 }
@@ -152,7 +110,7 @@ public struct SendFeedbackView: View {
                 .overlay {
                     HStack {
                         Spacer()
-                        Text("\(store.title.count)/20")
+                        Text("\(store.feedbackInfo.title.count)/20")
                             .foregroundStyle(.gray)
                             .padding()
                     }
@@ -161,10 +119,10 @@ public struct SendFeedbackView: View {
     }
     
     private var inquryDetailsView: some View {
-        TextEditor(text: $store.description.sending(\.setDescription))
-            .onChange(of: store.description) { _, newValue in
-                if store.description.count > 3000 {
-                    store.send(.setDescription(String(newValue.prefix(3000))))
+        TextEditor(text: $store.feedbackInfo.body.sending(\.setBody))
+            .onChange(of: store.feedbackInfo.body) { _, newValue in
+                if store.feedbackInfo.body.count > 3000 {
+                    store.send(.setBody(String(newValue.prefix(3000))))
                 }
              }
             .frame(height: 200)
@@ -220,8 +178,8 @@ public struct SendFeedbackView: View {
     
     private var selectedImageList: some View {
         LazyHStack {
-            ForEach(Array(store.selectionImageData.enumerated()), id: \.offset) { index, imageData in
-                if store.selectionImageData.count > index,
+            ForEach(Array(store.feedbackInfo.attachment.enumerated()), id: \.offset) { index, imageData in
+                if store.feedbackInfo.attachment.count > index,
                    let image = UIImage(data: imageData) {
                     Image(uiImage: image)
                         .resizable()
@@ -249,11 +207,11 @@ public struct SendFeedbackView: View {
     private var privacyNoticeView: some View {
         HStack {
             HStack {
-                Image(systemName: store.privacyAgreement ? "v.circle.fill" : "v.circle")
+                Image(systemName: store.feedbackInfo.agreeToGetDeviceInfo ? "v.circle.fill" : "v.circle")
                     .resizable()
                     .frame(width: 20, height: 20)
-                    .foregroundStyle(store.privacyAgreement ? Color.green.opacity(0.6) : Color.gray)
-                Text("(필수) 개인정보 수집 이용에 대한 안내")
+                    .foregroundStyle(store.feedbackInfo.agreeToGetDeviceInfo ? Color.green.opacity(0.6) : Color.gray)
+                Text("(필수)기종 정보와 OS에 대한 정보도 함께 전달합니다. 해당 정보는 피드백 반영 후 바로 파기합니다.")
                     .foregroundStyle(Color.gray)
             }
             .onTapGesture {
@@ -261,11 +219,6 @@ public struct SendFeedbackView: View {
             }
             
             Spacer()
-            Text("전문 보기")
-                .underline()
-                .onTapGesture {
-                    store.send(.togglePrivacyDescription)
-                }
         }
         .frame(height: 100, alignment: .center)
     }

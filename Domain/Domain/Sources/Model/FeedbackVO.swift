@@ -9,32 +9,33 @@
 import Foundation
 
 public struct FeedbackVO: Equatable, Hashable {
-    public var feedbackType: String
+    public var feedbackType: FeedbackType = .inquiry
     public var email: String
     public var title: String
     public var body: String
-    public var attachment: [Data]?
+    public var attachment: [Data]
     public let feedbackAddress: String = Bundle.main.object(forInfoDictionaryKey: "FeedbackAddress") as! String
-    public var deviceInfo: String
+    public var deviceInfo: String?
+    public var agreeToGetDeviceInfo: Bool = false
     
-    public static var initialState = Self(feedbackType: "",
-                                          email: "",
+    public static var initialState = Self(email: "",
                                           title: "",
-                                          body: "",
-                                          deviceInfo: "")
-    public init(feedbackType: String,
-                email: String,
+                                          body: "- 문의 내용:")
+    public init(email: String,
                 title: String,
                 body: String,
-                attachment: [Data]? = nil,
-                deviceInfo: String
+                attachment: [Data] = []
     ) {
-        self.feedbackType = feedbackType
         self.email = email
         self.title = title
         self.body = body
         self.attachment = attachment
-        self.deviceInfo = deviceInfo
+    }
+    
+    public enum FeedbackType: String, CaseIterable {
+        case inquiry = "일반 문의"
+        case proposal =  "개선 및 제안"
+        case etc = "기타"
     }
 }
 

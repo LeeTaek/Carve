@@ -18,15 +18,16 @@ public struct MailComposeView: UIViewControllerRepresentable {
     public init(store: StoreOf<MailComposeReducer>) {
         self.store = store
     }
+
     
     public func makeUIViewController(context: Context) -> MFMailComposeViewController {
         let viewController = MFMailComposeViewController()
         viewController.mailComposeDelegate = context.coordinator
         viewController.setToRecipients([store.mailInfo.feedbackAddress])
-        viewController.setSubject(store.mailInfo.title)
-        viewController.setMessageBody(store.mailInfo.body, isHTML: false)
-        guard let datas = store.mailInfo.attachment else { return viewController }
-        for (index, imageData) in datas.enumerated() {
+        let title = "[\(store.mailInfo.feedbackType.rawValue)] \(store.mailInfo.title)"
+        viewController.setSubject(title)
+        viewController.setMessageBody(body(), isHTML: false)
+        for (index, imageData) in store.mailInfo.attachment.enumerated() {
             viewController.addAttachmentData(imageData, mimeType: "image/jpeg", fileName: "attacnmentImage_\(index).jpg")
         }
         return viewController
@@ -38,6 +39,32 @@ public struct MailComposeView: UIViewControllerRepresentable {
     public func makeCoordinator() -> Coordinator {
         Coordinator(store: store)
     }
+    
+    private func body() -> String {
+        let deviceInfo = """
+        
+        
+        -----------------------------------------------------
+        
+        Device Model: \(UIDevice.modelName)
+        Device OS: \(UIDevice.current.systemVersion)
+        AppVersion: \(currentAppVersion())
+        
+        -----------------------------------------------------
+        """
+        return store.mailInfo.body + deviceInfo
+    }
+    
+    
+    private func currentAppVersion() -> String {
+      if let info: [String: Any] = Bundle.main.infoDictionary,
+          let currentVersion: String
+            = info["CFBundleShortVersionString"] as? String {
+            return currentVersion
+      }
+      return "nil"
+    }
+    
     
     public class Coordinator: NSObject, MFMailComposeViewControllerDelegate {
         let store: StoreOf<MailComposeReducer>
