@@ -48,23 +48,12 @@ public struct MailComposeView: UIViewControllerRepresentable {
         
         Device Model: \(UIDevice.modelName)
         Device OS: \(UIDevice.current.systemVersion)
-        AppVersion: \(currentAppVersion())
+        AppVersion: \(UIDevice.appVersion())
         
         -----------------------------------------------------
         """
         return store.mailInfo.body + deviceInfo
     }
-    
-    
-    private func currentAppVersion() -> String {
-      if let info: [String: Any] = Bundle.main.infoDictionary,
-          let currentVersion: String
-            = info["CFBundleShortVersionString"] as? String {
-            return currentVersion
-      }
-      return "nil"
-    }
-    
     
     public class Coordinator: NSObject, MFMailComposeViewControllerDelegate {
         let store: StoreOf<MailComposeReducer>
@@ -75,11 +64,8 @@ public struct MailComposeView: UIViewControllerRepresentable {
         public func mailComposeController(_ controller: MFMailComposeViewController,
                                           didFinishWith result: MFMailComposeResult,
                                           error: (any Error)?) {
-            defer {
-                store.send(.dismiss)
-            }
+            store.send(.dismiss)
         }
     }
-    
     
 }

@@ -16,7 +16,6 @@ public struct FeedbackVO: Equatable, Hashable {
     public var attachment: [Data]
     public let feedbackAddress: String = Bundle.main.object(forInfoDictionaryKey: "FeedbackAddress") as! String
     public var deviceInfo: String?
-    public var agreeToGetDeviceInfo: Bool = false
     
     public static var initialState = Self(email: "",
                                           title: "",

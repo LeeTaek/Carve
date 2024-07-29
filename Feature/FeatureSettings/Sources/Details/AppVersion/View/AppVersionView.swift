@@ -6,6 +6,7 @@
 //  Copyright © 2024 leetaek. All rights reserved.
 //
 
+import Core
 import SwiftUI
 import Resources
 
@@ -24,11 +25,7 @@ public struct AppVersionView: View {
         ) {
             List {
                 Section("앱 정보") {
-                    Image(asset: ResourcesAsset.xButton)
-                        .resizable()
-                        .frame(width: 50, height: 50, alignment: .center)
-                    
-                    
+                    appVersion
                 }
                 Button {
                     store.send(.pushToLisence)
@@ -45,4 +42,18 @@ public struct AppVersionView: View {
             }
         }
     }
+    
+    private var appVersion: some View {
+        HStack {
+            Image(asset: ResourcesAsset.appIcon)
+                .resizable()
+                .frame(width: 50, height: 50, alignment: .center)
+            Text("새기다")
+            Spacer()
+            Text(UIDevice.appVersion())
+                .padding(.horizontal)
+        }
+    }
+    
+    
 }

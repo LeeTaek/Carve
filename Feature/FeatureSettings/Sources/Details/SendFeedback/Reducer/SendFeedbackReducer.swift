@@ -17,7 +17,7 @@ import ComposableArchitecture
 @Reducer
 public struct SendFeedbackReducer {
     public init() { }
-    
+
     @ObservableState
     public struct State: Hashable {
         public static let initialState = Self()
@@ -26,6 +26,9 @@ public struct SendFeedbackReducer {
         public var imageSelection: [PhotosPickerItem] = []
         public var isOnPhotosPicker: Bool = false
         public var isOnFileImporter: Bool = false
+        public var agreeToDefaultNotice: Bool = false
+        public var agreeToGetDeviceInfo: Bool = false
+        public var popupMessage: String = ""
     }
     public enum Action {
         case path(PresentationAction<Path.Action>)
@@ -39,7 +42,9 @@ public struct SendFeedbackReducer {
         case setEncodedData([Data])
         case setFileData([URL])
         case removePhoto(Int)
+        case toggleDefaultAgreement
         case togglePrivacyAgreement
+        case isEnableSendButton
         case sendFeedback
     }
     
@@ -99,14 +104,40 @@ public struct SendFeedbackReducer {
                 }
                 guard state.imageSelection.count > index else { return .none }
                 state.imageSelection.remove(at: index)
-                
+            case .toggleDefaultAgreement:
+                state.agreeToDefaultNotice.toggle()
             case .togglePrivacyAgreement:
-                state.feedbackInfo.agreeToGetDeviceInfo.toggle()
+                state.agreeToGetDeviceInfo.toggle()
             case .sendFeedback:
                 if MFMailComposeViewController.canSendMail() {
                     state.path = .email(.init(mailInfo: state.feedbackInfo))
                 } else {
                     Log.debug("이메일을 보낼 수 없음")
+                }
+            case .isEnableSendButton:
+                if state.feedbackInfo.title.isEmpty {
+                    state.popupMessage = "문의 제목을 입력해주세요."
+                    return .none
+                }
+                if state.feedbackInfo.body.hasPrefix("- 문의 내용:") {
+                    let remainIsEmpty = state.feedbackInfo.body.dropFirst(8).isEmpty
+                    if remainIsEmpty {
+                        state.popupMessage = "문의 내용을 입력해주세요."
+                        return .none
+                    }
+                } else {
+                    if state.feedbackInfo.body.isEmpty {
+                        state.popupMessage = "문의 내용을 입력해주세요."
+                        return .none
+                    }
+                }
+                if !state.agreeToDefaultNotice || !state.agreeToGetDeviceInfo {
+                    state.popupMessage = "필수 동의 항목을 체크해주세요."
+                    return .none
+                }
+                state.popupMessage = ""
+                return .run { send in
+                    await send(.sendFeedback)
                 }
             default: break
             }
@@ -131,6 +162,7 @@ extension SendFeedbackReducer {
     @Reducer(state: .hashable)
     public enum Path {
         case email(MailComposeReducer)
+        case popup
     }
 }
 

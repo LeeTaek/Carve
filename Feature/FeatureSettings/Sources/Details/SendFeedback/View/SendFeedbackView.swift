@@ -15,6 +15,7 @@ import ComposableArchitecture
 
 public struct SendFeedbackView: View {
     @Bindable private var store: StoreOf<SendFeedbackReducer>
+    @State private var shakeTrigger: Bool = false
 
     public init(store: StoreOf<SendFeedbackReducer>) {
         self.store = store
@@ -22,20 +23,40 @@ public struct SendFeedbackView: View {
     
     public var body: some View {
         List {
-            Section("문의 분류") {
+            Section(
+                header: HStack {
+                        Text("*")
+                            .font(.system(size: 20))
+                            .foregroundStyle(.red)
+                        Text("문의 분류")
+                    }
+            ) {
                 feedbackTypeView
             }
             .listRowInsets(.init())
             .listRowBackground(Color.clear)
                         
-            Section("문의 제목") {
+            Section(
+                
+                header: HStack {
+                    Text("*")
+                        .font(.system(size: 20))
+                        .foregroundStyle(.red)
+                    Text("문의 제목")
+                }
+            ) {
                 titleView
             }
             .listRowInsets(.init())
             .listRowBackground(Color.clear)
             
             Section(
-                header: Text("문의 내용"),
+                header: HStack {
+                    Text("*")
+                        .font(.system(size: 20))
+                        .foregroundStyle(.red)
+                    Text("문의 내용")
+                },
                 footer: HStack {
                     Spacer()
                     Text("\(store.feedbackInfo.body.count)/3000")
@@ -62,12 +83,25 @@ public struct SendFeedbackView: View {
             }
             .listRowInsets(.init())
             
-            privacyNoticeView
+            noticeView
                 .listRowInsets(.init())
                 .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+            
+            if !store.popupMessage.isEmpty {
+                errorMessage
+                    .listRowInsets(.init())
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .shakeAnimation(trigger: $shakeTrigger)
+                    .onAppear {
+                        triggerShankeAnimation()
+                    }
+            }
             
             sendFeedbackButton
                 .listRowInsets(.init())
+                .listRowSeparator(.hidden)
         }
         .navigationTitle("의견 보내기")
     }
@@ -204,37 +238,71 @@ public struct SendFeedbackView: View {
         .padding()
     }
     
-    private var privacyNoticeView: some View {
-        HStack {
+    private var noticeView: some View {
+        VStack(alignment: .leading) {
             HStack {
-                Image(systemName: store.feedbackInfo.agreeToGetDeviceInfo ? "v.circle.fill" : "v.circle")
+                Text("*")
+                    .font(.system(size: 20))
+                    .foregroundStyle(.red)
+                Image(systemName: store.agreeToDefaultNotice ? "v.circle.fill" : "v.circle")
                     .resizable()
                     .frame(width: 20, height: 20)
-                    .foregroundStyle(store.feedbackInfo.agreeToGetDeviceInfo ? Color.green.opacity(0.6) : Color.gray)
-                Text("(필수)기종 정보와 OS에 대한 정보도 함께 전달합니다. 해당 정보는 피드백 반영 후 바로 파기합니다.")
+                    .foregroundStyle(store.agreeToDefaultNotice ? Color.green.opacity(0.6) : Color.gray)
+                Text("(필수)작성하신 의견을 앱 개발자에게 보냅니다.")
+                    .foregroundStyle(Color.gray)
+            }
+            .onTapGesture {
+                store.send(.toggleDefaultAgreement)
+            }
+            
+            HStack {
+                Text("*")
+                    .font(.system(size: 20))
+                    .foregroundStyle(.red)
+                Image(systemName: store.agreeToGetDeviceInfo ? "v.circle.fill" : "v.circle")
+                    .resizable()
+                    .frame(width: 20, height: 20)
+                    .foregroundStyle(store.agreeToGetDeviceInfo ? Color.green.opacity(0.6) : Color.gray)
+                Text("(필수)기종 정보와 OS에 대한 정보도 함께 전달합니다. 해당 정보는 피드백 확인 후 바로 파기됩니다.")
                     .foregroundStyle(Color.gray)
             }
             .onTapGesture {
                 store.send(.togglePrivacyAgreement)
             }
-            
-            Spacer()
         }
-        .frame(height: 100, alignment: .center)
+        .frame(height: 100)
+        .padding(.vertical)
     }
     
     private var sendFeedbackButton: some View {
         Button {
-            store.send(.sendFeedback)
+            store.send(.isEnableSendButton)
+            triggerShankeAnimation()
         } label: {
             Text("의견 보내기")
                 .foregroundStyle(.black)
                 .frame(maxWidth: .infinity, alignment: .center)
                 .padding()
         }
-        .sheet(item: $store.scope(state: \.path?.email, 
+        .sheet(item: $store.scope(state: \.path?.email,
                                   action: \.path.email)) { store in
             MailComposeView(store: store)
+        }
+    }
+    
+    private var errorMessage: some View {
+        Text(store.popupMessage)
+            .fontWeight(.medium)
+            .foregroundStyle(.red)
+    }
+    
+    private func triggerShankeAnimation() {
+        withAnimation(
+            Animation.linear(duration: 0.25)
+                .repeatCount(2, autoreverses: false)
+        ) {
+            shakeTrigger.toggle()
+            
         }
     }
     

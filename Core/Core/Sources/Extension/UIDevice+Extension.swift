@@ -75,4 +75,13 @@ public extension UIDevice {
         
         return mapToDevice(identifier: identifier)
     }()
+    
+    static func appVersion() -> String {
+        if let info: [String: Any] = Bundle.main.infoDictionary,
+           let currentVersion: String
+            = info["CFBundleShortVersionString"] as? String {
+            return currentVersion
+        }
+        return "nil"
+    }
 }
