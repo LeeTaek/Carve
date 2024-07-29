@@ -162,7 +162,6 @@ extension SendFeedbackReducer {
     @Reducer(state: .hashable)
     public enum Path {
         case email(MailComposeReducer)
-        case popup
     }
 }
 

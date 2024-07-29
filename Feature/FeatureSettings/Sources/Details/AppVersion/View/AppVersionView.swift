@@ -27,13 +27,18 @@ public struct AppVersionView: View {
                 Section("앱 정보") {
                     appVersion
                 }
-                Button {
-                    store.send(.pushToLisence)
-                } label: {
-                    Text("라이센스")
-                        .foregroundStyle(.black)
-                }
-
+                
+//                Button {
+//                    store.send(.pushToLisence)
+//                } label: {
+//                    HStack {
+//                        Text("라이센스")
+//                            .foregroundStyle(.black)
+//                        Spacer()
+//                        Image(systemName: "chevron.forward")
+//                            .foregroundStyle(.black)
+//                    }
+//                }
             }
         } destination: { store in
             switch store.case {

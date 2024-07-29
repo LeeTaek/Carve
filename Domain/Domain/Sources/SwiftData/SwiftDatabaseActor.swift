@@ -55,6 +55,15 @@ public actor SwiftDatabaseActor {
         self.modelContext.delete(item)
         try self.modelContext.save()
     }
+    
+    public func deleteAll<T: PersistentModel>(_ type: T.Type) throws {
+        try self.modelContext.delete(model: T.self)
+    }
+    
+    public func databaseIsEmpty<T: PersistentModel>(_ type: T.Type) throws -> Bool {
+        let objects: [T] = try self.fetch()
+        return objects.isEmpty
+    }
 }
 
 extension SwiftDatabaseActor: DependencyKey {

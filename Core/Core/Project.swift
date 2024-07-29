@@ -11,7 +11,6 @@ import ProjectDescriptionHelpers
 let projectName = "Core"
 
 let dependencies: [TargetDependency] = [
-    .Alamofire
 ]
 
 let script: [TargetScript] = [.swiftLint]

@@ -29,11 +29,14 @@ public struct CloudSettingView: View {
             }
             
             Button {
-                store.send(.removeAlliCloudData)
+                store.send(.databaseIsEmpty)
             }label: {
                 Text("모든 필사 데이터 삭제")
                     .foregroundStyle(.red)
                     .frame(maxWidth: .infinity, alignment: .center)
+            }
+            .popover(item: $store.scope(state: \.path?.popup, action: \.path.popup)) { store in
+                PopupView(store: store)
             }
         }
         .navigationTitle("iCloud 설정")

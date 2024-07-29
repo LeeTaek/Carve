@@ -23,6 +23,13 @@ public struct SendFeedbackView: View {
     
     public var body: some View {
         List {
+            Text("메일 앱을 통해 개발자에게 버그 수정, 기능 개성 요청 등등 의견을 보냅니다.\n회신이 필요한 경우 사용하신 메일 주소로 회신합니다.\n메일 앱 설정이 되어있지 않은 경우 앱스토어 의견에 남겨주세요.\n감사합니다😊")
+                .font(.system(size: 18, weight: .medium))
+                .lineSpacing(8)
+                .foregroundStyle(.black.opacity(0.7))
+                .listRowInsets(.init())
+                .padding()
+            
             Section(
                 header: HStack {
                         Text("*")

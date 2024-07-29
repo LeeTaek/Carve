@@ -17,7 +17,7 @@ public struct SettingsReducer {
     @ObservableState
     public struct State {
         public static let initialState = Self()
-        @Presents public var path: Path.State? = .sendFeedback(.initialState)
+        @Presents public var path: Path.State? = .iCloud(.initialState)
     }
     public enum Action {
         case path(PresentationAction<Path.Action>)

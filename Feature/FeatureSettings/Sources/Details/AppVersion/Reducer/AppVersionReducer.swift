@@ -42,5 +42,6 @@ public struct AppVersionReducer {
             }
             return .none
         }
+        .forEach(\.path, action: \.path)
     }
 }
