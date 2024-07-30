@@ -12,12 +12,12 @@ public extension InfoPlist {
         .extendingDefault(
           with: [
             "CFBundleExecutable": "$(EXECUTABLE_NAME)",
-            "CFBundleInfoDictionaryVersion": "0.1.0",
+            "CFBundleInfoDictionaryVersion": "1.0.0",
             "CFBundlePackageType": "APPL",
             "CFBundleName": "$(PRODUCT_NAME)",
             "CFBundleIdentifier": "$(PRODUCT_BUNDLE_IDENTIFIER)",
             "CFBundleVersion": "1",
-            "CFBundleShortVersionString": "0.1.0",
+            "CFBundleShortVersionString": "1.0.0",
             "UILaunchStoryboardName": "LaunchScreen",
             "UISupportedInterfaceOrientations": "UIInterfaceOrientationPortrait",
             "FeedbackAddress": "$(FEEDBACK_ADDRESS)"
