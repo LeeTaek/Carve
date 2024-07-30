@@ -11,7 +11,9 @@ import ProjectDescriptionHelpers
 let projectName = "Domain"
 
 let dependencies: [TargetDependency] = [
-    .Core
+    .Core,
+    
+    .Dependencies
 ]
 
 let script: [TargetScript] = [.swiftLint]

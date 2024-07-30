@@ -19,12 +19,14 @@ public extension Target {
         sources: SourceFilesList = "Sources/**",
         resources: ResourceFileElements? = [
             "Resources/**",
-            "./Support/GoogleService-Info.plist"
+            "./Support/GoogleService-Info.plist",
+            "./Support/PrivacyInfo.xcprivacy"
         ],
         entitlements: Entitlements? = nil,
         scripts: [ProjectDescription.TargetScript] = [],
         dependencies: [TargetDependency] = [],
-        settings: Settings? = nil
+        settings: Settings? = nil,
+        launchArguments: [ProjectDescription.LaunchArgument] = []
     )
     -> Target {
         return Target.target(
@@ -39,7 +41,8 @@ public extension Target {
             entitlements: entitlements,
             scripts: scripts,
             dependencies: dependencies,
-            settings: settings
+            settings: settings,
+            launchArguments: launchArguments
         )
     }
     

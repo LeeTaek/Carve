@@ -51,6 +51,7 @@ public extension TargetDependency {
     
     /// 외부 라이브러리: Tuist + SPM
     static let TCAArchitecture: Self = .external(name: "ComposableArchitecture")
+    static let Dependencies: Self = .external(name: "Dependencies")
     static let FirebaseAnalytics: Self = .external(name:  "FirebaseAnalytics")
     static let FirebaseMessaging: Self = .external(name:  "FirebaseMessaging")
     static let FirebaseCrashlytics: Self = .external(name: "FirebaseCrashlytics")

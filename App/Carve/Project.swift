@@ -18,6 +18,7 @@ let settings: Settings = .settings(
     base: SettingsDictionary()
         .automaticCodeSigning(devTeam: "H4MSW7FUBB")
         .otherLinkerFlags(["-all_load -Objc"])
+        .debugInformationFormat(.dwarfWithDsym)
         .merging([
             "ENABLE_USER_SCRIPT_SANDBOXING": "YES",
             "ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS": "YES",
@@ -30,7 +31,10 @@ let targets: [Target] = [
         name: .configuration(projectName),
         entitlements: .file(path: .relativeToCurrentFile("Support/Carve.entitlements")),
         scripts: script,
-        dependencies: dependencies
+        dependencies: dependencies,
+        launchArguments: [
+            .launchArgument(name: "-FIRDebugEnabled", isEnabled: true)
+        ]
     )
 ]
 
