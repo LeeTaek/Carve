@@ -18,34 +18,51 @@ public struct PopupView: View {
     }
     
     public var body: some View {
-        VStack {
+        VStack(spacing: 0) {
             if store.title != nil {
                 Text(store.title!)
                     .bold()
             }
             Text(store.body)
-            
-            HStack {
+                .font(.system(size: 18, weight: .medium))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .padding()
+                .background(.white)
+
+            HStack(spacing: 15) {
                 Button {
                     store.send(.confirm)
                 } label: {
                     Text(store.confirmTitle)
+                        .fontWeight(.semibold)
                         .foregroundStyle(store.confirmColor)
                 }
+                .frame(maxWidth: .infinity)
                 .padding()
+                .border(Color(uiColor: .systemGroupedBackground), width: 2)
+                .clipShape(RoundedRectangle(cornerRadius: 5))
+
                 if store.cancelTitle != nil {
-                    Spacer()
                     Button {
                         store.send(.cancel)
                     } label: {
                         Text(store.cancelTitle!)
+                            .fontWeight(.semibold)
                     }
+                    .frame(maxWidth: .infinity)
                     .padding()
+                    .border(Color(uiColor: .systemGroupedBackground), width: 2)
+                    .clipShape(RoundedRectangle(cornerRadius: 5))
+                    
                 }
             }
+            .padding()
+            .background(.white)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
         }
         .padding()
+        .border(Color(uiColor: .systemGroupedBackground), width: 15)
+        .frame(minWidth: 100, minHeight: 100)
+        .presentationDetents([.medium, .large])
     }
-    
-    
 }
