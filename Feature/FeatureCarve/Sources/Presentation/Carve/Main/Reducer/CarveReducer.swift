@@ -19,7 +19,6 @@ public struct CarveReducer {
     public init() { }
     @ObservableState
     public struct State {
-        public var lastChapter: Int
         public var columnVisibility: NavigationSplitViewVisibility
         public var carveDetailState: CarveDetailReducer.State
         @Shared(.appStorage("title")) public var currentTitle: TitleVO = .initialState
@@ -27,7 +26,6 @@ public struct CarveReducer {
         public var selectedChapter: Int?
         
         public static let initialState = State(
-            lastChapter: 1,
             columnVisibility: .detailOnly,
             carveDetailState: .initialState
         )
@@ -43,6 +41,7 @@ public struct CarveReducer {
     }
     public enum ViewAction: Equatable {
         case moveToSetting
+        case closeNavigationBar
     }
     
     public enum InnerAction: Equatable {
@@ -86,8 +85,30 @@ public struct CarveReducer {
                 state.selectedTitle = state.currentTitle.title
                 state.selectedChapter = state.currentTitle.chapter
                 state.columnVisibility = .all
+            case .scope(.carveDetailAction(.scope(.headerAction(.moveToNext)))):
+                if state.currentTitle.chapter == state.currentTitle.title.lastChapter {
+                    state.currentTitle.title = state.currentTitle.title.next()
+                    state.currentTitle.chapter = 1
+                } else {
+                    state.currentTitle.chapter += 1
+                }
+                return .run { send in
+                    await send(.scope(.carveDetailAction(.inner(.fetchSentence))))
+                }
+            case .scope(.carveDetailAction(.scope(.headerAction(.moveToBefore)))):
+                if state.currentTitle.chapter == 1 {
+                    state.currentTitle.title = state.currentTitle.title.before()
+                    state.currentTitle.chapter = state.currentTitle.title.lastChapter
+                } else {
+                    state.currentTitle.chapter -= 1
+                }
+                return .run { send in
+                    await send(.scope(.carveDetailAction(.inner(.fetchSentence))))
+                }
             case .view(.moveToSetting):
                 Log.debug("move To settings")
+            case .view(.closeNavigationBar):
+                state.columnVisibility = .detailOnly
             default: break
             }
             return .none

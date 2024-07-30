@@ -13,22 +13,24 @@ import SwiftUI
 import ComposableArchitecture
 
 public struct AppCoordinatorView: View {
-    private var store: StoreOf<AppCoordinator>
+    @Bindable private var store: StoreOf<AppCoordinator>
     
     public init(store: StoreOf<AppCoordinator>) {
         self.store = store
     }
     
     public var body: some View {
-        switch store.state {
+        switch store.path {
         case .carve:
-            if let store = store.scope(state: \.carve, action: \.carve) {
+            if let store = store.scope(state: \.path?.carve, action: \.path.carve) {
                 CarveView(store: store)
             }
         case .settings:
-            if let store = store.scope(state: \.settings, action: \.settings) {
+            if let store = store.scope(state: \.path?.settings, action: \.path.settings) {
                 SettingsView(store: store)
             }
+        default:
+            fatalError("Store init Failed")
         }
     }
 }

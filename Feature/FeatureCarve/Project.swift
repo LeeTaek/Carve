@@ -21,10 +21,14 @@ let dependencies: [TargetDependency] = [
 let script: [TargetScript] = [.swiftLint]
 
 let settings: Settings = .settings(
-  configurations: [
-    .debug(name: .debug),
-    .release(name: .release)
-  ]
+    base: [
+        "CLANG_ENABLE_MODULE_VERIFIER": "YES",
+        "ENABLE_USER_SCRIPT_SANDBOXING": "YES"
+    ],
+    configurations: [
+        .debug(name: .debug),
+        .release(name: .release)
+    ]
 )
 
 

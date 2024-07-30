@@ -23,15 +23,15 @@ public struct PencilPalatteView: View {
             penTypePalatte
                 .frame(maxWidth: .infinity)
 
-            devider
+            divider
             penLineWidth
                 .frame(maxWidth: .infinity)
 
-            devider
+            divider
             colorPalatte
                 .frame(maxWidth: .infinity)
 
-            devider
+            divider
             doButtons
                 .frame(maxWidth: .infinity)
 
@@ -81,7 +81,7 @@ public struct PencilPalatteView: View {
         }
     }
     
-    private var devider: some View {
+    private var divider: some View {
         Rectangle()
             .frame(width: 1, height: iconSize)
             .foregroundStyle(.gray)

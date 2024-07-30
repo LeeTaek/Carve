@@ -19,7 +19,8 @@ public extension InfoPlist {
             "CFBundleVersion": "1",
             "CFBundleShortVersionString": "0.1.0",
             "UILaunchStoryboardName": "LaunchScreen",
-            "UISupportedInterfaceOrientations": "UIInterfaceOrientationPortrait"
+            "UISupportedInterfaceOrientations": "UIInterfaceOrientationPortrait",
+            "FeedbackAddress": "$(FEEDBACK_ADDRESS)"
           ]
         )
     }

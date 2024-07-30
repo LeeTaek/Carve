@@ -36,7 +36,7 @@ extension DependencyValues {
 final class PersistentCloudKitContainer: @unchecked Sendable {
     static let shared = PersistentCloudKitContainer(isLive: true)
     static let testConatiner = PersistentCloudKitContainer(isLive: false)
-    let container: ModelContainer
+    private let container: ModelContainer
     let context: ModelContext
     
     private init(isLive: Bool) {

@@ -95,21 +95,25 @@ public enum BibleTitle: String, CaseIterable, Identifiable, Codable, Sendable {
     case jude = "2-26Jude.txt"
     case revelation = "2-27Revelation.txt"
 
-    public mutating func next() {
+    public func next() -> Self {
         let allCases = type(of: self).allCases
         let currentIndex = allCases.firstIndex(of: self)!
 
         if self != .revelation {
-            self = allCases[currentIndex + 1]
+            return allCases[currentIndex + 1]
+        } else {
+            return .revelation
         }
     }
 
-    public mutating func before() {
+    public func before() -> Self {
         let allCases = type(of: self).allCases
         let currentIndex = allCases.firstIndex(of: self)!
 
         if self != .genesis {
-            self = allCases[currentIndex - 1]
+            return allCases[currentIndex - 1]
+        } else {
+            return .genesis
         }
     }
 
