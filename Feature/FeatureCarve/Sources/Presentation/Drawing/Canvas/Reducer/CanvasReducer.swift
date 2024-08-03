@@ -47,7 +47,12 @@ public struct CanvasReducer {
                 let drawing = state.drawing
                 drawing.lineData = newDrawing.dataRepresentation()
                 return .run { _ in
-                    try await drawingContext.update(item: drawing)
+                    do {
+                        Log.debug("drawing: ", drawing)
+                        try await drawingContext.update(item: drawing)
+                    } catch {
+                        Log.debug("drawing error: \(error)")
+                    }
                 }
             case .registUndoCanvas(let canvas):
                 if undoManager.isPerformingUndoRedo {

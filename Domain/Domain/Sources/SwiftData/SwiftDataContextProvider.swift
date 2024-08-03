@@ -46,7 +46,7 @@ final class PersistentCloudKitContainer: @unchecked Sendable {
             let schema = Schema([
                 DrawingVO.self
             ])
-            let config = ModelConfiguration(url: url)
+            let config = ModelConfiguration(url: url, cloudKitDatabase: .private("iCloud.Carve.SwiftData.iCloud"))
             container = try ModelContainer(for: schema, configurations: config)
             context = ModelContext(container)
         } catch {

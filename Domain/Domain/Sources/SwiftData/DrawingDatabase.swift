@@ -59,8 +59,9 @@ public struct DrawingDatabase: Sendable, Database {
         let actor = try await createActor()
         let drawings: [DrawingVO] = try await fetch(title: title)
         for drawing in drawings {
-            if drawing.section <= last {
-                let newDrawing = DrawingVO(bibleTitle: title, section: drawing.section)
+            guard let section = drawing.section else { continue }
+            if section <= last {
+                let newDrawing = DrawingVO(bibleTitle: title, section: section)
                 if drawing.lineData != nil {
                     newDrawing.lineData = drawing.lineData
                 }
