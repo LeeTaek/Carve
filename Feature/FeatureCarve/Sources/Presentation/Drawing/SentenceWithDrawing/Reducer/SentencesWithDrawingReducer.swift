@@ -26,13 +26,13 @@ public struct SentencesWithDrawingReducer {
         public var underLineCount: Int = 1
         public var underlineOffset: [CGFloat] = [.zero]
         
-        public init(sentence: SentenceVO, drawing: DrawingVO) {
+        public init(sentence: SentenceVO, drawing: DrawingVO?) {
             self.id = "\(sentence.title.title.koreanTitle()).\(sentence.title.chapter).\(sentence.section)"
             self.sentence = sentence
             self.sentenceState = .init(chapterTitle: sentence.chapterTitle,
                                        section: sentence.section,
                                        sentence: sentence.sentenceScript)
-            self.canvasState = .init(drawing: drawing)
+            self.canvasState = .init(sentence: sentence, drawing: drawing)
         }
     }
     

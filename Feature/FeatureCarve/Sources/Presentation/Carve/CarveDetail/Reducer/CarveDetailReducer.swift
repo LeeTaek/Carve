@@ -72,15 +72,7 @@ public struct CarveDetailReducer {
                 return .run { send in
                     let sentences = try fetchBible(chapter: title)
                     do {
-                        var storedDrawing = try await drawingContext.fetch(title: title)
-                        guard let lastSection = sentences.last?.section
-                        else {
-                            throw CarveReducerError.fetchSentenceError
-                        }
-                        if storedDrawing.count != sentences.count {
-                            try await drawingContext.setDrawing(title: title, to: lastSection)
-                            storedDrawing = try await drawingContext.fetch(title: title)
-                        }
+                        let storedDrawing = try await drawingContext.fetch(title: title)
                         await send(.inner(.setSentence(sentences, storedDrawing)))
                     } catch {
                         Log.debug("fetch drawing error", error)
@@ -89,13 +81,19 @@ public struct CarveDetailReducer {
                 }
             case .inner(.setSentence(let sentences, let drawings)):
                 state.sentenceWithDrawingState.removeAll()
-                for (index, sentence) in sentences.enumerated() {
-                    let drawing = (drawings.isEmpty)
-                    ? DrawingVO(bibleTitle: sentence.title, section: sentence.section)
-                    : drawings[index]
-                    let currentState = SentencesWithDrawingReducer.State(sentence: sentence, drawing: drawing)
-                    state.sentenceWithDrawingState.append(currentState)
+                var sentenceState: IdentifiedArrayOf<SentencesWithDrawingReducer.State> = []
+                let sectionSet = Set(drawings.compactMap { $0.section })
+                for sentence in sentences {
+                    if sectionSet.contains(sentence.section) {
+                        let drawing = drawings.filter { $0.section == sentence.section }.first
+                        sentenceState.append(SentencesWithDrawingReducer.State(sentence: sentence,
+                                                                               drawing: drawing))
+                    } else {
+                        sentenceState.append(SentencesWithDrawingReducer.State(sentence: sentence,
+                                                                               drawing: nil))
+                    }
                 }
+                state.sentenceWithDrawingState = sentenceState
                 undoManager.clear()
                 return .run { send in
                     await send(.view(.scrollToTop))

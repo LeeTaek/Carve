@@ -16,15 +16,15 @@ import FeatureCarve
 @main
 struct CarveApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
-    public var modelContext: ModelContext
+    public var modelContainer: ModelContainer
     public let store: StoreOf<AppCoordinator>
     
     init() {
-        self.modelContext = {
+        self.modelContainer = {
             @Dependency(\.databaseService) var databaseService
             do {
-                let modelContext = try databaseService.context()
-                return modelContext
+                let modelContainer = try databaseService.container()
+                return modelContainer
             } catch {
                 fatalError("Could not find modelcontext")
             }
@@ -46,7 +46,7 @@ struct CarveApp: App {
                     ]
                 )
         }
-        .modelContext(self.modelContext)
+        .modelContainer(self.modelContainer)
     }
     
 }

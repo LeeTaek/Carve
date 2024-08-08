@@ -16,9 +16,10 @@ public final class DrawingVO: Equatable, Sendable {
         (lhs.id == rhs.id)
     }
     public let id: String!
-    @Relationship public let bibleTitle: TitleVO?
+    public let titleName: String?
+    public let titleChapter: Int?
     public let section: Int?
-    public var lineData: Data?
+    @Attribute(.externalStorage) public var lineData: Data?
     public var isWritten: Bool = false
     
     public init(author: String,
@@ -29,7 +30,8 @@ public final class DrawingVO: Equatable, Sendable {
         self.id = "\(bibleTitle.title.rawValue).\(bibleTitle.chapter).\(section)"
         self.lineData = lineData.dataRepresentation()
         self.isWritten = isWritten
-        self.bibleTitle = bibleTitle
+        self.titleName = bibleTitle.title.rawValue
+        self.titleChapter = bibleTitle.chapter
         self.section = section
     }
     
@@ -39,7 +41,8 @@ public final class DrawingVO: Equatable, Sendable {
     ) {
         self.id = "\(bibleTitle.title.rawValue).\(bibleTitle.chapter).\(section)"
         self.lineData = lineData
-        self.bibleTitle = bibleTitle
+        self.titleName = bibleTitle.title.rawValue
+        self.titleChapter = bibleTitle.chapter
         self.section = section
     }
     

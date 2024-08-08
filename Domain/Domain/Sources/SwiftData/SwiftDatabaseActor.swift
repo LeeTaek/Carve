@@ -68,14 +68,14 @@ public actor SwiftDatabaseActor {
 
 extension SwiftDatabaseActor: DependencyKey {
     public static var liveValue: @Sendable () async throws -> SwiftDatabaseActor = {
-        @Dependency(\.databaseService.context) var context
-        let container = try context().container
+        @Dependency(\.databaseService) var databaseService
+        let container = try databaseService.container()
         return SwiftDatabaseActor(modelContainer: container)
     }
     
     public static var testValue: @Sendable () async throws -> SwiftDatabaseActor = {
-        @Dependency(\.databaseService.context) var context
-        let container = try context().container
+        @Dependency(\.databaseService) var databaseService
+        let container = try databaseService.container()
         return SwiftDatabaseActor(modelContainer: container)
     }
 }
