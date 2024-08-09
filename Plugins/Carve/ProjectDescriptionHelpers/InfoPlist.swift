@@ -21,7 +21,8 @@ public extension InfoPlist {
             "UILaunchStoryboardName": "LaunchScreen",
             "UISupportedInterfaceOrientations": "UIInterfaceOrientationPortrait",
             "FeedbackAddress": "$(FEEDBACK_ADDRESS)",
-            "UIBackgroundModes": ["remote-notification"]
+            "UIBackgroundModes": ["remote-notification"],
+            "UIUserInterfaceStyle": "Light"
           ]
         )
     }
