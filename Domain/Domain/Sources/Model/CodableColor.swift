@@ -48,4 +48,15 @@ public struct CodableColor: Codable, Sendable, Identifiable {
     }
 }
 
-extension UIColor: @retroactive Identifiable { }
+extension UIColor: Identifiable {
+    public var id: String {
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        var alpha: CGFloat = 0
+        
+        self.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+        
+        return "\(red)-\(green)-\(blue)-\(alpha)"
+    }
+}
