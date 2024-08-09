@@ -6,7 +6,6 @@
 //  Copyright © 2024 leetaek. All rights reserved.
 //
 
-import CommonUI
 import SwiftUI
 
 import ComposableArchitecture
@@ -19,25 +18,34 @@ public struct SentencesWithDrawingView: View {
     }
     
     public var body: some View {
-        HStack {
-            BibleSentenceView(
-                store: self.store.scope(state: \.sentenceState,
-                                        action: \.scope.sentenceAction)
-            )
-            Spacer()
-            ZStack {
-                underLineView
-                CanvasView(
-                    store: self.store.scope(state: \.canvasState,
-                                            action: \.scope.canvasAction)
-                )
+        VStack {
+            if store.sentenceState.chapterTitle != nil {
+                chapterTitleView
             }
-            .frame(width: UIScreen.main.bounds.width / 2,
-                   alignment: .topTrailing)
+            HStack {
+                SentenceView(
+                    store: self.store.scope(state: \.sentenceState,
+                                            action: \.scope.sentenceAction)
+                )
+                Spacer()
+                ZStack {
+                    underLineView
+                    CanvasView(
+                        store: self.store.scope(state: \.canvasState,
+                                                action: \.scope.canvasAction)
+                    )
+                }
+                .frame(width: UIScreen.main.bounds.width / 2,
+                       alignment: .topTrailing)
+            }
         }
-        
     }
     
+    private var chapterTitleView: some View {
+        Text(store.sentenceState.chapterTitle ?? "")
+            .font(.system(size: 22))
+            .fontWeight(.heavy)
+    }
     
     private var underLineView: some View {
         VStack(spacing: 0) {

@@ -8,7 +8,7 @@
 
 import Core
 import SwiftUI
-@preconcurrency import SwiftData
+import SwiftData
 
 import Dependencies
 
@@ -29,15 +29,36 @@ public struct DrawingDatabase: Sendable, Database {
     public func fetch(title: TitleVO) async throws -> [DrawingVO] {
         @Dependency(\.createSwiftDataActor) var createActor
         let actor = try await createActor()
-//        let name = title.title.rawValue
-//        let chapter = title.chapter
-//        let predicate = #Predicate<DrawingVO> {
-//            $0.bibleTitle == title
-//        }
-//        let descriptor = FetchDescriptor(predicate: predicate, sortBy: [SortDescriptor(\.section)])
-        let storedDrawing: [DrawingVO] = try await actor.fetch()
+        let titleName = title.title.rawValue
+        let chapter = title.chapter
+        let predicate = #Predicate<DrawingVO> {
+            $0.titleName == titleName
+            && $0.titleChapter == chapter
+        }
+        let descriptor = FetchDescriptor(predicate: predicate,
+                                         sortBy: [SortDescriptor(\.section)])
+        let storedDrawing: [DrawingVO] = try await actor.fetch(descriptor)
+        storedDrawing.forEach {
+            Log.debug("fetchTitle \($0.titleName). \($0.titleChapter)", $0.lineData)
+        }
         Log.debug("fetch Title: \(title)", storedDrawing.count)
-        return storedDrawing.filter({ $0.bibleTitle == title })
+        return storedDrawing
+    }
+    
+    public func fetch(title: TitleVO, section: Int) async throws -> DrawingVO? {
+        @Dependency(\.createSwiftDataActor) var createActor
+        let actor = try await createActor()
+        let titleName = title.title.rawValue
+        let chapter = title.chapter
+        let predicate = #Predicate<DrawingVO> {
+            $0.titleName == titleName
+            && $0.titleChapter == chapter
+            && $0.section == section
+        }
+        let descriptor = FetchDescriptor(predicate: predicate,
+                                         sortBy: [SortDescriptor(\.section)])
+        let storedDrawing: DrawingVO? = try await actor.fetch(descriptor).first
+        return storedDrawing
     }
     
     public func add(item: DrawingVO) async throws {
@@ -59,8 +80,9 @@ public struct DrawingDatabase: Sendable, Database {
         let actor = try await createActor()
         let drawings: [DrawingVO] = try await fetch(title: title)
         for drawing in drawings {
-            if drawing.section <= last {
-                let newDrawing = DrawingVO(bibleTitle: title, section: drawing.section)
+            guard let section = drawing.section else { continue }
+            if section <= last {
+                let newDrawing = DrawingVO(bibleTitle: title, section: section)
                 if drawing.lineData != nil {
                     newDrawing.lineData = drawing.lineData
                 }
@@ -73,6 +95,18 @@ public struct DrawingDatabase: Sendable, Database {
             let drawing = DrawingVO(bibleTitle: title, section: section)
             try await actor.insert(drawing)
         }
+    }
+    
+    public func updateDrawing(drawing: DrawingVO) async throws {
+        @Dependency(\.createSwiftDataActor) var createActor
+        let actor = try await createActor()
+        let title = TitleVO(title: BibleTitle(rawValue: drawing.titleName!)!, chapter: drawing.titleChapter!)
+        if let storedDrawing = try await fetch(title: title, section: drawing.section!) {
+            try await update(item: drawing)
+        } else {
+            try await actor.insert(drawing)
+        }
+        Log.debug("update drawing", drawing)
     }
 }
 

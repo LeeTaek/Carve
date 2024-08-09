@@ -11,10 +11,16 @@ import ProjectDescriptionHelpers
 let projectName = "Core"
 
 let dependencies: [TargetDependency] = [
-    .Alamofire
 ]
 
 let script: [TargetScript] = [.swiftLint]
+
+let settings: Settings = .settings(
+    base: [
+        "CLANG_ENABLE_MODULE_VERIFIER": "YES",
+        "ENABLE_USER_SCRIPT_SANDBOXING": "YES"
+    ]
+)
 
 let target: [Target] = [
     .makeFrameworkTarget(projName: projectName, target: .debug, script: script, dependencies: dependencies),

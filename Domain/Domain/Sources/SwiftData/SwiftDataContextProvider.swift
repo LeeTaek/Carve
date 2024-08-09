@@ -8,42 +8,51 @@
 
 import Foundation
 import SwiftData
+import CloudKit
 
 import Dependencies
 
-public struct SwiftDataContextProvider: Sendable {
-    public var context: @Sendable () throws -> ModelContext
+public struct SwiftDataContainerProvider: Sendable {
+    public var container: @Sendable () throws -> ModelContainer
 }
 
-extension SwiftDataContextProvider: DependencyKey {
-    public static let liveValue: SwiftDataContextProvider = Self(
-    context: { appContext(isLive: true) }
+extension SwiftDataContainerProvider: DependencyKey {
+    public static let liveValue: SwiftDataContainerProvider = Self(
+        container: { PersistentCloudKitContainer.shared.container }
     )
     
-    public static let testValue: SwiftDataContextProvider = Self(
-        context: { appContext(isLive: false) }
+    public static let testValue: SwiftDataContainerProvider = Self(
+        container: { PersistentCloudKitContainer.testConatiner.container }
     )
     
 }
 
 extension DependencyValues {
-    public var databaseService: SwiftDataContextProvider {
-        get { self[SwiftDataContextProvider.self] }
-        set { self[SwiftDataContextProvider.self] = newValue}
+    public var databaseService: SwiftDataContainerProvider {
+        get { self[SwiftDataContainerProvider.self] }
+        set { self[SwiftDataContainerProvider.self] = newValue}
     }
 }
 
-private func appContext(isLive: Bool) -> ModelContext {
-    let path = isLive ? "Carve.sqlite" : "Carve.test.sqlite"
-    do {
-        let url = URL.applicationSupportDirectory.appending(path: path)
-        let schema = Schema([
-            DrawingVO.self
-        ])
-        let config = ModelConfiguration(url: url)
-        let container = try ModelContainer(for: schema, configurations: config)
-        return ModelContext(container)
-    } catch {
-        fatalError("Failed to create SwiftData container")
+final class PersistentCloudKitContainer: @unchecked Sendable {
+    static let shared = PersistentCloudKitContainer(isLive: true)
+    static let testConatiner = PersistentCloudKitContainer(isLive: false)
+    let container: ModelContainer
+    
+    private init(isLive: Bool) {
+        let path = isLive ? "Carve.sqlite" : "Carve.test.sqlite"
+        do {
+            let url = URL.applicationSupportDirectory.appending(path: path)
+            let schema = Schema([
+                DrawingVO.self
+            ])
+            let config = ModelConfiguration(
+                url: url,
+                cloudKitDatabase: .private("iCloud.Carve.SwiftData.iCloud")
+            )
+            container = try ModelContainer(for: schema, configurations: config)
+        } catch {
+            fatalError("Failed to create SwiftData container")
+        }
     }
 }

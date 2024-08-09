@@ -9,7 +9,7 @@
 import ProjectDescription
 
 extension PackageSettings {
-    public static var packages: Self = .init(
+    public static let packages: Self = .init(
         productTypes: [
             "Alamofire": .framework,
             "Kingfisher": .framework,
@@ -46,18 +46,17 @@ public extension TargetDependency {
     static let FeatureSettings: Self = .project(target: "FeatureSettings", path: .relativeToRoot("Feature/FeatureSettings"))
     static let Domain: Self = .project(target: "Domain", path: .relativeToRoot("Domain/Domain"))
     static let Core: Self = .project(target: "Core", path: .relativeToRoot("Core/Core"))
-    static let CommonUI: Self = .project(target: "CommonUI", path: .relativeToRoot("Shared/CommonUI"))
     static let Resources: Self = .project(target: "Resources", path: .relativeToRoot("Shared/Resources"))
 
     
     /// 외부 라이브러리: Tuist + SPM
     static let TCAArchitecture: Self = .external(name: "ComposableArchitecture")
+    static let Dependencies: Self = .external(name: "Dependencies")
     static let FirebaseAnalytics: Self = .external(name:  "FirebaseAnalytics")
     static let FirebaseMessaging: Self = .external(name:  "FirebaseMessaging")
     static let FirebaseCrashlytics: Self = .external(name: "FirebaseCrashlytics")
     static let Kingfisher: Self = .external(name: "Kingfisher")
     static let Alamofire: Self = .external(name: "Alamofire")
-    static let TCACoordinator: Self = .external(name: "TCACoordinators")
 }
 
 

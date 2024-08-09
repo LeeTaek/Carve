@@ -55,18 +55,27 @@ public actor SwiftDatabaseActor {
         self.modelContext.delete(item)
         try self.modelContext.save()
     }
+    
+    public func deleteAll<T: PersistentModel>(_ type: T.Type) throws {
+        try self.modelContext.delete(model: T.self)
+    }
+    
+    public func databaseIsEmpty<T: PersistentModel>(_ type: T.Type) throws -> Bool {
+        let objects: [T] = try self.fetch()
+        return objects.isEmpty
+    }
 }
 
 extension SwiftDatabaseActor: DependencyKey {
     public static var liveValue: @Sendable () async throws -> SwiftDatabaseActor = {
-        @Dependency(\.databaseService.context) var context
-        let container = try context().container
+        @Dependency(\.databaseService) var databaseService
+        let container = try databaseService.container()
         return SwiftDatabaseActor(modelContainer: container)
     }
     
     public static var testValue: @Sendable () async throws -> SwiftDatabaseActor = {
-        @Dependency(\.databaseService.context) var context
-        let container = try context().container
+        @Dependency(\.databaseService) var databaseService
+        let container = try databaseService.container()
         return SwiftDatabaseActor(modelContainer: container)
     }
 }

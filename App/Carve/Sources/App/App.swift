@@ -14,18 +14,20 @@ import Firebase
 import FeatureCarve
 
 @main
-struct CarveApp: SwiftUI.App {
+struct CarveApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
-    public var modelContext: ModelContext
+    public var modelContainer: ModelContainer
     public let store: StoreOf<AppCoordinator>
     
     init() {
-        self.modelContext = {
+        self.modelContainer = {
             @Dependency(\.databaseService) var databaseService
-            guard let modelContext = try? databaseService.context() else {
+            do {
+                let modelContainer = try databaseService.container()
+                return modelContainer
+            } catch {
                 fatalError("Could not find modelcontext")
             }
-            return modelContext
         }()
         self.store = Store(initialState: .initialState) {
             AppCoordinator()
@@ -44,7 +46,7 @@ struct CarveApp: SwiftUI.App {
                     ]
                 )
         }
-        .modelContext(self.modelContext)
+        .modelContainer(self.modelContainer)
     }
     
 }
