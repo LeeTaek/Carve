@@ -49,11 +49,19 @@ public struct HeaderView: View {
         .overlayPreferenceValue(HeaderBoundsKey.self) { value in
             if value != nil {
                 Color.clear
-                    .onGeometryChange(for: CGFloat.self) { proxy in
-                        proxy.size.height
-                    } action: { proxySize in
-                        store.send(.setHeaderHeight(proxySize))
-                    }
+                    .background(
+                        GeometryReader { proxy in
+                            Color.clear
+                                .onAppear {
+                                    let height = proxy.size.height
+                                    store.send(.setHeaderHeight(height))
+                                }
+                                .onChange(of: proxy.size.height) {
+                                    let newHeight = proxy.size.height
+                                    store.send(.setHeaderHeight(newHeight))
+                                }
+                        }
+                    )
             }
         }
         .offset(y: -store.headerOffset < store.headerOffset
