@@ -121,7 +121,7 @@ public struct CarveDetailReducer {
     }
     
     
-    func fetchBible(chapter: TitleVO) throws(CarveReducerError) -> [SentenceVO] {
+    func fetchBible(chapter: TitleVO) throws -> [SentenceVO] {
         let encodingEUCKR = CFStringConvertEncodingToNSStringEncoding(0x0422)
         var sentences: [SentenceVO] = []
         guard let textPath = ResourcesResources.bundle.path(forResource: chapter.title.rawValue,
@@ -140,7 +140,7 @@ public struct CarveDetailReducer {
                     return SentenceVO.init(title: chapter, sentence: sentence)
                 }
         } catch {
-            throw .fetchSentenceError
+            throw error
         }
         return sentences
     }
