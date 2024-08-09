@@ -8,36 +8,36 @@
 
 import Foundation
 import SwiftData
+import CloudKit
 
 import Dependencies
 
-public struct SwiftDataContextProvider: Sendable {
-    public var context: @Sendable () throws -> ModelContext
+public struct SwiftDataContainerProvider: Sendable {
+    public var container: @Sendable () throws -> ModelContainer
 }
 
-extension SwiftDataContextProvider: DependencyKey {
-    public static let liveValue: SwiftDataContextProvider = Self(
-        context: { PersistentCloudKitContainer.shared.context }
+extension SwiftDataContainerProvider: DependencyKey {
+    public static let liveValue: SwiftDataContainerProvider = Self(
+        container: { PersistentCloudKitContainer.shared.container }
     )
     
-    public static let testValue: SwiftDataContextProvider = Self(
-        context: { PersistentCloudKitContainer.testConatiner.context }
+    public static let testValue: SwiftDataContainerProvider = Self(
+        container: { PersistentCloudKitContainer.testConatiner.container }
     )
     
 }
 
 extension DependencyValues {
-    public var databaseService: SwiftDataContextProvider {
-        get { self[SwiftDataContextProvider.self] }
-        set { self[SwiftDataContextProvider.self] = newValue}
+    public var databaseService: SwiftDataContainerProvider {
+        get { self[SwiftDataContainerProvider.self] }
+        set { self[SwiftDataContainerProvider.self] = newValue}
     }
 }
 
 final class PersistentCloudKitContainer: @unchecked Sendable {
     static let shared = PersistentCloudKitContainer(isLive: true)
     static let testConatiner = PersistentCloudKitContainer(isLive: false)
-    private let container: ModelContainer
-    let context: ModelContext
+    let container: ModelContainer
     
     private init(isLive: Bool) {
         let path = isLive ? "Carve.sqlite" : "Carve.test.sqlite"
@@ -46,9 +46,11 @@ final class PersistentCloudKitContainer: @unchecked Sendable {
             let schema = Schema([
                 DrawingVO.self
             ])
-            let config = ModelConfiguration(url: url)
+            let config = ModelConfiguration(
+                url: url,
+                cloudKitDatabase: .private("iCloud.Carve.SwiftData.iCloud")
+            )
             container = try ModelContainer(for: schema, configurations: config)
-            context = ModelContext(container)
         } catch {
             fatalError("Failed to create SwiftData container")
         }

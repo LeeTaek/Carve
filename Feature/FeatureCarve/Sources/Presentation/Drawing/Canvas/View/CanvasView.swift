@@ -37,7 +37,7 @@ public struct CanvasView: UIViewRepresentable {
             
             return canvas
         }()
-        canvas.drawing = toDrawing(from: store.drawing.lineData)
+        canvas.drawing = toDrawing(from: store.drawing?.lineData)
         canvas.delegate = context.coordinator
         
         return canvas

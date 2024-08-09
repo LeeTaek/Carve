@@ -119,139 +119,73 @@ public enum BibleTitle: String, CaseIterable, Identifiable, Codable, Sendable {
 
     public var lastChapter: Int {
         switch self {
-        case .genesis:
-            return 50
-        case .exodus:
-            return 40
-        case .leviticus:
-            return 27
-        case .numbers:
-            return 36
-        case .deuteronomy:
-            return 34
-        case .joshua:
-            return 24
-        case .judges:
-            return 21
-        case .ruth:
-            return 4
-        case .samuel1:
-            return 31
-        case .samuel2:
-            return 24
-        case .kings1:
-            return 22
-        case .kings2:
-            return 25
-        case .chronicles1:
-            return 29
-        case .chronicles2:
-            return 36
-        case .ezra:
-            return 10
-        case .nehemiah:
-            return 13
-        case .esther:
-            return 10
-        case .job:
-            return 42
-        case .psalms:
-            return 150
-        case .proverbs:
-            return 31
-        case .ecclesiasters:
-            return 12
-        case .songOfSongs:
-            return 8
-        case .isaiah:
-            return 66
-        case .jeremiah:
-            return 52
-        case .lamentations:
-            return 5
-        case .ezekiel:
-            return 48
-        case .daniel:
-            return 12
-        case .hosea:
-            return 14
-        case .joel:
-            return 3
-        case .amos:
-            return 9
-        case .obadiah:
-            return 1
-        case .jonah:
-            return 4
-        case .micah:
-            return 7
-        case .nahum:
-            return 3
-        case .habakkuk:
-            return 3
-        case .zephaniah:
-            return 3
-        case .haggai:
-            return 2
-        case .zechariah:
-            return 14
-        case .malachi:
-            return 4
+        case .genesis: return 50
+        case .exodus: return 40
+        case .leviticus: return 27
+        case .numbers: return 36
+        case .deuteronomy: return 34
+        case .joshua: return 24
+        case .judges: return 21
+        case .ruth: return 4
+        case .samuel1: return 31
+        case .samuel2: return 24
+        case .kings1: return 22
+        case .kings2: return 25
+        case .chronicles1: return 29
+        case .chronicles2: return 36
+        case .ezra: return 10
+        case .nehemiah: return 13
+        case .esther: return 10
+        case .job: return 42
+        case .psalms: return 150
+        case .proverbs: return 31
+        case .ecclesiasters: return 12
+        case .songOfSongs: return 8
+        case .isaiah: return 66
+        case .jeremiah: return 52
+        case .lamentations: return 5
+        case .ezekiel: return 48
+        case .daniel: return 12
+        case .hosea: return 14
+        case .joel: return 3
+        case .amos: return 9
+        case .obadiah: return 1
+        case .jonah: return 4
+        case .micah: return 7
+        case .nahum: return 3
+        case .habakkuk: return 3
+        case .zephaniah: return 3
+        case .haggai: return 2
+        case .zechariah: return 14
+        case .malachi: return 4
 
-        case .matthew:
-            return 28
-        case .mark:
-            return 16
-        case .luke:
-            return 24
-        case .john:
-            return 21
-        case .acts:
-            return 28
-        case .romans:
-            return 16
-        case .corinthians1:
-            return 16
-        case .corinthians2:
-            return 13
-        case .galatians:
-            return 6
-        case .ephesians:
-            return 6
-        case .philippians:
-            return 4
-        case .colossians:
-            return 4
-        case .thessalonians1:
-            return 5
-        case .thessalonians2:
-            return 3
-        case .timothy1:
-            return 6
-        case .timothy2:
-            return 4
-        case .titus:
-            return 3
-        case .philemon:
-            return 1
-        case .hebrews:
-            return 13
-        case .james:
-            return 5
-        case .peter1:
-            return 5
-        case .peter2:
-            return 3
-        case .john1:
-            return 5
-        case .john2:
-            return 1
-        case .john3:
-            return 1
-        case .jude:
-            return 1
-        case .revelation:
-            return 22
+        case .matthew: return 28
+        case .mark: return 16
+        case .luke: return 24
+        case .john: return 21
+        case .acts: return 28
+        case .romans: return 16
+        case .corinthians1: return 16
+        case .corinthians2: return 13
+        case .galatians: return 6
+        case .ephesians: return 6
+        case .philippians: return 4
+        case .colossians: return 4
+        case .thessalonians1: return 5
+        case .thessalonians2: return 3
+        case .timothy1: return 6
+        case .timothy2: return 4
+        case .titus: return 3
+        case .philemon: return 1
+        case .hebrews: return 13
+        case .james: return 5
+        case .peter1: return 5
+        case .peter2: return 3
+        case .john1: return 5
+        case .john2: return 1
+        case .john3: return 1
+        case .jude: return 1
+        case .revelation: return 22
         }
     }
 

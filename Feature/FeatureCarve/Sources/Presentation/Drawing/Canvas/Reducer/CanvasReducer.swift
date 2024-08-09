@@ -18,15 +18,20 @@ public struct CanvasReducer {
     @ObservableState
     public struct State: Identifiable {
         public var id: String
-        public var drawing: DrawingVO
+        public var drawing: DrawingVO?
+        public var title: TitleVO
+        public var section: Int
         @Shared(.appStorage("pencilConfig")) public var pencilConfig: PencilPalatte = .initialState
         @Shared(.inMemory("canUndo")) public var canUndo: Bool = false
         @Shared(.inMemory("canRedo")) public var canRedo: Bool = false
-        public init(drawing: DrawingVO) {
-            self.id = "drawingData.\(String(describing: drawing.id))"
+        public init(sentence: SentenceVO, drawing: DrawingVO?) {
+            self.id = "drawingData.\(sentence.sentenceScript)"
             self.drawing = drawing
+            self.title = sentence.title
+            self.section = sentence.section
         }
-        public static let initialState = Self(drawing: .init(bibleTitle: .initialState,
+        public static let initialState = Self(sentence: .initialState,
+                                              drawing: .init(bibleTitle: .initialState,
                                                              section: 1))
     }
     
@@ -44,10 +49,20 @@ public struct CanvasReducer {
         Reduce { state, action in
             switch action {
             case .saveDrawing(let newDrawing):
-                let drawing = state.drawing
-                drawing.lineData = newDrawing.dataRepresentation()
-                return .run { _ in
-                    try await drawingContext.update(item: drawing)
+                if let drawing = state.drawing {
+                    drawing.lineData = newDrawing.dataRepresentation()
+                } else {
+                    state.drawing = DrawingVO(bibleTitle: state.title,
+                                              section: state.section,
+                                              lineData: newDrawing.dataRepresentation())
+                }
+                return .run { [drawing = state.drawing] _ in
+                    do {
+                        guard let drawing else { return }
+                        try await drawingContext.updateDrawing(drawing: drawing)
+                    } catch {
+                        Log.debug("drawing error: \(error)")
+                    }
                 }
             case .registUndoCanvas(let canvas):
                 if undoManager.isPerformingUndoRedo {

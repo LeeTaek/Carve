@@ -20,7 +20,8 @@ public extension InfoPlist {
             "CFBundleShortVersionString": "1.0.0",
             "UILaunchStoryboardName": "LaunchScreen",
             "UISupportedInterfaceOrientations": "UIInterfaceOrientationPortrait",
-            "FeedbackAddress": "$(FEEDBACK_ADDRESS)"
+            "FeedbackAddress": "$(FEEDBACK_ADDRESS)",
+            "UIBackgroundModes": ["remote-notification"]
           ]
         )
     }
