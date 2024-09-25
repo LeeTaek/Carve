@@ -15,10 +15,10 @@ public final class DrawingVO: Equatable, Sendable {
     public static func == (lhs: DrawingVO, rhs: DrawingVO) -> Bool {
         (lhs.id == rhs.id)
     }
-    public let id: String!
-    public let titleName: String?
-    public let titleChapter: Int?
-    public let section: Int?
+    public var id: String!
+    public var titleName: String?
+    public var titleChapter: Int?
+    public var section: Int?
     @Attribute(.externalStorage) public var lineData: Data?
     public var isWritten: Bool = false
     

@@ -12,15 +12,36 @@ import PackageDescription
 import ProjectDescription
 import ProjectDescriptionHelpers
 
-//let packageSettings = PackageSettings.packages
+let packageSettings = PackageSettings(
+    targetSettings: [
+        "FBLPromises": .objc,
+        "nanopb": .objc,
+        "Firebase": .objc,
+        "FirebaseAnalyticsWrapper": .objc,
+        "FirebaseAnalyticsSwiftTarget": .objc,
+        "GoogleAppMeasurementTarget": .objc,
+        "GoogleUtilities-AppDelegateSwizzler": .objc,
+        "GoogleUtilities-MethodSwizzler": .objc,
+        "third-party-IsAppEncrypted": .objc,
+        "GoogleUtilities-objc": .objc,
+        "GoogleUtilities-Environment": .objc,
+        "GoogleUtilities-Logger": .objc,
+        "GoogleUtilities-Network": .objc,
+        "GoogleUtilities-NSData": .objc,
+        "GoogleUtilities-Reachability": .objc,
+        "GoogleUtilities-UserDefaults": .objc,
+        "gRPC-Core": [
+            "GCC_PREPROCESSOR_DEFINITIONS": "$(inherited) GRPC_NO_BINDER=0 GRPC_ARES=0"
+        ]
+    ]
+)
+
 #endif
 
-let packages = Package(
-    name: "PackageName",
+let package = Package(
+    name: "Carve",
     dependencies: [
-        .package(url: "https://github.com/Alamofire/Alamofire", from:  "5.8.1"),
-        .package(url: "https://github.com/onevcat/Kingfisher.git", from:  "7.9.1"),
-        .package(url: "https://github.com/firebase/firebase-ios-sdk.git", from: "10.29.0"),
-        .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.11.2"),
+        .package(url: "https://github.com/firebase/firebase-ios-sdk.git", .upToNextMajor(from: "10.29.0")),
+        .package(url: "https://github.com/pointfreeco/swift-composable-architecture", .upToNextMajor(from: "1.15.0"))
     ]
 )
