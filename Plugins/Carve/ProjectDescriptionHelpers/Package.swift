@@ -8,37 +8,6 @@
 
 import ProjectDescription
 
-extension PackageSettings {
-    public static let packages: Self = .init(
-        productTypes: [
-            "Alamofire": .framework,
-            "Kingfisher": .framework,
-        ],
-        targetSettings: [
-            "FBLPromises": .objc,
-            "nanopb": .objc,
-            "Firebase": .objc,
-            "FirebaseAnalyticsWrapper": .objc,
-            "FirebaseAnalyticsSwiftTarget": .objc,
-            "GoogleAppMeasurementTarget": .objc,
-            "GoogleUtilities-AppDelegateSwizzler": .objc,
-            "GoogleUtilities-MethodSwizzler": .objc,
-            "third-party-IsAppEncrypted": .objc,
-            "GoogleUtilities-objc": .objc,
-            "GoogleUtilities-Environment": .objc,
-            "GoogleUtilities-Logger": .objc,
-            "GoogleUtilities-Network": .objc,
-            "GoogleUtilities-NSData": .objc,
-            "GoogleUtilities-Reachability": .objc,
-            "GoogleUtilities-UserDefaults": .objc,
-            "gRPC-Core": [
-                "GCC_PREPROCESSOR_DEFINITIONS": "$(inherited) GRPC_NO_BINDER=0 GRPC_ARES=0"
-            ]
-        ]
-    )
-}
-
-
 public extension TargetDependency {
     /// 내부 모듈
     static let App: Self = .project(target: "App", path: .relativeToRoot("App/Carve"))
@@ -55,8 +24,6 @@ public extension TargetDependency {
     static let FirebaseAnalytics: Self = .external(name:  "FirebaseAnalytics")
     static let FirebaseMessaging: Self = .external(name:  "FirebaseMessaging")
     static let FirebaseCrashlytics: Self = .external(name: "FirebaseCrashlytics")
-    static let Kingfisher: Self = .external(name: "Kingfisher")
-    static let Alamofire: Self = .external(name: "Alamofire")
 }
 
 

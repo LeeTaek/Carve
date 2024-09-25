@@ -13,7 +13,6 @@ let projectName = "FeatureSettings"
 let dependencies: [TargetDependency] = [
     .Domain,
     .TCAArchitecture,
-    .Kingfisher,
     .Resources
 ]
 

@@ -14,7 +14,6 @@ let projectName = "FeatureCarve"
 let dependencies: [TargetDependency] = [
     .Domain,
     .TCAArchitecture,
-    .Kingfisher,
     .Resources
 ]
 

@@ -29,10 +29,7 @@ public struct CarveReducer {
             columnVisibility: .detailOnly,
             carveDetailState: .initialState
         )
-    }
-    
-    @Dependency(\.drawingData) var drawingContext
-    
+    }    
     public enum Action: FeatureAction, Core.ScopeAction, BindableAction {
         case binding(BindingAction<State>)
         case view(ViewAction)

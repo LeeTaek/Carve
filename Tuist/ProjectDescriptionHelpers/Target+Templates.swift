@@ -10,7 +10,7 @@ import ProjectEnvironment
 
 public extension Target {
     static func makeAppTarget(
-        name: ConfigurationName,
+        name: String,
         destination: Destinations = [.iPad],
         product: Product = .app,
         bundleID: String = .defaultBundleID,
@@ -30,7 +30,7 @@ public extension Target {
     )
     -> Target {
         return Target.target(
-            name: name.rawValue,
+            name: name,
             destinations: destination,
             product: product,
             bundleId: bundleID,

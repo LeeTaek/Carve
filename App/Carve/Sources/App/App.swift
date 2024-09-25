@@ -16,19 +16,9 @@ import FeatureCarve
 @main
 struct CarveApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
-    public var modelContainer: ModelContainer
     public let store: StoreOf<AppCoordinator>
     
     init() {
-        self.modelContainer = {
-            @Dependency(\.databaseService) var databaseService
-            do {
-                let modelContainer = try databaseService.container()
-                return modelContainer
-            } catch {
-                fatalError("Could not find modelcontext")
-            }
-        }()
         self.store = Store(initialState: .initialState) {
             AppCoordinator()
         }
@@ -46,7 +36,7 @@ struct CarveApp: App {
                     ]
                 )
         }
-        .modelContainer(self.modelContainer)
+        .modelContainer(PersistentCloudKitContainer.shared.container)
     }
     
 }

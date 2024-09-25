@@ -12,32 +12,10 @@ import CloudKit
 
 import Dependencies
 
-public struct SwiftDataContainerProvider: Sendable {
-    public var container: @Sendable () throws -> ModelContainer
-}
-
-extension SwiftDataContainerProvider: DependencyKey {
-    public static let liveValue: SwiftDataContainerProvider = Self(
-        container: { PersistentCloudKitContainer.shared.container }
-    )
-    
-    public static let testValue: SwiftDataContainerProvider = Self(
-        container: { PersistentCloudKitContainer.testConatiner.container }
-    )
-    
-}
-
-extension DependencyValues {
-    public var databaseService: SwiftDataContainerProvider {
-        get { self[SwiftDataContainerProvider.self] }
-        set { self[SwiftDataContainerProvider.self] = newValue}
-    }
-}
-
-final class PersistentCloudKitContainer: @unchecked Sendable {
-    static let shared = PersistentCloudKitContainer(isLive: true)
-    static let testConatiner = PersistentCloudKitContainer(isLive: false)
-    let container: ModelContainer
+public final class PersistentCloudKitContainer: @unchecked Sendable {
+    public static let shared = PersistentCloudKitContainer(isLive: true)
+    public static let testConatiner = PersistentCloudKitContainer(isLive: false)
+    public let container: ModelContainer
     
     private init(isLive: Bool) {
         let path = isLive ? "Carve.sqlite" : "Carve.test.sqlite"

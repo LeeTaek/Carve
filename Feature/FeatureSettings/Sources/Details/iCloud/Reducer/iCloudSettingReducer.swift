@@ -21,7 +21,7 @@ public struct CloudSettingsReducer {
         @Presents public var path: Path.State?
         public var iCloudIsOn: Bool = true
     }
-    @Dependency(\.createSwiftDataActor) var database
+    private var database = SwiftDatabaseActor(modelContainer: PersistentCloudKitContainer.shared.container)
 
     public enum Action {
         case path(PresentationAction<Path.Action>)
@@ -42,7 +42,7 @@ public struct CloudSettingsReducer {
                 state.iCloudIsOn = ison
             case .databaseIsEmpty:
                 return .run { send in
-                    if !(try await database().databaseIsEmpty(DrawingVO.self)) {
+                    if !(try await database.databaseIsEmpty(DrawingVO.self)) {
                         await send(.presentPopover(title: nil,
                                                    body: "필사 데이터를 삭제하면 다시 복구할 수 없습니다.\n 정말 삭제하시겠습니까?",
                                                    confirmTitle: "삭제",
@@ -65,7 +65,7 @@ public struct CloudSettingsReducer {
                 ))
             case .removeAlliCloudData:
                 return .run { send in
-                    try await database().deleteAll(DrawingVO.self)
+                    try await database.deleteAll(DrawingVO.self)
                     await send(.presentPopover(
                         body: "모든 필사 데이터를 삭제했습니다.",
                         confirmTitle: "확인")
@@ -73,7 +73,7 @@ public struct CloudSettingsReducer {
                 }
             case .path(.presented(.popup(.confirm))):
                 return .run { send in
-                    if !(try await database().databaseIsEmpty(DrawingVO.self)) {
+                    if !(try await database.databaseIsEmpty(DrawingVO.self)) {
                         await send(.removeAlliCloudData)
                     } else {
                         await send(.popupDismiss)

@@ -45,7 +45,10 @@ public actor SwiftDatabaseActor {
                                            query: @Sendable @escaping (_ oldValue: T) async -> Void) async throws {
         if let storedItem: T = self.fetch(id: id) {
             await query(storedItem)
-            try self.modelContext.save()
+            try self.modelContext.transaction {
+                try self.modelContext.save()
+            }
+//            try self.modelContext.save()
         } else {
             throw SwiftDatabaseActorError.storedDataIsNone
         }
@@ -68,14 +71,14 @@ public actor SwiftDatabaseActor {
 
 extension SwiftDatabaseActor: DependencyKey {
     public static var liveValue: @Sendable () async throws -> SwiftDatabaseActor = {
-        @Dependency(\.databaseService) var databaseService
-        let container = try databaseService.container()
+//        @Dependency(\.databaseService) var databaseService
+        let container = PersistentCloudKitContainer.shared.container
         return SwiftDatabaseActor(modelContainer: container)
     }
     
     public static var testValue: @Sendable () async throws -> SwiftDatabaseActor = {
-        @Dependency(\.databaseService) var databaseService
-        let container = try databaseService.container()
+//        @Dependency(\.databaseService) var databaseService
+        let container = PersistentCloudKitContainer.shared.container
         return SwiftDatabaseActor(modelContainer: container)
     }
 }
