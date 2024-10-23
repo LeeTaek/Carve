@@ -52,13 +52,10 @@ public struct HeaderView: View {
                     .background(
                         GeometryReader { proxy in
                             Color.clear
-                                .onAppear {
-                                    let height = proxy.size.height
-                                    store.send(.setHeaderHeight(height))
-                                }
-                                .onChange(of: proxy.size.height) {
-                                    let newHeight = proxy.size.height
-                                    store.send(.setHeaderHeight(newHeight))
+                                .onGeometryChange(for: CGFloat.self) { proxy in
+                                    proxy.size.height
+                                } action: { proxySize in
+                                    store.send(.setHeaderHeight(proxySize))
                                 }
                         }
                     )

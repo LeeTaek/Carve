@@ -12,7 +12,7 @@ import CloudKit
 
 import Dependencies
 
-public final class PersistentCloudKitContainer: @unchecked Sendable {
+public final class PersistentCloudKitContainer {
     public static let shared = PersistentCloudKitContainer(isLive: true)
     public static let testConatiner = PersistentCloudKitContainer(isLive: false)
     public let container: ModelContainer

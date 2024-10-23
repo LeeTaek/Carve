@@ -24,13 +24,10 @@ public struct SentenceView: View {
                 .background(alignment: .center) {
                     GeometryReader { proxy in
                         Color.clear
-                            .onAppear {
-                                let frame = proxy.frame(in: .local)
-                                store.send(.inner(.redrawUnderline(frame)))
-                            }
-                            .onChange(of: proxy.size) {
-                                let newFrame = proxy.frame(in: .local)
-                                store.send(.inner(.redrawUnderline(newFrame)))
+                            .onGeometryChange(for: CGRect.self) { proxy in
+                                proxy.frame(in: .local)
+                            } action: { proxySize in
+                                store.send(.inner(.redrawUnderline(proxySize)))
                             }
                     }
                 }
