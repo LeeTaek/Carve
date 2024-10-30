@@ -6,6 +6,7 @@
 //  Copyright © 2024 leetaek. All rights reserved.
 //
 
+import Core
 import SwiftUI
 
 import ComposableArchitecture
@@ -157,6 +158,22 @@ public struct PencilPalatteView: View {
                 .padding()
                 .onTapGesture {
                     store.send(.setPencilType(.pen))
+                }
+            
+            RoundedRectangle(cornerRadius: 20)
+                .frame(width: iconSize + 10, height: iconSize + 10)
+                .foregroundStyle(store.pencilConfig.pencilType == .marker ? .gray.opacity(0.3) : .clear)
+                .overlay {
+                    FeatureCarveAsset.pencilHighlighter.swiftUIImage
+                        .resizable()
+                        .frame(width: iconSize, height: iconSize)
+                        .scaleEffect(store.pencilConfig.pencilType == .marker ? 0.8 : 1)
+                        .opacity(store.pencilConfig.pencilType == .marker ? 1 : 0.6)
+                }
+                .padding()
+                .onTapGesture {
+                    store.send(.setPencilType(.marker))
+                    Log.debug("marker")
                 }
             
             RoundedRectangle(cornerRadius: 20)
