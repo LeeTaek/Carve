@@ -98,7 +98,6 @@ public struct SentencesWithDrawingReducer {
         for _ in 1...lineCount {
             offsets.append(paddingSpace + fontHeight)
         }
-        Log.debug("calcurateLineOffsets")
         return offsets
     }
 }

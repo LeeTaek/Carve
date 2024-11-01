@@ -21,7 +21,7 @@ public struct CloudSettingsReducer {
         @Presents public var path: Path.State?
         public var iCloudIsOn: Bool = true
     }
-    private var database = SwiftDatabaseActor(modelContainer: PersistentCloudKitContainer.shared.container)
+    @Dependency(\.createSwiftDataActor) private var database
 
     public enum Action {
         case path(PresentationAction<Path.Action>)

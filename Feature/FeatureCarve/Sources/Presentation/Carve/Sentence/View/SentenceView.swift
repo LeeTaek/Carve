@@ -19,22 +19,21 @@ public struct SentenceView: View {
     }
     
     public var body: some View {
-        VStack {
-            sentenceDescription
-                .background(alignment: .center) {
-                    GeometryReader { proxy in
-                        Color.clear
-                            .onAppear {
-                                let frame = proxy.frame(in: .local)
-                                store.send(.inner(.redrawUnderline(frame)))
+        sentenceDescription
+            .onAppear {
+                store.send(.view(.isRedraw(true)))
+            }
+            .background(alignment: .center) {
+                GeometryReader { proxy in
+                    Color.clear
+                        .onChange(of: store.isredraw) { _, _ in
+                            if store.isredraw {
+                                let proxySize = proxy.frame(in: .local)
+                                store.send(.inner(.redrawUnderline(proxySize)))
                             }
-                            .onChange(of: proxy.size) {
-                                let newFrame = proxy.frame(in: .local)
-                                store.send(.inner(.redrawUnderline(newFrame)))
-                            }
-                    }
+                        }
                 }
-        }
+            }
     }
     
     private var chapterTitleView: some View {
