@@ -22,6 +22,8 @@ public struct SentenceReducer {
         public var chapterTitle: String?
         public let section: Int
         public let sentence: String
+        public var isredraw: Bool = false
+        
         @Shared(.appStorage("sentenceSetting")) public var sentenceSetting: SentenceSetting = .initialState
        
         public init(chapterTitle: String?,
@@ -45,6 +47,7 @@ public struct SentenceReducer {
     }
     
     public enum ViewAction {
+        case isRedraw(Bool)
     }
     
     public enum InnerAction {
@@ -53,8 +56,10 @@ public struct SentenceReducer {
     
     
     public var body: some Reducer<State, Action> {
-        Reduce { _, action in
+        Reduce { state, action in
             switch action {
+            case .view(.isRedraw(let isDraw)):
+                state.isredraw = isDraw
             default: break
             }
             return .none
