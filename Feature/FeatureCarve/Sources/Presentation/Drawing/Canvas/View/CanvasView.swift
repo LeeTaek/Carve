@@ -69,7 +69,7 @@ public struct CanvasView: UIViewRepresentable {
             if store.pencilConfig.pencilType == .monoline {
                 canvas.tool = PKEraserTool(.bitmap)
             } else {
-                canvas.tool = PKInkingTool(.pencil,
+                canvas.tool = PKInkingTool(store.pencilConfig.pencilType,
                                            color: store.pencilConfig.lineColor.color,
                                            width: store.pencilConfig.lineWidth)
             }
