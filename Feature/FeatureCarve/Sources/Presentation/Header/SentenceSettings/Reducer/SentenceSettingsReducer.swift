@@ -32,13 +32,13 @@ public struct SentenceSettingsReducer {
         Reduce { state, action in
             switch action {
             case .setLineSpace(let space):
-                state.setting.lineSpace = space
+                state.$setting.withLock { $0.lineSpace = space }
             case .setTraking(let tracking):
-                state.setting.traking = tracking
+                state.$setting.withLock { $0.traking = tracking }
             case .setFontSize(let size):
-                state.setting.fontSize = size
+                state.$setting.withLock { $0.fontSize = size }
             case .setFontFamily(let font):
-                state.setting.fontFamily = font
+                state.$setting.withLock { $0.fontFamily = font }
             default: break
             }
             return .none

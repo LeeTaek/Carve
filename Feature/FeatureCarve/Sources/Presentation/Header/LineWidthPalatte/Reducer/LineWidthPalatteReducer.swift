@@ -31,7 +31,7 @@ public struct LineWidthPalatteReducer {
             switch action {
             case .setWidth(let width) :
                 state.lineWidth = width
-                state.lineWidths[state.index] = width
+                state.$lineWidths.withLock { $0[state.index] = width }
             }
             return .none
         }

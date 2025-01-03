@@ -37,7 +37,7 @@ public struct ColorPalatteReducer {
                 let selectedColor = color.withAlphaComponent(state.alpha)
                 withAnimation(.easeInOut(duration: 0.2)) {
                     state.selectedColor = .init(color: selectedColor)
-                    state.palatteColors[state.index] = .init(color: selectedColor)
+                    state.$palatteColors.withLock { $0[state.index] = .init(color: selectedColor) }
                 }
             case .setAlpha(let alpha):
                 state.alpha = alpha
