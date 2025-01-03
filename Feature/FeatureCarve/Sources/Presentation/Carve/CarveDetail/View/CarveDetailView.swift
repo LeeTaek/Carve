@@ -30,27 +30,16 @@ public struct CarveDetailView: View {
     private var detailScroll: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(pinnedViews: .sectionHeaders) {
-                    Section {
-                        ForEach(
-                            store.scope(state: \.sentenceWithDrawingState,
-                                        action: \.scope.sentenceWithDrawingAction)
-                        ) { childStore in
-                            SentencesWithDrawingView(store: childStore)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .padding(.horizontal, 10)
+                contentView
+                    .padding(.top, store.headerState.headerHeight)
+                    .offsetY { previous, current in
+                        debounce {
+                            store.send(.view(.headerAnimation(previous, current)))
                         }
                     }
-                }
-                .padding(.top, store.headerState.headerHeight)
-                .offsetY { previous, current in
-                    store.send(.view(.headerAnimation(previous, current)))
-                }
-                .onChange(of: store.sentenceWithDrawingState) {
-                    guard let id = store.scope(state: \.sentenceWithDrawingState,
-                                               action: \.scope.sentenceWithDrawingAction).first?.id else { return }
-                    store.send(.view(.setProxy(proxy, id)))
-                }
+                    .onChange(of: store.sentenceWithDrawingState) {
+                        scrollToTop(proxy: proxy)
+                    }
             }
             .sheet(
                 item: $store.scope(
@@ -66,6 +55,30 @@ public struct CarveDetailView: View {
             }
         }
     }
-
     
+    private var contentView: some View {
+        LazyVStack(pinnedViews: .sectionHeaders) {
+            Section {
+                ForEach(
+                    store.scope(state: \.sentenceWithDrawingState,
+                                action: \.scope.sentenceWithDrawingAction)
+                ) { childStore in
+                    SentencesWithDrawingView(store: childStore)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 10)
+                }
+            }
+        }
+    }
+    
+    private func scrollToTop(proxy: ScrollViewProxy) {
+        guard let id = store.scope(state: \.sentenceWithDrawingState,
+                                   action: \.scope.sentenceWithDrawingAction).first?.id else { return }
+        store.send(.view(.setProxy(proxy, id)))
+    }
+    
+    private func debounce(delay: TimeInterval = 0.1,
+                          _ action: @escaping () -> Void) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: action)
+    }
 }

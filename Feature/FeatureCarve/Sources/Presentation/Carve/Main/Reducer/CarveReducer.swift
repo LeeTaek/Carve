@@ -81,6 +81,7 @@ public struct CarveReducer {
             case .scope(.carveDetailAction(.scope(.headerAction(.titleDidTapped)))):
                 state.selectedTitle = state.currentTitle.title
                 state.selectedChapter = state.currentTitle.chapter
+                state.carveDetailState.sentenceWithDrawingState.removeAll()
                 state.columnVisibility = .all
             case .scope(.carveDetailAction(.scope(.headerAction(.moveToNext)))):
                 if state.currentTitle.chapter == state.currentTitle.title.lastChapter {
