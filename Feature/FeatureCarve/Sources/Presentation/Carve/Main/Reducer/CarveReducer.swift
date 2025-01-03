@@ -57,14 +57,14 @@ public struct CarveReducer {
                     if state.currentTitle.title != title {
                         state.selectedChapter = nil
                     }
-                    state.currentTitle.title = title
+                    state.$currentTitle.withLock { $0.title = title }
                     return .none
                 }
             }
             .onChange(of: \.selectedChapter) { _, newValue in
                 Reduce { state, _ in
                     guard let selectedChapter = newValue else { return .none }
-                    state.currentTitle.chapter = selectedChapter
+                    state.$currentTitle.withLock { $0.chapter = selectedChapter }
                     state.columnVisibility = .detailOnly
                     return .run { send in
                         await send(.scope(.carveDetailAction(.inner(.fetchSentence))))
@@ -85,20 +85,20 @@ public struct CarveReducer {
                 state.columnVisibility = .all
             case .scope(.carveDetailAction(.scope(.headerAction(.moveToNext)))):
                 if state.currentTitle.chapter == state.currentTitle.title.lastChapter {
-                    state.currentTitle.title = state.currentTitle.title.next()
-                    state.currentTitle.chapter = 1
+                    state.$currentTitle.withLock { $0.title = state.currentTitle.title.next() }
+                    state.$currentTitle.withLock { $0.chapter = 1 }
                 } else {
-                    state.currentTitle.chapter += 1
+                    state.$currentTitle.withLock { $0.chapter += 1 }
                 }
                 return .run { send in
                     await send(.scope(.carveDetailAction(.inner(.fetchSentence))))
                 }
             case .scope(.carveDetailAction(.scope(.headerAction(.moveToBefore)))):
                 if state.currentTitle.chapter == 1 {
-                    state.currentTitle.title = state.currentTitle.title.before()
-                    state.currentTitle.chapter = state.currentTitle.title.lastChapter
+                    state.$currentTitle.withLock { $0.title = state.currentTitle.title.before() }
+                    state.$currentTitle.withLock { $0.chapter = state.currentTitle.title.lastChapter }
                 } else {
-                    state.currentTitle.chapter -= 1
+                    state.$currentTitle.withLock { $0.chapter -= 1 }
                 }
                 return .run { send in
                     await send(.scope(.carveDetailAction(.inner(.fetchSentence))))

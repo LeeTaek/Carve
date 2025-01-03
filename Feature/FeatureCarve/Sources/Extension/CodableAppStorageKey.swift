@@ -11,14 +11,14 @@ import UIKit
 
 import ComposableArchitecture
 
-extension PersistenceReaderKey {
+extension SharedKey {
     public static func appStorage<Value: Codable>(_ key: String) -> Self
     where Self == CodableAppStorageKey<Value> {
         CodableAppStorageKey(key)
     }
 }
 
-public struct CodableAppStorageKey<Value: Codable>: PersistenceKey {
+public struct CodableAppStorageKey<Value: Codable>: SharedKey {
     private let key: String
     private let store: UserDefaults
     
@@ -34,30 +34,39 @@ public struct CodableAppStorageKey<Value: Codable>: PersistenceKey {
     
     public func load(initialValue: Value?) -> Value? {
         guard let storedValue = self.store.object(forKey: self.key) as? Data else {
-            guard !SharedAppStorageLocals.isSetting else {
-                return initialValue
-            }
-            SharedAppStorageLocals.$isSetting.withValue(true) {
-                guard let initialValue else { return }
-                self.save(initialValue)
-            }
+            handleInitialValue(initialValue)
             return initialValue
         }
-        let value = try? JSONDecoder().decode(Value.self, from: storedValue)
-        return value
+        do {
+            return try JSONDecoder().decode(Value.self, from: storedValue)
+        } catch {
+            print("Failed to decode value for key \(self.key): \(error)")
+            return initialValue
+        }
     }
     
-    public func save(_ value: Value) {
-        guard let newValue = try? JSONEncoder().encode(value) else { return }
-        SharedAppStorageLocals.$isSetting.withValue(true) {
-            self.store.setValue(newValue, forKey: self.key)
+    public func save(_ value: Value, immediately: Bool) {
+        guard let encodedValue = try? JSONEncoder().encode(value) else {
+            print("Failed to encode value for key \(self.key)")
+            return
+        }
+        if immediately {
+            // 즉시 저장
+            self.store.setValue(encodedValue, forKey: self.key)
+        } else {
+            // 지연 저장 처리: 디바운싱 또는 스로틀링 로직
+            DispatchQueue.main.async {
+                SharedAppStorageLocals.$isSetting.withValue(true) {
+                    self.store.setValue(encodedValue, forKey: self.key)
+                }
+            }
         }
     }
     
     public func subscribe(
         initialValue: Value?,
         didSet: @Sendable @escaping (_ newValue: Value?) -> Void
-    ) -> Shared<Value>.Subscription {
+    ) -> SharedSubscription {
         let previousValue = LockIsolated(initialValue)
         let userDefaultsDidChange = NotificationCenter.default.addObserver(
             forName: UserDefaults.didChangeNotification,
@@ -82,9 +91,8 @@ public struct CodableAppStorageKey<Value: Codable>: PersistenceKey {
             queue: nil
         ) { _ in
             didSet(load(initialValue: initialValue))
-            
         }
-        return Shared.Subscription {
+        return SharedSubscription {
             NotificationCenter.default.removeObserver(userDefaultsDidChange)
             if let willEnterForeground {
                 NotificationCenter.default.removeObserver(willEnterForeground)
@@ -92,15 +100,22 @@ public struct CodableAppStorageKey<Value: Codable>: PersistenceKey {
         }
     }
     
+    private func handleInitialValue(_ initialValue: Value?) {
+        guard !SharedAppStorageLocals.isSetting else { return }
+        SharedAppStorageLocals.$isSetting.withValue(true) {
+            guard let initialValue else { return }
+            self.save(initialValue, immediately: true)
+        }
+    }
+    
     private func isEqual(_ lhs: Any, _ rhs: Any) -> Bool? {
-      (lhs as? any Equatable)?.isEqual(other: rhs)
+        (lhs as? any Equatable)?.isEqual(other: rhs)
     }
     
     private struct AppStorageKeyID: Hashable {
         let key: String
         let store: UserDefaults
     }
-
 }
 
 extension Equatable {

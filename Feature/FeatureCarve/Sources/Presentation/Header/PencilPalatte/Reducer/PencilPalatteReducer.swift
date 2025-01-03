@@ -61,23 +61,23 @@ public struct PencilPalatteReducer {
         Reduce { state, action in
             switch action {
             case .setConfigPencilColor(let color):
-                state.pencilConfig.lineColor = CodableColor(color: color)
+                state.$pencilConfig.withLock { $0.lineColor = CodableColor(color: color) }
             case .setConfigPencilType(let type):
-                state.pencilConfig.pencilType = type
+                state.$pencilConfig.withLock { $0.pencilType = type }
             case let .changePencilColor(index, color):
-                state.palatteColors[index] = .init(color: color)
+                state.$palatteColors.withLock { $0[index] = .init(color: color) }
             case .setColor(let index):
                 withAnimation {
-                    state.selectedColorIndex = index
-                    state.pencilConfig.lineColor = state.palatteColors[index]
+                    state.$selectedColorIndex.withLock { $0 = index }
+                    state.$pencilConfig.withLock { $0.lineColor = state.palatteColors[index] }
                 }
             case .setPencilType(let type):
                 withAnimation(.easeInOut(duration: 0.1)) {
-                    state.pencilConfig.pencilType = type
+                    state.$pencilConfig.withLock { $0.pencilType = type }
                 }
             case .setLineWidth(let index):
-                state.selectedWidthIndex = index
-                state.pencilConfig.lineWidth = state.lineWidths[index]
+                state.$selectedWidthIndex.withLock { $0 = index }
+                state.$pencilConfig.withLock { $0.lineWidth = state.lineWidths[index] }
             case .setPopoverPoint(let point):
                 state.popoverPoint = point
             case .popoverColor(let index):
@@ -85,8 +85,8 @@ public struct PencilPalatteReducer {
             case .popoverLineWidth(let index):
                 state.navigation = .lineWidthPalatte(.init(lineWidth: state.lineWidths[index], index: index))
             case .navigation(.dismiss):
-                state.pencilConfig.lineColor = state.palatteColors[state.selectedColorIndex]
-                state.pencilConfig.lineWidth = state.lineWidths[state.selectedWidthIndex]
+                state.$pencilConfig.withLock { $0.lineColor = state.palatteColors[state.selectedColorIndex] }
+                state.$pencilConfig.withLock { $0.lineWidth = state.lineWidths[state.selectedWidthIndex] }
             case .undo:
                 undoManager.undo()
                 return .run { send in
@@ -98,8 +98,8 @@ public struct PencilPalatteReducer {
                     await send(.setCanUndo)
                 }
             case .setCanUndo:
-                state.canUndo = undoManager.canUndo
-                state.canRedo = undoManager.canRedo
+                state.$canUndo.withLock { $0 = undoManager.canUndo }
+                state.$canRedo.withLock { $0 = undoManager.canRedo }
 
             default: break
             }

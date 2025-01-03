@@ -70,8 +70,8 @@ public struct CanvasReducer {
                     return .none
                 }
                 undoManager.registerUndoAction(for: canvas)
-                state.canUndo = undoManager.canUndo
-                state.canRedo = undoManager.canRedo
+                state.$canUndo.withLock { $0 = undoManager.canUndo }
+                state.$canRedo.withLock { $0 = undoManager.canRedo }
             default:
                 break
             }
