@@ -29,9 +29,7 @@ public struct CarveView: View {
         } content: {
             contentList
         } detail: {
-            CarveDetailView(store: store.scope(state: \.carveDetailState,
-                                               action: \.scope.carveDetailAction))
-            .toolbar(.hidden)
+            detailView()
         }
         .navigationSplitViewStyle(.automatic)
     }
@@ -86,6 +84,21 @@ public struct CarveView: View {
             NavigationLink(chapter.description, value: chapter)
         }
              .navigationTitle(store.currentTitle.title.koreanTitle())
+    }
+    
+    @ViewBuilder
+    private func detailView() -> some View {
+        if store.columnVisibility != .detailOnly {
+            Color(uiColor: .secondarySystemGroupedBackground)
+                .toolbar(.hidden)
+                .onTapGesture {
+                    store.send(.view(.closeNavigationBar))
+                }
+        } else {
+            CarveDetailView(store: store.scope(state: \.carveDetailState,
+                                               action: \.scope.carveDetailAction))
+            .toolbar(.hidden)
+        }
     }
 }
 

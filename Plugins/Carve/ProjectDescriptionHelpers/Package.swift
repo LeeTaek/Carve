@@ -15,8 +15,8 @@ public extension TargetDependency {
     static let FeatureSettings: Self = .project(target: "FeatureSettings", path: .relativeToRoot("Feature/FeatureSettings"))
     static let Domain: Self = .project(target: "Domain", path: .relativeToRoot("Domain/Domain"))
     static let Core: Self = .project(target: "Core", path: .relativeToRoot("Core/Core"))
+    static let UIComponent: Self = .project(target: "UIComponent", path: .relativeToRoot("Core/UIComponent"))
     static let Resources: Self = .project(target: "Resources", path: .relativeToRoot("Shared/Resources"))
-
     
     /// 외부 라이브러리: Tuist + SPM
     static let TCAArchitecture: Self = .external(name: "ComposableArchitecture")

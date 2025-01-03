@@ -14,7 +14,8 @@ let projectName = "FeatureCarve"
 let dependencies: [TargetDependency] = [
     .Domain,
     .TCAArchitecture,
-    .Resources
+    .Resources,
+    .UIComponent
 ]
 
 let script: [TargetScript] = [.swiftLint]
