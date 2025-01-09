@@ -24,6 +24,7 @@ public struct CarveNavigationReducer {
         @Shared(.appStorage("title")) public var currentTitle: TitleVO = .initialState
         public var selectedTitle: BibleTitle?
         public var selectedChapter: Int?
+        @Presents var detailNavigation: DetailDestination.State?
         
         public static let initialState = State(
             columnVisibility: .detailOnly,
@@ -36,17 +37,23 @@ public struct CarveNavigationReducer {
         case inner(InnerAction)
         case scope(ScopeAction)
     }
-    public enum ViewAction: Equatable {
+    @CasePathable
+    public enum ViewAction {
         case moveToSetting
         case closeNavigationBar
+        case detailNavigation(PresentationAction<DetailDestination.Action>)
+        case navigationToDrewLog
     }
-    
-    public enum InnerAction: Equatable {
+    public enum InnerAction {
     }
-    
     @CasePathable
     public enum ScopeAction {
         case carveDetailAction(CarveDetailReducer.Action)
+    }
+    @Reducer
+    public enum DetailDestination {
+        case sentenceSettings(SentenceSettingsReducer)
+        case drewLog(DrewLogReducer)
     }
     
     public var body: some Reducer<State, Action> {
@@ -107,12 +114,16 @@ public struct CarveNavigationReducer {
                 Log.debug("move To settings")
             case .view(.closeNavigationBar):
                 state.columnVisibility = .detailOnly
-            case .scope(.carveDetailAction(.view(.navigationToDrewLog))):
+            case .view(.navigationToDrewLog):
                 state.columnVisibility = .detailOnly
+                state.detailNavigation = .drewLog(.initialState)
+            case .scope(.carveDetailAction(.scope(.headerAction(.sentenceSettingsDidTapped)))):
+                state.detailNavigation = .sentenceSettings(.initialState)
             default: break
             }
             return .none
         }
+        .ifLet(\.$detailNavigation, action: \.view.detailNavigation)
     }
     
     

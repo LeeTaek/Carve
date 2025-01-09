@@ -19,7 +19,6 @@ public struct CarveDetailReducer {
     public struct State {
         public var headerState: HeaderReducer.State
         public var sentenceWithDrawingState: IdentifiedArrayOf<SentencesWithDrawingReducer.State> = []
-        @Presents var navigation: Destination.State?
         public var proxy: ScrollViewProxy?
         public var firstItemID: ObjectIdentifier?
         public static let initialState = State(
@@ -37,10 +36,8 @@ public struct CarveDetailReducer {
     @CasePathable
     public enum ViewAction {
         case headerAnimation(CGFloat, CGFloat)
-        case navigation(PresentationAction<Destination.Action>)
         case scrollToTop
         case setProxy(ScrollViewProxy, ObjectIdentifier)
-        case navigationToDrewLog
     }
     public enum InnerAction {
         case fetchSentence
@@ -50,11 +47,6 @@ public struct CarveDetailReducer {
     public enum ScopeAction {
         case sentenceWithDrawingAction(IdentifiedActionOf<SentencesWithDrawingReducer>)
         case headerAction(HeaderReducer.Action)
-    }
-    @Reducer
-    public enum Destination {
-        case sentenceSettings(SentenceSettingsReducer)
-        case drewLog(DrewLogReducer)
     }
     
     public var body: some Reducer<State, Action> {
@@ -100,8 +92,6 @@ public struct CarveDetailReducer {
                 return .run { send in
                     await send(.view(.scrollToTop))
                 }
-            case .scope(.headerAction(.sentenceSettingsDidTapped)):
-                state.navigation = .sentenceSettings(.initialState)
             case .view(.setProxy(let proxy, let id)):
                 state.proxy = proxy
                 state.firstItemID = id
@@ -111,13 +101,10 @@ public struct CarveDetailReducer {
                 withAnimation(.easeInOut(duration: 0.5)) {
                     state.proxy?.scrollTo(id, anchor: UnitPoint(x: 0, y: anchorPoint))
                 }
-            case .view(.navigationToDrewLog):
-                state.navigation = .drewLog(.initialState)
             default: break
             }
             return .none
         }
-        .ifLet(\.$navigation, action: \.view.navigation)
         .forEach(\.sentenceWithDrawingState,
                   action: \.scope.sentenceWithDrawingAction) {
             SentencesWithDrawingReducer()

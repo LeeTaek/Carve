@@ -64,7 +64,7 @@ public struct CarveNavigationView: View {
                 HStack {
                     Spacer()
                     Button {
-                        store.send(.scope(.carveDetailAction(.view(.navigationToDrewLog))))
+                        store.send(.view(.navigationToDrewLog))
                     } label: {
                         Image(systemName: "book.pages")
                             .foregroundStyle(.black)
@@ -105,7 +105,22 @@ public struct CarveNavigationView: View {
         } else {
             CarveDetailView(store: store.scope(state: \.carveDetailState,
                                                action: \.scope.carveDetailAction))
-            .toolbar(.hidden)
+            .sheet(
+                item: $store.scope(
+                    state: \.detailNavigation?.sentenceSettings,
+                    action: \.view.detailNavigation.sentenceSettings
+                )
+            ) { store in
+                SentenceSettingsView(store: store)
+            }
+            .fullScreenCover(
+                item: $store.scope(
+                    state: \.detailNavigation?.drewLog,
+                    action: \.view.detailNavigation.drewLog)
+            ) { store in
+                DrewLogView(store: store)
+                    .toolbar(.visible, for: .navigationBar)
+            }
         }
     }
 }

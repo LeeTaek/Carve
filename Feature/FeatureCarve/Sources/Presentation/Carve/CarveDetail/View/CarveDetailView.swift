@@ -41,22 +41,6 @@ public struct CarveDetailView: View {
                         scrollToTop(proxy: proxy)
                     }
             }
-            .sheet(
-                item: $store.scope(
-                    state: \.navigation?.sentenceSettings,
-                    action: \.view.navigation.sentenceSettings
-                )
-            ) { store in
-                SentenceSettingsView(store: store)
-            }
-            .fullScreenCover(
-                item: $store.scope(
-                    state: \.navigation?.drewLog,
-                    action: \.view.navigation.drewLog)
-            ) { store in
-                DrewLogView(store: store)
-                    .toolbar(.visible, for: .navigationBar)
-            }
             .coordinateSpace(name: "Scroll")
             .onAppear {
                 store.send(.inner(.fetchSentence))
