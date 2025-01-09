@@ -23,7 +23,7 @@ public struct AppCoordinatorView: View {
         switch store.path {
         case .carve:
             if let store = store.scope(state: \.path?.carve, action: \.path.carve) {
-                CarveView(store: store)
+                CarveNavigationView(store: store)
             }
         case .settings:
             if let store = store.scope(state: \.path?.settings, action: \.path.settings) {

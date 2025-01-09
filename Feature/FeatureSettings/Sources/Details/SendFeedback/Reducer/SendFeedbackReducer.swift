@@ -99,9 +99,7 @@ public struct SendFeedbackReducer {
                 
             case .removePhoto(let index):
                 guard state.feedbackInfo.attachment.count > index else { return .none }
-                withAnimation(.easeInOut(duration: 0.1)) {
-                    state.feedbackInfo.attachment.remove(at: index)
-                }
+                state.feedbackInfo.attachment.remove(at: index)
                 guard state.imageSelection.count > index else { return .none }
                 state.imageSelection.remove(at: index)
             case .toggleDefaultAgreement:

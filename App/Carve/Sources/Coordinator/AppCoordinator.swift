@@ -25,7 +25,7 @@ public struct AppCoordinator {
     
     @Reducer
     public enum Path {
-        case carve(CarveReducer)
+        case carve(CarveNavigationReducer)
         case settings(SettingsReducer)
     }
     

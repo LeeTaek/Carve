@@ -40,6 +40,7 @@ public struct CarveDetailReducer {
         case navigation(PresentationAction<Destination.Action>)
         case scrollToTop
         case setProxy(ScrollViewProxy, ObjectIdentifier)
+        case navigationToDrewLog
     }
     public enum InnerAction {
         case fetchSentence
@@ -53,6 +54,7 @@ public struct CarveDetailReducer {
     @Reducer
     public enum Destination {
         case sentenceSettings(SentenceSettingsReducer)
+        case drewLog(DrewLogReducer)
     }
     
     public var body: some Reducer<State, Action> {
@@ -109,6 +111,8 @@ public struct CarveDetailReducer {
                 withAnimation(.easeInOut(duration: 0.5)) {
                     state.proxy?.scrollTo(id, anchor: UnitPoint(x: 0, y: anchorPoint))
                 }
+            case .view(.navigationToDrewLog):
+                state.navigation = .drewLog(.initialState)
             default: break
             }
             return .none
