@@ -68,3 +68,7 @@ public struct SentencesWithDrawingView: View {
     }
     
 }
+
+#Preview {
+    
+}

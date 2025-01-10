@@ -65,6 +65,7 @@ public class SharedUndoManager {
 
 extension SharedUndoManager: DependencyKey {
     public static var liveValue = SharedUndoManager()
+    public static var previewValue = SharedUndoManager()
 }
 
 extension DependencyValues {

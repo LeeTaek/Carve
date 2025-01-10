@@ -41,14 +41,6 @@ public struct CarveDetailView: View {
                         scrollToTop(proxy: proxy)
                     }
             }
-            .sheet(
-                item: $store.scope(
-                    state: \.navigation?.sentenceSettings,
-                    action: \.view.navigation.sentenceSettings
-                )
-            ) { store in
-                SentenceSettingsView(store: store)
-            }
             .coordinateSpace(name: "Scroll")
             .onAppear {
                 store.send(.inner(.fetchSentence))
@@ -81,4 +73,15 @@ public struct CarveDetailView: View {
                           _ action: @escaping () -> Void) {
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: action)
     }
+}
+
+
+#Preview {
+    @Previewable @State var store = Store(
+        initialState: .initialState,
+        reducer: {
+            CarveDetailReducer()
+        }   
+    )
+    CarveDetailView(store: store)
 }
