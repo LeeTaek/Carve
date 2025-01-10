@@ -119,6 +119,8 @@ public struct CarveNavigationReducer {
                 state.detailNavigation = .drewLog(.initialState)
             case .scope(.carveDetailAction(.scope(.headerAction(.sentenceSettingsDidTapped)))):
                 state.detailNavigation = .sentenceSettings(.initialState)
+            case .view(.detailNavigation(.presented(.drewLog(.dismiss)))):
+                state.detailNavigation = nil
             default: break
             }
             return .none

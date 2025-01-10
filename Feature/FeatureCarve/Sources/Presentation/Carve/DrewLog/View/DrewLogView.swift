@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import Resources
 
 import ComposableArchitecture
 
@@ -20,16 +21,28 @@ public struct DrewLogView: View {
     public var body: some View {
         content
     }
+
     
     public var content: some View {
-        Text("Hello, World!")
+        VStack {
+            Button(action: { store.send(.dismiss) }) {
+                Text("DrewLogView")
+                    .font(Font(ResourcesFontFamily.NanumGothic.bold
+                        .font(size: 30)))
+                    .foregroundStyle(.black.opacity(0.7))
+                    .padding()
+            }
+        }
     }
 }
 
 #Preview {
     @Previewable @State var store = Store(
         initialState: .initialState,
-        reducer: { DrewLogReducer() }
+        reducer: { DrewLogReducer() },
+        withDependencies: {
+            $0.drawingData = .previewValue
+        }
     )
     DrewLogView(store: store)
 }

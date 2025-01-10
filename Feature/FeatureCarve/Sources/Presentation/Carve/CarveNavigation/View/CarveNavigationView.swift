@@ -148,3 +148,14 @@ struct SidebarDisclosureGroupStyle: DisclosureGroupStyle {
         }
     }
 }
+
+
+#Preview {
+    @Previewable @State var store = Store(
+        initialState: .initialState,
+        reducer: {
+            CarveNavigationReducer()
+        }
+    )
+    CarveNavigationView(store: store)
+}

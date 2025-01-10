@@ -19,6 +19,7 @@ public final class DrawingVO: Equatable, Sendable {
     public var titleName: String?
     public var titleChapter: Int?
     public var section: Int?
+    public var creationDate: Date?
     @Attribute(.externalStorage) public var lineData: Data?
     public var isWritten: Bool = false
     

@@ -7,6 +7,7 @@
 //
 
 import Core
+import Domain
 
 import ComposableArchitecture
 
@@ -16,14 +17,8 @@ public struct DrewLogReducer {
         public static let initialState = State()
     }
     public enum Action {
-//        case view(ViewAction)
-//        case inner(InnerAction)
+        case dismiss
     }
-//    public enum ViewAction: Equatable {
-//    }
-//    
-//    public enum InnerAction: Equatable {
-//    }
     public var body: some Reducer<State, Action> {
         Reduce { _, _ in
             return .none
