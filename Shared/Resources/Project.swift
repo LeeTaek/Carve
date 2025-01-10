@@ -1,12 +1,12 @@
 //
 //  Project.swift
-//  ProjectDescriptionHelpers
+//  CarveEnvironment
 //
 //  Created by openobject on 2023/08/28.
 //
 
 import ProjectDescription
-import ProjectDescriptionHelpers
+import CarveEnvironment
 
 let projectName = "Resources"
 

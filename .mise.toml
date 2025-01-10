@@ -5,5 +5,5 @@ always_keep_install = false
 verbose = false
 
 [tools]
-tuist = "4.27.0"
+tuist = "4.39.0"
 swiftlint = "latest"

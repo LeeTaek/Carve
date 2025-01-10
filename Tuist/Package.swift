@@ -1,4 +1,4 @@
-// swift-tools-version: 5.9
+// swift-tools-version: 6.0
 //
 //  Package.swift
 //  Config
@@ -10,9 +10,30 @@ import PackageDescription
 
 #if TUIST
 import ProjectDescription
-import ProjectDescriptionHelpers
+import CarveEnvironment
 
 let packageSettings = PackageSettings(
+//    productTypes: [
+//        "ComposableArchitecture": .framework,
+//        "Dependencies": .framework,
+//        "CombineSchedulers": .framework,
+//        "Sharing": .framework,
+//        "SwiftUINavigation": .framework,
+//        "UIKitNavigation": .framework,
+//        "UIKitNavigationShim": .framework,
+//        "ConcurrencyExtras": .framework,
+//        "Clocks": .framework,
+//        "CustomDump": .framework,
+//        "IdentifiedCollections": .framework,
+//        "XCTestDynamicOverlay": .framework,
+//        "IssueReporting": .framework,
+//        "_CollectionsUtilities": .framework,
+//        "PerceptionCore": .framework,
+//        "Perception": .framework,
+//        "OrderedCollections": .framework,
+//        "CasePaths": .framework,
+//        "DependenciesMacros": .framework,
+//    ],
     targetSettings: [
         "FBLPromises": .objc,
         "nanopb": .objc,
@@ -42,6 +63,6 @@ let package = Package(
     name: "Carve",
     dependencies: [
         .package(url: "https://github.com/firebase/firebase-ios-sdk.git", .upToNextMajor(from: "10.29.0")),
-        .package(url: "https://github.com/pointfreeco/swift-composable-architecture", .upToNextMajor(from: "1.17.0"))
+        .package(url: "https://github.com/pointfreeco/swift-composable-architecture", .upToNextMajor(from: "1.17.1"))
     ]
 )

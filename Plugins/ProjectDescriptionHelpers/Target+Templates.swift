@@ -1,12 +1,12 @@
 //
 //  Target+Templates.swift
-//  ProjectDescriptionHelpers
+//  CarveEnvironment
 //
 //  Created by 이택성 on 1/25/24.
 //
 
 import ProjectDescription
-import ProjectEnvironment
+import CarveEnvironment
 
 public extension Target {
     static func makeAppTarget(
@@ -69,7 +69,7 @@ public extension Target {
             infoPlist: infoPlist,
             sources: ["Tests/**"],
             scripts: script,
-            dependencies: [.target(name: projName)]
+            dependencies: dependencies
         )
     }
     

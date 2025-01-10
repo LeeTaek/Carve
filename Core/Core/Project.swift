@@ -1,12 +1,12 @@
 //
 //  Project.swift
-//  ProjectDescriptionHelpers
+//  CarveEnvironment
 //
 //  Created by 이택성 on 1/25/24.
 //
 
 import ProjectDescription
-import ProjectDescriptionHelpers
+import CarveEnvironment
 
 let projectName = "Core"
 

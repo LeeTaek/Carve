@@ -1,5 +1,5 @@
 import ProjectDescription
-import ProjectDescriptionHelpers
+import CarveEnvironment
 
 let projectName = "Carve"
 

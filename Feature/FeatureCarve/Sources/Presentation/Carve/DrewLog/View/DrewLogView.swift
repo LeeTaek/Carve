@@ -25,3 +25,11 @@ public struct DrewLogView: View {
         Text("Hello, World!")
     }
 }
+
+#Preview {
+    @Previewable @State var store = Store(
+        initialState: .initialState,
+        reducer: { DrewLogReducer() }
+    )
+    DrewLogView(store: store)
+}
