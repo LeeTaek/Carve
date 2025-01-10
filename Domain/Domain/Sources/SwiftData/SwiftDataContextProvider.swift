@@ -13,24 +13,40 @@ import CloudKit
 import Dependencies
 
 public final class PersistentCloudKitContainer {
-    public static let shared = PersistentCloudKitContainer(isLive: true)
-    public static let testConatiner = PersistentCloudKitContainer(isLive: false)
+    private enum ContainerType {
+        case live
+        case test
+        case preview
+    }
+    public static let shared = PersistentCloudKitContainer(type: .live)
+    public static let test = PersistentCloudKitContainer(type: .test)
+    public static let preview = PersistentCloudKitContainer(type: .preview)
     public let container: ModelContainer
     
-    private init(isLive: Bool) {
-        let path = isLive ? "Carve.sqlite" : "Carve.test.sqlite"
-        do {
-            let url = URL.applicationSupportDirectory.appending(path: path)
-            let schema = Schema([
-                DrawingVO.self
-            ])
-            let config = ModelConfiguration(
-                url: url,
-                cloudKitDatabase: .private("iCloud.Carve.SwiftData.iCloud")
-            )
-            container = try ModelContainer(for: schema, configurations: config)
-        } catch {
-            fatalError("Failed to create SwiftData container")
+    private init(type: ContainerType) {
+        switch type {
+        case .live, .test:
+            let path = if type == .live { "Carve.sqlite" } else { "Carve.test.sqlite" }
+            do {
+                let url = URL.applicationSupportDirectory.appending(path: path)
+                let schema = Schema([
+                    DrawingVO.self
+                ])
+                let config = ModelConfiguration(
+                    url: url,
+                    cloudKitDatabase: .private("iCloud.Carve.SwiftData.iCloud")
+                )
+                container = try ModelContainer(for: schema, configurations: config)
+            } catch {
+                fatalError("Failed to create SwiftData container")
+            }
+        case .preview:
+            do {
+                let config = ModelConfiguration(isStoredInMemoryOnly: true)
+                container = try ModelContainer(for: Schema([DrawingVO.self]), configurations: config)
+            } catch {
+                fatalError("Failed to create SwiftData container on Preview")
+            }
         }
     }
 }

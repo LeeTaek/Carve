@@ -91,8 +91,11 @@ public struct CanvasView: UIViewRepresentable {
 
 
 #Preview {
-    let store = Store(initialState: .initialState) {
-        CanvasReducer()
-    }
-    return CanvasView(store: store)
+    @Previewable @State var store = Store(initialState: .initialState,
+                                          reducer: { CanvasReducer() },
+                                          withDependencies: {
+        $0.drawingData = .previewValue
+        $0.undoManager = .previewValue
+    })
+    CanvasView(store: store)
 }

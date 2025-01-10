@@ -74,3 +74,14 @@ public struct CarveDetailView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: action)
     }
 }
+
+
+#Preview {
+    @Previewable @State var store = Store(
+        initialState: .initialState,
+        reducer: {
+            CarveDetailReducer()
+        }   
+    )
+    CarveDetailView(store: store)
+}
