@@ -77,7 +77,7 @@ public extension Target {
         projName: String,
         destination: Destinations = [.iPad],
         target: ConfigurationName,
-        product: Product = .staticFramework,
+        product: Product = Environment.forPreview.getBoolean(default: false) ? .framework : .staticFramework,
         bundleID: String = .defaultBundleID,
         deploymentTarget: DeploymentTargets = .iOS("17.0"),
         infoPlist: InfoPlist? = .default,

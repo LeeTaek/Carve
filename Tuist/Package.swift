@@ -8,32 +8,33 @@
 
 import PackageDescription
 
+
 #if TUIST
 import ProjectDescription
 import CarveEnvironment
 
 let packageSettings = PackageSettings(
-//    productTypes: [
-//        "ComposableArchitecture": .framework,
-//        "Dependencies": .framework,
-//        "CombineSchedulers": .framework,
-//        "Sharing": .framework,
-//        "SwiftUINavigation": .framework,
-//        "UIKitNavigation": .framework,
-//        "UIKitNavigationShim": .framework,
-//        "ConcurrencyExtras": .framework,
-//        "Clocks": .framework,
-//        "CustomDump": .framework,
-//        "IdentifiedCollections": .framework,
-//        "XCTestDynamicOverlay": .framework,
-//        "IssueReporting": .framework,
-//        "_CollectionsUtilities": .framework,
-//        "PerceptionCore": .framework,
-//        "Perception": .framework,
-//        "OrderedCollections": .framework,
-//        "CasePaths": .framework,
-//        "DependenciesMacros": .framework,
-//    ],
+    productTypes: Environment.forPreview.getBoolean(default: false) ? [
+        "ComposableArchitecture": .framework,
+        "Dependencies": .framework,
+        "CombineSchedulers": .framework,
+        "Sharing": .framework,
+        "SwiftUINavigation": .framework,
+        "UIKitNavigation": .framework,
+        "UIKitNavigationShim": .framework,
+        "ConcurrencyExtras": .framework,
+        "Clocks": .framework,
+        "CustomDump": .framework,
+        "IdentifiedCollections": .framework,
+        "XCTestDynamicOverlay": .framework,
+        "IssueReporting": .framework,
+        "_CollectionsUtilities": .framework,
+        "PerceptionCore": .framework,
+        "Perception": .framework,
+        "OrderedCollections": .framework,
+        "CasePaths": .framework,
+        "DependenciesMacros": .framework,
+    ] : [:] ,
     targetSettings: [
         "FBLPromises": .objc,
         "nanopb": .objc,
