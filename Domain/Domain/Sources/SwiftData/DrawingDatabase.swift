@@ -52,6 +52,16 @@ public struct DrawingDatabase: Sendable, Database {
         return storedDrawing
     }
     
+    public func fetchGrouptedByDate() async throws -> [Date: Int] {
+        let allDrawings: [DrawingVO] = try await actor.fetch()
+        let beforeDate = Calendar.current.date(from: DateComponents(year: 2024, month: 12, day: 31))!
+        let grouped = Dictionary(
+            grouping: allDrawings,
+            by: { Calendar.current.startOfDay(for: $0.updatedDate ?? beforeDate ) }
+        )
+        return grouped.mapValues { $0.count }
+    }
+    
     public func add(item: DrawingVO) async throws {
         try await actor.insert(item)
     }
@@ -59,6 +69,7 @@ public struct DrawingDatabase: Sendable, Database {
     public func update(item: DrawingVO) async throws {
         try await actor.update(item.id) { (oldValue: DrawingVO) async in
             oldValue.lineData = item.lineData
+            oldValue.updatedDate = item.updatedDate
         }
     }
     
