@@ -1,5 +1,5 @@
 import ProjectDescription
-import ProjectDescriptionHelpers
+import CarveEnvironment
 
 let projectName = "Carve"
 
@@ -19,7 +19,7 @@ let settings: Settings = .settings(
         .automaticCodeSigning(devTeam: "H4MSW7FUBB")
         .otherLinkerFlags(["-all_load -Objc"])
         .debugInformationFormat(.dwarfWithDsym)
-        .marketingVersion("1.0.3")
+        .marketingVersion("1.0.4")
         .currentProjectVersion("1")
         .merging([
             "ENABLE_USER_SCRIPT_SANDBOXING": "YES",

@@ -21,12 +21,7 @@ public struct LisenceReducer {
     public enum Action {
     }
     public var body: some Reducer<State, Action> {
-        Reduce { _, action in
-            switch action {
-            default: break
-            }
-            return .none
-        }
+        EmptyReducer()
     }
 }
 

@@ -14,7 +14,7 @@ import Dependencies
 
 public struct DrawingDatabase: Sendable, Database {
     public typealias Item = DrawingVO
-    @Dependency(\.createSwiftDataActor) private var actor
+    @Dependency(\.createSwiftDataActor) public var actor
     
     public func fetch() async throws -> DrawingVO {
         if let storedDrawing: DrawingVO = try await actor.fetch().first {
@@ -59,6 +59,7 @@ public struct DrawingDatabase: Sendable, Database {
     public func update(item: DrawingVO) async throws {
         try await actor.update(item.id) { (oldValue: DrawingVO) async in
             oldValue.lineData = item.lineData
+            oldValue.updateDate = item.updateDate
         }
     }
     
@@ -97,7 +98,22 @@ public struct DrawingDatabase: Sendable, Database {
 
 extension DrawingDatabase: DependencyKey {
     public static let liveValue: DrawingDatabase = Self()
-    public static let testValue: DrawingDatabase = Self()
+    public static var testValue: DrawingDatabase = {
+        let database = withDependencies {
+            $0.createSwiftDataActor = .testValue
+        } operation: {
+            DrawingDatabase()
+        }
+        return database
+    }()
+    public static var previewValue: DrawingDatabase = {
+        let database = withDependencies {
+            $0.createSwiftDataActor = .previewValue
+        } operation: {
+            DrawingDatabase()
+        }
+        return database
+    }()
 }
 
 extension DependencyValues {

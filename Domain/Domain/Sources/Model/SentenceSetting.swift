@@ -9,7 +9,7 @@
 import SwiftUI
 import Resources
 
-public struct SentenceSetting: Sendable, Codable {
+public struct SentenceSetting: Sendable, Codable, Equatable {
     public var lineSpace: CGFloat
     public var fontSize: CGFloat
     public var traking: CGFloat
@@ -47,14 +47,14 @@ public struct SentenceSetting: Sendable, Codable {
 }
 
 public enum FontCase: String, CaseIterable, Sendable, Codable {
-    case gothic = "NanumBarunGothic"
+    case gothic = "NanumGothic"
     case myeongjo = "NanumMyeongjo"
     case flower = "NanumFlowerScent"
         
     public func font(size: CGFloat) -> UIFont {
         switch self {
         case .flower: ResourcesFontFamily.나눔손글씨꽃내음.regular.font(size: size)
-        case .gothic: ResourcesFontFamily.NanumBarunGothic.regular.font(size: size)
+        case .gothic: ResourcesFontFamily.NanumGothic.regular.font(size: size)
         case .myeongjo: ResourcesFontFamily.NanumMyeongjo.regular.font(size: size)
         }
     }

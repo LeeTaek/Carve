@@ -11,7 +11,7 @@ import SwiftUI
 import ComposableArchitecture
 
 public struct SentencesWithDrawingView: View {
-    private var store: StoreOf<SentencesWithDrawingReducer>
+    @Bindable private var store: StoreOf<SentencesWithDrawingReducer>
     
     public init(store: StoreOf<SentencesWithDrawingReducer>) {
         self.store = store
@@ -66,5 +66,9 @@ public struct SentencesWithDrawingView: View {
             return path
         }
     }
+    
+}
+
+#Preview {
     
 }
