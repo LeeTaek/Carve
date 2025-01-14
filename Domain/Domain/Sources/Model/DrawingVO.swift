@@ -19,6 +19,8 @@ public final class DrawingVO: Equatable, Sendable {
     public var titleName: String?
     public var titleChapter: Int?
     public var section: Int?
+    public var creationDate: Date?
+    public var updateDate: Date?
     @Attribute(.externalStorage) public var lineData: Data?
     public var isWritten: Bool = false
     
@@ -26,24 +28,31 @@ public final class DrawingVO: Equatable, Sendable {
                 lineData: PKDrawing,
                 isWritten: Bool = false,
                 bibleTitle: TitleVO,
-                section: Int) {
+                section: Int,
+                updateDate: Date? = Date.now
+    ) {
         self.id = "\(bibleTitle.title.rawValue).\(bibleTitle.chapter).\(section)"
         self.lineData = lineData.dataRepresentation()
         self.isWritten = isWritten
         self.titleName = bibleTitle.title.rawValue
         self.titleChapter = bibleTitle.chapter
         self.section = section
+        self.creationDate = Date()
+        self.updateDate = updateDate
     }
     
     public init(bibleTitle: TitleVO,
                 section: Int,
-                lineData: Data? = nil
+                lineData: Data? = nil,
+                updateDate: Date? = Date.now
     ) {
         self.id = "\(bibleTitle.title.rawValue).\(bibleTitle.chapter).\(section)"
         self.lineData = lineData
         self.titleName = bibleTitle.title.rawValue
         self.titleChapter = bibleTitle.chapter
         self.section = section
+        self.creationDate = Date()
+        self.updateDate = updateDate
     }
     
 }

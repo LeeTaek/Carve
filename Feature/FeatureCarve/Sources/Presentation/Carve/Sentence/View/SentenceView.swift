@@ -12,7 +12,7 @@ import SwiftUI
 import ComposableArchitecture
 
 public struct SentenceView: View {
-    private var store: StoreOf<SentenceReducer>
+    @Bindable private var store: StoreOf<SentenceReducer>
 
     public init(store: StoreOf<SentenceReducer>) {
         self.store = store

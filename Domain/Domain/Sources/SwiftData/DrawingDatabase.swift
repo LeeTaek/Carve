@@ -59,6 +59,7 @@ public struct DrawingDatabase: Sendable, Database {
     public func update(item: DrawingVO) async throws {
         try await actor.update(item.id) { (oldValue: DrawingVO) async in
             oldValue.lineData = item.lineData
+            oldValue.updateDate = item.updateDate
         }
     }
     

@@ -51,6 +51,7 @@ public struct CanvasReducer {
             case .saveDrawing(let newDrawing):
                 if let drawing = state.drawing {
                     drawing.lineData = newDrawing.dataRepresentation()
+                    drawing.updateDate = Date.now
                 } else {
                     state.drawing = DrawingVO(bibleTitle: state.title,
                                               section: state.section,

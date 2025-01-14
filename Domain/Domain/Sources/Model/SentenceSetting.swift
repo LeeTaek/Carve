@@ -9,7 +9,7 @@
 import SwiftUI
 import Resources
 
-public struct SentenceSetting: Sendable, Codable {
+public struct SentenceSetting: Sendable, Codable, Equatable {
     public var lineSpace: CGFloat
     public var fontSize: CGFloat
     public var traking: CGFloat
