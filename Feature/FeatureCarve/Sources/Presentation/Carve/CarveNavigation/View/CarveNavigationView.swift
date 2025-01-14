@@ -63,14 +63,14 @@ public struct CarveNavigationView: View {
             ToolbarItem(placement: .bottomBar) {
                 HStack {
                     Spacer()
-                    Button {
-                        store.send(.view(.navigationToDrewLog))
-                    } label: {
-                        Image(systemName: "book.pages")
-                            .foregroundStyle(.black)
-                    }
-                    .frame(width: 30, height: 30)
-                    .padding(15)
+//                    Button {
+//                        store.send(.view(.navigationToDrewLog))
+//                    } label: {
+//                        Image(systemName: "book.pages")
+//                            .foregroundStyle(.black)
+//                    }
+//                    .frame(width: 30, height: 30)
+//                    .padding(15)
                     Button {
                         store.send(.view(.moveToSetting))
                     } label: {

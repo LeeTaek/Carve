@@ -20,7 +20,11 @@ public final class DrawingVO: Equatable, Sendable {
     public var titleChapter: Int?
     public var section: Int?
     public var creationDate: Date?
+<<<<<<< HEAD
     public var updatedDate: Date?
+=======
+    public var updateDate: Date?
+>>>>>>> develop
     @Attribute(.externalStorage) public var lineData: Data?
     public var isWritten: Bool = false
     
@@ -38,13 +42,13 @@ public final class DrawingVO: Equatable, Sendable {
         self.titleChapter = bibleTitle.chapter
         self.section = section
         self.creationDate = Date()
-        self.updatedDate = updateDate
+        self.updateDate = updateDate
     }
     
     public init(bibleTitle: TitleVO,
                 section: Int,
                 lineData: Data? = nil,
-                updatedDate: Date? = Date.now
+                updateDate: Date? = Date.now
     ) {
         self.id = "\(bibleTitle.title.rawValue).\(bibleTitle.chapter).\(section)"
         self.lineData = lineData
@@ -52,7 +56,7 @@ public final class DrawingVO: Equatable, Sendable {
         self.titleChapter = bibleTitle.chapter
         self.section = section
         self.creationDate = Date()
-        self.updatedDate = updatedDate
+        self.updateDate = updateDate
     }
     
 }
