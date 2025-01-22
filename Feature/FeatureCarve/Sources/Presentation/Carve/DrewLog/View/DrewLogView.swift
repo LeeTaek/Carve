@@ -22,33 +22,43 @@ public struct DrewLogView: View {
     }
     
     public var body: some View {
-        content
+        VStack(alignment: .leading, spacing: 16) {
+            title
+            Spacer()
+            if store.isLoading {
+                loadingView
+                Spacer()
+            } else {
+                content
+            }
+        }
+        .onAppear {
+            store.send(.inner(.fetchChartData))
+        }
+        .background(Color(uiColor: .systemGroupedBackground))
     }
     
     private var content: some View {
         GeometryReader { geometry in
-            VStack(alignment: .leading, spacing: 16) {
-                title
-                List {
-                    Section {
-                        chart
-                            .frame(
-                                width: (geometry.size.width/9) * 8,
-                                height: geometry.size.height/4,
-                                alignment: .center
-                            )
-                    } header: {
-                        chartTitle
-                    }
-                    Section {
-                        carvingTrackerChart
-                    } header: {
-                        carvingTrackerChartTitle
-                    }
+            List {
+                Section {
+                    chart
+                        .frame(
+                            width: (geometry.size.width/9) * 8,
+                            height: geometry.size.height/4,
+                            alignment: .center
+                        )
+                } header: {
+                    chartTitle
+                }
+                Section {
+                    carvingTrackerChart
+                } header: {
+                    carvingTrackerChartTitle
                 }
             }
-            .background(Color(uiColor: .systemGroupedBackground))
         }
+        .transition(.opacity)
     }
     
     private var title: some View {
@@ -56,8 +66,7 @@ public struct DrewLogView: View {
             Text("필사 기록")
                 .navigationTitleStyle()
         }
-        .padding()
-        
+        .padding(.horizontal)
     }
     
     private var chartTitle: some View {
@@ -73,41 +82,39 @@ public struct DrewLogView: View {
                 
                 Text("절의 말씀을 새겼네요.")
                     .sublineStyle(size: 18, opacity: 0.7)
-                
             }
         }
     }
     
     private var chart: some View {
-        GeometryReader { geometry in
-            Chart(store.chartData) { entry in
-                BarMark(
-                    x: .value("Date", entry.date, unit: .day),
-                    y: .value("Count", isAnimating ? entry.count : 0)
-                )
-                .annotation(position: .top, alignment: .center) {
-                    Text("\(entry.count)절")
-                        .fixedSize()
-                        .sublineStyle(size: 12, opacity: textAnimating ? 0.7: 0)
-                        .animation(.easeInOut(duration: 1.0), value: textAnimating)
-                }
-                .cornerRadius(10)
-                .foregroundStyle(by: .value("Date", entry.date))
+        Chart(store.chartData) { entry in
+            BarMark(
+                x: .value("Date", entry.date, unit: .day),
+                y: .value("Count", isAnimating ? entry.count : 0),
+                width: 50
+            )
+            .annotation(position: .top, alignment: .center) {
+                Text("\(entry.count)절")
+                    .fixedSize()
+                    .sublineStyle(size: 12, opacity: textAnimating ? 0.7: 0)
+                    .animation(.easeInOut(duration: 1.0), value: textAnimating)
+                
             }
-            .chartYScale(domain: 0...store.maxY)
-            .chartYAxis {
-                AxisMarks(position: .leading)
-            }
-            .chartXAxis {
-                AxisMarks(preset: .aligned, values: store.chartData.map { $0.date }) {
-                    AxisValueLabel(format: .dateTime.month().day(), centered: true)
-                    AxisGridLine()
-                }
-            }
-            .padding()
+            .cornerRadius(10)
+            .foregroundStyle(by: .value("Date", entry.date))
         }
+        .chartYScale(domain: 0...store.maxY)
+        .chartYAxis {
+            AxisMarks(position: .leading)
+        }
+        .chartXAxis {
+            AxisMarks(values: .stride(by: .day)) {
+                AxisValueLabel(format: .dateTime.month().day(), centered: true)
+                AxisGridLine()
+            }
+        }
+        .padding()
         .task {
-            store.send(.inner(.fetchChartData))
             try? await Task.sleep(nanoseconds: 100_000_000)
             withAnimation(.easeInOut(duration: 1.0)) {
                 self.isAnimating = true
@@ -119,24 +126,30 @@ public struct DrewLogView: View {
         }
     }
     
+    private var loadingView: some View {
+        ZStack {
+            Color(uiColor: .systemGroupedBackground)
+                .ignoresSafeArea()
+            VStack {
+                ProgressView()
+                    .progressViewStyle(.circular)
+                    .padding()
+                Text("필사 데이터를 불러오는 중입니다... ")
+                    .sublineStyle(size: 18, opacity: 0.7)
+                    .padding()
+            }
+        }
+        .transition(.opacity)
+    }
+    
     
     private var carvingTrackerChartTitle: some View {
-        HStack {
-            Text("필사 현황")
-                .sublineStyle(size: 18, opacity: 0.7)
-        }
+        Text("필사 현황")
+            .sublineStyle(size: 18, opacity: 0.7)
     }
     private var carvingTrackerChart: some View {
         Text("성경 필사 표 ")
     }
-    
-    private func calculateDomainRange(from dates: [Date]) -> ClosedRange<Date> {
-        print(dates)
-        let startDate = dates.first ?? Date().toLocalTime()
-        let endDate = dates.last ?? Date().toLocalTime()
-        return startDate...endDate
-    }
-
 }
 
 #Preview {
