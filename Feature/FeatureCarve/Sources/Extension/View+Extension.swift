@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import Resources
 
 extension View {
     @ViewBuilder
@@ -28,6 +29,16 @@ extension View {
     
     func animationEffect(isSelected: Bool, id: String, in namespace: Namespace.ID) -> some View {
         modifier(AnimationEffect(isSelected: isSelected, id: id, namespace: namespace))
+    }
+    
+    func navigationTitleStyle() -> some View {
+        self.font(Font(ResourcesFontFamily.NanumGothic.bold.font(size: 30)))
+            .foregroundStyle(.black.opacity(0.7))
+    }
+    
+    func sublineStyle(size: CGFloat, opacity: Double = 1.0) -> some View {
+        self.font(Font(ResourcesFontFamily.NanumGothic.bold.font(size: size)))
+            .foregroundStyle(.black.opacity(opacity))
     }
 }
 

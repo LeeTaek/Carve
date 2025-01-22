@@ -20,11 +20,7 @@ public final class DrawingVO: Equatable, Sendable {
     public var titleChapter: Int?
     public var section: Int?
     public var creationDate: Date?
-<<<<<<< HEAD
-    public var updatedDate: Date?
-=======
     public var updateDate: Date?
->>>>>>> develop
     @Attribute(.externalStorage) public var lineData: Data?
     public var isWritten: Bool = false
     
@@ -59,4 +55,29 @@ public final class DrawingVO: Equatable, Sendable {
         self.updateDate = updateDate
     }
     
+}
+
+extension DrawingVO {
+    static var previewData: [DrawingVO] {
+        [
+            DrawingVO(bibleTitle: TitleVO(title: .genesis, chapter: 1),
+                      section: 1,
+                      updateDate: Date()),
+            DrawingVO(bibleTitle: TitleVO(title: .genesis, chapter: 1),
+                      section: 2,
+                      updateDate: Date()),
+            DrawingVO(bibleTitle: TitleVO(title: .genesis, chapter: 1),
+                      section: 3,
+                      updateDate: Date()),
+            DrawingVO(bibleTitle: TitleVO(title: .exodus, chapter: 2),
+                      section: 1,
+                      updateDate: Calendar.current.date(byAdding: .day, value: -1, to: .now)!),
+            DrawingVO(bibleTitle: TitleVO(title: .exodus, chapter: 2),
+                      section: 2,
+                      updateDate: Calendar.current.date(byAdding: .day, value: -1, to: .now)!),
+            DrawingVO(bibleTitle: TitleVO(title: .revelation, chapter: 3),
+                      section: 3,
+                      updateDate: Calendar.current.date(byAdding: .day, value: -2, to: .now)!)
+        ]
+    }
 }

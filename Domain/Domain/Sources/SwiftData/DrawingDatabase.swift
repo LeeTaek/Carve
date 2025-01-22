@@ -57,7 +57,9 @@ public struct DrawingDatabase: Sendable, Database {
         let beforeDate = Calendar.current.date(from: DateComponents(year: 2024, month: 12, day: 31))!
         let grouped = Dictionary(
             grouping: allDrawings,
-            by: { Calendar.current.startOfDay(for: $0.updatedDate ?? beforeDate ) }
+            by: { drawing in
+                let date = drawing.updateDate ?? beforeDate
+                return Calendar.current.startOfDay(for: date.toLocalTime()) }
         )
         return grouped.mapValues { $0.count }
     }
@@ -120,7 +122,13 @@ extension DrawingDatabase: DependencyKey {
         let database = withDependencies {
             $0.createSwiftDataActor = .previewValue
         } operation: {
-            DrawingDatabase()
+            let database = DrawingDatabase()
+            Task {
+                for drawing in DrawingVO.previewData {
+                    try await database.add(item: drawing)
+                }
+            }
+            return database
         }
         return database
     }()
