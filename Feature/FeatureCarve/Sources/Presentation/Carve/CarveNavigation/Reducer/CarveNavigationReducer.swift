@@ -21,7 +21,7 @@ public struct CarveNavigationReducer {
     public struct State {
         public var columnVisibility: NavigationSplitViewVisibility
         public var carveDetailState: CarveDetailReducer.State
-        @Shared(.appStorage("title")) public var currentTitle: TitleVO = .initialState
+        @Shared(.appStorage("title")) public var currentTitle: BibleChapter = .initialState
         public var selectedTitle: BibleTitle?
         public var selectedChapter: Int?
         @Presents var detailNavigation: DetailDestination.State?
@@ -129,9 +129,9 @@ public struct CarveNavigationReducer {
     }
     
     
-    private func fetchBible(chapter: TitleVO) -> [SentenceVO] {
+    private func fetchBible(chapter: BibleChapter) -> [BibleVerse] {
         let encodingEUCKR = CFStringConvertEncodingToNSStringEncoding(0x0422)
-        var sentences: [SentenceVO] = []
+        var sentences: [BibleVerse] = []
         guard let textPath = ResourcesResources.bundle.path(forResource: chapter.title.rawValue,
                                                             ofType: nil)
         else { return sentences}
@@ -144,7 +144,7 @@ public struct CarveNavigationReducer {
                     Int($0.components(separatedBy: ":").first!)! == chapter.chapter
                 }
                 .map { sentence in
-                    return SentenceVO.init(title: chapter, sentence: sentence)
+                    return BibleVerse.init(title: chapter, sentence: sentence)
                 }
         } catch let error {
             Log.error(error.localizedDescription)

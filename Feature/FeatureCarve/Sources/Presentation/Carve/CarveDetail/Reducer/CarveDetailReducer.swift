@@ -41,7 +41,7 @@ public struct CarveDetailReducer {
     }
     public enum InnerAction {
         case fetchSentence
-        case setSentence([SentenceVO], [DrawingVO])
+        case setSentence([BibleVerse], [BibleDrawing])
     }
     @CasePathable
     public enum ScopeAction {
@@ -76,10 +76,10 @@ public struct CarveDetailReducer {
             case .inner(.setSentence(let sentences, let drawings)):
                 state.sentenceWithDrawingState.removeAll()
                 var sentenceState: IdentifiedArrayOf<SentencesWithDrawingReducer.State> = []
-                let sectionSet = Set(drawings.compactMap { $0.section })
+                let verseSet = Set(drawings.compactMap { $0.verse })
                 for sentence in sentences {
-                    if sectionSet.contains(sentence.section) {
-                        let drawing = drawings.filter { $0.section == sentence.section }.first
+                    if verseSet.contains(sentence.verse) {
+                        let drawing = drawings.filter { $0.verse == sentence.verse }.first
                         sentenceState.append(SentencesWithDrawingReducer.State(sentence: sentence,
                                                                                drawing: drawing))
                     } else {
@@ -112,9 +112,9 @@ public struct CarveDetailReducer {
     }
     
     
-    func fetchBible(chapter: TitleVO) throws(CarveReducerError) -> [SentenceVO] {
+    func fetchBible(chapter: BibleChapter) throws(CarveReducerError) -> [BibleVerse] {
         let encodingEUCKR = CFStringConvertEncodingToNSStringEncoding(0x0422)
-        var sentences: [SentenceVO] = []
+        var sentences: [BibleVerse] = []
         guard let textPath = ResourcesResources.bundle.path(forResource: chapter.title.rawValue,
                                                             ofType: nil)
         else { return sentences}
@@ -128,7 +128,7 @@ public struct CarveDetailReducer {
                     return first == chapter.chapter
                 }
                 .map { sentence in
-                    return SentenceVO.init(title: chapter, sentence: sentence)
+                    return BibleVerse.init(title: chapter, sentence: sentence)
                 }
         } catch {
             throw .fetchSentenceError

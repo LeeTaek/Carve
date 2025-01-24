@@ -19,7 +19,7 @@ final class DrawingDatabaseTesting {
     init() async throws {
         @Dependency(\.createSwiftDataActor) var createActor
         @Dependency(\.drawingData) var drawingContext
-        self.actor = try await createActor()
+        self.actor = createActor
         self.drawingDatabase = drawingContext
     }
     
@@ -31,21 +31,21 @@ final class DrawingDatabaseTesting {
     
     @Test func actorInsert() async throws {
         // given
-        let drawing = DrawingVO.init(bibleTitle: .initialState, section: 1)
+        let drawing = BibleDrawing.init(bibleTitle: .initialState, verse: 1)
         // when
         try await actor.insert(drawing)
-        let storedDrawing: DrawingVO = try #require(await actor.fetch().first)
+        let storedDrawing: BibleDrawing = try #require(await actor.fetch().first)
         // then
         #expect(drawing == storedDrawing)
     }
     
     @Test func fetchDrawing() async throws {
         // given
-        let title = TitleVO.init(title: .genesis, chapter: 1)
-        let lastSection = 1
-        let drawing = DrawingVO(bibleTitle: title, section: lastSection)
+        let title = BibleChapter.init(title: .genesis, chapter: 1)
+        let lastVerse = 1
+        let drawing = BibleDrawing(bibleTitle: title, verse: lastVerse)
         // when
-        try await drawingDatabase.setDrawing(title: title, to: lastSection)
+        try await drawingDatabase.setDrawing(title: title, to: lastVerse)
         let storedDrawings = try #require(await drawingDatabase.fetch())
         // then
         #expect(drawing == storedDrawings)
@@ -53,12 +53,12 @@ final class DrawingDatabaseTesting {
     
     @Test func fetchDrawings() async throws {
         // given
-        let title = TitleVO.init(title: .genesis, chapter: 1)
-        let lastSection = 31
+        let title = BibleChapter.init(title: .genesis, chapter: 1)
+        let lastVerse = 31
         // when
-        try await drawingDatabase.setDrawing(title: title, to: lastSection)
+        try await drawingDatabase.setDrawing(title: title, to: lastVerse)
         let storedDrawings = try #require(await drawingDatabase.fetch(title: title))
         // then
-        #expect(lastSection == storedDrawings.count)
+        #expect(lastVerse == storedDrawings.count)
     }
 }

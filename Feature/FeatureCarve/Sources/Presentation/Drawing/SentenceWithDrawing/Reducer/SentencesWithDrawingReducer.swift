@@ -20,17 +20,17 @@ public struct SentencesWithDrawingReducer {
             lhs.id == rhs.id
         }
         public let id: String
-        public let sentence: SentenceVO
+        public let sentence: BibleVerse
         public var sentenceState: SentenceReducer.State
         public var canvasState: CanvasReducer.State
         public var underLineCount: Int = 1
         public var underlineOffset: [CGFloat] = [.zero]
         
-        public init(sentence: SentenceVO, drawing: DrawingVO?) {
-            self.id = "\(sentence.title.title.koreanTitle()).\(sentence.title.chapter).\(sentence.section)"
+        public init(sentence: BibleVerse, drawing: BibleDrawing?) {
+            self.id = "\(sentence.title.title.koreanTitle()).\(sentence.title.chapter).\(sentence.verse)"
             self.sentence = sentence
             self.sentenceState = .init(chapterTitle: sentence.chapterTitle,
-                                       section: sentence.section,
+                                       verse: sentence.verse,
                                        sentence: sentence.sentenceScript)
             self.canvasState = .init(sentence: sentence, drawing: drawing)
         }

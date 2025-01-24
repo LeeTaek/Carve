@@ -78,7 +78,7 @@ public struct DrewLogView: View {
             } else {
                 Text("지난 한 주")
                     .sublineStyle(size: 18, opacity: 0.7)
-                Text("\(store.totalSection)")
+                Text("\(store.totalVerse)")
                     .sublineStyle(size: 25)
                 
                 Text("절의 말씀을 새겼네요.")

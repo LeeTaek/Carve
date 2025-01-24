@@ -1,5 +1,5 @@
 //
-//  SentenceVO.swift
+//  BibleVerse.swift
 //  DomainRealm
 //
 //  Created by 이택성 on 1/29/24.
@@ -9,29 +9,29 @@
 import Foundation
 import RegexBuilder
 
-public struct SentenceVO: Equatable, Sendable {
-    public var title: TitleVO
+public struct BibleVerse: Equatable, Sendable {
+    public var title: BibleChapter
     public var chapterTitle: String?
-    public var section: Int
+    public var verse: Int
     public var sentenceScript: String
 
     public static let initialState = Self(
-        title: TitleVO(title: .leviticus, chapter: 4),
-        section: 1,
+        title: BibleChapter(title: .leviticus, chapter: 4),
+        verse: 1,
         sentence: "이 일 후에 내가 보니"
     )
 
-    public init(title: TitleVO,
+    public init(title: BibleChapter,
                 chapterTitle: String? = nil,
-                section: Int,
+                verse: Int,
                 sentence: String) {
         self.title = title
         self.chapterTitle = chapterTitle
-        self.section = section
+        self.verse = verse
         self.sentenceScript = sentence
     }
 
-    public init(title: TitleVO,
+    public init(title: BibleChapter,
                 chapterTitle: String? = nil,
                 sentence: String) {
         self.title = title
@@ -67,7 +67,7 @@ public struct SentenceVO: Equatable, Sendable {
         }
        
         self.chapterTitle = chapterTitle
-        self.section = chapter ?? 0
+        self.verse = chapter ?? 0
         self.sentenceScript = sentenceScript
     }
     

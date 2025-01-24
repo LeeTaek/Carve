@@ -42,10 +42,10 @@ public struct SentenceView: View {
             .fontWeight(.heavy)
     }
     
-    private func sectionNumberView(_ section: Int) -> some View {
-        let sectionString = section > 9 ? section.description : section.description + " "
+    private func verseNumberView(_ verse: Int) -> some View {
+        let verseString = verse > 9 ? verse.description : verse.description + " "
         let sentenceSetting = store.sentenceSetting
-        return Text("\(sectionString)")
+        return Text("\(verseString)")
             .bold()
             .padding(.vertical, 
                      (sentenceSetting.lineSpace - sentenceSetting.fontFamily.font(size: sentenceSetting.fontSize).lineHeight) / 2)
@@ -55,7 +55,7 @@ public struct SentenceView: View {
     public var sentenceDescription: some View {
         let sentenceSetting = store.sentenceSetting
         return HStack(alignment: .top) {
-            sectionNumberView(store.section)
+            verseNumberView(store.verse)
             
             Text(store.sentence)
                 .tracking(sentenceSetting.traking)

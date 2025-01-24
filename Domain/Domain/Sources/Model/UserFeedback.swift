@@ -1,5 +1,5 @@
 //
-//  FeedbackVO.swift
+//  UserFeedback.swift
 //  Domain
 //
 //  Created by 이택성 on 7/25/24.
@@ -8,7 +8,7 @@
 
 import Foundation
 
-public struct FeedbackVO: Equatable, Hashable {
+public struct UserFeedback: Equatable, Hashable {
     public var feedbackType: FeedbackType = .inquiry
     public var email: String
     public var title: String

@@ -17,7 +17,7 @@ public struct DrewLogReducer {
     @ObservableState
     public struct State {
         public var chartData: [ChartDataEntry] = []
-        public var totalSection: Int = 0
+        public var totalVerse: Int = 0
         public var maxY: Int = 0
         public var isLoading: Bool = true
         
@@ -69,13 +69,12 @@ public struct DrewLogReducer {
             case .inner(.setChartData(let data)):
                 state.chartData = data
                 state.maxY = calculateRoundedMax(for: data)
-                state.totalSection = calculateTotalsection(for: data)
+                state.totalVerse = calculateTotalVerse(for: data)
             case .inner(.loadingComplete):
                 withAnimation(.easeInOut(duration: 0.5)) { // 애니메이션 추가
                     state.isLoading = false
                 }
-//            case .inner(.chapterPercentage):
-                
+            default: break
             }
             return .none
         }
@@ -87,7 +86,7 @@ public struct DrewLogReducer {
         return Int(ceil(roundedMax) * 10)
     }
     
-    private func calculateTotalsection(for entries: [ChartDataEntry]) -> Int {
+    private func calculateTotalVerse(for entries: [ChartDataEntry]) -> Int {
         if entries.isEmpty { return 0 }
         return entries.map { $0.count }.reduce(0, +)
     }

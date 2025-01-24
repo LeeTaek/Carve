@@ -1,6 +1,6 @@
 //
-//  TitleVO.swift
-//  DomainRealm
+//  BibleChapter.swift
+//  Domain
 //
 //  Created by 이택성 on 1/29/24.
 //  Copyright © 2024 leetaek. All rights reserved.
@@ -9,15 +9,15 @@
 import Foundation
 import SwiftData
 
-public struct TitleVO: Sendable, Codable, Hashable {
-    public static func == (lhs: TitleVO, rhs: TitleVO) -> Bool {
+public struct BibleChapter: Sendable, Codable, Hashable {
+    public static func == (lhs: BibleChapter, rhs: BibleChapter) -> Bool {
         (lhs.title == rhs.title) && (lhs.chapter == rhs.chapter)
     }
     
     public var title: BibleTitle
     public var chapter: Int
     
-    public static let initialState = TitleVO.init(title: .genesis, chapter: 1)
+    public static let initialState = BibleChapter.init(title: .genesis, chapter: 1)
     
     public init(title: BibleTitle, chapter: Int) {
         self.title = title
