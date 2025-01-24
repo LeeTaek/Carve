@@ -106,6 +106,11 @@ public struct DrawingDatabase: Sendable, Database {
         Log.debug("update drawing", drawing)
     }
     
+    public func loadChapterPercentage(title: TitleVO) async throws -> Int  {
+        let drawings: [DrawingVO] = try await fetch(title: title)
+        let lastSection = title
+        return 0
+    }
 }
 
 extension DrawingDatabase: DependencyKey {

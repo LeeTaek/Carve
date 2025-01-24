@@ -37,6 +37,7 @@ public struct DrewLogReducer {
         case fetchChartData
         case setChartData([ChartDataEntry])
         case loadingComplete
+        case chapterPercentage
     }
     
     public var body: some Reducer<State, Action> {
@@ -73,6 +74,8 @@ public struct DrewLogReducer {
                 withAnimation(.easeInOut(duration: 0.5)) { // 애니메이션 추가
                     state.isLoading = false
                 }
+//            case .inner(.chapterPercentage):
+                
             }
             return .none
         }
@@ -88,7 +91,7 @@ public struct DrewLogReducer {
         if entries.isEmpty { return 0 }
         return entries.map { $0.count }.reduce(0, +)
     }
-    
+        
     private func calculateLastWeek() -> ClosedRange<Date> {
         let localDate = Date().toLocalTime()
         let today = Calendar.current.startOfDay(for: localDate)

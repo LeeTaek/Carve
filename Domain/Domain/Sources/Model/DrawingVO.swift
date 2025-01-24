@@ -55,6 +55,10 @@ public final class DrawingVO: Equatable, Sendable {
         self.updateDate = updateDate
     }
     
+    public func isUpdate() -> Bool {
+        return creationDate == updateDate
+    }
+    
 }
 
 extension DrawingVO {

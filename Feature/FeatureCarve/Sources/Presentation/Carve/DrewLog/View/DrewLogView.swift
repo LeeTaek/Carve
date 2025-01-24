@@ -8,6 +8,7 @@
 
 import Core
 import Charts
+import Domain
 import SwiftUI
 
 import ComposableArchitecture
@@ -148,7 +149,27 @@ public struct DrewLogView: View {
             .sublineStyle(size: 18, opacity: 0.7)
     }
     private var carvingTrackerChart: some View {
-        Text("성경 필사 표 ")
+        ForEach(BibleTitle.allCases, id: \.self) { book in
+            VStack(alignment: .leading, spacing: 8) {
+                Text(book.koreanTitle())
+                    .sublineStyle(size: 16)
+                    .padding([.horizontal, .top])
+                LazyVGrid(
+                    columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 10),
+                    spacing: 8
+                ) {
+                    ForEach(1...book.lastChapter, id: \.self) { chapter in
+                        Text("\(chapter)")
+                            .sublineStyle(size: 16, opacity: 0.7)
+                            .frame(maxWidth: .infinity)
+                            .padding(8)
+                            .background(Color(uiColor: .systemGray6))
+                            .cornerRadius(8)
+                    }
+                }
+                .padding()
+            }
+        }
     }
 }
 
