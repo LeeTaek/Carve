@@ -161,26 +161,30 @@ public struct DrewLogView: View {
                 ) {
                     ForEach(1...title.lastChapter, id: \.self) { chapter in
                         let chapterID = BibleChapter(title: title, chapter: chapter)
-                        let percentage = store.chapterPercentages[chapterID, default: 0.0]
+                        let rawPercentage = store.chapterPercentages[chapterID, default: 0.0]
+                        let animatedPercentage = store.animatedPercentages[chapterID, default: 0.0]
+
                         VStack {
-                            RoundedRectangle(cornerRadius: 8)
-                                .strokeBorder(
-                                    AngularGradient(
-                                        gradient: Gradient(colors: [.blue, .blue.opacity(0)]),
-                                        center: .center,
-                                        startAngle: .degrees(0),
-                                        endAngle: .degrees(percentage * 360)
-                                    ),
-                                    lineWidth: 1
-                                )
-                                .frame(height: 50)
-                                .overlay(
-                                    Text("\(chapter)절")
-                                        .sublineStyle(size: 16, opacity: 0.7)
-                                )
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(.gray.opacity(0.5), lineWidth: 2)
+                                
+                                RoundedRectangle(cornerRadius: 8)
+                                    .trim(from: 0.75, to: 0.75 + CGFloat(animatedPercentage))
+                                    .stroke(.blue, lineWidth: 2)
+                                    .animation(.easeInOut(duration: 1.0), value: animatedPercentage)
+                            }
+                            .frame(height: 50)
+                            .overlay(
+                                Text("\(chapter)절")
+                                    .sublineStyle(size: 16, opacity: 0.7)
+                            )
                             
-                            Text("\(percentage)%")
-                                .sublineStyle(size: 16, opacity: 0.7)
+                            Text("\(Int(round(rawPercentage)))%")
+                                .sublineStyle(size: 14, opacity: 0.7)
+                        }
+                        .onAppear {
+                            store.send(.inner(.updatePercentageAnimation(chapterID, rawPercentage)))
                         }
                     }
                 }

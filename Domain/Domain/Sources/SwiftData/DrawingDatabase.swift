@@ -109,7 +109,6 @@ public struct DrawingDatabase: Sendable, Database {
         let drawings: [BibleDrawing] = try await fetch(chapter: chapter)
         guard let lastverse = LastVerseCache.shared.getLastVerse(for: chapter) else { return 0.0 }
         let percentage = Double(drawings.count) / Double(lastverse) * 100.0
-        Log.debug("loadChapterPercentage", percentage)
         return round(percentage * 100) / 100.0
     }
     
@@ -131,8 +130,6 @@ public struct DrawingDatabase: Sendable, Database {
                             await MainActor.run {
                                 progressUpadte?(progress)
                             }
-                            Log.debug("✅ 로딩 프로그레스: \(progress)")
-
                             return (chapter, percentage)
                         } catch {
                             return nil

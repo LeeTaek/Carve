@@ -20,6 +20,7 @@ public struct DrewLogReducer {
         public var totalVerse: Int = 0
         public var maxY: Int = 0
         public var chapterPercentages: [BibleChapter: Double] = [:]
+        public var animatedPercentages: [BibleChapter: Double] = [:]
         
         public var isChartDataLoaded: Bool = false
         public var isChapterPercentageLoaded: Bool = false
@@ -47,6 +48,7 @@ public struct DrewLogReducer {
         case fetchChapterPercentage
         case setChapterPercentage([BibleChapter: Double])
         case updateLoadingProgress(Double)
+        case updatePercentageAnimation(BibleChapter, Double)
     }
     
     public var body: some Reducer<State, Action> {
@@ -110,6 +112,10 @@ public struct DrewLogReducer {
                 withAnimation(.easeInOut(duration: 0.5)) {
                     state.isChartDataLoaded = true
                     state.isChapterPercentageLoaded = true
+                }
+            case .inner(.updatePercentageAnimation(let chapter, let percentage)):
+                withAnimation(.easeInOut(duration: 1.0)) {
+                    state.animatedPercentages[chapter] = percentage / 100.0
                 }
             }
             return .none
