@@ -19,7 +19,10 @@ public struct DrewLogReducer {
         public var chartData: [ChartDataEntry] = []
         public var totalVerse: Int = 0
         public var maxY: Int = 0
+        public var chapterPercentages: [BibleChapter: Double] = [:]
+        
         public var isLoading: Bool = true
+        
         
         public static let initialState = State()
     }
@@ -37,7 +40,8 @@ public struct DrewLogReducer {
         case fetchChartData
         case setChartData([ChartDataEntry])
         case loadingComplete
-        case chapterPercentage
+        case fetchChapterPercentage
+        case setChapterPercentage([BibleChapter: Double])
     }
     
     public var body: some Reducer<State, Action> {
@@ -74,7 +78,13 @@ public struct DrewLogReducer {
                 withAnimation(.easeInOut(duration: 0.5)) { // 애니메이션 추가
                     state.isLoading = false
                 }
-            default: break
+            case .inner(.fetchChapterPercentage):
+                return .run { send in
+                    let percentages = try await database.fetchAllChapterPercentage()
+                    await send(.inner(.setChapterPercentage(percentages)))
+                }
+            case .inner(.setChapterPercentage(let percentages)):
+                state.chapterPercentages = percentages
             }
             return .none
         }

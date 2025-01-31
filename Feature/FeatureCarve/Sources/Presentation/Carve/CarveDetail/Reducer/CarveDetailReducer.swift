@@ -66,7 +66,7 @@ public struct CarveDetailReducer {
                 return .run { send in
                     let sentences = try fetchBible(chapter: title)
                     do {
-                        let storedDrawing = try await drawingContext.fetch(title: title)
+                        let storedDrawing = try await drawingContext.fetch(chapter: title)
                         await send(.inner(.setSentence(sentences, storedDrawing)))
                     } catch {
                         Log.debug("fetch drawing error", error)

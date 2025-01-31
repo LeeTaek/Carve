@@ -35,6 +35,7 @@ public struct DrewLogView: View {
         }
         .onAppear {
             store.send(.inner(.fetchChartData))
+            store.send(.inner(.fetchChapterPercentage))
         }
         .background(Color(uiColor: .systemGroupedBackground))
     }
@@ -149,22 +150,38 @@ public struct DrewLogView: View {
             .sublineStyle(size: 18, opacity: 0.7)
     }
     private var carvingTrackerChart: some View {
-        ForEach(BibleTitle.allCases, id: \.self) { book in
+        ForEach(BibleTitle.allCases, id: \.self) { title in
             VStack(alignment: .leading, spacing: 8) {
-                Text(book.koreanTitle())
+                Text(title.koreanTitle())
                     .sublineStyle(size: 16)
                     .padding([.horizontal, .top])
                 LazyVGrid(
                     columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 10),
                     spacing: 8
                 ) {
-                    ForEach(1...book.lastChapter, id: \.self) { chapter in
-                        Text("\(chapter)")
-                            .sublineStyle(size: 16, opacity: 0.7)
-                            .frame(maxWidth: .infinity)
-                            .padding(8)
-                            .background(Color(uiColor: .systemGray6))
-                            .cornerRadius(8)
+                    ForEach(1...title.lastChapter, id: \.self) { chapter in
+                        let chapterID = BibleChapter(title: title, chapter: chapter)
+                        let percentage = store.chapterPercentages[chapterID, default: 0.0]
+                        VStack {
+                            RoundedRectangle(cornerRadius: 8)
+                                .strokeBorder(
+                                    AngularGradient(
+                                        gradient: Gradient(colors: [.blue, .blue.opacity(0)]),
+                                        center: .center,
+                                        startAngle: .degrees(0),
+                                        endAngle: .degrees(percentage * 360)
+                                    ),
+                                    lineWidth: 1
+                                )
+                                .frame(height: 50)
+                                .overlay(
+                                    Text("\(chapter)절")
+                                        .sublineStyle(size: 16, opacity: 0.7)
+                                )
+                            
+                            Text("\(percentage)%")
+                                .sublineStyle(size: 16, opacity: 0.7)
+                        }
                     }
                 }
                 .padding()

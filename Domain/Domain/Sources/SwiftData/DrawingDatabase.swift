@@ -25,9 +25,9 @@ public struct DrawingDatabase: Sendable, Database {
         }
     }
     
-    public func fetch(title: BibleChapter) async throws -> [BibleDrawing] {
-        let titleName = title.title.rawValue
-        let chapter = title.chapter
+    public func fetch(chapter: BibleChapter) async throws -> [BibleDrawing] {
+        let titleName = chapter.title.rawValue
+        let chapter = chapter.chapter
         let predicate = #Predicate<BibleDrawing> {
             $0.titleName == titleName
             && $0.titleChapter == chapter
@@ -76,7 +76,7 @@ public struct DrawingDatabase: Sendable, Database {
     }
     
     public func setDrawing(title: BibleChapter, to last: Int) async throws {
-        let drawings: [BibleDrawing] = try await fetch(title: title)
+        let drawings: [BibleDrawing] = try await fetch(chapter: title)
         for drawing in drawings {
             guard let verse = drawing.verse else { continue }
             if verse <= last {
@@ -103,14 +103,43 @@ public struct DrawingDatabase: Sendable, Database {
         } else {
             try await actor.insert(drawing)
         }
-        Log.debug("update drawing", drawing)
     }
     
-    public func loadChapterPercentage(title: BibleChapter) async throws -> Int  {
-        let drawings: [BibleDrawing] = try await fetch(title: title)
-        let lastverse = title
-        return 0
+    private func loadChapterPercentage(chapter: BibleChapter) async throws -> Double {
+        let drawings: [BibleDrawing] = try await fetch(chapter: chapter)
+        guard let lastverse = LastVerseCache.shared.getLastVerse(for: chapter) else { return 0.0 }
+        let percentage = Double(drawings.count) / Double(lastverse) * 100.0
+        return round(percentage * 100) / 100.0
     }
+    
+    public func fetchAllChapterPercentage() async throws -> [BibleChapter: Double] {
+        var percentages: [BibleChapter: Double] = [:]
+        
+        await withTaskGroup(of: (BibleChapter, Double)?.self) { group in
+            for title in BibleTitle.allCases {
+                for chapterNumber in 1...title.lastChapter {
+                    let chapter = BibleChapter(title: title, chapter: chapterNumber)
+                    
+                    group.addTask {
+                        do {
+                            let percentage = try await self.loadChapterPercentage(chapter: chapter)
+                            return (chapter, percentage)
+                        } catch {
+                            return nil
+                        }
+                    }
+                }
+                
+                for await result in group {
+                    if let (chapter, percentage) = result {
+                        percentages[chapter] = percentage
+                    }
+                }
+            }
+        }
+        return percentages
+    }
+
 }
 
 extension DrawingDatabase: DependencyKey {
