@@ -109,12 +109,15 @@ public struct DrawingDatabase: Sendable, Database {
         let drawings: [BibleDrawing] = try await fetch(chapter: chapter)
         guard let lastverse = LastVerseCache.shared.getLastVerse(for: chapter) else { return 0.0 }
         let percentage = Double(drawings.count) / Double(lastverse) * 100.0
+        Log.debug("loadChapterPercentage", percentage)
         return round(percentage * 100) / 100.0
     }
     
-    public func fetchAllChapterPercentage() async throws -> [BibleChapter: Double] {
+    public func fetchAllChapterPercentage(progressUpadte: ((Double) -> Void)? = nil) async throws -> [BibleChapter: Double] {
         var percentages: [BibleChapter: Double] = [:]
-        
+        let totalChapters = BibleTitle.allCases.reduce(0) { $0 + $1.lastChapter }
+        let chapterProgressCounter = ChapterProgress()
+
         await withTaskGroup(of: (BibleChapter, Double)?.self) { group in
             for title in BibleTitle.allCases {
                 for chapterNumber in 1...title.lastChapter {
@@ -123,6 +126,13 @@ public struct DrawingDatabase: Sendable, Database {
                     group.addTask {
                         do {
                             let percentage = try await self.loadChapterPercentage(chapter: chapter)
+                            let completedCount = await chapterProgressCounter.increment()
+                            let progress = Double(completedCount) / Double(totalChapters)
+                            await MainActor.run {
+                                progressUpadte?(progress)
+                            }
+                            Log.debug("✅ 로딩 프로그레스: \(progress)")
+
                             return (chapter, percentage)
                         } catch {
                             return nil
@@ -139,7 +149,15 @@ public struct DrawingDatabase: Sendable, Database {
         }
         return percentages
     }
-
+    
+    private actor ChapterProgress {
+        private(set) var completedChapters: Int = 0
+        
+        func increment() -> Int {
+            completedChapters += 1
+            return completedChapters
+        }
+    }
 }
 
 extension DrawingDatabase: DependencyKey {

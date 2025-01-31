@@ -136,7 +136,7 @@ public struct DrewLogView: View {
                 ProgressView()
                     .progressViewStyle(.circular)
                     .padding()
-                Text("필사 데이터를 불러오는 중입니다... ")
+                Text("필사 데이터를 불러오는 중입니다... \(Int(store.loadingProgress * 100))% ")
                     .sublineStyle(size: 18, opacity: 0.7)
                     .padding()
             }

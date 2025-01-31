@@ -28,6 +28,8 @@ public class LastVerseCache {
     private func loadCache() {
         if let cache = loadCacheFromFile() {
             lastVerses = cache
+            Log.debug("✅ 캐시 저장 후 재로드 성공: \(lastVerses.count) 개의 데이터")
+
         } else {
             setLastVersesCache()
         }

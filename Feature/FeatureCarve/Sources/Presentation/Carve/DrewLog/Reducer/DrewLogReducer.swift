@@ -21,8 +21,12 @@ public struct DrewLogReducer {
         public var maxY: Int = 0
         public var chapterPercentages: [BibleChapter: Double] = [:]
         
-        public var isLoading: Bool = true
-        
+        public var isChartDataLoaded: Bool = false
+        public var isChapterPercentageLoaded: Bool = false
+        public var loadingProgress: Double = 0.0
+        public var isLoading: Bool {
+            !(isChartDataLoaded && isChapterPercentageLoaded)
+        }
         
         public static let initialState = State()
     }
@@ -42,21 +46,24 @@ public struct DrewLogReducer {
         case loadingComplete
         case fetchChapterPercentage
         case setChapterPercentage([BibleChapter: Double])
+        case updateLoadingProgress(Double)
     }
     
     public var body: some Reducer<State, Action> {
         Reduce { state, action in
             switch action {
             case .view(.dismiss):
-                state.isLoading = true
+                state.isChartDataLoaded = false
+                state.isChapterPercentageLoaded = false
+                state.loadingProgress = 0.0
             case .inner(.fetchChartData):
-                state.isLoading = true
+                state.isChartDataLoaded = false
                 return .run { send in
                     let groupedData = try await database.fetchGrouptedByDate()
                     let lastweek = calculateLastWeek()
-                    let sortedData = groupedData.map {
-                        let adjustedDate = Calendar.current.date(byAdding: .day, value: -1, to: $0.key) ?? $0.key
-                        return ChartDataEntry(date: Calendar.current.startOfDay(for: adjustedDate), count: $0.value)
+                    let sortedData = groupedData.map { (key, value) -> ChartDataEntry in
+                        let adjustedDate = Calendar.current.date(byAdding: .day, value: -1, to: key) ?? key
+                        return ChartDataEntry(date: Calendar.current.startOfDay(for: adjustedDate), count: value)
                     }.sorted(by: { $0.date < $1.date })
                     
                     let adjustedData = stride(from: lastweek.lowerBound,
@@ -67,24 +74,43 @@ public struct DrewLogReducer {
                                 Calendar.current.isDate($0.date, equalTo: date, toGranularity: .day)
                             } ?? ChartDataEntry(date: date, count: 0)
                         }
-                    await send(.inner(.loadingComplete))
                     await send(.inner(.setChartData(adjustedData)))
                 }
             case .inner(.setChartData(let data)):
                 state.chartData = data
                 state.maxY = calculateRoundedMax(for: data)
                 state.totalVerse = calculateTotalVerse(for: data)
-            case .inner(.loadingComplete):
-                withAnimation(.easeInOut(duration: 0.5)) { // 애니메이션 추가
-                    state.isLoading = false
+                state.isChartDataLoaded = true
+                if state.isChartDataLoaded && state.isChapterPercentageLoaded {
+                    return .run { send in
+                        await send(.inner(.loadingComplete))
+                    }
                 }
             case .inner(.fetchChapterPercentage):
+                state.isChapterPercentageLoaded = false
                 return .run { send in
-                    let percentages = try await database.fetchAllChapterPercentage()
+                    let percentages = try await database.fetchAllChapterPercentage { progress in
+                        Task { @MainActor in
+                            send(.inner(.updateLoadingProgress(progress)))
+                        }
+                    }
                     await send(.inner(.setChapterPercentage(percentages)))
                 }
             case .inner(.setChapterPercentage(let percentages)):
                 state.chapterPercentages = percentages
+                state.isChapterPercentageLoaded = true
+                if state.isChartDataLoaded && state.isChapterPercentageLoaded {
+                    return .run { send in
+                        await send(.inner(.loadingComplete))
+                    }
+                }
+            case .inner(.updateLoadingProgress(let progress)):
+                state.loadingProgress = progress
+            case .inner(.loadingComplete):
+                withAnimation(.easeInOut(duration: 0.5)) {
+                    state.isChartDataLoaded = true
+                    state.isChapterPercentageLoaded = true
+                }
             }
             return .none
         }
