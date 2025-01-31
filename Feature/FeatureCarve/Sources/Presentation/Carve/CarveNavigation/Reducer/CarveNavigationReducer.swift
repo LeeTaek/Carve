@@ -43,6 +43,7 @@ public struct CarveNavigationReducer {
         case closeNavigationBar
         case detailNavigation(PresentationAction<DetailDestination.Action>)
         case navigationToDrewLog
+        case navigate(to: BibleChapter)
     }
     public enum InnerAction {
     }
@@ -91,24 +92,25 @@ public struct CarveNavigationReducer {
                 state.carveDetailState.sentenceWithDrawingState.removeAll()
                 state.columnVisibility = .all
             case .scope(.carveDetailAction(.scope(.headerAction(.moveToNext)))):
-                if state.currentTitle.chapter == state.currentTitle.title.lastChapter {
-                    state.$currentTitle.withLock { $0.title = state.currentTitle.title.next() }
-                    state.$currentTitle.withLock { $0.chapter = 1 }
+                let next: BibleChapter = if state.currentTitle.chapter == state.currentTitle.title.lastChapter {
+                    BibleChapter(title: state.currentTitle.title.next(),
+                                        chapter: 1)
                 } else {
-                    state.$currentTitle.withLock { $0.chapter += 1 }
+                    BibleChapter(title: state.currentTitle.title,
+                                        chapter: state.currentTitle.chapter + 1)
                 }
                 return .run { send in
-                    await send(.scope(.carveDetailAction(.inner(.fetchSentence))))
+                    await send(.view(.navigate(to: next)))
                 }
             case .scope(.carveDetailAction(.scope(.headerAction(.moveToBefore)))):
-                if state.currentTitle.chapter == 1 {
-                    state.$currentTitle.withLock { $0.title = state.currentTitle.title.before() }
-                    state.$currentTitle.withLock { $0.chapter = state.currentTitle.title.lastChapter }
+                let before: BibleChapter = if state.currentTitle.chapter == 1 {
+                    BibleChapter(title: state.currentTitle.title.before(),
+                                          chapter: state.currentTitle.title.lastChapter)
                 } else {
-                    state.$currentTitle.withLock { $0.chapter -= 1 }
+                    BibleChapter(title: state.currentTitle.title, chapter: state.currentTitle.chapter - 1)
                 }
                 return .run { send in
-                    await send(.scope(.carveDetailAction(.inner(.fetchSentence))))
+                    await send(.view(.navigate(to: before)))
                 }
             case .view(.moveToSetting):
                 Log.debug("move To settings")
@@ -121,6 +123,18 @@ public struct CarveNavigationReducer {
                 state.detailNavigation = .sentenceSettings(.initialState)
             case .view(.detailNavigation(.presented(.drewLog(.view(.dismiss))))):
                 state.detailNavigation = nil
+            case .view(.detailNavigation(.presented(.drewLog(.view(.navigateToDrwaing(let chapter)))))):
+                return .run { send in
+                    await send(.view(.navigate(to: chapter)))
+                }
+            case .view(.navigate(to: let chapter)):
+                state.$currentTitle.withLock { $0.title = chapter.title }
+                state.$currentTitle.withLock { $0.chapter = chapter.chapter }
+                state.carveDetailState.sentenceWithDrawingState.removeAll()
+                state.detailNavigation = nil
+                return .run { send in
+                    await send(.scope(.carveDetailAction(.inner(.fetchSentence))))
+                }
             default: break
             }
             return .none

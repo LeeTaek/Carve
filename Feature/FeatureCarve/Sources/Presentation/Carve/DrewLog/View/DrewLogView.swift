@@ -179,6 +179,9 @@ public struct DrewLogView: View {
                                 Text("\(chapter)절")
                                     .sublineStyle(size: 16, opacity: 0.7)
                             )
+                            .onTapGesture {
+                                store.send(.view(.navigateToDrwaing(chapterID)))
+                            }
                             
                             Text("\(Int(round(rawPercentage)))%")
                                 .sublineStyle(size: 14, opacity: 0.7)

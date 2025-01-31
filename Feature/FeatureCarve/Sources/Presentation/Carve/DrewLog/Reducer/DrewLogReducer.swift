@@ -39,6 +39,7 @@ public struct DrewLogReducer {
     }
     public enum ViewAction {
         case dismiss
+        case navigateToDrwaing(BibleChapter)
     }
     
     public enum InnerAction {
@@ -117,6 +118,7 @@ public struct DrewLogReducer {
                 withAnimation(.easeInOut(duration: 1.0)) {
                     state.animatedPercentages[chapter] = percentage / 100.0
                 }
+            default: break
             }
             return .none
         }
