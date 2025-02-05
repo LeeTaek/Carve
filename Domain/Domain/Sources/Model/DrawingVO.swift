@@ -11,14 +11,14 @@ import PencilKit
 import SwiftData
 
 @Model
-public final class BibleDrawing: Equatable, Sendable {
-    public static func == (lhs: BibleDrawing, rhs: BibleDrawing) -> Bool {
+public final class DrawingVO: Equatable, Sendable {
+    public static func == (lhs: DrawingVO, rhs: DrawingVO) -> Bool {
         (lhs.id == rhs.id)
     }
     public var id: String!
     public var titleName: String?
     public var titleChapter: Int?
-    public var verse: Int?
+    public var section: Int?
     public var creationDate: Date?
     public var updateDate: Date?
     @Attribute(.externalStorage) public var lineData: Data?
@@ -28,29 +28,29 @@ public final class BibleDrawing: Equatable, Sendable {
                 lineData: PKDrawing,
                 isWritten: Bool = false,
                 bibleTitle: BibleChapter,
-                verse: Int,
+                section: Int,
                 updateDate: Date? = Date.now
     ) {
-        self.id = "\(bibleTitle.title.rawValue).\(bibleTitle.chapter).\(verse)"
+        self.id = "\(bibleTitle.title.rawValue).\(bibleTitle.chapter).\(section)"
         self.lineData = lineData.dataRepresentation()
         self.isWritten = isWritten
         self.titleName = bibleTitle.title.rawValue
         self.titleChapter = bibleTitle.chapter
-        self.verse = verse
+        self.section = section
         self.creationDate = Date()
         self.updateDate = updateDate
     }
     
     public init(bibleTitle: BibleChapter,
-                verse: Int,
+                section: Int,
                 lineData: Data? = nil,
                 updateDate: Date? = Date.now
     ) {
-        self.id = "\(bibleTitle.title.rawValue).\(bibleTitle.chapter).\(verse)"
+        self.id = "\(bibleTitle.title.rawValue).\(bibleTitle.chapter).\(section)"
         self.lineData = lineData
         self.titleName = bibleTitle.title.rawValue
         self.titleChapter = bibleTitle.chapter
-        self.verse = verse
+        self.section = section
         self.creationDate = Date()
         self.updateDate = updateDate
     }
@@ -61,26 +61,27 @@ public final class BibleDrawing: Equatable, Sendable {
     
 }
 
-extension BibleDrawing {
-    static var previewData: [BibleDrawing] {
+
+extension DrawingVO {
+    static var previewData: [DrawingVO] {
         [
-            BibleDrawing(bibleTitle: BibleChapter(title: .genesis, chapter: 1),
-                      verse: 1,
+            DrawingVO(bibleTitle: BibleChapter(title: .genesis, chapter: 1),
+                      section: 1,
                       updateDate: Date()),
-            BibleDrawing(bibleTitle: BibleChapter(title: .genesis, chapter: 1),
-                      verse: 2,
+            DrawingVO(bibleTitle: BibleChapter(title: .genesis, chapter: 1),
+                      section: 2,
                       updateDate: Date()),
-            BibleDrawing(bibleTitle: BibleChapter(title: .genesis, chapter: 1),
-                      verse: 3,
+            DrawingVO(bibleTitle: BibleChapter(title: .genesis, chapter: 1),
+                      section: 3,
                       updateDate: Date()),
-            BibleDrawing(bibleTitle: BibleChapter(title: .exodus, chapter: 2),
-                      verse: 1,
+            DrawingVO(bibleTitle: BibleChapter(title: .exodus, chapter: 2),
+                      section: 1,
                       updateDate: Calendar.current.date(byAdding: .day, value: -1, to: .now)!),
-            BibleDrawing(bibleTitle: BibleChapter(title: .exodus, chapter: 2),
-                      verse: 2,
+            DrawingVO(bibleTitle: BibleChapter(title: .exodus, chapter: 2),
+                      section: 2,
                       updateDate: Calendar.current.date(byAdding: .day, value: -1, to: .now)!),
-            BibleDrawing(bibleTitle: BibleChapter(title: .revelation, chapter: 3),
-                      verse: 3,
+            DrawingVO(bibleTitle: BibleChapter(title: .revelation, chapter: 3),
+                      section: 3,
                       updateDate: Calendar.current.date(byAdding: .day, value: -2, to: .now)!)
         ]
     }

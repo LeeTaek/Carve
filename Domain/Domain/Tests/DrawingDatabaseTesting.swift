@@ -31,10 +31,10 @@ final class DrawingDatabaseTesting {
     
     @Test func actorInsert() async throws {
         // given
-        let drawing = BibleDrawing.init(bibleTitle: .initialState, verse: 1)
+        let drawing = DrawingVO.init(bibleTitle: .initialState, section: 1)
         // when
         try await actor.insert(drawing)
-        let storedDrawing: BibleDrawing = try #require(await actor.fetch().first)
+        let storedDrawing: DrawingVO = try #require(await actor.fetch().first)
         // then
         #expect(drawing == storedDrawing)
     }
@@ -43,7 +43,7 @@ final class DrawingDatabaseTesting {
         // given
         let title = BibleChapter.init(title: .genesis, chapter: 1)
         let lastVerse = 1
-        let drawing = BibleDrawing(bibleTitle: title, verse: lastVerse)
+        let drawing = DrawingVO(bibleTitle: title, section: lastVerse)
         // when
         try await drawingDatabase.setDrawing(title: title, to: lastVerse)
         let storedDrawings = try #require(await drawingDatabase.fetch())

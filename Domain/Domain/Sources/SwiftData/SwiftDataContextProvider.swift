@@ -33,7 +33,7 @@ public final class PersistentCloudKitContainer: ObservableObject {
             do {
                 let url = URL.applicationSupportDirectory.appending(path: path)
                 let schema = Schema([
-                    BibleDrawing.self
+                    DrawingVO.self
                 ])
                 let config = ModelConfiguration(
                     url: url,
@@ -48,7 +48,7 @@ public final class PersistentCloudKitContainer: ObservableObject {
         case .preview:
             do {
                 let config = ModelConfiguration(isStoredInMemoryOnly: true)
-                container = try ModelContainer(for: Schema([BibleDrawing.self]), configurations: config)
+                container = try ModelContainer(for: Schema([DrawingVO.self]), configurations: config)
             } catch {
                 fatalError("Failed to create SwiftData container on Preview")
             }

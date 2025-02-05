@@ -26,7 +26,7 @@ public struct SentencesWithDrawingReducer {
         public var underLineCount: Int = 1
         public var underlineOffset: [CGFloat] = [.zero]
         
-        public init(sentence: BibleVerse, drawing: BibleDrawing?) {
+        public init(sentence: BibleVerse, drawing: DrawingVO?) {
             self.id = "\(sentence.title.title.koreanTitle()).\(sentence.title.chapter).\(sentence.verse)"
             self.sentence = sentence
             self.sentenceState = .init(chapterTitle: sentence.chapterTitle,

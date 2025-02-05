@@ -18,13 +18,13 @@ public struct CanvasReducer {
     @ObservableState
     public struct State: Identifiable {
         public var id: String
-        public var drawing: BibleDrawing?
+        public var drawing: DrawingVO?
         public var title: BibleChapter
         public var verse: Int
         @Shared(.appStorage("pencilConfig")) public var pencilConfig: PencilPalatte = .initialState
         @Shared(.inMemory("canUndo")) public var canUndo: Bool = false
         @Shared(.inMemory("canRedo")) public var canRedo: Bool = false
-        public init(sentence: BibleVerse, drawing: BibleDrawing?) {
+        public init(sentence: BibleVerse, drawing: DrawingVO?) {
             self.id = "drawingData.\(sentence.sentenceScript)"
             self.drawing = drawing
             self.title = sentence.title
@@ -32,7 +32,7 @@ public struct CanvasReducer {
         }
         public static let initialState = Self(sentence: .initialState,
                                               drawing: .init(bibleTitle: .initialState,
-                                                             verse: 1))
+                                                             section: 1))
     }
     
     @Dependency(\.drawingData) var drawingContext
@@ -54,8 +54,8 @@ public struct CanvasReducer {
 
                     drawing.updateDate = Date.now
                 } else {
-                    state.drawing = BibleDrawing(bibleTitle: state.title,
-                                              verse: state.verse,
+                    state.drawing = DrawingVO(bibleTitle: state.title,
+                                              section: state.verse,
                                               lineData: newDrawing.dataRepresentation())
                 }
                 return .run { [drawing = state.drawing] _ in

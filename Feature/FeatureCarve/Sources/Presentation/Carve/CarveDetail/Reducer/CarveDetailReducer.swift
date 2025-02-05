@@ -41,7 +41,7 @@ public struct CarveDetailReducer {
     }
     public enum InnerAction {
         case fetchSentence
-        case setSentence([BibleVerse], [BibleDrawing])
+        case setSentence([BibleVerse], [DrawingVO])
     }
     @CasePathable
     public enum ScopeAction {
@@ -76,10 +76,10 @@ public struct CarveDetailReducer {
             case .inner(.setSentence(let sentences, let drawings)):
                 state.sentenceWithDrawingState.removeAll()
                 var sentenceState: IdentifiedArrayOf<SentencesWithDrawingReducer.State> = []
-                let verseSet = Set(drawings.compactMap { $0.verse })
+                let verseSet = Set(drawings.compactMap { $0.section })
                 for sentence in sentences {
                     if verseSet.contains(sentence.verse) {
-                        let drawing = drawings.filter { $0.verse == sentence.verse }.first
+                        let drawing = drawings.filter { $0.section == sentence.verse }.first
                         sentenceState.append(SentencesWithDrawingReducer.State(sentence: sentence,
                                                                                drawing: drawing))
                     } else {

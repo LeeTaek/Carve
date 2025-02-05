@@ -25,18 +25,18 @@ final class DrawingDatabaseTest: XCTestCase {
 
     override func tearDown() async throws {
         self.actor.modelContainer.deleteAllData()
-//        try await self.actor.modelContext.delete(model: BibleDrawing.self)
+//        try await self.actor.modelContext.delete(model: DrawingVO.self)
         self.actor = nil
         self.drawingDatabase = nil
     }
     
     func test_actor_insert() async throws {
         // given
-        let drawing = BibleDrawing.init(bibleTitle: .initialState, verse: 1)
+        let drawing = DrawingVO.init(bibleTitle: .initialState, section: 1)
         
         // when
         try await actor.insert(drawing)
-        let storedDrawing: BibleDrawing? = try await actor.fetch().first
+        let storedDrawing: DrawingVO? = try await actor.fetch().first
         
         // then
         XCTAssertEqual(drawing, storedDrawing)
@@ -46,7 +46,7 @@ final class DrawingDatabaseTest: XCTestCase {
         // given
         let title = BibleChapter.init(title: .genesis, chapter: 1)
         let lastVerse = 1
-        let drawing = BibleDrawing(bibleTitle: title, verse: lastVerse)
+        let drawing = DrawingVO(bibleTitle: title, section: lastVerse)
         
         // when
         try await drawingDatabase.setDrawing(title: title, to: lastVerse)
