@@ -22,11 +22,8 @@ public struct CanvasView: UIViewRepresentable {
     public func makeUIView(context: Context) -> PKCanvasView {
         let canvas: PKCanvasView = {
             let canvas = PKCanvasView()
-#if DEBUG
-            canvas.drawingPolicy = .anyInput
-#else
+
             canvas.drawingPolicy = .pencilOnly
-#endif
             canvas.tool = PKInkingTool(.pencil, 
                                        color: self.store.pencilConfig.lineColor.color,
                                        width: self.store.pencilConfig.lineWidth)

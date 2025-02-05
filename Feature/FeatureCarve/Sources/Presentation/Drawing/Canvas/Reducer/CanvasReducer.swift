@@ -35,7 +35,6 @@ public struct CanvasReducer {
                                                              section: 1))
     }
     
-    @Dependency(\.drawingData) var drawingContext
     @Dependency(\.undoManager) private var undoManager
 
     public enum Action: BindableAction {
@@ -57,14 +56,6 @@ public struct CanvasReducer {
                     state.drawing = DrawingVO(bibleTitle: state.title,
                                               section: state.verse,
                                               lineData: newDrawing.dataRepresentation())
-                }
-                return .run { [drawing = state.drawing] _ in
-                    do {
-                        guard let drawing else { return }
-                        try await drawingContext.updateDrawing(drawing: drawing)
-                    } catch {
-                        Log.debug("drawing error: \(error)")
-                    }
                 }
             case .registUndoCanvas(let canvas):
                 if undoManager.isPerformingUndoRedo {

@@ -27,7 +27,7 @@ public struct CarveDetailReducer {
     }
     @Dependency(\.drawingData) var drawingContext
     @Dependency(\.undoManager) var undoManager
-
+    
     public enum Action: FeatureAction, Core.ScopeAction {
         case view(ViewAction)
         case inner(InnerAction)
@@ -100,6 +100,22 @@ public struct CarveDetailReducer {
                 let anchorPoint = state.headerState.headerHeight / UIScreen.main.bounds.height
                 withAnimation(.easeInOut(duration: 0.5)) {
                     state.proxy?.scrollTo(id, anchor: UnitPoint(x: 0, y: anchorPoint))
+                }
+            case .scope(.sentenceWithDrawingAction(.element(id: let id,
+                                                            action: .scope(.canvasAction(let action))))):
+                guard case let .saveDrawing(drawing) = action,
+                      let index = state.sentenceWithDrawingState.firstIndex(where: { $0.id == id }) else {
+                    return .none
+                }
+                let sentenceState = state.sentenceWithDrawingState[index]
+                return .run { _ in
+                    do {
+                        guard let drawing = sentenceState.canvasState.drawing else { return }
+                        try await drawingContext.updateDrawing(drawing: drawing)
+                    } catch {
+                        Log.debug("drawingError", error)
+                    }
+                    
                 }
             default: break
             }
