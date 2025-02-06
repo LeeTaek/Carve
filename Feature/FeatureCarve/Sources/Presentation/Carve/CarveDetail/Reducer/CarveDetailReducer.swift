@@ -68,8 +68,9 @@ public struct CarveDetailReducer {
                     do {
                         let storedDrawing = try await drawingContext.fetch(chapter: title)
                         await send(.inner(.setSentence(sentences, storedDrawing)))
+                        Log.debug("fetched Draiwng Count", storedDrawing.count)
                     } catch {
-                        Log.debug("fetch drawing error", error)
+                        Log.error("fetch drawing error", error)
                         await send(.inner(.setSentence([], [])))
                     }
                 }
@@ -103,19 +104,14 @@ public struct CarveDetailReducer {
                 }
             case .scope(.sentenceWithDrawingAction(.element(id: let id,
                                                             action: .scope(.canvasAction(let action))))):
-                guard case let .saveDrawing(drawing) = action,
+                guard case .saveDrawing = action,
                       let index = state.sentenceWithDrawingState.firstIndex(where: { $0.id == id }) else {
                     return .none
                 }
                 let sentenceState = state.sentenceWithDrawingState[index]
                 return .run { _ in
-                    do {
-                        guard let drawing = sentenceState.canvasState.drawing else { return }
-                        try await drawingContext.updateDrawing(drawing: drawing)
-                    } catch {
-                        Log.debug("drawingError", error)
-                    }
-                    
+                    guard let drawing = sentenceState.canvasState.drawing else { return }
+                    try await drawingContext.updateDrawing(drawing: drawing)
                 }
             default: break
             }

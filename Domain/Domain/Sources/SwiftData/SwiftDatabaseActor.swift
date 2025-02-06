@@ -27,7 +27,7 @@ public actor SwiftDatabaseActor {
     
     public func fetch<T: PersistentModel>(_ descriptor: FetchDescriptor<T> = .init()) throws -> [T] {
         let fetched: [T] = try self.modelContext.fetch(descriptor)
-        Log.debug("fetched data's count", fetched.count)
+        Log.info("fetched \(T.self) data's count", fetched.count)
         return fetched
     }
     

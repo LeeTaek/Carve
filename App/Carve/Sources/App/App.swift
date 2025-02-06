@@ -42,14 +42,21 @@ struct CarveApp: App {
                     LaunchProgressView()
                 }
             }
-            .onChange(of: cloudKitContainer.progress) { _, newValue in
-                if newValue >= 1.0 {
-                    withAnimation {
-                        isDataLoaded = true
-                    }
-                }
+            .onChange(of: cloudKitContainer.progress) {
+                checkDataLoaded()
+            }
+            .onChange(of: cloudKitContainer.isSyncing) {
+                checkDataLoaded()
             }
         }
         .modelContainer(cloudKitContainer.container)
+    }
+    
+    private func checkDataLoaded() {
+        if cloudKitContainer.progress >= 1.0 && cloudKitContainer.isSyncing {
+            withAnimation {
+                isDataLoaded = true
+            }
+        }
     }
 }

@@ -28,9 +28,15 @@ struct LaunchProgressView: View {
                         .progressViewStyle(.linear)
                         .tint(.gray)
                         .frame(width: 150)
-                    Text("데이터 동기화 중... \(Int(cloudKitContainer.progress * 100))%")
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
+                    if cloudKitContainer.progress < 1.0 {
+                        Text("데이터 가져오는 중... \(Int(cloudKitContainer.progress * 100))%")
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                    } else {
+                        Text("데이터 동기화 중...")
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                    }
                     Spacer()
                 }
             }

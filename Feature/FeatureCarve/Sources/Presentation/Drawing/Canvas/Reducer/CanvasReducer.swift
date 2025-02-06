@@ -37,14 +37,12 @@ public struct CanvasReducer {
     
     @Dependency(\.undoManager) private var undoManager
 
-    public enum Action: BindableAction {
-        case binding(BindingAction<State>)
+    public enum Action {
         case saveDrawing(PKDrawing)
         case registUndoCanvas(PKCanvasView)
     }
 
     public var body: some Reducer<State, Action> {
-        BindingReducer()
         Reduce { state, action in
             switch action {
             case .saveDrawing(let newDrawing):
@@ -65,8 +63,6 @@ public struct CanvasReducer {
                 undoManager.registerUndoAction(for: canvas)
                 state.$canUndo.withLock { $0 = undoManager.canUndo }
                 state.$canRedo.withLock { $0 = undoManager.canRedo }
-            default:
-                break
             }
             return .none
         }
