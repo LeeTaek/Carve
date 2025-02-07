@@ -66,7 +66,7 @@ public struct CarveNavigationView: View {
                     Button {
                         store.send(.view(.navigationToDrewLog))
                     } label: {
-                        Image(systemName: "book.pages")
+                        Image(systemName: "chart.bar.xaxis")
                             .foregroundStyle(.black)
                     }
                     .frame(width: 30, height: 30)

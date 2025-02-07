@@ -10,12 +10,16 @@ import Core
 import Foundation
 import Resources
 
-public class LastVerseCache {
-    static let shared = LastVerseCache()
+public actor LastVerseCache {
     private var lastVerses: [BibleChapter: Int] = [:]
+    private var progressContinuation: AsyncStream<Double>.Continuation?
+    private var lastEmittedProgress: Double = 0.0
+    public let progressStream: AsyncStream<Double>
     
-    private init() {
-        loadCache()
+    public init() {
+        let (stream, continuation) = AsyncStream<Double>.makeStream(bufferingPolicy: .bufferingNewest(1))
+        self.progressStream = stream
+        self.progressContinuation = continuation
     }
     
     private func cacheFileURL() -> URL {
@@ -25,56 +29,88 @@ public class LastVerseCache {
     }
     
     
-    private func loadCache() {
-        if let cache = loadCacheFromFile() {
+    public func loadCache() async {
+        if let cache = await loadCacheFromFile() {
             lastVerses = cache
+            progressContinuation?.yield(1.0)
+            progressContinuation?.finish()
         } else {
-            setLastVersesCache()
+            await setLastVersesCache()
         }
     }
     
-    private func loadCacheFromFile() -> [BibleChapter: Int]? {
+    private func loadCacheFromFile() async -> [BibleChapter: Int]? {
         let url = cacheFileURL()
-        guard let data = try? Data(contentsOf: url) else { return nil }
-        return try? JSONDecoder().decode([BibleChapter: Int].self, from: data)
-    }
-    
-    private func saveCacheToFile() {
-        let url = cacheFileURL()
-        if let data = try? JSONEncoder().encode(lastVerses) {
-            try? data.write(to: url)
+        do {
+            let data = try await Task.detached {
+                try Data(contentsOf: url)
+            }.value
+            return try JSONDecoder().decode([BibleChapter: Int].self, from: data)
+        } catch {
+            Log.error("no cache file found")
+            return nil
         }
     }
     
-    private func setLastVersesCache() {
+    private func saveCacheToFile() async {
+        let url = cacheFileURL()
+        do {
+            let data = try JSONEncoder().encode(lastVerses)
+            try await Task.detached {
+                try data.write(to: url)
+            }.value
+        } catch {
+            Log.error("Failed to save LastVerseCache: \(error)")
+        }
+    }
+    
+    private func setLastVersesCache() async {
         var calculatedData: [BibleChapter: Int] = [:]
-        for title in BibleTitle.allCases {
-            for chapter in 1...title.lastChapter {
-                let bibleChapter = BibleChapter(title: title, chapter: chapter)
-                
-                do {
-                    let lastVerse = try fetchLastVerse(for: bibleChapter)
-                    calculatedData[bibleChapter] = lastVerse
-                } catch {
-                    Log.debug(error.localizedDescription)
+        let totalChapters = BibleTitle.allCases.reduce(0) { $0 + $1.lastChapter }
+        let progressCounter = ChapterProgress()
+        await withTaskGroup(of: (BibleChapter,
+                                 Int?).self) { group in
+            for title in BibleTitle.allCases {
+                for chapter in 1...title.lastChapter {
+                    let bibleChapter = BibleChapter(title: title, chapter: chapter)
+                    
+                    group.addTask {
+                        do {
+                            let lastVerse = try await self.fetchLastVerse(for: bibleChapter)
+                            let completed = await progressCounter.increment()
+                            let progress = Double(completed) / Double(totalChapters)
+                            await self.emitProgressIfNeeded(progress)
+                            return (bibleChapter, lastVerse)
+                        } catch {
+                            Log.error(error.localizedDescription, bibleChapter)
+                            return (bibleChapter, nil)
+                        }
+                    }
                 }
+            }
+            for await (bibleChapter, lastVerse) in group {
+                guard let lastVerse else { continue }
+                calculatedData[bibleChapter] = lastVerse
             }
         }
         lastVerses = calculatedData
-        saveCacheToFile()
+        await saveCacheToFile()
+        progressContinuation?.yield(1.0)
+        progressContinuation?.finish()
     }
     
-    private func fetchLastVerse(for chapter: BibleChapter) throws(LastVerseCacheError) -> Int {
+    private func fetchLastVerse(for chapter: BibleChapter) async throws(LastVerseCacheError) -> Int {
         let encodingEUCKR = CFStringConvertEncodingToNSStringEncoding(0x0422)
         guard let textPath = ResourcesResources.bundle.path(forResource: chapter.title.rawValue,
                                                             ofType: nil)
-        else {
-            throw .textPathError
-        }
+        else { throw .textPathError }
         
         do {
-            let bibleText = try String(contentsOfFile: textPath,
-                                       encoding: String.Encoding(rawValue: encodingEUCKR))
+            let bibleText = try await Task.detached {
+                try String(contentsOfFile: textPath,
+                           encoding: String.Encoding(rawValue: encodingEUCKR))
+            }.value
+                    
             let chapterSentences = bibleText
                 .components(separatedBy: CharacterSet.newlines)
                 .filter { line in
@@ -89,9 +125,7 @@ public class LastVerseCache {
             
             guard let verseComponents = chapterSentences.last?.components(separatedBy: ":"),
                   verseComponents.count >= 2
-            else {
-                throw LastVerseCacheError.invalidChapterNumberError
-            }
+            else { throw LastVerseCacheError.invalidChapterNumberError }
             
             let lastVerseStr = verseComponents[1].trimmingCharacters(in: .whitespacesAndNewlines)
             let component = lastVerseStr.split(separator: " ")
@@ -105,8 +139,26 @@ public class LastVerseCache {
         }
     }
     
-    public func getLastVerse(for chapter: BibleChapter) -> Int? {
+    public func getLastVerse(for chapter: BibleChapter) async -> Int? {
         return lastVerses[chapter]
+    }
+    
+    private func emitProgressIfNeeded(_ progress: Double) {
+        let progressIncrease = (progress - lastEmittedProgress) * 100
+        if progressIncrease >= 1.0 {
+            lastEmittedProgress = progress
+            self.progressContinuation?.yield(progress)
+        }
+    }
+    
+    private actor ChapterProgress {
+        private var completedChapters: Int = 0
+        
+        func increment() -> Int {
+            completedChapters += 1
+            return completedChapters
+            
+        }
     }
     
     enum LastVerseCacheError: Error {

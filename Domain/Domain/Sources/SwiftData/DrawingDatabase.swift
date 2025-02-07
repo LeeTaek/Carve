@@ -110,18 +110,38 @@ public struct DrawingDatabase: Sendable, Database {
         }
     }
     
-    private func loadChapterPercentage(chapter: BibleChapter) async throws -> Double {
+    private func loadChapterPercentage(chapter: BibleChapter, cache: LastVerseCache) async throws -> Double {
         let drawings: [DrawingVO] = try await fetch(chapter: chapter)
-        guard let lastverse = LastVerseCache.shared.getLastVerse(for: chapter) else { return 0.0 }
+        guard let lastverse = await cache.getLastVerse(for: chapter) else { return 0.0 }
         let percentage = Double(drawings.count) / Double(lastverse) * 100.0
         return round(percentage * 100) / 100.0
     }
     
-    public func fetchAllChapterPercentage(progressUpadte: ((Double) -> Void)? = nil) async throws -> [BibleChapter: Double] {
+    public func fetchAllChapterPercentage(progressUpdate: ((Double) -> Void)? = nil) async throws -> [BibleChapter: Double] {
         var percentages: [BibleChapter: Double] = [:]
         let totalChapters = BibleTitle.allCases.reduce(0) { $0 + $1.lastChapter }
         let chapterProgressCounter = ChapterProgress()
+        let lastVerseCache = LastVerseCache()
+        
+        var cacheProgress: Double = 0.0
+        var taskGroupProgress: Double = 0.0
+        
+        Task {
+            await lastVerseCache.loadCache()
+        }
+        
+        Task.detached {
+            for await progress in lastVerseCache.progressStream {
+                cacheProgress = progress
+                let combinedProgress = self.combineProgress(cacheProgress: cacheProgress, taskGroupProgress: taskGroupProgress)
 
+                await MainActor.run {
+                    progressUpdate?(combinedProgress)
+                }
+                await Task.yield()
+            }
+        }
+        
         await withTaskGroup(of: (BibleChapter, Double)?.self) { group in
             for title in BibleTitle.allCases {
                 for chapterNumber in 1...title.lastChapter {
@@ -129,11 +149,14 @@ public struct DrawingDatabase: Sendable, Database {
                     
                     group.addTask {
                         do {
-                            let percentage = try await self.loadChapterPercentage(chapter: chapter)
+                            let percentage = try await self.loadChapterPercentage(chapter: chapter,
+                                                                                  cache: lastVerseCache)
                             let completedCount = await chapterProgressCounter.increment()
-                            let progress = Double(completedCount) / Double(totalChapters)
+                            taskGroupProgress = Double(completedCount) / Double(totalChapters)
+                            let combinedProgress = self.combineProgress(cacheProgress: cacheProgress,
+                                                                        taskGroupProgress: taskGroupProgress)
                             await MainActor.run {
-                                progressUpadte?(progress)
+                                progressUpdate?(combinedProgress)
                             }
                             return (chapter, percentage)
                         } catch {
@@ -150,6 +173,10 @@ public struct DrawingDatabase: Sendable, Database {
             }
         }
         return percentages
+    }
+    
+    private func combineProgress(cacheProgress: Double, taskGroupProgress: Double) -> Double {
+        return (cacheProgress * 0.5) + (taskGroupProgress * 0.5)
     }
     
     private actor ChapterProgress {
