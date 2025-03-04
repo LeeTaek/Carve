@@ -14,7 +14,7 @@ import ComposableArchitecture
 
 public struct CanvasView: UIViewRepresentable {
     public typealias UIViewType = PKCanvasView
-    @Bindable private var store: StoreOf<CanvasReducer>
+    private var store: StoreOf<CanvasReducer>
     init(store: StoreOf<CanvasReducer>) {
         self.store = store
     }
@@ -22,11 +22,8 @@ public struct CanvasView: UIViewRepresentable {
     public func makeUIView(context: Context) -> PKCanvasView {
         let canvas: PKCanvasView = {
             let canvas = PKCanvasView()
-#if DEBUG
-            canvas.drawingPolicy = .anyInput
-#else
+
             canvas.drawingPolicy = .pencilOnly
-#endif
             canvas.tool = PKInkingTool(.pencil, 
                                        color: self.store.pencilConfig.lineColor.color,
                                        width: self.store.pencilConfig.lineWidth)
@@ -44,9 +41,15 @@ public struct CanvasView: UIViewRepresentable {
     }
     
     public func updateUIView(_ uiView: PKCanvasView, context: Context) {
-        uiView.tool = PKInkingTool(.pencil,
-                                   color: self.store.pencilConfig.lineColor.color,
-                                   width: self.store.pencilConfig.lineWidth)
+        Task { @MainActor in
+            uiView.tool = PKInkingTool(.pencil,
+                                       color: self.store.pencilConfig.lineColor.color,
+                                       width: self.store.pencilConfig.lineWidth)
+            let newDrawing = toDrawing(from: store.drawing?.lineData)
+            if uiView.drawing != newDrawing {
+                uiView.drawing = newDrawing
+            }
+        }
         context.coordinator.updateTool(for: uiView)
     }
     
@@ -55,23 +58,31 @@ public struct CanvasView: UIViewRepresentable {
     }
     
     final public class Coordinator: NSObject, PKCanvasViewDelegate {
-        var store: StoreOf<CanvasReducer>
+        private var store: StoreOf<CanvasReducer>
+        private var lastUpdate = Date()
+        private let debounceInterval: TimeInterval = 0.3
+        
         init(store: StoreOf<CanvasReducer>) {
             self.store = store
         }
         
         public func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
+            let now = Date()
+            guard now.timeIntervalSince(lastUpdate) > debounceInterval else { return }
+            lastUpdate = now
             self.store.send(.saveDrawing(canvasView.drawing))
             self.store.send(.registUndoCanvas(canvasView))
         }
         
         public func updateTool(for canvas: PKCanvasView) {
-            if store.pencilConfig.pencilType == .monoline {
-                canvas.tool = PKEraserTool(.bitmap)
-            } else {
-                canvas.tool = PKInkingTool(store.pencilConfig.pencilType,
-                                           color: store.pencilConfig.lineColor.color,
-                                           width: store.pencilConfig.lineWidth)
+            Task { @MainActor in
+                if store.pencilConfig.pencilType == .monoline {
+                    canvas.tool = PKEraserTool(.bitmap)
+                } else {
+                    canvas.tool = PKInkingTool(store.pencilConfig.pencilType,
+                                               color: store.pencilConfig.lineColor.color,
+                                               width: store.pencilConfig.lineWidth)
+                }
             }
         }
     }
