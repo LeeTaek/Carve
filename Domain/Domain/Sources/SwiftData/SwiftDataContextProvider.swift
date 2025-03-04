@@ -58,6 +58,8 @@ public final class PersistentCloudKitContainer: ObservableObject {
     }
     
     private func observeCloudKitSyncProgress() {
+        Log.debug("observe Cloud 시작")
+
         Task {
             let operation = CKFetchDatabaseChangesOperation()
             operation.recordZoneWithIDChangedBlock = { recordZoneID in
@@ -131,6 +133,7 @@ public final class PersistentCloudKitContainer: ObservableObject {
     
     private func isSyncFromCloudKit() async {
         let cloudkitNotification = NotificationCenter.default.notifications(named: NSPersistentCloudKitContainer.eventChangedNotification)
+        Log.debug("isSyncing 시작")
         for await notification in cloudkitNotification {
             if let cloudEvent = notification.userInfo?[NSPersistentCloudKitContainer.eventNotificationUserInfoKey]
                 as? NSPersistentCloudKitContainer.Event {

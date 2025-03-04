@@ -126,19 +126,25 @@ public struct DrawingDatabase: Sendable, Database {
         var cacheProgress: Double = 0.0
         var taskGroupProgress: Double = 0.0
         
+        let hasCache = await lastVerseCache.loadCacheFromFile() != nil
+        
         Task {
             await lastVerseCache.loadCache()
         }
         
-        Task.detached {
-            for await progress in lastVerseCache.progressStream {
-                cacheProgress = progress
-                let combinedProgress = self.combineProgress(cacheProgress: cacheProgress, taskGroupProgress: taskGroupProgress)
-
-                await MainActor.run {
-                    progressUpdate?(combinedProgress)
+        if !hasCache {
+            Task.detached {
+                for await progress in lastVerseCache.progressStream {
+                    Log.debug("캐싱 진행", progress)
+                    cacheProgress = progress
+                    let combinedProgress = self.combineProgress(cacheProgress: cacheProgress,
+                                                                taskGroupProgress: taskGroupProgress,
+                                                                hasCache: hasCache)
+                    await MainActor.run {
+                        progressUpdate?(combinedProgress)
+                    }
+                    await Task.yield()
                 }
-                await Task.yield()
             }
         }
         
@@ -154,7 +160,8 @@ public struct DrawingDatabase: Sendable, Database {
                             let completedCount = await chapterProgressCounter.increment()
                             taskGroupProgress = Double(completedCount) / Double(totalChapters)
                             let combinedProgress = self.combineProgress(cacheProgress: cacheProgress,
-                                                                        taskGroupProgress: taskGroupProgress)
+                                                                        taskGroupProgress: taskGroupProgress,
+                                                                        hasCache: hasCache)
                             await MainActor.run {
                                 progressUpdate?(combinedProgress)
                             }
@@ -175,8 +182,12 @@ public struct DrawingDatabase: Sendable, Database {
         return percentages
     }
     
-    private func combineProgress(cacheProgress: Double, taskGroupProgress: Double) -> Double {
-        return (cacheProgress * 0.5) + (taskGroupProgress * 0.5)
+    private func combineProgress(cacheProgress: Double,
+                                 taskGroupProgress: Double,
+                                 hasCache: Bool) -> Double {
+        let weightCacheProgress = hasCache ? 0.0 : 0.5
+        let weightTaskProgress = hasCache ? 1.0 : 0.5
+        return (cacheProgress * weightCacheProgress) + (taskGroupProgress * weightTaskProgress)
     }
     
     private actor ChapterProgress {

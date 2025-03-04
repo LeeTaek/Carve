@@ -10,6 +10,8 @@ import Core
 import Foundation
 import Resources
 
+import Dependencies
+
 public actor LastVerseCache {
     private var lastVerses: [BibleChapter: Int] = [:]
     private var progressContinuation: AsyncStream<Double>.Continuation?
@@ -17,7 +19,7 @@ public actor LastVerseCache {
     public let progressStream: AsyncStream<Double>
     
     public init() {
-        let (stream, continuation) = AsyncStream<Double>.makeStream(bufferingPolicy: .bufferingNewest(1))
+        let (stream, continuation) = AsyncStream<Double>.makeStream()
         self.progressStream = stream
         self.progressContinuation = continuation
     }
@@ -37,9 +39,10 @@ public actor LastVerseCache {
         } else {
             await setLastVersesCache()
         }
+        Log.debug("캐싱 완료")
     }
     
-    private func loadCacheFromFile() async -> [BibleChapter: Int]? {
+    public func loadCacheFromFile() async -> [BibleChapter: Int]? {
         let url = cacheFileURL()
         do {
             let data = try await Task.detached {
@@ -68,31 +71,37 @@ public actor LastVerseCache {
         var calculatedData: [BibleChapter: Int] = [:]
         let totalChapters = BibleTitle.allCases.reduce(0) { $0 + $1.lastChapter }
         let progressCounter = ChapterProgress()
-        await withTaskGroup(of: (BibleChapter,
-                                 Int?).self) { group in
-            for title in BibleTitle.allCases {
-                for chapter in 1...title.lastChapter {
-                    let bibleChapter = BibleChapter(title: title, chapter: chapter)
-                    
-                    group.addTask {
-                        do {
-                            let lastVerse = try await self.fetchLastVerse(for: bibleChapter)
-                            let completed = await progressCounter.increment()
-                            let progress = Double(completed) / Double(totalChapters)
-                            await self.emitProgressIfNeeded(progress)
-                            return (bibleChapter, lastVerse)
-                        } catch {
-                            Log.error(error.localizedDescription, bibleChapter)
-                            return (bibleChapter, nil)
-                        }
+        
+        let bibleChapters = BibleTitle.allCases.flatMap { title in
+            (1...title.lastChapter).map { chapter in
+                BibleChapter(title: title, chapter: chapter)
+            }
+        }
+        Log.debug("총 캐싱해야 할 챕터 수: \(bibleChapters.count)")
+
+        await withTaskGroup(of: (BibleChapter, Int?).self) { group in
+            for bibleChapter in bibleChapters {
+                group.addTask {
+                    do {
+                        let lastVerse = try await self.fetchLastVerse(for: bibleChapter)
+                        let completed = await progressCounter.increment()
+                        let progress = Double(completed) / Double(totalChapters)
+
+                        await self.emitProgressIfNeeded(progress)
+                        return (bibleChapter, lastVerse)
+                    } catch {
+                        Log.error(error.localizedDescription, bibleChapter)
+                        return (bibleChapter, nil)
                     }
                 }
             }
+            
             for await (bibleChapter, lastVerse) in group {
                 guard let lastVerse else { continue }
                 calculatedData[bibleChapter] = lastVerse
             }
         }
+        
         lastVerses = calculatedData
         await saveCacheToFile()
         progressContinuation?.yield(1.0)
@@ -165,5 +174,18 @@ public actor LastVerseCache {
         case textPathError
         case readingFileError
         case invalidChapterNumberError
+    }
+}
+
+extension LastVerseCache: DependencyKey {
+    public static var liveValue: LastVerseCache = LastVerseCache()
+    public static var testValue: LastVerseCache = LastVerseCache()
+    public static var previewValue: LastVerseCache = LastVerseCache()
+}
+
+extension DependencyValues {
+    public var lastVerseCache: LastVerseCache {
+        get { self[LastVerseCache.self] }
+        set { self[LastVerseCache.self] = newValue }
     }
 }
