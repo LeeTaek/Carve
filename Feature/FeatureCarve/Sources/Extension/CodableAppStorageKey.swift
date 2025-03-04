@@ -34,19 +34,31 @@ public struct CodableAppStorageKey<Value: Codable>: SharedKey {
     
     public func load(context: LoadContext<Value>,
                      continuation: LoadContinuation<Value>) {
-        Log.debug("SharedKey_Load", context.initialValue)
+        Log.debug("SharedKey_Load", context.initialValue.debugDescription)
+        var hasResumed = false // 중복 호출 방지 플래그
+
         if let storedData = store.data(forKey: key) {
             do {
                 let decodedValue = try JSONDecoder().decode(Value.self, from: storedData)
                 continuation.resume(returning: decodedValue)
+                hasResumed = true
             } catch {
                 Log.debug("CodableAppStorageKey_load_error \(key)", error )
-                handleInitialValue(context.initialValue, saveContext: .didSet, continuation: continuation)
+                handleInitialValue(context.initialValue,
+                                   saveContext: .didSet,
+                                   continuation: continuation,
+                                   hasResumed: &hasResumed)
             }
         } else {
             Log.debug("CodableAppStorageKey_load_error ", key )
-            handleInitialValue(context.initialValue, saveContext: .didSet, continuation: continuation)
-            continuation.resume(returning: context.initialValue!)
+            handleInitialValue(context.initialValue,
+                               saveContext: .didSet,
+                               continuation: continuation,
+                               hasResumed: &hasResumed)
+            if !hasResumed {
+                continuation.resume(returning: context.initialValue!)
+                hasResumed = true
+            }
         }
     }
     
@@ -104,7 +116,8 @@ public struct CodableAppStorageKey<Value: Codable>: SharedKey {
     private func handleInitialValue(
         _ initialValue: Value?,
         saveContext: SaveContext,
-        continuation: LoadContinuation<Value>
+        continuation: LoadContinuation<Value>,
+        hasResumed: inout Bool
     ) {
         guard let initialValue = initialValue else {
             // 값이 없는 경우
@@ -115,9 +128,15 @@ public struct CodableAppStorageKey<Value: Codable>: SharedKey {
             // 초기값을 저장
             let encodedValue = try JSONEncoder().encode(initialValue)
             store.set(encodedValue, forKey: self.key)
-            continuation.resume(returning: initialValue)
+            if !hasResumed {
+                continuation.resume(returning: initialValue)
+                hasResumed = true
+            }
         } catch {
-            continuation.resume(throwing: error)
+            if !hasResumed {
+                continuation.resume(throwing: error)
+                hasResumed = true
+            }
         }
     }
     

@@ -86,10 +86,15 @@ public struct DrawingDatabase: Sendable, Database {
     
     public func updateDrawing(drawing: DrawingVO) async throws {
         let title = TitleVO(title: BibleTitle(rawValue: drawing.titleName!)!, chapter: drawing.titleChapter!)
-        if (try await fetch(title: title, section: drawing.section!)) != nil {
-            try await update(item: drawing)
-        } else {
-            try await actor.insert(drawing)
+        do {
+            if (try await fetch(title: title, section: drawing.section!)) != nil {
+                try await update(item: drawing)
+            } else {
+                try await actor.insert(drawing)
+            }
+            Log.debug("update drawing", drawing.id ?? "")
+        } catch {
+            Log.error("failed to update drawing", error)
         }
         Log.debug("update drawing", drawing)
     }

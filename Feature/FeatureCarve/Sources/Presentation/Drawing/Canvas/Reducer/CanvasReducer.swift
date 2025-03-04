@@ -35,17 +35,14 @@ public struct CanvasReducer {
                                                              section: 1))
     }
     
-    @Dependency(\.drawingData) var drawingContext
     @Dependency(\.undoManager) private var undoManager
 
-    public enum Action: BindableAction {
-        case binding(BindingAction<State>)
+    public enum Action {
         case saveDrawing(PKDrawing)
         case registUndoCanvas(PKCanvasView)
     }
 
     public var body: some Reducer<State, Action> {
-        BindingReducer()
         Reduce { state, action in
             switch action {
             case .saveDrawing(let newDrawing):
@@ -57,14 +54,6 @@ public struct CanvasReducer {
                                               section: state.section,
                                               lineData: newDrawing.dataRepresentation())
                 }
-                return .run { [drawing = state.drawing] _ in
-                    do {
-                        guard let drawing else { return }
-                        try await drawingContext.updateDrawing(drawing: drawing)
-                    } catch {
-                        Log.debug("drawing error: \(error)")
-                    }
-                }
             case .registUndoCanvas(let canvas):
                 if undoManager.isPerformingUndoRedo {
                     undoManager.isPerformingUndoRedo = false
@@ -73,8 +62,6 @@ public struct CanvasReducer {
                 undoManager.registerUndoAction(for: canvas)
                 state.$canUndo.withLock { $0 = undoManager.canUndo }
                 state.$canRedo.withLock { $0 = undoManager.canRedo }
-            default:
-                break
             }
             return .none
         }

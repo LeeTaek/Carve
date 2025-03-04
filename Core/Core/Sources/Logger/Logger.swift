@@ -28,15 +28,15 @@ public struct Log {
         fileprivate var category: String {
             switch self {
             case .debug:
-                return "🔴Debug"
+                return "✅Debug"
             case .info:
-                return "🟠Info"
+                return "ℹ️Info"
             case .network:
-                return "🔵Network"
+                return "🛜Network"
             case .error:
-                return "🟡Error"
+                return "❌Error"
             case .custom(let categoryName):
-                return "🟢\(categoryName)"
+                return "❗️\(categoryName)"
             }
         }
 
@@ -71,45 +71,82 @@ public struct Log {
         }
     }
 
-    static private func log(_ message: Any, _ arguments: [Any], level: Level) {
-        #if DEBUG
-            let extraMessage: String = arguments.map({ String(describing: $0) }).joined(separator: " ")
-            let logger = Logger(subsystem: OSLog.subsystem, category: level.category)
-            let logMessage = "\(message) \(extraMessage)"
-            switch level {
-            case .debug,
-                 .custom:
-                logger.debug("\(logMessage, privacy: .public)")
-            case .info:
-                logger.info("\(logMessage, privacy: .public)")
-            case .network:
-                logger.log("\(logMessage, privacy: .public)")
-            case .error:
-                logger.error("\(logMessage, privacy: .public)")
-            }
-        #endif
+    static private func log(
+        _ message: Any,
+        _ arguments: [Any],
+        level: Level,
+        fileName: String = #file,
+        line: Int = #line,
+        funcName: String = #function
+    ) {
+#if DEBUG
+        let extraMessage: String = arguments.map({ String(describing: $0) }).joined(separator: " ")
+        let logger = Logger(subsystem: OSLog.subsystem, category: level.category)
+        let logMessage = "[\(level.category) \(fileName.components(separatedBy: "/").last ?? "")(\(line))] \(message): \(extraMessage)"
+        switch level {
+        case .debug, .custom:
+            logger.debug("\(logMessage, privacy: .public)")
+        case .info:
+            logger.info("\(logMessage, privacy: .public)")
+        case .network:
+            logger.log("\(logMessage, privacy: .public)")
+        case .error:
+            logger.error("\(logMessage, privacy: .public)")
+        }
+#endif
     }
 }
 
 
 public extension Log {
-    static func debug(_ message: Any, _ arguments: Any...) {
-        log(message, arguments, level: .debug)
+    static func debug(
+        _ message: Any,
+        _ arguments: Any...,
+        file: String = #file,
+        line: Int = #line,
+        function: String = #function
+    ) {
+        log(message, arguments, level: .debug, fileName: file, line: line, funcName: function)
     }
-
-    static func info(_ message: Any, _ arguments: Any...) {
-        log(message, arguments, level: .info)
+    
+    static func info(
+        _ message: Any,
+        _ arguments: Any...,
+        file: String = #file,
+        line: Int = #line,
+        function: String = #function
+    ) {
+        log(message, arguments, level: .info, fileName: file, line: line, funcName: function)
     }
-
-    static func network(_ message: Any, _ arguments: Any...) {
-        log(message, arguments, level: .network)
+    
+    static func network(
+        _ message: Any,
+        _ arguments: Any...,
+        file: String = #file,
+        line: Int = #line,
+        function: String = #function
+    ) {
+        log(message, arguments, level: .network, fileName: file, line: line, funcName: function)
     }
-
-    static func error(_ message: Any, _ arguments: Any...) {
-        log(message, arguments, level: .network)
+    
+    static func error(
+        _ message: Any,
+        _ arguments: Any...,
+        file: String = #file,
+        line: Int = #line,
+        function: String = #function
+    ) {
+        log(message, arguments, level: .error, fileName: file, line: line, funcName: function)
     }
-
-    static func custom(category: String, _ message: Any, _ arguments: Any...) {
-        log(message, arguments, level: .custom(categoryName: category))
+    
+    static func custom(
+        category: String,
+        _ message: Any,
+        _ arguments: Any...,
+        file: String = #file,
+        line: Int = #line,
+        function: String = #function
+    ) {
+        log(message, arguments, level: .custom(categoryName: category), fileName: file, line: line, funcName: function)
     }
 }
