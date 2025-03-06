@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import Core
 import Domain
 
 struct LaunchProgressView: View {
@@ -34,10 +35,10 @@ struct LaunchProgressView: View {
             }
         }
         .onChange(of: cloudKitContainer.syncState) { _, newState in
+            Log.debug("syncState", newState)
             if newState == .failed {
                 cloudKitContainer.handleSyncFailure()
             }
-            
         }
         .ignoresSafeArea()
     }
