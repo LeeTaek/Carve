@@ -42,9 +42,6 @@ struct CarveApp: App {
                     LaunchProgressView()
                 }
             }
-            .onChange(of: cloudKitContainer.progress) {
-                checkDataLoaded()
-            }
             .onChange(of: cloudKitContainer.syncState) {
                 checkDataLoaded()
             }
@@ -53,8 +50,7 @@ struct CarveApp: App {
     }
     
     private func checkDataLoaded() {
-        if (cloudKitContainer.progress >= 1.0 && cloudKitContainer.syncState == .success)
-            || cloudKitContainer.syncState == .next {
+        if cloudKitContainer.syncState == .next {
             withAnimation {
                 isDataLoaded = true
             }

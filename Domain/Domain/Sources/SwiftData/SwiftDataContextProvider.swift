@@ -72,8 +72,9 @@ public final class PersistentCloudKitContainer: ObservableObject {
                 guard cloudKitAccountStatus == .available else {
                     throw NSError(domain: "CloudKitError", code: 1)
                 }
-                
-                self.syncState = .syncing
+                Task { @MainActor in
+                    self.syncState = .syncing
+                }
                 let operation = CKFetchDatabaseChangesOperation()
                 
                 operation.fetchDatabaseChangesResultBlock = { result in
@@ -81,11 +82,18 @@ public final class PersistentCloudKitContainer: ObservableObject {
                         switch result {
                         case .success:
                             Log.debug("CloudKit 동기화 완료")
-                            await self.fetchRecordsFromCloudKit()
-                            await self.isSyncFromCloudKit()
+                            do {
+                                try await Task.withTimeout(seconds: 5) {
+                                    await self.fetchRecordsFromCloudKit()
+                                    await self.isSyncFromCloudKit()
+                                }
+                            } catch {
+                                Log.error("⏳ 동기화 시간이 초과됨. 다음 화면으로 진행")
+                                self.syncState = .next
+                            }
                         case .failure(let error):
                             Log.error("CloudKit 동기화 중 오류 발생", error.localizedDescription)
-                            
+                            throw NSError(domain: "CloudKitError", code: 1)
                         }
                     }
                 }
@@ -147,22 +155,27 @@ public final class PersistentCloudKitContainer: ObservableObject {
     }
     
     private func isSyncFromCloudKit() async {
+        Log.debug("isSyncFromCloudKit")
         let cloudkitNotification = NotificationCenter.default.notifications(named: NSPersistentCloudKitContainer.eventChangedNotification)
         for await notification in cloudkitNotification {
             if let cloudEvent = notification.userInfo?[NSPersistentCloudKitContainer.eventNotificationUserInfoKey]
                 as? NSPersistentCloudKitContainer.Event {
-                if cloudEvent.endDate != nil {
-                    Log.info("starting an event")
-                    if cloudEvent.succeeded {
-                        Log.info("CloudKit sync succeeded", cloudEvent.type)
-                        Task { @MainActor in
+                if cloudEvent.endDate != nil {      // CloudKit 이벤트가 끝난 후에 실행
+                    Log.info("end of CloudKit event")
+                    Task { @MainActor in
+                        if cloudEvent.succeeded {
+                            Log.info("CloudKit sync succeeded", cloudEvent.type)
                             self.syncState = .success
+                        } else {
+                            Log.info("SyncFailed!")
+                            self.syncState = .failed
                         }
-                    } else {
-                        Log.info("SyncFailed!")
-                    }
-                    if let error = cloudEvent.error {
-                        Log.error("Error: \(error.localizedDescription)")
+                        
+                        try? await Task.sleep(nanoseconds: 500_000_000)
+                        self.syncState = .next
+                        if let error = cloudEvent.error {
+                            Log.error("Error: \(error.localizedDescription)")
+                        }
                     }
                 }
             }
