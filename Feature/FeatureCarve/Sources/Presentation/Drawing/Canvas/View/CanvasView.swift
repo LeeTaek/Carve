@@ -9,6 +9,7 @@
 import Core
 import PencilKit
 import SwiftUI
+import Combine
 
 import ComposableArchitecture
 
@@ -20,13 +21,11 @@ public struct CanvasView: UIViewRepresentable {
     }
     
     public func makeUIView(context: Context) -> PKCanvasView {
+
         let canvas: PKCanvasView = {
             let canvas = PKCanvasView()
 
             canvas.drawingPolicy = .pencilOnly
-            canvas.tool = PKInkingTool(.pencil, 
-                                       color: self.store.pencilConfig.lineColor.color,
-                                       width: self.store.pencilConfig.lineWidth)
             canvas.backgroundColor = .clear
             canvas.isOpaque = false
             canvas.translatesAutoresizingMaskIntoConstraints = false
@@ -36,21 +35,18 @@ public struct CanvasView: UIViewRepresentable {
         }()
         canvas.drawing = toDrawing(from: store.drawing?.lineData)
         canvas.delegate = context.coordinator
+        context.coordinator.bind(to: canvas)
         
         return canvas
     }
     
     public func updateUIView(_ uiView: PKCanvasView, context: Context) {
         Task { @MainActor in
-            uiView.tool = PKInkingTool(.pencil,
-                                       color: self.store.pencilConfig.lineColor.color,
-                                       width: self.store.pencilConfig.lineWidth)
             let newDrawing = toDrawing(from: store.drawing?.lineData)
             if uiView.drawing != newDrawing {
                 uiView.drawing = newDrawing
             }
         }
-        context.coordinator.updateTool(for: uiView)
     }
     
     public func makeCoordinator() -> Coordinator {
@@ -61,7 +57,8 @@ public struct CanvasView: UIViewRepresentable {
         private var store: StoreOf<CanvasReducer>
         private var lastUpdate = Date()
         private let debounceInterval: TimeInterval = 0.3
-        
+        private var cancaellable = Set<AnyCancellable>()
+
         init(store: StoreOf<CanvasReducer>) {
             self.store = store
         }
@@ -74,16 +71,19 @@ public struct CanvasView: UIViewRepresentable {
             self.store.send(.registUndoCanvas(canvasView))
         }
         
-        public func updateTool(for canvas: PKCanvasView) {
-            Task { @MainActor in
-                if store.pencilConfig.pencilType == .monoline {
-                    canvas.tool = PKEraserTool(.bitmap)
-                } else {
-                    canvas.tool = PKInkingTool(store.pencilConfig.pencilType,
-                                               color: store.pencilConfig.lineColor.color,
-                                               width: store.pencilConfig.lineWidth)
+        public func bind(to canvas: PKCanvasView) {
+            store.$pencilConfig.publisher
+                .sink { pencil in
+                    let tool: PKTool = pencil.pencilType == .monoline
+                    ? PKEraserTool(.bitmap)
+                    : PKInkingTool(
+                        pencil.pencilType,
+                        color: pencil.lineColor.color,
+                        width: pencil.lineWidth
+                    )
+                    canvas.tool = tool
                 }
-            }
+                .store(in: &cancaellable)
         }
     }
     
