@@ -2,14 +2,15 @@
 # 📝 성경필사 앱 - 새기다 
 [📲 App store Link ](https://apps.apple.com/kr/app/%EC%83%88%EA%B8%B0%EB%8B%A4/id6502980733) 
 
-## 브로젝트 빌드 방법
+## 프로젝트 빌드 방법
 1. Tuist 설치
     [tuist documents 참고](https://docs.tuist.io/guides/quick-start/install-tuist)
 2. Git clone 
 3. 터미널에서 클론 받은 경로로 이동 후 tuist install 실행
-4-1. tuist generate로 프로젝트 생성  
-4-2. SwiftUI의 Preview 기능을 사용할 시에는 TUIST_FOR_PREVIEW=TRUE tuist generate 명령어 실행
-     단, 이 경우 프로젝트 빌드시 크래시 발생. Prewview 이용시에만 사용. 
+4. 프로젝트 생성 명렁어 실행 
+    4-1. tuist generate로 프로젝트 생성  
+    4-2. SwiftUI의 Preview 기능을 사용할 시에는 TUIST_FOR_PREVIEW=TRUE tuist generate 명령어 실행
+     단, 이 경우 프로젝트 빌드시 크래시 발생. Preview 이용시에만 사용. 
 5. 생성된 xcworkspace 실행
 
 
