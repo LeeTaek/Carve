@@ -34,7 +34,7 @@ public struct AppCoordinator {
             switch action {
             case .path(.presented(.carve(.view(.moveToSetting)))):
                 state.path = .settings(.initialState)
-            case .path(.presented(.settings(.backToCarve))):
+            case .path(.presented(.settings(.view(.backToCarve)))):
                 state.path = .carve(.initialState)
             default: break
             }

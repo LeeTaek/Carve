@@ -10,6 +10,7 @@ import Resources
 
 import ComposableArchitecture
 
+@ViewAction(for: SettingsReducer.self)
 public struct SettingsView: View {
     @Bindable public var store: StoreOf<SettingsReducer>
     
@@ -25,7 +26,7 @@ public struct SettingsView: View {
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button {
-                            store.send(.backToCarve)
+                            send(.backToCarve)
                         } label: {
                             Image(asset: ResourcesAsset.xButton)
                                 .resizable()

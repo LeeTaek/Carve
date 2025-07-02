@@ -11,8 +11,9 @@ import Resources
 
 import ComposableArchitecture
 
+@ViewAction(for: HeaderReducer.self)
 public struct HeaderView: View {
-    private var store: StoreOf<HeaderReducer>
+    public var store: StoreOf<HeaderReducer>
     private let iconSize: CGFloat = 30
     public  init(store: StoreOf<HeaderReducer>) {
         self.store = store
@@ -22,7 +23,7 @@ public struct HeaderView: View {
         let titleName = store.currentTitle.title.koreanTitle()
         return VStack {
             HStack {
-                Button(action: { store.send(.titleDidTapped) }) {
+                Button(action: { send(.titleDidTapped) }) {
                     Text("\(titleName) \(store.currentTitle.chapter)장")
                         .font(Font(ResourcesFontFamily.NanumGothic.bold.font(size: 30)))
                         .foregroundStyle(.black.opacity(0.7))
@@ -59,7 +60,7 @@ public struct HeaderView: View {
                                 .onGeometryChange(for: CGFloat.self) { proxy in
                                     proxy.size.height
                                 } action: { proxySize in
-                                    store.send(.setHeaderHeight(proxySize))
+                                    send(.setHeaderHeight(proxySize))
                                 }
                         }
                     )
@@ -73,7 +74,7 @@ public struct HeaderView: View {
     
     private var pencilConfigButton: some View {
         Button {
-            store.send(.pencilConfigDidTapped)
+            send(.pencilConfigDidTapped)
         } label: {
             Image(asset: FeatureCarveAsset.pencilConfig)
                 .resizable()
@@ -84,7 +85,7 @@ public struct HeaderView: View {
     
     private var sentenceSettingsButton: some View {
         Button {
-            store.send(.sentenceSettingsDidTapped)
+            send(.sentenceSettingsDidTapped)
         } label: {
             Image(asset: FeatureCarveAsset.sentenceConfig)
                 .resizable()
@@ -95,7 +96,7 @@ public struct HeaderView: View {
     
     private var nextButton: some View {
         Button {
-            store.send(.moveToNext)
+            send(.moveToNext)
         } label: {
             Image(asset: FeatureCarveAsset.next)
                 .resizable()
@@ -106,7 +107,7 @@ public struct HeaderView: View {
     
     private var beforeButton: some View {
         Button {
-            store.send(.moveToBefore)
+            send(.moveToBefore)
         } label: {
             Image(asset: FeatureCarveAsset.before)
                 .resizable()

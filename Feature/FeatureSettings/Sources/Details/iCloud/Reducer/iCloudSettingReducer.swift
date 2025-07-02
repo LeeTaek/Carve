@@ -23,10 +23,9 @@ public struct CloudSettingsReducer {
     }
     @Dependency(\.createSwiftDataActor) private var database
 
-    public enum Action {
+    public enum Action: ViewAction {
         case path(PresentationAction<Path.Action>)
         case setiCloud(Bool)
-        case databaseIsEmpty
         case removeAlliCloudData
         case presentPopover(title: String? = nil,
                             body: String,
@@ -34,13 +33,18 @@ public struct CloudSettingsReducer {
                             cancelTitle: String? = nil,
                             color: Color = .black)
         case popupDismiss
+        case view(View)
+        
+        public enum View {
+            case databaseIsEmpty
+        }
     }
     public var body: some Reducer<State, Action> {
         Reduce { state, action in
             switch action {
             case .setiCloud(let ison):
                 state.iCloudIsOn = ison
-            case .databaseIsEmpty:
+            case .view(.databaseIsEmpty):
                 return .run { send in
                     if !(try await database.databaseIsEmpty(DrawingVO.self)) {
                         await send(.presentPopover(title: nil,
@@ -71,7 +75,7 @@ public struct CloudSettingsReducer {
                         confirmTitle: "확인")
                     )
                 }
-            case .path(.presented(.popup(.confirm))):
+            case .path(.presented(.popup(.view(.confirm)))):
                 return .run { send in
                     if !(try await database.databaseIsEmpty(DrawingVO.self)) {
                         await send(.removeAlliCloudData)
@@ -79,7 +83,7 @@ public struct CloudSettingsReducer {
                         await send(.popupDismiss)
                     }
                 }
-            case .path(.presented(.popup(.cancel))):
+            case .path(.presented(.popup(.view(.cancel)))):
                 state.path = nil
             case .popupDismiss:
                 state.path = nil

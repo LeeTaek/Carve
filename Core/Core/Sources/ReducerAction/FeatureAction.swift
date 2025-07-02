@@ -8,13 +8,9 @@
 
 import Foundation
 
-public protocol FeatureAction {
-    associatedtype ViewAction
+public protocol InnerAction {
     associatedtype InnerAction
 
-    // view에서 사용되는 action
-    static func view(_: ViewAction) -> Self
-    
     // Reducer 내부적으로 사용되는 action
     static func inner(_: InnerAction) -> Self
 }

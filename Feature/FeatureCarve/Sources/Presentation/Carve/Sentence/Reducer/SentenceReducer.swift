@@ -41,19 +41,14 @@ public struct SentenceReducer {
 
     }
     
-    public enum Action: FeatureAction {
-        case view(ViewAction)
-        case inner(InnerAction)
+    public enum Action: ViewAction {
+        case view(View)
+        
+        public enum View {
+            case isRedraw(Bool)
+            case redrawUnderline(CGRect)
+        }
     }
-    
-    public enum ViewAction {
-        case isRedraw(Bool)
-    }
-    
-    public enum InnerAction {
-        case redrawUnderline(CGRect)
-    }
-    
     
     public var body: some Reducer<State, Action> {
         Reduce { state, action in

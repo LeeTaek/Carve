@@ -13,8 +13,9 @@ import PhotosUI
 
 import ComposableArchitecture
 
+@ViewAction(for: SendFeedbackReducer.self)
 public struct SendFeedbackView: View {
-    @Bindable private var store: StoreOf<SendFeedbackReducer>
+    @Bindable public var store: StoreOf<SendFeedbackReducer>
     @State private var shakeTrigger: Bool = false
 
     public init(store: StoreOf<SendFeedbackReducer>) {
@@ -138,10 +139,10 @@ public struct SendFeedbackView: View {
     
     private var titleView: some View {
         HStack {
-            TextField("제목을 입력하세요 (20자 이내)", text: $store.feedbackInfo.title.sending(\.setTitle))
+            TextField("제목을 입력하세요 (20자 이내)", text: $store.feedbackInfo.title.sending(\.view.setTitle))
                 .onChange(of: store.feedbackInfo.title) { _, newValue in
                     if store.feedbackInfo.title.count > 20 {
-                        store.send(.setTitle(String(newValue.prefix(20))))
+                        send(.setTitle(String(newValue.prefix(20))))
                     }
                 }
                 .padding()
@@ -160,10 +161,10 @@ public struct SendFeedbackView: View {
     }
     
     private var inquryDetailsView: some View {
-        TextEditor(text: $store.feedbackInfo.body.sending(\.setBody))
+        TextEditor(text: $store.feedbackInfo.body.sending(\.view.setBody))
             .onChange(of: store.feedbackInfo.body) { _, newValue in
                 if store.feedbackInfo.body.count > 3000 {
-                    store.send(.setBody(String(newValue.prefix(3000))))
+                    send(.setBody(String(newValue.prefix(3000))))
                 }
              }
             .frame(height: 200)
@@ -175,7 +176,7 @@ public struct SendFeedbackView: View {
         Menu {
             ForEach(SendFeedbackReducer.AttachmentType.allCases, id: \.self) { type in
                 Button {
-                    store.send(.setAttachment(type))
+                    send(.setAttachment(type))
                 } label: {
                     Text(type.rawValue)
                         .padding()
@@ -210,7 +211,7 @@ public struct SendFeedbackView: View {
         ) { result in
             switch result {
             case .success(let fileUrls):
-                store.send(.setFileData(fileUrls))
+                send(.setFileData(fileUrls))
             case .failure(let error):
                 Log.debug("fileImporter error:", error.localizedDescription)
             }
@@ -236,7 +237,7 @@ public struct SendFeedbackView: View {
                                 .background(Color.black.opacity(0.7))
                                 .clipShape(.circle)
                                 .onTapGesture {
-                                    store.send(.removePhoto(index))
+                                    send(.removePhoto(index))
                                 }
                         }
                 }
@@ -259,7 +260,7 @@ public struct SendFeedbackView: View {
                     .foregroundStyle(Color.gray)
             }
             .onTapGesture {
-                store.send(.toggleDefaultAgreement)
+                send(.toggleDefaultAgreement)
             }
             
             HStack {
@@ -274,7 +275,7 @@ public struct SendFeedbackView: View {
                     .foregroundStyle(Color.gray)
             }
             .onTapGesture {
-                store.send(.togglePrivacyAgreement)
+                send(.togglePrivacyAgreement)
             }
         }
         .frame(height: 100)
@@ -283,7 +284,7 @@ public struct SendFeedbackView: View {
     
     private var sendFeedbackButton: some View {
         Button {
-            store.send(.isEnableSendButton)
+            send(.isEnableSendButton)
             triggerShankeAnimation()
         } label: {
             Text("의견 보내기")

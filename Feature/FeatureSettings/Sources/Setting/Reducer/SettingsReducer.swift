@@ -19,10 +19,14 @@ public struct SettingsReducer {
         public static let initialState = Self()
         @Presents public var path: Path.State? = .iCloud(.initialState)
     }
-    public enum Action {
+    public enum Action: ViewAction {
         case path(PresentationAction<Path.Action>)
         case push(Path.State?)
-        case backToCarve
+        case view(View)
+        
+        public enum View {
+            case backToCarve
+        }
     }
     
     @Reducer(state: .hashable)

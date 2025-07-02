@@ -26,14 +26,18 @@ public struct ColorPalatteReducer {
             self.alpha = color.color.alphaValue
         }
     }
-    public enum Action {
-        case setColor(UIColor)
+    public enum Action: ViewAction {
+        case view(View)
         case setAlpha(CGFloat)
+
+        public enum View {
+            case setColor(UIColor)
+        }
     }
     public var body: some Reducer<State, Action> {
         Reduce { state, action in
             switch action {
-            case .setColor(let color):
+            case .view(.setColor(let color)):
                 let selectedColor = color.withAlphaComponent(state.alpha)
                 withAnimation(.easeInOut(duration: 0.2)) {
                     state.selectedColor = .init(color: selectedColor)

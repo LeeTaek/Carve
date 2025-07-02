@@ -10,8 +10,9 @@ import SwiftUI
 
 import ComposableArchitecture
 
+@ViewAction(for: PopupReducer.self)
 public struct PopupView: View {
-    @Bindable private var store: StoreOf<PopupReducer>
+    @Bindable public var store: StoreOf<PopupReducer>
     
     public init(store: StoreOf<PopupReducer>) {
         self.store = store
@@ -31,7 +32,7 @@ public struct PopupView: View {
 
             HStack(spacing: 15) {
                 Button {
-                    store.send(.confirm)
+                    send(.confirm)
                 } label: {
                     Text(store.confirmTitle)
                         .fontWeight(.semibold)
@@ -44,7 +45,7 @@ public struct PopupView: View {
 
                 if store.cancelTitle != nil {
                     Button {
-                        store.send(.cancel)
+                        send(.cancel)
                     } label: {
                         Text(store.cancelTitle!)
                             .fontWeight(.semibold)

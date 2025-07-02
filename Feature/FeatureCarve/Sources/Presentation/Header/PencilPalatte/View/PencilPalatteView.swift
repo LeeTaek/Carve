@@ -11,8 +11,9 @@ import SwiftUI
 
 import ComposableArchitecture
 
+@ViewAction(for: PencilPalatteReducer.self)
 public struct PencilPalatteView: View {
-    @Bindable private var store: StoreOf<PencilPalatteReducer>
+    @Bindable public var store: StoreOf<PencilPalatteReducer>
     private let iconSize: CGFloat = 20
     public init(store: StoreOf<PencilPalatteReducer>) {
         self.store = store
@@ -58,7 +59,7 @@ public struct PencilPalatteView: View {
                     }
                     .padding()
                     .onTapGesture {
-                        store.send(.setColor(index))
+                        send(.setColor(index))
                     }
                     .gesture(
                         longPressGesture(action: .popoverColor(index))
@@ -70,7 +71,7 @@ public struct PencilPalatteView: View {
             .onChanged { value in
                 let point = CGPoint(x: value.location.x,
                                     y: value.location.y)
-                store.send(.setPopoverPoint(point))
+                send(.setPopoverPoint(point))
             }
         )
         .popover(
@@ -104,7 +105,7 @@ public struct PencilPalatteView: View {
                     }
                     .padding()
                     .onTapGesture {
-                        store.send(.setLineWidth(index))
+                        send(.setLineWidth(index))
                     }
                     .gesture(
                         longPressGesture(action: .popoverLineWidth(index))
@@ -116,7 +117,7 @@ public struct PencilPalatteView: View {
             .onChanged { value in
                 let point = CGPoint(x: value.location.x,
                                     y: value.location.y)
-                store.send(.setPopoverPoint(point))
+                send(.setPopoverPoint(point))
             }
         )
         .popover(
@@ -142,7 +143,7 @@ public struct PencilPalatteView: View {
                 }
                 .padding()
                 .onTapGesture {
-                    store.send(.setPencilType(.pencil))
+                    send(.setPencilType(.pencil))
                 }
             
             RoundedRectangle(cornerRadius: 20)
@@ -157,7 +158,7 @@ public struct PencilPalatteView: View {
                 }
                 .padding()
                 .onTapGesture {
-                    store.send(.setPencilType(.pen))
+                    send(.setPencilType(.pen))
                 }
             
             RoundedRectangle(cornerRadius: 20)
@@ -172,7 +173,7 @@ public struct PencilPalatteView: View {
                 }
                 .padding()
                 .onTapGesture {
-                    store.send(.setPencilType(.marker))
+                    send(.setPencilType(.marker))
                     Log.debug("marker")
                 }
             
@@ -188,7 +189,7 @@ public struct PencilPalatteView: View {
                 }
                 .padding()
                 .onTapGesture {
-                    store.send(.setPencilType(.monoline))
+                    send(.setPencilType(.monoline))
                 }
         }
     }
@@ -196,7 +197,7 @@ public struct PencilPalatteView: View {
     private var doButtons: some View {
         HStack {
             Button {
-                store.send(.undo)
+                send(.undo)
             } label: {
                 FeatureCarveAsset.undo.swiftUIImage
                     .resizable()
@@ -207,7 +208,7 @@ public struct PencilPalatteView: View {
             .disabled(!store.canUndo)
             
             Button {
-                store.send(.redo)
+                send(.redo)
             } label: {
                 FeatureCarveAsset.redo.swiftUIImage
                     .resizable()

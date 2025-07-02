@@ -40,15 +40,20 @@ public struct HeaderReducer {
                                               
         )
     }
-    public enum Action {
-        case titleDidTapped
-        case setHeaderHeight(CGFloat)
+    public enum Action: ViewAction {
         case headerAnimation(CGFloat, CGFloat)
-        case pencilConfigDidTapped
-        case sentenceSettingsDidTapped
         case palatteAction(PencilPalatteReducer.Action)
-        case moveToNext
-        case moveToBefore
+        case view(View)
+        
+        public enum View {
+            case titleDidTapped
+            case setHeaderHeight(CGFloat)
+            case pencilConfigDidTapped
+            case sentenceSettingsDidTapped
+            case moveToNext
+            case moveToBefore
+
+        }
     }
     
     public var body: some Reducer<State, Action> {
@@ -58,7 +63,7 @@ public struct HeaderReducer {
         
         Reduce { state, action in
             switch action {
-            case .setHeaderHeight(let height):
+            case .view(.setHeaderHeight(let height)):
                 state.headerHeight = height
             case .headerAnimation(let previous, let current):
                 if previous > current {
@@ -80,7 +85,7 @@ public struct HeaderReducer {
                     let offset = state.lastHeaderOffset + (current - state.shiftOffset)
                     state.headerOffset = (offset > 0 ? 0 : offset)
                 }
-            case .pencilConfigDidTapped:
+            case .view(.pencilConfigDidTapped):
                 withAnimation(.easeInOut(duration: 0.2)) {
                     state.showPalatte.toggle()
                 }

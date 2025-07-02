@@ -12,8 +12,9 @@ import Resources
 
 import ComposableArchitecture
 
+@ViewAction(for: CarveNavigationReducer.self)
 public struct CarveNavigationView: View {
-    @Bindable private var store: StoreOf<CarveNavigationReducer>
+    @Bindable public var store: StoreOf<CarveNavigationReducer>
     @State private var isShowOldTestment: Bool
     @State private var isShowNewTestment: Bool
     
@@ -64,7 +65,7 @@ public struct CarveNavigationView: View {
                 HStack {
                     Spacer()
 //                    Button {
-//                        store.send(.view(.navigationToDrewLog))
+//                        send(.navigationToDrewLog)
 //                    } label: {
 //                        Image(systemName: "book.pages")
 //                            .foregroundStyle(.black)
@@ -72,7 +73,7 @@ public struct CarveNavigationView: View {
 //                    .frame(width: 30, height: 30)
 //                    .padding(15)
                     Button {
-                        store.send(.view(.moveToSetting))
+                        send(.moveToSetting)
                     } label: {
                         Image(systemName: "gear")
                             .foregroundStyle(.black)
@@ -100,7 +101,7 @@ public struct CarveNavigationView: View {
             Color(uiColor: .secondarySystemGroupedBackground)
                 .toolbar(.hidden)
                 .onTapGesture {
-                    store.send(.view(.closeNavigationBar))
+                    send(.closeNavigationBar)
                 }
         } else {
             CarveDetailView(store: store.scope(state: \.carveDetailState,

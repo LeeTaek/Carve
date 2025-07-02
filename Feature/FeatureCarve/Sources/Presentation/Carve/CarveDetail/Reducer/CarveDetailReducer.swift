@@ -28,19 +28,21 @@ public struct CarveDetailReducer {
     @Dependency(\.drawingData) var drawingContext
     @Dependency(\.undoManager) var undoManager
     
-    public enum Action: FeatureAction, Core.ScopeAction {
-        case view(ViewAction)
+    public enum Action: ViewAction, Core.ScopeAction {
+        case view(View)
         case inner(InnerAction)
         case scope(ScopeAction)
+        
+        @CasePathable
+        public enum View {
+            case fetchSentence
+            case headerAnimation(CGFloat, CGFloat)
+            case scrollToTop
+            case setProxy(ScrollViewProxy, ObjectIdentifier)
+        }
     }
-    @CasePathable
-    public enum ViewAction {
-        case headerAnimation(CGFloat, CGFloat)
-        case scrollToTop
-        case setProxy(ScrollViewProxy, ObjectIdentifier)
-    }
+
     public enum InnerAction {
-        case fetchSentence
         case setSentence([SentenceVO], [DrawingVO])
     }
     @CasePathable
@@ -61,7 +63,7 @@ public struct CarveDetailReducer {
                 return .run { send in
                     await send(.scope(.headerAction(.headerAnimation(previous, current))))
                 }
-            case .inner(.fetchSentence):
+            case .view(.fetchSentence):
                 let title = state.headerState.currentTitle
                 return .run { send in
                     let sentences = try fetchBible(chapter: title)

@@ -36,19 +36,16 @@ public struct SentencesWithDrawingReducer {
         }
     }
     
-    public enum Action: FeatureAction, Core.ScopeAction {
-        case view(ViewAction)
-        case inner(InnerAction)
+    public enum Action: ViewAction, Core.ScopeAction {
+        case view(View)
         case scope(ScopeAction)
+        
+        public enum View {
+            case setBible
+            case setHeight(height: CGFloat)
+            case calculateLineOffsets(CGRect)
+        }
     }
-    
-    public enum ViewAction {
-        case setBible
-        case setHeight(height: CGFloat)
-        case calculateLineOffsets(CGRect)
-    }
-    
-    public enum InnerAction { }
     
     @CasePathable
     public enum ScopeAction {
@@ -75,7 +72,7 @@ public struct SentencesWithDrawingReducer {
                 state.underlineOffset = offsetY
                 state.underLineCount = offsetY.count
                 return .none
-            case .scope(.sentenceAction(.inner(.redrawUnderline(let rect)))):
+            case .scope(.sentenceAction(.view(.redrawUnderline(let rect)))):
                 return .run { send in
                     await send(.view(.calculateLineOffsets(rect)))
                 }

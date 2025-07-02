@@ -11,8 +11,9 @@ import SwiftUI
 
 import ComposableArchitecture
 
+@ViewAction(for: CarveDetailReducer.self)
 public struct CarveDetailView: View {
-    @Bindable private var store: StoreOf<CarveDetailReducer>
+    @Bindable public var store: StoreOf<CarveDetailReducer>
     
     public init(store: StoreOf<CarveDetailReducer>) {
         self.store = store
@@ -34,7 +35,7 @@ public struct CarveDetailView: View {
                     .padding(.top, store.headerState.headerHeight)
                     .offsetY { previous, current in
                         debounce {
-                            store.send(.view(.headerAnimation(previous, current)))
+                            send(.headerAnimation(previous, current))
                         }
                     }
                     .onChange(of: store.sentenceWithDrawingState) {
@@ -43,7 +44,7 @@ public struct CarveDetailView: View {
             }
             .coordinateSpace(name: "Scroll")
             .onAppear {
-                store.send(.inner(.fetchSentence))
+                send(.fetchSentence)
             }
         }
     }
@@ -66,7 +67,7 @@ public struct CarveDetailView: View {
     private func scrollToTop(proxy: ScrollViewProxy) {
         guard let id = store.scope(state: \.sentenceWithDrawingState,
                                    action: \.scope.sentenceWithDrawingAction).first?.id else { return }
-        store.send(.view(.setProxy(proxy, id)))
+        send(.setProxy(proxy, id))
     }
     
     private func debounce(delay: TimeInterval = 0.1,

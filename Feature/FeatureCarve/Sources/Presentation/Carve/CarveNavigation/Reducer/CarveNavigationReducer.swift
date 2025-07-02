@@ -31,21 +31,20 @@ public struct CarveNavigationReducer {
             carveDetailState: .initialState
         )
     }
-    public enum Action: FeatureAction, Core.ScopeAction, BindableAction {
+    public enum Action: ViewAction, Core.ScopeAction, BindableAction {
         case binding(BindingAction<State>)
-        case view(ViewAction)
-        case inner(InnerAction)
+        case view(View)
         case scope(ScopeAction)
+        
+        @CasePathable
+        public enum View {
+            case moveToSetting
+            case closeNavigationBar
+            case detailNavigation(PresentationAction<DetailDestination.Action>)
+            case navigationToDrewLog
+        }
     }
-    @CasePathable
-    public enum ViewAction {
-        case moveToSetting
-        case closeNavigationBar
-        case detailNavigation(PresentationAction<DetailDestination.Action>)
-        case navigationToDrewLog
-    }
-    public enum InnerAction {
-    }
+
     @CasePathable
     public enum ScopeAction {
         case carveDetailAction(CarveDetailReducer.Action)
@@ -74,7 +73,7 @@ public struct CarveNavigationReducer {
                     state.$currentTitle.withLock { $0.chapter = selectedChapter }
                     state.columnVisibility = .detailOnly
                     return .run { send in
-                        await send(.scope(.carveDetailAction(.inner(.fetchSentence))))
+                        await send(.scope(.carveDetailAction(.view(.fetchSentence))))
                     }
                 }
             }
@@ -85,12 +84,12 @@ public struct CarveNavigationReducer {
         
         Reduce { state, action in
             switch action {
-            case .scope(.carveDetailAction(.scope(.headerAction(.titleDidTapped)))):
+            case .scope(.carveDetailAction(.scope(.headerAction(.view(.titleDidTapped))))):
                 state.selectedTitle = state.currentTitle.title
                 state.selectedChapter = state.currentTitle.chapter
                 state.carveDetailState.sentenceWithDrawingState.removeAll()
                 state.columnVisibility = .all
-            case .scope(.carveDetailAction(.scope(.headerAction(.moveToNext)))):
+            case .scope(.carveDetailAction(.scope(.headerAction(.view(.moveToNext))))):
                 if state.currentTitle.chapter == state.currentTitle.title.lastChapter {
                     state.$currentTitle.withLock { $0.title = state.currentTitle.title.next() }
                     state.$currentTitle.withLock { $0.chapter = 1 }
@@ -98,9 +97,9 @@ public struct CarveNavigationReducer {
                     state.$currentTitle.withLock { $0.chapter += 1 }
                 }
                 return .run { send in
-                    await send(.scope(.carveDetailAction(.inner(.fetchSentence))))
+                    await send(.scope(.carveDetailAction(.view(.fetchSentence))))
                 }
-            case .scope(.carveDetailAction(.scope(.headerAction(.moveToBefore)))):
+            case .scope(.carveDetailAction(.scope(.headerAction(.view(.moveToBefore))))):
                 if state.currentTitle.chapter == 1 {
                     state.$currentTitle.withLock { $0.title = state.currentTitle.title.before() }
                     state.$currentTitle.withLock { $0.chapter = state.currentTitle.title.lastChapter }
@@ -108,7 +107,7 @@ public struct CarveNavigationReducer {
                     state.$currentTitle.withLock { $0.chapter -= 1 }
                 }
                 return .run { send in
-                    await send(.scope(.carveDetailAction(.inner(.fetchSentence))))
+                    await send(.scope(.carveDetailAction(.view(.fetchSentence))))
                 }
             case .view(.moveToSetting):
                 Log.debug("move To settings")
@@ -117,7 +116,7 @@ public struct CarveNavigationReducer {
             case .view(.navigationToDrewLog):
                 state.columnVisibility = .detailOnly
                 state.detailNavigation = .drewLog(.initialState)
-            case .scope(.carveDetailAction(.scope(.headerAction(.sentenceSettingsDidTapped)))):
+            case .scope(.carveDetailAction(.scope(.headerAction(.view(.sentenceSettingsDidTapped))))):
                 state.detailNavigation = .sentenceSettings(.initialState)
             default: break
             }

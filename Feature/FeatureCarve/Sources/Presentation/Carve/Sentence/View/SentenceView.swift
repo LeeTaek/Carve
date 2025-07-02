@@ -11,8 +11,9 @@ import SwiftUI
 
 import ComposableArchitecture
 
+@ViewAction(for: SentenceReducer.self)
 public struct SentenceView: View {
-    @Bindable private var store: StoreOf<SentenceReducer>
+    @Bindable public var store: StoreOf<SentenceReducer>
 
     public init(store: StoreOf<SentenceReducer>) {
         self.store = store
@@ -21,7 +22,7 @@ public struct SentenceView: View {
     public var body: some View {
         sentenceDescription
             .onAppear {
-                store.send(.view(.isRedraw(true)))
+                send(.isRedraw(true))
             }
             .background(alignment: .center) {
                 GeometryReader { proxy in
@@ -29,7 +30,7 @@ public struct SentenceView: View {
                         .onChange(of: store.isredraw) { _, _ in
                             if store.isredraw {
                                 let proxySize = proxy.frame(in: .local)
-                                store.send(.inner(.redrawUnderline(proxySize)))
+                                send(.redrawUnderline(proxySize))
                             }
                         }
                 }

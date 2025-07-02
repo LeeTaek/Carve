@@ -10,8 +10,9 @@ import SwiftUI
 
 import ComposableArchitecture
 
+@ViewAction(for: ColorPalatteReducer.self)
 public struct ColorPalatteView: View {
-    @Bindable private var store: StoreOf<ColorPalatteReducer>
+    @Bindable public var store: StoreOf<ColorPalatteReducer>
     public init(store: StoreOf<ColorPalatteReducer>) {
         self.store = store
     }
@@ -34,7 +35,7 @@ public struct ColorPalatteView: View {
                                     .foregroundColor(store.selectedColor.color == color ? .white : .clear)
                             }
                             .onTapGesture {
-                                store.send(.setColor(color))
+                                send(.setColor(color))
                             }
                             .padding()
                     }

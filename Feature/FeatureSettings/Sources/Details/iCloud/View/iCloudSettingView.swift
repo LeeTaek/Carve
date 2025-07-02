@@ -10,8 +10,9 @@ import SwiftUI
 
 import ComposableArchitecture
 
+@ViewAction(for: CloudSettingsReducer.self)
 public struct CloudSettingView: View {
-    @Bindable private var store: StoreOf<CloudSettingsReducer>
+    @Bindable public var store: StoreOf<CloudSettingsReducer>
     
     public init(store: StoreOf<CloudSettingsReducer>) {
         self.store = store
@@ -30,7 +31,7 @@ public struct CloudSettingView: View {
             }
             
             Button {
-                store.send(.databaseIsEmpty)
+                send(.databaseIsEmpty)
             }label: {
                 Text("모든 필사 데이터 삭제")
                     .foregroundStyle(.red)

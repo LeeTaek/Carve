@@ -30,22 +30,28 @@ public struct SendFeedbackReducer {
         public var agreeToGetDeviceInfo: Bool = false
         public var popupMessage: String = ""
     }
-    public enum Action {
+    public enum Action: ViewAction {
         case path(PresentationAction<Path.Action>)
         case setFeedbackType(FeedbackVO.FeedbackType)
-        case setTitle(String)
-        case setBody(String)
-        case setAttachment(AttachmentType?)
         case presentPhotoPicker(Bool)
         case preesentFileImporter(Bool)
         case setPhotosImage([PhotosPickerItem])
         case setEncodedData([Data])
-        case setFileData([URL])
-        case removePhoto(Int)
-        case toggleDefaultAgreement
-        case togglePrivacyAgreement
-        case isEnableSendButton
         case sendFeedback
+        
+        case view(View)
+        
+        @CasePathable
+        public enum View {
+            case setTitle(String)
+            case setBody(String)
+            case setAttachment(AttachmentType?)
+            case setFileData([URL])
+            case toggleDefaultAgreement
+            case togglePrivacyAgreement
+            case removePhoto(Int)
+            case isEnableSendButton
+        }
     }
     
     public var body: some Reducer<State, Action> {
@@ -53,11 +59,11 @@ public struct SendFeedbackReducer {
             switch action {
             case .setFeedbackType(let type):
                 state.feedbackInfo.feedbackType = type
-            case .setTitle(let title):
+            case .view(.setTitle(let title)):
                 state.feedbackInfo.title = title
-            case .setBody(let body):
+            case .view(.setBody(let body)):
                 state.feedbackInfo.body = body
-            case .setAttachment(let type):
+            case .view(.setAttachment(let type)):
                 switch type {
                 case .photo:
                     state.isOnPhotosPicker = true
@@ -85,7 +91,7 @@ public struct SendFeedbackReducer {
                 withAnimation(.easeInOut(duration: 0.8)) {
                     state.feedbackInfo.attachment = data
                 }
-            case .setFileData(let urls):
+            case .view(.setFileData(let urls)):
                 return .run { send in
                     var imageDatas: [Data] = []
                     for url in Array(urls.prefix(5)) {
@@ -97,14 +103,14 @@ public struct SendFeedbackReducer {
                     await send(.setEncodedData(imageDatas))
                 }
                 
-            case .removePhoto(let index):
+            case .view(.removePhoto(let index)):
                 guard state.feedbackInfo.attachment.count > index else { return .none }
                 state.feedbackInfo.attachment.remove(at: index)
                 guard state.imageSelection.count > index else { return .none }
                 state.imageSelection.remove(at: index)
-            case .toggleDefaultAgreement:
+            case .view(.toggleDefaultAgreement):
                 state.agreeToDefaultNotice.toggle()
-            case .togglePrivacyAgreement:
+            case .view(.togglePrivacyAgreement):
                 state.agreeToGetDeviceInfo.toggle()
             case .sendFeedback:
                 if MFMailComposeViewController.canSendMail() {
@@ -112,7 +118,7 @@ public struct SendFeedbackReducer {
                 } else {
                     Log.debug("이메일을 보낼 수 없음")
                 }
-            case .isEnableSendButton:
+            case .view(.isEnableSendButton):
                 if state.feedbackInfo.title.isEmpty {
                     state.popupMessage = "문의 제목을 입력해주세요."
                     return .none

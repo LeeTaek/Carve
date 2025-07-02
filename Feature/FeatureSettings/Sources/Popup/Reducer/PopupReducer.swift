@@ -21,13 +21,17 @@ public struct PopupReducer {
         public var cancelTitle: String?
         public var confirmColor: Color = .black
     }
-    public enum Action {
+    public enum Action: ViewAction {
         case setTitle(String)
         case setBody(String)
         case setConfirmTitle(String)
         case setCancelTitle(String)
-        case confirm
-        case cancel
+        case view(View)
+        
+        public enum View {
+            case confirm
+            case cancel
+        }
     }
     public var body: some Reducer<State, Action> {
         Reduce { state, action in

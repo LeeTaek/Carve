@@ -10,8 +10,9 @@ import SwiftUI
 
 import ComposableArchitecture
 
+@ViewAction(for: SentencesWithDrawingReducer.self)
 public struct SentencesWithDrawingView: View {
-    @Bindable private var store: StoreOf<SentencesWithDrawingReducer>
+    @Bindable public var store: StoreOf<SentencesWithDrawingReducer>
     
     public init(store: StoreOf<SentencesWithDrawingReducer>) {
         self.store = store
