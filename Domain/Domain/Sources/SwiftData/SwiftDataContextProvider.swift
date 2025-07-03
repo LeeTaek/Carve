@@ -83,7 +83,7 @@ public final class PersistentCloudKitContainer: ObservableObject {
                         case .success:
                             Log.debug("CloudKit 동기화 완료")
                             do {
-                                try await Task.withTimeout(seconds: 5) {
+                                try await Task.withTimeout(seconds: 20) {
                                     await self.fetchRecordsFromCloudKit()
                                     await self.isSyncFromCloudKit()
                                 }
@@ -107,6 +107,8 @@ public final class PersistentCloudKitContainer: ObservableObject {
         }
     }
     
+    /// CloudKit에 저장된 필사 데이터 수 반환
+    /// - Returns: 저장되어 있는 구절 수
     private func getTotalRecordCountFromCloudKit() async -> Int {
         let query = CKQuery(recordType: "CD_DrawingVO", predicate: NSPredicate(value: true))
         let operation = CKQueryOperation(query: query)
@@ -131,53 +133,68 @@ public final class PersistentCloudKitContainer: ObservableObject {
         }
     }
     
+    
+    /// Cloudkit Datafetch Progress 계산을 위한 메서드
     private func fetchRecordsFromCloudKit() async {
         let query = CKQuery(recordType: "CD_DrawingVO", predicate: NSPredicate(value: true))
         let operation = CKQueryOperation(query: query)
         operation.resultsLimit = CKQueryOperation.maximumResults
         
         var fetchedCount = 0
-        let totalRecords = await getTotalRecordCountFromCloudKit()
         
-        operation.recordMatchedBlock = { _, _ in
-            Task { @MainActor in
-                fetchedCount += 1
-                self.progress = Double(fetchedCount) / Double(totalRecords)
-                if self.progress > 1.0 { self.progress = 1.0 }
+        Task {
+            let totalRecords = await getTotalRecordCountFromCloudKit()
+            
+            operation.recordMatchedBlock = { _, _ in
+                Task { @MainActor in
+                    fetchedCount += 1
+                    self.progress = Double(fetchedCount) / Double(totalRecords)
+                    if self.progress > 1.0 { self.progress = 1.0 }
+                }
             }
+            
+            operation.queryResultBlock = { _ in
+                Log.debug("CloudKit에서 Drawing 데이터 업데이트",  "\(totalRecords)개")
+            }
+            
+            cloudKitDB.add(operation)
         }
-        
-        operation.queryResultBlock = { _ in
-            Log.debug("CloudKit에서 Drawing 데이터 업데이트",  "\(totalRecords)개")
-        }
-        
-        cloudKitDB.add(operation)
     }
     
-    private func isSyncFromCloudKit() async {
+    
+    /// CloudKit DataFetch 완료 여부 notification 구독을 위한 메서드
+    private func isSyncFromCloudKit(timeout seconds: UInt64 = 20) async {
         Log.debug("isSyncFromCloudKit")
+        let deadline = Date().addingTimeInterval(TimeInterval(seconds))
         let cloudkitNotification = NotificationCenter.default.notifications(named: NSPersistentCloudKitContainer.eventChangedNotification)
+        
         for await notification in cloudkitNotification {
             if let cloudEvent = notification.userInfo?[NSPersistentCloudKitContainer.eventNotificationUserInfoKey]
                 as? NSPersistentCloudKitContainer.Event {
-                if cloudEvent.endDate != nil {      // CloudKit 이벤트가 끝난 후에 실행
-                    Log.info("end of CloudKit event")
-                    Task { @MainActor in
-                        if cloudEvent.succeeded {
-                            Log.info("CloudKit sync succeeded", cloudEvent.type)
-                            self.syncState = .success
-                        } else {
-                            Log.info("SyncFailed!")
-                            self.syncState = .failed
-                        }
-                        
-                        try? await Task.sleep(nanoseconds: 500_000_000)
-                        self.syncState = .next
-                        if let error = cloudEvent.error {
-                            Log.error("Error: \(error.localizedDescription)")
-                        }
+                if let endDate = cloudEvent.endDate , cloudEvent.type == .import {      // CloudKit 이벤트가 끝난 후에 실행
+                    Log.debug("cloudKit import event ended at", endDate)
+                    
+                    await MainActor.run {
+                        self.syncState = .success
                     }
+                    
+                    // 2초 대기후 다음 화면으로 넘어감
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    await MainActor.run {
+                        self.syncState = .next
+                    }
+                    return
                 }
+                
+                // ❗️timeout check
+                if Date() > deadline {
+                    Log.error("⏳ CloudKit sync timeout")
+                    await MainActor.run {
+                        self.syncState = .next
+                    }
+                    return
+                }
+                
             }
         }
     }
