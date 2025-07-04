@@ -52,7 +52,7 @@ public struct DrawingDatabase: Sendable, Database {
         return storedDrawing
     }
     
-    /// 마지막으로 저장한 데이터 가져오기
+    /// 해당 구절의 필사 데이터 모두 가져오기
     private func fetchLatest(title: TitleVO, section: Int) async throws -> DrawingVO? {
         let titleName = title.title.rawValue
         let chapter = title.chapter
@@ -66,6 +66,20 @@ public struct DrawingDatabase: Sendable, Database {
         return try await actor.fetch(descriptor).first
     }
     
+    
+    public func fetchDrawings(title: TitleVO, section: Int) async throws -> [DrawingVO]? {
+        let titleName = title.title.rawValue
+        let chapter = title.chapter
+        let predicate = #Predicate<DrawingVO> {
+            $0.titleName == titleName
+            && $0.titleChapter == chapter
+            && $0.section == section
+        }
+        let descriptor = FetchDescriptor(predicate: predicate,
+                                         sortBy: [SortDescriptor(\.updateDate, order: .reverse)])
+        let storedDrawing: [DrawingVO]? = try await actor.fetch(descriptor)
+        return storedDrawing
+    }
     
     
     public func add(item: DrawingVO) async throws {
