@@ -40,6 +40,17 @@ public struct SentencesWithDrawingView: View {
                        alignment: .topTrailing)
             }
         }
+        .contextMenu {
+            Button("이전 필사 내용 보기") {
+                send(.presentDrewHistory(true))
+            }
+        }
+        .sheet(isPresented: $store.isPresentDrewHistory.sending(\.view.presentDrewHistory)) {
+            SentenceDrewHistoryListView(
+                store: self.store.scope(state: \.drewHistoryState,
+                                        action: \.scope.drewHistoryAction)
+            )
+        }
     }
     
     private var chapterTitleView: some View {

@@ -23,8 +23,10 @@ public struct SentencesWithDrawingReducer {
         public let sentence: SentenceVO
         public var sentenceState: SentenceReducer.State
         public var canvasState: CanvasReducer.State
+        public var drewHistoryState: SentenceDrewHistoryListReducer.State
         public var underLineCount: Int = 1
         public var underlineOffset: [CGFloat] = [.zero]
+        public var isPresentDrewHistory: Bool = false
         
         public init(sentence: SentenceVO, drawing: DrawingVO?) {
             self.id = "\(sentence.title.title.koreanTitle()).\(sentence.title.chapter).\(sentence.section)"
@@ -33,6 +35,7 @@ public struct SentencesWithDrawingReducer {
                                        section: sentence.section,
                                        sentence: sentence.sentenceScript)
             self.canvasState = .init(sentence: sentence, drawing: drawing)
+            self.drewHistoryState = .init(title: sentence.title, section: sentence.section)
         }
     }
     
@@ -40,10 +43,12 @@ public struct SentencesWithDrawingReducer {
         case view(View)
         case scope(ScopeAction)
         
+        @CasePathable
         public enum View {
             case setBible
             case setHeight(height: CGFloat)
             case calculateLineOffsets(CGRect)
+            case presentDrewHistory(Bool)
         }
     }
     
@@ -51,6 +56,7 @@ public struct SentencesWithDrawingReducer {
     public enum ScopeAction {
         case sentenceAction(SentenceReducer.Action)
         case canvasAction(CanvasReducer.Action)
+        case drewHistoryAction(SentenceDrewHistoryListReducer.Action)
     }
     
     
@@ -62,6 +68,10 @@ public struct SentencesWithDrawingReducer {
         Scope(state: \.canvasState,
               action: \.scope.canvasAction) {
             CanvasReducer()
+        }
+        Scope(state: \.drewHistoryState,
+              action: \.scope.drewHistoryAction) {
+            SentenceDrewHistoryListReducer()
         }
         
         Reduce { state, action in
@@ -76,7 +86,9 @@ public struct SentencesWithDrawingReducer {
                 return .run { send in
                     await send(.view(.calculateLineOffsets(rect)))
                 }
-                
+            case .view(.presentDrewHistory(let isPresent)):
+                state.isPresentDrewHistory = isPresent
+                return.none
             default:
                 return .none
             }
