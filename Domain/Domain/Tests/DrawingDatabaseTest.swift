@@ -13,21 +13,11 @@ import SwiftData
 import Dependencies
 
 final class DrawingDatabaseTest: XCTestCase {
-    var actor: SwiftDatabaseActor!
-    var drawingDatabase: DrawingDatabase!
-
-    override func setUp() async throws {
-        @Dependency(\.createSwiftDataActor) var createActor
-        @Dependency(\.drawingData) var drawingContext
-        self.actor = try await createActor()
-        self.drawingDatabase = drawingContext
-    }
+    @Dependency(\.createSwiftDataActor) var actor
+    @Dependency(\.drawingData) var drawingContext
 
     override func tearDown() async throws {
-        self.actor.modelContainer.deleteAllData()
-//        try await self.actor.modelContext.delete(model: DrawingVO.self)
-        self.actor = nil
-        self.drawingDatabase = nil
+        try await self.actor.deleteAll(DrawingVO.self)
     }
     
     func test_actor_insert() async throws {
@@ -49,8 +39,8 @@ final class DrawingDatabaseTest: XCTestCase {
         let drawing = DrawingVO(bibleTitle: title, section: lastSection)
         
         // when
-        try await drawingDatabase.setDrawing(title: title, to: lastSection)
-        let storedDrawings = try await drawingDatabase.fetch()
+        try await actor.insert(drawing)
+        let storedDrawings = try await drawingContext.fetch()
         
         // then
         XCTAssertEqual(drawing, storedDrawings)
@@ -62,8 +52,8 @@ final class DrawingDatabaseTest: XCTestCase {
         let lastSection = 31
         
         // when
-        try await drawingDatabase.setDrawing(title: title, to: lastSection)        
-        let storedDrawings = try await drawingDatabase.fetch(title: title)
+        try await drawingContext.setDrawing(title: title, to: lastSection)        
+        let storedDrawings = try await drawingContext.fetch(title: title)
         
         // then
         XCTAssertEqual(lastSection, storedDrawings.count)

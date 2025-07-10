@@ -23,7 +23,7 @@ public final class PersistentCloudKitContainer: ObservableObject {
     public static let test = PersistentCloudKitContainer(type: .test)
     public static let preview = PersistentCloudKitContainer(type: .preview)
     public let container: ModelContainer
-    private let cloudKitDB = CKContainer(identifier: "iCloud.Carve.SwiftData.iCloud").privateCloudDatabase
+    private var cloudKitDB: CKDatabase?
     
     @Published public var progress: Double = 0.0
     @Published public var syncState: CloudSyncState = .idle
@@ -38,8 +38,9 @@ public final class PersistentCloudKitContainer: ObservableObject {
     
     private init(type: ContainerType) {
         switch type {
-        case .live, .test:
-            let path = if type == .live { "Carve.sqlite" } else { "Carve.test.sqlite" }
+        case .live:
+            self.cloudKitDB = CKContainer(identifier: "iCloud.Carve.SwiftData.iCloud").privateCloudDatabase
+            let path = "Carve.sqlite"
             do {
                 let url = URL.applicationSupportDirectory.appending(path: path)
                 let schema = Schema([
@@ -47,13 +48,15 @@ public final class PersistentCloudKitContainer: ObservableObject {
                 ])
                 let config = ModelConfiguration(
                     url: url,
-                    cloudKitDatabase: .private("iCloud.Carve.SwiftData.iCloud")
+                    cloudKitDatabase: .private("iCloud. Carve.SwiftData.iCloud")
                 )
-                container = try ModelContainer(for: schema, configurations: config)
+                container = try ModelContainer(for: DrawingSchemaV2.DrawingVO.self,
+                                               migrationPlan: DrawingDataMigrationPlan.self,
+                                               configurations: config)
                 
                 observeCloudKitSyncProgress()
-            } catch {
-                fatalError("Failed to create SwiftData container")
+            } catch { 
+                fatalError("Failed to create SwiftData container: \(error.localizedDescription)")
             }
         case .preview:
             do {
@@ -62,10 +65,24 @@ public final class PersistentCloudKitContainer: ObservableObject {
             } catch {
                 fatalError("Failed to create SwiftData container on Preview")
             }
+        case .test:
+            let path = "Carve.test.sqlite"
+            do {
+                let url = URL.applicationSupportDirectory.appending(path: path)
+                let schema = Schema([
+                    DrawingVO.self
+                ])
+                let config = ModelConfiguration(url: url)
+                container = try ModelContainer(for: schema,
+                                               configurations: config)
+            } catch {
+                fatalError("Failed to create SwiftData container")
+            }
         }
     }
     
     private func observeCloudKitSyncProgress() {
+        guard let cloudKitDB else { return }
         Task {
             do {
                 let cloudKitAccountStatus = try await CKContainer.default().accountStatus()
@@ -110,6 +127,7 @@ public final class PersistentCloudKitContainer: ObservableObject {
     /// CloudKit에 저장된 필사 데이터 수 반환
     /// - Returns: 저장되어 있는 구절 수
     private func getTotalRecordCountFromCloudKit() async -> Int {
+        guard let cloudKitDB else { return 0 }
         let query = CKQuery(recordType: "CD_DrawingVO", predicate: NSPredicate(value: true))
         let operation = CKQueryOperation(query: query)
         operation.resultsLimit = CKQueryOperation.maximumResults
@@ -136,6 +154,7 @@ public final class PersistentCloudKitContainer: ObservableObject {
     
     /// Cloudkit Datafetch Progress 계산을 위한 메서드
     private func fetchRecordsFromCloudKit() async {
+        guard let cloudKitDB else { return }
         let query = CKQuery(recordType: "CD_DrawingVO", predicate: NSPredicate(value: true))
         let operation = CKQueryOperation(query: query)
         operation.resultsLimit = CKQueryOperation.maximumResults
