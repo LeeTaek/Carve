@@ -35,6 +35,7 @@ public struct SentencesWithDrawingView: View {
                         store: self.store.scope(state: \.canvasState,
                                                 action: \.scope.canvasAction)
                     )
+                    .id(store.canvasState.drawing?.creationDate ?? Date())
                 }
                 .frame(width: UIScreen.main.bounds.width / 2,
                        alignment: .topTrailing)

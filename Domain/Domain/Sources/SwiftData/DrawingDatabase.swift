@@ -16,6 +16,7 @@ public struct DrawingDatabase: Sendable, Database {
     public typealias Item = DrawingVO
     @Dependency(\.createSwiftDataActor) public var actor
     
+    /// 테스트를 위한 fetch
     public func fetch() async throws -> DrawingVO {
         if let storedDrawing: DrawingVO = try await actor.fetch().first {
             return storedDrawing
@@ -25,6 +26,9 @@ public struct DrawingDatabase: Sendable, Database {
         }
     }
     
+    /// 한 장의 필사 데이터를 모두 불러옴
+    /// - Parameter title: 가져올 성경의 이름과 장
+    /// - Returns: 해당 장의 필사 데이터
     public func fetch(title: TitleVO) async throws -> [DrawingVO] {
         let titleName = title.title.rawValue
         let chapter = title.chapter
@@ -38,6 +42,7 @@ public struct DrawingDatabase: Sendable, Database {
         return storedDrawing
     }
     
+    /// 해당 아이디의 필사 데이터를 모두 불러옴
     public func fetch(title: TitleVO, section: Int) async throws -> DrawingVO? {
         let titleName = title.title.rawValue
         let chapter = title.chapter
@@ -52,21 +57,11 @@ public struct DrawingDatabase: Sendable, Database {
         return storedDrawing
     }
     
-    /// 해당 구절의 필사 데이터 모두 가져오기
-    private func fetchLatest(title: TitleVO, section: Int) async throws -> DrawingVO? {
-        let titleName = title.title.rawValue
-        let chapter = title.chapter
-        let predicate = #Predicate<DrawingVO> {
-            $0.titleName == titleName &&
-            $0.titleChapter == chapter &&
-            $0.section == section
-        }
-        let descriptor = FetchDescriptor(predicate: predicate,
-                                         sortBy: [SortDescriptor(\.updateDate, order: .reverse)])
-        return try await actor.fetch(descriptor).first
-    }
-    
-    
+    /// 해당 절의 필사 데이터 모두 가져오기
+    /// - Parameters:
+    ///   - title: 해상 성경의 이름과 장
+    ///   - section: 절
+    /// - Returns: 해당 절의 필사 데이터를 전부 반환
     public func fetchDrawings(title: TitleVO, section: Int) async throws -> [DrawingVO]? {
         let titleName = title.title.rawValue
         let chapter = title.chapter
@@ -127,6 +122,12 @@ public struct DrawingDatabase: Sendable, Database {
             Log.error("failed to update drawing", error)
         }
         Log.debug("update drawing", drawing)
+    }
+    
+    public func updateDrawings(drawings: [DrawingVO]) async throws {
+        for drawing in drawings {
+            try await updateDrawing(drawing: drawing)
+        }
     }
     
 }

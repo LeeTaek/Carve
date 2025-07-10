@@ -82,7 +82,9 @@ public struct CarveDetailReducer {
                 let sectionSet = Set(drawings.compactMap { $0.section })
                 for sentence in sentences {
                     if sectionSet.contains(sentence.section) {
-                        let drawing = drawings.filter { $0.section == sentence.section }.first
+                        let candidates = drawings.filter { $0.section == sentence.section }
+                        let drawing = candidates.first(where: { $0.isPresent == true })
+                        ?? candidates.sorted(by: { ($0.updateDate ?? .distantPast) > ($1.updateDate ?? .distantPast) }).first
                         sentenceState.append(SentencesWithDrawingReducer.State(sentence: sentence,
                                                                                drawing: drawing))
                     } else {

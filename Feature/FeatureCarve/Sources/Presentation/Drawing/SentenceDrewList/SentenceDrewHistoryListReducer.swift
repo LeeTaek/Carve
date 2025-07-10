@@ -34,10 +34,11 @@ public struct SentenceDrewHistoryListReducer {
     public enum Action: ViewAction {
         case view(View)
         case setDrawings([DrawingVO])
+        case setPresentDrawing(DrawingVO)
         
         public enum View {
             case fetchDrawings
-            case selectDrawing
+            case selectDrawing(DrawingVO)
         }
     }
     public var body: some Reducer<State, Action> {
@@ -57,8 +58,14 @@ public struct SentenceDrewHistoryListReducer {
                 }
             case .setDrawings(let drawings):
                 state.drawings = drawings
-            case .view(.selectDrawing):
-                break
+            case .view(.selectDrawing(let drawing)):
+                state.drawings.forEach {
+                    $0.isPresent = ($0 == drawing)
+                }
+                return .run { [drawings = state.drawings] send in
+                    try await drawingContext.updateDrawings(drawings: drawings)
+                    await send(.setPresentDrawing(drawing))
+                }
             default: break
             }
             return .none

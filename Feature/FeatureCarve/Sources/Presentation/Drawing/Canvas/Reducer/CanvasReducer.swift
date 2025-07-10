@@ -40,6 +40,7 @@ public struct CanvasReducer {
     public enum Action {
         case saveDrawing(PKDrawing)
         case registUndoCanvas(PKCanvasView)
+        case setDrawing(DrawingVO)
     }
 
     public var body: some Reducer<State, Action> {
@@ -62,6 +63,8 @@ public struct CanvasReducer {
                 undoManager.registerUndoAction(for: canvas)
                 state.$canUndo.withLock { $0 = undoManager.canUndo }
                 state.$canRedo.withLock { $0 = undoManager.canRedo }
+            case .setDrawing(let drawing):
+                state.drawing = drawing
             }
             return .none
         }

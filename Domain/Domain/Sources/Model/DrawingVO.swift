@@ -21,8 +21,9 @@ public final class DrawingVO: Equatable, Sendable {
     public var section: Int?
     public var creationDate: Date?
     public var updateDate: Date?
-    @Attribute(.externalStorage) public var lineData: Data?
+    public var isPresent: Bool? = false
     public var isWritten: Bool = false
+    @Attribute(.externalStorage) public var lineData: Data?
     
     public init(author: String,
                 lineData: PKDrawing,

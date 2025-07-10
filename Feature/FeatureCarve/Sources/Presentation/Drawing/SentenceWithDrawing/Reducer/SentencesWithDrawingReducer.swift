@@ -81,17 +81,21 @@ public struct SentencesWithDrawingReducer {
                                                    rect: rect)
                 state.underlineOffset = offsetY
                 state.underLineCount = offsetY.count
-                return .none
             case .scope(.sentenceAction(.view(.redrawUnderline(let rect)))):
                 return .run { send in
                     await send(.view(.calculateLineOffsets(rect)))
                 }
             case .view(.presentDrewHistory(let isPresent)):
                 state.isPresentDrewHistory = isPresent
-                return.none
-            default:
-                return .none
+            case .scope(.drewHistoryAction(.setPresentDrawing(let drawing))):
+                state.isPresentDrewHistory = false
+                return .run { send in
+                    await send(.scope(.canvasAction(.setDrawing(drawing))))
+                }
+            default: break
+                
             }
+            return .none
         }
     }
     

@@ -47,9 +47,6 @@ public struct SentenceDrewHistoryListView: View {
                 } header: {
                     updatedDate(date: drawing.updateDate)
                 }
-                .onTapGesture {
-                    send(.selectDrawing)
-                }
             }
         }
     }
@@ -63,9 +60,13 @@ public struct SentenceDrewHistoryListView: View {
             let aspectRatio = bounds.height > 0 ? bounds.width / bounds.height : 1.0
             let width = height * aspectRatio
             
-            DrawingPreview(drawing: pkDrawing)
-                .frame(width: width, height: height)
-                .padding()
+            Button {
+                send(.selectDrawing(drawing))
+            } label: {
+                DrawingPreview(drawing: pkDrawing)
+                    .frame(width: width, height: height)
+                    .padding()
+            }
         } else {
             Text("불러올 수 없는 필사 데이터입니다.")
                 .padding(.vertical)
