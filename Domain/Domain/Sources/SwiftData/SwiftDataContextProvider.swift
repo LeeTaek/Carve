@@ -48,10 +48,10 @@ public final class PersistentCloudKitContainer: ObservableObject {
                 ])
                 let config = ModelConfiguration(
                     url: url,
-                    cloudKitDatabase: .private("iCloud. Carve.SwiftData.iCloud")
+                    cloudKitDatabase: .private("iCloud.Carve.SwiftData.iCloud")
                 )
-                container = try ModelContainer(for: DrawingSchemaV2.DrawingVO.self,
-                                               migrationPlan: DrawingDataMigrationPlan.self,
+                container = try ModelContainer(for: schema,
+                                               migrationPlan: MigrationPlanV1Only.self,
                                                configurations: config)
                 
                 observeCloudKitSyncProgress()

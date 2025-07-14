@@ -23,7 +23,7 @@ public final class BibleDrawing: Equatable, Sendable {
     public var updateDate: Date?
     public var translation: Translation? = Translation.NKRV
     public var drawingVersion: Int? = 1
-    public var isWritten: Bool? = false
+    public var isPresent: Bool? = false
     @Attribute(.externalStorage) public var lineData: Data?
     
     public init() { }
@@ -38,8 +38,14 @@ public final class BibleDrawing: Equatable, Sendable {
         self.titleChapter = bibleTitle.chapter
         self.verse = verse
         self.creationDate = Date()
-        self.id = "\(bibleTitle.title.rawValue).\(bibleTitle.chapter).\(verse).\(creationDate?.description ?? "")"
         self.updateDate = updateDate
+        self.id = {
+            if let timestamp = creationDate?.timeIntervalSince1970  {
+                return "\(bibleTitle.title.rawValue).\(bibleTitle.chapter).\(verse).\(timestamp)"
+            } else {
+                return "\(bibleTitle.title.rawValue).\(bibleTitle.chapter).\(verse).\(Date().timeIntervalSince1970)"
+            }
+        }()
     }
     
 }

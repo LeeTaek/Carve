@@ -20,8 +20,6 @@ public final class DrawingVO: Equatable, Sendable {
     public var section: Int?
     public var creationDate: Date?
     public var updateDate: Date?
-    public var translation: Translation? = Translation.NKRV
-    public var drawingVersion: Int? = 1
     public var isPresent: Bool? = false
     @Attribute(.externalStorage) public var lineData: Data?
     
