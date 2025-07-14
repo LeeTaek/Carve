@@ -14,52 +14,16 @@ public enum DrawingSchemaV1: VersionedSchema {
     
     public static var models: [any PersistentModel.Type] {
         [DrawingVO.self]
-    }
-    
-    @Model
-    public class DrawingVO {
-        public var bibleTitle: Data?
-        public var creationDate: Date?
-        public var entityName: String?
-        public var id: String!
-        public var isPresent: Bool?
-        public var isWritten: Bool?    // 필요한 경우
-        public var section: Int?
-        public var titleChapter: Int?
-        public var titleName: String?
-        public var updateDate: Date?
-        @Attribute(.externalStorage) public var lineData: Data?
-        
-        public init() { }
-    }
-    
-    
+    }    
 }
 
 enum DrawingSchemaV2: VersionedSchema {
     static var versionIdentifier = Schema.Version(2, 0, 0)
     
     static var models: [any PersistentModel.Type] {
-        [DrawingVO.self, BibleDrawing.self]
+        [BibleDrawing.self]
     }
-    
-    @Model
-    public class DrawingVO {
-        public var bibleTitle: Data?
-        public var creationDate: Date?
-        public var entityName: String?
-        public var id: String!
-        public var isPresent: Bool?
-        public var isWritten: Bool?    // 필요한 경우
-        public var section: Int?
-        public var titleChapter: Int?
-        public var titleName: String?
-        public var updateDate: Date?
-        @Attribute(.externalStorage) public var lineData: Data?
-        
-        public init() {}
-    }
-    
+
     @Model
     public class BibleDrawing {
         public var id: String!
@@ -95,7 +59,7 @@ enum DrawingDataMigrationPlan: SchemaMigrationPlan {
         fromVersion: DrawingSchemaV1.self,
         toVersion: DrawingSchemaV2.self,
         willMigrate: { context in
-            let drawings = try context.fetch(FetchDescriptor<DrawingSchemaV1.DrawingVO>())
+            let drawings = try context.fetch(FetchDescriptor<DrawingVO>())
             updatedDrawings = drawings.map { old in
                 let new = DrawingSchemaV2.BibleDrawing()
                 new.id = {
@@ -117,8 +81,6 @@ enum DrawingDataMigrationPlan: SchemaMigrationPlan {
                 new.lineData = old.lineData
                 return new
             }
-//            try context.delete(DrawingSchemaV1.DrawingVO.self)
-            try context.save()
         },
         didMigrate: { context in
             updatedDrawings.forEach { context.insert($0) }
