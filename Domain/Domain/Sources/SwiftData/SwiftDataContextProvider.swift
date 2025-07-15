@@ -44,24 +44,41 @@ public final class PersistentCloudKitContainer: ObservableObject {
             do {
                 let url = URL.applicationSupportDirectory.appending(path: path)
                 let schema = Schema([
-                    DrawingVO.self
+                    BibleDrawing.self
                 ])
                 let config = ModelConfiguration(
                     url: url,
                     cloudKitDatabase: .private("iCloud.Carve.SwiftData.iCloud")
                 )
-                container = try ModelContainer(for: schema,
-                                               migrationPlan: MigrationPlanV1Only.self,
+                self.container = try ModelContainer(for: schema,
+                                               migrationPlan: DrawingDataMigrationPlan.self,
                                                configurations: config)
                 
                 observeCloudKitSyncProgress()
-            } catch { 
-                fatalError("Failed to create SwiftData container: \(error.localizedDescription)")
+            } catch {
+                Log.error("마이그레이션 실패, 초기 스키마로 초기화 시도: \(error)")
+                
+                do {
+                    let url = URL.applicationSupportDirectory.appending(path: path)
+                    let schema = Schema([
+                        DrawingVO.self
+                    ])
+                    let config = ModelConfiguration(
+                        url: url,
+                        cloudKitDatabase: .private("iCloud.Carve.SwiftData.iCloud")
+                    )
+                    self.container = try ModelContainer(for: schema,
+                                                   migrationPlan: MigrationPlanV1Only.self,
+                                                   configurations: config)
+                    observeCloudKitSyncProgress()
+                } catch {
+                    fatalError("Failed to create SwiftData container: \(error.localizedDescription)")
+                }
             }
         case .preview:
             do {
                 let config = ModelConfiguration(isStoredInMemoryOnly: true)
-                container = try ModelContainer(for: Schema([DrawingVO.self]), configurations: config)
+                self.container = try ModelContainer(for: Schema([DrawingVO.self]), configurations: config)
             } catch {
                 fatalError("Failed to create SwiftData container on Preview")
             }
@@ -73,7 +90,7 @@ public final class PersistentCloudKitContainer: ObservableObject {
                     DrawingVO.self
                 ])
                 let config = ModelConfiguration(url: url)
-                container = try ModelContainer(for: schema,
+                self.container = try ModelContainer(for: schema,
                                                configurations: config)
             } catch {
                 fatalError("Failed to create SwiftData container")
