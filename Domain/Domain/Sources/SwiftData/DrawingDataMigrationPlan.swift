@@ -8,7 +8,7 @@
 
 import Foundation
 import SwiftData
-
+import PencilKit
 
 enum MigrationPlanV1Only: SchemaMigrationPlan {
     static var schemas: [VersionedSchema.Type] {
@@ -29,7 +29,16 @@ enum DrawingDataMigrationPlan: SchemaMigrationPlan {
         toVersion: DrawingSchemaV2.self,
         willMigrate: { context in
             let drawings = try context.fetch(FetchDescriptor<DrawingSchemaV1.DrawingVO>())
-            updatedDrawings = drawings.map { old in
+            updatedDrawings = drawings
+                .filter { drawing in        // drawing이 비어있으면 제거
+                    if drawing.lineData?.containsPKStroke == true {
+                        return true
+                    } else {
+                        context.delete(drawing)
+                        return false
+                    }
+                }
+                .map { old in
                 let new = DrawingSchemaV2.BibleDrawing()
                 new.id = {
                     if let title = old.titleName,

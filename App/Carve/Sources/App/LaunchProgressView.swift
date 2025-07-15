@@ -64,12 +64,11 @@ struct LaunchProgressView: View {
                 .foregroundColor(.gray)
         case .syncing:
             if cloudKitContainer.showMigrationV1OnlyAlert {
-                Text("데이터 가져오는 중... \(Int(cloudKitContainer.progress * 100))%")
+                Text("데이터 마이그레이션 중... \(Int(cloudKitContainer.progress * 100))%")
                     .font(.subheadline)
                     .foregroundColor(.gray)
             } else {
-                Text("데이터 마이그레이션 중... \(Int(cloudKitContainer.progress * 100))%")
-                    .font(.subheadline)
+                Text("데이터 가져오는 중... \(Int(cloudKitContainer.progress * 100))%")                    .font(.subheadline)
                     .foregroundColor(.gray)
             }
         case .success:
