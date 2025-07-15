@@ -43,7 +43,7 @@ public struct CarveDetailReducer {
     }
 
     public enum InnerAction {
-        case setSentence([SentenceVO], [DrawingVO])
+        case setSentence([SentenceVO], [BibleDrawing])
     }
     @CasePathable
     public enum ScopeAction {
@@ -79,10 +79,10 @@ public struct CarveDetailReducer {
             case .inner(.setSentence(let sentences, let drawings)):
                 state.sentenceWithDrawingState.removeAll()
                 var sentenceState: IdentifiedArrayOf<SentencesWithDrawingReducer.State> = []
-                let sectionSet = Set(drawings.compactMap { $0.section })
+                let sectionSet = Set(drawings.compactMap { $0.verse })
                 for sentence in sentences {
-                    if sectionSet.contains(sentence.section) {
-                        let candidates = drawings.filter { $0.section == sentence.section }
+                    if sectionSet.contains(sentence.verse) {
+                        let candidates = drawings.filter { $0.verse == sentence.verse }
                         let drawing = candidates.first(where: { $0.isPresent == true })
                         ?? candidates.sorted(by: { ($0.updateDate ?? .distantPast) > ($1.updateDate ?? .distantPast) }).first
                         sentenceState.append(SentencesWithDrawingReducer.State(sentence: sentence,

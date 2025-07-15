@@ -52,7 +52,7 @@ public struct SentenceDrewHistoryListView: View {
     }
     
     @ViewBuilder
-    private func drawingPreview(of drawing: DrawingVO) -> some View {
+    private func drawingPreview(of drawing: BibleDrawing) -> some View {
         if let drawingData = drawing.lineData,
            let pkDrawing = try? PKDrawing(data: drawingData) {
             let bounds = pkDrawing.bounds

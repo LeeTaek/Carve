@@ -27,6 +27,7 @@ public final class PersistentCloudKitContainer: ObservableObject {
     
     @Published public var progress: Double = 0.0
     @Published public var syncState: CloudSyncState = .idle
+    public var showMigrationV1OnlyAlert: Bool = false
     
     public enum CloudSyncState {
         case idle
@@ -53,7 +54,6 @@ public final class PersistentCloudKitContainer: ObservableObject {
                 self.container = try ModelContainer(for: schema,
                                                migrationPlan: DrawingDataMigrationPlan.self,
                                                configurations: config)
-                
                 observeCloudKitSyncProgress()
             } catch {
                 Log.error("마이그레이션 실패, 초기 스키마로 초기화 시도: \(error)")
@@ -71,6 +71,7 @@ public final class PersistentCloudKitContainer: ObservableObject {
                                                    migrationPlan: MigrationPlanV1Only.self,
                                                    configurations: config)
                     observeCloudKitSyncProgress()
+                    showMigrationV1OnlyAlert = true
                 } catch {
                     fatalError("Failed to create SwiftData container: \(error.localizedDescription)")
                 }
@@ -78,7 +79,7 @@ public final class PersistentCloudKitContainer: ObservableObject {
         case .preview:
             do {
                 let config = ModelConfiguration(isStoredInMemoryOnly: true)
-                self.container = try ModelContainer(for: Schema([DrawingVO.self]), configurations: config)
+                self.container = try ModelContainer(for: Schema([BibleDrawing.self]), configurations: config)
             } catch {
                 fatalError("Failed to create SwiftData container on Preview")
             }
@@ -87,7 +88,7 @@ public final class PersistentCloudKitContainer: ObservableObject {
             do {
                 let url = URL.applicationSupportDirectory.appending(path: path)
                 let schema = Schema([
-                    DrawingVO.self
+                    BibleDrawing.self
                 ])
                 let config = ModelConfiguration(url: url)
                 self.container = try ModelContainer(for: schema,
@@ -145,7 +146,7 @@ public final class PersistentCloudKitContainer: ObservableObject {
     /// - Returns: 저장되어 있는 구절 수
     private func getTotalRecordCountFromCloudKit() async -> Int {
         guard let cloudKitDB else { return 0 }
-        let query = CKQuery(recordType: "CD_DrawingVO", predicate: NSPredicate(value: true))
+        let query = CKQuery(recordType: "CD_BibleDrawing", predicate: NSPredicate(value: true))
         let operation = CKQueryOperation(query: query)
         operation.resultsLimit = CKQueryOperation.maximumResults
         
@@ -172,7 +173,7 @@ public final class PersistentCloudKitContainer: ObservableObject {
     /// Cloudkit Datafetch Progress 계산을 위한 메서드
     private func fetchRecordsFromCloudKit() async {
         guard let cloudKitDB else { return }
-        let query = CKQuery(recordType: "CD_DrawingVO", predicate: NSPredicate(value: true))
+        let query = CKQuery(recordType: "CD_BibleDrawing", predicate: NSPredicate(value: true))
         let operation = CKQueryOperation(query: query)
         operation.resultsLimit = CKQueryOperation.maximumResults
         
@@ -216,8 +217,11 @@ public final class PersistentCloudKitContainer: ObservableObject {
                     
                     // 2초 대기후 다음 화면으로 넘어감
                     try? await Task.sleep(nanoseconds: 2_000_000_000)
-                    await MainActor.run {
-                        self.syncState = .next
+                    
+                    if !showMigrationV1OnlyAlert {
+                        await MainActor.run {
+                            self.syncState = .next
+                        }
                     }
                     return
                 }

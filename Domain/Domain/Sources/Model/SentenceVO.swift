@@ -12,7 +12,7 @@ import RegexBuilder
 public struct SentenceVO: Equatable, Sendable {
     public var title: TitleVO
     public var chapterTitle: String?
-    public var section: Int
+    public var verse: Int
     public var sentenceScript: String
 
     public static let initialState = Self(
@@ -27,7 +27,7 @@ public struct SentenceVO: Equatable, Sendable {
                 sentence: String) {
         self.title = title
         self.chapterTitle = chapterTitle
-        self.section = section
+        self.verse = section
         self.sentenceScript = sentence
     }
 
@@ -67,7 +67,7 @@ public struct SentenceVO: Equatable, Sendable {
         }
        
         self.chapterTitle = chapterTitle
-        self.section = chapter ?? 0
+        self.verse = chapter ?? 0
         self.sentenceScript = sentenceScript
     }
     

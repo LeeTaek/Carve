@@ -26,22 +26,22 @@ final class DrawingDatabaseTesting {
     
     @Test func actorInsert() async throws {
         // given
-        let drawing = DrawingVO.init(bibleTitle: .initialState, section: 1)
+        let drawing = BibleDrawing.init(bibleTitle: .initialState, section: 1)
         // when
         try await actor.insert(drawing)
-        let storedDrawing: DrawingVO = try #require(await actor.fetch().first)
+        let storedDrawing: BibleDrawing = try #require(await actor.fetch().first)
         // then
         #expect(drawing == storedDrawing)
         
         // teardown
-        try await actor.deleteAll(DrawingVO.self)
+        try await actor.deleteAll(BibleDrawing.self)
     }
     
     @Test func fetchDrawing() async throws {
         // given
         let title = TitleVO.init(title: .genesis, chapter: 1)
         let lastSection = 1
-        let drawing = DrawingVO(bibleTitle: title, section: lastSection)
+        let drawing = BibleDrawing(bibleTitle: title, verse: lastSection)
         // when
         try await drawingContext.setDrawing(title: title, to: lastSection)
         let storedDrawings = try #require(await drawingContext.fetch())
@@ -49,7 +49,7 @@ final class DrawingDatabaseTesting {
         #expect(drawing == storedDrawings)
         
         // teardown
-        try await actor.deleteAll(DrawingVO.self)
+        try await actor.deleteAll(BibleDrawing.self)
     }
     
     @Test func fetchDrawings() async throws {
@@ -63,7 +63,7 @@ final class DrawingDatabaseTesting {
         #expect(lastSection == storedDrawings.count)
         
         // teardown
-        try await actor.deleteAll(DrawingVO.self)
+        try await actor.deleteAll(BibleDrawing.self)
     }
     
     
@@ -93,16 +93,16 @@ final class DrawingDatabaseTesting {
         
         
         // when
-        container = try ModelContainer(for: DrawingSchemaV2.DrawingVO.self,
+        container = try ModelContainer(for: DrawingSchemaV2.BibleDrawing.self,
                                        migrationPlan: DrawingDataMigrationPlan.self,
                                        configurations: config)
         context = ModelContext(container)
-        let predicateV2 = #Predicate<DrawingSchemaV2.DrawingVO> {
+        let predicateV2 = #Predicate<DrawingSchemaV2.BibleDrawing> {
             $0.titleName == titmeName &&
             $0.titleChapter == chapter
         }
         let descriptorV2 = FetchDescriptor(predicate: predicateV2,
-                                     sortBy: [SortDescriptor(\.section)])
+                                     sortBy: [SortDescriptor(\.verse)])
         let migrationFetchedDrawing = try context.fetch(descriptorV2).first
         
         // then

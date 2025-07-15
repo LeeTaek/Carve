@@ -12,6 +12,7 @@ import Domain
 
 struct LaunchProgressView: View {
     @ObservedObject private var cloudKitContainer = PersistentCloudKitContainer.shared
+    @State private var shouldShowMigrationAlert: Bool = false
     
     var body: some View {
         GeometryReader { geometry in
@@ -39,6 +40,17 @@ struct LaunchProgressView: View {
             if newState == .failed {
                 cloudKitContainer.handleSyncFailure()
             }
+            
+            if newState == .success && cloudKitContainer.showMigrationV1OnlyAlert {
+                shouldShowMigrationAlert = true
+            }
+        }
+        .alert("데이터 마이그레이션이 수행되었습니다.", isPresented: $shouldShowMigrationAlert) {
+            Button("확인", role: .cancel) {
+                exit(0)
+            }
+        } message: {
+            Text("앱을 재실행해주세요.")
         }
         .ignoresSafeArea()
     }
@@ -51,9 +63,15 @@ struct LaunchProgressView: View {
                 .font(.subheadline)
                 .foregroundColor(.gray)
         case .syncing:
-            Text("데이터 가져오는 중... \(Int(cloudKitContainer.progress * 100))%")
-                .font(.subheadline)
-                .foregroundColor(.gray)
+            if cloudKitContainer.showMigrationV1OnlyAlert {
+                Text("데이터 가져오는 중... \(Int(cloudKitContainer.progress * 100))%")
+                    .font(.subheadline)
+                    .foregroundColor(.gray)
+            } else {
+                Text("데이터 마이그레이션 중... \(Int(cloudKitContainer.progress * 100))%")
+                    .font(.subheadline)
+                    .foregroundColor(.gray)
+            }
         case .success:
             Text("데이터 동기화 완료")
                 .font(.subheadline)

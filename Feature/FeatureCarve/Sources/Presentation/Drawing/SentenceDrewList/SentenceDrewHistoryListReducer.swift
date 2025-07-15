@@ -18,7 +18,7 @@ public struct SentenceDrewHistoryListReducer {
         public var id: String
         public var title: TitleVO
         public var section: Int
-        public var drawings: [DrawingVO] = []
+        public var drawings: [BibleDrawing] = []
 
         public static let initialState = State(title: .init(title: .genesis, chapter: 1),
                                                section: 1)
@@ -33,12 +33,12 @@ public struct SentenceDrewHistoryListReducer {
     
     public enum Action: ViewAction {
         case view(View)
-        case setDrawings([DrawingVO])
-        case setPresentDrawing(DrawingVO)
+        case setDrawings([BibleDrawing])
+        case setPresentDrawing(BibleDrawing)
         
         public enum View {
             case fetchDrawings
-            case selectDrawing(DrawingVO)
+            case selectDrawing(BibleDrawing)
         }
     }
     public var body: some Reducer<State, Action> {

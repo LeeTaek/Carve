@@ -43,7 +43,7 @@ let target: [Target] = [
         dependencies: dependencies,
         settings: settings
     ),
-    .makeTestTarget(projName: projectName, target: .debug, script: script)
+    .makeTestTarget(projName: projectName, target: .debug, script: script, dependencies: [.target(name: projectName)])
 ]
 
 

@@ -9,73 +9,6 @@
 import Foundation
 import SwiftData
 
-public enum DrawingSchemaV1: VersionedSchema {
-    public static var versionIdentifier = Schema.Version(1, 0, 0)
-    
-    public static var models: [any PersistentModel.Type] {
-        [DrawingVO.self]
-    }
-    
-    @Model
-    public class DrawingVO {
-        public var bibleTitle: Data?
-        public var creationDate: Date?
-        public var entityName: String?
-        public var id: String!
-        public var isPresent: Bool?
-        public var isWritten: Bool?    // 필요한 경우
-        public var section: Int?
-        public var titleChapter: Int?
-        public var titleName: String?
-        public var updateDate: Date?
-        @Attribute(.externalStorage) public var lineData: Data?
-        
-        public init() { }
-    }
-    
-    
-}
-
-enum DrawingSchemaV2: VersionedSchema {
-    static var versionIdentifier = Schema.Version(2, 0, 0)
-    
-    static var models: [any PersistentModel.Type] {
-        [DrawingVO.self, BibleDrawing.self]
-    }
-    
-    @Model
-    public class DrawingVO {
-        public var bibleTitle: Data?
-        public var creationDate: Date?
-        public var entityName: String?
-        public var id: String!
-        public var isPresent: Bool?
-        public var isWritten: Bool?    // 필요한 경우
-        public var section: Int?
-        public var titleChapter: Int?
-        public var titleName: String?
-        public var updateDate: Date?
-        @Attribute(.externalStorage) public var lineData: Data?
-        
-        public init() {}
-    }
-    
-    @Model
-    public class BibleDrawing {
-        public var id: String!
-        public var titleName: String?
-        public var titleChapter: Int?
-        public var verse: Int?
-        public var creationDate: Date?
-        public var updateDate: Date?
-        public var translation: Translation? = Translation.NKRV
-        public var drawingVersion: Int? = 1
-        public var isPresent: Bool? = false
-        @Attribute(.externalStorage) public var lineData: Data?
-        
-        public init() { }
-    }
-}
 
 enum MigrationPlanV1Only: SchemaMigrationPlan {
     static var schemas: [VersionedSchema.Type] {
@@ -103,7 +36,7 @@ enum DrawingDataMigrationPlan: SchemaMigrationPlan {
                        let chapter = old.titleChapter,
                        let section = old.section,
                        let createdAt = old.creationDate {
-                        let timestamp = createdAt.timeIntervalSince1970
+                        let timestamp = Int(createdAt.timeIntervalSince1970)
                         return "\(title).\(chapter).\(section).\(timestamp)"
                     } else {
                         return old.id
@@ -111,13 +44,14 @@ enum DrawingDataMigrationPlan: SchemaMigrationPlan {
                 }()
                 new.titleName = old.titleName
                 new.titleChapter = old.titleChapter
+                new.translation = .NKRV
+                new.drawingVersion = 1
                 new.verse = old.section
                 new.creationDate = old.creationDate
                 new.updateDate = old.updateDate
                 new.lineData = old.lineData
                 return new
             }
-//            try context.delete(DrawingSchemaV1.DrawingVO.self)
             try context.save()
         },
         didMigrate: { context in
