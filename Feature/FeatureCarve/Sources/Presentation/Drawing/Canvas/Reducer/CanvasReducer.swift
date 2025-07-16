@@ -20,7 +20,7 @@ public struct CanvasReducer {
         public var id: String
         public var drawing: BibleDrawing?
         public var title: TitleVO
-        public var section: Int
+        public var verse: Int
         @Shared(.appStorage("pencilConfig")) public var pencilConfig: PencilPalatte = .initialState
         @Shared(.inMemory("canUndo")) public var canUndo: Bool = false
         @Shared(.inMemory("canRedo")) public var canRedo: Bool = false
@@ -28,11 +28,11 @@ public struct CanvasReducer {
             self.id = "drawingData.\(sentence.sentenceScript)"
             self.drawing = drawing
             self.title = sentence.title
-            self.section = sentence.verse
+            self.verse = sentence.verse
         }
         public static let initialState = Self(sentence: .initialState,
                                               drawing: .init(bibleTitle: .initialState,
-                                                             section: 1))
+                                                             verse: 1))
     }
     
     @Dependency(\.undoManager) private var undoManager
@@ -52,7 +52,7 @@ public struct CanvasReducer {
                     drawing.updateDate = Date.now
                 } else {
                     state.drawing = BibleDrawing(bibleTitle: state.title,
-                                                 section: state.section,
+                                                 verse: state.verse,
                                                  lineData: newDrawing.dataRepresentation())
                 }
             case .registUndoCanvas(let canvas):

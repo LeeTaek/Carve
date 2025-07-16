@@ -22,7 +22,7 @@ final class DrawingDatabaseTest: XCTestCase {
     
     func test_actor_insert() async throws {
         // given
-        let drawing = BibleDrawing.init(bibleTitle: .initialState, section: 1)
+        let drawing = BibleDrawing.init(bibleTitle: .initialState, verse: 1)
         
         // when
         try await actor.insert(drawing)
@@ -35,8 +35,8 @@ final class DrawingDatabaseTest: XCTestCase {
     func test_fetch_drawing() async throws {
         // given
         let title = TitleVO.init(title: .genesis, chapter: 1)
-        let lastSection = 1
-        let drawing = BibleDrawing(bibleTitle: title, section: lastSection)
+        let lastVerse = 1
+        let drawing = BibleDrawing(bibleTitle: title, verse: lastVerse)
         
         // when
         try await actor.insert(drawing)
@@ -49,13 +49,13 @@ final class DrawingDatabaseTest: XCTestCase {
     func test_fetech_drawings() async throws {
         // given
         let title = TitleVO.init(title: .genesis, chapter: 1)
-        let lastSection = 31
+        let lastVerse = 31
         
         // when
-        try await drawingContext.setDrawing(title: title, to: lastSection)        
+        try await drawingContext.setDrawing(title: title, to: lastVerse)
         let storedDrawings = try await drawingContext.fetch(title: title)
         
         // then
-        XCTAssertEqual(lastSection, storedDrawings.count)
+        XCTAssertEqual(lastVerse, storedDrawings.count)
     }
 }

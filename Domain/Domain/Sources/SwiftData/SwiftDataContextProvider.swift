@@ -27,11 +27,12 @@ public final class PersistentCloudKitContainer: ObservableObject {
     
     @Published public var progress: Double = 0.0
     @Published public var syncState: CloudSyncState = .idle
-    public var showMigrationV1OnlyAlert: Bool = false
+    public var isMigration: Bool = false
     
     public enum CloudSyncState {
         case idle
         case syncing
+        case migration
         case success
         case failed
         case next
@@ -73,7 +74,7 @@ public final class PersistentCloudKitContainer: ObservableObject {
                                                             migrationPlan: MigrationPlanV1Only.self,
                                                             configurations: config)
                         observeCloudKitSyncProgress()
-                        showMigrationV1OnlyAlert = true
+                        isMigration = true
                     } catch {
                         fatalError("Failed to create SwiftData container: \(error.localizedDescription)")
                     }
@@ -113,17 +114,22 @@ public final class PersistentCloudKitContainer: ObservableObject {
                     throw NSError(domain: "CloudKitError", code: 1)
                 }
                 Task { @MainActor in
-                    self.syncState = .syncing
+                    if self.isMigration {
+                        self.syncState = .migration
+                    } else {
+                        self.syncState = .syncing
+                    }
                 }
                 let operation = CKFetchDatabaseChangesOperation()
-                
+                let deadLine: CGFloat = self.isMigration ? 120 : 20
+
                 operation.fetchDatabaseChangesResultBlock = { result in
                     Task { @MainActor in
                         switch result {
                         case .success:
                             Log.debug("CloudKit 동기화 완료")
                             do {
-                                try await Task.withTimeout(seconds: 20) {
+                                try await Task.withTimeout(seconds: deadLine) {
                                     await self.fetchRecordsFromCloudKit()
                                     await self.isSyncFromCloudKit()
                                 }
@@ -223,7 +229,7 @@ public final class PersistentCloudKitContainer: ObservableObject {
                     // 2초 대기후 다음 화면으로 넘어감
                     try? await Task.sleep(nanoseconds: 2_000_000_000)
                     
-                    if !showMigrationV1OnlyAlert {
+                    if !isMigration {
                         await MainActor.run {
                             self.syncState = .next
                         }

@@ -17,17 +17,17 @@ public struct SentenceVO: Equatable, Sendable {
 
     public static let initialState = Self(
         title: TitleVO(title: .leviticus, chapter: 4),
-        section: 1,
+        verse: 1,
         sentence: "이 일 후에 내가 보니"
     )
 
     public init(title: TitleVO,
                 chapterTitle: String? = nil,
-                section: Int,
+                verse: Int,
                 sentence: String) {
         self.title = title
         self.chapterTitle = chapterTitle
-        self.verse = section
+        self.verse = verse
         self.sentenceScript = sentence
     }
 

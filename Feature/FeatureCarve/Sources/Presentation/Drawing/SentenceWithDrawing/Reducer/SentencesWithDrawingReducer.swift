@@ -32,10 +32,10 @@ public struct SentencesWithDrawingReducer {
             self.id = "\(sentence.title.title.koreanTitle()).\(sentence.title.chapter).\(sentence.verse)"
             self.sentence = sentence
             self.sentenceState = .init(chapterTitle: sentence.chapterTitle,
-                                       section: sentence.verse,
+                                       verse: sentence.verse,
                                        sentence: sentence.sentenceScript)
             self.canvasState = .init(sentence: sentence, drawing: drawing)
-            self.drewHistoryState = .init(title: sentence.title, section: sentence.verse)
+            self.drewHistoryState = .init(title: sentence.title, verse: sentence.verse)
         }
     }
     

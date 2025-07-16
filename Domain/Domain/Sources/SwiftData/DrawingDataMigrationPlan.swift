@@ -43,10 +43,10 @@ enum DrawingDataMigrationPlan: SchemaMigrationPlan {
                 new.id = {
                     if let title = old.titleName,
                        let chapter = old.titleChapter,
-                       let section = old.section,
+                       let verse = old.section,
                        let createdAt = old.creationDate {
                         let timestamp = Int(createdAt.timeIntervalSince1970)
-                        return "\(title).\(chapter).\(section).\(timestamp)"
+                        return "\(title).\(chapter).\(verse).\(timestamp)"
                     } else {
                         return old.id
                     }

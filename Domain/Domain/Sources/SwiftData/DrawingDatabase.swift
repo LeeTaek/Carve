@@ -21,8 +21,8 @@ public struct DrawingDatabase: Sendable, Database {
         if let storedDrawing: BibleDrawing = try await actor.fetch().first {
             return storedDrawing
         } else {
-            try await actor.insert(BibleDrawing.init(bibleTitle: .initialState, section: 1))
-            return BibleDrawing.init(bibleTitle: .initialState, section: 1)
+            try await actor.insert(BibleDrawing.init(bibleTitle: .initialState, verse: 1))
+            return BibleDrawing.init(bibleTitle: .initialState, verse: 1)
         }
     }
     
@@ -59,13 +59,13 @@ public struct DrawingDatabase: Sendable, Database {
     ///   - title: 해상 성경의 이름과 장
     ///   - section: 절
     /// - Returns: 해당 절의 필사 데이터를 전부 반환
-    public func fetchDrawings(title: TitleVO, section: Int) async throws -> [BibleDrawing]? {
+    public func fetchDrawings(title: TitleVO, verse: Int) async throws -> [BibleDrawing]? {
         let titleName = title.title.rawValue
         let chapter = title.chapter
         let predicate = #Predicate<BibleDrawing> {
             $0.titleName == titleName
             && $0.titleChapter == chapter
-            && $0.verse == section
+            && $0.verse == verse
         }
         let descriptor = FetchDescriptor(predicate: predicate,
                                          sortBy: [SortDescriptor(\.updateDate, order: .reverse)])
@@ -89,9 +89,9 @@ public struct DrawingDatabase: Sendable, Database {
     public func setDrawing(title: TitleVO, to last: Int) async throws {
         let drawings: [BibleDrawing] = try await fetch(title: title)
         for drawing in drawings {
-            guard let section = drawing.verse else { continue }
-            if section <= last {
-                let newDrawing = BibleDrawing(bibleTitle: title, verse: section)
+            guard let verse = drawing.verse else { continue }
+            if verse <= last {
+                let newDrawing = BibleDrawing(bibleTitle: title, verse: verse)
                 if drawing.lineData != nil {
                     newDrawing.lineData = drawing.lineData
                 }
@@ -100,8 +100,8 @@ public struct DrawingDatabase: Sendable, Database {
                 try await actor.delete(drawing)
             }
         }
-        for section in 1...last {
-            let drawing = BibleDrawing(bibleTitle: title, verse: section)
+        for verse in 1...last {
+            let drawing = BibleDrawing(bibleTitle: title, verse: verse)
             try await actor.insert(drawing)
         }
         
