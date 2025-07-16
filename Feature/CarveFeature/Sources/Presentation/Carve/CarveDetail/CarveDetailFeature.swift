@@ -37,13 +37,13 @@ public struct CarveDetailFeature {
         public enum View {
             case fetchSentence
             case headerAnimation(CGFloat, CGFloat)
-            case scrollToTop
-            case setProxy(ScrollViewProxy, ObjectIdentifier)
+            case setProxy(ScrollViewProxy)
         }
     }
 
     public enum InnerAction {
         case setSentence([SentenceVO], [BibleDrawing])
+        case scrollToTop
     }
     @CasePathable
     public enum ScopeAction {
@@ -87,17 +87,15 @@ public struct CarveDetailFeature {
                 }
                 state.sentenceWithDrawingState = sentenceState
                 undoManager.clear()
-                return .run { send in
-                    await send(.view(.scrollToTop))
-                }
-            case .view(.setProxy(let proxy, let id)):
+            case .view(.setProxy(let proxy)):
                 state.proxy = proxy
-                state.firstItemID = id
-            case .view(.scrollToTop):
-                guard let id = state.firstItemID else { return .none }
-                let anchorPoint = state.headerState.headerHeight / UIScreen.main.bounds.height
+                return .run { send in
+                    await send(.inner(.scrollToTop))
+                }
+            case .inner(.scrollToTop):
+                guard let id = state.sentenceWithDrawingState.first?.id else { return .none }
                 withAnimation(.easeInOut(duration: 0.5)) {
-                    state.proxy?.scrollTo(id, anchor: UnitPoint(x: 0, y: anchorPoint))
+                    state.proxy?.scrollTo(id, anchor: .bottom)
                 }
             case .scope(.sentenceWithDrawingAction(.element(id: let id,
                                                             action: .scope(.canvasAction(let action))))):

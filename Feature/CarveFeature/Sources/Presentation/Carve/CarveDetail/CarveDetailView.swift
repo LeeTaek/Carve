@@ -39,7 +39,7 @@ public struct CarveDetailView: View {
                         }
                     }
                     .onChange(of: store.sentenceWithDrawingState) {
-                        scrollToTop(proxy: proxy)
+                        send(.setProxy(proxy))
                     }
             }
             .coordinateSpace(name: "Scroll")
@@ -54,7 +54,8 @@ public struct CarveDetailView: View {
             Section {
                 ForEach(
                     store.scope(state: \.sentenceWithDrawingState,
-                                action: \.scope.sentenceWithDrawingAction)
+                                action: \.scope.sentenceWithDrawingAction),
+                    id: \.state.id
                 ) { childStore in
                     SentencesWithDrawingView(store: childStore)
                         .fixedSize(horizontal: false, vertical: true)
@@ -63,13 +64,7 @@ public struct CarveDetailView: View {
             }
         }
     }
-    
-    private func scrollToTop(proxy: ScrollViewProxy) {
-        guard let id = store.scope(state: \.sentenceWithDrawingState,
-                                   action: \.scope.sentenceWithDrawingAction).first?.id else { return }
-        send(.setProxy(proxy, id))
-    }
-    
+
     private func debounce(delay: TimeInterval = 0.1,
                           _ action: @escaping () -> Void) {
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: action)
