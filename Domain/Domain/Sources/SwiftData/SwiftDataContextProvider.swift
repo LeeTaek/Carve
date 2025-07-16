@@ -116,6 +116,7 @@ public final class PersistentCloudKitContainer: ObservableObject {
                 Task { @MainActor in
                     if self.isMigration {
                         self.syncState = .migration
+                        await self.fetchRecordsFromCloudKit()
                     } else {
                         self.syncState = .syncing
                     }
