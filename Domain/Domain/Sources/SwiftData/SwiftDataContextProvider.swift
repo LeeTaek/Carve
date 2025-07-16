@@ -6,7 +6,7 @@
 //  Copyright © 2024 leetaek. All rights reserved.
 //
 
-import Core
+import CarveToolkit
 import CloudKit
 import CoreData
 import SwiftData

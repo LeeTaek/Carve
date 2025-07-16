@@ -10,5 +10,5 @@ import ProjectDescription
 let workspace = Workspace(
   name: "Carve",
   projects: [
-    .relativeToRoot("App/Carve")
+    .relativeToRoot("App/CarveApp")
 ])
