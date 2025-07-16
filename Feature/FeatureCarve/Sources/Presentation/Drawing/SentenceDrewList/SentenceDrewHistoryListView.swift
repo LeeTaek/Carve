@@ -28,11 +28,12 @@ public struct SentenceDrewHistoryListView: View {
         VStack(alignment: .leading) {
             Text("\(store.title.title.koreanTitle()) \(store.title.chapter)장 필사 기록")
                 .font(.title)
-                .padding()
+                .padding(.vertical)
             
             drewList
             
         }
+        .background(Color(uiColor: .systemGroupedBackground))
         .onAppear {
             send(.fetchDrawings)
         }

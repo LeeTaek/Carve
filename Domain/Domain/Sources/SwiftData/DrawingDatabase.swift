@@ -42,14 +42,11 @@ public struct DrawingDatabase: Sendable, Database {
         return storedDrawing
     }
     
-    /// 해당 아이디의 필사 데이터를 모두 불러옴
-    public func fetch(title: TitleVO, section: Int) async throws -> BibleDrawing? {
-        let titleName = title.title.rawValue
-        let chapter = title.chapter
+    /// 해당 아이디의 필사 데이터 불러옴
+    public func fetch(drawing: BibleDrawing) async throws -> BibleDrawing? {
+        let id = drawing.id
         let predicate = #Predicate<BibleDrawing> {
-            $0.titleName == titleName
-            && $0.titleChapter == chapter
-            && $0.verse == section
+            $0.id == id
         }
         let descriptor = FetchDescriptor(predicate: predicate,
                                          sortBy: [SortDescriptor(\.verse)])
@@ -73,6 +70,7 @@ public struct DrawingDatabase: Sendable, Database {
         let descriptor = FetchDescriptor(predicate: predicate,
                                          sortBy: [SortDescriptor(\.updateDate, order: .reverse)])
         let storedDrawing: [BibleDrawing]? = try await actor.fetch(descriptor)
+        Log.debug("Drew Log Count:", storedDrawing?.count)
         return storedDrawing
     }
     
@@ -110,9 +108,8 @@ public struct DrawingDatabase: Sendable, Database {
     }
     
     public func updateDrawing(drawing: BibleDrawing) async throws {
-        let title = TitleVO(title: BibleTitle(rawValue: drawing.titleName!)!, chapter: drawing.titleChapter!)
         do {
-            if (try await fetch(title: title, section: drawing.verse!)) != nil {
+            if (try await fetch(drawing: drawing)) != nil {
                 try await update(item: drawing)
             } else {
                 try await actor.insert(drawing)

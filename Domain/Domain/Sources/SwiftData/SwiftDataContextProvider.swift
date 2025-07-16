@@ -56,23 +56,28 @@ public final class PersistentCloudKitContainer: ObservableObject {
                                                configurations: config)
                 observeCloudKitSyncProgress()
             } catch {
-                Log.error("마이그레이션 실패, 초기 스키마로 초기화 시도: \(error)")
-                
-                do {
-                    let url = URL.applicationSupportDirectory.appending(path: path)
-                    let schema = Schema([
-                        DrawingVO.self
-                    ])
-                    let config = ModelConfiguration(
-                        url: url,
-                        cloudKitDatabase: .private("iCloud.Carve.SwiftData.iCloud")
-                    )
-                    self.container = try ModelContainer(for: schema,
-                                                   migrationPlan: MigrationPlanV1Only.self,
-                                                   configurations: config)
-                    observeCloudKitSyncProgress()
-                    showMigrationV1OnlyAlert = true
-                } catch {
+                if let error = error as? SwiftDataError,
+                   error == .loadIssueModelContainer {
+                    Log.error("마이그레이션 실패, 초기 스키마로 초기화 시도: \(error)")
+                    
+                    do {
+                        let url = URL.applicationSupportDirectory.appending(path: path)
+                        let schema = Schema([
+                            DrawingVO.self
+                        ])
+                        let config = ModelConfiguration(
+                            url: url,
+                            cloudKitDatabase: .private("iCloud.Carve.SwiftData.iCloud")
+                        )
+                        self.container = try ModelContainer(for: schema,
+                                                            migrationPlan: MigrationPlanV1Only.self,
+                                                            configurations: config)
+                        observeCloudKitSyncProgress()
+                        showMigrationV1OnlyAlert = true
+                    } catch {
+                        fatalError("Failed to create SwiftData container: \(error.localizedDescription)")
+                    }
+                } else {
                     fatalError("Failed to create SwiftData container: \(error.localizedDescription)")
                 }
             }
