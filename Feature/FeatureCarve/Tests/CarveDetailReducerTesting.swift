@@ -4,10 +4,10 @@
 //
 //  Created by 이택성 on 7/16/24.
 //  Copyright © 2024 leetaek. All rights reserved.
-//
+
 
 @testable import FeatureCarve
-import Domain
+@testable import Domain
 import Testing
 
 import ComposableArchitecture

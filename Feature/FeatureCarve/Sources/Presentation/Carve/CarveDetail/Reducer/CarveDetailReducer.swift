@@ -43,7 +43,7 @@ public struct CarveDetailReducer {
     }
 
     public enum InnerAction {
-        case setSentence([SentenceVO], [DrawingVO])
+        case setSentence([SentenceVO], [BibleDrawing])
     }
     @CasePathable
     public enum ScopeAction {
@@ -79,18 +79,11 @@ public struct CarveDetailReducer {
             case .inner(.setSentence(let sentences, let drawings)):
                 state.sentenceWithDrawingState.removeAll()
                 var sentenceState: IdentifiedArrayOf<SentencesWithDrawingReducer.State> = []
-                let sectionSet = Set(drawings.compactMap { $0.section })
                 for sentence in sentences {
-                    if sectionSet.contains(sentence.section) {
-                        let candidates = drawings.filter { $0.section == sentence.section }
-                        let drawing = candidates.first(where: { $0.isPresent == true })
-                        ?? candidates.sorted(by: { ($0.updateDate ?? .distantPast) > ($1.updateDate ?? .distantPast) }).first
-                        sentenceState.append(SentencesWithDrawingReducer.State(sentence: sentence,
-                                                                               drawing: drawing))
-                    } else {
-                        sentenceState.append(SentencesWithDrawingReducer.State(sentence: sentence,
-                                                                               drawing: nil))
-                    }
+                    let candidates = drawings.filter { $0.verse == sentence.verse && $0.lineData?.containsPKStroke == true }
+                    let drawing = candidates.first(where: { $0.isPresent == true })
+                    ?? candidates.sorted(by: { ($0.updateDate ?? Date.distantPast) > ($1.updateDate ?? Date.distantPast) }).first
+                    sentenceState.append(SentencesWithDrawingReducer.State(sentence: sentence, drawing: drawing))
                 }
                 state.sentenceWithDrawingState = sentenceState
                 undoManager.clear()
@@ -114,7 +107,9 @@ public struct CarveDetailReducer {
                 }
                 let sentenceState = state.sentenceWithDrawingState[index]
                 return .run { _ in
-                    guard let drawing = sentenceState.canvasState.drawing else { return }
+                    guard let drawing = sentenceState.canvasState.drawing,
+                          drawing.lineData?.containsPKStroke == true
+                    else { return }
                     try await drawingContext.updateDrawing(drawing: drawing)
                 }
             default: break

@@ -18,21 +18,21 @@ public struct CanvasReducer {
     @ObservableState
     public struct State: Identifiable {
         public var id: String
-        public var drawing: DrawingVO?
+        public var drawing: BibleDrawing?
         public var title: TitleVO
-        public var section: Int
+        public var verse: Int
         @Shared(.appStorage("pencilConfig")) public var pencilConfig: PencilPalatte = .initialState
         @Shared(.inMemory("canUndo")) public var canUndo: Bool = false
         @Shared(.inMemory("canRedo")) public var canRedo: Bool = false
-        public init(sentence: SentenceVO, drawing: DrawingVO?) {
+        public init(sentence: SentenceVO, drawing: BibleDrawing?) {
             self.id = "drawingData.\(sentence.sentenceScript)"
             self.drawing = drawing
             self.title = sentence.title
-            self.section = sentence.section
+            self.verse = sentence.verse
         }
         public static let initialState = Self(sentence: .initialState,
                                               drawing: .init(bibleTitle: .initialState,
-                                                             section: 1))
+                                                             verse: 1))
     }
     
     @Dependency(\.undoManager) private var undoManager
@@ -40,7 +40,7 @@ public struct CanvasReducer {
     public enum Action {
         case saveDrawing(PKDrawing)
         case registUndoCanvas(PKCanvasView)
-        case setDrawing(DrawingVO)
+        case setDrawing(BibleDrawing)
     }
 
     public var body: some Reducer<State, Action> {
@@ -51,9 +51,9 @@ public struct CanvasReducer {
                     drawing.lineData = newDrawing.dataRepresentation()
                     drawing.updateDate = Date.now
                 } else {
-                    state.drawing = DrawingVO(bibleTitle: state.title,
-                                              section: state.section,
-                                              lineData: newDrawing.dataRepresentation())
+                    state.drawing = BibleDrawing(bibleTitle: state.title,
+                                                 verse: state.verse,
+                                                 lineData: newDrawing.dataRepresentation())
                 }
             case .registUndoCanvas(let canvas):
                 if undoManager.isPerformingUndoRedo {

@@ -17,28 +17,28 @@ public struct SentenceDrewHistoryListReducer {
     public struct State: Identifiable {
         public var id: String
         public var title: TitleVO
-        public var section: Int
-        public var drawings: [DrawingVO] = []
+        public var verse: Int
+        public var drawings: [BibleDrawing] = []
 
         public static let initialState = State(title: .init(title: .genesis, chapter: 1),
-                                               section: 1)
+                                               verse: 1)
         
-        public init(title: TitleVO, section: Int) {
-            self.id = "DrewHistory.\(title.title.rawValue).\(title.chapter).\(section)"
+        public init(title: TitleVO, verse: Int) {
+            self.id = "DrewHistory.\(title.title.rawValue).\(title.chapter).\(verse)"
             self.title = title
-            self.section = section
+            self.verse = verse
         }
     }
     @Dependency(\.drawingData) var drawingContext
     
     public enum Action: ViewAction {
         case view(View)
-        case setDrawings([DrawingVO])
-        case setPresentDrawing(DrawingVO)
+        case setDrawings([BibleDrawing])
+        case setPresentDrawing(BibleDrawing)
         
         public enum View {
             case fetchDrawings
-            case selectDrawing(DrawingVO)
+            case selectDrawing(BibleDrawing)
         }
     }
     public var body: some Reducer<State, Action> {
@@ -46,10 +46,10 @@ public struct SentenceDrewHistoryListReducer {
             switch action {
             case .view(.fetchDrawings):
                 let title = state.title
-                let section = state.section
+                let verse = state.verse
                 return .run { send in
                     do {
-                        guard let fetchedDrawings = try await drawingContext.fetchDrawings(title: title, section: section) else { return }
+                        guard let fetchedDrawings = try await drawingContext.fetchDrawings(title: title, verse: verse) else { return }
                         await send(.setDrawings(fetchedDrawings))
                     } catch  {
                         Log.error("fetched Drawing Data error", error)

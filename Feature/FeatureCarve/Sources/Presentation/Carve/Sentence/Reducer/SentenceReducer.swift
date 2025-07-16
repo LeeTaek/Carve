@@ -20,23 +20,23 @@ public struct SentenceReducer {
     public struct State: Identifiable {
         public var id: String
         public var chapterTitle: String?
-        public let section: Int
+        public let verse: Int
         public let sentence: String
         public var isredraw: Bool = false
         
         @Shared(.appStorage("sentenceSetting")) public var sentenceSetting: SentenceSetting = .initialState
        
         public init(chapterTitle: String?,
-                    section: Int,
+                    verse: Int,
                     sentence: String) {
-            self.id = String(section) + sentence
+            self.id = String(verse) + sentence
             self.chapterTitle = chapterTitle
-            self.section = section
+            self.verse = verse
             self.sentence = sentence
         }
         
         public static let initialState = Self.init(chapterTitle: nil,
-                                                   section: 1,
+                                                   verse: 1,
                                                    sentence: "태초에 하나님이 천지를 창조하시니라")
 
     }

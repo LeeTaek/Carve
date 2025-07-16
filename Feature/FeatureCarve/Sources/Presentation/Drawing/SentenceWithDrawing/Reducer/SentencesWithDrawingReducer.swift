@@ -28,14 +28,14 @@ public struct SentencesWithDrawingReducer {
         public var underlineOffset: [CGFloat] = [.zero]
         public var isPresentDrewHistory: Bool = false
         
-        public init(sentence: SentenceVO, drawing: DrawingVO?) {
-            self.id = "\(sentence.title.title.koreanTitle()).\(sentence.title.chapter).\(sentence.section)"
+        public init(sentence: SentenceVO, drawing: BibleDrawing?) {
+            self.id = "\(sentence.title.title.koreanTitle()).\(sentence.title.chapter).\(sentence.verse)"
             self.sentence = sentence
             self.sentenceState = .init(chapterTitle: sentence.chapterTitle,
-                                       section: sentence.section,
+                                       verse: sentence.verse,
                                        sentence: sentence.sentenceScript)
             self.canvasState = .init(sentence: sentence, drawing: drawing)
-            self.drewHistoryState = .init(title: sentence.title, section: sentence.section)
+            self.drewHistoryState = .init(title: sentence.title, verse: sentence.verse)
         }
     }
     

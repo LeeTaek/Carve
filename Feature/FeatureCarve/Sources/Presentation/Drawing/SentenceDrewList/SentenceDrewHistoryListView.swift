@@ -7,6 +7,7 @@
 //
 
 import Domain
+import Resources
 import SwiftUI
 import PencilKit
 
@@ -26,13 +27,26 @@ public struct SentenceDrewHistoryListView: View {
     
     private var content: some View {
         VStack(alignment: .leading) {
-            Text("\(store.title.title.koreanTitle()) \(store.title.chapter)장 필사 기록")
-                .font(.title)
+            Text("\(store.title.title.koreanTitle()) \(store.title.chapter)장 \(store.verse)절 필사 기록")
+                .font(Font(ResourcesFontFamily.NanumGothic.bold.font(size: 25)))
+                .foregroundStyle(.black.opacity(0.7))
                 .padding()
             
-            drewList
-            
+            if store.drawings.isEmpty {
+                VStack {
+                    Spacer()
+                    Text("필사 내역이 없습니다.")
+                        .font(Font(ResourcesFontFamily.NanumGothic.bold.font(size: 20)))
+                        .foregroundStyle(.black.opacity(0.7))
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(uiColor: .systemGroupedBackground))
+            } else {
+                drewList
+            }
         }
+        .background(Color(uiColor: .systemGroupedBackground))
         .onAppear {
             send(.fetchDrawings)
         }
@@ -52,7 +66,7 @@ public struct SentenceDrewHistoryListView: View {
     }
     
     @ViewBuilder
-    private func drawingPreview(of drawing: DrawingVO) -> some View {
+    private func drawingPreview(of drawing: BibleDrawing) -> some View {
         if let drawingData = drawing.lineData,
            let pkDrawing = try? PKDrawing(data: drawingData) {
             let bounds = pkDrawing.bounds
@@ -72,7 +86,6 @@ public struct SentenceDrewHistoryListView: View {
                 .padding(.vertical)
         }
     }
-    
     
     private func updatedDate(date: Date?) -> some View {
         if let date {
