@@ -11,7 +11,7 @@ import CarveToolkit
 import Domain
 
 struct LaunchProgressView: View {
-    @ObservedObject private var cloudKitContainer = PersistentCloudKitContainer.shared
+    @ObservedObject private var cloudKitContainer = PersistentCloudKitContainer()
     @State private var shouldShowMigrationAlert: Bool = false
     
     var body: some View {

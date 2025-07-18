@@ -69,17 +69,17 @@ public actor SwiftDatabaseActor {
 
 extension SwiftDatabaseActor: DependencyKey {
     public static var liveValue: SwiftDatabaseActor = {
-        let container = PersistentCloudKitContainer.shared.container
+        @Dependency(\.container) var container
         return SwiftDatabaseActor(modelContainer: container)
     }()
     
     public static var testValue: SwiftDatabaseActor = {
-        let container = PersistentCloudKitContainer.test.container
+        @Dependency(\.container) var container
         return SwiftDatabaseActor(modelContainer: container)
     }()
     
     public static var previewValue: SwiftDatabaseActor = {
-        let container = PersistentCloudKitContainer.preview.container
+        @Dependency(\.container) var container
         return SwiftDatabaseActor(modelContainer: container)
     }()
 }

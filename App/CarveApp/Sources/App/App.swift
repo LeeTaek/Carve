@@ -17,7 +17,7 @@ import CarveFeature
 struct CarveApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
     public let store: StoreOf<AppCoordinatorFeature>
-    @StateObject private var cloudKitContainer = PersistentCloudKitContainer.shared
+    @StateObject private var cloudKitContainer = PersistentCloudKitContainer()
     @State private var isDataLoaded: Bool = false
     
     init() {

@@ -14,17 +14,6 @@ import SwiftData
 import Dependencies
 
 public final class PersistentCloudKitContainer: ObservableObject {
-    private enum ContainerType {
-        case live
-        case test
-        case preview
-    }
-    public static let shared = PersistentCloudKitContainer(type: .live)
-    public static let test = PersistentCloudKitContainer(type: .test)
-    public static let preview = PersistentCloudKitContainer(type: .preview)
-    public let container: ModelContainer
-    private var cloudKitDB: CKDatabase?
-    
     @Published public var progress: Double = 0.0
     @Published public var syncState: CloudSyncState = .idle
     public var isMigration: Bool = false
@@ -38,75 +27,14 @@ public final class PersistentCloudKitContainer: ObservableObject {
         case next
     }
     
-    private init(type: ContainerType) {
-        switch type {
-        case .live:
-            self.cloudKitDB = CKContainer(identifier: "iCloud.Carve.SwiftData.iCloud").privateCloudDatabase
-            let path = "Carve.sqlite"
-            do {
-                let url = URL.applicationSupportDirectory.appending(path: path)
-                let schema = Schema([
-                    BibleDrawing.self
-                ])
-                let config = ModelConfiguration(
-                    url: url,
-                    cloudKitDatabase: .private("iCloud.Carve.SwiftData.iCloud")
-                )
-                self.container = try ModelContainer(for: schema,
-                                               migrationPlan: DrawingDataMigrationPlan.self,
-                                               configurations: config)
-                observeCloudKitSyncProgress()
-            } catch {
-                if let error = error as? SwiftDataError,
-                   error == .loadIssueModelContainer {
-                    Log.error("마이그레이션 실패, 초기 스키마로 초기화 시도: \(error)")
-                    
-                    do {
-                        let url = URL.applicationSupportDirectory.appending(path: path)
-                        let schema = Schema([
-                            DrawingVO.self
-                        ])
-                        let config = ModelConfiguration(
-                            url: url,
-                            cloudKitDatabase: .private("iCloud.Carve.SwiftData.iCloud")
-                        )
-                        self.container = try ModelContainer(for: schema,
-                                                            migrationPlan: MigrationPlanV1Only.self,
-                                                            configurations: config)
-                        observeCloudKitSyncProgress()
-                        isMigration = true
-                    } catch {
-                        fatalError("Failed to create SwiftData container: \(error.localizedDescription)")
-                    }
-                } else {
-                    fatalError("Failed to create SwiftData container: \(error.localizedDescription)")
-                }
-            }
-        case .preview:
-            do {
-                let config = ModelConfiguration(isStoredInMemoryOnly: true)
-                self.container = try ModelContainer(for: Schema([BibleDrawing.self]), configurations: config)
-            } catch {
-                fatalError("Failed to create SwiftData container on Preview")
-            }
-        case .test:
-            let path = "Carve.test.sqlite"
-            do {
-                let url = URL.applicationSupportDirectory.appending(path: path)
-                let schema = Schema([
-                    BibleDrawing.self
-                ])
-                let config = ModelConfiguration(url: url)
-                self.container = try ModelContainer(for: schema,
-                                               configurations: config)
-            } catch {
-                fatalError("Failed to create SwiftData container")
-            }
-        }
-    }
+    @Dependency(\.container) public var container
+    @Dependency(\.cloudkitDB) var cloudKitDB
     
+    public init() {
+        observeCloudKitSyncProgress()
+    }
+
     private func observeCloudKitSyncProgress() {
-        guard let cloudKitDB else { return }
         Task {
             do {
                 let cloudKitAccountStatus = try await CKContainer.default().accountStatus()
@@ -157,7 +85,6 @@ public final class PersistentCloudKitContainer: ObservableObject {
     /// CloudKit에 저장된 필사 데이터 수 반환
     /// - Returns: 저장되어 있는 구절 수
     private func getTotalRecordCountFromCloudKit() async -> Int {
-        guard let cloudKitDB else { return 0 }
         let query = CKQuery(recordType: "CD_BibleDrawing", predicate: NSPredicate(value: true))
         let operation = CKQueryOperation(query: query)
         operation.resultsLimit = CKQueryOperation.maximumResults
@@ -184,7 +111,6 @@ public final class PersistentCloudKitContainer: ObservableObject {
     
     /// Cloudkit Datafetch Progress 계산을 위한 메서드
     private func fetchRecordsFromCloudKit() async {
-        guard let cloudKitDB else { return }
         let query = CKQuery(recordType: "CD_BibleDrawing", predicate: NSPredicate(value: true))
         let operation = CKQueryOperation(query: query)
         operation.resultsLimit = CKQueryOperation.maximumResults

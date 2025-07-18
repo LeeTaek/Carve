@@ -23,7 +23,8 @@ public extension InfoPlist {
             "UISupportedInterfaceOrientations": "UIInterfaceOrientationPortrait",
             "FeedbackAddress": "$(FEEDBACK_ADDRESS)",
             "UIBackgroundModes": ["remote-notification"],
-            "UIUserInterfaceStyle": "Light"
+            "UIUserInterfaceStyle": "Light",
+            "CLOUDKIT_CONTAINER_ID": "$(CLOUDKIT_CONTAINER_ID)"
           ]
         )
     }
