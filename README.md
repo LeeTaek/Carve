@@ -30,17 +30,17 @@
 
 ## 모듈 구조
 ![quick demo](graph.png)]
-- **Carve (앱 모듈)** 
+- **CarveApp (앱 진입 모듈)** 
      - 화면 모듈 전환: TCA Treebase Navigation으로 Featrue 간 의존성 없이 화면 전환
-- **Core** 
-    - 공통 로직: Log, Extension 등 
-- **Domain** 
-    - 비즈니스 로직: Model, SwiftData 등
-    - Dependency 객체를 정의
-- **FeatureCarve(필사 화면 모듈)**
-    - CarveView, DrawingView 등
-- **FeatureSettings(앱 설정 모듈)**
-    - SettingsView 등
-- **Resources(Feature 공통 리소스 모듈)** 
-
-
+- **CarveFeature (필사 기능 모듈)**
+    - 성경 본문 필사와 관련된 주요 화면(DrawingView, CarveView 등)을 포함합니다.
+    - SwiftData 및 CloudKit을 통해 데이터를 처리하고, UI와 상태를 TCA로 연결합니다.
+- **SettingsFeature (설정 기능 모듈)**
+    - 앱 정보, 기타 설정 기능을 담당하는 View 및 로직을 포함합니다.
+- **Domain (비즈니스 로직 모듈)**
+    - SwiftData 모델, CloudKit 마이그레이션, 저장소 구성 등 데이터 계층의 핵심 역할을 수행합니다.
+    - 각 Feature에서 사용하는 모델과 저장 로직을 이곳에서 정의하고 주입합니다.
+- **CarveToolkit (공통 지원 도구 모듈)**
+    - Logger, FeatureAction 등 여러 Feature에서 공유하는 보조 유틸리티 코드를 모아둔 모듈입니다.
+- **Resources (공통 리소스 모듈)**
+    - 색상, 폰트, 이미지 등 앱 전반에서 사용하는 디자인 리소스를 관리합니다.

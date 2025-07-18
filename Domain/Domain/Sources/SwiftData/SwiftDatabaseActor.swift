@@ -8,7 +8,7 @@
 
 import Foundation
 import SwiftData
-import Core
+import CarveToolkit
 
 import Dependencies
 

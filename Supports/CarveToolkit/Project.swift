@@ -2,18 +2,15 @@
 //  Project.swift
 //  CarveEnvironment
 //
-//  Created by 이택성 on 1/29/24.
+//  Created by 이택성 on 1/25/24.
 //
 
 import ProjectDescription
 import CarveEnvironment
 
-let projectName = "Domain"
+let projectName = "CarveToolkit"
 
 let dependencies: [TargetDependency] = [
-    .CarveToolkit,
-    
-    .Dependencies
 ]
 
 let script: [TargetScript] = [.swiftLint]
@@ -25,14 +22,12 @@ let settings: Settings = .settings(
     ]
 )
 
-
 let target: [Target] = [
-    .makeFrameworkTarget(projName: projectName, target: .debug, script: script, dependencies: dependencies, settings: settings),
-    .makeTestTarget(projName: projectName, target: .debug, script: script, dependencies: [.target(name: projectName)])
+    .makeFrameworkTarget(projName: projectName, target: .debug, script: script, dependencies: dependencies),
+    .makeTestTarget(projName: projectName, target: .debug, script: script)
 ]
 
 let project = Project.makeModule(
     name: projectName,
-    targets: target,
-    settings: settings
+    targets: target
 )

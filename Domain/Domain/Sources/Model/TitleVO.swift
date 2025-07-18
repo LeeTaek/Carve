@@ -102,7 +102,7 @@ public enum BibleTitle: String, CaseIterable, Identifiable, Codable, Sendable {
         if self != .revelation {
             return allCases[currentIndex + 1]
         } else {
-            return .revelation
+            return .genesis
         }
     }
 
@@ -113,7 +113,7 @@ public enum BibleTitle: String, CaseIterable, Identifiable, Codable, Sendable {
         if self != .genesis {
             return allCases[currentIndex - 1]
         } else {
-            return .genesis
+            return .revelation
         }
     }
 

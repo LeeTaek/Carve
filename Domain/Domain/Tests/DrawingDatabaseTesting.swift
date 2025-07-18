@@ -7,7 +7,7 @@
 //
 
 @testable import Domain
-import Core
+import CarveToolkit
 import Testing
 import SwiftData
 import PencilKit
@@ -120,10 +120,25 @@ final class DrawingDatabaseTesting {
     
     /// 임의 drawing 추가
     func makeMockDrawingWithStroke() -> Data {
-        let path = PKStrokePath(controlPoints: [.init(location: CGPoint(x: 0, y: 0), timeOffset: 0, size: .init(width: 5, height: 5), opacity: 1, force: 1, azimuth: 0, altitude: 0),
-                                                 .init(location: CGPoint(x: 100, y: 100), timeOffset: 1, size: .init(width: 5, height: 5), opacity: 1, force: 1, azimuth: 0, altitude: 0)],
-                                 creationDate: Date())
-
+        let path = PKStrokePath(
+            controlPoints: [
+                .init(location: CGPoint(x: 0, y: 0),
+                      timeOffset: 0,
+                      size: .init(width: 5, height: 5),
+                      opacity: 1,
+                      force: 1,
+                      azimuth: 0,
+                      altitude: 0),
+                .init(location: CGPoint(x: 100, y: 100),
+                      timeOffset: 1,
+                      size: .init(width: 5, height: 5),
+                      opacity: 1,
+                      force: 1,
+                      azimuth: 0,
+                      altitude: 0)
+            ],
+            creationDate: Date()
+        )
         let stroke = PKStroke(ink: PKInk(.pen, color: .black), path: path)
         return PKDrawing(strokes: [stroke]).dataRepresentation()
     }

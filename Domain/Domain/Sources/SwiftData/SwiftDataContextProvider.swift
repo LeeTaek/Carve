@@ -6,7 +6,7 @@
 //  Copyright © 2024 leetaek. All rights reserved.
 //
 
-import Core
+import CarveToolkit
 import CloudKit
 import CoreData
 import SwiftData
@@ -116,6 +116,7 @@ public final class PersistentCloudKitContainer: ObservableObject {
                 Task { @MainActor in
                     if self.isMigration {
                         self.syncState = .migration
+                        await self.fetchRecordsFromCloudKit()
                     } else {
                         self.syncState = .syncing
                     }

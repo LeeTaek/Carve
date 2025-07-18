@@ -46,7 +46,7 @@ public enum DrawingSchemaV2: VersionedSchema {
             self.creationDate = Date()
             self.updateDate = updateDate
             self.id = {
-                if let timestamp = creationDate?.timeIntervalSince1970  {
+                if let timestamp = creationDate?.timeIntervalSince1970 {
                     return "\(bibleTitle.title.rawValue).\(bibleTitle.chapter).\(verse).\(Int(timestamp))"
                 } else {
                     return "\(bibleTitle.title.rawValue).\(bibleTitle.chapter).\(verse).\(Date().timeIntervalSince1970)"
