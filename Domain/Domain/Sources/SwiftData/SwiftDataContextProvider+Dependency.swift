@@ -14,33 +14,41 @@ import Dependencies
 
 extension CKDatabase: @retroactive DependencyKey {
     public static var liveValue: CKDatabase {
-        CKContainer(identifier: "iCloud.Carve.SwiftData.iCloud").privateCloudDatabase
+        @Dependency(\.containerId) var containerId
+        return CKContainer(identifier: containerId.id).privateCloudDatabase
     }
+}
+
+extension ContainerID: DependencyKey {
+    public static var liveValue: ContainerID = .initialState
+    public static var previewValue: ContainerID = .initialState
+    public static var testValue: ContainerID = .initialState
 }
 
 extension ModelContainer: @retroactive DependencyKey {
     public static var liveValue: ModelContainer {
+        @Dependency(\.containerId) var containerId
         do {
-            let url = URL.applicationSupportDirectory.appending(path: "Carve.sqlite")
+            let url = URL.applicationSupportDirectory.appending(path: containerId.localDBPath)
             let schema = Schema([
                 BibleDrawing.self
             ])
             let config = ModelConfiguration(
                 url: url,
-                cloudKitDatabase: .private("iCloud.Carve.SwiftData.iCloud")
+                cloudKitDatabase: .private(containerId.id)
             )
             return try ModelContainer(for: schema,
                                       migrationPlan: DrawingDataMigrationPlan.self,
                                       configurations: config)
         } catch {
             do {
-                let url = URL.applicationSupportDirectory.appending(path: "Carve.sqlite")
+                let url = URL.applicationSupportDirectory.appending(path: containerId.localDBPath)
                 let schema = Schema([
                     DrawingVO.self
                 ])
                 let config = ModelConfiguration(
                     url: url,
-                    cloudKitDatabase: .private("iCloud.Carve.SwiftData.iCloud")
+                    cloudKitDatabase: .private(containerId.id)
                 )
                 return try ModelContainer(for: schema,
                                           migrationPlan: MigrationPlanV1Only.self,
@@ -73,15 +81,32 @@ extension ModelContainer: @retroactive DependencyKey {
     
 }
 
+extension PersistentCloudKitContainer: DependencyKey {
+    public static var liveValue = PersistentCloudKitContainer()
+    public static var previewValue: PersistentCloudKitContainer = PersistentCloudKitContainer()
+    public static var testValue: PersistentCloudKitContainer = PersistentCloudKitContainer()
+}
+
+
 public extension DependencyValues {
-    var container: ModelContainer {
+    var containerId: ContainerID {
+        get { self[ContainerID.self] }
+        set { self[ContainerID.self] = newValue }
+    }
+    
+    var modelContainer: ModelContainer {
         get { self[ModelContainer.self] }
         set { self[ModelContainer.self] = newValue }
     }
     
-    var cloudkitDB: CKDatabase {
+    var cloudKitDatabase: CKDatabase {
         get { self[CKDatabase.self] }
         set { self[CKDatabase.self] = newValue }
+    }
+    
+    var clouodKitSyncManager: PersistentCloudKitContainer {
+        get { self[PersistentCloudKitContainer.self] }
+        set { self[PersistentCloudKitContainer.self] = newValue }
     }
 }
 

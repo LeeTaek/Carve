@@ -13,6 +13,17 @@ import SwiftData
 
 import Dependencies
 
+public class ContainerID {
+    public static var initialState = ContainerID(id: "")
+    public var id: String
+    public var localDBPath: String
+    
+    public init(id: String) {
+        self.id = id
+        self.localDBPath = id.contains("dev") ? "Carve.dev.sqlite" : "Carve.sqlite"
+    }
+}
+
 public final class PersistentCloudKitContainer: ObservableObject {
     @Published public var progress: Double = 0.0
     @Published public var syncState: CloudSyncState = .idle
@@ -24,17 +35,14 @@ public final class PersistentCloudKitContainer: ObservableObject {
         case migration
         case success
         case failed
-        case next
+        case nextScene
     }
     
-    @Dependency(\.container) public var container
-    @Dependency(\.cloudkitDB) var cloudKitDB
+    @Dependency(\.cloudKitDatabase) var cloudKitDB
     
-    public init() {
-        observeCloudKitSyncProgress()
-    }
+    public init() {}
 
-    private func observeCloudKitSyncProgress() {
+    public func observeCloudKitSyncProgress() {
         Task {
             do {
                 let cloudKitAccountStatus = try await CKContainer.default().accountStatus()
@@ -64,7 +72,7 @@ public final class PersistentCloudKitContainer: ObservableObject {
                                 }
                             } catch {
                                 Log.error("⏳ 동기화 시간이 초과됨. 다음 화면으로 진행")
-                                self.syncState = .next
+                                self.syncState = .nextScene
                             }
                         case .failure(let error):
                             Log.error("CloudKit 동기화 중 오류 발생", error.localizedDescription)
@@ -123,7 +131,7 @@ public final class PersistentCloudKitContainer: ObservableObject {
             operation.recordMatchedBlock = { _, _ in
                 Task { @MainActor in
                     fetchedCount += 1
-                    self.progress = Double(fetchedCount) / Double(totalRecords)
+                    self.progress = totalRecords > 0 ? Double(fetchedCount) / Double(totalRecords) : 1.0
                     if self.progress > 1.0 { self.progress = 1.0 }
                 }
             }
@@ -158,7 +166,7 @@ public final class PersistentCloudKitContainer: ObservableObject {
                     
                     if !isMigration {
                         await MainActor.run {
-                            self.syncState = .next
+                            self.syncState = .nextScene
                         }
                     }
                     return
@@ -168,7 +176,7 @@ public final class PersistentCloudKitContainer: ObservableObject {
                 if Date() > deadline {
                     Log.error("⏳ CloudKit sync timeout")
                     await MainActor.run {
-                        self.syncState = .next
+                        self.syncState = .nextScene
                     }
                     return
                 }
@@ -181,7 +189,7 @@ public final class PersistentCloudKitContainer: ObservableObject {
         Task {
             try await Task.sleep(nanoseconds: 1_500_000_000)
             await MainActor.run {
-                self.syncState = .next
+                self.syncState = .nextScene
             }
         }
     }

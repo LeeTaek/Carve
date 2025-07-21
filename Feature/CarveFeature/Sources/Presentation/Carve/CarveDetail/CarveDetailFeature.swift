@@ -70,7 +70,6 @@ public struct CarveDetailFeature {
                     do {
                         let storedDrawing = try await drawingContext.fetch(title: title)
                         await send(.inner(.setSentence(sentences, storedDrawing)))
-                        Log.debug("fetched Draiwng Count", storedDrawing.count)
                     } catch {
                         Log.error("fetch drawing error", error)
                         await send(.inner(.setSentence([], [])))

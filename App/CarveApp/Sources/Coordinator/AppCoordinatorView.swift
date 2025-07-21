@@ -21,6 +21,11 @@ public struct AppCoordinatorView: View {
     
     public var body: some View {
         switch store.path {
+        case .launchProgress:
+            if let store = store.scope(state: \.path?.launchProgress,
+                                       action: \.path.launchProgress) {
+                LaunchProgressView(store: store)
+            }
         case .carve:
             if let store = store.scope(state: \.path?.carve, action: \.path.carve) {
                 CarveNavigationView(store: store)
