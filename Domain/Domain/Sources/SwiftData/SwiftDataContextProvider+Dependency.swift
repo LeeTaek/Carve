@@ -36,7 +36,7 @@ extension ModelContainer: @retroactive DependencyKey {
         } catch {
             if let error = error as? SwiftDataError, error == .loadIssueModelContainer {
                 @Dependency(\.clouodKitSyncManager) var cloudkitContainer
-
+                cloudkitContainer.syncState = .migration
                 do {
                     let url = URL.applicationSupportDirectory.appending(path: containerId.localDBPath)
                     let schema = Schema([
