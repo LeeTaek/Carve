@@ -12,13 +12,6 @@ import SwiftData
 
 import Dependencies
 
-extension CKDatabase: @retroactive DependencyKey {
-    public static var liveValue: CKDatabase {
-        @Dependency(\.containerId) var containerId
-        return CKContainer(identifier: containerId.id).privateCloudDatabase
-    }
-}
-
 extension ContainerID: DependencyKey {
     public static var liveValue: ContainerID = .initialState
     public static var previewValue: ContainerID = .initialState
@@ -41,19 +34,27 @@ extension ModelContainer: @retroactive DependencyKey {
                                       migrationPlan: DrawingDataMigrationPlan.self,
                                       configurations: config)
         } catch {
-            do {
-                let url = URL.applicationSupportDirectory.appending(path: containerId.localDBPath)
-                let schema = Schema([
-                    DrawingVO.self
-                ])
-                let config = ModelConfiguration(
-                    url: url,
-                    cloudKitDatabase: .private(containerId.id)
-                )
-                return try ModelContainer(for: schema,
-                                          migrationPlan: MigrationPlanV1Only.self,
-                                          configurations: config)
-            } catch {
+            if let error = error as? SwiftDataError, error == .loadIssueModelContainer {
+                @Dependency(\.clouodKitSyncManager) var cloudkitContainer
+
+                do {
+                    let url = URL.applicationSupportDirectory.appending(path: containerId.localDBPath)
+                    let schema = Schema([
+                        DrawingVO.self
+                    ])
+                    let config = ModelConfiguration(
+                        url: url,
+                        cloudKitDatabase: .private(containerId.id)
+                    )
+                    cloudkitContainer.syncState = .migration
+                    return try ModelContainer(for: schema,
+                                              migrationPlan: MigrationPlanV1Only.self,
+                                              configurations: config)
+                    
+                } catch {
+                    fatalError("Failed to migration live ModelContainer: \(error.localizedDescription)")
+                }
+            } else {
                 fatalError("Failed to create live ModelContainer: \(error.localizedDescription)")
             }
         }
@@ -98,12 +99,8 @@ public extension DependencyValues {
         get { self[ModelContainer.self] }
         set { self[ModelContainer.self] = newValue }
     }
-    
-    var cloudKitDatabase: CKDatabase {
-        get { self[CKDatabase.self] }
-        set { self[CKDatabase.self] = newValue }
-    }
-    
+
+    /// CloudKit
     var clouodKitSyncManager: PersistentCloudKitContainer {
         get { self[PersistentCloudKitContainer.self] }
         set { self[PersistentCloudKitContainer.self] = newValue }

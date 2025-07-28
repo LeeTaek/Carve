@@ -17,7 +17,7 @@ public struct LaunchProgressFeature {
     @ObservableState
     public struct State {
         public var shouldShowMigrationAlert: Bool = false
-        public var syncProgress: Double = 0.0
+//        public var syncProgress: Double = 0.0
         public var syncState: PersistentCloudKitContainer.CloudSyncState = .idle
         public var isMigration: Bool = false
         
@@ -30,9 +30,7 @@ public struct LaunchProgressFeature {
     public enum Action: ViewAction {
         case view(View)
         case binding
-        case updateProgress(Double)
         case updateSyncState(PersistentCloudKitContainer.CloudSyncState)
-        case faliedSyncCloudkit
         case syncCompleted
 
         @CasePathable
@@ -45,44 +43,35 @@ public struct LaunchProgressFeature {
         Reduce { state, action in
             switch action {
             case .view(.onAppear):
-                cloudkitContainer.observeCloudKitSyncProgress()
                 return .run { send in
+                    await cloudkitContainer.observeCloudKitSyncProgress()
                     await send(.binding)
                 }
             case .binding:
-                
                 return .run { send in
-                    async let progressStream: Void = {
-                        for await progress in cloudkitContainer.$progress.values {
-                            Log.debug("progress", progress)
-                            await send(.updateProgress(progress))
-                        }
-                    }()
-                    async let syncStateStream: Void = {
-                        for await syncState in cloudkitContainer.$syncState.values {
-                            await send(.updateSyncState(syncState))
-                        }
-                    }()
-                    
-                    _ = await (progressStream, syncStateStream)
+                    for await syncState in cloudkitContainer.$syncState.values {
+                        await send(.updateSyncState(syncState))
+                    }
                 }
-            case .updateProgress(let progress):
-                state.syncProgress = progress
             case .updateSyncState(let syncState):
                 state.syncState = syncState
-                if syncState == .failed {
-                    return .send(.faliedSyncCloudkit)
-                }
-                if syncState == .success && state.isMigration {
+                switch syncState {
+                case .failed:
+                    return .run { send in
+                        try? await Task.sleep(nanoseconds: 1_500_000_000)
+                        await send(.syncCompleted)
+                    }
+                case .migrationCompleted:
                     return .send(.view(.setMigratioinAlert(true)))
-                }
-                if syncState == .nextScene {
-                    return .send(.syncCompleted)
+                case .syncCompleted:
+                    return .run { send in
+                        try? await Task.sleep(nanoseconds: 1_500_000_000)
+                        await send(.syncCompleted)
+                    }
+                default: break
                 }
             case .view(.setMigratioinAlert(let isShow)):
                 state.shouldShowMigrationAlert = isShow
-            case .faliedSyncCloudkit:
-                cloudkitContainer.handleSyncFailure()
             default: break
             }
             return .none

@@ -118,7 +118,6 @@ public struct DrawingDatabase: Sendable, Database {
         } catch {
             Log.error("failed to update drawing", error)
         }
-        Log.debug("update drawing", drawing)
     }
     
     public func updateDrawings(drawings: [BibleDrawing]) async throws {

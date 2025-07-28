@@ -32,10 +32,11 @@ struct LaunchProgressView: View {
                             x: geometry.size.width / 2,
                             y: (geometry.size.height) / 2 * 0.8
                         )
-                    ProgressView(value: store.syncProgress, total: 1.0)
-                        .progressViewStyle(.linear)
-                        .tint(.gray)
-                        .frame(width: 150)
+                    if !(store.syncState == .failed || store.syncState == .syncCompleted) {
+                        ProgressView()
+                            .tint(.gray)
+                            .frame(width: 150)
+                    }
                     cloudkitSyncStateMessage(state: store.syncState)
                     Spacer()
                 }
@@ -58,28 +59,27 @@ struct LaunchProgressView: View {
     func cloudkitSyncStateMessage(state: PersistentCloudKitContainer.CloudSyncState) -> some View {
         switch state {
         case .idle:
-            Text("초기화 중...")
-                .font(.subheadline)
-                .foregroundColor(.gray)
+            statusText("초기화 중...")
         case .syncing:
-            Text("데이터 동기화 중... \(Int(store.syncProgress * 100))%")
-                .font(.subheadline)
-                .foregroundColor(.gray)
+            statusText("데이터 동기화 중...")
         case .migration:
-            Text("데이터 마이그레이션 중...\n조금만 기다려주세요. \(Int(store.syncProgress * 100))%")
-                .font(.subheadline)
-                .foregroundColor(.gray)
-        case .success:
-            Text("데이터 동기화 완료")
-                .font(.subheadline)
-                .foregroundColor(.gray)
+            statusText("데이터 마이그레이션 중...\n조금만 기다려주세요.")
         case .failed:
             Text("❗️iCloud에서 데이터를 가져오는데 실패했습니다.\n네트워크를 확인해주세요.")
                 .font(.subheadline)
                 .foregroundColor(.red)
                 .multilineTextAlignment(.center)
-        case .nextScene:
-            EmptyView()
+        case .syncCompleted:
+            statusText("데이터 동기화 완료")
+        default: EmptyView()
         }
+    }
+
+    @ViewBuilder
+    private func statusText(_ message: String) -> some View {
+        Text(message)
+            .font(.subheadline)
+            .foregroundColor(.gray)
+            .multilineTextAlignment(.center)
     }
 }
