@@ -13,251 +13,94 @@ import SwiftData
 
 import Dependencies
 
-public final class PersistentCloudKitContainer: ObservableObject {
-    private enum ContainerType {
-        case live
-        case test
-        case preview
-    }
-    public static let shared = PersistentCloudKitContainer(type: .live)
-    public static let test = PersistentCloudKitContainer(type: .test)
-    public static let preview = PersistentCloudKitContainer(type: .preview)
-    public let container: ModelContainer
-    private var cloudKitDB: CKDatabase?
+public class ContainerID {
+    public static var initialState = ContainerID(id: "")
+    public var id: String
+    public var localDBPath: String
     
-    @Published public var progress: Double = 0.0
+    public init(id: String) {
+        self.id = id
+        self.localDBPath = id.contains("dev") ? "Carve.dev.sqlite" : "Carve.sqlite"
+    }
+}
+
+public final class PersistentCloudKitContainer: ObservableObject {
     @Published public var syncState: CloudSyncState = .idle
-    public var isMigration: Bool = false
+    private var currentTitle: TitleVO
+    private lazy var cloudKitDB: CKDatabase = {
+        @Dependency(\.containerId) var containerId
+        return CKContainer(identifier: containerId.id).privateCloudDatabase
+    }()
+    
+    @Dependency(\.drawingData) private var drawingDatabase
     
     public enum CloudSyncState {
         case idle
         case syncing
+        case syncCompleted
         case migration
-        case success
+        case migrationCompleted
         case failed
-        case next
     }
     
-    private init(type: ContainerType) {
-        switch type {
-        case .live:
-            self.cloudKitDB = CKContainer(identifier: "iCloud.Carve.SwiftData.iCloud").privateCloudDatabase
-            let path = "Carve.sqlite"
-            do {
-                let url = URL.applicationSupportDirectory.appending(path: path)
-                let schema = Schema([
-                    BibleDrawing.self
-                ])
-                let config = ModelConfiguration(
-                    url: url,
-                    cloudKitDatabase: .private("iCloud.Carve.SwiftData.iCloud")
-                )
-                self.container = try ModelContainer(for: schema,
-                                               migrationPlan: DrawingDataMigrationPlan.self,
-                                               configurations: config)
-                observeCloudKitSyncProgress()
-            } catch {
-                if let error = error as? SwiftDataError,
-                   error == .loadIssueModelContainer {
-                    Log.error("마이그레이션 실패, 초기 스키마로 초기화 시도: \(error)")
-                    
-                    do {
-                        let url = URL.applicationSupportDirectory.appending(path: path)
-                        let schema = Schema([
-                            DrawingVO.self
-                        ])
-                        let config = ModelConfiguration(
-                            url: url,
-                            cloudKitDatabase: .private("iCloud.Carve.SwiftData.iCloud")
-                        )
-                        self.container = try ModelContainer(for: schema,
-                                                            migrationPlan: MigrationPlanV1Only.self,
-                                                            configurations: config)
-                        observeCloudKitSyncProgress()
-                        isMigration = true
-                    } catch {
-                        fatalError("Failed to create SwiftData container: \(error.localizedDescription)")
-                    }
-                } else {
-                    fatalError("Failed to create SwiftData container: \(error.localizedDescription)")
-                }
-            }
-        case .preview:
-            do {
-                let config = ModelConfiguration(isStoredInMemoryOnly: true)
-                self.container = try ModelContainer(for: Schema([BibleDrawing.self]), configurations: config)
-            } catch {
-                fatalError("Failed to create SwiftData container on Preview")
-            }
-        case .test:
-            let path = "Carve.test.sqlite"
-            do {
-                let url = URL.applicationSupportDirectory.appending(path: path)
-                let schema = Schema([
-                    BibleDrawing.self
-                ])
-                let config = ModelConfiguration(url: url)
-                self.container = try ModelContainer(for: schema,
-                                               configurations: config)
-            } catch {
-                fatalError("Failed to create SwiftData container")
-            }
+    init() {
+        // 현재 장 Fetch
+        if let titleData = UserDefaults.standard.data(forKey: "title"),
+           let decodedTitle = try? JSONDecoder().decode(TitleVO.self, from: titleData) {
+            self.currentTitle = decodedTitle
+        } else {
+            self.currentTitle = .initialState
         }
     }
     
-    private func observeCloudKitSyncProgress() {
-        guard let cloudKitDB else { return }
-        Task {
-            do {
-                let cloudKitAccountStatus = try await CKContainer.default().accountStatus()
-                guard cloudKitAccountStatus == .available else {
-                    throw NSError(domain: "CloudKitError", code: 1)
-                }
-                Task { @MainActor in
-                    if self.isMigration {
-                        self.syncState = .migration
-                        await self.fetchRecordsFromCloudKit()
-                    } else {
-                        self.syncState = .syncing
-                    }
-                }
-                let operation = CKFetchDatabaseChangesOperation()
-                let deadLine: CGFloat = self.isMigration ? 120 : 20
-
-                operation.fetchDatabaseChangesResultBlock = { result in
-                    Task { @MainActor in
-                        switch result {
-                        case .success:
-                            Log.debug("CloudKit 동기화 완료")
-                            do {
-                                try await Task.withTimeout(seconds: deadLine) {
-                                    await self.fetchRecordsFromCloudKit()
-                                    await self.isSyncFromCloudKit()
-                                }
-                            } catch {
-                                Log.error("⏳ 동기화 시간이 초과됨. 다음 화면으로 진행")
-                                self.syncState = .next
-                            }
-                        case .failure(let error):
-                            Log.error("CloudKit 동기화 중 오류 발생", error.localizedDescription)
-                            throw NSError(domain: "CloudKitError", code: 1)
-                        }
-                    }
-                }
-                cloudKitDB.add(operation)
-            } catch {
-                Log.error("CloudKit 초기화 실패, 네트워크 or iCloud 계정 확인 필요", error.localizedDescription)
-                await MainActor.run {
-                    self.syncState = .failed
-                }
-            }
-        }
-    }
-    
-    /// CloudKit에 저장된 필사 데이터 수 반환
-    /// - Returns: 저장되어 있는 구절 수
-    private func getTotalRecordCountFromCloudKit() async -> Int {
-        guard let cloudKitDB else { return 0 }
-        let query = CKQuery(recordType: "CD_BibleDrawing", predicate: NSPredicate(value: true))
-        let operation = CKQueryOperation(query: query)
-        operation.resultsLimit = CKQueryOperation.maximumResults
-        
-        return await withCheckedContinuation { continuation in
-            var totalRecords = 0
-            var hasResumed = false
-            
-            operation.recordMatchedBlock = { _, result in
-                if case .success = result {
-                    totalRecords += 1
-                }
-            }
-            operation.queryResultBlock = { _ in
-                if !hasResumed {
-                    hasResumed = true
-                    continuation.resume(returning: totalRecords)
-                }
-            }
-            cloudKitDB.add(operation)
-        }
-    }
-    
-    
-    /// Cloudkit Datafetch Progress 계산을 위한 메서드
-    private func fetchRecordsFromCloudKit() async {
-        guard let cloudKitDB else { return }
-        let query = CKQuery(recordType: "CD_BibleDrawing", predicate: NSPredicate(value: true))
-        let operation = CKQueryOperation(query: query)
-        operation.resultsLimit = CKQueryOperation.maximumResults
-        
-        var fetchedCount = 0
-        
-        Task {
-            let totalRecords = await getTotalRecordCountFromCloudKit()
-            
-            operation.recordMatchedBlock = { _, _ in
-                Task { @MainActor in
-                    fetchedCount += 1
-                    self.progress = Double(fetchedCount) / Double(totalRecords)
-                    if self.progress > 1.0 { self.progress = 1.0 }
-                }
+    /// CloudKit 동기화 상태를 확인하고, 동기화 진행 상태에 따라 적절한 처리를 수행
+    public func observeCloudKitSyncProgress() async {
+        self.syncState = (syncState == .migration) ? .migration : .syncing
+        do {
+            // iCloud 계정상태 확인
+            let cloudKitAccountStatus = try await CKContainer.default().accountStatus()
+            guard cloudKitAccountStatus == .available else {
+                throw CloudkitError.accountError
             }
             
-            operation.queryResultBlock = { _ in
-                Log.debug("CloudKit에서 Drawing 데이터 업데이트",  "\(totalRecords)개")
-            }
-            
-            cloudKitDB.add(operation)
-        }
-    }
-    
-    
-    /// CloudKit DataFetch 완료 여부 notification 구독을 위한 메서드
-    private func isSyncFromCloudKit(timeout seconds: UInt64 = 20) async {
-        Log.debug("isSyncFromCloudKit")
-        let deadline = Date().addingTimeInterval(TimeInterval(seconds))
-        let cloudkitNotification = NotificationCenter.default.notifications(named: NSPersistentCloudKitContainer.eventChangedNotification)
-        
-        for await notification in cloudkitNotification {
-            if let cloudEvent = notification.userInfo?[NSPersistentCloudKitContainer.eventNotificationUserInfoKey]
-                as? NSPersistentCloudKitContainer.Event {
-                if let endDate = cloudEvent.endDate , cloudEvent.type == .import {      // CloudKit 이벤트가 끝난 후에 실행
-                    Log.debug("cloudKit import event ended at", endDate)
-                    
-                    await MainActor.run {
-                        self.syncState = .success
-                    }
-                    
-                    // 2초 대기후 다음 화면으로 넘어감
-                    try? await Task.sleep(nanoseconds: 2_000_000_000)
-                    
-                    if !isMigration {
-                        await MainActor.run {
-                            self.syncState = .next
-                        }
-                    }
-                    return
-                }
-                
-                // ❗️timeout check
-                if Date() > deadline {
-                    Log.error("⏳ CloudKit sync timeout")
-                    await MainActor.run {
-                        self.syncState = .next
-                    }
-                    return
-                }
-                
-            }
-        }
-    }
-    
-    public func handleSyncFailure() {
-        Task {
-            try await Task.sleep(nanoseconds: 1_500_000_000)
+            // cloudKit to local로 import 작업 수행
+            let deadline: Double = syncState == .migration ? 120 : 20
+            try await self.isSyncFromCloudKit(deadline: deadline)
+        } catch {
+            Log.error("CloudKit 초기화 실패, 네트워크 or iCloud 계정 확인 필요", error.localizedDescription)
             await MainActor.run {
-                self.syncState = .next
+                self.syncState = .failed
             }
         }
     }
     
+    
+    /// CloudKit sync 완료 여부 notification 구독을 위한 메서드
+    /// 지정 시간 내에  .import를 수신하면 동기화 완료 처리
+    private func isSyncFromCloudKit(deadline seconds: Double) async throws {
+        try await Task.withTimeout(seconds: seconds) {
+            let cloudkitNotification = NotificationCenter.default.notifications(named: NSPersistentCloudKitContainer.eventChangedNotification)
+            
+            for await notification in cloudkitNotification {
+                if let cloudEvent = notification.userInfo?[NSPersistentCloudKitContainer.eventNotificationUserInfoKey]
+                    as? NSPersistentCloudKitContainer.Event {
+                    Log.debug("cloudEvent", cloudEvent.debugDescription)
+                    if cloudEvent.endDate != nil , cloudEvent.type == .import {      // CloudKit 이벤트가 끝난 후에 실행
+                        await MainActor.run {
+                            self.syncState = (self.syncState == .migration) ? .migrationCompleted : .syncCompleted
+                        }
+                        return
+                    }
+                }
+            }
+            throw CloudkitError.timeout
+        }
+    }
+        
+    private enum CloudkitError: Error {
+        case initFail
+        case timeout
+        case syncingFail
+        case accountError
+    }
 }

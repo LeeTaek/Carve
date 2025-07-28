@@ -17,7 +17,7 @@ public struct AppCoordinatorFeature {
     @ObservableState
     public struct State {
         public static var initialState = Self()
-        @Presents public var path: Path.State? = .carve(.initialState)
+        @Presents public var path: Path.State? = .launchProgress(.initialState)
     }
     public enum Action {
         case path(PresentationAction<Path.Action>)
@@ -25,6 +25,7 @@ public struct AppCoordinatorFeature {
     
     @Reducer
     public enum Path {
+        case launchProgress(LaunchProgressFeature)
         case carve(CarveNavigationFeature)
         case settings(SettingsFeature)
     }
@@ -32,6 +33,8 @@ public struct AppCoordinatorFeature {
     public var body: some Reducer<State, Action> {
         Reduce { state, action in
             switch action {
+            case .path(.presented(.launchProgress(.syncCompleted))):
+                state.path = .carve(.initialState)
             case .path(.presented(.carve(.view(.moveToSetting)))):
                 state.path = .settings(.initialState)
             case .path(.presented(.settings(.view(.backToCarve)))):

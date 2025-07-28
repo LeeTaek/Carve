@@ -19,22 +19,19 @@ extension SharedKey {
 }
 
 public struct CodableAppStorageKey<Value: Codable>: SharedKey {
+    @Dependency(\.defaultAppStorage) var store
     private let key: String
-    private let store: UserDefaults
-    
+
     public var id: AnyHashable {
         AppStorageKeyID(key: key, store: store)
     }
     
     public init(_ key: String) {
-        @Dependency(\.defaultAppStorage) var store
         self.key = key
-        self.store = store
     }
     
     public func load(context: LoadContext<Value>,
                      continuation: LoadContinuation<Value>) {
-        Log.debug("SharedKey_Load", context.initialValue.debugDescription)
         var hasResumed = false // 중복 호출 방지 플래그
 
         if let storedData = store.data(forKey: key) {
