@@ -25,8 +25,19 @@ let settings: Settings = .settings(
             "ENABLE_USER_SCRIPT_SANDBOXING": "YES",
             "ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS": "YES",
             "FEEDBACK_ADDRESS": "retake_joy@naver.com",
-            "ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS": "YES"
+            "ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS": "YES",
+//            "CLOUDKIT_CONTAINER_ID": "iCloud.Carve.SwiftData.iCloud.dev"
+            "CLOUDKIT_CONTAINER_ID": "iCloud.Carve.SwiftData.iCloud"
+        ]),
+    configurations: [
+        .debug(name: "Debug", settings: [
+//            "CLOUDKIT_CONTAINER_ID": "iCloud.Carve.SwiftData.iCloud.dev"
+            "CLOUDKIT_CONTAINER_ID": "iCloud.Carve.SwiftData.iCloud"
+        ]),
+        .release(name: "Release", settings: [
+            "CLOUDKIT_CONTAINER_ID": "iCloud.Carve.SwiftData.iCloud"
         ])
+    ]
 )
 
 let targets: [Target] = [
