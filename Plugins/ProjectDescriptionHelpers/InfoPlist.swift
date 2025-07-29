@@ -17,13 +17,14 @@ public extension InfoPlist {
             "CFBundleName": "$(PRODUCT_NAME)",
             "CFBundleIdentifier": "$(PRODUCT_BUNDLE_IDENTIFIER)",
             "CFBundleVersion": "1",
-            "CFBundleShortVersionString": "1.0.7",
+            "CFBundleShortVersionString": "1.1.0",
             "CFBundleDisplayName": "새기다",
             "UILaunchStoryboardName": "LaunchScreen",
             "UISupportedInterfaceOrientations": "UIInterfaceOrientationPortrait",
             "FeedbackAddress": "$(FEEDBACK_ADDRESS)",
             "UIBackgroundModes": ["remote-notification"],
-            "UIUserInterfaceStyle": "Light"
+            "UIUserInterfaceStyle": "Light",
+            "CLOUDKIT_CONTAINER_ID": "$(CLOUDKIT_CONTAINER_ID)"
           ]
         )
     }

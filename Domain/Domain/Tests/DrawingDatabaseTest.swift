@@ -13,30 +13,20 @@ import SwiftData
 import Dependencies
 
 final class DrawingDatabaseTest: XCTestCase {
-    var actor: SwiftDatabaseActor!
-    var drawingDatabase: DrawingDatabase!
-
-    override func setUp() async throws {
-        @Dependency(\.createSwiftDataActor) var createActor
-        @Dependency(\.drawingData) var drawingContext
-        self.actor = try await createActor()
-        self.drawingDatabase = drawingContext
-    }
+    @Dependency(\.createSwiftDataActor) var actor
+    @Dependency(\.drawingData) var drawingContext
 
     override func tearDown() async throws {
-        self.actor.modelContainer.deleteAllData()
-//        try await self.actor.modelContext.delete(model: DrawingVO.self)
-        self.actor = nil
-        self.drawingDatabase = nil
+        try await self.actor.deleteAll(BibleDrawing.self)
     }
     
     func test_actor_insert() async throws {
         // given
-        let drawing = DrawingVO.init(bibleTitle: .initialState, section: 1)
+        let drawing = BibleDrawing.init(bibleTitle: .initialState, verse: 1)
         
         // when
         try await actor.insert(drawing)
-        let storedDrawing: DrawingVO? = try await actor.fetch().first
+        let storedDrawing: BibleDrawing? = try await actor.fetch().first
         
         // then
         XCTAssertEqual(drawing, storedDrawing)
@@ -45,12 +35,12 @@ final class DrawingDatabaseTest: XCTestCase {
     func test_fetch_drawing() async throws {
         // given
         let title = TitleVO.init(title: .genesis, chapter: 1)
-        let lastSection = 1
-        let drawing = DrawingVO(bibleTitle: title, section: lastSection)
+        let lastVerse = 1
+        let drawing = BibleDrawing(bibleTitle: title, verse: lastVerse)
         
         // when
-        try await drawingDatabase.setDrawing(title: title, to: lastSection)
-        let storedDrawings = try await drawingDatabase.fetch()
+        try await actor.insert(drawing)
+        let storedDrawings = try await drawingContext.fetch()
         
         // then
         XCTAssertEqual(drawing, storedDrawings)
@@ -59,13 +49,13 @@ final class DrawingDatabaseTest: XCTestCase {
     func test_fetech_drawings() async throws {
         // given
         let title = TitleVO.init(title: .genesis, chapter: 1)
-        let lastSection = 31
+        let lastVerse = 31
         
         // when
-        try await drawingDatabase.setDrawing(title: title, to: lastSection)        
-        let storedDrawings = try await drawingDatabase.fetch(title: title)
+        try await drawingContext.setDrawing(title: title, to: lastVerse)
+        let storedDrawings = try await drawingContext.fetch(title: title)
         
         // then
-        XCTAssertEqual(lastSection, storedDrawings.count)
+        XCTAssertEqual(lastVerse, storedDrawings.count)
     }
 }

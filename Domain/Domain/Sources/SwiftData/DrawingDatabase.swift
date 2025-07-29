@@ -6,69 +6,92 @@
 //  Copyright © 2024 leetaek. All rights reserved.
 //
 
-import Core
+import CarveToolkit
 import SwiftUI
 import SwiftData
 
 import Dependencies
 
 public struct DrawingDatabase: Sendable, Database {
-    public typealias Item = DrawingVO
+    public typealias Item = BibleDrawing
     @Dependency(\.createSwiftDataActor) public var actor
     
-    public func fetch() async throws -> DrawingVO {
-        if let storedDrawing: DrawingVO = try await actor.fetch().first {
+    /// 테스트를 위한 fetch
+    public func fetch() async throws -> BibleDrawing {
+        if let storedDrawing: BibleDrawing = try await actor.fetch().first {
             return storedDrawing
         } else {
-            try await actor.insert(DrawingVO.init(bibleTitle: .initialState, section: 1))
-            return DrawingVO.init(bibleTitle: .initialState, section: 1)
+            try await actor.insert(BibleDrawing.init(bibleTitle: .initialState, verse: 1))
+            return BibleDrawing.init(bibleTitle: .initialState, verse: 1)
         }
     }
     
-    public func fetch(title: TitleVO) async throws -> [DrawingVO] {
+    /// 한 장의 필사 데이터를 모두 불러옴
+    /// - Parameter title: 가져올 성경의 이름과 장
+    /// - Returns: 해당 장의 필사 데이터
+    public func fetch(title: TitleVO) async throws -> [BibleDrawing] {
         let titleName = title.title.rawValue
         let chapter = title.chapter
-        let predicate = #Predicate<DrawingVO> {
-            $0.titleName == titleName
-            && $0.titleChapter == chapter
+        let predicate = #Predicate<BibleDrawing> {
+            $0.titleName == titleName &&
+            $0.titleChapter == chapter
         }
         let descriptor = FetchDescriptor(predicate: predicate,
-                                         sortBy: [SortDescriptor(\.section)])
-        let storedDrawing: [DrawingVO] = try await actor.fetch(descriptor)
+                                         sortBy: [SortDescriptor(\.verse)])
+        let storedDrawing: [BibleDrawing] = try await actor.fetch(descriptor)
         return storedDrawing
     }
     
-    public func fetch(title: TitleVO, section: Int) async throws -> DrawingVO? {
-        let titleName = title.title.rawValue
-        let chapter = title.chapter
-        let predicate = #Predicate<DrawingVO> {
-            $0.titleName == titleName
-            && $0.titleChapter == chapter
-            && $0.section == section
+    /// 해당 아이디의 필사 데이터 불러옴
+    public func fetch(drawing: BibleDrawing) async throws -> BibleDrawing? {
+        let id = drawing.id
+        let predicate = #Predicate<BibleDrawing> {
+            $0.id == id
         }
         let descriptor = FetchDescriptor(predicate: predicate,
-                                         sortBy: [SortDescriptor(\.section)])
-        let storedDrawing: DrawingVO? = try await actor.fetch(descriptor).first
+                                         sortBy: [SortDescriptor(\.verse)])
+        let storedDrawing: BibleDrawing? = try await actor.fetch(descriptor).first
         return storedDrawing
     }
     
-    public func add(item: DrawingVO) async throws {
+    /// 해당 절의 필사 데이터 모두 가져오기
+    /// - Parameters:
+    ///   - title: 해상 성경의 이름과 장
+    ///   - section: 절
+    /// - Returns: 해당 절의 필사 데이터를 전부 반환
+    public func fetchDrawings(title: TitleVO, verse: Int) async throws -> [BibleDrawing]? {
+        let titleName = title.title.rawValue
+        let chapter = title.chapter
+        let predicate = #Predicate<BibleDrawing> {
+            $0.titleName == titleName
+            && $0.titleChapter == chapter
+            && $0.verse == verse
+        }
+        let descriptor = FetchDescriptor(predicate: predicate,
+                                         sortBy: [SortDescriptor(\.updateDate, order: .reverse)])
+        let storedDrawing: [BibleDrawing]? = try await actor.fetch(descriptor)
+        Log.debug("Drew Log Count:", storedDrawing?.count)
+        return storedDrawing
+    }
+    
+    
+    public func add(item: BibleDrawing) async throws {
         try await actor.insert(item)
     }
     
-    public func update(item: DrawingVO) async throws {
-        try await actor.update(item.id) { (oldValue: DrawingVO) async in
+    public func update(item: BibleDrawing) async throws {
+        try await actor.update(item.id) { (oldValue: BibleDrawing) async in
             oldValue.lineData = item.lineData
             oldValue.updateDate = item.updateDate
         }
     }
     
     public func setDrawing(title: TitleVO, to last: Int) async throws {
-        let drawings: [DrawingVO] = try await fetch(title: title)
+        let drawings: [BibleDrawing] = try await fetch(title: title)
         for drawing in drawings {
-            guard let section = drawing.section else { continue }
-            if section <= last {
-                let newDrawing = DrawingVO(bibleTitle: title, section: section)
+            guard let verse = drawing.verse else { continue }
+            if verse <= last {
+                let newDrawing = BibleDrawing(bibleTitle: title, verse: verse)
                 if drawing.lineData != nil {
                     newDrawing.lineData = drawing.lineData
                 }
@@ -77,17 +100,16 @@ public struct DrawingDatabase: Sendable, Database {
                 try await actor.delete(drawing)
             }
         }
-        for section in 1...last {
-            let drawing = DrawingVO(bibleTitle: title, section: section)
+        for verse in 1...last {
+            let drawing = BibleDrawing(bibleTitle: title, verse: verse)
             try await actor.insert(drawing)
         }
         
     }
     
-    public func updateDrawing(drawing: DrawingVO) async throws {
-        let title = TitleVO(title: BibleTitle(rawValue: drawing.titleName!)!, chapter: drawing.titleChapter!)
+    public func updateDrawing(drawing: BibleDrawing) async throws {
         do {
-            if (try await fetch(title: title, section: drawing.section!)) != nil {
+            if (try await fetch(drawing: drawing)) != nil {
                 try await update(item: drawing)
             } else {
                 try await actor.insert(drawing)
@@ -96,7 +118,12 @@ public struct DrawingDatabase: Sendable, Database {
         } catch {
             Log.error("failed to update drawing", error)
         }
-        Log.debug("update drawing", drawing)
+    }
+    
+    public func updateDrawings(drawings: [BibleDrawing]) async throws {
+        for drawing in drawings {
+            try await updateDrawing(drawing: drawing)
+        }
     }
     
 }

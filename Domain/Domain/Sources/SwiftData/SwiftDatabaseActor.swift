@@ -8,7 +8,7 @@
 
 import Foundation
 import SwiftData
-import Core
+import CarveToolkit
 
 import Dependencies
 
@@ -69,17 +69,17 @@ public actor SwiftDatabaseActor {
 
 extension SwiftDatabaseActor: DependencyKey {
     public static var liveValue: SwiftDatabaseActor = {
-        let container = PersistentCloudKitContainer.shared.container
+        @Dependency(\.modelContainer) var container
         return SwiftDatabaseActor(modelContainer: container)
     }()
     
     public static var testValue: SwiftDatabaseActor = {
-        let container = PersistentCloudKitContainer.test.container
+        @Dependency(\.modelContainer) var container
         return SwiftDatabaseActor(modelContainer: container)
     }()
     
     public static var previewValue: SwiftDatabaseActor = {
-        let container = PersistentCloudKitContainer.preview.container
+        @Dependency(\.modelContainer) var container
         return SwiftDatabaseActor(modelContainer: container)
     }()
 }
