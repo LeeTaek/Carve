@@ -22,7 +22,7 @@ public struct SentenceFeature {
         public var chapterTitle: String?
         public let verse: Int
         public let sentence: String
-        public var isredraw: Bool = false
+        public var underlineOffsets: [CGFloat] = []
         
         @Shared(.appStorage("sentenceSetting")) public var sentenceSetting: SentenceSetting = .initialState
        
@@ -41,23 +41,25 @@ public struct SentenceFeature {
 
     }
     
-    public enum Action: ViewAction {
-        case view(View)
-        
-        public enum View {
-            case isRedraw(Bool)
-            case redrawUnderline(CGRect)
-        }
+    public enum Action {
+        case setUnderlineOffsets(Text.LayoutKey.Value)
     }
     
     public var body: some Reducer<State, Action> {
         Reduce { state, action in
             switch action {
-            case .view(.isRedraw(let isDraw)):
-                state.isredraw = isDraw
-            default: break
+            case .setUnderlineOffsets(let textLayout):
+                let layoutLines = textLayout.map { $0.layout.compactMap { $0 } }.flatMap(\.self)
+                
+                let fontSize = state.sentenceSetting.fontSize
+                let uiFont = state.sentenceSetting.fontFamily.font(size: fontSize)
+                let decender = uiFont.descender.magnitude
+                
+                let lineOffests = layoutLines.map { $0.origin.y + decender }
+                
+                state.underlineOffsets = lineOffests
+                return .none
             }
-            return .none
         }
     }
 }

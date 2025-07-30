@@ -11,7 +11,6 @@ import SwiftUI
 
 import ComposableArchitecture
 
-@ViewAction(for: SentenceFeature.self)
 public struct SentenceView: View {
     @Bindable public var store: StoreOf<SentenceFeature>
 
@@ -21,20 +20,6 @@ public struct SentenceView: View {
     
     public var body: some View {
         sentenceDescription
-            .onAppear {
-                send(.isRedraw(true))
-            }
-            .background(alignment: .center) {
-                GeometryReader { proxy in
-                    Color.clear
-                        .onChange(of: store.isredraw) { _, _ in
-                            if store.isredraw {
-                                let proxySize = proxy.frame(in: .local)
-                                send(.redrawUnderline(proxySize))
-                            }
-                        }
-                }
-            }
     }
     
     private var chapterTitleView: some View {
@@ -55,16 +40,23 @@ public struct SentenceView: View {
     
     public var sentenceDescription: some View {
         let sentenceSetting = store.sentenceSetting
+        let lineSpacing = sentenceSetting.lineSpace - sentenceSetting.fontFamily.font(size: sentenceSetting.fontSize).lineHeight
+        let lineGapPadding = (sentenceSetting.lineSpace - sentenceSetting.fontFamily.font(size: sentenceSetting.fontSize).lineHeight) / 2
+        
         return HStack(alignment: .top) {
             verseNumberView(store.verse)
             
             Text(store.sentence)
                 .tracking(sentenceSetting.traking)
                 .font(Font(sentenceSetting.fontFamily.font(size: sentenceSetting.fontSize)))
-                .lineSpacing(sentenceSetting.lineSpace - sentenceSetting.fontFamily.font(size: sentenceSetting.fontSize).lineHeight)
+                .lineSpacing(lineSpacing)
                 .lineLimit(nil)
-                .padding(.vertical, 
-                         (sentenceSetting.lineSpace - sentenceSetting.fontFamily.font(size: sentenceSetting.fontSize).lineHeight) / 2)
+                .onPreferenceChange(Text.LayoutKey.self) { textLayout in
+                    store.send(.setUnderlineOffsets(textLayout))
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.vertical, lineGapPadding)
+        
         }
     }
 }

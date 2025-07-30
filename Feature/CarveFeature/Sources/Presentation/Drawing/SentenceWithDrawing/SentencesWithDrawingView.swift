@@ -40,6 +40,7 @@ public struct SentencesWithDrawingView: View {
                 .frame(width: UIScreen.main.bounds.width / 2,
                        alignment: .topTrailing)
             }
+            .padding(.vertical, 2)
         }
         .contextMenu {
             Button("이전 필사 내용 보기") {
@@ -61,27 +62,27 @@ public struct SentencesWithDrawingView: View {
     }
     
     private var underLineView: some View {
-        VStack(spacing: 0) {
-            ForEach(0..<store.underLineCount, id: \.self) { lineIndex in
-                Line()
-                    .stroke(style: StrokeStyle(lineWidth: 1, dash: [5]))
-                    .frame(height: store.underlineOffset[lineIndex]) // 밑줄 높이
+        let underlineOffsets = store.sentenceState.underlineOffsets
+        
+        return Canvas { context, size in
+            for y in underlineOffsets {
+                var path = Path()
+                path.move(to: CGPoint(x: 0, y: y))
+                path.addLine(to: CGPoint(x: size.width, y: y))
+                context.stroke(path, with: .color(.gray), style: StrokeStyle(lineWidth: 1, dash: [5]))
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(.horizontal, 20)
-    }
-    
-    private struct Line: Shape {
-        func path(in rect: CGRect) -> Path {
-            var path = Path()
-            path.move(to: CGPoint(x: 0, y: rect.maxY))
-            path.addLine(to: CGPoint(x: rect.width, y: rect.maxY))
-            return path
-        }
     }
     
 }
 
 #Preview {
+    @Previewable @State var store = Store(
+        initialState: .initialState) {
+            SentencesWithDrawingFeature()
+        }
+    SentencesWithDrawingView(store: store)
     
 }

@@ -24,8 +24,6 @@ public struct SentencesWithDrawingFeature {
         public var sentenceState: SentenceFeature.State
         public var canvasState: CanvasFeature.State
         public var drewHistoryState: SentenceDrewHistoryListFeature.State
-        public var underLineCount: Int = 1
-        public var underlineOffset: [CGFloat] = [.zero]
         public var isPresentDrewHistory: Bool = false
         
         public init(sentence: SentenceVO, drawing: BibleDrawing?) {
@@ -37,6 +35,10 @@ public struct SentencesWithDrawingFeature {
             self.canvasState = .init(sentence: sentence, drawing: drawing)
             self.drewHistoryState = .init(title: sentence.title, verse: sentence.verse)
         }
+        
+        public static var initialState = Self(sentence: SentenceVO.initialState,
+                                               drawing: BibleDrawing.init(
+                                                bibleTitle: TitleVO(title: .leviticus, chapter: 4), verse: 1))
     }
     
     public enum Action: ViewAction, CarveToolkit.ScopeAction {
@@ -47,7 +49,6 @@ public struct SentencesWithDrawingFeature {
         public enum View {
             case setBible
             case setHeight(height: CGFloat)
-            case calculateLineOffsets(CGRect)
             case presentDrewHistory(Bool)
         }
     }
@@ -76,15 +77,6 @@ public struct SentencesWithDrawingFeature {
         
         Reduce { state, action in
             switch action {
-            case .view(.calculateLineOffsets(let rect)):
-                let offsetY = calcurateLineOffsets(state: state.sentenceState,
-                                                   rect: rect)
-                state.underlineOffset = offsetY
-                state.underLineCount = offsetY.count
-            case .scope(.sentenceAction(.view(.redrawUnderline(let rect)))):
-                return .run { send in
-                    await send(.view(.calculateLineOffsets(rect)))
-                }
             case .view(.presentDrewHistory(let isPresent)):
                 state.isPresentDrewHistory = isPresent
             case .scope(.drewHistoryAction(.setPresentDrawing(let drawing))):
@@ -99,18 +91,4 @@ public struct SentencesWithDrawingFeature {
         }
     }
     
-    
-    private func calcurateLineOffsets(state: SentenceFeature.State,
-                                      rect: CGRect) -> [CGFloat] {
-        let frameHeight = rect.height
-        let lineCount = Int(frameHeight / state.sentenceSetting.lineSpace)
-        let fontHeight = state.sentenceSetting.fontFamily.font(size: state.sentenceSetting.fontSize).lineHeight
-        let paddingSpace = (state.sentenceSetting.lineSpace - fontHeight) / 2
-        var offsets: [CGFloat] = []
-        guard lineCount > 0 else { return offsets }
-        for _ in 1...lineCount {
-            offsets.append(paddingSpace + fontHeight)
-        }
-        return offsets
-    }
 }
