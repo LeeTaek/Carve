@@ -17,7 +17,6 @@ public struct LaunchProgressFeature {
     @ObservableState
     public struct State {
         public var shouldShowMigrationAlert: Bool = false
-//        public var syncProgress: Double = 0.0
         public var syncState: PersistentCloudKitContainer.CloudSyncState = .idle
         public var isMigration: Bool = false
         
