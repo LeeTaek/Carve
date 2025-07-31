@@ -99,7 +99,6 @@ public struct CarveNavigationView: View {
     private func detailView() -> some View {
         if store.columnVisibility != .detailOnly {
             Color(uiColor: .secondarySystemGroupedBackground)
-                .toolbar(.hidden)
                 .onTapGesture {
                     send(.closeNavigationBar)
                 }
