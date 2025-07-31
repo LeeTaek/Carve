@@ -13,9 +13,11 @@ import ComposableArchitecture
 @ViewAction(for: SentencesWithDrawingFeature.self)
 public struct SentencesWithDrawingView: View {
     @Bindable public var store: StoreOf<SentencesWithDrawingFeature>
+    @Binding private var halfWidth: CGFloat
     
-    public init(store: StoreOf<SentencesWithDrawingFeature>) {
+    public init(store: StoreOf<SentencesWithDrawingFeature>, halfWidth: Binding<CGFloat>) {
         self.store = store
+        self._halfWidth = halfWidth
     }
     
     public var body: some View {
@@ -28,17 +30,16 @@ public struct SentencesWithDrawingView: View {
                     store: self.store.scope(state: \.sentenceState,
                                             action: \.scope.sentenceAction)
                 )
-                Spacer()
+                .frame(width: halfWidth * 0.95, alignment: .leading)
+
                 ZStack {
                     underLineView
                     CanvasView(
                         store: self.store.scope(state: \.canvasState,
                                                 action: \.scope.canvasAction)
                     )
-                    .id(store.canvasState.drawing?.creationDate ?? Date())
                 }
-                .frame(width: UIScreen.main.bounds.width / 2,
-                       alignment: .topTrailing)
+                .frame(width: halfWidth, alignment: .topTrailing)
             }
             .padding(.vertical, 2)
         }
@@ -83,6 +84,7 @@ public struct SentencesWithDrawingView: View {
         initialState: .initialState) {
             SentencesWithDrawingFeature()
         }
-    SentencesWithDrawingView(store: store)
+    @Previewable @State var halfWidth = UIScreen().bounds.width / 2
     
+    SentencesWithDrawingView(store: store, halfWidth: $halfWidth)
 }

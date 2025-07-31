@@ -33,7 +33,9 @@ public struct SentenceView: View {
         let sentenceSetting = store.sentenceSetting
         return Text("\(sectionString)")
             .bold()
-            .padding(.vertical, 
+            .tracking(sentenceSetting.traking)
+            .font(Font(sentenceSetting.fontFamily.font(size: sentenceSetting.fontSize)))
+            .padding(.vertical,
                      (sentenceSetting.lineSpace - sentenceSetting.fontFamily.font(size: sentenceSetting.fontSize).lineHeight) / 2)
     }
     
