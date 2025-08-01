@@ -7,6 +7,7 @@
 //
 
 import CarveFeature
+import ChartFeature
 import SettingsFeature
 import SwiftUI
 
@@ -33,6 +34,10 @@ public struct AppCoordinatorView: View {
         case .settings:
             if let store = store.scope(state: \.path?.settings, action: \.path.settings) {
                 SettingsView(store: store)
+            }
+        case .chart:
+            if let store = store.scope(state: \.path?.chart, action: \.path.chart) {
+                DrawingChartView(store: store)
             }
         default:
             fatalError("Store init Failed")

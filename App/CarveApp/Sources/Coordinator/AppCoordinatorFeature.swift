@@ -9,6 +9,7 @@
 import SwiftUI
 import CarveFeature
 import SettingsFeature
+import ChartFeature
 
 import ComposableArchitecture
 
@@ -28,6 +29,7 @@ public struct AppCoordinatorFeature {
         case launchProgress(LaunchProgressFeature)
         case carve(CarveNavigationFeature)
         case settings(SettingsFeature)
+        case chart(DrawingChartFeature)
     }
     
     public var body: some Reducer<State, Action> {
@@ -39,6 +41,8 @@ public struct AppCoordinatorFeature {
                 state.path = .settings(.initialState)
             case .path(.presented(.settings(.view(.backToCarve)))):
                 state.path = .carve(.initialState)
+            case .path(.presented(.carve(.view(.moveToChart)))):
+                state.path = .chart(.initialState)
             default: break
             }
             return .none

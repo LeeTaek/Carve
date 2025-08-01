@@ -39,9 +39,10 @@ public struct CarveNavigationFeature {
         @CasePathable
         public enum View {
             case moveToSetting
+            case moveToChart
             case closeNavigationBar
             case detailNavigation(PresentationAction<DetailDestination.Action>)
-            case navigationToDrewLog
+//            case navigationToDrewLog
         }
     }
 
@@ -52,7 +53,6 @@ public struct CarveNavigationFeature {
     @Reducer
     public enum DetailDestination {
         case sentenceSettings(SentenceSettingsFeature)
-        case drewLog(DrewLogFeature)
     }
     
     public var body: some Reducer<State, Action> {
@@ -109,11 +109,10 @@ public struct CarveNavigationFeature {
                 }
             case .view(.moveToSetting):
                 Log.debug("move To settings")
+            case .view(.moveToChart):
+                Log.debug("move To Charts")
             case .view(.closeNavigationBar):
                 state.columnVisibility = .detailOnly
-            case .view(.navigationToDrewLog):
-                state.columnVisibility = .detailOnly
-                state.detailNavigation = .drewLog(.initialState)
             case .scope(.carveDetailAction(.scope(.headerAction(.view(.sentenceSettingsDidTapped))))):
                 state.detailNavigation = .sentenceSettings(.initialState)
             default: break

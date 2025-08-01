@@ -5,6 +5,7 @@ let projectName = "CarveApp"
 
 let dependencies: [TargetDependency] = [
     .CarveFeature,
+    .ChartFeature,
     .SettingsFeature,
     .FirebaseAnalytics,
     .FirebaseMessaging,

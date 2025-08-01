@@ -64,7 +64,7 @@ public struct CarveNavigationView: View {
             ToolbarItemGroup(placement: .bottomBar) {
                 HStack {
                     Button {
-                        send(.navigationToDrewLog)
+                        send(.moveToChart)
                     } label: {
                         Image(asset: CarveFeatureAsset.chart)
                             .resizable()
@@ -115,14 +115,6 @@ public struct CarveNavigationView: View {
                 )
             ) { store in
                 SentenceSettingsView(store: store)
-            }
-            .fullScreenCover(
-                item: $store.scope(
-                    state: \.detailNavigation?.drewLog,
-                    action: \.view.detailNavigation.drewLog)
-            ) { store in
-                DrewLogView(store: store)
-                    .toolbar(.visible, for: .navigationBar)
             }
         }
     }
