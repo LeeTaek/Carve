@@ -73,3 +73,10 @@ public struct SettingsView: View {
         }
     }
 }
+
+#Preview {
+    @Previewable @State var store = Store(initialState: .initialState) {
+        SettingsFeature()
+    }
+    SettingsView(store: store)
+}

@@ -64,11 +64,11 @@ public struct CarveDetailView: View {
                     id: \.state.id
                 ) { childStore in
                     SentencesWithDrawingView(store: childStore, halfWidth: $halfWidth)
-                        .fixedSize(horizontal: false, vertical: true)
                         .padding(.horizontal, 10)
                 }
             }
         }
+        .id("\(store.sentenceSetting)-\(halfWidth)")
     }
 
     private func debounce(delay: TimeInterval = 0.1,

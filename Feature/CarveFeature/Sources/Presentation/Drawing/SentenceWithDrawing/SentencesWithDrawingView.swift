@@ -26,22 +26,18 @@ public struct SentencesWithDrawingView: View {
             if store.sentenceState.chapterTitle != nil {
                 chapterTitleView
             }
-            HStack {
-                SentenceView(
-                    store: self.store.scope(state: \.sentenceState,
-                                            action: \.scope.sentenceAction)
-                )
-                .frame(width: halfWidth * 0.95, alignment: .leading)
-
-                ZStack {
-                    underLineView
-                    CanvasView(
-                        store: self.store.scope(state: \.canvasState,
-                                                action: \.scope.canvasAction)
-                    )
+            HStack(alignment: .top) {
+                if store.sentenceState.sentenceSetting.isLeftHanded {
+                    // 왼손잡이
+                    canvasView
+                    sentenceView
+                } else {
+                    // 오른손잡이
+                    sentenceView
+                    canvasView
                 }
-                .frame(width: halfWidth, alignment: .topTrailing)
             }
+            .animation(.easeInOut(duration: 0.3), value: store.sentenceState.sentenceSetting.isLeftHanded)
             .padding(.vertical, 2)
         }
         .touchIgnoringContextMenu(ignoringType: .pencil) {
@@ -55,6 +51,25 @@ public struct SentencesWithDrawingView: View {
                                         action: \.scope.drewHistoryAction)
             )
         }
+    }
+    
+    private var sentenceView: some View {
+        SentenceView(
+            store: self.store.scope(state: \.sentenceState,
+                                    action: \.scope.sentenceAction)
+        )
+        .frame(width: halfWidth * 0.95, alignment: .leading)
+    }
+    
+    private var canvasView: some View {
+        ZStack {
+            underLineView
+            CanvasView(
+                store: self.store.scope(state: \.canvasState,
+                                        action: \.scope.canvasAction)
+            )
+        }
+        .frame(width: halfWidth, alignment: .topTrailing)
     }
     
     private var chapterTitleView: some View {

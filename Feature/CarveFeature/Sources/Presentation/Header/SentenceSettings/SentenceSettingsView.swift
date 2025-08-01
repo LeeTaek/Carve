@@ -69,6 +69,29 @@ public struct SentenceSettingsView: View {
                 )
                 .padding(.vertical)
             }
+            Section(
+                header: Text("글자 간격: \(Int(store.setting.traking))").font(.headline).bold()
+            ) {
+                CustomSlider(
+                    value: $store.setting.traking,
+                    minValue: 1,
+                    maxValue: 10
+                )
+                .padding(.vertical)
+            }
+            Section(
+                header: Text("왼손 사용자 화면 구성")
+            ) {
+                Toggle("왼손 사용자용 화면", isOn: $store.setting.isLeftHanded)
+                    .tint(Color.teal)
+            }
         }
     }
+}
+
+#Preview {
+    @Previewable @State var store = Store(initialState: .initialState) {
+        SentenceSettingsFeature()
+    }
+    SentenceSettingsView(store: store)
 }

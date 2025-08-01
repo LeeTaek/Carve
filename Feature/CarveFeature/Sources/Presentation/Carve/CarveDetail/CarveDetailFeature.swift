@@ -24,6 +24,7 @@ public struct CarveDetailFeature {
         public static let initialState = State(
             headerState: .initialState
         )
+        @Shared(.appStorage("sentenceSetting")) public var sentenceSetting: SentenceSetting = .initialState
     }
     @Dependency(\.drawingData) var drawingContext
     @Dependency(\.undoManager) var undoManager
