@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import CarveToolkit
 
 import ComposableArchitecture
 
@@ -43,10 +44,10 @@ public struct SentencesWithDrawingView: View {
             }
             .padding(.vertical, 2)
         }
-        .contextMenu {
-            Button("이전 필사 내용 보기") {
-                send(.presentDrewHistory(true))
-            }
+        .touchIgnoringContextMenu(ignoringType: .pencil) {
+            UIMenu(children: [
+                UIAction(title: "이전 필사 내용 보기") {_ in send(.presentDrewHistory(true)) }
+            ])
         }
         .sheet(isPresented: $store.isPresentDrewHistory.sending(\.view.presentDrewHistory)) {
             SentenceDrewHistoryListView(
