@@ -69,17 +69,18 @@ public struct CarveNavigationView: View {
 //                    } label: {
 //                        Image(systemName: "book.pages")
 //                            .foregroundStyle(.black)
+//                            .frame(width: 30, height: 30)
 //                    }
-//                    .frame(width: 30, height: 30)
-//                    .padding(15)
+                    
                     Button {
                         send(.moveToSetting)
                     } label: {
-                        Image(systemName: "gear")
+                        Image(asset: CarveFeatureAsset.settings)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
                             .foregroundStyle(.black)
+                            .frame(width: 30, height: 30)
                     }
-                    .frame(width: 30, height: 30)
-                    .padding(.trailing, 15)
                 }
             }
         }
@@ -147,4 +148,12 @@ struct SidebarDisclosureGroupStyle: DisclosureGroupStyle {
             configuration.content
         }
     }
+}
+
+#Preview {
+    @Previewable @State var store = Store(initialState: .initialState) {
+        CarveNavigationFeature()
+    }
+    
+    CarveNavigationView(store: store)
 }
