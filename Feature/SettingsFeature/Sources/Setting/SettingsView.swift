@@ -69,7 +69,14 @@ public struct SettingsView: View {
                 AppVersionView(store: store)
             }
         default:
-            fatalError("Not Defined Settings View")
+            EmptyView()
         }
     }
+}
+
+#Preview {
+    @Previewable @State var store = Store(initialState: .initialState) {
+        SettingsFeature()
+    }
+    SettingsView(store: store)
 }

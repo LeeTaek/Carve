@@ -21,28 +21,12 @@ public struct SentenceSettingsFeature {
         @Shared(.appStorage("sentenceSetting")) public var setting: SentenceSetting = .initialState
         public static var initialState: Self = .init()
     }
-    public enum Action {
-        case setLineSpace(CGFloat)
-        case setFontSize(CGFloat)
-        case setTraking(CGFloat)
-        case setFontFamily(FontCase)
+    public enum Action: BindableAction {
         case sampleSentence(SentenceFeature.Action)
+        case binding(BindingAction<State>)
     }
     public var body: some Reducer<State, Action> {
-        Reduce { state, action in
-            switch action {
-            case .setLineSpace(let space):
-                state.$setting.withLock { $0.lineSpace = space }
-            case .setTraking(let tracking):
-                state.$setting.withLock { $0.traking = tracking }
-            case .setFontSize(let size):
-                state.$setting.withLock { $0.fontSize = size }
-            case .setFontFamily(let font):
-                state.$setting.withLock { $0.fontFamily = font }
-            default: break
-            }
-            return .none
-        }
+        BindingReducer()
     }
     
 }

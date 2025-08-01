@@ -323,3 +323,9 @@ public struct SendFeedbackView: View {
     
 }
  
+#Preview {
+    @Previewable @State var store = Store(initialState: .initialState) {
+        SendFeedbackFeature()
+    }
+    SendFeedbackView(store: store)
+}

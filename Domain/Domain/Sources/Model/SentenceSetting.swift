@@ -9,7 +9,7 @@
 import SwiftUI
 import Resources
 
-public struct SentenceSetting: Sendable, Codable, Equatable {
+public struct SentenceSetting: Sendable, Codable, Equatable, Hashable {
     public var lineSpace: CGFloat
     public var fontSize: CGFloat
     public var traking: CGFloat
@@ -17,6 +17,7 @@ public struct SentenceSetting: Sendable, Codable, Equatable {
     public var textHeight: CGFloat
     public var fontFamily: FontCase
     public var lineCount: Int
+    public var isLeftHanded: Bool = false
     
     public static let initialState = SentenceSetting(
         lineSpace: 30,

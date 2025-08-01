@@ -72,9 +72,7 @@ public struct CarveNavigationFeature {
                     guard let selectedChapter = newValue else { return .none }
                     state.$currentTitle.withLock { $0.chapter = selectedChapter }
                     state.columnVisibility = .detailOnly
-                    return .run { send in
-                        await send(.scope(.carveDetailAction(.view(.fetchSentence))))
-                    }
+                    return .none
                 }
             }
         Scope(state: \.carveDetailState,

@@ -18,6 +18,12 @@ extension View {
                                   animatableData: trigger.wrappedValue ? 1 : 0))
     }
     
+    public func touchIgnoringContextMenu(ignoringType: UITouch.TouchType,
+                                         _ menu: @escaping () -> UIMenu)
+    -> some View {
+        self.modifier(TouchIgnoringContextMenuModifier(ignoringType: ignoringType, menu: menu))
+    }
+    
 }
 
 struct ShakeEffect: GeometryEffect {
