@@ -80,7 +80,19 @@ extension SwiftDatabaseActor: DependencyKey {
     
     public static var previewValue: SwiftDatabaseActor = {
         @Dependency(\.modelContainer) var container
-        return SwiftDatabaseActor(modelContainer: container)
+        let actor = SwiftDatabaseActor(modelContainer: container)
+        
+        let sampleDrawing = [
+            BibleDrawing(bibleTitle: .initialState, section: 1, lineData: .mockDrawing),
+            BibleDrawing(bibleTitle: .initialState, section: 2, lineData: .mockDrawing),
+            BibleDrawing(bibleTitle: .initialState, section: 3)
+        ]
+        Task {
+            for drawing in sampleDrawing {
+                try? actor.insert(drawing)
+            }
+        }
+        return actor
     }()
 }
 

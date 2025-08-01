@@ -70,7 +70,25 @@ public struct DrawingDatabase: Sendable, Database {
         let descriptor = FetchDescriptor(predicate: predicate,
                                          sortBy: [SortDescriptor(\.updateDate, order: .reverse)])
         let storedDrawing: [BibleDrawing]? = try await actor.fetch(descriptor)
-        Log.debug("Drew Log Count:", storedDrawing?.count)
+        Log.debug("Drew Log Count:", storedDrawing?.count ?? 0)
+        return storedDrawing
+    }
+    
+    
+    public func fetchDrawings(date: Date) async throws -> [BibleDrawing]? {
+        let calendar = Calendar.current
+        let startOfDay = calendar.startOfDay(for: date)
+        let endOfDay = calendar.date(byAdding: DateComponents(day: 1, second: -1), to: startOfDay)!
+
+        let predicate = #Predicate<BibleDrawing> {
+            if let updateDate = $0.updateDate {
+                  return updateDate >= startOfDay && updateDate <= endOfDay
+              } else {
+                  return false
+              }
+        }
+        let descriptor = FetchDescriptor(predicate: predicate)
+        let storedDrawing: [BibleDrawing]? = try await actor.fetch(descriptor)
         return storedDrawing
     }
     
