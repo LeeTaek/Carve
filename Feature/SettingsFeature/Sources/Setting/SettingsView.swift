@@ -69,7 +69,7 @@ public struct SettingsView: View {
                 AppVersionView(store: store)
             }
         default:
-            fatalError("Not Defined Settings View")
+            EmptyView()
         }
     }
 }

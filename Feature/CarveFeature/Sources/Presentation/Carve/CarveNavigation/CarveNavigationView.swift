@@ -61,16 +61,17 @@ public struct CarveNavigationView: View {
         }
         .navigationTitle("성경")
         .toolbar {
-            ToolbarItem(placement: .bottomBar) {
+            ToolbarItemGroup(placement: .bottomBar) {
                 HStack {
-                    Spacer()
-//                    Button {
-//                        send(.navigationToDrewLog)
-//                    } label: {
-//                        Image(systemName: "book.pages")
-//                            .foregroundStyle(.black)
-//                            .frame(width: 30, height: 30)
-//                    }
+                    Button {
+                        send(.navigationToDrewLog)
+                    } label: {
+                        Image(asset: CarveFeatureAsset.chart)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .foregroundStyle(.black)
+                            .frame(width: 35, height: 35)
+                    }
                     
                     Button {
                         send(.moveToSetting)
@@ -79,9 +80,10 @@ public struct CarveNavigationView: View {
                             .resizable()
                             .aspectRatio(contentMode: .fit)
                             .foregroundStyle(.black)
-                            .frame(width: 30, height: 30)
+                            .frame(width: 25, height: 25)
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .trailing)
             }
         }
         .toolbar(removing: .sidebarToggle)
