@@ -34,6 +34,7 @@ let packageSettings = PackageSettings(
         "OrderedCollections": .framework,
         "CasePaths": .framework,
         "DependenciesMacros": .framework,
+        "CasePathsCore": .framework
     ] : [:] ,
     targetSettings: [
         "FBLPromises": .objc,

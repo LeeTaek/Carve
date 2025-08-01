@@ -24,6 +24,7 @@ public struct CarveDetailFeature {
         public static let initialState = State(
             headerState: .initialState
         )
+        @Shared(.appStorage("sentenceSetting")) public var sentenceSetting: SentenceSetting = .initialState
     }
     @Dependency(\.drawingData) var drawingContext
     @Dependency(\.undoManager) var undoManager
@@ -76,7 +77,6 @@ public struct CarveDetailFeature {
                     }
                 }
             case .inner(.setSentence(let sentences, let drawings)):
-                state.sentenceWithDrawingState.removeAll()
                 var sentenceState: IdentifiedArrayOf<SentencesWithDrawingFeature.State> = []
                 for sentence in sentences {
                     let candidates = drawings.filter { $0.verse == sentence.verse && $0.lineData?.containsPKStroke == true }

@@ -14,7 +14,7 @@ import ComposableArchitecture
 @ViewAction(for: HeaderFeature.self)
 public struct HeaderView: View {
     public var store: StoreOf<HeaderFeature>
-    private let iconSize: CGFloat = 30
+    private let iconSize: CGFloat = 40
     public  init(store: StoreOf<HeaderFeature>) {
         self.store = store
     }

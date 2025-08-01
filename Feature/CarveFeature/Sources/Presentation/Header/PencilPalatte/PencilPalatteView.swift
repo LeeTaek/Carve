@@ -14,7 +14,7 @@ import ComposableArchitecture
 @ViewAction(for: PencilPalatteFeature.self)
 public struct PencilPalatteView: View {
     @Bindable public var store: StoreOf<PencilPalatteFeature>
-    private let iconSize: CGFloat = 20
+    private let iconSize: CGFloat = 25
     public init(store: StoreOf<PencilPalatteFeature>) {
         self.store = store
     }

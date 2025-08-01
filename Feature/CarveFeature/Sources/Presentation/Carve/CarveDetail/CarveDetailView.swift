@@ -14,6 +14,7 @@ import ComposableArchitecture
 @ViewAction(for: CarveDetailFeature.self)
 public struct CarveDetailView: View {
     @Bindable public var store: StoreOf<CarveDetailFeature>
+    @State private(set) var halfWidth: CGFloat = 0
     
     public init(store: StoreOf<CarveDetailFeature>) {
         self.store = store
@@ -47,6 +48,11 @@ public struct CarveDetailView: View {
                 send(.fetchSentence)
             }
         }
+        .onGeometryChange(for: CGFloat.self) { proxy in
+            return proxy.size.width / 2
+        } action: { halfWidth in
+            self.halfWidth = halfWidth
+        }
     }
     
     private var contentView: some View {
@@ -57,12 +63,12 @@ public struct CarveDetailView: View {
                                 action: \.scope.sentenceWithDrawingAction),
                     id: \.state.id
                 ) { childStore in
-                    SentencesWithDrawingView(store: childStore)
-                        .fixedSize(horizontal: false, vertical: true)
+                    SentencesWithDrawingView(store: childStore, halfWidth: $halfWidth)
                         .padding(.horizontal, 10)
                 }
             }
         }
+        .id("\(store.sentenceSetting)-\(halfWidth)")
     }
 
     private func debounce(delay: TimeInterval = 0.1,

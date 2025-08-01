@@ -61,26 +61,29 @@ public struct CarveNavigationView: View {
         }
         .navigationTitle("성경")
         .toolbar {
-            ToolbarItem(placement: .bottomBar) {
+            ToolbarItemGroup(placement: .bottomBar) {
                 HStack {
-                    Spacer()
-//                    Button {
-//                        send(.navigationToDrewLog)
-//                    } label: {
-//                        Image(systemName: "book.pages")
-//                            .foregroundStyle(.black)
-//                    }
-//                    .frame(width: 30, height: 30)
-//                    .padding(15)
+                    Button {
+                        send(.navigationToDrewLog)
+                    } label: {
+                        Image(asset: CarveFeatureAsset.chart)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .foregroundStyle(.black)
+                            .frame(width: 35, height: 35)
+                    }
+                    
                     Button {
                         send(.moveToSetting)
                     } label: {
-                        Image(systemName: "gear")
+                        Image(asset: CarveFeatureAsset.settings)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
                             .foregroundStyle(.black)
+                            .frame(width: 25, height: 25)
                     }
-                    .frame(width: 30, height: 30)
-                    .padding(.trailing, 15)
                 }
+                .frame(maxWidth: .infinity, alignment: .trailing)
             }
         }
         .toolbar(removing: .sidebarToggle)
@@ -99,7 +102,6 @@ public struct CarveNavigationView: View {
     private func detailView() -> some View {
         if store.columnVisibility != .detailOnly {
             Color(uiColor: .secondarySystemGroupedBackground)
-                .toolbar(.hidden)
                 .onTapGesture {
                     send(.closeNavigationBar)
                 }
@@ -148,4 +150,12 @@ struct SidebarDisclosureGroupStyle: DisclosureGroupStyle {
             configuration.content
         }
     }
+}
+
+#Preview {
+    @Previewable @State var store = Store(initialState: .initialState) {
+        CarveNavigationFeature()
+    }
+    
+    CarveNavigationView(store: store)
 }

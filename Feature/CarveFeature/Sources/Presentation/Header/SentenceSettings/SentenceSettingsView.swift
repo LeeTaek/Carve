@@ -32,7 +32,7 @@ public struct SentenceSettingsView: View {
                 header: Text("폰트").font(.headline).bold()
             ) {
                 SegmentedPicker(
-                    selection: $store.setting.fontFamily.sending(\.setFontFamily),
+                    selection: $store.setting.fontFamily,
                     items: Domain.FontCase.allCases) { font in
                         Text(font.title)
                             .font(Font(font.font(size: 20)))
@@ -43,7 +43,7 @@ public struct SentenceSettingsView: View {
                 header: Text("폰트 크기: \(Int(store.setting.fontSize))").font(.headline).bold()
             ) {
                 CustomSlider(
-                    value: $store.setting.fontSize.sending(\.setFontSize),
+                    value: $store.setting.fontSize,
                     minValue: 15,
                     maxValue: 40
                 )
@@ -53,7 +53,7 @@ public struct SentenceSettingsView: View {
                 header: Text("줄 간격: \(Int(store.setting.lineSpace))").font(.headline).bold()
             ) {
                 CustomSlider(
-                    value: $store.setting.lineSpace.sending(\.setLineSpace),
+                    value: $store.setting.lineSpace,
                     minValue: 5,
                     maxValue: 70
                 )
@@ -63,12 +63,35 @@ public struct SentenceSettingsView: View {
                 header: Text("글자 간격: \(Int(store.setting.traking))").font(.headline).bold()
             ) {
                 CustomSlider(
-                    value: $store.setting.traking.sending(\.setTraking),
+                    value: $store.setting.traking,
                     minValue: 1,
                     maxValue: 10
                 )
                 .padding(.vertical)
             }
+            Section(
+                header: Text("글자 간격: \(Int(store.setting.traking))").font(.headline).bold()
+            ) {
+                CustomSlider(
+                    value: $store.setting.traking,
+                    minValue: 1,
+                    maxValue: 10
+                )
+                .padding(.vertical)
+            }
+            Section(
+                header: Text("왼손 사용자 화면 구성")
+            ) {
+                Toggle("왼손 사용자용 화면", isOn: $store.setting.isLeftHanded)
+                    .tint(Color.teal)
+            }
         }
     }
+}
+
+#Preview {
+    @Previewable @State var store = Store(initialState: .initialState) {
+        SentenceSettingsFeature()
+    }
+    SentenceSettingsView(store: store)
 }
