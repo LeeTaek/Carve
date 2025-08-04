@@ -43,8 +43,8 @@ public struct LaunchProgressFeature {
             switch action {
             case .view(.onAppear):
                 return .run { send in
-                    await cloudkitContainer.observeCloudKitSyncProgress()
                     await send(.binding)
+                    await cloudkitContainer.observeCloudKitSyncProgress()
                 }
             case .binding:
                 return .run { send in
