@@ -89,7 +89,7 @@ extension SwiftDatabaseActor: DependencyKey {
         ]
         Task {
             for drawing in sampleDrawing {
-                try? actor.insert(drawing)
+                try? await actor.insert(drawing)
             }
         }
         return actor
