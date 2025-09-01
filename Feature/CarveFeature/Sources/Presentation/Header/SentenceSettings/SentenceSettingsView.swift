@@ -8,6 +8,7 @@
 
 import Domain
 import SwiftUI
+import UIComponents
 
 import ComposableArchitecture
 

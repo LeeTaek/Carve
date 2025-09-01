@@ -12,6 +12,7 @@ let projectName = "ChartFeature"
 
 let dependencies: [TargetDependency] = [
     .Domain,
+    .UIComponents,
     .TCAArchitecture,
     .Resources
 ]

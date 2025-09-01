@@ -16,6 +16,7 @@ public extension TargetDependency {
     static let ChartFeature: Self = .project(target: "ChartFeature", path: .relativeToRoot("Feature/ChartFeature"))
     static let Domain: Self = .project(target: "Domain", path: .relativeToRoot("Domain/Domain"))
     static let CarveToolkit: Self = .project(target: "CarveToolkit", path: .relativeToRoot("Supports/CarveToolkit"))
+    static let UIComponents: Self = .project(target: "UIComponents", path: .relativeToRoot("Supports/UIComponents"))
     static let Resources: Self = .project(target: "Resources", path: .relativeToRoot("Shared/Resources"))
     
     /// 외부 라이브러리: Tuist + SPM
