@@ -26,11 +26,10 @@ public struct PencilPalatteFeature {
         @Shared(.appStorage("lineWidthSet")) public var lineWidths: [CGFloat] = [2.0, 4.0, 6.0]
         @Shared(.inMemory("canUndo")) public var canUndo: Bool = false
         @Shared(.inMemory("canRedo")) public var canRedo: Bool = false
-        public var palattePencilType: PKInkingTool.InkType
         public var popoverPoint: CGPoint = .zero
         @Presents var navigation: Destination.State?
                 
-        public static var initialState = State(palattePencilType: .pen)
+        public static var initialState = State()
     }
 
     @Dependency(\.undoManager) private var undoManager
@@ -104,7 +103,6 @@ public struct PencilPalatteFeature {
             case .setCanUndo:
                 state.$canUndo.withLock { $0 = undoManager.canUndo }
                 state.$canRedo.withLock { $0 = undoManager.canRedo }
-
             default: break
             }
             return .none

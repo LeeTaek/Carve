@@ -10,6 +10,7 @@ import CarveToolkit
 import Domain
 import Resources
 import SwiftUI
+import PencilKit
 
 import ComposableArchitecture
 
@@ -25,6 +26,7 @@ public struct CarveDetailFeature {
             headerState: .initialState
         )
         @Shared(.appStorage("sentenceSetting")) public var sentenceSetting: SentenceSetting = .initialState
+        var lastUsedPencil: PKInkingTool.InkType = .pencil
     }
     @Dependency(\.drawingData) var drawingContext
     @Dependency(\.undoManager) var undoManager
@@ -39,6 +41,8 @@ public struct CarveDetailFeature {
             case fetchSentence
             case headerAnimation(CGFloat, CGFloat)
             case setProxy(ScrollViewProxy)
+            case switchToEraser
+            case switchToPrevious
         }
     }
 
@@ -109,6 +113,22 @@ public struct CarveDetailFeature {
                     else { return }
                     try await drawingContext.updateDrawing(drawing: drawing)
                 }
+            case .view(.switchToEraser):
+                // monoline을 지우개로 사용
+                Log.debug("switch Eraser")
+                state.lastUsedPencil = state.headerState.palatteSetting.pencilConfig.pencilType
+                return .send(.scope(.headerAction(.palatteAction(.view(.setPencilType(.monoline))))))
+            case .view(.switchToPrevious):
+                Log.debug("switch previous")
+                // 지우개인 경우 기본 펜으로
+                return .send(.scope(.headerAction(.palatteAction(.view(.setPencilType(state.lastUsedPencil))))))
+                
+            case .scope(.headerAction(.palatteAction(.view(.setPencilType(let penType))))):
+                guard penType != .monoline,
+                      penType != state.lastUsedPencil
+                else { return .none }
+                
+                state.lastUsedPencil = penType
             default: break
             }
             return .none
