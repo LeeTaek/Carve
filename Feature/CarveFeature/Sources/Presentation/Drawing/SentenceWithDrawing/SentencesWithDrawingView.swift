@@ -16,6 +16,10 @@ public struct SentencesWithDrawingView: View {
     @Bindable public var store: StoreOf<SentencesWithDrawingFeature>
     @Binding private var halfWidth: CGFloat
     
+    private var topDrawingInset: CGFloat {
+        store.sentence.verse == 1 ? 25 : 0
+    }
+    
     public init(store: StoreOf<SentencesWithDrawingFeature>, halfWidth: Binding<CGFloat>) {
         self.store = store
         self._halfWidth = halfWidth
@@ -59,6 +63,7 @@ public struct SentencesWithDrawingView: View {
                                     action: \.scope.sentenceAction)
         )
         .frame(width: halfWidth * 0.95, alignment: .leading)
+        .padding(.top, topDrawingInset)
     }
     
     private var canvasView: some View {
@@ -84,8 +89,8 @@ public struct SentencesWithDrawingView: View {
         return Canvas { context, size in
             for y in underlineOffsets {
                 var path = Path()
-                path.move(to: CGPoint(x: 0, y: y))
-                path.addLine(to: CGPoint(x: size.width, y: y))
+                path.move(to: CGPoint(x: 0, y: y + topDrawingInset))
+                path.addLine(to: CGPoint(x: size.width, y: y + topDrawingInset))
                 context.stroke(path, with: .color(.gray), style: StrokeStyle(lineWidth: 1, dash: [5]))
             }
         }
