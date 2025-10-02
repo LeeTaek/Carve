@@ -29,7 +29,7 @@ public struct SentenceDrewHistoryListFeature {
             self.verse = verse
         }
     }
-    @Dependency(\.drawingData) var drawingContext
+    @Dependency(\.drawingRepository) var drawingContext
     
     public enum Action: ViewAction {
         case view(View)
@@ -49,7 +49,7 @@ public struct SentenceDrewHistoryListFeature {
                 let verse = state.verse
                 return .run { send in
                     do {
-                        guard let fetchedDrawings = try await drawingContext.fetchDrawings(title: title, verse: verse) else { return }
+                        let fetchedDrawings = try await drawingContext.fetchDrawings(title: title, verse: verse)
                         await send(.setDrawings(fetchedDrawings))
                     } catch {
                         Log.error("fetched Drawing Data error", error)
@@ -59,8 +59,8 @@ public struct SentenceDrewHistoryListFeature {
             case .setDrawings(let drawings):
                 state.drawings = drawings
             case .view(.selectDrawing(let drawing)):
-                state.drawings.forEach {
-                    $0.isPresent = ($0 == drawing)
+                for idx in state.drawings.indices {
+                    state.drawings[idx].isPresent = (state.drawings[idx] == drawing)
                 }
                 return .run { [drawings = state.drawings] send in
                     try await drawingContext.updateDrawings(drawings: drawings)

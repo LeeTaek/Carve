@@ -10,6 +10,7 @@ import CarveToolkit
 import PencilKit
 import SwiftUI
 import Combine
+import Domain
 
 import ComposableArchitecture
 
@@ -104,9 +105,9 @@ public struct CanvasView: UIViewRepresentable {
 #Preview {
     @Previewable @State var store = Store(initialState: .initialState,
                                           reducer: { CanvasFeature() },
-                                          withDependencies: {
-        $0.drawingData = .previewValue
-        $0.undoManager = .previewValue
+                                          withDependencies: { def in
+        def.drawingRepository = DrawingRepositoryKey.previewValue
+        def.undoManager = .previewValue
     })
     CanvasView(store: store)
 }

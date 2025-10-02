@@ -8,6 +8,6 @@
 
 import Foundation
 
-public enum Translation: String, Codable {
+public enum Translation: String, Codable, Sendable {
     case NKRV       // 개역개정
 }

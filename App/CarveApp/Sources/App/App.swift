@@ -5,7 +5,7 @@
 //  Created by 이택성 on 1/22/24.
 //
 
-import Domain
+import Data
 import SwiftData
 import SwiftUI
 
@@ -17,13 +17,10 @@ import FirebaseAnalytics
 struct CarveApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
     private var store: StoreOf<AppCoordinatorFeature>
-    var modelContainer: ModelContainer
+    @Dependency(\.modelContainer) var modelContainer: ModelContainer
     
     init() {
-        let containerID = Self.makeContainerID()
-        let modelContainer = Self.makeModelContainer(containerID: containerID)
-        self.modelContainer = modelContainer
-        self.store = Self.makeStore(containerID: containerID, modelContainer: modelContainer)
+        self.store = Self.makeStore()
     }
     
     var body: some Scene {
@@ -45,24 +42,8 @@ struct CarveApp: App {
 
 // MARK: - helpers
 extension CarveApp {
-    private static func makeContainerID() -> ContainerID {
-        let id = Bundle.main.object(forInfoDictionaryKey: "CLOUDKIT_CONTAINER_ID") as? String ?? ""
-        return ContainerID(id: id)
-    }
-
-    private static func makeModelContainer(containerID: ContainerID) -> ModelContainer {
-        withDependencies {
-            $0.containerId = containerID
-        } operation: {
-            DependencyValues._current.modelContainer
-        }
-    }
-
-    private static func makeStore(containerID: ContainerID, modelContainer: ModelContainer) -> StoreOf<AppCoordinatorFeature> {
-        withDependencies {
-            $0.containerId = containerID
-            $0.modelContainer = modelContainer
-        } operation: {
+    private static func makeStore() -> StoreOf<AppCoordinatorFeature> {
+        withDependencies(AppDependencies.configure()) {
             Store(initialState: .initialState) {
                 AppCoordinatorFeature()
             }

@@ -28,7 +28,7 @@ public struct CarveDetailFeature {
         @Shared(.appStorage("sentenceSetting")) public var sentenceSetting: SentenceSetting = .initialState
         var lastUsedPencil: PKInkingTool.InkType = .pencil
     }
-    @Dependency(\.drawingData) var drawingContext
+    @Dependency(\.drawingRepository) var drawingContext
     @Dependency(\.undoManager) var undoManager
     
     public enum Action: ViewAction, CarveToolkit.ScopeAction {

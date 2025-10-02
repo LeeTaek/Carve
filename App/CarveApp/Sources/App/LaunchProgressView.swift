@@ -8,7 +8,7 @@
 
 import SwiftUI
 import CarveToolkit
-import Domain
+import Data
 
 import ComposableArchitecture
 

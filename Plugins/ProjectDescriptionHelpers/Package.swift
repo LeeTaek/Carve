@@ -13,6 +13,7 @@ public extension TargetDependency {
     static let CarveApp: Self = .project(target: "App", path: .relativeToRoot("App/CarveApp"))
     static let CarveFeature: Self = .project(target: "CarveFeature", path: .relativeToRoot("Feature/CarveFeature"))
     static let SettingsFeature: Self = .project(target: "SettingsFeature", path: .relativeToRoot("Feature/SettingsFeature"))
+    static let Data: Self = .project(target: "Data", path: .relativeToRoot("Data/Data"))
     static let Domain: Self = .project(target: "Domain", path: .relativeToRoot("Domain/Domain"))
     static let CarveToolkit: Self = .project(target: "CarveToolkit", path: .relativeToRoot("Supports/CarveToolkit"))
     static let Resources: Self = .project(target: "Resources", path: .relativeToRoot("Shared/Resources"))

@@ -47,7 +47,7 @@ public struct CanvasFeature {
         Reduce { state, action in
             switch action {
             case .saveDrawing(let newDrawing):
-                if let drawing = state.drawing {
+                if var drawing = state.drawing {
                     drawing.lineData = newDrawing.dataRepresentation()
                     drawing.updateDate = Date.now
                 } else {

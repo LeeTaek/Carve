@@ -6,8 +6,10 @@
 //  Copyright © 2025 leetaek. All rights reserved.
 //
 
+import Domain
 import Foundation
 import SwiftData
+
 
 public enum DrawingSchemaV2: VersionedSchema {
     public static var versionIdentifier = Schema.Version(2, 0, 0)
@@ -61,7 +63,38 @@ public enum DrawingSchemaV2: VersionedSchema {
         ) {
             self.init(bibleTitle: bibleTitle, verse: section, lineData: lineData, updateDate: updateDate)
         }
+        
+        public convenience init(_ bible: Domain.BibleDrawing) {
+            self.init()
+            self.id = bible.id
+            self.titleName = bible.titleName
+            self.titleChapter = bible.titleChapter
+            self.verse = bible.verse
+            self.creationDate = bible.creationDate
+            self.updateDate = bible.updateDate
+            self.translation = bible.translation
+            self.drawingVersion = bible.drawingVersion
+            self.isPresent = bible.isPresent
+            self.lineData = bible.lineData
+        }
+        
+        func toDomain() -> Domain.BibleDrawing {
+            let domain = Domain.BibleDrawing(
+                id: self.id,
+                titleName: self.titleName,
+                titleChapter: self.titleChapter,
+                verse: self.verse,
+                lineData: self.lineData,
+                updateDate: self.updateDate,
+                translation: self.translation,
+                drawingVersion: self.drawingVersion,
+                isPresent: self.isPresent,
+                creationDate: self.creationDate
+            )
+            return domain
+        }
     }
 }
 
-public typealias BibleDrawing = DrawingSchemaV2.BibleDrawing
+// Data 모듈 안에서만 사용
+typealias BibleDrawing = DrawingSchemaV2.BibleDrawing

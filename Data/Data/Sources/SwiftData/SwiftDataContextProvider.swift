@@ -6,6 +6,7 @@
 //  Copyright © 2024 leetaek. All rights reserved.
 //
 
+import Domain
 import CarveToolkit
 import CloudKit
 import CoreData
@@ -32,7 +33,7 @@ public final class PersistentCloudKitContainer: ObservableObject {
         return CKContainer(identifier: containerId.id).privateCloudDatabase
     }()
     
-    @Dependency(\.drawingData) private var drawingDatabase
+    @Dependency(\.drawingRepository) private var drawingDatabase
     
     public enum CloudSyncState {
         case idle

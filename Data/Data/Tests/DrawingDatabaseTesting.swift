@@ -6,7 +6,8 @@
 //  Copyright © 2024 leetaek. All rights reserved.
 //
 
-@testable import Domain
+@testable import Data
+import Domain
 import CarveToolkit
 import Testing
 import SwiftData
@@ -28,7 +29,7 @@ final class DrawingDatabaseTesting {
     
     @Test func actorInsert() async throws {
         // given
-        let drawing = BibleDrawing.init(bibleTitle: .initialState, verse: 1)
+        let drawing = 애ㅡ먀ㅜ.BibleDrawing.init(bibleTitle: .initialState, verse: 1)
         // when
         try await actor.insert(drawing)
         let storedDrawing: BibleDrawing = try #require(await actor.fetch().first)

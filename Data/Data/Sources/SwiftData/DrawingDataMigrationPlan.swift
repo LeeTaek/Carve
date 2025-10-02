@@ -7,8 +7,10 @@
 //
 
 import Foundation
+import Domain
 import SwiftData
 import PencilKit
+
 
 enum MigrationPlanV1Only: SchemaMigrationPlan {
     static var schemas: [VersionedSchema.Type] {

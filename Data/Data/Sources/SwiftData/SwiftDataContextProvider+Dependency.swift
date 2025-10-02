@@ -35,7 +35,7 @@ extension ModelContainer: @retroactive DependencyKey {
                                       configurations: config)
         } catch {
             if let error = error as? SwiftDataError, error == .loadIssueModelContainer {
-                @Dependency(\.clouodKitSyncManager) var cloudkitContainer
+                @Dependency(\.cloudKitSyncManager) var cloudkitContainer
                 cloudkitContainer.syncState = .migration
                 
                 do {
@@ -102,7 +102,7 @@ public extension DependencyValues {
     }
 
     /// CloudKit
-    var clouodKitSyncManager: PersistentCloudKitContainer {
+    var cloudKitSyncManager: PersistentCloudKitContainer {
         get { self[PersistentCloudKitContainer.self] }
         set { self[PersistentCloudKitContainer.self] = newValue }
     }

@@ -4,6 +4,7 @@ import CarveEnvironment
 let projectName = "CarveApp"
 
 let dependencies: [TargetDependency] = [
+    .Data,
     .CarveFeature,
     .SettingsFeature,
     .FirebaseAnalytics,

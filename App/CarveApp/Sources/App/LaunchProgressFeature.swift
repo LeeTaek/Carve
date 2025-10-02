@@ -7,7 +7,7 @@
 //
 
 import Foundation
-import Domain
+import Data
 import CarveToolkit
 
 import ComposableArchitecture
@@ -23,7 +23,7 @@ public struct LaunchProgressFeature {
         public static let initialState = State()
     }
     
-    @Dependency(\.clouodKitSyncManager) var cloudkitContainer
+    @Dependency(\.cloudKitSyncManager) var cloudkitContainer
     
     
     public enum Action: ViewAction {
