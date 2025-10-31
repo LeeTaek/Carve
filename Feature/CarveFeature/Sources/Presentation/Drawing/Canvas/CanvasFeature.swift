@@ -24,6 +24,7 @@ public struct CanvasFeature {
         @Shared(.appStorage("pencilConfig")) public var pencilConfig: PencilPalatte = .initialState
         @Shared(.inMemory("canUndo")) public var canUndo: Bool = false
         @Shared(.inMemory("canRedo")) public var canRedo: Bool = false
+        @Shared(.appStorage("allowFingerDrawing")) public var allowFingerDrawing: Bool = false
         public init(sentence: SentenceVO, drawing: BibleDrawing?) {
             self.id = "drawingData.\(sentence.sentenceScript)"
             self.drawing = drawing

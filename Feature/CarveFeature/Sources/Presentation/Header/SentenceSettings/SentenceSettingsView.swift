@@ -80,9 +80,11 @@ public struct SentenceSettingsView: View {
                 .padding(.vertical)
             }
             Section(
-                header: Text("왼손 사용자 화면 구성")
+                header: Text("화면 구성 및 필기 설정")
             ) {
-                Toggle("왼손 사용자용 화면", isOn: $store.setting.isLeftHanded)
+                Toggle("왼손 사용자용 화면", isOn: $store.isLeftHanded)
+                    .tint(Color.teal)
+                Toggle("손가락 필사 허용", isOn: $store.allowFingerDrawing)
                     .tint(Color.teal)
             }
         }

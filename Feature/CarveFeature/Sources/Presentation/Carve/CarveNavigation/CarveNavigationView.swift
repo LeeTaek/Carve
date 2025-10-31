@@ -27,8 +27,10 @@ public struct CarveNavigationView: View {
     public var body: some View {
         NavigationSplitView(columnVisibility: $store.columnVisibility) {
             sideBar
+                .navigationSplitViewColumnWidth(min: 200, ideal: 300, max: 350)
         } content: {
             contentList
+                .navigationSplitViewColumnWidth(min: 150, ideal: 300, max: 350)
         } detail: {
             detailView()
         }

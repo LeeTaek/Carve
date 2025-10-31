@@ -31,7 +31,7 @@ public struct SentencesWithDrawingView: View {
                 chapterTitleView
             }
             HStack(alignment: .top) {
-                if store.sentenceState.sentenceSetting.isLeftHanded {
+                if store.isLeftHanded {
                     // 왼손잡이
                     canvasView
                     sentenceView
@@ -41,7 +41,7 @@ public struct SentencesWithDrawingView: View {
                     canvasView
                 }
             }
-            .animation(.easeInOut(duration: 0.3), value: store.sentenceState.sentenceSetting.isLeftHanded)
+            .animation(.easeInOut(duration: 0.3), value: store.isLeftHanded)
             .padding(.vertical, 2)
         }
         .touchIgnoringContextMenu(ignoringType: .pencil) {
