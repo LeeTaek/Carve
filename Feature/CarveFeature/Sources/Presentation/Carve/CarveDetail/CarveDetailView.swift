@@ -21,12 +21,35 @@ public struct CarveDetailView: View {
     }
     
     public var body: some View {
+        if #available(iOS 17.5, *) {
+            applyPencilDoubleTapView()
+                .overlay(alignment: .top) {
+                    HeaderView(store: store.scope(state: \.headerState,
+                                                  action: \.scope.headerAction))
+                }
+                .toolbar(.hidden, for: .navigationBar)
+        } else {
+            detailScroll
+                .overlay(alignment: .top) {
+                    HeaderView(store: store.scope(state: \.headerState,
+                                                  action: \.scope.headerAction))
+                }
+                .toolbar(.hidden, for: .navigationBar)
+        }
+    }
+    
+    
+    @available(iOS 17.5, *)
+    private func applyPencilDoubleTapView() -> some View {
         detailScroll
-            .overlay(alignment: .top) {
-                HeaderView(store: store.scope(state: \.headerState,
-                                              action: \.scope.headerAction))
+            .onPencilDoubleTap { _ in
+                let isEraser = (store.headerState.palatteSetting.pencilConfig.pencilType == .monoline)
+                if isEraser {
+                    send(.switchToPrevious)
+                } else {
+                    send(.switchToEraser)
+                }
             }
-            .toolbar(.hidden, for: .navigationBar)
     }
     
     private var detailScroll: some View {

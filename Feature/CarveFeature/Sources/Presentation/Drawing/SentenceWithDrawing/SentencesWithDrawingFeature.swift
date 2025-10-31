@@ -25,7 +25,8 @@ public struct SentencesWithDrawingFeature {
         public var canvasState: CanvasFeature.State
         public var drewHistoryState: SentenceDrewHistoryListFeature.State
         public var isPresentDrewHistory: Bool = false
-        
+        @Shared(.appStorage("isLeftHanded")) public var isLeftHanded: Bool = false
+
         public init(sentence: SentenceVO, drawing: BibleDrawing?) {
             self.id = "\(sentence.title.title.koreanTitle()).\(sentence.title.chapter).\(sentence.verse)"
             self.sentence = sentence
