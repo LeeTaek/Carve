@@ -84,6 +84,12 @@ public struct CanvasView: UIViewRepresentable {
                     canvas.tool = tool
                 }
                 .store(in: &cancaellable)
+            
+            store.$allowFingerDrawing.publisher
+                .sink { allow in
+                    canvas.drawingPolicy = allow ? .anyInput : .pencilOnly
+                }
+                .store(in: &cancaellable)
         }
     }
     
