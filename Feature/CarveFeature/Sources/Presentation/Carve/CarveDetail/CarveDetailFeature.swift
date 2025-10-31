@@ -26,6 +26,7 @@ public struct CarveDetailFeature {
             headerState: .initialState
         )
         @Shared(.appStorage("sentenceSetting")) public var sentenceSetting: SentenceSetting = .initialState
+        @Shared(.appStorage("isLeftHanded")) public var isLeftHanded: Bool = false
         var lastUsedPencil: PKInkingTool.InkType = .pencil
     }
     @Dependency(\.drawingData) var drawingContext

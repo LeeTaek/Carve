@@ -27,12 +27,14 @@ public struct CarveNavigationView: View {
     public var body: some View {
         NavigationSplitView(columnVisibility: $store.columnVisibility) {
             sideBar
+                .navigationSplitViewColumnWidth(min: 200, ideal: 300, max: 350)
         } content: {
             contentList
+                .navigationSplitViewColumnWidth(min: 150, ideal: 300, max: 350)
         } detail: {
             detailView()
         }
-        .navigationSplitViewStyle(.automatic)
+        .navigationSplitViewStyle(.prominentDetail)
     }
     
     private var sideBar: some View {
@@ -63,15 +65,20 @@ public struct CarveNavigationView: View {
         .toolbar {
             ToolbarItemGroup(placement: .bottomBar) {
                 HStack {
-                    Button {
-                        send(.navigationToDrewLog)
-                    } label: {
-                        Image(asset: CarveFeatureAsset.chart)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .foregroundStyle(.black)
-                            .frame(width: 35, height: 35)
-                    }
+//                    Button {
+//                        send(.navigationToDrewLog)
+//                    } label: {
+//                        Image(asset: CarveFeatureAsset.chart)
+//                            .resizable()
+//                            .aspectRatio(contentMode: .fit)
+//                            .foregroundStyle(.black)
+//                            .frame(width: 35, height: 35)
+//                    }
+                    
+//                    if #available(iOS 26.0, *) {
+//                        ToolbarSpacer(.fixed)
+//                    }
+                    
                     
                     Button {
                         send(.moveToSetting)
@@ -86,7 +93,6 @@ public struct CarveNavigationView: View {
                 .frame(maxWidth: .infinity, alignment: .trailing)
             }
         }
-        .toolbar(removing: .sidebarToggle)
     }
     
     private var contentList: some View {

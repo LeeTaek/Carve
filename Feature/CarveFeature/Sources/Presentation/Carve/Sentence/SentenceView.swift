@@ -54,7 +54,10 @@ public struct SentenceView: View {
                 .lineSpacing(lineSpacing)
                 .lineLimit(nil)
                 .onPreferenceChange(Text.LayoutKey.self) { textLayout in
-                    store.send(.setUnderlineOffsets(textLayout))
+                    Task { @MainActor [weak store] in
+                        guard let store else { return }
+                        store.send(.setUnderlineOffsets(textLayout))
+                    }
                 }
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.vertical, lineGapPadding)

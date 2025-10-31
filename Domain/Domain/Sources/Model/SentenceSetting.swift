@@ -17,7 +17,6 @@ public struct SentenceSetting: Sendable, Codable, Equatable, Hashable {
     public var textHeight: CGFloat
     public var fontFamily: FontCase
     public var lineCount: Int
-    public var isLeftHanded: Bool = false
     
     public static let initialState = SentenceSetting(
         lineSpace: 30,

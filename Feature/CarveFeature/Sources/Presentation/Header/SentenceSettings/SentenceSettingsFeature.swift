@@ -19,6 +19,9 @@ public struct SentenceSettingsFeature {
                                                                  verse: 16,
                                                                  sentence: "하나님이 세상을 이처럼 사랑하사 독생자를 주셨으니 이는 저를 믿는 자마다 멸망치 않고 영생을 얻게 하려 하심이니라")
         @Shared(.appStorage("sentenceSetting")) public var setting: SentenceSetting = .initialState
+        @Shared(.appStorage("allowFingerDrawing")) public var allowFingerDrawing: Bool = false
+        @Shared(.appStorage("isLeftHanded")) public var isLeftHanded: Bool = false
+        
         public static var initialState: Self = .init()
     }
     public enum Action: BindableAction {
