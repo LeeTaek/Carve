@@ -55,20 +55,26 @@ public struct CarveDetailView: View {
     private var detailScroll: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                contentView
-                    .padding(.top, store.headerState.headerHeight)
-                    .offsetY { previous, current in
-                        debounce {
-                            send(.headerAnimation(previous, current))
+                ZStack {
+                    contentView
+                        .padding(.top, store.headerState.headerHeight)
+                        .offsetY { previous, current in
+                            debounce {
+                                send(.headerAnimation(previous, current))
+                            }
                         }
-                    }
-                    .onChange(of: store.sentenceWithDrawingState) {
-                        send(.setProxy(proxy))
-                    }
-            }
-            .coordinateSpace(name: "Scroll")
-            .onAppear {
-                send(.fetchSentence)
+                        .onChange(of: store.sentenceWithDrawingState) {
+                            send(.setProxy(proxy))
+                        }
+                    
+                    CombinedCanvasView(sentenceStates: Array(store.sentenceWithDrawingState))
+                        .id(store.sentenceWithDrawingState.map(\.verseFrame.debugDescription).joined())
+                        .allowsHitTesting(false) // 일단 보기용
+                }
+                .coordinateSpace(name: "Scroll")
+                .onAppear {
+                    send(.fetchSentence)
+                }
             }
         }
         .onGeometryChange(for: CGFloat.self) { proxy in
@@ -93,7 +99,7 @@ public struct CarveDetailView: View {
         }
         .id("\(store.sentenceSetting)-\(halfWidth)")
     }
-
+    
     private func debounce(delay: TimeInterval = 0.1,
                           _ action: @escaping () -> Void) {
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: action)
@@ -106,7 +112,7 @@ public struct CarveDetailView: View {
         initialState: .initialState,
         reducer: {
             CarveDetailFeature()
-        }   
+        }
     )
     CarveDetailView(store: store)
 }

@@ -33,12 +33,12 @@ public struct SentencesWithDrawingView: View {
             HStack(alignment: .top) {
                 if store.isLeftHanded {
                     // 왼손잡이
-                    canvasView
+                    underLineView
                     sentenceView
                 } else {
                     // 오른손잡이
                     sentenceView
-                    canvasView
+                    underLineView
                 }
             }
             .animation(.easeInOut(duration: 0.3), value: store.isLeftHanded)
@@ -66,17 +66,6 @@ public struct SentencesWithDrawingView: View {
         .padding(.top, topDrawingInset)
     }
     
-    private var canvasView: some View {
-        ZStack {
-            underLineView
-            CanvasView(
-                store: self.store.scope(state: \.canvasState,
-                                        action: \.scope.canvasAction)
-            )
-        }
-        .frame(width: halfWidth, alignment: .topTrailing)
-    }
-    
     private var chapterTitleView: some View {
         Text(store.sentenceState.chapterTitle ?? "")
             .font(.system(size: 22))
@@ -94,8 +83,26 @@ public struct SentencesWithDrawingView: View {
                 context.stroke(path, with: .color(.gray), style: StrokeStyle(lineWidth: 1, dash: [5]))
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(.horizontal, 20)
+        .frame(width: halfWidth, alignment: .topTrailing)
+        .background(
+            GeometryReader { proxy in
+                Color.clear
+                    .onAppear {
+                        // 레이아웃 패스 이후에 측정하여 .zero 방지
+                        DispatchQueue.main.async {
+                            // 이미 저장된 frame이 있으면 무시
+                            if store.verseFrame.width > 0 && store.verseFrame.height > 0 {
+                                return
+                            }
+                            
+                            let rect = proxy.frame(in: .named("Scroll"))
+                            guard rect.width > 0, rect.height > 0 else { return }
+                            send(.updateVerseFrame(rect))
+                        }
+                    }
+            }
+        )
     }
     
 }

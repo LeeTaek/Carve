@@ -25,6 +25,8 @@ public struct SentencesWithDrawingFeature {
         public var canvasState: CanvasFeature.State
         public var drewHistoryState: SentenceDrewHistoryListFeature.State
         public var isPresentDrewHistory: Bool = false
+        /// verse 그릴 UnderLineView의 rect
+        public var verseFrame: CGRect = .zero
         @Shared(.appStorage("isLeftHanded")) public var isLeftHanded: Bool = false
 
         public init(sentence: SentenceVO, drawing: BibleDrawing?) {
@@ -51,6 +53,7 @@ public struct SentencesWithDrawingFeature {
             case setBible
             case setHeight(height: CGFloat)
             case presentDrewHistory(Bool)
+            case updateVerseFrame(CGRect)
         }
     }
     
@@ -80,6 +83,9 @@ public struct SentencesWithDrawingFeature {
             switch action {
             case .view(.presentDrewHistory(let isPresent)):
                 state.isPresentDrewHistory = isPresent
+            case .view(.updateVerseFrame(let rect)):
+                state.verseFrame = rect
+                
             case .scope(.drewHistoryAction(.setPresentDrawing(let drawing))):
                 state.isPresentDrewHistory = false
                 return .run { send in
