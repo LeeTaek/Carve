@@ -67,9 +67,14 @@ public struct CarveDetailView: View {
                             send(.setProxy(proxy))
                         }
                     
-                    CombinedCanvasView(sentenceStates: Array(store.sentenceWithDrawingState))
-                        .id(store.sentenceWithDrawingState.map(\.verseFrame.debugDescription).joined())
-                        .allowsHitTesting(false) // 일단 보기용
+                    CombinedCanvasView(
+                        store: self.store.scope(
+                            state: \.canvasState,
+                            action: \.scope.canvasAction
+                        )
+                    )
+                    .id(store.canvasState.combinedDrawing.dataRepresentation().base64EncodedString())
+                    .allowsHitTesting(false) // 일단 보기용
                 }
                 .coordinateSpace(name: "Scroll")
                 .onAppear {

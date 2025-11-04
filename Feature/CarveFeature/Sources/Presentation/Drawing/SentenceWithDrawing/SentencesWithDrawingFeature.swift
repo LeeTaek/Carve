@@ -22,26 +22,24 @@ public struct SentencesWithDrawingFeature {
         public let id: String
         public let sentence: SentenceVO
         public var sentenceState: SentenceFeature.State
-        public var canvasState: CanvasFeature.State
+//        public var canvasState: CanvasFeature.State
         public var drewHistoryState: SentenceDrewHistoryListFeature.State
         public var isPresentDrewHistory: Bool = false
         /// verse 그릴 UnderLineView의 rect
         public var verseFrame: CGRect = .zero
         @Shared(.appStorage("isLeftHanded")) public var isLeftHanded: Bool = false
 
-        public init(sentence: SentenceVO, drawing: BibleDrawing?) {
+        public init(sentence: SentenceVO) {
             self.id = "\(sentence.title.title.koreanTitle()).\(sentence.title.chapter).\(sentence.verse)"
             self.sentence = sentence
             self.sentenceState = .init(chapterTitle: sentence.chapterTitle,
                                        verse: sentence.verse,
                                        sentence: sentence.sentenceScript)
-            self.canvasState = .init(sentence: sentence, drawing: drawing)
+//            self.canvasState = .init(sentence: sentence, drawing: drawing)
             self.drewHistoryState = .init(title: sentence.title, verse: sentence.verse)
         }
         
-        public static var initialState = Self(sentence: SentenceVO.initialState,
-                                               drawing: BibleDrawing.init(
-                                                bibleTitle: TitleVO(title: .leviticus, chapter: 4), verse: 1))
+        public static var initialState = Self(sentence: SentenceVO.initialState)
     }
     
     public enum Action: ViewAction, CarveToolkit.ScopeAction {
@@ -60,7 +58,6 @@ public struct SentencesWithDrawingFeature {
     @CasePathable
     public enum ScopeAction {
         case sentenceAction(SentenceFeature.Action)
-        case canvasAction(CanvasFeature.Action)
         case drewHistoryAction(SentenceDrewHistoryListFeature.Action)
     }
     
@@ -69,10 +66,6 @@ public struct SentencesWithDrawingFeature {
         Scope(state: \.sentenceState,
               action: \.scope.sentenceAction) {
             SentenceFeature()
-        }
-        Scope(state: \.canvasState,
-              action: \.scope.canvasAction) {
-            CanvasFeature()
         }
         Scope(state: \.drewHistoryState,
               action: \.scope.drewHistoryAction) {
@@ -88,9 +81,9 @@ public struct SentencesWithDrawingFeature {
                 
             case .scope(.drewHistoryAction(.setPresentDrawing(let drawing))):
                 state.isPresentDrewHistory = false
-                return .run { send in
-                    await send(.scope(.canvasAction(.setDrawing(drawing))))
-                }
+//                return .run { send in
+//                    await send(.scope(.canvasAction(.setDrawing(drawing))))
+//                }
             default: break
                 
             }

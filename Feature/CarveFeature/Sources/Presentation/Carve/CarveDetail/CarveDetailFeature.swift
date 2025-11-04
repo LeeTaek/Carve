@@ -20,6 +20,7 @@ public struct CarveDetailFeature {
     public struct State {
         public var headerState: HeaderFeature.State
         public var sentenceWithDrawingState: IdentifiedArrayOf<SentencesWithDrawingFeature.State> = []
+        public var canvasState: CombinedCanvasFeature.State = .initialState
         public var proxy: ScrollViewProxy?
         public var firstItemID: ObjectIdentifier?
         public static let initialState = State(
@@ -48,13 +49,13 @@ public struct CarveDetailFeature {
     }
 
     public enum InnerAction {
-        case setSentence([SentenceVO], [BibleDrawing])
         case scrollToTop
     }
     @CasePathable
     public enum ScopeAction {
         case sentenceWithDrawingAction(IdentifiedActionOf<SentencesWithDrawingFeature>)
         case headerAction(HeaderFeature.Action)
+        case canvasAction(CombinedCanvasFeature.Action)
     }
     
     public var body: some Reducer<State, Action> {
@@ -62,65 +63,66 @@ public struct CarveDetailFeature {
               action: \.scope.headerAction) {
             HeaderFeature()
         }
-        
+        Scope(state: \.canvasState,
+              action: \.scope.canvasAction) {
+            CombinedCanvasFeature()
+        }
+
         Reduce { state, action in
             switch action {
             case .view(.headerAnimation(let previous, let current)):
-                return .run { send in
-                    await send(.scope(.headerAction(.headerAnimation(previous, current))))
-                }
+                return .send(.scope(.headerAction(.headerAnimation(previous, current))))
+                
             case .view(.fetchSentence):
                 let title = state.headerState.currentTitle
-                return .run { send in
-                    let sentences = try fetchBible(chapter: title)
-                    do {
-                        let storedDrawing = try await drawingContext.fetch(title: title)
-                        await send(.inner(.setSentence(sentences, storedDrawing)))
-                    } catch {
-                        Log.error("fetch drawing error", error)
-                        await send(.inner(.setSentence([], [])))
-                    }
-                }
-            case .inner(.setSentence(let sentences, let drawings)):
                 var sentenceState: IdentifiedArrayOf<SentencesWithDrawingFeature.State> = []
-                for sentence in sentences {
-                    let candidates = drawings.filter { $0.verse == sentence.verse && $0.lineData?.containsPKStroke == true }
-                    let drawing = candidates.first(where: { $0.isPresent == true })
-                    ?? candidates.sorted(by: { ($0.updateDate ?? Date.distantPast) > ($1.updateDate ?? Date.distantPast) }).first
-                    sentenceState.append(SentencesWithDrawingFeature.State(sentence: sentence, drawing: drawing))
+                
+                guard let sentences = try? fetchBible(chapter: title) else {
+                    Log.error("Fetch Sentence Error")
+                    return .none
+                }
+                sentences.forEach {
+                    sentenceState.append(SentencesWithDrawingFeature.State(sentence: $0))
                 }
                 state.sentenceWithDrawingState = sentenceState
+                let verseRectMap: [Int: CGRect] = Dictionary(uniqueKeysWithValues:
+                    sentenceState.compactMap { feature in
+                        return (feature.sentence.verse, feature.verseFrame)
+                    }
+                )
+                state.canvasState = .init(drawingRect: verseRectMap)
                 undoManager.clear()
+                
+                return .send(.scope(.canvasAction(.fetchDrawingData)))
+                
             case .view(.setProxy(let proxy)):
                 state.proxy = proxy
-                return .run { send in
-                    await send(.inner(.scrollToTop))
-                }
+                return .send(.inner(.scrollToTop))
+                
             case .inner(.scrollToTop):
                 guard let id = state.sentenceWithDrawingState.first?.id else { return .none }
                 withAnimation(.easeInOut(duration: 0.5)) {
                     state.proxy?.scrollTo(id, anchor: .bottom)
                 }
-            case .scope(.sentenceWithDrawingAction(.element(id: let id,
-                                                            action: .scope(.canvasAction(let action))))):
-                guard case .saveDrawing = action,
-                      let index = state.sentenceWithDrawingState.firstIndex(where: { $0.id == id }) else {
-                    return .none
-                }
-                let sentenceState = state.sentenceWithDrawingState[index]
-                return .run { _ in
-                    guard let drawing = sentenceState.canvasState.drawing,
-                          drawing.lineData?.containsPKStroke == true
-                    else { return }
-                    try await drawingContext.updateDrawing(drawing: drawing)
-                }
+//            case .scope(.sentenceWithDrawingAction(.element(id: let id,
+//                                                            action: .scope(.canvasAction(let action))))):
+//                guard case .saveDrawing = action,
+//                      let index = state.sentenceWithDrawingState.firstIndex(where: { $0.id == id }) else {
+//                    return .none
+//                }
+//                let sentenceState = state.sentenceWithDrawingState[index]
+//                return .run { _ in
+//                    guard let drawing = sentenceState.canvasState.drawing,
+//                          drawing.lineData?.containsPKStroke == true
+//                    else { return }
+//                    try await drawingContext.updateDrawing(drawing: drawing)
+//                }
             case .view(.switchToEraser):
                 // monoline을 지우개로 사용
                 Log.debug("switch Eraser")
                 state.lastUsedPencil = state.headerState.palatteSetting.pencilConfig.pencilType
                 return .send(.scope(.headerAction(.palatteAction(.view(.setPencilType(.monoline))))))
             case .view(.switchToPrevious):
-                Log.debug("switch previous")
                 // 지우개인 경우 기본 펜으로
                 return .send(.scope(.headerAction(.palatteAction(.view(.setPencilType(state.lastUsedPencil))))))
                 
@@ -130,6 +132,21 @@ public struct CarveDetailFeature {
                 else { return .none }
                 
                 state.lastUsedPencil = penType
+                
+            case .scope(.sentenceWithDrawingAction(
+                .element(id: let id, action: .view(.updateVerseFrame(let rect))))
+            ):
+                guard let index = state.sentenceWithDrawingState.firstIndex(where: { $0.id == id }) else {
+                    return .none
+                }
+
+                // 현재 문장의 verse 가져오기
+                let sentenceState = state.sentenceWithDrawingState[index]
+                let verse = sentenceState.sentence.verse
+
+                // verseRectMap 업데이트
+                state.canvasState.drawingRect[verse] = rect
+                
             default: break
             }
             return .none
@@ -141,7 +158,17 @@ public struct CarveDetailFeature {
     }
     
     
-    func fetchBible(chapter: TitleVO) throws(CarveReducerError) -> [SentenceVO] {
+    enum CarveReducerError: Error {
+        case fetchSentenceError
+        case chapterConvertError
+    }
+}
+
+
+extension CarveDetailFeature {
+    /// 성경 본문 가져오기
+    /// - Parameter chapter: 가져올 성경의 제목과 장
+    private func fetchBible(chapter: TitleVO) throws(CarveReducerError) -> [SentenceVO] {
         let encodingEUCKR = CFStringConvertEncodingToNSStringEncoding(0x0422)
         var sentences: [SentenceVO] = []
         guard let textPath = ResourcesResources.bundle.path(forResource: chapter.title.rawValue,
@@ -166,8 +193,5 @@ public struct CarveDetailFeature {
     }
     
     
-    enum CarveReducerError: Error {
-        case fetchSentenceError
-        case chapterConvertError
-    }
+    
 }
