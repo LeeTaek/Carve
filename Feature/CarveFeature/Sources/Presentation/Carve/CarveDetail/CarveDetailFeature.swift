@@ -90,9 +90,8 @@ public struct CarveDetailFeature {
                         return (feature.sentence.verse, feature.verseFrame)
                     }
                 )
-                state.canvasState = .init(drawingRect: verseRectMap)
+                state.canvasState = .init(title: title, drawingRect: verseRectMap)
                 undoManager.clear()
-                
                 return .send(.scope(.canvasAction(.fetchDrawingData)))
                 
             case .view(.setProxy(let proxy)):
@@ -104,24 +103,13 @@ public struct CarveDetailFeature {
                 withAnimation(.easeInOut(duration: 0.5)) {
                     state.proxy?.scrollTo(id, anchor: .bottom)
                 }
-//            case .scope(.sentenceWithDrawingAction(.element(id: let id,
-//                                                            action: .scope(.canvasAction(let action))))):
-//                guard case .saveDrawing = action,
-//                      let index = state.sentenceWithDrawingState.firstIndex(where: { $0.id == id }) else {
-//                    return .none
-//                }
-//                let sentenceState = state.sentenceWithDrawingState[index]
-//                return .run { _ in
-//                    guard let drawing = sentenceState.canvasState.drawing,
-//                          drawing.lineData?.containsPKStroke == true
-//                    else { return }
-//                    try await drawingContext.updateDrawing(drawing: drawing)
-//                }
+
             case .view(.switchToEraser):
                 // monoline을 지우개로 사용
                 Log.debug("switch Eraser")
                 state.lastUsedPencil = state.headerState.palatteSetting.pencilConfig.pencilType
                 return .send(.scope(.headerAction(.palatteAction(.view(.setPencilType(.monoline))))))
+                
             case .view(.switchToPrevious):
                 // 지우개인 경우 기본 펜으로
                 return .send(.scope(.headerAction(.palatteAction(.view(.setPencilType(state.lastUsedPencil))))))

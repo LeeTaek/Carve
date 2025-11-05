@@ -74,7 +74,7 @@ public struct CarveDetailView: View {
                         )
                     )
                     .id(store.canvasState.combinedDrawing.dataRepresentation().base64EncodedString())
-                    .allowsHitTesting(false) // 일단 보기용
+//                    .allowsHitTesting(false)  // 일단 보기용
                 }
                 .coordinateSpace(name: "Scroll")
                 .onAppear {

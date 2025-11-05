@@ -107,7 +107,7 @@ public struct DrawingDatabase: Sendable, Database {
         
     }
     
-    public func updateDrawing(drawing: BibleDrawing) async throws {
+    public func updateDrawing(drawing: BibleDrawing) async {
         do {
             if (try await fetch(drawing: drawing)) != nil {
                 try await update(item: drawing)
@@ -120,9 +120,9 @@ public struct DrawingDatabase: Sendable, Database {
         }
     }
     
-    public func updateDrawings(drawings: [BibleDrawing]) async throws {
+    public func updateDrawings(drawings: [BibleDrawing]) async {
         for drawing in drawings {
-            try await updateDrawing(drawing: drawing)
+            await updateDrawing(drawing: drawing)
         }
     }
     

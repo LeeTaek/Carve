@@ -59,9 +59,15 @@ public struct CombinedCanvasView: UIViewRepresentable {
     
     final public class Coordinator: NSObject, PKCanvasViewDelegate {
         private var store: StoreOf<CombinedCanvasFeature>
+        /// Debounce 적용을 위한 이전 Update 타이밍
         private var lastUpdate = Date()
+        /// drawing Data update를 위한 Debounce 시간
         private let debounceInterval: TimeInterval = 0.3
+        /// publisher sink cancellable
         private var cancaellable = Set<AnyCancellable>()
+        /// 이전 stroke 수
+        private var previousStrokeCount = 0
+
 
         init(store: StoreOf<CombinedCanvasFeature>) {
             self.store = store
@@ -71,6 +77,24 @@ public struct CombinedCanvasView: UIViewRepresentable {
             let now = Date()
             guard now.timeIntervalSince(lastUpdate) > debounceInterval else { return }
             lastUpdate = now
+            
+            let drawing = canvasView.drawing
+            let strokes = drawing.strokes
+            guard strokes.count > previousStrokeCount else { return }
+            
+            let newStroke = strokes.suffix(from: previousStrokeCount)
+            previousStrokeCount = newStroke.count
+            
+            // stroke의 rect 계산
+            let changedRect = newStroke.reduce(CGRect.null) { partialResult, stroke in
+                partialResult.union(stroke.renderBounds)
+            }
+                      
+            guard !changedRect.isEmpty, !changedRect.isNull else { return }
+
+            store.send(.saveDrawing(drawing, changedRect))
+            
+            
 //            self.store.send(.saveDrawing(canvasView.drawing))
 //            self.store.send(.registUndoCanvas(canvasView))
         }
