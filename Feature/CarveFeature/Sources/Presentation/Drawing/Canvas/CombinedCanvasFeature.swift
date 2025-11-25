@@ -55,6 +55,7 @@ public struct CombinedCanvasFeature {
         Reduce { state, action in
             switch action {
             case .fetchDrawingData:
+                state.combinedDrawing = .init()
                 return .run { [title = state.title, context = drawingContext] send in
                     let fetchedData = await fetchDrawings(title: title, context: context)
                     await send(.setDrawing(fetchedData))
@@ -78,7 +79,6 @@ public struct CombinedCanvasFeature {
                     )
                 }
             }
-            
             return .none
         }
     }
@@ -124,13 +124,17 @@ extension CombinedCanvasFeature {
             else { continue }
             Log.debug(verse)
 
-            guard frame.width > 0, frame.height > 0 else { continue }
-            
-            let transform = CGAffineTransform(
-                translationX: frame.minX,
-                y: frame.minY
+            // 절대좌표로 저장된 경우 → 로컬좌표로 정규화
+            let local = pkDrawing.normalizedForVerseRect(frame)
+
+            //  로컬좌표를 verseRect 위치에 맞춰 절대좌표로 변환
+            let shifted = local.transformed(
+                using: CGAffineTransform(
+                    translationX: frame.minX,
+                    y: frame.minY
+                )
             )
-            let shifted = pkDrawing.transformed(using: transform)
+
             mergedDrawing.append(shifted)
         }
         return mergedDrawing

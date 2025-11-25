@@ -179,7 +179,4 @@ extension CarveDetailFeature {
         }
         return sentences
     }
-    
-    
-    
 }

@@ -17,6 +17,7 @@ import ComposableArchitecture
 public struct CombinedCanvasView: UIViewRepresentable {
     public typealias UIViewType = PKCanvasView
     private var store: StoreOf<CombinedCanvasFeature>
+
     init(store: StoreOf<CombinedCanvasFeature>) {
         self.store = store
     }
@@ -42,14 +43,6 @@ public struct CombinedCanvasView: UIViewRepresentable {
     }
 
     public func updateUIView(_ canvas: PKCanvasView, context: Context) {
-        Task { @MainActor in
-            let newDrawing = store.combinedDrawing
-            if canvas.drawing != newDrawing {
-                canvas.drawing = newDrawing
-                Log.debug("🖋 Canvas Updated: strokes = \(newDrawing.strokes.count)")
-
-            }
-        }
     }
     
     
@@ -64,7 +57,7 @@ public struct CombinedCanvasView: UIViewRepresentable {
         /// drawing Data update를 위한 Debounce 시간
         private let debounceInterval: TimeInterval = 0.3
         /// publisher sink cancellable
-        private var cancaellable = Set<AnyCancellable>()
+        private var cancellables = Set<AnyCancellable>()
         /// 이전 stroke 수
         private var previousStrokeCount = 0
 
@@ -102,6 +95,14 @@ public struct CombinedCanvasView: UIViewRepresentable {
         }
         
         public func bind(to canvas: PKCanvasView) {
+            observe { [weak self] in
+                guard let self else { return }
+                if canvas.drawing != self.store.combinedDrawing {
+                    canvas.drawing = self.store.combinedDrawing
+                    Log.debug("🖋 Canvas Updated: strokes = \(self.store.combinedDrawing.strokes.count)")
+                }
+            }
+            
             store.$pencilConfig.publisher
                 .sink { pencil in
                     let tool: PKTool = pencil.pencilType == .monoline
@@ -113,13 +114,13 @@ public struct CombinedCanvasView: UIViewRepresentable {
                     )
                     canvas.tool = tool
                 }
-                .store(in: &cancaellable)
+                .store(in: &cancellables)
             
             store.$allowFingerDrawing.publisher
                 .sink { allow in
                     canvas.drawingPolicy = allow ? .anyInput : .pencilOnly
                 }
-                .store(in: &cancaellable)
+                .store(in: &cancellables)
         }
     }
     

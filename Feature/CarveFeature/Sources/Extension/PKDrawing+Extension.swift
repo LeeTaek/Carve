@@ -22,6 +22,31 @@ extension PKDrawing {
         let clippedStrokes = strokes.compactMap { $0.clippedPrecisely(to: rect) }
         return PKDrawing(strokes: clippedStrokes)
     }
+    
+    /// 절대좌표계를 로컬좌표계로 정규화
+    func normalizedForVerseRect(_ rect: CGRect, tolerance: CGFloat = 20) -> PKDrawing {
+        guard let first = strokes.first else { return self }
+
+        let bounds = first.renderBounds
+
+        // 절대좌표로 저장된 경우: verseRect.minX/minY 근처에서 시작함
+        let isAbsolute =
+            abs(bounds.minX - rect.minX) < tolerance &&
+            abs(bounds.minY - rect.minY) < tolerance
+
+        if isAbsolute {
+            // 절대 → 로컬 변환
+            let toLocal = CGAffineTransform(
+                translationX: -rect.minX,
+                y: -rect.minY
+            )
+            return self.transformed(using: toLocal)
+        } else {
+            // 이미 로컬좌표
+            return self
+        }
+    }
+
 }
 
 public extension PKStroke {

@@ -22,7 +22,6 @@ public struct SentencesWithDrawingFeature {
         public let id: String
         public let sentence: SentenceVO
         public var sentenceState: SentenceFeature.State
-//        public var canvasState: CanvasFeature.State
         public var drewHistoryState: SentenceDrewHistoryListFeature.State
         public var isPresentDrewHistory: Bool = false
         /// verse 그릴 UnderLineView의 rect
@@ -35,7 +34,6 @@ public struct SentencesWithDrawingFeature {
             self.sentenceState = .init(chapterTitle: sentence.chapterTitle,
                                        verse: sentence.verse,
                                        sentence: sentence.sentenceScript)
-//            self.canvasState = .init(sentence: sentence, drawing: drawing)
             self.drewHistoryState = .init(title: sentence.title, verse: sentence.verse)
         }
         

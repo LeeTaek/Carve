@@ -63,7 +63,7 @@ public struct SentenceDrewHistoryListFeature {
                     $0.isPresent = ($0 == drawing)
                 }
                 return .run { [drawings = state.drawings] send in
-                    try await drawingContext.updateDrawings(drawings: drawings)
+                    await drawingContext.updateDrawings(drawings: drawings)
                     await send(.setPresentDrawing(drawing))
                 }
             default: break
