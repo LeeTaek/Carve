@@ -68,34 +68,14 @@ public struct CombinedCanvasFeature {
                 state.combinedDrawing = mergeDrawings(state.drawings, verseFrame: state.drawingRect)
                 
             case .saveDrawing(let drawing, let changedRect):
-                return .run { [title = state.title, verseRects = state.drawingRect, drawings = state.drawings, context = drawingContext] _ in
-                    
-                    // changedRect와 교차하는 verse
-                    let affectedVerse = verseRects.filter { $0.value.intersects(changedRect) }
-                    
-                    var updateDrawingList: [BibleDrawing] = []
-                    
-                    for (verse, rect) in affectedVerse {
-                        Log.debug("saveDrawing", verse)
-
-                        // 해당 절의 영역에 있는 drawing clipping
-                        let subDrawing = drawing.clippedPrecisely(to: rect)
-                        guard !subDrawing.strokes.isEmpty else { continue }
-                        
-                        // 기존 drawing여부 확인
-                        if let existng = drawings.first(where: { $0.verse == verse }) {
-                            existng.lineData = subDrawing.dataRepresentation()
-                            existng.updateDate = .now
-                            updateDrawingList.append(existng)
-                        } else {
-                            // 새 verse 생성
-                            let newDrawing = BibleDrawing(bibleTitle: title,
-                                                         verse: verse,
-                                                         lineData: subDrawing.dataRepresentation())
-                            updateDrawingList.append(newDrawing)
-                        }
-                    }
-                    await context.updateDrawings(drawings: updateDrawingList)
+                return .run { [title = state.title, verseRects = state.drawingRect, context = drawingContext] _ in
+                    await saveDrawing(
+                        for: title,
+                        from: changedRect,
+                        verseRects: verseRects,
+                        canvasDrawing: drawing,
+                        context: context
+                    )
                 }
             }
             
@@ -119,16 +99,7 @@ extension CombinedCanvasFeature {
             
             // 한 절에 여러 Drawing이 있는 경우 필터링
             let filteredDrawings: [BibleDrawing] = Dictionary(grouping: candidates, by: \.verse)
-                .compactMap { (_, drawings) in
-                    // isPresent가 있으면 그 데이터로 가져옴
-                    if let active = drawings.first(where: { $0.isPresent == true }) {
-                        return active
-                    }
-                    // isPresent 설정이 안되어 있으면 가장 최근 업데이트 된 데이터를 가져옴
-                    return drawings.max {
-                        ($0.updateDate ?? .distantPast) > ($1.updateDate ?? .distantPast)
-                    }
-                }
+                .compactMap { $0.value.mainDrawing() }
                 .sorted(by: { ($0.verse ?? 0) < ($1.verse ?? 0) })
             return filteredDrawings
         } catch {
@@ -163,5 +134,48 @@ extension CombinedCanvasFeature {
             mergedDrawing.append(shifted)
         }
         return mergedDrawing
+    }
+    
+    
+    /// 그린걸 verse로 저장하는 drawing
+    /// 1. Canvas에서 그린 Stroke의 Rect와 drawing을 통으로  받음(CombinedCanvasView - canvasViewDraiwngDidChange)
+    /// 2. stroke가 지나간 verse를 찾아서 해당 verse의 drawing을 업데이트 or 새로 생성
+    /// 3. SwiftData update
+    ///
+    /// - Parameters:
+    ///   - title: 저장할 drawing
+    ///   - changedRect: 새로 그려진 영역의 Rect
+    ///   - verseRects: rect가 어떤 절에 있는지 정보
+    ///   - canvasDrawing: canvas의 전체 그림 정보
+    ///   - context: SwiftData Context
+    private func saveDrawing(
+        for title: TitleVO,
+        from changedRect: CGRect,
+        verseRects: [Int: CGRect],
+        canvasDrawing: PKDrawing,
+        context: DrawingDatabase
+    ) async {
+        // 어떤 verse가 변경되었는지 찾기
+        let affectedVerse = verseRects.filter { $0.value.intersects(changedRect) }
+        guard !affectedVerse.isEmpty else { return }
+            
+        // drawing이 여러 절을 지나갈 경우 지나간 해당 절의 drawing data temp
+        var updateDrawingList: [DrawingUpdateRequest] = []
+        
+        for (verse, rect) in affectedVerse {
+            Log.debug("drawing이 지나간 verse", verse)
+            
+            // 캔버스에서 해당 절의 영역에 있는 drawing clipping
+            let clipped = canvasDrawing.clippedPrecisely(to: rect)
+            guard !clipped.strokes.isEmpty else { continue }
+
+            let request = DrawingUpdateRequest(
+                title: title,
+                verse: verse,
+                updateLineData: clipped.dataRepresentation()
+            )
+            updateDrawingList.append(request)
+        }
+        await context.updateDraiwngs(requests: updateDrawingList)
     }
 }

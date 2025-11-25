@@ -70,7 +70,7 @@ public struct DrawingDatabase: Sendable, Database {
         let descriptor = FetchDescriptor(predicate: predicate,
                                          sortBy: [SortDescriptor(\.updateDate, order: .reverse)])
         let storedDrawing: [BibleDrawing]? = try await actor.fetch(descriptor)
-        Log.debug("Drew Log Count:", storedDrawing?.count)
+        Log.debug("Drew Log Count:", storedDrawing?.count as Any)
         return storedDrawing
     }
     
@@ -123,6 +123,37 @@ public struct DrawingDatabase: Sendable, Database {
     public func updateDrawings(drawings: [BibleDrawing]) async {
         for drawing in drawings {
             await updateDrawing(drawing: drawing)
+        }
+    }
+    
+    public func updateDraiwngs(requests: [DrawingUpdateRequest]) async {
+        for req in requests {
+            do {
+                // 1. 해당 verse 에 대한 기존 drawing fetch
+                let existing = try await fetchDrawings(title: req.title, verse: req.verse)?.mainDrawing()
+
+                if let existing {
+                    // 2. 기존 데이터 업데이트
+                    let id = existing.persistentModelID
+                    try await actor.update(id) { (old: BibleDrawing) async in
+                        old.lineData = req.updateLineData
+                        old.updateDate = req.updateDate
+                    }
+                    Log.debug("🔄 updated drawing verse:", req.verse)
+                } else {
+                    // 3. 존재하지 않으면 새로 생성
+                    let new = BibleDrawing(
+                        bibleTitle: req.title,
+                        verse: req.verse,
+                        lineData: req.updateLineData,
+                        updateDate: req.updateDate
+                    )
+                    try await actor.insert(new)
+                    Log.debug("🆕 inserted new drawing verse:", req.verse)
+                }
+            } catch {
+                Log.error("❌ updateDrawings failed:", error)
+            }
         }
     }
     

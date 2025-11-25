@@ -80,17 +80,19 @@ public struct CombinedCanvasView: UIViewRepresentable {
             
             let drawing = canvasView.drawing
             let strokes = drawing.strokes
-            guard strokes.count > previousStrokeCount else { return }
             
-            let newStroke = strokes.suffix(from: previousStrokeCount)
-            previousStrokeCount = newStroke.count
+            // 새로 그린 stroke 추출
+            let currentCount = strokes.count
+            guard currentCount > previousStrokeCount else { return }
             
-            // stroke의 rect 계산
-            let changedRect = newStroke.reduce(CGRect.null) { partialResult, stroke in
-                partialResult.union(stroke.renderBounds)
+            let newStroke = strokes[previousStrokeCount..<currentCount]
+            previousStrokeCount = currentCount
+            
+            // 새 stroke들의 rect 계산
+            let changedRect = newStroke.reduce(CGRect.null) { partial, stroke in
+                partial.union(stroke.renderBounds)
             }
-                      
-            guard !changedRect.isEmpty, !changedRect.isNull else { return }
+            guard !changedRect.isNull, !changedRect.isEmpty else { return }
 
             store.send(.saveDrawing(drawing, changedRect))
             

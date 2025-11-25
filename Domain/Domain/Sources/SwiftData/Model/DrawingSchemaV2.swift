@@ -65,3 +65,20 @@ public enum DrawingSchemaV2: VersionedSchema {
 }
 
 public typealias BibleDrawing = DrawingSchemaV2.BibleDrawing
+
+extension Array where Element == BibleDrawing {
+    /// 여러 BibleDrawing 중 메인 Drawing 하나를 선택
+     /// 1. isPresent == true 가 있으면 그걸 우선
+     /// 2. 없으면 updateDate 기준으로 최신 것을 선택
+     public func mainDrawing() -> BibleDrawing? {
+         // 1) isPresent == true 데이터 우선
+         if let active = self.first(where: { $0.isPresent == true }) {
+             return active
+         }
+         
+         // 2) updateDate 기준 최신 데이터
+         return self.max {
+             ($0.updateDate ?? .distantPast) < ($1.updateDate ?? .distantPast)
+         }
+     }
+}
