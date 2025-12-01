@@ -73,12 +73,29 @@ public struct CarveDetailView: View {
                             action: \.scope.canvasAction
                         )
                     )
+                    .background(
+                        GeometryReader { proxy in
+                            Color.clear
+                                .onAppear {
+                                    let frame = proxy.frame(in: .global)
+                                    send(.canvasFrameChanged(frame))
+                                }
+                                .onChange(of: proxy.frame(in: .global)) { _, frame in
+                                    send(.canvasFrameChanged(frame))
+                                }
+                        }
+                    )
+                    .frame(width: halfWidth)
+                    .frame(
+                        maxWidth: .infinity,
+                        alignment: store.isLeftHanded ? .leading : .trailing
+                    )
                 }
-                .coordinateSpace(name: "Scroll")
                 .onAppear {
                     send(.fetchSentence)
                 }
             }
+            .coordinateSpace(name: "Scroll")
         }
         .onGeometryChange(for: CGFloat.self) { proxy in
             return proxy.size.width / 2

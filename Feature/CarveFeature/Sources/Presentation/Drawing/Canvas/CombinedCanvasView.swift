@@ -38,7 +38,8 @@ public struct CombinedCanvasView: UIViewRepresentable {
         canvas.drawing = store.combinedDrawing
         canvas.delegate = context.coordinator
         context.coordinator.bind(to: canvas)
-        
+        Log.debug("📏 canvas initial bounds = \(canvas.bounds)")
+
         return canvas
     }
 
@@ -88,21 +89,20 @@ public struct CombinedCanvasView: UIViewRepresentable {
             guard !changedRect.isNull, !changedRect.isEmpty else { return }
 
             store.send(.saveDrawing(drawing, changedRect))
-            
-            
-//            self.store.send(.saveDrawing(canvasView.drawing))
-//            self.store.send(.registUndoCanvas(canvasView))
         }
         
         public func bind(to canvas: PKCanvasView) {
             observe { [weak self] in
                 guard let self else { return }
-                if canvas.drawing != self.store.combinedDrawing {
-                    canvas.drawing = self.store.combinedDrawing
-                    Log.debug("🖋 Canvas Updated: strokes = \(self.store.combinedDrawing.strokes.count)")
+                
+                let newDrawing = self.store.combinedDrawing
+                guard canvas.drawing.dataRepresentation() != newDrawing.dataRepresentation() else {
+                    return
                 }
+                canvas.drawing = newDrawing
+                Log.debug("🖋 Canvas Updated: strokes = \(newDrawing.strokes.count)")
             }
-            
+            Log.debug("📏 canvas.bounds.height = \(canvas.bounds.height)")
             store.$pencilConfig.publisher
                 .sink { pencil in
                     let tool: PKTool = pencil.pencilType == .monoline

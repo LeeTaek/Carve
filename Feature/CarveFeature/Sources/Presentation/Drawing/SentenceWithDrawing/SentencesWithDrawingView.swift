@@ -88,21 +88,16 @@ public struct SentencesWithDrawingView: View {
         .background(
             GeometryReader { proxy in
                 Color.clear
-                    .onChange(of: proxy.size) { 
-                        // 레이아웃 패스 이후에 측정하여 .zero 방지
+                    .onAppear {
                         DispatchQueue.main.async {
-                            let rect = proxy.frame(in: .named("Scroll"))
-                                          guard rect.width > 0, rect.height > 0 else { return }
-                                          send(.updateVerseFrame(rect))
-                            
-//                            // 이미 저장된 frame이 있으면 무시
-//                            if store.verseFrame.width > 0 && store.verseFrame.height > 0 {
-//                                return
-//                            }
-//                            
-//                            let rect = proxy.frame(in: .named("Scroll"))
-//                            guard rect.width > 0, rect.height > 0 else { return }
-//                            send(.updateVerseFrame(rect))
+                            let rectInGlobal = proxy.frame(in: .global)
+                            send(.updateVerseFrame(rectInGlobal))
+                        }
+                    }
+                    .onChange(of: proxy.size) { _, _ in
+                        DispatchQueue.main.async {
+                            let rect = proxy.frame(in: .global)
+                            send(.updateVerseFrame(rect))
                         }
                     }
             }

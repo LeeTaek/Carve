@@ -45,6 +45,7 @@ public struct CarveDetailFeature {
             case setProxy(ScrollViewProxy)
             case switchToEraser
             case switchToPrevious
+            case canvasFrameChanged(CGRect)
         }
     }
 
@@ -85,13 +86,9 @@ public struct CarveDetailFeature {
                     sentenceState.append(SentencesWithDrawingFeature.State(sentence: $0))
                 }
                 state.sentenceWithDrawingState = sentenceState
-                let verseRectMap: [Int: CGRect] = Dictionary(uniqueKeysWithValues:
-                    sentenceState.compactMap { feature in
-                        return (feature.sentence.verse, feature.verseFrame)
-                    }
-                )
-                state.canvasState = .init(title: title, drawingRect: verseRectMap)
+                state.canvasState = .init(title: title, drawingRect: [:])
                 undoManager.clear()
+                
                 return .send(.scope(.canvasAction(.fetchDrawingData)))
                 
             case .view(.setProxy(let proxy)):
@@ -122,18 +119,31 @@ public struct CarveDetailFeature {
                 state.lastUsedPencil = penType
                 
             case .scope(.sentenceWithDrawingAction(
-                .element(id: let id, action: .view(.updateVerseFrame(let rect))))
+                .element(id: let id, action: .view(.updateVerseFrame(let globalRect))))
             ):
                 guard let index = state.sentenceWithDrawingState.firstIndex(where: { $0.id == id }) else {
                     return .none
                 }
-
-                // 현재 문장의 verse 가져오기
                 let sentenceState = state.sentenceWithDrawingState[index]
                 let verse = sentenceState.sentence.verse
 
-                // verseRectMap 업데이트
-                state.canvasState.drawingRect[verse] = rect
+                let canvasFrame = state.canvasState.canvasGlobalFrame
+                guard canvasFrame.width > 0, canvasFrame.height > 0 else { return .none }
+
+                // canvas 기준 로컬 rect로 변환
+                let localRect = CGRect(
+                    x: globalRect.minX - canvasFrame.minX,
+                    y: globalRect.minY - canvasFrame.minY,
+                    width: globalRect.width,
+                    height: globalRect.height
+                )
+
+                return .send(.scope(.canvasAction(
+                    .verseFrameUpdated(verse: verse, rect: localRect)
+                )))
+                
+            case .view(.canvasFrameChanged(let rect)):
+                return .send(.scope(.canvasAction(.canvasFrameChanged(rect))))
                 
             default: break
             }
