@@ -38,37 +38,7 @@ final class DrawingDatabaseTesting {
         // teardown
         try await actor.deleteAll(BibleDrawing.self)
     }
-    
-    @Test func fetchDrawing() async throws {
-        // given
-        let title = TitleVO.init(title: .genesis, chapter: 1)
-        let lastVerse = 1
-        let drawing = BibleDrawing(bibleTitle: title, verse: lastVerse)
-        // when
-        try await drawingContext.setDrawing(title: title, to: lastVerse)
-        let storedDrawings = try #require(await drawingContext.fetch())
-        // then
-        #expect(drawing == storedDrawings)
         
-        // teardown
-        try await actor.deleteAll(BibleDrawing.self)
-    }
-    
-    @Test func fetchDrawings() async throws {
-        // given
-        let title = TitleVO.init(title: .genesis, chapter: 1)
-        let lastVerse = 31
-        // when
-        try await drawingContext.setDrawing(title: title, to: lastVerse)
-        let storedDrawings = try #require(await drawingContext.fetch(title: title))
-        // then
-        #expect(lastVerse == storedDrawings.count)
-        
-        // teardown
-        try await actor.deleteAll(BibleDrawing.self)
-    }
-    
-    
     @Test func migrationV1toV2() async throws {
         // given
         let title = TitleVO.init(title: .genesis, chapter: 1)

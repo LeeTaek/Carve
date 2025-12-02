@@ -49,7 +49,7 @@ public struct SentenceDrewHistoryListFeature {
                 let verse = state.verse
                 return .run { send in
                     do {
-                        guard let fetchedDrawings = try await drawingContext.fetchDrawings(title: title, verse: verse) else { return }
+                        let fetchedDrawings = try await drawingContext.fetchDrawings(title: title, verse: verse)
                         await send(.setDrawings(fetchedDrawings))
                     } catch {
                         Log.error("fetched Drawing Data error", error)
@@ -59,11 +59,19 @@ public struct SentenceDrewHistoryListFeature {
             case .setDrawings(let drawings):
                 state.drawings = drawings
             case .view(.selectDrawing(let drawing)):
-                state.drawings.forEach {
-                    $0.isPresent = ($0 == drawing)
+                // 로컬 상태에서 선택된 drawing만 isPresent = true 로 갱신
+                for index in state.drawings.indices {
+                    state.drawings[index].isPresent = (state.drawings[index] == drawing)
                 }
-                return .run { [drawings = state.drawings] send in
-                    await drawingContext.updateDrawings(drawings: drawings)
+                let title = state.title
+                let verse = state.verse
+                let presentID = drawing.persistentModelID
+                return .run { send in
+                    await drawingContext.updatePresentDrawing(
+                        title: title,
+                        verse: verse,
+                        presentID: presentID
+                    )
                     await send(.setPresentDrawing(drawing))
                 }
             default: break

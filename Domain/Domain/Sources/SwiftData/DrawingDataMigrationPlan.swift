@@ -19,12 +19,12 @@ enum MigrationPlanV1Only: SchemaMigrationPlan {
 
 enum DrawingDataMigrationPlan: SchemaMigrationPlan {
     static var schemas: [VersionedSchema.Type] {
-        [DrawingSchemaV1.self, DrawingSchemaV2.self]
+        [DrawingSchemaV1.self, DrawingSchemaV2.self, DrawingSchemaV3.self]
     }
 
     private static var updatedDrawings: [DrawingSchemaV2.BibleDrawing] = []
 
-    static let migrateV1toV2 = MigrationStage.custom(
+    static let migrationV1toV2 = MigrationStage.custom(
         fromVersion: DrawingSchemaV1.self,
         toVersion: DrawingSchemaV2.self,
         willMigrate: { context in
@@ -68,8 +68,17 @@ enum DrawingDataMigrationPlan: SchemaMigrationPlan {
             try context.save()
         }
     )
+    
+    /// BiblePageDrawing만 추가
+    static let migrationV2toV3 = MigrationStage.lightweight(
+        fromVersion: DrawingSchemaV2.self,
+        toVersion: DrawingSchemaV3.self
+    )
 
     static var stages: [MigrationStage] {
-        [migrateV1toV2]
+        [
+            migrationV1toV2,
+            migrationV2toV3
+        ]
     }
 }

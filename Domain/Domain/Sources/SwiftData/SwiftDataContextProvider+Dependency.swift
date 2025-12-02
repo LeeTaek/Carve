@@ -24,7 +24,8 @@ extension ModelContainer: @retroactive DependencyKey {
         do {
             let url = URL.applicationSupportDirectory.appending(path: containerId.localDBPath)
             let schema = Schema([
-                BibleDrawing.self
+                BibleDrawing.self,
+                BiblePageDrawing.self
             ])
             let config = ModelConfiguration(
                 url: url,
@@ -64,7 +65,12 @@ extension ModelContainer: @retroactive DependencyKey {
     public static var previewValue: ModelContainer {
         do {
             let config = ModelConfiguration(isStoredInMemoryOnly: true)
-            return try ModelContainer(for: Schema([BibleDrawing.self]), configurations: config)
+            return try ModelContainer(
+                for: Schema([
+                    BibleDrawing.self,
+                    BiblePageDrawing.self
+                ]),
+                configurations: config)
         } catch {
             fatalError("Failed to create preview ModelContainer")
         }
@@ -73,7 +79,10 @@ extension ModelContainer: @retroactive DependencyKey {
     public static var testValue: ModelContainer {
         do {
             let url = URL.applicationSupportDirectory.appending(path: "Carve.test.sqlite")
-            let schema = Schema([BibleDrawing.self])
+            let schema = Schema([
+                BibleDrawing.self,
+                BiblePageDrawing.self
+            ])
             let config = ModelConfiguration(url: url)
             return try ModelContainer(for: schema, configurations: config)
         } catch {

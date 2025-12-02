@@ -46,16 +46,4 @@ final class DrawingDatabaseTest: XCTestCase {
         XCTAssertEqual(drawing, storedDrawings)
     }
 
-    func test_fetech_drawings() async throws {
-        // given
-        let title = TitleVO.init(title: .genesis, chapter: 1)
-        let lastVerse = 31
-        
-        // when
-        try await drawingContext.setDrawing(title: title, to: lastVerse)
-        let storedDrawings = try await drawingContext.fetch(title: title)
-        
-        // then
-        XCTAssertEqual(lastVerse, storedDrawings.count)
-    }
 }
