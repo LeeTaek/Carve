@@ -27,12 +27,16 @@ public struct CombinedCanvasFeature {
         public var combinedDrawing: PKDrawing = PKDrawing()
         /// global 좌표계 기준 CombinedCanvasView의 frame (절 frame → 캔버스 로컬 좌표 변환용)
         public var canvasGlobalFrame: CGRect = .zero
-
+        /// undo/redo 가능 여부
+        public var canUndo: Bool = false
+        public var canRedo: Bool = false
+        /// undo/redo 요청 트리거용. 
+        public var undoVersion: Int = 0
+        public var redoVersion: Int = 0
+        
         
         @Shared(.appStorage("pencilConfig")) public var pencilConfig: PencilPalatte = .initialState
         @Shared(.appStorage("allowFingerDrawing")) public var allowFingerDrawing: Bool = false
-        @Shared(.inMemory("canUndo")) public var canUndo: Bool = false
-        @Shared(.inMemory("canRedo")) public var canRedo: Bool = false
         
         public init(title: TitleVO, drawingRect: [Int: CGRect]) {
             self.title = title
@@ -41,7 +45,6 @@ public struct CombinedCanvasFeature {
         public static let initialState = Self(title: .initialState, drawingRect: [:])
     }
     @Dependency(\.drawingData) var drawingContext
-    @Dependency(\.undoManager) var undoManager
 
     public enum Action {
         /// SwiftData에서 DrawingData 가져옴
@@ -54,6 +57,12 @@ public struct CombinedCanvasFeature {
         case verseFrameUpdated(verse: Int, rect: CGRect)
         /// global 좌표계 기준 CombinedCanvasView의 frame 변경 알림
         case canvasFrameChanged(CGRect)
+        /// undo 상태 변경 알림
+        case undoStateChanged(canUndo: Bool, canRedo: Bool)
+        /// undo
+        case undo
+        /// redo
+        case redo
     }
     
     public var body: some Reducer<State, Action> {
@@ -92,6 +101,16 @@ public struct CombinedCanvasFeature {
             case .canvasFrameChanged(let frame):
                 state.canvasGlobalFrame = frame
                 return .none
+                
+            case .undoStateChanged(let canUndo, let canRedo):
+                state.canUndo = canUndo
+                state.canRedo = canRedo
+                
+            case .undo:
+                state.undoVersion &+= 1
+                
+            case .redo:
+                state.redoVersion &+= 1
             }
             return .none
         }

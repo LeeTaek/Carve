@@ -31,7 +31,6 @@ public struct CarveDetailFeature {
         var lastUsedPencil: PKInkingTool.InkType = .pencil
     }
     @Dependency(\.drawingData) var drawingContext
-    @Dependency(\.undoManager) var undoManager
     
     public enum Action: ViewAction, CarveToolkit.ScopeAction {
         case view(View)
@@ -87,7 +86,6 @@ public struct CarveDetailFeature {
                 }
                 state.sentenceWithDrawingState = sentenceState
                 state.canvasState = .init(title: title, drawingRect: [:])
-                undoManager.clear()
                 
                 return .send(.scope(.canvasAction(.fetchDrawingData)))
                 
@@ -144,6 +142,16 @@ public struct CarveDetailFeature {
                 
             case .view(.canvasFrameChanged(let rect)):
                 return .send(.scope(.canvasAction(.canvasFrameChanged(rect))))
+                
+            case .scope(.canvasAction(.undoStateChanged(let canUndo, let canRedo))):
+                state.headerState.palatteSetting.canUndo = canUndo
+                state.headerState.palatteSetting.canRedo = canRedo
+                
+            case .scope(.headerAction(.palatteAction(.view(.undo)))):
+                return .send(.scope(.canvasAction(.undo)))
+                
+            case .scope(.headerAction(.palatteAction(.view(.redo)))):
+                return .send(.scope(.canvasAction(.redo)))
                 
             default: break
             }

@@ -38,7 +38,6 @@ public struct CombinedCanvasView: UIViewRepresentable {
         canvas.drawing = store.combinedDrawing
         canvas.delegate = context.coordinator
         context.coordinator.bind(to: canvas)
-        Log.debug("📏 canvas initial bounds = \(canvas.bounds)")
 
         return canvas
     }
@@ -68,6 +67,13 @@ public struct CombinedCanvasView: UIViewRepresentable {
         }
         
         public func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
+            // undo/redo 중에는 save 무시
+            if canvasView.undoManager?.isUndoing == true ||
+                canvasView.undoManager?.isRedoing == true {
+                notifyUndoState(from: canvasView)
+                return
+            }
+            
             let now = Date()
             guard now.timeIntervalSince(lastUpdate) > debounceInterval else { return }
             lastUpdate = now
@@ -89,9 +95,11 @@ public struct CombinedCanvasView: UIViewRepresentable {
             guard !changedRect.isNull, !changedRect.isEmpty else { return }
 
             store.send(.saveDrawing(drawing, changedRect))
+            notifyUndoState(from: canvasView)
         }
         
         public func bind(to canvas: PKCanvasView) {
+            // Drawing Bind
             observe { [weak self] in
                 guard let self else { return }
                 
@@ -100,9 +108,29 @@ public struct CombinedCanvasView: UIViewRepresentable {
                     return
                 }
                 canvas.drawing = newDrawing
-                Log.debug("🖋 Canvas Updated: strokes = \(newDrawing.strokes.count)")
             }
-            Log.debug("📏 canvas.bounds.height = \(canvas.bounds.height)")
+            // undo상태 초기화
+            notifyUndoState(from: canvas)
+            
+            store.publisher.undoVersion
+                .removeDuplicates()
+                .sink { [weak self] _ in
+                    guard let self else { return }
+                    canvas.undoManager?.undo()
+                    self.notifyUndoState(from: canvas)
+                }
+                .store(in: &cancellables)
+            
+            store.publisher.redoVersion
+                .removeDuplicates()
+                .sink { [weak self] _ in
+                    guard let self else { return }
+                    canvas.undoManager?.redo()
+                    self.notifyUndoState(from: canvas)
+                }
+                .store(in: &cancellables)
+
+            // Pencil Config bind
             store.$pencilConfig.publisher
                 .sink { pencil in
                     let tool: PKTool = pencil.pencilType == .monoline
@@ -116,11 +144,20 @@ public struct CombinedCanvasView: UIViewRepresentable {
                 }
                 .store(in: &cancellables)
             
+            // 손가락 입력 설정 Bind
             store.$allowFingerDrawing.publisher
-                .sink { allow in
+                .sink { [weak self] allow in
+                    guard let self else { return }
                     canvas.drawingPolicy = allow ? .anyInput : .pencilOnly
                 }
                 .store(in: &cancellables)
+        }
+        
+        /// Undo/Redo 가능 여부를 Feature로 전달
+        private func notifyUndoState(from canvas: PKCanvasView) {
+            let canUndo = canvas.undoManager?.canUndo ?? false
+            let canRedo = canvas.undoManager?.canRedo ?? false
+            store.send(.undoStateChanged(canUndo: canUndo, canRedo: canRedo))
         }
     }
     
