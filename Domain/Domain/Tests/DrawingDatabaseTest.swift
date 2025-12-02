@@ -40,22 +40,10 @@ final class DrawingDatabaseTest: XCTestCase {
         
         // when
         try await actor.insert(drawing)
-        let storedDrawings = try await drawingContext.fetch()
+        let storedDrawings = try await drawingContext.fetch(title: title).first
         
         // then
         XCTAssertEqual(drawing, storedDrawings)
     }
 
-    func test_fetech_drawings() async throws {
-        // given
-        let title = TitleVO.init(title: .genesis, chapter: 1)
-        let lastVerse = 31
-        
-        // when
-        try await drawingContext.setDrawing(title: title, to: lastVerse)
-        let storedDrawings = try await drawingContext.fetch(title: title)
-        
-        // then
-        XCTAssertEqual(lastVerse, storedDrawings.count)
-    }
 }

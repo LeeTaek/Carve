@@ -33,12 +33,12 @@ public struct SentencesWithDrawingView: View {
             HStack(alignment: .top) {
                 if store.isLeftHanded {
                     // 왼손잡이
-                    canvasView
+                    underLineView
                     sentenceView
                 } else {
                     // 오른손잡이
                     sentenceView
-                    canvasView
+                    underLineView
                 }
             }
             .animation(.easeInOut(duration: 0.3), value: store.isLeftHanded)
@@ -66,17 +66,6 @@ public struct SentencesWithDrawingView: View {
         .padding(.top, topDrawingInset)
     }
     
-    private var canvasView: some View {
-        ZStack {
-            underLineView
-            CanvasView(
-                store: self.store.scope(state: \.canvasState,
-                                        action: \.scope.canvasAction)
-            )
-        }
-        .frame(width: halfWidth, alignment: .topTrailing)
-    }
-    
     private var chapterTitleView: some View {
         Text(store.sentenceState.chapterTitle ?? "")
             .font(.system(size: 22))
@@ -94,8 +83,25 @@ public struct SentencesWithDrawingView: View {
                 context.stroke(path, with: .color(.gray), style: StrokeStyle(lineWidth: 1, dash: [5]))
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(.horizontal, 20)
+        .frame(width: halfWidth, alignment: .topTrailing)
+        .background(
+            GeometryReader { proxy in
+                Color.clear
+                    .onAppear {
+                        DispatchQueue.main.async {
+                            let rectInGlobal = proxy.frame(in: .global)
+                            send(.updateVerseFrame(rectInGlobal))
+                        }
+                    }
+                    .onChange(of: proxy.size) { _, _ in
+                        DispatchQueue.main.async {
+                            let rect = proxy.frame(in: .global)
+                            send(.updateVerseFrame(rect))
+                        }
+                    }
+            }
+        )
     }
     
 }

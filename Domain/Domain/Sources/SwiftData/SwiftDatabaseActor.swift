@@ -12,13 +12,6 @@ import CarveToolkit
 
 import Dependencies
 
-public protocol Database {
-    associatedtype Item: PersistentModel
-    func fetch() async throws -> Item
-    func add(item: Item) async throws
-    func update(item: Item) async throws
-}
-
 @ModelActor
 public actor SwiftDatabaseActor {
     public enum SwiftDatabaseActorError: Error {

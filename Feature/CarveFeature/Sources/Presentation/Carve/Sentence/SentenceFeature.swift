@@ -19,11 +19,15 @@ public struct SentenceFeature {
     @ObservableState
     public struct State: Identifiable {
         public var id: String
+        /// 성경 제목 및 장
         public var chapterTitle: String?
+        /// 성경 절
         public let verse: Int
+        /// 성경 문장
         public let sentence: String
+        /// 각 텍스트 라인의 하단 Offset
         public var underlineOffsets: [CGFloat] = []
-        
+        /// 문장 폰트 등 설정
         @Shared(.appStorage("sentenceSetting")) public var sentenceSetting: SentenceSetting = .initialState
        
         public init(chapterTitle: String?,

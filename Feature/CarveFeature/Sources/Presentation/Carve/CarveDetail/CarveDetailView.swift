@@ -55,21 +55,48 @@ public struct CarveDetailView: View {
     private var detailScroll: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                contentView
-                    .padding(.top, store.headerState.headerHeight)
-                    .offsetY { previous, current in
-                        debounce {
-                            send(.headerAnimation(previous, current))
+                ZStack {
+                    contentView
+                        .padding(.top, store.headerState.headerHeight)
+                        .offsetY { previous, current in
+                            debounce {
+                                send(.headerAnimation(previous, current))
+                            }
                         }
-                    }
-                    .onChange(of: store.sentenceWithDrawingState) {
-                        send(.setProxy(proxy))
-                    }
+                        .onChange(of: store.sentenceWithDrawingState) {
+                            send(.setProxy(proxy))
+                        }
+                    
+                    CombinedCanvasView(
+                        store: self.store.scope(
+                            state: \.canvasState,
+                            action: \.scope.canvasAction
+                        )
+                    )
+                    .id(store.canvasState.title)
+                    .background(
+                        GeometryReader { proxy in
+                            Color.clear
+                                .onAppear {
+                                    let frame = proxy.frame(in: .global)
+                                    send(.canvasFrameChanged(frame))
+                                }
+                                .onChange(of: proxy.frame(in: .global)) { _, frame in
+                                    send(.canvasFrameChanged(frame))
+                                }
+                        }
+                    )
+                    .frame(width: halfWidth)
+                    .frame(
+                        maxWidth: .infinity,
+                        alignment: store.isLeftHanded ? .leading : .trailing
+                    )
+                }
+                .onAppear {
+                    send(.fetchSentence)
+                }
             }
             .coordinateSpace(name: "Scroll")
-            .onAppear {
-                send(.fetchSentence)
-            }
         }
         .onGeometryChange(for: CGFloat.self) { proxy in
             return proxy.size.width / 2
@@ -93,7 +120,7 @@ public struct CarveDetailView: View {
         }
         .id("\(store.sentenceSetting)-\(halfWidth)")
     }
-
+    
     private func debounce(delay: TimeInterval = 0.1,
                           _ action: @escaping () -> Void) {
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: action)
@@ -106,7 +133,7 @@ public struct CarveDetailView: View {
         initialState: .initialState,
         reducer: {
             CarveDetailFeature()
-        }   
+        }
     )
     CarveDetailView(store: store)
 }

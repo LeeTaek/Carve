@@ -63,5 +63,3 @@ public enum DrawingSchemaV2: VersionedSchema {
         }
     }
 }
-
-public typealias BibleDrawing = DrawingSchemaV2.BibleDrawing
