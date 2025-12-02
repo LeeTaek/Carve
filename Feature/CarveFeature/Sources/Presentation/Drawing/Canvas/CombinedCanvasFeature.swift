@@ -51,6 +51,8 @@ public struct CombinedCanvasFeature {
         case fetchDrawingData
         /// Drawing 할당
         case setDrawing([BibleDrawing])
+        /// 페이지 단위 full Drawing 직접 할당
+        case setPageDrawing(PKDrawing)
         /// save drawing data
         case saveDrawing(PKDrawing, CGRect)
         /// 캔버스 로컬 좌표계 기준으로 계산된 각 절의 rect 갱신
@@ -70,13 +72,25 @@ public struct CombinedCanvasFeature {
             switch action {
             case .fetchDrawingData:
                 return .run { [title = state.title, context = drawingContext] send in
-                    let fetchedData = await fetchDrawings(title: title, context: context)
-                    await send(.setDrawing(fetchedData))
+                    // fullDrawing이 있으면 그대로 사용
+                    if let pageDrawing = try? await context.fetchPageDrawing(title: title),
+                       let data = pageDrawing.fullLineData,
+                       let fullDrawing = try? PKDrawing(data: data) {
+                        await send(.setPageDrawing(fullDrawing))
+                    } else {
+                        // CombinedCanvas 이전의 splitDrawingd이면 merge
+                        let fetchedData = await fetchDrawings(title: title, context: context)
+                        await send(.setDrawing(fetchedData))
+                    }
                 }
-                
+
             case .setDrawing(let drawings):
                 state.drawings = drawings
                 rebuild(state: &state)
+                
+            case .setPageDrawing(let drawing):
+                state.drawings = []   // 페이지에 Drawing이 있는 경우 verse 기반 drawing 안 씀
+                state.combinedDrawing = drawing
                 
             case .saveDrawing(let drawing, let changedRect):
                 return .run { [title = state.title, verseRects = state.drawingRect, context = drawingContext] _ in
@@ -96,7 +110,9 @@ public struct CombinedCanvasFeature {
                 }
                 
                 state.drawingRect[verse] = rect
-                rebuild(state: &state)
+                if !state.drawings.isEmpty {
+                    rebuild(state: &state)
+                }
 
             case .canvasFrameChanged(let frame):
                 state.canvasGlobalFrame = frame
@@ -141,8 +157,8 @@ extension CombinedCanvasFeature {
         }
     }
 
-    /// 그린걸 verse로 저장하는 drawing
-    /// 1. Canvas에서 그린 Stroke의 Rect와 drawing을 통으로  받음(CombinedCanvasView - canvasViewDraiwngDidChange)
+    /// 그린걸 verse 단위로 나누어 저장하고, 페이지단위 full drawing도 함께 업데이트
+    /// 1. Canvas에서 그린 Stroke의 Rect와 drawing을 통으로 받음(CombinedCanvasView - canvasViewDraiwngDidChange)
     /// 2. stroke가 지나간 verse를 찾아서 해당 verse의 drawing을 업데이트 or 새로 생성
     /// 3. SwiftData update
     ///
@@ -189,6 +205,11 @@ extension CombinedCanvasFeature {
             updateDrawingList.append(request)
         }
         await context.updateDrawings(requests: updateDrawingList)
+        // 페이지 단위 fullUpdate
+        await context.upsertPageDrawing(
+            title: title,
+            fullLineData: canvasDrawing.dataRepresentation()
+        )
     }
     
     

@@ -40,7 +40,7 @@ final class DrawingDatabaseTest: XCTestCase {
         
         // when
         try await actor.insert(drawing)
-        let storedDrawings = try await drawingContext.fetch()
+        let storedDrawings = try await drawingContext.fetch(title: title).first
         
         // then
         XCTAssertEqual(drawing, storedDrawings)

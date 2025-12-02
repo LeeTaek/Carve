@@ -87,7 +87,7 @@ public struct DrawingDatabase: Sendable {
                         old.lineData = req.updateLineData
                         old.updateDate = req.updateDate
                     }
-                    Log.debug("🔄 updated drawing verse:", req.verse)
+                    Log.debug("updated drawing verse:", req.verse)
                 } else {
                     // 3. 존재하지 않으면 새로 생성
                     let new = BibleDrawing(
@@ -158,7 +158,7 @@ public struct DrawingDatabase: Sendable {
         title: TitleVO,
         fullLineData: Data,
         updateDate: Date = .now
-    ) async throws {
+    ) async {
         do {
             if let existing = try await fetchPageDrawing(title: title) {
                 // 기존 페이지 Drawing 업데이트
@@ -180,7 +180,6 @@ public struct DrawingDatabase: Sendable {
             }
         } catch {
             Log.error("❌ upsertPageDrawing failed:", error)
-            throw error
         }
     }
     

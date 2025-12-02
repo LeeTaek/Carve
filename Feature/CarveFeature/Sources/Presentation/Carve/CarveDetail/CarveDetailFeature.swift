@@ -22,7 +22,7 @@ public struct CarveDetailFeature {
         public var sentenceWithDrawingState: IdentifiedArrayOf<SentencesWithDrawingFeature.State> = []
         public var canvasState: CombinedCanvasFeature.State = .initialState
         public var proxy: ScrollViewProxy?
-        public var firstItemID: ObjectIdentifier?
+        
         public static let initialState = State(
             headerState: .initialState
         )

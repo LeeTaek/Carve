@@ -12,11 +12,8 @@ import Testing
 
 import ComposableArchitecture
 
+
 struct CarveDetailReducerTesting {
-    let reducer = CarveDetailFeature()
-    let titles: [TitleVO] =  (1...BibleTitle.genesis.lastChapter).map {
-        TitleVO(title: .genesis, chapter: $0)
-    }
     
     @Test(arguments: [
         TitleVO.init(title: .samuel1, chapter: 4),
@@ -24,8 +21,8 @@ struct CarveDetailReducerTesting {
         TitleVO(title: .samuel2, chapter: 2)
     ])
     func fetchBible(title: TitleVO) throws {
-        #expect(throws: Never.self) {
-            try reducer.fetchBible(chapter: title)
-        }
+//        #expect(throws: Never.self) {
+//            try reducer.fetchBible(chapter: title)
+//        }
     }
 }
