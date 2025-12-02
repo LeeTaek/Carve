@@ -126,7 +126,7 @@ public struct DrawingDatabase: Sendable, Database {
         }
     }
     
-    public func updateDraiwngs(requests: [DrawingUpdateRequest]) async {
+    public func updateDrawings(requests: [DrawingUpdateRequest]) async {
         for req in requests {
             do {
                 // 1. 해당 verse 에 대한 기존 drawing fetch
@@ -149,7 +149,7 @@ public struct DrawingDatabase: Sendable, Database {
                         updateDate: req.updateDate
                     )
                     try await actor.insert(new)
-                    Log.debug("🆕 inserted new drawing verse:", req.verse)
+                    Log.debug("inserted new drawing verse:", req.verse)
                 }
             } catch {
                 Log.error("❌ updateDrawings failed:", error)

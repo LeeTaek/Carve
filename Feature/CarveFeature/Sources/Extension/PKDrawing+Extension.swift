@@ -50,20 +50,31 @@ extension PKDrawing {
 }
 
 public extension PKStroke {
+    /// 캔버스 좌표계 기준 Rect 안에 포함되는 Stroke만 만 남기는 Clip 
     func clippedPrecisely(to rect: CGRect) -> PKStroke? {
         //  이 stroke가 rect와 전혀 겹치지 않으면 skip
         guard renderBounds.intersects(rect) else { return nil }
 
-        // path 내부의 control point 중 rect 안에 들어가는 점만 추출
-        let filteredPoints = path.map { $0 }.filter { rect.contains($0.location) }
+        // rect(캔버스/global 좌표)를 stroke 로컬 좌표계로 변환
+        // transform: local -> global 이므로, inverse 는 global -> local
+        let inverseTransform = transform.inverted()
+        let localRect = rect.applying(inverseTransform)
+        
+        // 로컬 좌표계 기준으로 rect 안에 들어오는 control point 만 추출
+        let filteredPoints: [PKStrokePoint] = path.map { $0 }.filter { point in
+            localRect.contains(point.location)
+        }
 
         // 남은 점이 없으면 skip
         guard !filteredPoints.isEmpty else { return nil }
 
-        // 새로운 PKStrokePath 구성
-        let newPath = PKStrokePath(controlPoints: filteredPoints, creationDate: path.creationDate)
+        // 새로운 PKStrokePath 구성 (좌표계는 여전히 로컬)
+        let newPath = PKStrokePath(
+            controlPoints: filteredPoints,
+            creationDate: path.creationDate
+        )
 
-        // 기존 속성 그대로 복제
+        // 기존 속성을 유지한 채 path 만 교체
         return PKStroke(
             ink: ink,
             path: newPath,

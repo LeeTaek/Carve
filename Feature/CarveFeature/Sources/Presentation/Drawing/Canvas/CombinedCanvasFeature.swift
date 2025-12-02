@@ -60,7 +60,6 @@ public struct CombinedCanvasFeature {
         Reduce { state, action in
             switch action {
             case .fetchDrawingData:
-                state.combinedDrawing = .init()
                 return .run { [title = state.title, context = drawingContext] send in
                     let fetchedData = await fetchDrawings(title: title, context: context)
                     await send(.setDrawing(fetchedData))
@@ -170,7 +169,7 @@ extension CombinedCanvasFeature {
             )
             updateDrawingList.append(request)
         }
-        await context.updateDraiwngs(requests: updateDrawingList)
+        await context.updateDrawings(requests: updateDrawingList)
     }
     
     
@@ -192,13 +191,9 @@ extension CombinedCanvasFeature {
                   let pkDrawing = try? PKDrawing(data: data)
             else { continue }
             
-            let bounds = pkDrawing.bounds
-            let targetX: CGFloat = 0
-            let targetY: CGFloat = rect.minY
-            
             let transform = CGAffineTransform(
-                translationX: targetX - bounds.minX,
-                y: targetY - bounds.minY
+                translationX: rect.minX,
+                y: rect.minY
             )
             let shifted = pkDrawing.transformed(using: transform)
             merged.append(shifted)

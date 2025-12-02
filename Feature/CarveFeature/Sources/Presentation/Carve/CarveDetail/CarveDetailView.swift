@@ -73,6 +73,7 @@ public struct CarveDetailView: View {
                             action: \.scope.canvasAction
                         )
                     )
+                    .id(store.canvasState.title)
                     .background(
                         GeometryReader { proxy in
                             Color.clear
