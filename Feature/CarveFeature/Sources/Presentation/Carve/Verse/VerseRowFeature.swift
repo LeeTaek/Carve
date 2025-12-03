@@ -13,19 +13,24 @@ import SwiftUI
 import ComposableArchitecture
 
 @Reducer
-public struct SentencesWithDrawingFeature {
+public struct VerseRowFeature {
     @ObservableState
     public struct State: Identifiable, Equatable {
-        public static func == (lhs: SentencesWithDrawingFeature.State, rhs: SentencesWithDrawingFeature.State) -> Bool {
+        public static func == (lhs: VerseRowFeature.State, rhs: VerseRowFeature.State) -> Bool {
             lhs.id == rhs.id
         }
         public let id: String
+        /// 성경 제목, 장, 절을 포함한 도메인 모델
         public let sentence: SentenceVO
-        public var sentenceState: SentenceFeature.State
-        public var drewHistoryState: SentenceDrewHistoryListFeature.State
+        /// 절의 텍스트와 밑줄 정보를 관리하는 VerseTextFeature 상태
+        public var sentenceState: VerseTextFeature.State
+        /// 해당 절의 필사 history를 관리하는 VerseDrawingHistoryFeature 상태
+        public var drewHistoryState: VerseDrawingHistoryFeature.State
+        /// 필사 히스토리 시트 노출 여부
         public var isPresentDrewHistory: Bool = false
-        /// verse 그릴 UnderLineView의 rect
+        /// verse 그릴 UnderLineView의 global 좌표 Rect
         public var verseFrame: CGRect = .zero
+        /// 왼손잡이 여부
         @Shared(.appStorage("isLeftHanded")) public var isLeftHanded: Bool = false
 
         public init(sentence: SentenceVO) {
@@ -46,42 +51,41 @@ public struct SentencesWithDrawingFeature {
         
         @CasePathable
         public enum View {
-            case setBible
-            case setHeight(height: CGFloat)
+            /// 필사 히스토리 시트의 노출/숨김 설정
             case presentDrewHistory(Bool)
+            /// underlineView의 globalRect를 업데이트하며 CarveDetailFeature에 전달
             case updateVerseFrame(CGRect)
         }
     }
     
     @CasePathable
     public enum ScopeAction {
-        case sentenceAction(SentenceFeature.Action)
-        case drewHistoryAction(SentenceDrewHistoryListFeature.Action)
+        case sentenceAction(VerseTextFeature.Action)
+        case drewHistoryAction(VerseDrawingHistoryFeature.Action)
     }
     
     
     public var body: some Reducer<State, Action> {
         Scope(state: \.sentenceState,
               action: \.scope.sentenceAction) {
-            SentenceFeature()
+            VerseTextFeature()
         }
         Scope(state: \.drewHistoryState,
               action: \.scope.drewHistoryAction) {
-            SentenceDrewHistoryListFeature()
+            VerseDrawingHistoryFeature()
         }
         
         Reduce { state, action in
             switch action {
             case .view(.presentDrewHistory(let isPresent)):
                 state.isPresentDrewHistory = isPresent
+                
             case .view(.updateVerseFrame(let rect)):
                 state.verseFrame = rect
                 
-            case .scope(.drewHistoryAction(.setPresentDrawing(let drawing))):
+            case .scope(.drewHistoryAction(.setPresentDrawing)):
                 state.isPresentDrewHistory = false
-//                return .run { send in
-//                    await send(.scope(.canvasAction(.setDrawing(drawing))))
-//                }
+
             default: break
                 
             }

@@ -22,7 +22,7 @@ public struct SentenceSettingsView: View {
             Section(
                 header: Text("예시 문구").font(.headline).bold()
             ) {
-                SentenceView(store: self.store.scope(state: \.sampleSentence,
+                VerseTextView(store: self.store.scope(state: \.sampleSentence,
                                                      action: \.sampleSentence)
                 )
                 .frame(height: 300, alignment: .center)

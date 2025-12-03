@@ -161,3 +161,14 @@ public struct CombinedCanvasView: UIViewRepresentable {
     }
     
 }
+
+#Preview {
+    @Previewable @State var store = Store(
+        initialState: .initialState,
+        reducer: { CombinedCanvasFeature() },
+        withDependencies: {
+            $0.drawingData = .previewValue
+        }
+    )
+    CombinedCanvasView(store: store)
+}

@@ -25,8 +25,6 @@ public struct CombinedCanvasFeature {
         public var drawings: [BibleDrawing] = []
         /// Canvas에 그리기 위한 drawing
         public var combinedDrawing: PKDrawing = PKDrawing()
-        /// global 좌표계 기준 CombinedCanvasView의 frame (절 frame → 캔버스 로컬 좌표 변환용)
-        public var canvasGlobalFrame: CGRect = .zero
         /// undo/redo 가능 여부
         public var canUndo: Bool = false
         public var canRedo: Bool = false
@@ -57,8 +55,6 @@ public struct CombinedCanvasFeature {
         case saveDrawing(PKDrawing, CGRect)
         /// 캔버스 로컬 좌표계 기준으로 계산된 각 절의 rect 갱신
         case verseFrameUpdated(verse: Int, rect: CGRect)
-        /// global 좌표계 기준 CombinedCanvasView의 frame 변경 알림
-        case canvasFrameChanged(CGRect)
         /// undo 상태 변경 알림
         case undoStateChanged(canUndo: Bool, canRedo: Bool)
         /// undo
@@ -114,10 +110,6 @@ public struct CombinedCanvasFeature {
                     rebuild(state: &state)
                 }
 
-            case .canvasFrameChanged(let frame):
-                state.canvasGlobalFrame = frame
-                return .none
-                
             case .undoStateChanged(let canUndo, let canRedo):
                 state.canUndo = canUndo
                 state.canRedo = canRedo

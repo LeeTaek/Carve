@@ -11,10 +11,11 @@ import SwiftUI
 
 import ComposableArchitecture
 
-public struct SentenceView: View {
-    @Bindable public var store: StoreOf<SentenceFeature>
+/// 한 절(verse)의 텍스트를 표시하고 밑줄(underline) 계산하는 뷰입니다.
+public struct VerseTextView: View {
+    @Bindable public var store: StoreOf<VerseTextFeature>
 
-    public init(store: StoreOf<SentenceFeature>) {
+    public init(store: StoreOf<VerseTextFeature>) {
         self.store = store
     }
     
@@ -22,12 +23,7 @@ public struct SentenceView: View {
         sentenceDescription
     }
     
-    private var chapterTitleView: some View {
-        Text(store.chapterTitle ?? "")
-            .font(.system(size: 22))
-            .fontWeight(.heavy)
-    }
-    
+    /// 각 절의 번호
     private func verseNumberView(_ verse: Int) -> some View {
         let sectionString = verse > 9 ? verse.description : verse.description + " "
         let sentenceSetting = store.sentenceSetting
@@ -39,7 +35,7 @@ public struct SentenceView: View {
                      (sentenceSetting.lineSpace - sentenceSetting.fontFamily.font(size: sentenceSetting.fontSize).lineHeight) / 2)
     }
     
-    
+    /// 각 절의 내용 문장
     public var sentenceDescription: some View {
         let sentenceSetting = store.sentenceSetting
         let lineSpacing = sentenceSetting.lineSpace - sentenceSetting.fontFamily.font(size: sentenceSetting.fontSize).lineHeight
@@ -70,9 +66,9 @@ public struct SentenceView: View {
 
 #if DEBUG
 #Preview {
-    let store = Store(initialState: SentenceFeature.State.initialState) {
-        SentenceFeature()
+    let store = Store(initialState: VerseTextFeature.State.initialState) {
+        VerseTextFeature()
     }
-    return SentenceView(store: store)
+    return VerseTextView(store: store)
 }
 #endif

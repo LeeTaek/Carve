@@ -13,8 +13,10 @@ import SwiftUI
 
 import ComposableArchitecture
 
+
+/// 한 절(verse)의 텍스트 및 밑줄(underline) 상태 관리
 @Reducer
-public struct SentenceFeature {
+public struct VerseTextFeature {
     public init() { }
     @ObservableState
     public struct State: Identifiable {
@@ -29,23 +31,28 @@ public struct SentenceFeature {
         public var underlineOffsets: [CGFloat] = []
         /// 문장 폰트 등 설정
         @Shared(.appStorage("sentenceSetting")) public var sentenceSetting: SentenceSetting = .initialState
-       
-        public init(chapterTitle: String?,
-                    verse: Int,
-                    sentence: String) {
+        
+        public init(
+            chapterTitle: String?,
+            verse: Int,
+            sentence: String
+        ) {
             self.id = String(verse) + sentence
             self.chapterTitle = chapterTitle
             self.verse = verse
             self.sentence = sentence
         }
         
-        public static let initialState = Self.init(chapterTitle: nil,
-                                                   verse: 1,
-                                                   sentence: "태초에 하나님이 천지를 창조하시니라")
-
+        public static let initialState = Self.init(
+            chapterTitle: nil,
+            verse: 1,
+            sentence: "태초에 하나님이 천지를 창조하시니라"
+        )
+        
     }
     
     public enum Action {
+        /// Text 레이아웃 정보를 전달받아 각 라인의 밑줄 Offset 계산
         case setUnderlineOffsets(Text.LayoutKey.Value)
     }
     

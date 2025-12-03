@@ -11,16 +11,18 @@ import CarveToolkit
 
 import ComposableArchitecture
 
-@ViewAction(for: SentencesWithDrawingFeature.self)
-public struct SentencesWithDrawingView: View {
-    @Bindable public var store: StoreOf<SentencesWithDrawingFeature>
+/// 한 절(verse)에 대한 Row UI를 그리는 뷰.
+@ViewAction(for: VerseRowFeature.self)
+public struct VerseRowView: View {
+    @Bindable public var store: StoreOf<VerseRowFeature>
+    /// sentence와 canvas 영역 배치를 위한 너비
     @Binding private var halfWidth: CGFloat
-    
+    /// 1절일때만 상단 여백 추가
     private var topDrawingInset: CGFloat {
         store.sentence.verse == 1 ? 25 : 0
     }
     
-    public init(store: StoreOf<SentencesWithDrawingFeature>, halfWidth: Binding<CGFloat>) {
+    public init(store: StoreOf<VerseRowFeature>, halfWidth: Binding<CGFloat>) {
         self.store = store
         self._halfWidth = halfWidth
     }
@@ -50,15 +52,16 @@ public struct SentencesWithDrawingView: View {
             ])
         }
         .sheet(isPresented: $store.isPresentDrewHistory.sending(\.view.presentDrewHistory)) {
-            SentenceDrewHistoryListView(
+            VerseDrawingHistoryView(
                 store: self.store.scope(state: \.drewHistoryState,
                                         action: \.scope.drewHistoryAction)
             )
         }
     }
     
+    /// 현재 절 내용표시 텍스트 뷰
     private var sentenceView: some View {
-        SentenceView(
+        VerseTextView(
             store: self.store.scope(state: \.sentenceState,
                                     action: \.scope.sentenceAction)
         )
@@ -66,12 +69,15 @@ public struct SentencesWithDrawingView: View {
         .padding(.top, topDrawingInset)
     }
     
+    /// 각 장의 제목
     private var chapterTitleView: some View {
         Text(store.sentenceState.chapterTitle ?? "")
             .font(.system(size: 22))
             .fontWeight(.heavy)
     }
     
+    /// Canvas 밑에 깔 밑줄 view
+    /// glbalRect를 측정해 상위로 전달
     private var underLineView: some View {
         let underlineOffsets = store.sentenceState.underlineOffsets
         
@@ -109,9 +115,9 @@ public struct SentencesWithDrawingView: View {
 #Preview {
     @Previewable @State var store = Store(
         initialState: .initialState) {
-            SentencesWithDrawingFeature()
+            VerseRowFeature()
         }
     @Previewable @State var halfWidth = UIScreen().bounds.width / 2
     
-    SentencesWithDrawingView(store: store, halfWidth: $halfWidth)
+    VerseRowView(store: store, halfWidth: $halfWidth)
 }
