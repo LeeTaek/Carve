@@ -96,6 +96,12 @@ public struct CarveDetailView: View {
                     send(.fetchSentence)
                 }
             }
+            .onTapGesture {
+                send(.tapForHeaderHidden)
+            }
+            .onTwoFingerDoubleTap {
+                send(.twoFingerDoubleTapForUndo)
+            }
             .coordinateSpace(name: "Scroll")
         }
         .onGeometryChange(for: CGFloat.self) { proxy in

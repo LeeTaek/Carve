@@ -17,7 +17,7 @@ public enum DrawingSchemaV2: VersionedSchema {
     }
     
     @Model
-    public final class BibleDrawing: Equatable, Sendable {
+    public final class BibleDrawing: Equatable {
         public static func == (lhs: BibleDrawing, rhs: BibleDrawing) -> Bool {
             (lhs.id == rhs.id)
         }

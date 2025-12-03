@@ -45,6 +45,8 @@ public struct CarveDetailFeature {
             case switchToEraser
             case switchToPrevious
             case canvasFrameChanged(CGRect)
+            case twoFingerDoubleTapForUndo
+            case tapForHeaderHidden
         }
     }
 
@@ -152,6 +154,12 @@ public struct CarveDetailFeature {
                 
             case .scope(.headerAction(.palatteAction(.view(.redo)))):
                 return .send(.scope(.canvasAction(.redo)))
+                
+            case .view(.tapForHeaderHidden):
+                return .send(.scope(.headerAction(.toggleVisibility)))
+                
+            case .view(.twoFingerDoubleTapForUndo):
+                return .send(.scope(.canvasAction(.undo)))
                 
             default: break
             }
