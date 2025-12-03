@@ -16,7 +16,7 @@ import ComposableArchitecture
 public struct HeaderFeature {
     @ObservableState
     public struct State {
-        @Shared(.appStorage("title")) public var currentTitle: TitleVO = .initialState
+        @Shared(.appStorage("title")) public var currentTitle: BibleChapter = .initialState
         public var headerHeight: CGFloat
         public var headerOffset: CGFloat
         public var lastHeaderOffset: CGFloat

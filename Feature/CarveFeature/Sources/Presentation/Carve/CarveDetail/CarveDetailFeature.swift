@@ -170,9 +170,9 @@ public struct CarveDetailFeature {
 extension CarveDetailFeature {
     /// 성경 본문 가져오기
     /// - Parameter chapter: 가져올 성경의 제목과 장
-    private func fetchBible(chapter: TitleVO) throws(CarveReducerError) -> [SentenceVO] {
+    private func fetchBible(chapter: BibleChapter) throws(CarveReducerError) -> [BibleVerse] {
         let encodingEUCKR = CFStringConvertEncodingToNSStringEncoding(0x0422)
-        var sentences: [SentenceVO] = []
+        var sentences: [BibleVerse] = []
         guard let textPath = ResourcesResources.bundle.path(forResource: chapter.title.rawValue,
                                                             ofType: nil)
         else { return sentences}
@@ -186,7 +186,7 @@ extension CarveDetailFeature {
                     return first == chapter.chapter
                 }
                 .map { sentence in
-                    return SentenceVO.init(title: chapter, sentence: sentence)
+                    return BibleVerse.init(title: chapter, sentence: sentence)
                 }
         } catch {
             throw .fetchSentenceError

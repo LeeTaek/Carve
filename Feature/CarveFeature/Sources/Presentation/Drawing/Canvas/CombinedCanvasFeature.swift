@@ -20,7 +20,7 @@ public struct CombinedCanvasFeature {
         /// drawing 그리기 위한 위치 -  [verse: rect]
         public var drawingRect: [Int: CGRect] = [:]
         /// drawing 가져오기 위한 title
-        public var title: TitleVO
+        public var title: BibleChapter
         /// fetch, update 등 데이터 관리를 위한 배열
         public var drawings: [BibleDrawing] = []
         /// Canvas에 그리기 위한 drawing
@@ -36,7 +36,7 @@ public struct CombinedCanvasFeature {
         @Shared(.appStorage("pencilConfig")) public var pencilConfig: PencilPalatte = .initialState
         @Shared(.appStorage("allowFingerDrawing")) public var allowFingerDrawing: Bool = false
         
-        public init(title: TitleVO, drawingRect: [Int: CGRect]) {
+        public init(title: BibleChapter, drawingRect: [Int: CGRect]) {
             self.title = title
             self.drawingRect = drawingRect
         }
@@ -130,7 +130,7 @@ extension CombinedCanvasFeature {
     /// SwiftData에서 Drawing Fetch
     /// - Parameter title: SwiftData에서 가져올 TitleVO
     /// - Returns: SwiftData에서 가져온 데이터
-    private func fetchDrawings(title: TitleVO, context: DrawingDatabase) async -> [BibleDrawing] {
+    private func fetchDrawings(title: BibleChapter, context: DrawingDatabase) async -> [BibleDrawing] {
         do {
             let storedDrawing = try await context.fetch(title: title)
             // DrawingData가 있는 애들만 거름
@@ -161,7 +161,7 @@ extension CombinedCanvasFeature {
     ///   - canvasDrawing: canvas의 전체 그림 정보
     ///   - context: SwiftData Context
     private func saveDrawing(
-        for title: TitleVO,
+        for title: BibleChapter,
         from changedRect: CGRect,
         verseRects: [Int: CGRect],
         canvasDrawing: PKDrawing,

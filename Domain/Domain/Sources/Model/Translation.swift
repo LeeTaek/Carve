@@ -8,6 +8,7 @@
 
 import Foundation
 
+/// 성경 번역 버전
 public enum Translation: String, Codable {
     case NKRV       // 개역개정
 }

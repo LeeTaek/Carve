@@ -21,7 +21,7 @@ public struct VerseRowFeature {
         }
         public let id: String
         /// 성경 제목, 장, 절을 포함한 도메인 모델
-        public let sentence: SentenceVO
+        public let sentence: BibleVerse
         /// 절의 텍스트와 밑줄 정보를 관리하는 VerseTextFeature 상태
         public var sentenceState: VerseTextFeature.State
         /// 해당 절의 필사 history를 관리하는 VerseDrawingHistoryFeature 상태
@@ -33,7 +33,7 @@ public struct VerseRowFeature {
         /// 왼손잡이 여부
         @Shared(.appStorage("isLeftHanded")) public var isLeftHanded: Bool = false
 
-        public init(sentence: SentenceVO) {
+        public init(sentence: BibleVerse) {
             self.id = "\(sentence.title.title.koreanTitle()).\(sentence.title.chapter).\(sentence.verse)"
             self.sentence = sentence
             self.sentenceState = .init(chapterTitle: sentence.chapterTitle,
@@ -42,7 +42,7 @@ public struct VerseRowFeature {
             self.drewHistoryState = .init(title: sentence.title, verse: sentence.verse)
         }
         
-        public static var initialState = Self(sentence: SentenceVO.initialState)
+        public static var initialState = Self(sentence: BibleVerse.initialState)
     }
     
     public enum Action: ViewAction, CarveToolkit.ScopeAction {

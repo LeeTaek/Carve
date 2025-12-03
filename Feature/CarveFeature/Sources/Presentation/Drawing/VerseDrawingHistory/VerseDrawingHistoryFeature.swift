@@ -17,7 +17,7 @@ public struct VerseDrawingHistoryFeature {
     public struct State: Identifiable {
         public var id: String
         /// 성경 제목, 장
-        public var title: TitleVO
+        public var title: BibleChapter
         /// 성경 절
         public var verse: Int
         /// 해당 절에 대한 필사 기록 목록
@@ -26,7 +26,7 @@ public struct VerseDrawingHistoryFeature {
         public static let initialState = State(title: .init(title: .genesis, chapter: 1),
                                                verse: 1)
         
-        public init(title: TitleVO, verse: Int) {
+        public init(title: BibleChapter, verse: Int) {
             self.id = "DrewHistory.\(title.title.rawValue).\(title.chapter).\(verse)"
             self.title = title
             self.verse = verse

@@ -22,7 +22,7 @@ public struct DrawingDatabase: Sendable {
     /// - Parameter title: 가져올 성경의 이름과 장
     /// - Returns: 해당 장의 필사 데이터
     /// - Note: `verse` 기준 오름차순 정렬(1, 2, 3, ...)로 반환
-    public func fetch(title: TitleVO) async throws -> [BibleDrawing] {
+    public func fetch(title: BibleChapter) async throws -> [BibleDrawing] {
         let titleName = title.title.rawValue
         let chapter = title.chapter
         let predicate = #Predicate<BibleDrawing> {
@@ -54,7 +54,7 @@ public struct DrawingDatabase: Sendable {
     /// - Returns: 해당 절에 저장된 모든 필사 데이터를 반환
     /// - Note: `updateDate` 기준 내림차순 정렬(가장 최근 데이터가 먼저)으로 반환되며,
     ///         비어 있을 경우 빈 배열(`[]`) 반환.
-    public func fetchDrawings(title: TitleVO, verse: Int) async throws -> [BibleDrawing] {
+    public func fetchDrawings(title: BibleChapter, verse: Int) async throws -> [BibleDrawing] {
         let titleName = title.title.rawValue
         let chapter = title.chapter
         let predicate = #Predicate<BibleDrawing> {
@@ -111,7 +111,7 @@ public struct DrawingDatabase: Sendable {
     ///   - verse: 절 번호
     ///   - presentID: isPresent = true 로 표시할 Drawing의 ID
     public func updatePresentDrawing(
-        title: TitleVO,
+        title: BibleChapter,
         verse: Int,
         presentID: PersistentIdentifier
     ) async {
@@ -136,7 +136,7 @@ public struct DrawingDatabase: Sendable {
     /// - Parameter title: 가져올 성경의 이름과 장
     /// - Returns: 해당 장의 페이지 전체 필사 데이터 (없으면 nil)
     /// - Note: 정렬 조건은 없으며, 조건에 매칭되는 첫 번째 레코드만 반환.
-    public func fetchPageDrawing(title: TitleVO) async throws -> BiblePageDrawing? {
+    public func fetchPageDrawing(title: BibleChapter) async throws -> BiblePageDrawing? {
         let titleName = title.title.rawValue
         let chapter = title.chapter
         let predicate = #Predicate<BiblePageDrawing> {
@@ -155,7 +155,7 @@ public struct DrawingDatabase: Sendable {
     ///   - drawingVersion: 좌표계/인코딩 버전을 나타내는 버전 값
     ///   - updateDate: 업데이트 일시 (기본값: 현재 시각)
     public func upsertPageDrawing(
-        title: TitleVO,
+        title: BibleChapter,
         fullLineData: Data,
         updateDate: Date = .now
     ) async {

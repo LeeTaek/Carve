@@ -33,7 +33,7 @@ public enum DrawingSchemaV1: VersionedSchema {
 
         public init() { }
             
-        public init(bibleTitle: TitleVO,
+        public init(bibleTitle: BibleChapter,
                     verse: Int,
                     lineData: Data? = nil,
                     updateDate: Date? = Date.now
@@ -48,7 +48,7 @@ public enum DrawingSchemaV1: VersionedSchema {
             self.verse = verse
         }
         
-        public convenience init(bibleTitle: TitleVO,
+        public convenience init(bibleTitle: BibleChapter,
                                 section: Int,
                                 lineData: Data? = nil,
                                 updateDate: Date? = Date.now

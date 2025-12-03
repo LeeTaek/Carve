@@ -32,7 +32,7 @@ public struct CarveNavigationFeature {
         /// content 화면에 띄우는 네비게이션 상태
         @Presents var detailNavigation: DetailDestination.State?
         /// 앱 전역에 공유하는 현재 성경 title
-        @Shared(.appStorage("title")) public var currentTitle: TitleVO = .initialState
+        @Shared(.appStorage("title")) public var currentTitle: BibleChapter = .initialState
         
         public static let initialState = State(
             columnVisibility: .detailOnly,

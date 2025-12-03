@@ -41,7 +41,7 @@ final class DrawingDatabaseTesting {
         
     @Test func migrationV1toV2() async throws {
         // given
-        let title = TitleVO.init(title: .genesis, chapter: 1)
+        let title = BibleChapter.init(title: .genesis, chapter: 1)
         let section = 1
         let drawing = DrawingSchemaV1.DrawingVO(bibleTitle: title,
                                                 section: section,

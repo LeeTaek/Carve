@@ -8,20 +8,24 @@
 
 import UIKit
 
+/// @Shraed로 사용하기 위해 Codable 등으로 감싸는 래퍼.
 public struct CodableColor: Codable, Sendable, Identifiable {
     public var id: ObjectIdentifier {
         self.color.id
     }
+    /// 실제로 표현하고자 하는 UIColor.
     public var color: UIColor
     
     public init(color: UIColor) {
         self.color = color
     }
     
+    /// RGBA 컴포넌트를 인코딩/디코딩할 때 사용할 키.
     enum CodingKeys: String, CodingKey {
         case red, green, blue, alpha
     }
 
+    /// 디코더로부터 RGBA 값을 디코딩하여 UIColor를 복원.
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let red = try container.decode(CGFloat.self, forKey: .red)
@@ -32,6 +36,7 @@ public struct CodableColor: Codable, Sendable, Identifiable {
         self.color = UIColor(red: red, green: green, blue: blue, alpha: alpha)
     }
     
+    /// UIColor를 RGBA 컴포넌트로 분해하여 인코더에 기록.
     public func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         var red: CGFloat = 0
