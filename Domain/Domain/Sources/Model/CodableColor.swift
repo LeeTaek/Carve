@@ -48,7 +48,7 @@ public struct CodableColor: Codable, Sendable, Identifiable {
     }
 }
 
-extension UIColor: Identifiable {
+extension UIColor: @retroactive Identifiable {
     public var id: String {
         var red: CGFloat = 0
         var green: CGFloat = 0

@@ -17,7 +17,7 @@ public enum DrawingSchemaV1: VersionedSchema {
     }
     
     @Model
-    public final class DrawingVO: Equatable, Sendable {
+    public final class DrawingVO: Equatable {
         public static func == (lhs: DrawingVO, rhs: DrawingVO) -> Bool {
             (lhs.id == rhs.id)
         }
