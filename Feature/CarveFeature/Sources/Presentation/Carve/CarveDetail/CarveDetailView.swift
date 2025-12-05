@@ -121,8 +121,14 @@ public struct CarveDetailView: View {
                                 action: \.scope.verseRowAction),
                     id: \.state.id
                 ) { childStore in
-                    VerseRowView(store: childStore, halfWidth: $halfWidth)
-                        .padding(.horizontal, 10)
+                    VerseRowView(
+                        store: childStore,
+                        halfWidth: $halfWidth,
+                        onUnderlineLayoutChange: { id, layout in
+                            send(.underlineLayoutChanged(id: id, layout: layout))
+                        }
+                    )
+                    .padding(.horizontal, 10)
                 }
             }
         }

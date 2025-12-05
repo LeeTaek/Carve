@@ -68,6 +68,8 @@ public struct CarveDetailFeature {
             case tapForHeaderHidden
             /// 두손가락 더블탭 액션: undo
             case twoFingerDoubleTapForUndo
+            /// 밑줄 레이아웃 계산 (ForEachReducer missing element warning 회피를 위해 VerseRow가 아닌 상위에서 처리)
+            case underlineLayoutChanged(id: VerseRowFeature.State.ID, layout: Text.LayoutKey.Value)
         }
     }
 
@@ -118,6 +120,19 @@ public struct CarveDetailFeature {
                 // 3) Drawing 데이터 fetch 트리거
                 return .send(.scope(.canvasAction(.fetchDrawingData)))
 
+            case .view(.underlineLayoutChanged(let id, let layout)):
+                guard var row = state.verseRowState[id: id] else { return .none }
+
+                let setting = row.verseTextState.sentenceSetting
+                let offsets = VerseTextFeature.makeUnderlineOffsets(
+                    from: layout,
+                    sentenceSetting: setting
+                )
+                row.verseTextState.underlineOffsets = offsets
+                state.verseRowState[id: id] = row
+
+                return .none
+                
             case .view(.setProxy(let proxy)):
                 state.proxy = proxy
                 return .send(.scrollToTop)

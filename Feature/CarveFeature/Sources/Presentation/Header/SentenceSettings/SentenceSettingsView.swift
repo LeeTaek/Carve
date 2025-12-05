@@ -22,8 +22,16 @@ public struct SentenceSettingsView: View {
             Section(
                 header: Text("예시 문구").font(.headline).bold()
             ) {
-                VerseTextView(store: self.store.scope(state: \.sampleSentence,
-                                                     action: \.sampleSentence)
+                VerseTextView(
+                    store: self.store.scope(state: \.sampleSentence,
+                                            action: \.sampleSentence),
+                    onLayoutChange: { layout in
+                        let offsets =  VerseTextFeature.makeUnderlineOffsets(
+                            from: layout,
+                            sentenceSetting: store.sampleSentence.sentenceSetting
+                        )
+                        store.send(.sampleSentence(.setUnderlineOffsets(offsets)))
+                    }
                 )
                 .frame(height: 300, alignment: .center)
             }

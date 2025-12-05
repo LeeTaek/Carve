@@ -55,25 +55,37 @@ public struct VerseTextFeature {
     }
     
     public enum Action {
-        /// Text 레이아웃 정보를 전달받아 각 라인의 밑줄 Offset 계산
-        case setUnderlineOffsets(Text.LayoutKey.Value)
+        /// 각 라인의 밑줄 Offset을 상태에 반영하는 액션.
+        /// 밑줄 offset 계산 및 갱신은 Feature(CarveDetailFeature)의 .view(.underlineLayoutChanged)`에서 수행,
+        /// 이 액션은 주로 Preview 환경에서 레이아웃 변경 결과를 직접 상태에 주입할 때 사용.
+        case setUnderlineOffsets([CGFloat])
     }
     
     public var body: some Reducer<State, Action> {
         Reduce { state, action in
             switch action {
-            case .setUnderlineOffsets(let textLayout):
-                let layoutLines = textLayout.map { $0.layout.compactMap { $0 } }.flatMap(\.self)
-                
-                let fontSize = state.sentenceSetting.fontSize
-                let uiFont = state.sentenceSetting.fontFamily.font(size: fontSize)
-                let decender = uiFont.descender.magnitude
-                
-                let lineOffests = layoutLines.map { $0.origin.y + decender }
-                
-                state.underlineOffsets = lineOffests
+            case .setUnderlineOffsets(let offsets):
+                state.underlineOffsets = offsets
                 return .none
             }
         }
+    }
+    
+    
+    /// 밑줄 offset 계산,
+    /// - Parameters:
+    ///   - textLayout: 변경된 TextPreference
+    ///   - sentenceSetting: 폰트, 자간 등 설정
+    public static func makeUnderlineOffsets(
+        from textLayout: Text.LayoutKey.Value,
+        sentenceSetting: SentenceSetting
+    ) -> [CGFloat] {
+        let layoutLines = textLayout.map { $0.layout.compactMap { $0 } }.flatMap(\.self)
+        
+        let fontSize = sentenceSetting.fontSize
+        let uiFont = sentenceSetting.fontFamily.font(size: fontSize)
+        let descender = uiFont.descender.magnitude
+        
+        return layoutLines.map { $0.origin.y + descender }
     }
 }

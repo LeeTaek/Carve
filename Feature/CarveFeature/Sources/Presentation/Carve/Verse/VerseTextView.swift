@@ -14,9 +14,20 @@ import ComposableArchitecture
 /// 한 절(verse)의 텍스트를 표시하고 밑줄(underline) 계산하는 뷰입니다.
 public struct VerseTextView: View {
     @Bindable public var store: StoreOf<VerseTextFeature>
+    
+    /// Text.LayoutKey(텍스트 레이아웃 변경 이벤트)를 상위로 전달하기 위한 클로저.
+    /// - Note: 실제 이 클로저를 통해 CarveDetailFeature의
+    ///         `.view(.underlineLayoutChanged)`액션을 보내어 밑줄 offset 계산 및 상태 갱신.
+    ///         이렇게 레이아웃 이벤트만 상위로 올려 처리함으로써 ForEachReducer의
+    ///         missing element warning을 회피한다.
+    let onLayoutChange: (Text.LayoutKey.Value) -> Void
 
-    public init(store: StoreOf<VerseTextFeature>) {
+    public init(
+        store: StoreOf<VerseTextFeature>,
+        onLayoutChange: @escaping (Text.LayoutKey.Value) -> Void
+    ) {
         self.store = store
+        self.onLayoutChange = onLayoutChange
     }
     
     public var body: some View {
@@ -51,7 +62,7 @@ public struct VerseTextView: View {
                 .lineSpacing(lineSpacing)
                 .lineLimit(nil)
                 .onPreferenceChange(Text.LayoutKey.self) { textLayout in
-                    store.send(.setUnderlineOffsets(textLayout))
+                    onLayoutChange(textLayout)
                 }
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.vertical, lineGapPadding)
@@ -67,6 +78,12 @@ public struct VerseTextView: View {
     let store = Store(initialState: VerseTextFeature.State.initialState) {
         VerseTextFeature()
     }
-    return VerseTextView(store: store)
+    VerseTextView(store: store) { layout in
+        let offsets =  VerseTextFeature.makeUnderlineOffsets(
+            from: layout,
+            sentenceSetting: store.sentenceSetting
+        )
+        store.send(.setUnderlineOffsets(offsets))
+    }
 }
 #endif

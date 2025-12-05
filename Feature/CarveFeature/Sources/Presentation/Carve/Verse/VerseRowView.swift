@@ -21,10 +21,22 @@ public struct VerseRowView: View {
     private var topDrawingInset: CGFloat {
         store.sentence.verse == 1 ? 25 : 0
     }
+    /// Text.LayoutKey(텍스트 레이아웃 변경 이벤트)를 상위(CarveDetailFeature)로 전달하기 위한 클로저.
+    /// - Note: 원래는 VerseTextFeature.Action.setUnderlineOffsets로 직접 액션을 보냈으나,
+    ///         ForEachReducer에서 missing element warning이 발생하는 문제를 피하기 위해
+    ///         레이아웃 이벤트만 상위로 올리고, 실제 underlineOffsets 계산 및 상태 갱신은
+    ///         CarveDetailFeature에서 처리.
+    let onUnderlineLayoutChange: (VerseRowFeature.State.ID, Text.LayoutKey.Value) -> Void
+
     
-    public init(store: StoreOf<VerseRowFeature>, halfWidth: Binding<CGFloat>) {
+    public init(
+        store: StoreOf<VerseRowFeature>,
+        halfWidth: Binding<CGFloat>,
+        onUnderlineLayoutChange: @escaping (VerseRowFeature.State.ID, Text.LayoutKey.Value) -> Void
+    ) {
         self.store = store
         self._halfWidth = halfWidth
+        self.onUnderlineLayoutChange = onUnderlineLayoutChange
     }
     
     public var body: some View {
@@ -62,8 +74,10 @@ public struct VerseRowView: View {
     /// 현재 절 내용표시 텍스트 뷰
     private var sentenceView: some View {
         VerseTextView(
-            store: self.store.scope(state: \.verseTextState,
-                                    action: \.scope.verseTextAction)
+            store: self.store.scope(state: \.verseTextState,action: \.scope.verseTextAction),
+            onLayoutChange: { layout in
+                onUnderlineLayoutChange(store.id, layout)
+            }
         )
         .frame(width: halfWidth * 0.95, alignment: .leading)
         .padding(.top, topDrawingInset)
@@ -119,5 +133,11 @@ public struct VerseRowView: View {
         }
     @Previewable @State var halfWidth = UIScreen().bounds.width / 2
     
-    VerseRowView(store: store, halfWidth: $halfWidth)
+    VerseRowView(store: store, halfWidth: $halfWidth) { _, layout in
+        let offsets =  VerseTextFeature.makeUnderlineOffsets(
+            from: layout,
+            sentenceSetting: store.verseTextState.sentenceSetting
+        )
+        store.send(.scope(.verseTextAction(.setUnderlineOffsets(offsets))))
+    }
 }
