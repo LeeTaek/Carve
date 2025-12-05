@@ -75,7 +75,7 @@ extension VerseDrawingHistoryFeature {
         let verse = state.verse
         return .run { send in
             do {
-                let fetchedDrawings = try await drawingContext.fetchDrawings(title: title, verse: verse)
+                let fetchedDrawings = try await drawingContext.fetchDrawings(chapter: title, verse: verse)
                 await send(.setDrawings(fetchedDrawings))
             } catch {
                 Log.error("fetched Drawing Data error", error)
@@ -95,7 +95,7 @@ extension VerseDrawingHistoryFeature {
         let presentID = drawing.persistentModelID
         return .run { send in
             await drawingContext.updatePresentDrawing(
-                title: title,
+                chapter: title,
                 verse: verse,
                 presentID: presentID
             )

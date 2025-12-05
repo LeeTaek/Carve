@@ -65,7 +65,7 @@ public struct CarveDetailView: View {
                                 send(.headerAnimation(previous, current))
                             }
                         }
-                        .onChange(of: store.sentenceWithDrawingState) {
+                        .onChange(of: store.verseRowState) {
                             send(.setProxy(proxy))
                         }
                     
@@ -75,7 +75,7 @@ public struct CarveDetailView: View {
                             action: \.scope.canvasAction
                         )
                     )
-                    .id(store.canvasState.title)
+                    .id(store.canvasState.chapter)
                     .background(
                         GeometryReader { proxy in
                             Color.clear
@@ -117,8 +117,8 @@ public struct CarveDetailView: View {
         LazyVStack(pinnedViews: .sectionHeaders) {
             Section {
                 ForEach(
-                    store.scope(state: \.sentenceWithDrawingState,
-                                action: \.scope.sentenceWithDrawingAction),
+                    store.scope(state: \.verseRowState,
+                                action: \.scope.verseRowAction),
                     id: \.state.id
                 ) { childStore in
                     VerseRowView(store: childStore, halfWidth: $halfWidth)

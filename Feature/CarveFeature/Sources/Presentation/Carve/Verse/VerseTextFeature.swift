@@ -1,5 +1,5 @@
 //
-//  SentenceFeature.swift
+//  VerseTextFeature.swift
 //  FeatureCarve
 //
 //  Created by 이택성 on 6/12/24.
@@ -29,6 +29,9 @@ public struct VerseTextFeature {
         public let sentence: String
         /// 각 텍스트 라인의 하단 Offset
         public var underlineOffsets: [CGFloat] = []
+        /// 화면 복귀시 underline preferenceKey 재설정을 위한 key
+        public var preferenceVersion: UUID = .init()
+        
         /// 문장 폰트 등 설정
         @Shared(.appStorage("sentenceSetting")) public var sentenceSetting: SentenceSetting = .initialState
         

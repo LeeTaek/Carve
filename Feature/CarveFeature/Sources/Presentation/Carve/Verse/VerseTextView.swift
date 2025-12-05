@@ -1,5 +1,5 @@
 //
-//  SentenceView.swift
+//  VerseTextView.swift
 //  FeatureCarve
 //
 //  Created by 이택성 on 6/12/24.
@@ -45,15 +45,13 @@ public struct VerseTextView: View {
             verseNumberView(store.verse)
             
             Text(store.sentence)
+                .id(store.preferenceVersion)
                 .tracking(sentenceSetting.traking)
                 .font(Font(sentenceSetting.fontFamily.font(size: sentenceSetting.fontSize)))
                 .lineSpacing(lineSpacing)
                 .lineLimit(nil)
                 .onPreferenceChange(Text.LayoutKey.self) { textLayout in
-                    Task { @MainActor [weak store] in
-                        guard let store else { return }
-                        store.send(.setUnderlineOffsets(textLayout))
-                    }
+                    store.send(.setUnderlineOffsets(textLayout))
                 }
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.vertical, lineGapPadding)

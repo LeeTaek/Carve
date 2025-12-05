@@ -1,5 +1,5 @@
 //
-//  SentencesWithDrawingView.swift
+//  VerseRowView.swift
 //  FeatureCarve
 //
 //  Created by 이택성 on 2/22/24.
@@ -29,7 +29,7 @@ public struct VerseRowView: View {
     
     public var body: some View {
         VStack {
-            if store.sentenceState.chapterTitle != nil {
+            if store.verseTextState.chapterTitle != nil {
                 chapterTitleView
             }
             HStack(alignment: .top) {
@@ -62,8 +62,8 @@ public struct VerseRowView: View {
     /// 현재 절 내용표시 텍스트 뷰
     private var sentenceView: some View {
         VerseTextView(
-            store: self.store.scope(state: \.sentenceState,
-                                    action: \.scope.sentenceAction)
+            store: self.store.scope(state: \.verseTextState,
+                                    action: \.scope.verseTextAction)
         )
         .frame(width: halfWidth * 0.95, alignment: .leading)
         .padding(.top, topDrawingInset)
@@ -71,7 +71,7 @@ public struct VerseRowView: View {
     
     /// 각 장의 제목
     private var chapterTitleView: some View {
-        Text(store.sentenceState.chapterTitle ?? "")
+        Text(store.verseTextState.chapterTitle ?? "")
             .font(.system(size: 22))
             .fontWeight(.heavy)
     }
@@ -79,7 +79,7 @@ public struct VerseRowView: View {
     /// Canvas 밑에 깔 밑줄 view
     /// glbalRect를 측정해 상위로 전달
     private var underLineView: some View {
-        let underlineOffsets = store.sentenceState.underlineOffsets
+        let underlineOffsets = store.verseTextState.underlineOffsets
         
         return Canvas { context, size in
             for y in underlineOffsets {

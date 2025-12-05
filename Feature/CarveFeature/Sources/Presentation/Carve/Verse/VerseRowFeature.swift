@@ -1,5 +1,5 @@
 //
-//  SentencesWithDrawingReducer.swift
+//  VerseRowFeature.swift
 //  FeatureCarve
 //
 //  Created by 이택성 on 2/22/24.
@@ -23,7 +23,7 @@ public struct VerseRowFeature {
         /// 성경 제목, 장, 절을 포함한 도메인 모델
         public let sentence: BibleVerse
         /// 절의 텍스트와 밑줄 정보를 관리하는 VerseTextFeature 상태
-        public var sentenceState: VerseTextFeature.State
+        public var verseTextState: VerseTextFeature.State
         /// 해당 절의 필사 history를 관리하는 VerseDrawingHistoryFeature 상태
         public var drewHistoryState: VerseDrawingHistoryFeature.State
         /// 필사 히스토리 시트 노출 여부
@@ -36,7 +36,7 @@ public struct VerseRowFeature {
         public init(sentence: BibleVerse) {
             self.id = "\(sentence.title.title.koreanTitle()).\(sentence.title.chapter).\(sentence.verse)"
             self.sentence = sentence
-            self.sentenceState = .init(chapterTitle: sentence.chapterTitle,
+            self.verseTextState = .init(chapterTitle: sentence.chapterTitle,
                                        verse: sentence.verse,
                                        sentence: sentence.sentenceScript)
             self.drewHistoryState = .init(title: sentence.title, verse: sentence.verse)
@@ -60,14 +60,14 @@ public struct VerseRowFeature {
     
     @CasePathable
     public enum ScopeAction {
-        case sentenceAction(VerseTextFeature.Action)
+        case verseTextAction(VerseTextFeature.Action)
         case drewHistoryAction(VerseDrawingHistoryFeature.Action)
     }
     
     
     public var body: some Reducer<State, Action> {
-        Scope(state: \.sentenceState,
-              action: \.scope.sentenceAction) {
+        Scope(state: \.verseTextState,
+              action: \.scope.verseTextAction) {
             VerseTextFeature()
         }
         Scope(state: \.drewHistoryState,

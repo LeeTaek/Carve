@@ -21,7 +21,7 @@ public struct CarveDetailFeature {
         /// 헤더 상태
         public var headerState: HeaderFeature.State
         /// 성경 구절 상태 List
-        public var sentenceWithDrawingState: IdentifiedArrayOf<VerseRowFeature.State> = []
+        public var verseRowState: IdentifiedArrayOf<VerseRowFeature.State> = []
         /// 캔버스 상태
         public var canvasState: CombinedCanvasFeature.State = .initialState
         /// ScrollView 위치 제어용 프록시
@@ -48,6 +48,8 @@ public struct CarveDetailFeature {
         case view(View)
         case scope(ScopeAction)
         
+        case setFetchedSentence(chapter: BibleChapter, verses: [BibleVerse])
+        
         @CasePathable
         public enum View {
             /// 성경 구절 fetch
@@ -71,10 +73,17 @@ public struct CarveDetailFeature {
 
     @CasePathable
     public enum ScopeAction {
-        case sentenceWithDrawingAction(IdentifiedActionOf<VerseRowFeature>)
+        case verseRowAction(IdentifiedActionOf<VerseRowFeature>)
         case headerAction(HeaderFeature.Action)
         case canvasAction(CombinedCanvasFeature.Action)
     }
+    
+    /// 비동기 작업 취소용 작업
+    enum CancelID: Hashable {
+        /// 성경 불러올떄
+        case fetchBible(title: BibleChapter)
+    }
+    
     
     public var body: some Reducer<State, Action> {
         Scope(state: \.headerState,
@@ -92,8 +101,23 @@ public struct CarveDetailFeature {
                 return .send(.scope(.headerAction(.headerAnimation(previous, current))))
                 
             case .view(.fetchSentence):
-                return handleFetchSentence(state: &state)
+                let oldChapter = state.canvasState.chapter
+                                
+                return .merge(
+                    .cancel(id: CancelID.fetchBible(title: oldChapter)),
+                    handleFetchSentence(state: &state)
+                )
                 
+            case .setFetchedSentence(let chapter, let verses):
+                state.verseRowState = IdentifiedArrayOf(
+                    uniqueElements: verses.map { VerseRowFeature.State(sentence: $0) }
+                )
+                
+                state.canvasState = .init(chapter: chapter, drawingRect: [:])
+                
+                // 3) Drawing 데이터 fetch 트리거
+                return .send(.scope(.canvasAction(.fetchDrawingData)))
+
             case .view(.setProxy(let proxy)):
                 state.proxy = proxy
                 return .send(.scrollToTop)
@@ -120,7 +144,7 @@ public struct CarveDetailFeature {
                 state.lastUsedPencil = penType
                 return .none
 
-            case .scope(.sentenceWithDrawingAction(
+            case .scope(.verseRowAction(
                 .element(id: let id, action: .view(.updateVerseFrame(let globalRect))))
             ):
                 return updateVerseFrame(
@@ -153,8 +177,8 @@ public struct CarveDetailFeature {
             default: return .none
             }
         }
-        .forEach(\.sentenceWithDrawingState,
-                  action: \.scope.sentenceWithDrawingAction) {
+        .forEach(\.verseRowState,
+                  action: \.scope.verseRowAction) {
             VerseRowFeature()
         }
     }
@@ -200,26 +224,24 @@ extension CarveDetailFeature {
     /// 3. Drawing데이터 불러옴
     private func handleFetchSentence(state: inout State) -> Effect<Action> {
         let title = state.headerState.currentTitle
-          var sentenceState: IdentifiedArrayOf<VerseRowFeature.State> = []
           
-          do {
-              let sentences = try fetchBible(chapter: title)
-              sentences.forEach {
-                  sentenceState.append(VerseRowFeature.State(sentence: $0))
-              }
-              state.sentenceWithDrawingState = sentenceState
-              state.canvasState = .init(title: title, drawingRect: [:])
-              return .send(.scope(.canvasAction(.fetchDrawingData)))
-          } catch {
-              Log.error("Fetch Sentence Error")
-              return .none
-          }
+        return .run { send in
+            do {
+                let sentences = try fetchBible(chapter: title)
+                try Task.checkCancellation()
+                
+                await send(.setFetchedSentence(chapter: title, verses: sentences))
+            } catch {
+                Log.error("Fetch Sentence Error")
+            }
+        }
+        .cancellable(id: CancelID.fetchBible(title: title), cancelInFlight: true)
     }
     
     
     /// ScrollView 맨 위로 스크롤
     private func scrollToTop(state: inout State) -> Effect<Action> {
-        guard let id = state.sentenceWithDrawingState.first?.id else { return .none }
+        guard let id = state.verseRowState.first?.id else { return .none }
         withAnimation(.easeInOut(duration: 0.5)) {
             state.proxy?.scrollTo(id, anchor: .bottom)
         }
@@ -237,10 +259,10 @@ extension CarveDetailFeature {
         id: VerseRowFeature.State.ID,
         globalRect: CGRect
     ) -> Effect<Action> {
-        guard let index = state.sentenceWithDrawingState.firstIndex(where: { $0.id == id }) else {
+        guard let index = state.verseRowState.firstIndex(where: { $0.id == id }) else {
             return .none
         }
-        let sentenceState = state.sentenceWithDrawingState[index]
+        let sentenceState = state.verseRowState[index]
         let verse = sentenceState.sentence.verse
 
         let canvasFrame = state.canvasGlobalFrame

@@ -1,5 +1,5 @@
 //
-//  FeedbackVO.swift
+//  UserFeedback.swift
 //  Domain
 //
 //  Created by 이택성 on 7/25/24.

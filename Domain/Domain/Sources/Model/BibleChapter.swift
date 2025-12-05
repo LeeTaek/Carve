@@ -1,5 +1,5 @@
 //
-//  TitleVO.swift
+//  BibleChapter.swift
 //  DomainRealm
 //
 //  Created by 이택성 on 1/29/24.

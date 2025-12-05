@@ -11,7 +11,7 @@ import Foundation
 /// BibleDrawing의 drawing 데이터 변경을 전달하기 위한 업데이트 요청 모델.
 public struct DrawingUpdateRequest: Sendable {
     /// 성경(제목/장).
-    public let title: BibleChapter
+    public let chapter: BibleChapter
     /// 변경 대상이 되는 절(verse).
     public let verse: Int
     /// 업데이트할 PKDrawing Data.
@@ -20,12 +20,12 @@ public struct DrawingUpdateRequest: Sendable {
     public let updateDate: Date
     
     public init(
-        title: BibleChapter,
+        chapter: BibleChapter,
         verse: Int,
         updateLineData: Data,
         updateDate: Date = .now
     ) {
-        self.title = title
+        self.chapter = chapter
         self.verse = verse
         self.updateLineData = updateLineData
         self.updateDate = updateDate
