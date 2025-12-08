@@ -13,19 +13,20 @@ import UIKit
 
 import ComposableArchitecture
 
+@available(*, deprecated, message: "CombinedCanvasView / CombinedCanvasFeature로 대체")
 @Reducer
 public struct CanvasFeature {
     @ObservableState
     public struct State: Identifiable {
         public var id: String
         public var drawing: BibleDrawing?
-        public var title: TitleVO
+        public var title: BibleChapter
         public var verse: Int
         @Shared(.appStorage("pencilConfig")) public var pencilConfig: PencilPalatte = .initialState
         @Shared(.inMemory("canUndo")) public var canUndo: Bool = false
         @Shared(.inMemory("canRedo")) public var canRedo: Bool = false
         @Shared(.appStorage("allowFingerDrawing")) public var allowFingerDrawing: Bool = false
-        public init(sentence: SentenceVO, drawing: BibleDrawing?) {
+        public init(sentence: BibleVerse, drawing: BibleDrawing?) {
             self.id = "drawingData.\(sentence.sentenceScript)"
             self.drawing = drawing
             self.title = sentence.title

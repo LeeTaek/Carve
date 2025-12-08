@@ -19,7 +19,7 @@ public enum DrawingSchemaV3: VersionedSchema {
     
     /// 각 절에 해당하는 필사 데이터용 모델
     @Model
-    public final class BibleDrawing: Equatable, Sendable {
+    public final class BibleDrawing: Equatable {
         public static func == (lhs: BibleDrawing, rhs: BibleDrawing) -> Bool {
             (lhs.id == rhs.id)
         }
@@ -36,7 +36,7 @@ public enum DrawingSchemaV3: VersionedSchema {
         
         public init() { }
             
-        public init(bibleTitle: TitleVO,
+        public init(bibleTitle: BibleChapter,
                     verse: Int,
                     lineData: Data? = nil,
                     updateDate: Date? = Date.now
@@ -56,7 +56,7 @@ public enum DrawingSchemaV3: VersionedSchema {
             }()
         }
         
-        public convenience init(bibleTitle: TitleVO,
+        public convenience init(bibleTitle: BibleChapter,
                                 section: Int,
                                 lineData: Data? = nil,
                                 updateDate: Date? = Date.now
@@ -67,7 +67,7 @@ public enum DrawingSchemaV3: VersionedSchema {
     
     /// 장에 해당하는 화면 전체 필사 데이터용 모델
     @Model
-    public final class BiblePageDrawing: Equatable, Sendable {
+    public final class BiblePageDrawing: Equatable {
         
         public var id: String!
         public var titleName: String?
@@ -82,7 +82,7 @@ public enum DrawingSchemaV3: VersionedSchema {
         public init() {}
 
         public init(
-            bibleTitle: TitleVO,
+            bibleTitle: BibleChapter,
             fullLineData: Data?,
             updateDate: Date? = .now
         ) {
@@ -91,8 +91,6 @@ public enum DrawingSchemaV3: VersionedSchema {
             self.fullLineData = fullLineData
             self.creationDate = .now
             self.updateDate = updateDate
-
-            // title 단위로 유니크하게 가고 싶으면 이렇게:
             self.id = "\(bibleTitle.title.rawValue).\(bibleTitle.chapter)"
         }
     }

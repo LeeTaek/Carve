@@ -117,7 +117,7 @@ public struct SendFeedbackView: View {
     private var feedbackTypeView: some View {
         Menu {
             Picker(store.feedbackInfo.feedbackType.rawValue, selection: $store.feedbackInfo.feedbackType.sending(\.setFeedbackType)) {
-                ForEach(FeedbackVO.FeedbackType.allCases, id: \.self) { type in
+                ForEach(UserFeedback.FeedbackType.allCases, id: \.self) { type in
                     Text(type.rawValue)
                         .padding()
                 }

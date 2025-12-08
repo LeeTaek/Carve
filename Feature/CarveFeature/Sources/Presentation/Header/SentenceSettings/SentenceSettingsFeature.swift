@@ -15,7 +15,7 @@ import ComposableArchitecture
 public struct SentenceSettingsFeature {
     @ObservableState
     public struct State {
-        public var sampleSentence: SentenceFeature.State = .init(chapterTitle: nil,
+        public var sampleSentence: VerseTextFeature.State = .init(chapterTitle: nil,
                                                                  verse: 16,
                                                                  sentence: "하나님이 세상을 이처럼 사랑하사 독생자를 주셨으니 이는 저를 믿는 자마다 멸망치 않고 영생을 얻게 하려 하심이니라")
         @Shared(.appStorage("sentenceSetting")) public var setting: SentenceSetting = .initialState
@@ -25,7 +25,7 @@ public struct SentenceSettingsFeature {
         public static var initialState: Self = .init()
     }
     public enum Action: BindableAction {
-        case sampleSentence(SentenceFeature.Action)
+        case sampleSentence(VerseTextFeature.Action)
         case binding(BindingAction<State>)
     }
     public var body: some Reducer<State, Action> {

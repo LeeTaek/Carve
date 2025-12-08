@@ -19,12 +19,12 @@ public struct DrawingDatabase: Sendable {
     // MARK: - verse 단위 BibleDrawing
     
     /// 한 장의 필사 데이터를 모두 불러옴
-    /// - Parameter title: 가져올 성경의 이름과 장
+    /// - Parameter chapter: 가져올 성경의 이름과 장
     /// - Returns: 해당 장의 필사 데이터
     /// - Note: `verse` 기준 오름차순 정렬(1, 2, 3, ...)로 반환
-    public func fetch(title: TitleVO) async throws -> [BibleDrawing] {
-        let titleName = title.title.rawValue
-        let chapter = title.chapter
+    public func fetch(chapter: BibleChapter) async throws -> [BibleDrawing] {
+        let titleName = chapter.title.rawValue
+        let chapter = chapter.chapter
         let predicate = #Predicate<BibleDrawing> {
             $0.titleName == titleName &&
             $0.titleChapter == chapter
@@ -49,14 +49,14 @@ public struct DrawingDatabase: Sendable {
     
     /// 해당 절의 필사 데이터를 모두 가져옴
     /// - Parameters:
-    ///   - title: 해당 성경의 이름과 장
+    ///   - chapter: 해당 성경의 이름과 장
     ///   - verse: 절 번호
     /// - Returns: 해당 절에 저장된 모든 필사 데이터를 반환
     /// - Note: `updateDate` 기준 내림차순 정렬(가장 최근 데이터가 먼저)으로 반환되며,
     ///         비어 있을 경우 빈 배열(`[]`) 반환.
-    public func fetchDrawings(title: TitleVO, verse: Int) async throws -> [BibleDrawing] {
-        let titleName = title.title.rawValue
-        let chapter = title.chapter
+    public func fetchDrawings(chapter: BibleChapter, verse: Int) async throws -> [BibleDrawing] {
+        let titleName = chapter.title.rawValue
+        let chapter = chapter.chapter
         let predicate = #Predicate<BibleDrawing> {
             $0.titleName == titleName
             && $0.titleChapter == chapter
@@ -78,7 +78,7 @@ public struct DrawingDatabase: Sendable {
         for req in requests {
             do {
                 // 1. 해당 verse 에 대한 기존 drawing fetch
-                let existing = try await fetchDrawings(title: req.title, verse: req.verse).mainDrawing()
+                let existing = try await fetchDrawings(chapter: req.chapter, verse: req.verse).mainDrawing()
 
                 if let existing {
                     // 2. 기존 데이터 업데이트
@@ -91,7 +91,7 @@ public struct DrawingDatabase: Sendable {
                 } else {
                     // 3. 존재하지 않으면 새로 생성
                     let new = BibleDrawing(
-                        bibleTitle: req.title,
+                        bibleTitle: req.chapter,
                         verse: req.verse,
                         lineData: req.updateLineData,
                         updateDate: req.updateDate
@@ -107,16 +107,16 @@ public struct DrawingDatabase: Sendable {
     
     /// 특정 절에서 어떤 Drawing이 isPresent인지 저장.
     /// - Parameters:
-    ///   - title: 성경의 이름과 장
+    ///   - chapter: 성경의 이름과 장
     ///   - verse: 절 번호
     ///   - presentID: isPresent = true 로 표시할 Drawing의 ID
     public func updatePresentDrawing(
-        title: TitleVO,
+        chapter: BibleChapter,
         verse: Int,
         presentID: PersistentIdentifier
     ) async {
         do {
-            let drawings = try await fetchDrawings(title: title, verse: verse)
+            let drawings = try await fetchDrawings(chapter: chapter, verse: verse)
             for drawing in drawings {
                 let id = drawing.persistentModelID
                 try await actor.update(id) { (old: BibleDrawing) async in
@@ -133,12 +133,12 @@ public struct DrawingDatabase: Sendable {
     // MARK: - Page 단위 BibleDrawing
     
     /// 한 장 전체의 페이지 단위 필사 데이터(BiblePageDrawing)를 불러옴.
-    /// - Parameter title: 가져올 성경의 이름과 장
+    /// - Parameter chapter: 가져올 성경의 이름과 장
     /// - Returns: 해당 장의 페이지 전체 필사 데이터 (없으면 nil)
     /// - Note: 정렬 조건은 없으며, 조건에 매칭되는 첫 번째 레코드만 반환.
-    public func fetchPageDrawing(title: TitleVO) async throws -> BiblePageDrawing? {
-        let titleName = title.title.rawValue
-        let chapter = title.chapter
+    public func fetchPageDrawing(chapter: BibleChapter) async throws -> BiblePageDrawing? {
+        let titleName = chapter.title.rawValue
+        let chapter = chapter.chapter
         let predicate = #Predicate<BiblePageDrawing> {
             $0.titleName == titleName &&
             $0.titleChapter == chapter
@@ -155,28 +155,28 @@ public struct DrawingDatabase: Sendable {
     ///   - drawingVersion: 좌표계/인코딩 버전을 나타내는 버전 값
     ///   - updateDate: 업데이트 일시 (기본값: 현재 시각)
     public func upsertPageDrawing(
-        title: TitleVO,
+        chapter: BibleChapter,
         fullLineData: Data,
         updateDate: Date = .now
     ) async {
         do {
-            if let existing = try await fetchPageDrawing(title: title) {
+            if let existing = try await fetchPageDrawing(chapter: chapter) {
                 // 기존 페이지 Drawing 업데이트
                 let id = existing.persistentModelID
                 try await actor.update(id) { (old: BiblePageDrawing) async in
                     old.fullLineData = fullLineData
                     old.updateDate = updateDate
                 }
-                Log.debug("🔄 updated page drawing:", title)
+                Log.debug("🔄 updated page drawing:", chapter)
             } else {
                 // 없으면 새로 생성
                 let page = BiblePageDrawing(
-                    bibleTitle: title,
+                    bibleTitle: chapter,
                     fullLineData: fullLineData,
                     updateDate: updateDate
                 )
                 try await actor.insert(page)
-                Log.debug(" inserted page drawing:", title)
+                Log.debug(" inserted page drawing:", chapter)
             }
         } catch {
             Log.error("❌ upsertPageDrawing failed:", error)

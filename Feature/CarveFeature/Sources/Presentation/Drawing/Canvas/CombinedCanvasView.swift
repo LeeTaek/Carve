@@ -146,8 +146,7 @@ public struct CombinedCanvasView: UIViewRepresentable {
             
             // 손가락 입력 설정 Bind
             store.$allowFingerDrawing.publisher
-                .sink { [weak self] allow in
-                    guard let self else { return }
+                .sink { allow in
                     canvas.drawingPolicy = allow ? .anyInput : .pencilOnly
                 }
                 .store(in: &cancellables)
@@ -161,4 +160,15 @@ public struct CombinedCanvasView: UIViewRepresentable {
         }
     }
     
+}
+
+#Preview {
+    @Previewable @State var store = Store(
+        initialState: .initialState,
+        reducer: { CombinedCanvasFeature() },
+        withDependencies: {
+            $0.drawingData = .previewValue
+        }
+    )
+    CombinedCanvasView(store: store)
 }

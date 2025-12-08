@@ -17,8 +17,8 @@ public struct MailComposeFeature {
     public struct State: Equatable, Hashable {
         public static var initialState = Self(mailInfo: .initialState)
         public var isPresent: Bool = false
-        public var mailInfo: FeedbackVO
-        public init(mailInfo: FeedbackVO) {
+        public var mailInfo: UserFeedback
+        public init(mailInfo: UserFeedback) {
             self.mailInfo = mailInfo
         }
     }

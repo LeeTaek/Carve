@@ -16,11 +16,11 @@ import ComposableArchitecture
 struct CarveDetailReducerTesting {
     
     @Test(arguments: [
-        TitleVO.init(title: .samuel1, chapter: 4),
-        TitleVO.initialState,
-        TitleVO(title: .samuel2, chapter: 2)
+        BibleChapter.init(title: .samuel1, chapter: 4),
+        BibleChapter.initialState,
+        BibleChapter(title: .samuel2, chapter: 2)
     ])
-    func fetchBible(title: TitleVO) throws {
+    func fetchBible(title: BibleChapter) throws {
 //        #expect(throws: Never.self) {
 //            try reducer.fetchBible(chapter: title)
 //        }

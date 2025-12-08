@@ -10,13 +10,6 @@ import Foundation
 import PencilKit
 
 extension PKDrawing {
-    func clipped(to rect: CGRect) -> PKDrawing {
-        let filteredStrokes = self.strokes.filter { stroke in
-            stroke.renderBounds.intersects(rect)
-        }
-        return PKDrawing(strokes: filteredStrokes)
-    }
-    
     /// verseRect 내부에 포함되는 stroke 부분만 남기는 정밀 clip
     func clippedPrecisely(to rect: CGRect) -> PKDrawing {
         let clippedStrokes = strokes.compactMap { $0.clippedPrecisely(to: rect) }

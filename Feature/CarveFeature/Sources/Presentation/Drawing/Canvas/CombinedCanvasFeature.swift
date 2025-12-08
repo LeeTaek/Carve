@@ -20,13 +20,11 @@ public struct CombinedCanvasFeature {
         /// drawing 그리기 위한 위치 -  [verse: rect]
         public var drawingRect: [Int: CGRect] = [:]
         /// drawing 가져오기 위한 title
-        public var title: TitleVO
+        public var chapter: BibleChapter
         /// fetch, update 등 데이터 관리를 위한 배열
         public var drawings: [BibleDrawing] = []
         /// Canvas에 그리기 위한 drawing
         public var combinedDrawing: PKDrawing = PKDrawing()
-        /// global 좌표계 기준 CombinedCanvasView의 frame (절 frame → 캔버스 로컬 좌표 변환용)
-        public var canvasGlobalFrame: CGRect = .zero
         /// undo/redo 가능 여부
         public var canUndo: Bool = false
         public var canRedo: Bool = false
@@ -38,11 +36,11 @@ public struct CombinedCanvasFeature {
         @Shared(.appStorage("pencilConfig")) public var pencilConfig: PencilPalatte = .initialState
         @Shared(.appStorage("allowFingerDrawing")) public var allowFingerDrawing: Bool = false
         
-        public init(title: TitleVO, drawingRect: [Int: CGRect]) {
-            self.title = title
+        public init(chapter: BibleChapter, drawingRect: [Int: CGRect]) {
+            self.chapter = chapter
             self.drawingRect = drawingRect
         }
-        public static let initialState = Self(title: .initialState, drawingRect: [:])
+        public static let initialState = Self(chapter: .initialState, drawingRect: [:])
     }
     @Dependency(\.drawingData) var drawingContext
 
@@ -57,8 +55,6 @@ public struct CombinedCanvasFeature {
         case saveDrawing(PKDrawing, CGRect)
         /// 캔버스 로컬 좌표계 기준으로 계산된 각 절의 rect 갱신
         case verseFrameUpdated(verse: Int, rect: CGRect)
-        /// global 좌표계 기준 CombinedCanvasView의 frame 변경 알림
-        case canvasFrameChanged(CGRect)
         /// undo 상태 변경 알림
         case undoStateChanged(canUndo: Bool, canRedo: Bool)
         /// undo
@@ -71,15 +67,15 @@ public struct CombinedCanvasFeature {
         Reduce { state, action in
             switch action {
             case .fetchDrawingData:
-                return .run { [title = state.title, context = drawingContext] send in
+                return .run { [chapter = state.chapter, context = drawingContext] send in
                     // fullDrawing이 있으면 그대로 사용
-                    if let pageDrawing = try? await context.fetchPageDrawing(title: title),
+                    if let pageDrawing = try? await context.fetchPageDrawing(chapter: chapter),
                        let data = pageDrawing.fullLineData,
                        let fullDrawing = try? PKDrawing(data: data) {
                         await send(.setPageDrawing(fullDrawing))
                     } else {
                         // CombinedCanvas 이전의 splitDrawingd이면 merge
-                        let fetchedData = await fetchDrawings(title: title, context: context)
+                        let fetchedData = await fetchDrawings(chapter: chapter, context: context)
                         await send(.setDrawing(fetchedData))
                     }
                 }
@@ -93,9 +89,9 @@ public struct CombinedCanvasFeature {
                 state.combinedDrawing = drawing
                 
             case .saveDrawing(let drawing, let changedRect):
-                return .run { [title = state.title, verseRects = state.drawingRect, context = drawingContext] _ in
+                return .run { [chapter = state.chapter, verseRects = state.drawingRect, context = drawingContext] _ in
                     await saveDrawing(
-                        for: title,
+                        for: chapter,
                         from: changedRect,
                         verseRects: verseRects,
                         canvasDrawing: drawing,
@@ -114,10 +110,6 @@ public struct CombinedCanvasFeature {
                     rebuild(state: &state)
                 }
 
-            case .canvasFrameChanged(let frame):
-                state.canvasGlobalFrame = frame
-                return .none
-                
             case .undoStateChanged(let canUndo, let canRedo):
                 state.canUndo = canUndo
                 state.canRedo = canRedo
@@ -138,9 +130,9 @@ extension CombinedCanvasFeature {
     /// SwiftData에서 Drawing Fetch
     /// - Parameter title: SwiftData에서 가져올 TitleVO
     /// - Returns: SwiftData에서 가져온 데이터
-    private func fetchDrawings(title: TitleVO, context: DrawingDatabase) async -> [BibleDrawing] {
+    private func fetchDrawings(chapter: BibleChapter, context: DrawingDatabase) async -> [BibleDrawing] {
         do {
-            let storedDrawing = try await context.fetch(title: title)
+            let storedDrawing = try await context.fetch(chapter: chapter)
             // DrawingData가 있는 애들만 거름
             let candidates = storedDrawing.filter { $0.lineData?.containsPKStroke == true }
             
@@ -163,13 +155,13 @@ extension CombinedCanvasFeature {
     /// 3. SwiftData update
     ///
     /// - Parameters:
-    ///   - title: 저장할 drawing
+    ///   - chapter: 저장할 drawing
     ///   - changedRect: 새로 그려진 영역의 Rect
     ///   - verseRects: rect가 어떤 절에 있는지 정보
     ///   - canvasDrawing: canvas의 전체 그림 정보
     ///   - context: SwiftData Context
     private func saveDrawing(
-        for title: TitleVO,
+        for chapter: BibleChapter,
         from changedRect: CGRect,
         verseRects: [Int: CGRect],
         canvasDrawing: PKDrawing,
@@ -198,7 +190,7 @@ extension CombinedCanvasFeature {
             )
             
             let request = DrawingUpdateRequest(
-                title: title,
+                chapter: chapter,
                 verse: verse,
                 updateLineData: local.dataRepresentation()
             )
@@ -207,7 +199,7 @@ extension CombinedCanvasFeature {
         await context.updateDrawings(requests: updateDrawingList)
         // 페이지 단위 fullUpdate
         await context.upsertPageDrawing(
-            title: title,
+            chapter: chapter,
             fullLineData: canvasDrawing.dataRepresentation()
         )
     }

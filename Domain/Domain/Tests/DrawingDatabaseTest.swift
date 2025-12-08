@@ -34,13 +34,13 @@ final class DrawingDatabaseTest: XCTestCase {
     
     func test_fetch_drawing() async throws {
         // given
-        let title = TitleVO.init(title: .genesis, chapter: 1)
+        let title = BibleChapter.init(title: .genesis, chapter: 1)
         let lastVerse = 1
         let drawing = BibleDrawing(bibleTitle: title, verse: lastVerse)
         
         // when
         try await actor.insert(drawing)
-        let storedDrawings = try await drawingContext.fetch(title: title).first
+        let storedDrawings = try await drawingContext.fetch(chapter: title).first
         
         // then
         XCTAssertEqual(drawing, storedDrawings)
