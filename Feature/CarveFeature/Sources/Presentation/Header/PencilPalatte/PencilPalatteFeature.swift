@@ -17,29 +17,31 @@ import ComposableArchitecture
 public struct PencilPalatteFeature {
     @ObservableState
     public struct State {
+        public var popoverPoint: CGPoint = .zero
+        public var canUndo: Bool = false
+        public var canRedo: Bool = false
+        
         @Shared(.appStorage("pencilConfig")) public var pencilConfig: PencilPalatte = .initialState
         @Shared(.appStorage("selectedColorIndex")) public var selectedColorIndex: Int = 0
         @Shared(.appStorage("selectedWidthIndex")) public var selectedWidthIndex: Int = 0
-        @Shared(.appStorage("palatteColorSet")) public var palatteColors: [CodableColor] = [.init(color: .black),
-                                                                                            .init(color: .blue),
-                                                                                            .init(color: .red)]
+        @Shared(.appStorage("palatteColorSet")) public var palatteColors: [CodableColor] = [
+            .init(color: .black),
+            .init(color: .blue),
+            .init(color: .red)
+        ]
         @Shared(.appStorage("lineWidthSet")) public var lineWidths: [CGFloat] = [2.0, 4.0, 6.0]
-        @Shared(.inMemory("canUndo")) public var canUndo: Bool = false
-        @Shared(.inMemory("canRedo")) public var canRedo: Bool = false
-        public var popoverPoint: CGPoint = .zero
+        
         @Presents var navigation: Destination.State?
                 
         public static var initialState = State()
     }
 
-    @Dependency(\.undoManager) private var undoManager
     
     public enum Action: ViewAction {
         case setConfigPencilColor(UIColor)
         case setConfigPencilType(PKInkingTool.InkType)
         case changePencilColor(index: Int, color: UIColor)
         case navigation(PresentationAction<Destination.Action>)
-        case setCanUndo
         case view(View)
         
         public enum View {
@@ -90,19 +92,7 @@ public struct PencilPalatteFeature {
             case .navigation(.dismiss):
                 state.$pencilConfig.withLock { $0.lineColor = state.palatteColors[state.selectedColorIndex] }
                 state.$pencilConfig.withLock { $0.lineWidth = state.lineWidths[state.selectedWidthIndex] }
-            case .view(.undo):
-                undoManager.undo()
-                return .run { send in
-                    await send(.setCanUndo)
-                }
-            case .view(.redo):
-                undoManager.redo()
-                return .run { send in
-                    await send(.setCanUndo)
-                }
-            case .setCanUndo:
-                state.$canUndo.withLock { $0 = undoManager.canUndo }
-                state.$canRedo.withLock { $0 = undoManager.canRedo }
+
             default: break
             }
             return .none

@@ -13,6 +13,7 @@ import Combine
 
 import ComposableArchitecture
 
+@available(*, deprecated, message: "CombinedCanvasView / CombinedCanvasFeature로 대체")
 public struct CanvasView: UIViewRepresentable {
     public typealias UIViewType = PKCanvasView
     private var store: StoreOf<CanvasFeature>
@@ -104,15 +105,4 @@ public struct CanvasView: UIViewRepresentable {
         return PKDrawing()
     }
     
-}
-
-
-#Preview {
-    @Previewable @State var store = Store(initialState: .initialState,
-                                          reducer: { CanvasFeature() },
-                                          withDependencies: {
-        $0.drawingData = .previewValue
-        $0.undoManager = .previewValue
-    })
-    CanvasView(store: store)
 }

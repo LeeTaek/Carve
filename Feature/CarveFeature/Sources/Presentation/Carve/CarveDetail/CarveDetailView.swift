@@ -14,6 +14,7 @@ import ComposableArchitecture
 @ViewAction(for: CarveDetailFeature.self)
 public struct CarveDetailView: View {
     @Bindable public var store: StoreOf<CarveDetailFeature>
+    /// CombinedCanvasView의 너비를 화면의 절반으로 맞추기 위해 계산.
     @State private(set) var halfWidth: CGFloat = 0
     
     public init(store: StoreOf<CarveDetailFeature>) {
@@ -21,6 +22,7 @@ public struct CarveDetailView: View {
     }
     
     public var body: some View {
+        /// iOS 17.5 이상에서 Apple Pencil 더블탭으로 지우개/이전 펜 타입을 전환하는 래핑 뷰 적용
         if #available(iOS 17.5, *) {
             applyPencilDoubleTapView()
                 .overlay(alignment: .top) {
@@ -45,7 +47,7 @@ public struct CarveDetailView: View {
             .onPencilDoubleTap { _ in
                 let isEraser = (store.headerState.palatteSetting.pencilConfig.pencilType == .monoline)
                 if isEraser {
-                    send(.switchToPrevious)
+                    send(.switchToPreviousPenType)
                 } else {
                     send(.switchToEraser)
                 }
@@ -55,21 +57,54 @@ public struct CarveDetailView: View {
     private var detailScroll: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                contentView
-                    .padding(.top, store.headerState.headerHeight)
-                    .offsetY { previous, current in
-                        debounce {
-                            send(.headerAnimation(previous, current))
+                ZStack {
+                    contentView
+                        .padding(.top, store.headerState.headerHeight)
+                        .offsetY { previous, current in
+                            delay {
+                                send(.headerAnimation(previous, current))
+                            }
                         }
-                    }
-                    .onChange(of: store.sentenceWithDrawingState) {
-                        send(.setProxy(proxy))
-                    }
+                        .onChange(of: store.verseRowState) {
+                            send(.setProxy(proxy))
+                        }
+                    
+                    CombinedCanvasView(
+                        store: self.store.scope(
+                            state: \.canvasState,
+                            action: \.scope.canvasAction
+                        )
+                    )
+                    .id(store.canvasState.chapter)
+                    .background(
+                        GeometryReader { proxy in
+                            Color.clear
+                                .onAppear {
+                                    let frame = proxy.frame(in: .global)
+                                    send(.canvasFrameChanged(frame))
+                                }
+                                .onChange(of: proxy.frame(in: .global)) { _, frame in
+                                    send(.canvasFrameChanged(frame))
+                                }
+                        }
+                    )
+                    .frame(width: halfWidth)
+                    .frame(
+                        maxWidth: .infinity,
+                        alignment: store.isLeftHanded ? .leading : .trailing
+                    )
+                }
+                .onAppear {
+                    send(.fetchSentence)
+                }
+            }
+            .onTapGesture {
+                send(.tapForHeaderHidden)
+            }
+            .onTwoFingerDoubleTap {
+                send(.twoFingerDoubleTapForUndo)
             }
             .coordinateSpace(name: "Scroll")
-            .onAppear {
-                send(.fetchSentence)
-            }
         }
         .onGeometryChange(for: CGFloat.self) { proxy in
             return proxy.size.width / 2
@@ -82,20 +117,29 @@ public struct CarveDetailView: View {
         LazyVStack(pinnedViews: .sectionHeaders) {
             Section {
                 ForEach(
-                    store.scope(state: \.sentenceWithDrawingState,
-                                action: \.scope.sentenceWithDrawingAction),
+                    store.scope(state: \.verseRowState,
+                                action: \.scope.verseRowAction),
                     id: \.state.id
                 ) { childStore in
-                    SentencesWithDrawingView(store: childStore, halfWidth: $halfWidth)
-                        .padding(.horizontal, 10)
+                    VerseRowView(
+                        store: childStore,
+                        halfWidth: $halfWidth,
+                        onUnderlineLayoutChange: { id, layout in
+                            send(.underlineLayoutChanged(id: id, layout: layout))
+                        }
+                    )
+                    .padding(.horizontal, 10)
                 }
             }
         }
         .id("\(store.sentenceSetting)-\(halfWidth)")
     }
-
-    private func debounce(delay: TimeInterval = 0.1,
-                          _ action: @escaping () -> Void) {
+    
+    /// 헤더 스크롤 애니메이션 등 과도한 이벤트 호출을 방지하기 위한 딜레이
+    private func delay(
+        to delay: TimeInterval = 0.1,
+        _ action: @escaping () -> Void
+    ) {
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: action)
     }
 }
@@ -106,7 +150,7 @@ public struct CarveDetailView: View {
         initialState: .initialState,
         reducer: {
             CarveDetailFeature()
-        }   
+        }
     )
     CarveDetailView(store: store)
 }

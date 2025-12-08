@@ -20,6 +20,7 @@ public struct CloudSettingsFeature {
         public static let initialState = Self()
         @Presents public var path: Path.State?
         public var iCloudIsOn: Bool = true
+        public var isLoading: Bool = false
     }
     @Dependency(\.createSwiftDataActor) private var database
 
@@ -27,12 +28,16 @@ public struct CloudSettingsFeature {
         case path(PresentationAction<Path.Action>)
         case setiCloud(Bool)
         case removeAlliCloudData
-        case presentPopover(title: String? = nil,
-                            body: String,
-                            confirmTitle: String,
-                            cancelTitle: String? = nil,
-                            color: Color = .black)
+        case presentPopover(
+            title: String? = nil,
+            body: String,
+            confirmTitle: String,
+            cancelTitle: String? = nil,
+            color: Color = .black,
+            action: PopupFeature.ConfirmAction
+        )
         case popupDismiss
+        case setLoading(Bool)
         case view(View)
         
         public enum View {
@@ -47,37 +52,51 @@ public struct CloudSettingsFeature {
             case .view(.databaseIsEmpty):
                 return .run { send in
                     if !(try await database.databaseIsEmpty(BibleDrawing.self)) {
-                        await send(.presentPopover(title: nil,
-                                                   body: "필사 데이터를 삭제하면 다시 복구할 수 없습니다.\n 정말 삭제하시겠습니까?",
-                                                   confirmTitle: "삭제",
-                                                   cancelTitle: "취소",
-                                                   color: .red))
+                        await send(.presentPopover(
+                            title: nil,
+                            body: "필사 데이터를 삭제하면 다시 복구할 수 없습니다.\n 정말 삭제하시겠습니까?",
+                            confirmTitle: "삭제",
+                            cancelTitle: "취소",
+                            color: .red,
+                            action: .deleteAllData
+                        ))
                     } else {
                         await send(.presentPopover(
                             body: "기기에 필사 데이터가 존재하지 않습니다.",
-                            confirmTitle: "확인"
+                            confirmTitle: "확인",
+                            action: .dismiss
                         ))
                     }
                 }
-            case let .presentPopover(title, body, confirmTitle, cancelTitle, color):
+            case let .presentPopover(title, body, confirmTitle, cancelTitle, color, action):
                 state.path = .popup(.init(
                     title: title,
                     body: body,
                     confirmTitle: confirmTitle,
                     cancelTitle: cancelTitle,
-                    confirmColor: color
+                    confirmColor: color,
+                    confirmAction: action
                 ))
             case .removeAlliCloudData:
                 return .run { send in
+                    await send(.setLoading(true))
                     try await database.deleteAll(BibleDrawing.self)
+                    await send(.setLoading(false))
+                    
                     await send(.presentPopover(
                         body: "모든 필사 데이터를 삭제했습니다.",
-                        confirmTitle: "확인")
-                    )
+                        confirmTitle: "확인",
+                        action: .dismiss
+                    ))
                 }
             case .path(.presented(.popup(.view(.confirm)))):
+                let shouldDeleteAllData = state.path?.popup?.confirmAction == .deleteAllData
                 return .run { send in
-                    if !(try await database.databaseIsEmpty(BibleDrawing.self)) {
+                    guard let databaseIsEmpty = try? await database.databaseIsEmpty(BibleDrawing.self) else {
+                        return
+                    }
+                    
+                    if shouldDeleteAllData && !databaseIsEmpty {
                         await send(.removeAlliCloudData)
                     } else {
                         await send(.popupDismiss)
@@ -87,6 +106,8 @@ public struct CloudSettingsFeature {
                 state.path = nil
             case .popupDismiss:
                 state.path = nil
+            case .setLoading(let isLoading):
+                state.isLoading = isLoading
             default: break
             }
             return .none

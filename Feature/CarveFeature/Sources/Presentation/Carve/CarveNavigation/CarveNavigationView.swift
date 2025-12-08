@@ -12,10 +12,13 @@ import Resources
 
 import ComposableArchitecture
 
+/// Carve 디테일 화면의 네비게이션 담당
 @ViewAction(for: CarveNavigationFeature.self)
 public struct CarveNavigationView: View {
     @Bindable public var store: StoreOf<CarveNavigationFeature>
+    /// 구약 성경의 DisclosureGroup 접힘/펼침
     @State private var isShowOldTestment: Bool
+    /// 신약 성경의 DisclosureGroup 접힘/펼침
     @State private var isShowNewTestment: Bool
     
     public init(store: StoreOf<CarveNavigationFeature>) {
@@ -37,6 +40,7 @@ public struct CarveNavigationView: View {
         .navigationSplitViewStyle(.prominentDetail)
     }
     
+    /// 성경 제목(구약/신약) 사이드바
     private var sideBar: some View {
         List(selection: $store.selectedTitle) {
             DisclosureGroup(
@@ -95,6 +99,7 @@ public struct CarveNavigationView: View {
         }
     }
     
+    /// 성경 장 목록
     private var contentList: some View {
         List(1...(store.currentTitle.title.lastChapter),
              id: \.self ,
@@ -104,6 +109,7 @@ public struct CarveNavigationView: View {
              .navigationTitle(store.currentTitle.title.koreanTitle())
     }
     
+    /// detail화면의 content와 sheet popup 등 네비게이션 관리.
     @ViewBuilder
     private func detailView() -> some View {
         if store.columnVisibility != .detailOnly {
@@ -134,7 +140,7 @@ public struct CarveNavigationView: View {
     }
 }
 
-
+/// 사이드바 DisclosureGroup에 화살표 회전 애니메이션을 적용하는 커스텀 스타일
 struct SidebarDisclosureGroupStyle: DisclosureGroupStyle {
     func makeBody(configuration: Configuration) -> some View {
         HStack {
