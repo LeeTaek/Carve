@@ -43,7 +43,14 @@ public struct DrawingChartView: View {
             }
         }
         .task {
+#if DEBUG
+        // Xcode 프리뷰에서는 fetchData 안 날림
+        if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] != "1" {
             send(.fetchData)
+        }
+        #else
+        send(.fetchData)
+        #endif
         }
     }
     
@@ -79,8 +86,7 @@ public struct DrawingChartView: View {
                         if let date = value.as(Date.self) {
                             Text(date.formatted(
                                 Date.FormatStyle()
-                                    .
-                                locale(Locale(identifier: "ko_KR"))
+                                    .locale(Locale(identifier: "ko_KR"))
                                     .month(.defaultDigits)
                                     .day(.defaultDigits)
                                     .weekday(.abbreviated)
@@ -91,17 +97,22 @@ public struct DrawingChartView: View {
                     AxisGridLine(centered: true, stroke: StrokeStyle(lineWidth: 1, dash: [5]))
                 }
             }
-            .chartXVisibleDomain(length: 86400 * 7)  // 7일
-            .chartScrollPosition(x: $store.scrollPosition)
-            .chartScrollableAxes(.horizontal)
-            .chartXSelection(value: $store.selectedDate)
-            .chartYScale(domain: 0...max(1, store.dailyRecords.map(\.count).max() ?? 0))
+            .chartXScale(
+                  domain: store.lowerBoundDate
+                  ...
+                  Calendar.current.startOfDay(for: Date())
+              )
+            .chartScrollableAxes(.horizontal)               // 가로 스크롤 활성화
+            .chartXVisibleDomain(length: 86400 * 7)         // 한 페이지에 7일
+            .chartScrollPosition(x: $store.scrollPosition)  // 현재 페이지 기준 값
             .chartScrollTargetBehavior(
               .valueAligned(
-                matching: DateComponents(hour: 0),               // 스냅 기준: 매일 00:00
-                majorAlignment: .page
+                matching: DateComponents(hour: 0),          // 하루 단위 스냅
+                majorAlignment: .page                       // 페이지 단위로 스냅
               )
             )
+            .chartXSelection(value: $store.selectedDate)
+            .chartYScale(domain: 0...max(1, store.dailyRecords.map(\.count).max() ?? 0))
             .frame(height: UIScreen.main.bounds.height / 3)
         } else {
             EmptyView()
@@ -111,26 +122,11 @@ public struct DrawingChartView: View {
 
 
 #Preview {
-
-    @Previewable @State var store = Store(initialState: .initialState) {
+    @Previewable @State var store = Store(initialState: .previewState) {
         DrawingChartFeature()
     } withDependencies: { dependency in
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        let yesterday = calendar.date(byAdding: .day, value: -1, to: today)!
-        let dayBeforeYesterday = calendar.date(byAdding: .day, value: -2, to: today)!
-        
-        let sampleDrawing = [
-            BibleDrawing(bibleTitle: .initialState, section: 4, lineData: .mockDrawing, updateDate: yesterday),
-            BibleDrawing(bibleTitle: .initialState, section: 5, lineData: .mockDrawing, updateDate: yesterday),
-            BibleDrawing(bibleTitle: .initialState, section: 6, lineData: .mockDrawing, updateDate: dayBeforeYesterday)
-        ]
-        
-        for drawing in sampleDrawing {
-            try? dependency.createSwiftDataActor.insert(drawing)
-        }
+        dependency.drawingData = .previewValue
     }
-
     
     DrawingChartView(store: store)
 }
