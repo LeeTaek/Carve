@@ -44,13 +44,13 @@ public struct DrawingChartView: View {
         }
         .task {
 #if DEBUG
-        // Xcode 프리뷰에서는 fetchData 안 날림
-        if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] != "1" {
+            // Xcode 프리뷰에서는 fetchData 안 날림
+            if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] != "1" {
+                send(.fetchData)
+            }
+#else
             send(.fetchData)
-        }
-        #else
-        send(.fetchData)
-        #endif
+#endif
         }
     }
     
@@ -93,23 +93,22 @@ public struct DrawingChartView: View {
                             ))
                         }
                     }
-
+                    
                     AxisGridLine(centered: true, stroke: StrokeStyle(lineWidth: 1, dash: [5]))
                 }
             }
+            // 스크롤 가능한 전체 도메인: 하한선 ~ 오늘
             .chartXScale(
-                  domain: store.lowerBoundDate
-                  ...
-                  Calendar.current.startOfDay(for: Date())
-              )
-            .chartScrollableAxes(.horizontal)               // 가로 스크롤 활성화
+                domain: store.lowerBoundDate...Calendar.current.startOfDay(for: Date())
+            )
+            .chartScrollableAxes(.horizontal)
             .chartXVisibleDomain(length: 86400 * 7)         // 한 페이지에 7일
             .chartScrollPosition(x: $store.scrollPosition)  // 현재 페이지 기준 값
             .chartScrollTargetBehavior(
-              .valueAligned(
-                matching: DateComponents(hour: 0),          // 하루 단위 스냅
-                majorAlignment: .page                       // 페이지 단위로 스냅
-              )
+                .valueAligned(
+                    matching: DateComponents(hour: 0),
+                    majorAlignment: .page                   // visibleDomain 기준 페이지 스냅
+                )
             )
             .chartXSelection(value: $store.selectedDate)
             .chartYScale(domain: 0...max(1, store.dailyRecords.map(\.count).max() ?? 0))

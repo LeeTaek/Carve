@@ -18,7 +18,6 @@ public struct DrawingChartFeature {
     @ObservableState
     public struct State {
         public static let initialState = Self()
-        
         /// 차트에 표시할 하루 단위 필사 기록 목록.
         public var dailyRecords: [DailyRecord] = []
         /// 차트의 현재 스크롤 위치(날짜)
@@ -85,11 +84,7 @@ public struct DrawingChartFeature {
     
     public var body: some Reducer<State, Action> {
         BindingReducer()
-            .onChange(of: \.scrollPosition) { old, new in
-                Reduce { state, _ in
-                    handleScrollPositionChange(&state, old: old, new: new)
-                }
-            }
+            // 선택된 날짜 변경 시 선택 레코드 동기화
             .onChange(of: \.selectedDate) { _, newValue in
                 Reduce { state, _ in
                     handleSelectedDateChange(&state, newValue: newValue)
@@ -123,35 +118,6 @@ public struct DrawingChartFeature {
 }
 
 extension DrawingChartFeature {
-    /// 스크롤 위치가 변할 때(왼쪽으로 이동) 과거 데이터를 prefetch할지 판단.
-    private func handleScrollPositionChange(
-        _ state: inout State,
-        old: Date,
-        new: Date
-    ) -> Effect<Action> {
-        let calendar = Calendar.current
-        let oldDay = calendar.startOfDay(for: old)
-        let newDay = calendar.startOfDay(for: new)
-        
-        // 스크롤 방향이 오른쪽(미래) 또는 하루 변화 없음 → 무시
-        guard newDay < oldDay else { return .none }
-        
-        // 초기 로딩 중이거나, 이미 페이징 중이면 무시
-        guard !state.dailyRecords.isEmpty, !state.isAppendingPastData else { return .none }
-        
-        let prefetchDistanceDays = 1
-        let prefetchThreshold = calendar.date(byAdding: .day,
-                                              value: prefetchDistanceDays,
-                                              to: state.earliestFetchedDate)!
-        
-        guard state.earliestFetchedDate > state.lowerBoundDate else { return .none }
-        
-        if newDay <= prefetchThreshold {
-            return .send(.view(.loadMoreBefore(newDay)))
-        }
-        return .none
-    }
-    
     /// 선택된 날짜가 바뀌었을 때 선택된 레코드를 동기화.
     private func handleSelectedDateChange(
         _ state: inout State,
