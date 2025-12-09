@@ -11,6 +11,7 @@ import UIKit
 
 import ComposableArchitecture
 
+/// AppStorage(UserDefaults) 기반 Codable 타입을 @Shared로 사용하기 위한 Extension
 extension SharedKey {
     public static func appStorage<Value: Codable>(_ key: String) -> Self
     where Self == CodableAppStorageKey<Value> {
@@ -18,6 +19,9 @@ extension SharedKey {
     }
 }
 
+/// Codable 타입을 AppStorage(UserDefaults)에 저장하고, shared 상태로 연동하기 위한 Key
+/// UserDefaults에 저장할때 사용하는 키를 주입받고, 해당 키로 Encoding, Decoding하여 저장/반환
+/// UserDefaults.didChangeNotification를 구독하여 값 변경시 새로운 값 전파
 public struct CodableAppStorageKey<Value: Codable>: SharedKey {
     @Dependency(\.defaultAppStorage) var store
     private let key: String
@@ -30,6 +34,7 @@ public struct CodableAppStorageKey<Value: Codable>: SharedKey {
         self.key = key
     }
     
+    ///  UserDefaults에서 로드, 없거나 디코딩 실패시 초기값 저장/반환
     public func load(context: LoadContext<Value>,
                      continuation: LoadContinuation<Value>) {
         var hasResumed = false // 중복 호출 방지 플래그
@@ -59,7 +64,7 @@ public struct CodableAppStorageKey<Value: Codable>: SharedKey {
         }
     }
     
-    
+    /// 전달된 값 JSON 으로 인코딩해서 UserDefaults에 저장
     public func save(_ value: Value,
                      context: SaveContext,
                      continuation: SaveContinuation) {
@@ -73,6 +78,7 @@ public struct CodableAppStorageKey<Value: Codable>: SharedKey {
         }
     }
     
+    /// UserDefaults.didChangeNotification을 구독하여 값 변경 시마다 새로운 값을 전파
     public func subscribe(context: LoadContext<Value>,
                           subscriber: SharedSubscriber<Value>) -> SharedSubscription {
         if let storedData = store.data(forKey: key) {
@@ -110,6 +116,7 @@ public struct CodableAppStorageKey<Value: Codable>: SharedKey {
         }
     }
     
+    /// 초기값이 존재할때 UserDefaults에 저장, continuation에서 처리
     private func handleInitialValue(
         _ initialValue: Value?,
         saveContext: SaveContext,
@@ -137,6 +144,7 @@ public struct CodableAppStorageKey<Value: Codable>: SharedKey {
         }
     }
     
+    /// SharedKey 식별을 위해 사용되는 ID
     private struct AppStorageKeyID: Hashable {
         let key: String
         let store: UserDefaults

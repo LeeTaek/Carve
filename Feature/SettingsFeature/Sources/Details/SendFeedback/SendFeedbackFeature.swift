@@ -22,7 +22,7 @@ public struct SendFeedbackFeature {
     public struct State: Hashable {
         public static let initialState = Self()
         @Presents public var path: Path.State?
-        public var feedbackInfo: FeedbackVO = .initialState
+        public var feedbackInfo: UserFeedback = .initialState
         public var imageSelection: [PhotosPickerItem] = []
         public var isOnPhotosPicker: Bool = false
         public var isOnFileImporter: Bool = false
@@ -32,7 +32,7 @@ public struct SendFeedbackFeature {
     }
     public enum Action: ViewAction {
         case path(PresentationAction<Path.Action>)
-        case setFeedbackType(FeedbackVO.FeedbackType)
+        case setFeedbackType(UserFeedback.FeedbackType)
         case presentPhotoPicker(Bool)
         case preesentFileImporter(Bool)
         case setPhotosImage([PhotosPickerItem])

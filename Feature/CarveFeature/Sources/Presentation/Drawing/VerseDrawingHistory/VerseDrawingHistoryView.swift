@@ -13,11 +13,11 @@ import PencilKit
 
 import ComposableArchitecture
 
-@ViewAction(for: SentenceDrewHistoryListFeature.self)
-public struct SentenceDrewHistoryListView: View {
-    @Bindable public var store: StoreOf<SentenceDrewHistoryListFeature>
+@ViewAction(for: VerseDrawingHistoryFeature.self)
+public struct VerseDrawingHistoryView: View {
+    @Bindable public var store: StoreOf<VerseDrawingHistoryFeature>
     
-    public init(store: StoreOf<SentenceDrewHistoryListFeature>) {
+    public init(store: StoreOf<VerseDrawingHistoryFeature>) {
         self.store = store
     }
     
@@ -101,7 +101,7 @@ public struct SentenceDrewHistoryListView: View {
 #Preview {
     @Previewable @State var store = Store(
         initialState: .initialState,
-        reducer: { SentenceDrewHistoryListFeature() }
+        reducer: { VerseDrawingHistoryFeature() }
     )
-    SentenceDrewHistoryListView(store: store)
+    VerseDrawingHistoryView(store: store)
 }

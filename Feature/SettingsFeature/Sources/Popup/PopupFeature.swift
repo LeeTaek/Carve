@@ -20,7 +20,15 @@ public struct PopupFeature {
         public var confirmTitle: String = ""
         public var cancelTitle: String?
         public var confirmColor: Color = .black
+        public var confirmAction: ConfirmAction = .dismiss
+        
     }
+    
+    public enum ConfirmAction: Equatable {
+        case dismiss
+        case deleteAllData
+    }
+    
     public enum Action: ViewAction {
         case setTitle(String)
         case setBody(String)

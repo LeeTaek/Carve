@@ -1,5 +1,5 @@
 //
-//  TitleVO.swift
+//  BibleChapter.swift
 //  DomainRealm
 //
 //  Created by 이택성 on 1/29/24.
@@ -9,15 +9,18 @@
 import Foundation
 import SwiftData
 
-public struct TitleVO: Sendable, Codable, Hashable {
-    public static func == (lhs: TitleVO, rhs: TitleVO) -> Bool {
+/// 성경의 한 위치(책 + 장) 모델.
+public struct BibleChapter: Sendable, Codable, Hashable {
+    public static func == (lhs: BibleChapter, rhs: BibleChapter) -> Bool {
         (lhs.title == rhs.title) && (lhs.chapter == rhs.chapter)
     }
     
+    /// 성경 책(창세기, 출애굽기 등).
     public var title: BibleTitle
+    /// 장(chapter) 번호.
     public var chapter: Int
     
-    public static let initialState = TitleVO.init(title: .genesis, chapter: 1)
+    public static let initialState = BibleChapter.init(title: .genesis, chapter: 1)
     
     public init(title: BibleTitle, chapter: Int) {
         self.title = title
@@ -25,6 +28,7 @@ public struct TitleVO: Sendable, Codable, Hashable {
     }
 }
 
+/// 성경 66권(구약/신약).
 public enum BibleTitle: String, CaseIterable, Identifiable, Codable, Sendable {
     public var id: Self { self }
     case genesis = "1-01Genesis.txt"
@@ -95,6 +99,8 @@ public enum BibleTitle: String, CaseIterable, Identifiable, Codable, Sendable {
     case jude = "2-26Jude.txt"
     case revelation = "2-27Revelation.txt"
 
+    /// 현재 책 기준으로 다음 책을 반환.
+    /// - 마지막 책(요한계시록)일 경우 다시 창세기로 순환.
     public func next() -> Self {
         let allCases = type(of: self).allCases
         let currentIndex = allCases.firstIndex(of: self)!
@@ -106,6 +112,8 @@ public enum BibleTitle: String, CaseIterable, Identifiable, Codable, Sendable {
         }
     }
 
+    /// 현재 책 기준으로 이전 책을 반환합니다.
+    /// - 첫 책(창세기)일 경우 요한계시록으로 순환.
     public func before() -> Self {
         let allCases = type(of: self).allCases
         let currentIndex = allCases.firstIndex(of: self)!
@@ -117,6 +125,8 @@ public enum BibleTitle: String, CaseIterable, Identifiable, Codable, Sendable {
         }
     }
 
+    /// 각 성경 책이 갖는 마지막 장.
+    /// - 예: 창세기 50장, 마태복음 28장 등.
     public var lastChapter: Int {
         switch self {
         case .genesis: return 50
@@ -189,6 +199,9 @@ public enum BibleTitle: String, CaseIterable, Identifiable, Codable, Sendable {
         }
     }
 
+    /// 텍스트 리소스 파일명 일부 문자열로부터 대응되는 BibleTitle.
+    /// - Parameter raw: 파일명에 포함된 문자열.
+    /// - Returns: 일치하는 책이 없을 경우 기본값으로 창세기를 반환.
     public static func getTitle(_ raw: String) -> Self {
         for title in Self.allCases where title.rawValue.contains(raw) {
             return title
@@ -196,6 +209,7 @@ public enum BibleTitle: String, CaseIterable, Identifiable, Codable, Sendable {
         return .genesis
     }
 
+    /// 각 성경 책의 한글 제목을 반환. (예: .genesis → "창세기")
     public func koreanTitle() -> String {
         let titles: [Self: String] = [
             .genesis: "창세기",
@@ -268,6 +282,8 @@ public enum BibleTitle: String, CaseIterable, Identifiable, Codable, Sendable {
         return titles[self] ?? ""
     }
     
+    /// 현재 책이 구약(Old Testament)에 속하는지 여부.
+    /// allCases 배열에서의 인덱스를 기준으로 39권 이전이면 구약으로 간주.
     public var isOldtestment: Bool {
         if let index = Self.allCases.firstIndex(of: self) {
             return index < 39
