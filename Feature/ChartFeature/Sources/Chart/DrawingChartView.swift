@@ -19,6 +19,7 @@ import ComposableArchitecture
 @ViewAction(for: DrawingChartFeature.self)
 public struct DrawingChartView: View {
     @Bindable public var store: StoreOf<DrawingChartFeature>
+    @State private var isInteractingWithChart = false
     
     private let darkBlue = Color(hex: 0x0A77AE)
     private let lightBlue = Color(hex: 0x76DAF0)
@@ -35,13 +36,28 @@ public struct DrawingChartView: View {
     public var body: some View {
         List {
             Section {
-                chart()
+                DailyRecordChartView(
+                    records: store.dailyRecords,
+                    scrollPosition: $store.scrollPosition,
+                    selectedDate: $store.selectedDate,
+                    lowerBoundDate: store.lowerBoundDate
+                )
             } header: {
                 Text("주간 필사량")
                     .font(.subheadline)
                     .foregroundStyle(.gray)
             }
+            
+            Section {
+                latestDrawingHistoryList
+            } header: {
+                Text("최근 필사 내역")
+                    .font(.subheadline)
+                    .foregroundStyle(.gray)
+            }
+            
         }
+        .scrollDisabled(isInteractingWithChart)
         .task {
 #if DEBUG
             // Xcode 프리뷰에서는 fetchData 안 날림
@@ -54,67 +70,14 @@ public struct DrawingChartView: View {
         }
     }
     
-    @ViewBuilder
-    public func chart() -> some View {
-        if (store.dailyRecords.last?.date) != nil {
-            Chart(store.dailyRecords) { record in
-                LineMark(
-                    x: .value("날짜", record.date, unit: .day),
-                    y: .value("필사량", record.count)
-                )
-                .lineStyle(StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
-                .foregroundStyle(
-                    LinearGradient(
-                        gradient: Gradient(colors: [lightBlue, primaryBlue]),
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .symbol {
-                    if let count = store.selectedRecord?.count,
-                       let id = store.selectedRecord?.id {
-                        CustomSymbol(value: count, isSelected: id == record.id)
-                    } else {
-                        EmptyView()
-                    }
-                }
-                .interpolationMethod(.cardinal(tension: 0.4))
-            }
-            .chartXAxis {           // X축 UI
-                AxisMarks(values: .stride(by: .day)) { value in
-                    AxisValueLabel {        // x축 라벨
-                        if let date = value.as(Date.self) {
-                            Text(date.formatted(
-                                Date.FormatStyle()
-                                    .locale(Locale(identifier: "ko_KR"))
-                                    .month(.defaultDigits)
-                                    .day(.defaultDigits)
-                                    .weekday(.abbreviated)
-                            ))
-                        }
-                    }
-                    
-                    AxisGridLine(centered: true, stroke: StrokeStyle(lineWidth: 1, dash: [5]))
-                }
-            }
-            // 스크롤 가능한 전체 도메인: 하한선 ~ 오늘
-            .chartXScale(
-                domain: store.lowerBoundDate...Calendar.current.startOfDay(for: Date())
-            )
-            .chartScrollableAxes(.horizontal)
-            .chartXVisibleDomain(length: 86400 * 7)         // 한 페이지에 7일
-            .chartScrollPosition(x: $store.scrollPosition)  // 현재 페이지 기준 값
-            .chartScrollTargetBehavior(
-                .valueAligned(
-                    matching: DateComponents(hour: 0),
-                    majorAlignment: .page                   // visibleDomain 기준 페이지 스냅
-                )
-            )
-            .chartXSelection(value: $store.selectedDate)
-            .chartYScale(domain: 0...max(1, store.dailyRecords.map(\.count).max() ?? 0))
-            .frame(height: UIScreen.main.bounds.height / 3)
-        } else {
-            EmptyView()
+    private var latestDrawingHistoryList: some View {
+        VStack {
+            let totalCount = store.dailyRecords.reduce(0) { $0 + $1.count }
+            Text("한 주 동안 \(totalCount)개의 절을 필사하셨네요!")
+                .font(.subheadline)
+                .padding()
+            
+            
         }
     }
 }
