@@ -19,16 +19,7 @@ import ComposableArchitecture
 @ViewAction(for: DrawingChartFeature.self)
 public struct DrawingChartView: View {
     @Bindable public var store: StoreOf<DrawingChartFeature>
-    @State private var isInteractingWithChart = false
-    
-    private let darkBlue = Color(hex: 0x0A77AE)
-    private let lightBlue = Color(hex: 0x76DAF0)
-    private let mediumBlue = Color(hex: 0x318FA8)
-    private let primaryBlue = Color(hex: 0x089CF5)
-    private let offWhite = Color(hex: 0xEBE8EB)
-    private let darkGray = Color(hex: 0x343434)
-    private let lavenderBlue = Color(hex: 0xC0BCE2)
-    
+
     public init(store: StoreOf<DrawingChartFeature>) {
         self.store = store
     }
@@ -37,27 +28,43 @@ public struct DrawingChartView: View {
         List {
             Section {
                 DailyRecordChartView(
-                    records: store.dailyRecords,
-                    scrollPosition: $store.scrollPosition,
-                    selectedDate: $store.selectedDate,
-                    lowerBoundDate: store.lowerBoundDate
+                    store: store.scope(
+                        state: \.dailyRecordChart,
+                        action: \.dailyRecordChart
+                    )
                 )
+                // 섹션 헤더에는 영향 주지 않고, 콘텐츠(행)만 카드처럼 보이도록 처리
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(Color.white)
+                .sectionCardShadow()
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
             } header: {
                 Text("주간 필사량")
                     .font(.subheadline)
-                    .foregroundStyle(.gray)
+                    .foregroundStyle(Color.Brand.ink)
             }
             
             Section {
                 latestDrawingHistoryList
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(Color.white)
+                    .sectionCardShadow()
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
             } header: {
                 Text("최근 필사 내역")
                     .font(.subheadline)
-                    .foregroundStyle(.gray)
+                    .foregroundStyle(Color.Brand.ink)
             }
             
         }
-        .scrollDisabled(isInteractingWithChart)
+        .scrollDisabled(store.dailyRecordChart.isScrolling)
+        .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .background(Color.Brand.background)
         .task {
 #if DEBUG
             // Xcode 프리뷰에서는 fetchData 안 날림
@@ -72,7 +79,7 @@ public struct DrawingChartView: View {
     
     private var latestDrawingHistoryList: some View {
         VStack {
-            let totalCount = store.dailyRecords.reduce(0) { $0 + $1.count }
+            let totalCount = store.dailyRecordChart.records.reduce(0) { $0 + $1.count }
             Text("한 주 동안 \(totalCount)개의 절을 필사하셨네요!")
                 .font(.subheadline)
                 .padding()
