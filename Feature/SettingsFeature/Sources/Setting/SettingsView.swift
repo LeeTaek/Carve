@@ -36,6 +36,7 @@ public struct SettingsView: View {
                     }
                 }
         }
+        .toolbar(.hidden)
     }
     
     private var sideBar: some View {

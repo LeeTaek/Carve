@@ -1,5 +1,5 @@
 //
-//  VerseRowView.swift
+//  SentencesWithDrawingView.swift
 //  FeatureCarve
 //
 //  Created by 이택성 on 2/22/24.
@@ -11,26 +11,19 @@ import CarveToolkit
 
 import ComposableArchitecture
 
-/// 한 절(verse)에 대한 Row UI를 그리는 뷰.
-@ViewAction(for: VerseRowFeature.self)
-public struct VerseRowView: View {
-    @Bindable public var store: StoreOf<VerseRowFeature>
-    /// sentence와 canvas 영역 배치를 위한 너비
+@ViewAction(for: SentencesWithDrawingFeature.self)
+public struct SentencesWithDrawingView: View {
+    @Bindable public var store: StoreOf<SentencesWithDrawingFeature>
     @Binding private var halfWidth: CGFloat
-    /// 1절일때만 상단 여백 추가
+    
     private var topDrawingInset: CGFloat {
         store.sentence.verse == 1 ? 25 : 0
     }
-    /// Text.LayoutKey(텍스트 레이아웃 변경 이벤트)를 상위(CarveDetailFeature)로 전달하기 위한 클로저.
-    /// - Note: 원래는 VerseTextFeature.Action.setUnderlineOffsets로 직접 액션을 보냈으나,
-    ///         ForEachReducer에서 missing element warning이 발생하는 문제를 피하기 위해
-    ///         레이아웃 이벤트만 상위로 올리고, 실제 underlineOffsets 계산 및 상태 갱신은
-    ///         CarveDetailFeature에서 처리.
     let onUnderlineLayoutChange: (VerseRowFeature.State.ID, Text.LayoutKey.Value) -> Void
 
     
     public init(
-        store: StoreOf<VerseRowFeature>,
+        store: StoreOf<SentencesWithDrawingFeature>,
         halfWidth: Binding<CGFloat>,
         onUnderlineLayoutChange: @escaping (VerseRowFeature.State.ID, Text.LayoutKey.Value) -> Void
     ) {
@@ -41,18 +34,18 @@ public struct VerseRowView: View {
     
     public var body: some View {
         VStack {
-            if store.verseTextState.chapterTitle != nil {
+            if store.sentenceState.chapterTitle != nil {
                 chapterTitleView
             }
             HStack(alignment: .top) {
                 if store.isLeftHanded {
                     // 왼손잡이
-                    underLineView
+                    canvasView
                     sentenceView
                 } else {
                     // 오른손잡이
                     sentenceView
-                    underLineView
+                    canvasView
                 }
             }
             .animation(.easeInOut(duration: 0.3), value: store.isLeftHanded)
@@ -71,10 +64,10 @@ public struct VerseRowView: View {
         }
     }
     
-    /// 현재 절 내용표시 텍스트 뷰
     private var sentenceView: some View {
         VerseTextView(
-            store: self.store.scope(state: \.verseTextState,action: \.scope.verseTextAction),
+            store: self.store.scope(state: \.sentenceState,
+                                    action: \.scope.sentenceAction),
             onLayoutChange: { layout in
                 onUnderlineLayoutChange(store.id, layout)
             }
@@ -83,17 +76,25 @@ public struct VerseRowView: View {
         .padding(.top, topDrawingInset)
     }
     
-    /// 각 장의 제목
+    private var canvasView: some View {
+        ZStack {
+            underLineView
+            CanvasView(
+                store: self.store.scope(state: \.canvasState,
+                                        action: \.scope.canvasAction)
+            )
+        }
+        .frame(width: halfWidth, alignment: .topTrailing)
+    }
+    
     private var chapterTitleView: some View {
-        Text(store.verseTextState.chapterTitle ?? "")
+        Text(store.sentenceState.chapterTitle ?? "")
             .font(.system(size: 22))
             .fontWeight(.heavy)
     }
     
-    /// Canvas 밑에 깔 밑줄 view
-    /// glbalRect를 측정해 상위로 전달
     private var underLineView: some View {
-        let underlineOffsets = store.verseTextState.underlineOffsets
+        let underlineOffsets = store.sentenceState.underlineOffsets
         
         return Canvas { context, size in
             for y in underlineOffsets {
@@ -103,44 +104,24 @@ public struct VerseRowView: View {
                 context.stroke(path, with: .color(.gray), style: StrokeStyle(lineWidth: 1, dash: [5]))
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(.horizontal, 20)
-        .frame(width: halfWidth, alignment: .topTrailing)
-        .background(
-            GeometryReader { proxy in
-                Color.clear
-                    .preference(
-                        key: VerseFramePreferenceKey.self,
-                        value: proxy.frame(in: .named("CanvasSpace"))
-                    )
-            }
-        )
-        .onPreferenceChange(VerseFramePreferenceKey.self) { rect in
-            send(.updateVerseFrame(rect))
-        }
     }
     
 }
-
-private struct VerseFramePreferenceKey: PreferenceKey {
-    static var defaultValue: CGRect = .zero
-    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
-        value = nextValue()
-    }
-}
-
 
 #Preview {
     @Previewable @State var store = Store(
         initialState: .initialState) {
-            VerseRowFeature()
+            SentencesWithDrawingFeature()
         }
     @Previewable @State var halfWidth = UIScreen().bounds.width / 2
     
-    VerseRowView(store: store, halfWidth: $halfWidth) { _, layout in
+    SentencesWithDrawingView(store: store, halfWidth: $halfWidth) { _, layout in
         let offsets =  VerseTextFeature.makeUnderlineOffsets(
             from: layout,
-            sentenceSetting: store.verseTextState.sentenceSetting
+            sentenceSetting: store.sentenceState.sentenceSetting
         )
-        store.send(.scope(.verseTextAction(.setUnderlineOffsets(offsets))))
+        store.send(.scope(.sentenceAction(.setUnderlineOffsets(offsets))))
     }
 }

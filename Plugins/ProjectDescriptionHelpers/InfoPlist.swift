@@ -17,7 +17,7 @@ public extension InfoPlist {
             "CFBundleName": "$(PRODUCT_NAME)",
             "CFBundleIdentifier": "$(PRODUCT_BUNDLE_IDENTIFIER)",
             "CFBundleVersion": "1",
-            "CFBundleShortVersionString": "1.2.0",
+            "CFBundleShortVersionString": "1.2.1",
             "CFBundleDisplayName": "새기다",
             "UILaunchStoryboardName": "LaunchScreen",
             "UISupportedInterfaceOrientations": "UIInterfaceOrientationPortrait",
