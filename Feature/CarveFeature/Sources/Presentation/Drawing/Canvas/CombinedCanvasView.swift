@@ -31,6 +31,22 @@ public struct CombinedCanvasView: UIViewRepresentable {
             canvas.backgroundColor = .clear
             canvas.isOpaque = false
             canvas.translatesAutoresizingMaskIntoConstraints = false
+            
+            canvas.isScrollEnabled = false
+            canvas.bounces = false
+            canvas.alwaysBounceVertical = false
+            canvas.alwaysBounceHorizontal = false
+            canvas.minimumZoomScale = 1
+            canvas.maximumZoomScale = 1
+            canvas.zoomScale = 1
+            canvas.contentInset = .zero
+            canvas.contentOffset = .zero
+
+            let scale = UIScreen.main.scale
+            canvas.contentScaleFactor = scale
+            canvas.layer.contentsScale = scale
+            
+            
             canvas.becomeFirstResponder()
             
             return canvas
@@ -43,6 +59,9 @@ public struct CombinedCanvasView: UIViewRepresentable {
     }
 
     public func updateUIView(_ canvas: PKCanvasView, context: Context) {
+        // SwiftUI 리사이즈/회전 중에도 PKCanvasView 내부 UIScrollView 상태가 남지 않도록
+        // 매 업데이트 타이밍에 안전하게 정규화.
+        context.coordinator.normalizeCanvasForOverlay(canvas)
     }
     
     
@@ -60,7 +79,8 @@ public struct CombinedCanvasView: UIViewRepresentable {
         private var cancellables = Set<AnyCancellable>()
         /// 이전 stroke 수
         private var previousStrokeCount = 0
-
+        /// 마지막으로 정규화(normalize)했던 bounds (리사이즈 감지)
+        private var lastNormalizedBounds: CGRect = .zero
 
         init(store: StoreOf<CombinedCanvasFeature>) {
             self.store = store
@@ -73,7 +93,7 @@ public struct CombinedCanvasView: UIViewRepresentable {
                 notifyUndoState(from: canvasView)
                 return
             }
-            
+                
             let now = Date()
             guard now.timeIntervalSince(lastUpdate) > debounceInterval else { return }
             lastUpdate = now
@@ -108,9 +128,11 @@ public struct CombinedCanvasView: UIViewRepresentable {
                     return
                 }
                 canvas.drawing = newDrawing
+                self.previousStrokeCount = newDrawing.strokes.count
             }
             // undo상태 초기화
             notifyUndoState(from: canvas)
+            normalizeCanvasForOverlay(canvas)
             
             store.publisher.undoVersion
                 .removeDuplicates()
@@ -158,6 +180,43 @@ public struct CombinedCanvasView: UIViewRepresentable {
             let canRedo = canvas.undoManager?.canRedo ?? false
             store.send(.undoStateChanged(canUndo: canUndo, canRedo: canRedo))
         }
+        
+        /// 리사이즈/회전/윈도우 크기 변경 시 PKCanvasView(UIScrollView) 내부 상태가 남아
+        /// 라이브 스트로크가 입력 위치와 어긋나는 것을 완화하기 위해 상태를 정규화.
+        func normalizeCanvasForOverlay(_ canvas: PKCanvasView) {
+            // 스크롤/줌 고정
+            canvas.isScrollEnabled = false
+            canvas.bounces = false
+            canvas.alwaysBounceVertical = false
+            canvas.alwaysBounceHorizontal = false
+            canvas.minimumZoomScale = 1
+            canvas.maximumZoomScale = 1
+            if canvas.zoomScale != 1 { canvas.zoomScale = 1 }
+
+            // inset/offset 초기화
+            if canvas.contentInset != .zero { canvas.contentInset = .zero }
+            if canvas.contentOffset != .zero { canvas.contentOffset = .zero }
+
+            // contentSize는 bounds에 맞춰 고정 (bounds가 0이면 생략)
+            if !canvas.bounds.isEmpty {
+                let desired = canvas.bounds.size
+                if canvas.contentSize != desired { canvas.contentSize = desired }
+            }
+
+            // 화면 스케일 고정 (윈도우 모드 전환 시 contentsScale mismatch 방지)
+            let scale = UIScreen.main.scale
+            if canvas.contentScaleFactor != scale { canvas.contentScaleFactor = scale }
+            if canvas.layer.contentsScale != scale { canvas.layer.contentsScale = scale }
+
+            // bounds가 바뀐 시점에는 한번 더 강하게 정규화
+            if lastNormalizedBounds != canvas.bounds {
+                lastNormalizedBounds = canvas.bounds
+                // 레이아웃 반영 타이밍을 앞당겨 라이브 렌더링 오프셋을 줄인다.
+                canvas.setNeedsLayout()
+                canvas.layoutIfNeeded()
+            }
+        }
+        
     }
     
 }

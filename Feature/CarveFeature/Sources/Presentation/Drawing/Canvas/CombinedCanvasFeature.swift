@@ -89,6 +89,8 @@ public struct CombinedCanvasFeature {
                 state.combinedDrawing = drawing
                 
             case .saveDrawing(let drawing, let changedRect):
+                state.combinedDrawing = drawing
+                
                 return .run { [chapter = state.chapter, verseRects = state.drawingRect, context = drawingContext] _ in
                     await saveDrawing(
                         for: chapter,
