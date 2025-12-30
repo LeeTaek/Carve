@@ -183,6 +183,27 @@ public struct DrawingDatabase: Sendable {
         }
     }
     
+    public func updateDrawing(drawing: BibleDrawing) async throws {
+        do {
+            if (try await fetch(drawing: drawing)) != nil {
+                try await actor.update(drawing.id) { (oldValue: BibleDrawing) async in
+                    oldValue.lineData = drawing.lineData
+                    oldValue.updateDate = drawing.updateDate
+                }
+            } else {
+                try await actor.insert(drawing)
+            }
+            Log.debug("update drawing", drawing.id ?? "")
+        } catch {
+            Log.error("failed to update drawing", error)
+        }
+    }
+    
+    public func updateDrawings(drawings: [BibleDrawing]) async throws {
+        for drawing in drawings {
+            try await updateDrawing(drawing: drawing)
+        }
+    }
 }
 
 extension DrawingDatabase: DependencyKey {

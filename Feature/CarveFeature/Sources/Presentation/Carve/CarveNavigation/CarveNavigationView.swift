@@ -12,10 +12,7 @@ import Resources
 
 import ComposableArchitecture
 
-/// Carve Detail flow의 네비게이션 담당 View.
-/// - Note: NavigationSplitView + selection 으로 사이드바/콘텐츠/디테일 컬럼을 구성하고,
-///  `detailNavigation`(enum Destination + @Presents)로 sheet/fullScreenCover를 여는
-///   트리 기반 네비게이션 패턴을 사용.
+/// Carve 디테일 화면의 네비게이션 담당
 @ViewAction(for: CarveNavigationFeature.self)
 public struct CarveNavigationView: View {
     @Bindable public var store: StoreOf<CarveNavigationFeature>
@@ -112,7 +109,7 @@ public struct CarveNavigationView: View {
              .navigationTitle(store.currentTitle.title.koreanTitle())
     }
     
-    /// detail화면의 content와 sheet popup 등 tree 기반 네비게이션 관리.
+    /// detail화면의 content와 sheet popup 등 네비게이션 관리.
     @ViewBuilder
     private func detailView() -> some View {
         if store.columnVisibility != .detailOnly {

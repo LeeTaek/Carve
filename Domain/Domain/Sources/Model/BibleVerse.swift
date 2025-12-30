@@ -39,7 +39,7 @@ public struct BibleVerse: Equatable, Sendable {
         self.sentenceScript = sentence
     }
 
-    /// 한 줄의 원시 문자열에서 장 제목/절 번호/본문을 파싱하여 SentenceVO를 초기화.
+    /// 한 줄의 원시 문자열에서 장 제목/절 번호/본문을 파싱하여 BibleVerse를 초기화.
     /// 문자열에서 "숫자:숫자" 패턴과 "<소제목>" 패턴을 인식하여 분리.
     /// - Parameters:
     ///   - title: 성경 책 정보를 담은 TitleVO.
