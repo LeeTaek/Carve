@@ -13,7 +13,7 @@ import Combine
 
 import ComposableArchitecture
 
-//@available(*, deprecated, message: "CombinedCanvasView / CombinedCanvasFeature로 대체")
+@available(*, deprecated, message: "CombinedCanvasView / CombinedCanvasFeature로 대체")
 public struct CanvasView: UIViewRepresentable {
     public typealias UIViewType = PKCanvasView
     private var store: StoreOf<CanvasFeature>
