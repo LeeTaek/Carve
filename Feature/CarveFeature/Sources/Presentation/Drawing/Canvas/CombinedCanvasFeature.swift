@@ -68,20 +68,15 @@ public struct CombinedCanvasFeature {
             switch action {
             case .fetchDrawingData:
                 return .run { [chapter = state.chapter, context = drawingContext] send in
-                    // 1) verse 기반 drawing을 먼저 사용 (리사이즈/레이아웃 변경에 대응하기 위함)
-                    let fetchedData = await fetchDrawings(chapter: chapter, context: context)
-                    if !fetchedData.isEmpty {
-                        await send(.setDrawing(fetchedData))
-                        return
-                    }
-
-                    // 2) verse drawing이 전혀 없는 경우에만 fullDrawing fallback
+                    // fullDrawing이 있으면 그대로 사용
                     if let pageDrawing = try? await context.fetchPageDrawing(chapter: chapter),
                        let data = pageDrawing.fullLineData,
                        let fullDrawing = try? PKDrawing(data: data) {
                         await send(.setPageDrawing(fullDrawing))
                     } else {
-                        await send(.setDrawing([]))
+                        // CombinedCanvas 이전의 splitDrawingd이면 merge
+                        let fetchedData = await fetchDrawings(chapter: chapter, context: context)
+                        await send(.setDrawing(fetchedData))
                     }
                 }
 
@@ -90,6 +85,7 @@ public struct CombinedCanvasFeature {
                 rebuild(state: &state)
                 
             case .setPageDrawing(let drawing):
+                state.drawings = []   // 페이지에 Drawing이 있는 경우 verse 기반 drawing 안 씀
                 state.combinedDrawing = drawing
                 
             case .saveDrawing(let drawing, let changedRect):
