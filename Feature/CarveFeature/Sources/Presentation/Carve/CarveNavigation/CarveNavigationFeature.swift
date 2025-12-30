@@ -138,7 +138,7 @@ extension CarveNavigationFeature {
     private func handleTitleDidTapped(state: inout State) -> Effect<Action> {
         state.selectedTitle = state.currentTitle.title
         state.selectedChapter = state.currentTitle.chapter
-        state.carveDetailState.verseRowState.removeAll()
+        state.carveDetailState.sentenceWithDrawingState.removeAll()
         state.columnVisibility = .all
         return .none
     }

@@ -22,14 +22,13 @@ public struct CarveDetailFeature {
         public var headerState: HeaderFeature.State
         /// 성경 구절 상태 List
         public var verseRowState: IdentifiedArrayOf<VerseRowFeature.State> = []
-        /// 캔버스 상태
-        public var canvasState: CombinedCanvasFeature.State = .initialState
+        public var sentenceWithDrawingState: IdentifiedArrayOf<SentencesWithDrawingFeature.State> = []
         /// ScrollView 위치 제어용 프록시
         public var proxy: ScrollViewProxy?
         /// 마지막으로 사용한 펜 종류(펜슬 더블탭시 전환용)
         var lastUsedPencil: PKInkingTool.InkType = .pencil
-        /// global 좌표계 기준 CombinedCanvasView의 frame (Canvas 기준 verse 별 rect 계산용)
-        var canvasGlobalFrame: CGRect = .zero
+//        /// global 좌표계 기준 CombinedCanvasView의 frame (Canvas 기준 verse 별 rect 계산용)
+//        var canvasGlobalFrame: CGRect = .zero
         
         /// 성경 문장 출력시 자간 폰트 등 설정
         @Shared(.appStorage("sentenceSetting")) public var sentenceSetting: SentenceSetting = .initialState
@@ -41,10 +40,13 @@ public struct CarveDetailFeature {
         )
     }
     @Dependency(\.drawingData) var drawingContext
+    @Dependency(\.undoManager) var undoManager
     
     public enum Action: ViewAction, CarveToolkit.ScopeAction {
         /// 화면 최상단으로 스크롤
         case scrollToTop
+        case setSentence([BibleVerse], [BibleDrawing])
+        
         case view(View)
         case scope(ScopeAction)
         
@@ -76,8 +78,9 @@ public struct CarveDetailFeature {
     @CasePathable
     public enum ScopeAction {
         case verseRowAction(IdentifiedActionOf<VerseRowFeature>)
+        case sentenceWithDrawingAction(IdentifiedActionOf<SentencesWithDrawingFeature>)
         case headerAction(HeaderFeature.Action)
-        case canvasAction(CombinedCanvasFeature.Action)
+//        case canvasAction(CombinedCanvasFeature.Action)
     }
     
     /// 비동기 작업 취소용 작업
@@ -92,10 +95,6 @@ public struct CarveDetailFeature {
               action: \.scope.headerAction) {
             HeaderFeature()
         }
-        Scope(state: \.canvasState,
-              action: \.scope.canvasAction) {
-            CombinedCanvasFeature()
-        }
 
         Reduce { state, action in
             switch action {
@@ -103,33 +102,46 @@ public struct CarveDetailFeature {
                 return .send(.scope(.headerAction(.headerAnimation(previous, current))))
                 
             case .view(.fetchSentence):
-                let oldChapter = state.canvasState.chapter
+                let oldChapter = state.headerState.currentTitle
                                 
                 return .merge(
                     .cancel(id: CancelID.fetchBible(title: oldChapter)),
                     handleFetchSentence(state: &state)
                 )
                 
+            case .setSentence(let sentences, let drawings):
+                var sentenceState: IdentifiedArrayOf<SentencesWithDrawingFeature.State> = []
+                for sentence in sentences {
+                    let candidates = drawings.filter { $0.verse == sentence.verse && $0.lineData?.containsPKStroke == true }
+                    let drawing = candidates.first(where: { $0.isPresent == true })
+                    ?? candidates.sorted(by: { ($0.updateDate ?? Date.distantPast) > ($1.updateDate ?? Date.distantPast) }).first
+                    sentenceState.append(SentencesWithDrawingFeature.State(sentence: sentence, drawing: drawing))
+                }
+                state.sentenceWithDrawingState = sentenceState
+                undoManager.clear()
+                return .none
+                
             case .setFetchedSentence(let chapter, let verses):
                 state.verseRowState = IdentifiedArrayOf(
                     uniqueElements: verses.map { VerseRowFeature.State(sentence: $0) }
                 )
                 
-                state.canvasState = .init(chapter: chapter, drawingRect: [:])
+//                state.canvasState = .init(chapter: chapter, drawingRect: [:])
                 
                 // 3) Drawing 데이터 fetch 트리거
-                return .send(.scope(.canvasAction(.fetchDrawingData)))
+//                return .send(.scope(.canvasAction(.fetchDrawingData)))
+                return .none
 
             case .view(.underlineLayoutChanged(let id, let layout)):
-                guard var row = state.verseRowState[id: id] else { return .none }
+                guard var row = state.sentenceWithDrawingState[id: id] else { return .none }
 
-                let setting = row.verseTextState.sentenceSetting
+                let setting = row.sentenceState.sentenceSetting
                 let offsets = VerseTextFeature.makeUnderlineOffsets(
                     from: layout,
                     sentenceSetting: setting
                 )
-                row.verseTextState.underlineOffsets = offsets
-                state.verseRowState[id: id] = row
+                row.sentenceState.underlineOffsets = offsets
+                state.sentenceWithDrawingState[id: id] = row
 
                 return .none
                 
@@ -159,42 +171,61 @@ public struct CarveDetailFeature {
                 state.lastUsedPencil = penType
                 return .none
 
-            case .scope(.verseRowAction(
-                .element(id: let id, action: .view(.updateVerseFrame(let globalRect))))
-            ):
-                return updateVerseFrame(
-                    state: &state,
-                    id: id,
-                    globalRect: globalRect
-                )
-                
-            case .view(.canvasFrameChanged(let rect)):
-                state.canvasGlobalFrame = rect
-                return .none
-
-            case .scope(.canvasAction(.undoStateChanged(let canUndo, let canRedo))):
-                state.headerState.palatteSetting.canUndo = canUndo
-                state.headerState.palatteSetting.canRedo = canRedo
-                return .none
-
-            case .scope(.headerAction(.palatteAction(.view(.undo)))):
-                return .send(.scope(.canvasAction(.undo)))
-                
-            case .scope(.headerAction(.palatteAction(.view(.redo)))):
-                return .send(.scope(.canvasAction(.redo)))
-                
+//            case .scope(.verseRowAction(
+//                .element(id: let id, action: .view(.updateVerseFrame(let globalRect))))
+//            ):
+//                return updateVerseFrame(
+//                    state: &state,
+//                    id: id,
+//                    globalRect: globalRect
+//                )
+//                
+//            case .view(.canvasFrameChanged(let rect)):
+//                state.canvasGlobalFrame = rect
+//                return .none
+//
+//            case .scope(.canvasAction(.undoStateChanged(let canUndo, let canRedo))):
+//                state.headerState.palatteSetting.canUndo = canUndo
+//                state.headerState.palatteSetting.canRedo = canRedo
+//                return .none
+//            case .scope(.headerAction(.palatteAction(.view(.undo)))):
+//                return .send(.scope(.canvasAction(.undo)))
+//                return .none
+//                
+//            case .scope(.headerAction(.palatteAction(.view(.redo)))):
+//                return .send(.scope(.canvasAction(.redo)))
+            
             case .view(.tapForHeaderHidden):
                 return .send(.scope(.headerAction(.toggleVisibility)))
                 
             case .view(.twoFingerDoubleTapForUndo):
-                return .send(.scope(.canvasAction(.undo)))
+//                return .send(.scope(.canvasAction(.undo)))
+                Log.debug("두손가락 탭")
+                return .send(.scope(.headerAction(.palatteAction(.view(.undo)))))
+
+            case .scope(.sentenceWithDrawingAction(
+                .element(id: let id,
+                         action: .scope(.canvasAction(let action))))
+            ):
+                guard case .saveDrawing = action,
+                      let index = state.sentenceWithDrawingState.firstIndex(where: { $0.id == id }) else {
+                    return .none
+                }
+                let sentenceState = state.sentenceWithDrawingState[index]
+                return .run { _ in
+                    guard let drawing = sentenceState.canvasState.drawing,
+                          drawing.lineData?.containsPKStroke == true
+                    else { return }
+                    try await drawingContext.updateDrawing(drawing: drawing)
+                }
                 
+                     
             default: return .none
             }
         }
-        .forEach(\.verseRowState,
-                  action: \.scope.verseRowAction) {
-            VerseRowFeature()
+        .forEach(\.sentenceWithDrawingState,
+                  action: \.scope.sentenceWithDrawingAction) {
+            SentencesWithDrawingFeature()
         }
     }
     
@@ -243,9 +274,12 @@ extension CarveDetailFeature {
         return .run { send in
             do {
                 let sentences = try fetchBible(chapter: title)
-                try Task.checkCancellation()
+                let drawings = try await drawingContext.fetch(chapter: title)
                 
-                await send(.setFetchedSentence(chapter: title, verses: sentences))
+                try Task.checkCancellation()
+                await send(.setSentence(sentences, drawings))
+                
+ //                await send(.setFetchedSentence(chapter: title, verses: sentences))
             } catch {
                 Log.error("Fetch Sentence Error")
             }
@@ -263,36 +297,36 @@ extension CarveDetailFeature {
         return .none
     }
     
-    
-    /// Sentence 셀에서 전달된 global 좌표를 Canvas 기준 로컬 좌표로 변환하고,
-    /// 각 절의 rect를 CombinedCanvasFeature에 전달.
-    /// - Parameters:
-    ///   - id: 각 절의 상태 ID
-    ///   - globalRect: 각 절의 Rect
-    private func updateVerseFrame(
-        state: inout State,
-        id: VerseRowFeature.State.ID,
-        globalRect: CGRect
-    ) -> Effect<Action> {
-        guard let index = state.verseRowState.firstIndex(where: { $0.id == id }) else {
-            return .none
-        }
-        let sentenceState = state.verseRowState[index]
-        let verse = sentenceState.sentence.verse
-
-        let canvasFrame = state.canvasGlobalFrame
-        guard canvasFrame.width > 0, canvasFrame.height > 0 else { return .none }
-
-        // canvas 기준 로컬 rect로 변환
-        let localRect = CGRect(
-            x: globalRect.minX - canvasFrame.minX,
-            y: globalRect.minY - canvasFrame.minY,
-            width: globalRect.width,
-            height: globalRect.height
-        )
-
-        return .send(.scope(.canvasAction(
-            .verseFrameUpdated(verse: verse, rect: localRect)
-        )))
-    }
+//    
+//    /// Sentence 셀에서 전달된 global 좌표를 Canvas 기준 로컬 좌표로 변환하고,
+//    /// 각 절의 rect를 CombinedCanvasFeature에 전달.
+//    /// - Parameters:
+//    ///   - id: 각 절의 상태 ID
+//    ///   - globalRect: 각 절의 Rect
+//    private func updateVerseFrame(
+//        state: inout State,
+//        id: VerseRowFeature.State.ID,
+//        globalRect: CGRect
+//    ) -> Effect<Action> {
+//        guard let index = state.verseRowState.firstIndex(where: { $0.id == id }) else {
+//            return .none
+//        }
+//        let sentenceState = state.verseRowState[index]
+//        let verse = sentenceState.sentence.verse
+//
+//        let canvasFrame = state.canvasGlobalFrame
+//        guard canvasFrame.width > 0, canvasFrame.height > 0 else { return .none }
+//
+//        // canvas 기준 로컬 rect로 변환
+//        let localRect = CGRect(
+//            x: globalRect.minX - canvasFrame.minX,
+//            y: globalRect.minY - canvasFrame.minY,
+//            width: globalRect.width,
+//            height: globalRect.height
+//        )
+//
+//        return .send(.scope(.canvasAction(
+//            .verseFrameUpdated(verse: verse, rect: localRect)
+//        )))
+//    }
 }

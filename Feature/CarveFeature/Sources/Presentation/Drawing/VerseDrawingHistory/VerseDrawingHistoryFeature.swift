@@ -38,8 +38,8 @@ public struct VerseDrawingHistoryFeature {
         case view(View)
         /// 필사 기록 목록 비동기로 조회하여 반영
         case setDrawings([BibleDrawing])
-        /// 선택 여부를 상위로 전달: 팝업 닫기 위한 목적
-        case setPresentDrawing
+        /// 선택 여부를 상위로 전달: 팝업 닫기 위한 목적, 선택한 drawing 전달
+        case setPresentDrawing(BibleDrawing)
         
         public enum View {
             /// 성경 절에 대한 필사 기록을 가져옴
@@ -99,7 +99,7 @@ extension VerseDrawingHistoryFeature {
                 verse: verse,
                 presentID: presentID
             )
-            await send(.setPresentDrawing)
+            await send(.setPresentDrawing(drawing))
         }
     }
 }

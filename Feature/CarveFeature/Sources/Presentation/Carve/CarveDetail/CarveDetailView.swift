@@ -65,45 +65,44 @@ public struct CarveDetailView: View {
                             send(.headerAnimation(previous, current))
                         }
                     }
-                    .onChange(of: store.verseRowState) {
+                    .onChange(of: store.sentenceWithDrawingState) {
                         send(.setProxy(proxy))
                     }
-                    // ✅ Canvas를 contentView에 overlay로 올려서 높이/레이아웃을 완전히 동일하게 맞춘다.
-                    // 이렇게 하면 Pencil hover/다운 시점에 Canvas만 별도로 "커지는" 레이아웃 흔들림을 줄일 수 있다.
-                    .border(.blue)
-                    .overlay {
-                        CombinedCanvasView(
-                            store: self.store.scope(
-                                state: \.canvasState,
-                                action: \.scope.canvasAction
-                            ),
-                            onInkingChanged: { isInking in
-                                self.isInking = isInking
-                            }
-                        )
-                        .border(.red)
-                        .id(store.canvasState.chapter)
-                        .frame(width: halfWidth)
-                        .frame(
-                            maxWidth: .infinity,
-                            maxHeight: .infinity,
-                            alignment: store.isLeftHanded ? .leading : .trailing
-                        )
-                        .background(
-                            GeometryReader { proxy in
-                                Color.clear
-                                    .allowsHitTesting(false)
-                                    .onAppear {
-                                        let frame = proxy.frame(in: .named("CanvasSpace"))
-                                        send(.canvasFrameChanged(frame))
-                                    }
-                                    .onChange(of: proxy.frame(in: .named("CanvasSpace"))) { _, frame in
-                                        // 최종 레이아웃 기준 프레임을 항상 반영 (split/fullscreen 전환 시 좌표계 어긋남 방지)
-                                        send(.canvasFrameChanged(frame))
-                                    }
-                            }
-                        )
-                    }
+//                    // ✅ Canvas를 contentView에 overlay로 올려서 높이/레이아웃을 완전히 동일하게 맞춘다.
+//                    // 이렇게 하면 Pencil hover/다운 시점에 Canvas만 별도로 "커지는" 레이아웃 흔들림을 줄일 수 있다.
+//                    .overlay {
+//                        CombinedCanvasView(
+//                            store: self.store.scope(
+//                                state: \.canvasState,
+//                                action: \.scope.canvasAction
+//                            ),
+//                            onInkingChanged: { isInking in
+//                                self.isInking = isInking
+//                            }
+//                        )
+//                        .border(.red)
+//                        .id(store.canvasState.chapter)
+//                        .frame(width: halfWidth)
+//                        .frame(
+//                            maxWidth: .infinity,
+//                            maxHeight: .infinity,
+//                            alignment: store.isLeftHanded ? .leading : .trailing
+//                        )
+//                        .background(
+//                            GeometryReader { proxy in
+//                                Color.clear
+//                                    .allowsHitTesting(false)
+//                                    .onAppear {
+//                                        let frame = proxy.frame(in: .named("CanvasSpace"))
+//                                        send(.canvasFrameChanged(frame))
+//                                    }
+//                                    .onChange(of: proxy.frame(in: .named("CanvasSpace"))) { _, frame in
+//                                        // 최종 레이아웃 기준 프레임을 항상 반영 (split/fullscreen 전환 시 좌표계 어긋남 방지)
+//                                        send(.canvasFrameChanged(frame))
+//                                    }
+//                            }
+//                        )
+//                    }
                     .coordinateSpace(name: "CanvasSpace")
                     .onAppear {
                         send(.fetchSentence)
@@ -138,11 +137,11 @@ public struct CarveDetailView: View {
         LazyVStack(pinnedViews: .sectionHeaders) {
             Section {
                 ForEach(
-                    store.scope(state: \.verseRowState,
-                                action: \.scope.verseRowAction),
+                    store.scope(state: \.sentenceWithDrawingState,
+                                action: \.scope.sentenceWithDrawingAction),
                     id: \.state.id
                 ) { childStore in
-                    VerseRowView(
+                    SentencesWithDrawingView(
                         store: childStore,
                         halfWidth: $halfWidth,
                         onUnderlineLayoutChange: { id, layout in
