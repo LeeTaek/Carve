@@ -114,7 +114,8 @@ public struct VerseRowView: View {
                             send(.updateVerseFrame(rectInScroll))
                         }
                     }
-                    .onChange(of: proxy.frame(in: .named("Scroll"))) { _, rect in                        DispatchQueue.main.async {
+                    .onChange(of: proxy.frame(in: .named("Scroll"))) { _, rect in
+                        DispatchQueue.main.async {
                             send(.updateVerseFrame(rect))
                         }
                     }
