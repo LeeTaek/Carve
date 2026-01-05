@@ -62,6 +62,8 @@ public struct CombinedCanvasView: UIViewRepresentable {
         // SwiftUI 리사이즈/회전 중에도 PKCanvasView 내부 UIScrollView 상태가 남지 않도록
         // 매 업데이트 타이밍에 안전하게 정규화.
         context.coordinator.normalizeCanvasForOverlay(canvas)
+        // publisher 구독 타이밍과 엇갈려도 SwiftUI update cycle에서 drawing을 확실히 반영
+        context.coordinator.applyStoreDrawingIfNeeded(canvas, store.combinedDrawing)
     }
     
     
@@ -120,16 +122,19 @@ public struct CombinedCanvasView: UIViewRepresentable {
         
         public func bind(to canvas: PKCanvasView) {
             // Drawing Bind
-            observe { [weak self] in
+            store.publisher.combinedDrawing
+              .removeDuplicates(
+                by: { $0.dataRepresentation() == $1.dataRepresentation() }
+              )
+              .receive(on: DispatchQueue.main)
+              .sink { [weak self] newDrawing in
                 guard let self else { return }
-                
-                let newDrawing = self.store.combinedDrawing
-                guard canvas.drawing.dataRepresentation() != newDrawing.dataRepresentation() else {
-                    return
-                }
                 canvas.drawing = newDrawing
                 self.previousStrokeCount = newDrawing.strokes.count
-            }
+              }
+              .store(in: &cancellables)
+            
+            
             // undo상태 초기화
             notifyUndoState(from: canvas)
             normalizeCanvasForOverlay(canvas)
@@ -172,6 +177,13 @@ public struct CombinedCanvasView: UIViewRepresentable {
                     canvas.drawingPolicy = allow ? .anyInput : .pencilOnly
                 }
                 .store(in: &cancellables)
+        }
+        
+        /// SwiftUI update cycle에서도 store의 drawing을 PKCanvasView에 확실히 반영
+        func applyStoreDrawingIfNeeded(_ canvas: PKCanvasView, _ newDrawing: PKDrawing) {
+            guard canvas.drawing.dataRepresentation() != newDrawing.dataRepresentation() else { return }
+            canvas.drawing = newDrawing
+            self.previousStrokeCount = newDrawing.strokes.count
         }
         
         /// Undo/Redo 가능 여부를 Feature로 전달

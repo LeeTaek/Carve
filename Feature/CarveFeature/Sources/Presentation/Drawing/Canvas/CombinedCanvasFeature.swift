@@ -28,7 +28,7 @@ public struct CombinedCanvasFeature {
         /// undo/redo 가능 여부
         public var canUndo: Bool = false
         public var canRedo: Bool = false
-        /// undo/redo 요청 트리거용. 
+        /// undo/redo 요청 트리거용.
         public var undoVersion: Int = 0
         public var redoVersion: Int = 0
         
@@ -68,20 +68,27 @@ public struct CombinedCanvasFeature {
             switch action {
             case .fetchDrawingData:
                 return .run { [chapter = state.chapter, context = drawingContext] send in
-                    // verse 단위 drawing은 항상 가져옴. (레이아웃 변경 시 재배치의 기준)
+                    // 1) Fetch verse drawing. (레이아웃 변경 시 재배치의 기준)
                     let fetchedVerseDrawings = await fetchDrawings(chapter: chapter, context: context)
 
-                    // page 단위 full drawing은 "초기 표시" 용 캐시로만 사용.
+                    // 2) page 단위 full drawing은 "초기 표시" 용 캐시로만 사용.
                     if let pageDrawing = try? await context.fetchPageDrawing(chapter: chapter),
                        let data = pageDrawing.fullLineData,
                        let fullDrawing = try? PKDrawing(data: data) {
                         await send(.setPageDrawing(fullDrawing))
                     }
+
+                    // 3) verse drawing을 state에 주입. (이후 verseFrameUpdated 시 rebuild)
+                    await send(.setDrawing(fetchedVerseDrawings))
                 }
 
             case .setDrawing(let drawings):
                 state.drawings = drawings
-                if !drawings.isEmpty {
+
+                // 첫 진입 시에는 rebuild를 호출하면 rebuild의 guard에 걸려 combinedDrawing을 비워
+                // "처음 진입 시 그림이 안 보이는" 현상이 발생할 수 있으므로,
+                // rect가 준비된 이후(verseFrameUpdated) 또는 이미 준비된 경우에만 rebuild.
+                if canRebuild(state) {
                     rebuild(state: &state)
                 }
             case .setPageDrawing(let drawing):
@@ -109,7 +116,7 @@ public struct CombinedCanvasFeature {
                 }
                 
                 state.drawingRect[verse] = rect
-                if !state.drawings.isEmpty {
+                if canRebuild(state) {
                     rebuild(state: &state)
                 }
 
@@ -181,21 +188,30 @@ extension CombinedCanvasFeature {
             Log.debug("drawing이 지나간 verse", verse)
             
             // 캔버스에서 해당 절의 영역에 있는 drawing clipping
-            let clipped = canvasDrawing.clippedPrecisely(to: rect)
+            let topPadding: CGFloat = 8
+            let paddedRect = CGRect(
+                x: rect.minX,
+                y: rect.minY - topPadding,
+                width: rect.width,
+                height: rect.height + topPadding
+            )
+            let clipped = canvasDrawing.clippedPrecisely(to: paddedRect)
             guard !clipped.strokes.isEmpty else { continue }
 
             // 절 rect의 Origin 만큼 빼서 로컬좌표 기준으로 변환
             let local = clipped.transformed(
                 using: CGAffineTransform(
                     translationX: -rect.minX,
-                    y: -rect.minY
+                    y: -paddedRect.minY
                 )
             )
             
             let request = DrawingUpdateRequest(
                 chapter: chapter,
                 verse: verse,
-                updateLineData: local.dataRepresentation()
+                updateLineData: local.dataRepresentation(),
+                baseWidth: Double(rect.width),
+                baseHeight: Double(rect.height)
             )
             updateDrawingList.append(request)
         }
@@ -211,30 +227,74 @@ extension CombinedCanvasFeature {
     
     /// DrawingRect와 verse별 drawing 기반으로 combinedDrawing 생성
     /// 레이아웃/좌표가 변경될때마다 호출되어 verse위치 반영한 하나의 PKDrawing 로 merge
-    /// - Parameter state: 현재 상태값
     private func rebuild(state: inout State) {
-        guard !state.drawings.isEmpty, !state.drawingRect.isEmpty else {
+        // verse drawing 자체가 없으면 비움.
+        guard !state.drawings.isEmpty else {
             state.combinedDrawing = PKDrawing()
             return
         }
-        
-        var merged = PKDrawing()
-        
-        for (verse, rect) in state.drawingRect.sorted(by: { $0.key < $1.key }) {
-            guard let drawing = state.drawings.first(where: { $0.verse == verse }),
-                  let data = drawing.lineData,
-                  let pkDrawing = try? PKDrawing(data: data)
-            else { continue }
-            
-            let transform = CGAffineTransform(
-                translationX: rect.minX,
-                y: rect.minY
-            )
-            let shifted = pkDrawing.transformed(using: transform)
-            merged.append(shifted)
+        // rect가 아직 준비되지 않았으면(초기 진입/첫 렌더링)
+        // page-cache(combinedDrawing)를 유지.
+        guard !state.drawingRect.isEmpty else {
+            return
         }
+
+        var merged = PKDrawing()
+
+        for (verse, rect) in state.drawingRect.sorted(by: { $0.key < $1.key }) {
+            guard let verseDrawing = state.drawings.first(where: { $0.verse == verse }),
+                  let data = verseDrawing.lineData,
+                  let local = try? PKDrawing(data: data)
+            else { continue }
+
+            // 로컬 drawing의 bounds origin을 (0,0)으로 정규화
+            // 저장 시 -rect.minX/-rect.minY를 했더라도, 실제 stroke bounds가 0부터 시작하지 않을 수 있음
+            let normalized = local
+
+            // X는 항상 underline 폭에 맞춤.
+            // baseWidth가 없으면 bounds.width로 fallback
+            let scaleX: CGFloat
+            if let bw = verseDrawing.baseWidth, bw > 0 {
+                // baseWidth가 있으면 underline 폭 기준으로 확대/축소 모두 허용
+                scaleX = rect.width / CGFloat(bw)
+            } else {
+                // fallback(bounds 기반)에서는 확대 금지(축소만 허용)
+                // 한 글자/짧은 필사가 과하게 늘어나는 문제 방지
+                let width = normalized.bounds.width
+                scaleX = width > 0 ? min(1, rect.width / width) : 1
+            }
+            
+            // - baseHeight가 있을 때만 overflow 판정을 신뢰.
+            // - overflow 시에도 늘리지는 않고(<= 1) 필요하면 줄여서 underline 안에 맞춤.
+            let scaleY: CGFloat
+            if let bh = verseDrawing.baseHeight, bh > 0 {
+                let contentMaxY = Double(normalized.bounds.maxY)
+                let willOverflow = contentMaxY > bh + 1 // tolerance: 1pt
+                let ratio = rect.height / CGFloat(bh)
+                scaleY = willOverflow ? min(1, ratio) : 1
+            } else {
+                // fallback(bounds 기반)에서는 Y 스케일을 적용하지 않음.
+                scaleY = 1
+            }
+
+            let scaled = normalized.transformed(using: CGAffineTransform(scaleX: scaleX, y: scaleY))
+            let placed = scaled.transformed(using: CGAffineTransform(translationX: rect.minX, y: rect.minY))
+            merged.append(placed)
+        }
+
+        // rect 준비/매칭 이슈로 merged가 비는 경우 pageDrawing(캐시)을 빈 그림으로 덮어쓰지 않도록.
+        guard !merged.strokes.isEmpty else { return }
         state.combinedDrawing = merged
     }
     
     
-}
+    /// rebuild를 수행해도 되는지 판단: 실제 drawing이 있는 verse들의 rect가 준비되어 있어야 함.
+    private func canRebuild(_ state: State) -> Bool {
+        let verses = Set(state.drawings.compactMap { $0.verse })
+        guard !verses.isEmpty else { return false }
+        return verses.allSatisfy { verse in
+            guard let rect = state.drawingRect[verse] else { return false }
+            return !rect.isNull && !rect.isEmpty
+        }
+    }
+}   
