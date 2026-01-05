@@ -108,26 +108,22 @@ public struct VerseRowView: View {
         .background(
             GeometryReader { proxy in
                 Color.clear
-                    .preference(
-                        key: VerseFramePreferenceKey.self,
-                        value: proxy.frame(in: .named("CanvasSpace"))
-                    )
+                    .onAppear {
+                        DispatchQueue.main.async {
+                            let rectInScroll = proxy.frame(in: .named("Scroll"))
+                            send(.updateVerseFrame(rectInScroll))
+                        }
+                    }
+                    .onChange(of: proxy.frame(in: .named("Scroll"))) { _, rect in
+                        DispatchQueue.main.async {
+                            send(.updateVerseFrame(rect))
+                        }
+                    }
             }
         )
-        .onPreferenceChange(VerseFramePreferenceKey.self) { rect in
-            send(.updateVerseFrame(rect))
-        }
     }
     
 }
-
-private struct VerseFramePreferenceKey: PreferenceKey {
-    static var defaultValue: CGRect = .zero
-    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
-        value = nextValue()
-    }
-}
-
 
 #Preview {
     @Previewable @State var store = Store(

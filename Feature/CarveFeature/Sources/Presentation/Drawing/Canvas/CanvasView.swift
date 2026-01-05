@@ -13,7 +13,7 @@ import Combine
 
 import ComposableArchitecture
 
-//@available(*, deprecated, message: "CombinedCanvasView / CombinedCanvasFeature로 대체")
+@available(*, deprecated, message: "CombinedCanvasView / CombinedCanvasFeature로 대체")
 public struct CanvasView: UIViewRepresentable {
     public typealias UIViewType = PKCanvasView
     private var store: StoreOf<CanvasFeature>
@@ -56,7 +56,7 @@ public struct CanvasView: UIViewRepresentable {
     
     final public class Coordinator: NSObject, PKCanvasViewDelegate {
         private var store: StoreOf<CanvasFeature>
-        private var lastUpdate = Date()
+        private var lastUpdate = Date.distantPast
         private let debounceInterval: TimeInterval = 0.3
         private var cancaellable = Set<AnyCancellable>()
 

@@ -9,6 +9,98 @@
 import Foundation
 import SwiftData
 
+/// BibleDrawing 프로퍼티 추가 위한 LightWeight
+public enum DrawingSchemaV3Minor1: VersionedSchema {
+    public static var versionIdentifier = Schema.Version(3, 1, 0)
+    
+    public static var models: [any PersistentModel.Type] {
+        [BibleDrawing.self, BiblePageDrawing.self]
+    }
+    
+    
+    /// 각 절에 해당하는 필사 데이터용 모델
+    @Model
+    public final class BibleDrawing: Equatable {
+        public static func == (lhs: BibleDrawing, rhs: BibleDrawing) -> Bool {
+            (lhs.id == rhs.id)
+        }
+        public var id: String!
+        public var titleName: String?
+        public var titleChapter: Int?
+        public var verse: Int?
+        public var creationDate: Date?
+        public var updateDate: Date?
+        public var translation: Translation? = Translation.NKRV
+        public var drawingVersion: Int? = 1
+        public var isPresent: Bool? = false
+        public var baseWidth: Double?
+        public var baseHeight: Double?
+        @Attribute(.externalStorage) public var lineData: Data?
+        
+        public init() { }
+            
+        public init(bibleTitle: BibleChapter,
+                    verse: Int,
+                    lineData: Data? = nil,
+                    updateDate: Date? = Date.now
+        ) {
+            self.lineData = lineData
+            self.titleName = bibleTitle.title.rawValue
+            self.titleChapter = bibleTitle.chapter
+            self.verse = verse
+            self.creationDate = Date()
+            self.updateDate = updateDate
+            self.id = {
+                if let timestamp = creationDate?.timeIntervalSince1970 {
+                    return "\(bibleTitle.title.rawValue).\(bibleTitle.chapter).\(verse).\(Int(timestamp))"
+                } else {
+                    return "\(bibleTitle.title.rawValue).\(bibleTitle.chapter).\(verse).\(Date().timeIntervalSince1970)"
+                }
+            }()
+        }
+        
+        public convenience init(bibleTitle: BibleChapter,
+                                section: Int,
+                                lineData: Data? = nil,
+                                updateDate: Date? = Date.now
+        ) {
+            self.init(bibleTitle: bibleTitle, verse: section, lineData: lineData, updateDate: updateDate)
+        }
+    }
+    
+    /// 장에 해당하는 화면 전체 필사 데이터용 모델
+    @Model
+    public final class BiblePageDrawing: Equatable {
+        
+        public var id: String!
+        public var titleName: String?
+        public var titleChapter: Int?
+        public var creationDate: Date?
+        public var updateDate: Date?
+        public var translation: Translation? = Translation.NKRV
+
+        @Attribute(.externalStorage)
+        public var fullLineData: Data?   // full PKDrawing
+
+        public init() {}
+
+        public init(
+            bibleTitle: BibleChapter,
+            fullLineData: Data?,
+            updateDate: Date? = .now
+        ) {
+            self.titleName = bibleTitle.title.rawValue
+            self.titleChapter = bibleTitle.chapter
+            self.fullLineData = fullLineData
+            self.creationDate = .now
+            self.updateDate = updateDate
+            self.id = "\(bibleTitle.title.rawValue).\(bibleTitle.chapter)"
+        }
+    }
+}
+
+
+
 public enum DrawingSchemaV3: VersionedSchema {
     public static var versionIdentifier = Schema.Version(3, 0, 0)
     
@@ -96,8 +188,8 @@ public enum DrawingSchemaV3: VersionedSchema {
     }
 }
 
-public typealias BibleDrawing = DrawingSchemaV3.BibleDrawing
-public typealias BiblePageDrawing = DrawingSchemaV3.BiblePageDrawing
+public typealias BibleDrawing = DrawingSchemaV3Minor1.BibleDrawing
+public typealias BiblePageDrawing = DrawingSchemaV3Minor1.BiblePageDrawing
 
 extension Array where Element == BibleDrawing {
     /// 여러 BibleDrawing 중 메인 Drawing 하나를 선택
