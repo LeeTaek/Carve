@@ -25,7 +25,7 @@ public struct DrawingWeeklySummaryView: View {
         LazyVGrid(
             columns: tileColumns,
             alignment: .leading,
-            spacing: 12
+            spacing: 16
         ) {
             TileCard(title: "최근 필사 내역") {
                 latestDrawingHistoryTile
@@ -87,11 +87,15 @@ public struct DrawingWeeklySummaryView: View {
         } else {
             VStack(alignment: .leading, spacing: 4) {
                 ForEach(store.recentVerses.prefix(3)) { item in
-                    Text("• \(item.message)")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Button {
+                        send(.recentVerseTapped(item))
+                    } label: {
+                        Text("• \(item.message)")
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
             .padding(.top, 4)
@@ -137,12 +141,15 @@ public struct DrawingWeeklySummaryView: View {
                 
                 ForEach(items.indices, id: \.self) { index in
                     let item = items[index]
-                    
-                    Text("• \(item.title.koreanTitle()) \(item.chapter)장")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Button {
+                        send(.recentChapterTapped(item))
+                    } label: {
+                        Text("• \(item.title.koreanTitle()) \(item.chapter)장")
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
             .padding(.top, 4)

@@ -59,7 +59,15 @@ public struct AppCoordinatorFeature {
 
             case .path(.element(id: _, action: .settings(.view(.backToCarve)))):
                 state.path.removeLast()
-
+                
+            case let .path(.element(id: _, action: .chart(.drawingWeeklySummary(.openChapter(chapter))))):
+                state.path.removeLast()
+                return .send(.root(.presented(.carve(.moveToChapter(chapter)))))
+                
+            case let .path(.element(id: _, action: .chart(.drawingWeeklySummary(.openVerse(verse))))):
+              state.path.removeLast()
+              return .send(.root(.presented(.carve(.moveToVerse(verse)))))
+                
             case .root(.presented(.carve(.view(.moveToChart)))):
                 state.path.append(.chart(.initialState))
                 

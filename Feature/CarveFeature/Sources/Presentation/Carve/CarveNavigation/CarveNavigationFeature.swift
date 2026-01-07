@@ -42,6 +42,8 @@ public struct CarveNavigationFeature {
     }
     public enum Action: ViewAction, CarveToolkit.ScopeAction, BindableAction {
         case binding(BindingAction<State>)
+        case moveToChapter(BibleChapter)
+        case moveToVerse(BibleVerse)
         case view(View)
         case scope(ScopeAction)
         
@@ -97,6 +99,25 @@ public struct CarveNavigationFeature {
         
         Reduce { state, action in
             switch action {
+            case .moveToChapter(let chapter):
+                state.selectedTitle = chapter.title
+                state.selectedChapter = chapter.chapter
+                state.$currentTitle.withLock { $0 = chapter }
+                state.columnVisibility = .detailOnly
+                state.carveDetailState.verseRowState.removeAll()
+                
+                return .none
+                
+            case .moveToVerse(let verse):
+                let chapter = verse.title
+                state.selectedTitle = chapter.title
+                state.selectedChapter = chapter.chapter
+                state.$currentTitle.withLock { $0 = chapter }
+                state.columnVisibility = .detailOnly
+                state.carveDetailState.verseRowState.removeAll()
+
+                return .send(.scope(.carveDetailAction(.setScrollTarget(verse))))
+                
             case .scope(.carveDetailAction(.scope(.headerAction(.view(.titleDidTapped))))):
                 return handleTitleDidTapped(state: &state)
                 
