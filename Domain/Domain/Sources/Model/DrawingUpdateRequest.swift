@@ -18,16 +18,22 @@ public struct DrawingUpdateRequest: Sendable {
     public let updateLineData: Data
     /// 이 업데이트 요청이 생성된 시각.
     public let updateDate: Date
+    public let baseWidth: Double?
+    public let baseHeight: Double?
     
     public init(
         chapter: BibleChapter,
         verse: Int,
         updateLineData: Data,
-        updateDate: Date = .now
+        updateDate: Date = .now,
+        baseWidth: Double? = nil,
+        baseHeight: Double? = nil
     ) {
         self.chapter = chapter
         self.verse = verse
         self.updateLineData = updateLineData
         self.updateDate = updateDate
+        self.baseWidth = baseWidth
+        self.baseHeight = baseHeight
     }
 }

@@ -14,9 +14,8 @@ import SwiftData
 
 import ComposableArchitecture
 
-/// Carve 영역(SplitView) 내 네비게이션 관리 Reducer.
-/// - Note: 성경 (제목/장) 선택, SplitView 컬럼 전환,
-///         상세 화면(CarveDetail + 설정/그림 기록 시트) 트리 기반 네비게이션을 담당.
+/// Carve 전체 네비게이션 관리 Reducer
+/// 성경 (제목/장) 선ㄴ택, Splitview, 상세화면 전환 담당
 @Reducer
 public struct CarveNavigationFeature {
     public init() { }

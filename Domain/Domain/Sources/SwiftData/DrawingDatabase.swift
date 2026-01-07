@@ -95,25 +95,32 @@ public struct DrawingDatabase: Sendable {
     public func updateDrawings(requests: [DrawingUpdateRequest]) async {
         for req in requests {
             do {
-                // 1. 해당 verse 에 대한 기존 drawing fetch
+                // 해당 verse 에 대한 기존 drawing fetch
                 let existing = try await fetchDrawings(chapter: req.chapter, verse: req.verse).mainDrawing()
 
                 if let existing {
-                    // 2. 기존 데이터 업데이트
+                    // 기존 데이터 업데이트
                     let id = existing.persistentModelID
                     try await actor.update(id) { (old: BibleDrawing) async in
                         old.lineData = req.updateLineData
                         old.updateDate = req.updateDate
+
+                        // base size는 요청에 값이 있을 때만 반영 (nil이면 기존값 유지)
+                        if let bw = req.baseWidth { old.baseWidth = bw }
+                        if let bh = req.baseHeight { old.baseHeight = bh }
                     }
                     Log.debug("updated drawing verse:", req.verse)
                 } else {
-                    // 3. 존재하지 않으면 새로 생성
+                    // 존재하지 않으면 새로 생성
                     let new = BibleDrawing(
                         bibleTitle: req.chapter,
                         verse: req.verse,
                         lineData: req.updateLineData,
                         updateDate: req.updateDate
                     )
+                    // base size는 요청에 값이 있을 때만 세팅
+                    if let bw = req.baseWidth { new.baseWidth = bw }
+                    if let bh = req.baseHeight { new.baseHeight = bh }
                     try await actor.insert(new)
                     Log.debug("inserted new drawing verse:", req.verse)
                 }

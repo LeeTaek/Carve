@@ -327,6 +327,18 @@ extension CarveDetailFeature {
             height: globalRect.height
         )
 
+        state.canvasState.drawingRect[verse] = localRect
+
+        // baseWidth/baseHeight self-healing은 verse drawing이 메모리에 로드된 이후에만 가능
+        if let index = state.canvasState.drawings.firstIndex(where: { $0.verse == verse }) {
+            if state.canvasState.drawings[index].baseWidth == nil {
+                state.canvasState.drawings[index].baseWidth = Double(localRect.width)
+            }
+            if state.canvasState.drawings[index].baseHeight == nil {
+                state.canvasState.drawings[index].baseHeight = Double(localRect.height)
+            }
+        }
+        
         return .send(.scope(.canvasAction(
             .verseFrameUpdated(verse: verse, rect: localRect)
         )))

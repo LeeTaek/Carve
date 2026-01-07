@@ -16,6 +16,9 @@ public struct CarveDetailView: View {
     @Bindable public var store: StoreOf<CarveDetailFeature>
     /// CombinedCanvasView의 너비를 화면의 절반으로 맞추기 위해 계산.
     @State private(set) var halfWidth: CGFloat = 0
+    /// iPad 멀티윈도우/회전 등으로 레이아웃(특히 width)이 바뀔 때 PKCanvasView 내부 상태를 리셋하기 위한 트리거
+    @State private var canvasLayoutVersion: Int = 0
+    @State private var lastObservedScrollSize: CGSize = .zero
     
     public init(store: StoreOf<CarveDetailFeature>) {
         self.store = store
@@ -75,15 +78,16 @@ public struct CarveDetailView: View {
                             action: \.scope.canvasAction
                         )
                     )
-                    .id(store.canvasState.chapter)
+                    .id("\(store.canvasState.chapter)-\(canvasLayoutVersion)")
+                    .transaction { $0.animation = nil }
                     .background(
                         GeometryReader { proxy in
                             Color.clear
                                 .onAppear {
-                                    let frame = proxy.frame(in: .global)
+                                    let frame = proxy.frame(in: .named("Scroll"))
                                     send(.canvasFrameChanged(frame))
                                 }
-                                .onChange(of: proxy.frame(in: .global)) { _, frame in
+                                .onChange(of: proxy.frame(in: .named("Scroll"))) { _, frame in
                                     send(.canvasFrameChanged(frame))
                                 }
                         }
@@ -106,10 +110,19 @@ public struct CarveDetailView: View {
             }
             .coordinateSpace(name: "Scroll")
         }
-        .onGeometryChange(for: CGFloat.self) { proxy in
-            return proxy.size.width / 2
-        } action: { halfWidth in
-            self.halfWidth = halfWidth
+        .onGeometryChange(for: CGSize.self) { proxy in
+            return proxy.size
+        } action: { size in
+            let newHalfWidth = size.width / 2
+            if self.halfWidth != newHalfWidth {
+                self.halfWidth = newHalfWidth
+            }
+
+            // PKCanvasView를 재생성하도록 version을 올린다.
+            if self.lastObservedScrollSize != size {
+                self.lastObservedScrollSize = size
+                self.canvasLayoutVersion &+= 1
+            }
         }
     }
     

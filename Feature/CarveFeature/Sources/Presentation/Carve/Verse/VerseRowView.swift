@@ -110,13 +110,12 @@ public struct VerseRowView: View {
                 Color.clear
                     .onAppear {
                         DispatchQueue.main.async {
-                            let rectInGlobal = proxy.frame(in: .global)
-                            send(.updateVerseFrame(rectInGlobal))
+                            let rectInScroll = proxy.frame(in: .named("Scroll"))
+                            send(.updateVerseFrame(rectInScroll))
                         }
                     }
-                    .onChange(of: proxy.size) { _, _ in
+                    .onChange(of: proxy.frame(in: .named("Scroll"))) { _, rect in
                         DispatchQueue.main.async {
-                            let rect = proxy.frame(in: .global)
                             send(.updateVerseFrame(rect))
                         }
                     }

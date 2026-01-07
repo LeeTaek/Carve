@@ -56,7 +56,7 @@ public struct CanvasView: UIViewRepresentable {
     
     final public class Coordinator: NSObject, PKCanvasViewDelegate {
         private var store: StoreOf<CanvasFeature>
-        private var lastUpdate = Date()
+        private var lastUpdate = Date.distantPast
         private let debounceInterval: TimeInterval = 0.3
         private var cancaellable = Set<AnyCancellable>()
 
