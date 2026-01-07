@@ -19,6 +19,8 @@ public struct DrawingChartFeature {
     public struct State {
         public static let initialState = Self()
         var dailyRecordChart: DailyRecordChartFeature.State
+        var drawingWeeklySummary: DrawingWeeklySummaryFeature.State = .init()
+
         /// fetch한 데이터 중 가장 오래된 날짜
         /// 과거 구간을 추가 로딩할지 여부를 판단하는 기준.
         public var earliestFetchedDate: Date = Calendar.current.startOfDay(for: Date())
@@ -36,78 +38,7 @@ public struct DrawingChartFeature {
         /// - Key: startOfDay(Date)
         /// - Value: [BibleChapter: verseCount]
         public var chapterCountsByDay: [Date: [BibleChapter: Int]] = [:]
-        /// 차트가 현재 보여주는 주의 시작일
-        private var currentWeekStart: Date {
-          Calendar.current.startOfDay(for: dailyRecordChart.scrollPosition)
-        }
-        /// 차트가 현재 보여주는 주(7일)의 평균(절/일)
-        public var currentWeekAverage: Int {
-          let cal = Calendar.current
-          let start = currentWeekStart
-          let end = cal.date(byAdding: .day, value: 6, to: start)!
 
-          // 7일 구간의 합
-          let sum = dailyRecordChart.records.reduce(0) { partial, record in
-            let day = cal.startOfDay(for: record.date)
-            return (start...end).contains(day) ? partial + record.count : partial
-          }
-
-          return Int(round(Double(sum) / 7.0))
-        }
-        /// 차트에 표시되는 이번 주 records
-        private var currentWeekRecords: [DailyRecord] {
-          let cal = Calendar.current
-          let start = currentWeekStart
-          let end = cal.date(byAdding: .day, value: 6, to: start)!
-          return dailyRecordChart.records.filter {
-            let day = cal.startOfDay(for: $0.date)
-            return (start...end).contains(day)
-          }
-        }
-        /// 차트에 표기되는 이번 주 필사 절의 총 합
-        public var currentWeekTotalCount: Int {
-          currentWeekRecords.reduce(0) { $0 + $1.count }
-        }
-        /// 차트에 표시되는 이번 주 최대 필사 량
-        public var currentWeekMaxCount: Int {
-          currentWeekRecords.map(\.count).max() ?? 0
-        }
-
-
-        /// 현재 차트가 보여주는 7일(이번 주) 날짜 목록 (startOfDay 기준)
-        private var currentWeekDates: [Date] {
-            let cal = Calendar.current
-            return (0..<7)
-                .compactMap { offset in
-                    cal.date(byAdding: .day, value: offset, to: currentWeekStart)
-                }
-                .map { cal.startOfDay(for: $0) }
-        }
-
-        /// 현재 차트가 보여주는 7일(이번 주) 동안 가장 많이 필사한 장과 그 절 수.
-        /// - Returns: (chapter, count) / 기록이 없으면 nil
-        public var currentWeekTopChapter: (chapter: BibleChapter, count: Int)? {
-            var merged: [BibleChapter: Int] = [:]
-
-            for day in currentWeekDates {
-                let counts = chapterCountsByDay[day, default: [:]]
-                for (chapter, count) in counts {
-                    merged[chapter, default: 0] += count
-                }
-            }
-
-            guard let best = merged.max(by: { $0.value < $1.value }) else { return nil }
-            return (best.key, best.value)
-        }
-
-        /// UI 표시용 텍스트: "로마서 8장 (총 22절)" 형태
-        public var currentWeekTopChapterText: String {
-            guard let top = currentWeekTopChapter else {
-                return "이번 주 기록이 없어요"
-            }
-            return "\(top.chapter.title.koreanTitle()) \(top.chapter.chapter)장 (총 \(top.count)절)"
-        }
-        
         public init() {
             let cal = Calendar.current
             let today = cal.startOfDay(for: Date())
@@ -125,6 +56,7 @@ public struct DrawingChartFeature {
                 scrollPosition: today,
                 selectedDate: nil
             )
+            self.drawingWeeklySummary.scrollPosition = self.dailyRecordChart.scrollPosition
         }
         
         /// Xcode 프리뷰에서 사용할 더미.
@@ -146,6 +78,9 @@ public struct DrawingChartFeature {
                 state.dailyRecordChart.selectedDate = latest
                 state.selectedRecord = state.dailyRecordChart.records.first { $0.date == latest }
                 state.earliestFetchedDate = state.dailyRecordChart.records.map(\.date).min() ?? today
+                state.drawingWeeklySummary.dailyRecords = state.dailyRecordChart.records
+                state.drawingWeeklySummary.scrollPosition = state.dailyRecordChart.scrollPosition
+                state.drawingWeeklySummary.chapterCountsByDay = state.chapterCountsByDay
             }
             
             return state
@@ -159,12 +94,10 @@ public struct DrawingChartFeature {
         case view(View)
         /// 비동기로 조회한 하루 단위 필사 기록 + 장(Chapter) 집계를 상태에 반영.
         case setFetchedDailyData(dailyRecords: [DailyRecord], chapterCountsByDay: [Date: [BibleChapter: Int]])
-
-        /// (레거시) 하루 단위 필사 기록만 반영.
-        case setDailyRecords([DailyRecord])
         /// 과거 데이터 추가 로딩이 완료되었음을 알림.
         case endAppending
         case dailyRecordChart(DailyRecordChartFeature.Action)
+        case drawingWeeklySummary(DrawingWeeklySummaryFeature.Action)
         
         public enum View {
             /// 화면 진입 시(또는 새로고침 시) 차트 데이터를 조회.
@@ -177,45 +110,58 @@ public struct DrawingChartFeature {
     }
     
     public var body: some Reducer<State, Action> {
-        BindingReducer()
-            .onChange(of: \.dailyRecordChart.selectedDate) { _, newValue in
-                Reduce { state, _ in
-                    handleSelectedDateChange(&state, newValue: newValue)
+        CombineReducers {
+            BindingReducer()
+            
+            Scope(state: \.dailyRecordChart, action: \.dailyRecordChart) {
+                DailyRecordChartFeature()
+            }
+            
+            Scope(state: \.drawingWeeklySummary, action: \.drawingWeeklySummary) {
+                DrawingWeeklySummaryFeature()
+            }
+            
+            Reduce { state, action in
+                switch action {
+                case .view(.fetchData):
+                    return handleFetchData()
+                    
+                case let .setFetchedDailyData(dailyRecords, chapterCountsByDay):
+                    state.chapterCountsByDay = chapterCountsByDay
+                    state.drawingWeeklySummary.chapterCountsByDay = chapterCountsByDay
+                    handleSetDailyRecords(&state, dailyRecords: dailyRecords)
+                    return .none
+                    
+                case .view(.tapSymbol(let date)):
+                    handleTapSymbol(&state, date: date)
+                    return .none
+                    
+                case .view(.loadMoreBefore(let referenceDate)):
+                    return handleLoadMoreBefore(&state, referenceDate: referenceDate)
+                    
+                case .endAppending:
+                    state.isAppendingPastData = false
+                    return .none
+                    
+                case .drawingWeeklySummary(.openVerse(let verse)):
+                    return .none
+                    
+                case .drawingWeeklySummary(.openChapter(let chapter)):
+                    return .none
+                    
+                default: return .none
                 }
             }
-        
-        Scope(state: \.dailyRecordChart, action: \.dailyRecordChart) {
-            DailyRecordChartFeature()
         }
-        
-        Reduce { state, action in
-            switch action {
-            case .view(.fetchData):
-                return handleFetchData()
-                
-            case let .setFetchedDailyData(dailyRecords, chapterCountsByDay):
-                state.chapterCountsByDay = chapterCountsByDay
-                handleSetDailyRecords(&state, dailyRecords: dailyRecords)
+        .onChange(of: \.dailyRecordChart.selectedDate) { _, newValue in
+            Reduce { state, _ in
+                handleSelectedDateChange(&state, newValue: newValue)
+            }
+        }
+        .onChange(of: \.dailyRecordChart.scrollPosition) { _, newValue in
+            Reduce { state, _ in
+                state.drawingWeeklySummary.scrollPosition = newValue
                 return .none
-
-            case .setDailyRecords(let dailyRecords):
-                // 레거시 경로: records만 반영하고, 집계는 비운다.
-                state.chapterCountsByDay = [:]
-                handleSetDailyRecords(&state, dailyRecords: dailyRecords)
-                return .none
-                
-            case .view(.tapSymbol(let date)):
-                handleTapSymbol(&state, date: date)
-                return .none
-                
-            case .view(.loadMoreBefore(let referenceDate)):
-                return handleLoadMoreBefore(&state, referenceDate: referenceDate)
-                
-            case .endAppending:
-                state.isAppendingPastData = false
-                return .none
-                
-            default: return .none
             }
         }
     }
@@ -315,6 +261,9 @@ extension DrawingChartFeature {
             state.dailyRecordChart.selectedDate = nil
             state.selectedRecord = nil
         }
+        state.drawingWeeklySummary.dailyRecords = state.dailyRecordChart.records
+        state.drawingWeeklySummary.scrollPosition = state.dailyRecordChart.scrollPosition
+        state.drawingWeeklySummary.chapterCountsByDay = state.chapterCountsByDay
     }
     
     /// 차트 위 심볼(데이터 포인트)을 탭했을 때 선택 상태를 갱신.
@@ -326,12 +275,7 @@ extension DrawingChartFeature {
     /// 현재 스크롤 위치를 기준으로, 그 이전 주(과거 구간)의 데이터를 추가로 조회하는 Effect.
     private func handleLoadMoreBefore(_ state: inout State, referenceDate: Date) -> Effect<Action> {
         state.isAppendingPastData = true
-        
-        // 차트의 scrollPosition은 '보이는 X 도메인의 선두(leading) 값'으로 동작함.
-        // prepend(과거 주 추가) 후에도 동일한 화면을 유지하려면
-        // 선두 값을 '기존 선두 + 7일'로 보정해야 점프가 사라짐.
         let oldLeading = state.dailyRecordChart.scrollPosition
-        
         let cal = Calendar.current
         
         // 우리가 가진 가장 과거의 주를 기준으로, 그 이전 주만 1회 확장
@@ -366,14 +310,11 @@ extension DrawingChartFeature {
         let existingChapterCountsByDay = state.chapterCountsByDay
         
         return .run { send in
-            // ✅ 이전 주(7일) 데이터를 한 번에 fetch 한 뒤, 날짜별로 집계해서 필요한 날(daysToAppend)만 사용한다.
             let weekEnd = cal.date(byAdding: .day, value: 7, to: previousWeekStart)!
             let range = DateInterval(start: previousWeekStart, end: weekEnd)
-
             let drawings = try await drawingData.fetchDrawings(in: range)
 
             let groupedByDay: [Date: [BibleDrawing]] = Dictionary(grouping: drawings) { drawing in
-                // fetchDrawings(in:)에서 updateDate != nil 레코드만 반환하도록 필터링했기 때문에 force unwrap 가능
                 cal.startOfDay(for: drawing.updateDate!)
             }
 
