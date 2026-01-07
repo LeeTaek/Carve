@@ -79,11 +79,6 @@ struct DailyRecordChartView: View {
         let fallbackXDomain = start...endExclusive
         
         return Chart {
-            if let selectedDate = store.selectedDate {
-                RuleMark(x: .value("날짜", selectedDate.middleOfDay(), unit: .day))
-                    .lineStyle(StrokeStyle(lineWidth: 1.2))
-                    .foregroundStyle(Color.Brand.ink.opacity(0.3))
-            }
         }
         .chartXScale(domain: visible?.xDomain ?? fallbackXDomain)
         .chartYScale(domain: store.yScale)
@@ -238,8 +233,29 @@ struct DailyRecordChartView: View {
         .chartLegend(.hidden)
         .chartXScale(domain: page?.xDomain ?? fallbackXDomain)
         .chartYScale(domain: store.yScale)
-        // 가운데 페이지에만 selection 허용
-        .chartXSelection(value: allowsSelection ? $store.selectedDate : .constant(nil))
+        .chartOverlay { proxy in
+            GeometryReader { geo in
+                Rectangle()
+                    .fill(.clear)
+                    .contentShape(Rectangle())
+                    .gesture(
+                        SpatialTapGesture()
+                            .onEnded { value in
+                                guard allowsSelection else { return }
+                                
+                                let plotFrame: CGRect = {
+                                    if let anchor = proxy.plotFrame { return geo[anchor] }
+                                    else { return .zero }
+                                }()
+                                
+                                let x = value.location.x - plotFrame.minX
+                                if let date: Date = proxy.value(atX: x) {
+                                    store.selectedDate = Calendar.current.startOfDay(for: date)
+                                }
+                            }
+                    )
+            }
+        }
     }
 }
 

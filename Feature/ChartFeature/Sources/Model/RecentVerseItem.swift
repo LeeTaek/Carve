@@ -26,6 +26,6 @@ public struct RecentVerseItem: Equatable, Identifiable, Sendable {
 
   public var message: String {
     let book = verse.title.title.koreanTitle()
-    return "\(book) \(verse.title.chapter)장 \(verse.verse)절을 필사하셨어요"
+    return "\(book) \(verse.title.chapter)장 \(verse.verse)절"
   }
 }
