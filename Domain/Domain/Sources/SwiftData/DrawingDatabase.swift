@@ -201,6 +201,40 @@ public struct DrawingDatabase: Sendable {
         }
     }
     
+    /// 최근 range 사이에 업데이트 된 drawing을 최신순으로 반환
+    public func fetchDrawings(in range: DateInterval) async throws -> [BibleDrawing] {
+        let predicate = #Predicate<BibleDrawing> {
+            if let updateDate = $0.updateDate {
+                return updateDate >= range.start && updateDate < range.end
+            } else {
+                return false
+            }
+        }
+
+        let descriptor = FetchDescriptor(
+            predicate: predicate,
+            sortBy: [SortDescriptor(\.updateDate, order: .reverse)]
+        )
+
+        return try await actor.fetch(descriptor)
+    }
+    
+    /// 최근 필사 Verse 리스트용 (최신순, 제한)
+    public func fetchRecentDrawings(limit: Int) async throws -> [BibleDrawing] {
+        guard limit > 0 else { return [] }
+
+        let predicate = #Predicate<BibleDrawing> {
+            $0.updateDate != nil
+        }
+
+        var descriptor = FetchDescriptor(
+            predicate: predicate,
+            sortBy: [SortDescriptor(\.updateDate, order: .reverse)]
+        )
+        descriptor.fetchLimit = limit
+
+        return try await actor.fetch(descriptor)
+    }
 }
 
 extension DrawingDatabase: DependencyKey {

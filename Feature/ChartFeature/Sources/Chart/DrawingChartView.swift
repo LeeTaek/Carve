@@ -25,45 +25,43 @@ public struct DrawingChartView: View {
     }
     
     public var body: some View {
-        List {
-            Section {
-                DailyRecordChartView(
-                    store: store.scope(
-                        state: \.dailyRecordChart,
-                        action: \.dailyRecordChart
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+
+                // 상단: 차트 카드(가로 전체)
+                CardSection(title: "주간 필사량") {
+                    DailyRecordChartView(
+                        store: store.scope(
+                            state: \.dailyRecordChart,
+                            action: \.dailyRecordChart
+                        )
                     )
-                )
-                // 섹션 헤더에는 영향 주지 않고, 콘텐츠(행)만 카드처럼 보이도록 처리
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .background(Color.white)
-                .sectionCardShadow()
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
-            } header: {
-                Text("주간 필사량")
-                    .font(.subheadline)
-                    .foregroundStyle(Color.Brand.ink)
+                }
+
+                // 하단: 타일 3개 (가로 여유에 따라 3열/2열/1열로 자동 개행)
+                LazyVGrid(
+                    columns: [GridItem(.adaptive(minimum: 220), spacing: 12, alignment: .top)],
+                    alignment: .leading,
+                    spacing: 12
+                ) {
+                    TileCard(title: "최근 필사 내역") {
+                        latestDrawingHistoryTile
+                    }
+
+                    TileCard(title: "이번 주 평균") {
+                        weeklyAverageTile
+                    }
+
+                    TileCard(title: "이번 주 최고 장") {
+                        topChapterTile
+                    }
+                }
             }
-            
-            Section {
-                latestDrawingHistoryList
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .background(Color.white)
-                    .sectionCardShadow()
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
-            } header: {
-                Text("최근 필사 내역")
-                    .font(.subheadline)
-                    .foregroundStyle(Color.Brand.ink)
-            }
-            
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
         }
+        // 차트 드래그 중에는 바깥 스크롤을 잠가서 gesture 충돌을 줄임
         .scrollDisabled(store.dailyRecordChart.isScrolling)
-        .listStyle(.insetGrouped)
-        .scrollContentBackground(.hidden)
         .background(Color.Brand.background)
         .task {
 #if DEBUG
@@ -77,15 +75,65 @@ public struct DrawingChartView: View {
         }
     }
     
-    private var latestDrawingHistoryList: some View {
-        VStack {
-            let totalCount = store.dailyRecordChart.records.reduce(0) { $0 + $1.count }
-            Text("한 주 동안 \(totalCount)개의 절을 필사하셨네요!")
-                .font(.subheadline)
-                .padding()
-            
-            
+
+    private var latestDrawingHistoryTile: some View {
+        return VStack(alignment: .leading, spacing: 6) {
+            Text("한 주 동안")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Text("\(store.currentWeekTotalCount)절")
+                .font(.title3)
+                .foregroundStyle(Color.Brand.ink)
+                .monospacedDigit()
+
+            Spacer(minLength: 0)
+
+            Text("필사하셨어요")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private var weeklyAverageTile: some View {
+        return VStack(alignment: .leading, spacing: 6) {
+            Text("평균")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Text("\(store.currentWeekAverage)절/일")
+                .font(.title3)
+                .foregroundStyle(Color.Brand.ink)
+                .monospacedDigit()
+
+            Spacer(minLength: 0)
+
+            Text("(최근 7일)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private var topChapterTile: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("이번 주")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Text(store.currentWeekTopChapterText)
+                .font(.title3)
+                .foregroundStyle(Color.Brand.ink)
+                .lineLimit(2)
+
+            Spacer(minLength: 0)
+
+            Text("(절 수 기준)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }
 
@@ -98,4 +146,47 @@ public struct DrawingChartView: View {
     }
     
     DrawingChartView(store: store)
+}
+
+
+/// 제목 + 카드 콘텐츠
+private struct CardSection<Content: View>: View {
+    let title: String
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.subheadline)
+                .foregroundStyle(Color.Brand.ink)
+
+            content()
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(Color.white)
+                .sectionCardShadow()
+        }
+    }
+}
+
+/// 하나의 정사각형 타일 카드
+private struct TileCard<Content: View>: View {
+    let title: String
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.subheadline)
+                .foregroundStyle(Color.Brand.ink)
+
+            content()
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .background(Color.white)
+        .sectionCardShadow()
+        // 타일은 가로 폭을 유지하면서 height를 width와 동일하게.
+        .aspectRatio(1, contentMode: .fit)
+    }
 }

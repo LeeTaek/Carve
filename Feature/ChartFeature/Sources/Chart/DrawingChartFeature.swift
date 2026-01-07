@@ -32,6 +32,81 @@ public struct DrawingChartFeature {
         public var isAppendingPastData: Bool = false
         /// 선택된 날짜에 해당하는 `DailyRecord` (차트 선택과 동기화)
         public var selectedRecord: DailyRecord?
+        /// 날짜별(하루)로 장(Chapter) 단위 필사 절 수를 집계한 값.
+        /// - Key: startOfDay(Date)
+        /// - Value: [BibleChapter: verseCount]
+        public var chapterCountsByDay: [Date: [BibleChapter: Int]] = [:]
+        /// 차트가 현재 보여주는 주의 시작일
+        private var currentWeekStart: Date {
+          Calendar.current.startOfDay(for: dailyRecordChart.scrollPosition)
+        }
+        /// 차트가 현재 보여주는 주(7일)의 평균(절/일)
+        public var currentWeekAverage: Int {
+          let cal = Calendar.current
+          let start = currentWeekStart
+          let end = cal.date(byAdding: .day, value: 6, to: start)!
+
+          // 7일 구간의 합
+          let sum = dailyRecordChart.records.reduce(0) { partial, record in
+            let day = cal.startOfDay(for: record.date)
+            return (start...end).contains(day) ? partial + record.count : partial
+          }
+
+          return Int(round(Double(sum) / 7.0))
+        }
+        /// 차트에 표시되는 이번 주 records
+        private var currentWeekRecords: [DailyRecord] {
+          let cal = Calendar.current
+          let start = currentWeekStart
+          let end = cal.date(byAdding: .day, value: 6, to: start)!
+          return dailyRecordChart.records.filter {
+            let day = cal.startOfDay(for: $0.date)
+            return (start...end).contains(day)
+          }
+        }
+        /// 차트에 표기되는 이번 주 필사 절의 총 합
+        public var currentWeekTotalCount: Int {
+          currentWeekRecords.reduce(0) { $0 + $1.count }
+        }
+        /// 차트에 표시되는 이번 주 최대 필사 량
+        public var currentWeekMaxCount: Int {
+          currentWeekRecords.map(\.count).max() ?? 0
+        }
+
+
+        /// 현재 차트가 보여주는 7일(이번 주) 날짜 목록 (startOfDay 기준)
+        private var currentWeekDates: [Date] {
+            let cal = Calendar.current
+            return (0..<7)
+                .compactMap { offset in
+                    cal.date(byAdding: .day, value: offset, to: currentWeekStart)
+                }
+                .map { cal.startOfDay(for: $0) }
+        }
+
+        /// 현재 차트가 보여주는 7일(이번 주) 동안 가장 많이 필사한 장과 그 절 수.
+        /// - Returns: (chapter, count) / 기록이 없으면 nil
+        public var currentWeekTopChapter: (chapter: BibleChapter, count: Int)? {
+            var merged: [BibleChapter: Int] = [:]
+
+            for day in currentWeekDates {
+                let counts = chapterCountsByDay[day, default: [:]]
+                for (chapter, count) in counts {
+                    merged[chapter, default: 0] += count
+                }
+            }
+
+            guard let best = merged.max(by: { $0.value < $1.value }) else { return nil }
+            return (best.key, best.value)
+        }
+
+        /// UI 표시용 텍스트: "로마서 8장 (총 22절)" 형태
+        public var currentWeekTopChapterText: String {
+            guard let top = currentWeekTopChapter else {
+                return "이번 주 기록이 없어요"
+            }
+            return "\(top.chapter.title.koreanTitle()) \(top.chapter.chapter)장 (총 \(top.count)절)"
+        }
         
         public init() {
             let cal = Calendar.current
@@ -42,6 +117,7 @@ public struct DrawingChartFeature {
             self.earliestFetchedDate = today
             self.isAppendingPastData = false
             self.selectedRecord = nil
+            self.chapterCountsByDay = [:]
 
             self.dailyRecordChart = DailyRecordChartFeature.State(
                 records: [],
@@ -81,7 +157,10 @@ public struct DrawingChartFeature {
     public enum Action: ViewAction, BindableAction {
         case binding(BindingAction<State>)
         case view(View)
-        /// 비동기로 조회한 하루 단위 필사 기록을 상태에 반영.
+        /// 비동기로 조회한 하루 단위 필사 기록 + 장(Chapter) 집계를 상태에 반영.
+        case setFetchedDailyData(dailyRecords: [DailyRecord], chapterCountsByDay: [Date: [BibleChapter: Int]])
+
+        /// (레거시) 하루 단위 필사 기록만 반영.
         case setDailyRecords([DailyRecord])
         /// 과거 데이터 추가 로딩이 완료되었음을 알림.
         case endAppending
@@ -114,7 +193,14 @@ public struct DrawingChartFeature {
             case .view(.fetchData):
                 return handleFetchData()
                 
+            case let .setFetchedDailyData(dailyRecords, chapterCountsByDay):
+                state.chapterCountsByDay = chapterCountsByDay
+                handleSetDailyRecords(&state, dailyRecords: dailyRecords)
+                return .none
+
             case .setDailyRecords(let dailyRecords):
+                // 레거시 경로: records만 반영하고, 집계는 비운다.
+                state.chapterCountsByDay = [:]
                 handleSetDailyRecords(&state, dailyRecords: dailyRecords)
                 return .none
                 
@@ -158,19 +244,50 @@ extension DrawingChartFeature {
         let today = calendar.startOfDay(for: Date())
         
         // 최근 30일 (오늘 포함)
+        let start = calendar.date(byAdding: .day, value: -29, to: today)!
+        let end = calendar.date(byAdding: .day, value: 1, to: today)! // 내일 0시 (exclusive)
+        let range = DateInterval(start: start, end: end)
+        
+        // UI 도메인용 30일 날짜 목록 (0도 포함시키기 위함)
         let days = (0..<30).compactMap { offset in
-            calendar.date(byAdding: .day, value: -29 + offset, to: today)
+            calendar.date(byAdding: .day, value: offset, to: start)
         }
         
         let drawingData = self.drawingData
         
         return .run { send in
-            var dailyRecords: [DailyRecord] = []
-            for date in days {
-                let count = try await drawingData.fetchDrawings(date: date)?.count ?? 0
-                dailyRecords.append(.init(date: date, count: count))
+            // 최근 30일치 drawing을 한 번에 가져오고, feature에서 날짜별로 집계.
+            let drawings = try await drawingData.fetchDrawings(in: range)
+
+            // 날짜별 그룹 (startOfDay 기준)
+            let groupedByDay: [Date: [BibleDrawing]] = Dictionary(grouping: drawings) { drawing in
+                calendar.startOfDay(for: drawing.updateDate!)
             }
-            await send(.setDailyRecords(dailyRecords))
+
+            // UI 도메인 30일(빈 날 포함)을 DailyRecord로 변환
+            let dailyRecords: [DailyRecord] = days
+                .map { calendar.startOfDay(for: $0) }
+                .map { day in
+                    let count = groupedByDay[day]?.count ?? 0
+                    return DailyRecord(date: day, count: count)
+                }
+
+            // 날짜별 장(Chapter) 단위 집계 (UI 도메인 30일 기준, 빈 날 포함)
+            var chapterCountsByDay: [Date: [BibleChapter: Int]] = [:]
+            for day in days.map({ calendar.startOfDay(for: $0) }) {
+                let dayDrawings = groupedByDay[day] ?? []
+                var counts: [BibleChapter: Int] = [:]
+
+                for drawing in dayDrawings {
+                    guard let title = BibleTitle(rawValue: drawing.titleName!) else { continue }
+                    let chapter = BibleChapter(title: title, chapter: drawing.titleChapter!)
+                    counts[chapter, default: 0] += 1
+                }
+
+                chapterCountsByDay[day] = counts
+            }
+
+            await send(.setFetchedDailyData(dailyRecords: dailyRecords, chapterCountsByDay: chapterCountsByDay))
         }
     }
     
@@ -246,16 +363,54 @@ extension DrawingChartFeature {
         
         let drawingData = self.drawingData
         let existingRecords = state.dailyRecordChart.records
+        let existingChapterCountsByDay = state.chapterCountsByDay
         
         return .run { send in
-            var newRecords: [DailyRecord] = []
-            for date in daysToAppend {
-                let count = try await drawingData.fetchDrawings(date: date)?.count ?? 0
-                newRecords.append(.init(date: date, count: count))
+            // ✅ 이전 주(7일) 데이터를 한 번에 fetch 한 뒤, 날짜별로 집계해서 필요한 날(daysToAppend)만 사용한다.
+            let weekEnd = cal.date(byAdding: .day, value: 7, to: previousWeekStart)!
+            let range = DateInterval(start: previousWeekStart, end: weekEnd)
+
+            let drawings = try await drawingData.fetchDrawings(in: range)
+
+            let groupedByDay: [Date: [BibleDrawing]] = Dictionary(grouping: drawings) { drawing in
+                // fetchDrawings(in:)에서 updateDate != nil 레코드만 반환하도록 필터링했기 때문에 force unwrap 가능
+                cal.startOfDay(for: drawing.updateDate!)
             }
-            
-            // 데이터 prepend
-            await send(.setDailyRecords(newRecords + existingRecords))
+
+            let newRecords: [DailyRecord] = daysToAppend
+                .map { cal.startOfDay(for: $0) }
+                .map { day in
+                    let count = groupedByDay[day]?.count ?? 0
+                    return DailyRecord(date: day, count: count)
+                }
+
+            // 날짜별 장(Chapter) 단위 집계 (prepend 구간)
+            var newChapterCountsByDay: [Date: [BibleChapter: Int]] = [:]
+            for day in daysToAppend.map({ cal.startOfDay(for: $0) }) {
+                let dayDrawings = groupedByDay[day] ?? []
+                var counts: [BibleChapter: Int] = [:]
+
+                for drawing in dayDrawings {
+                    guard let title = BibleTitle(rawValue: drawing.titleName!) else { continue }
+                    let chapter = BibleChapter(title: title, chapter: drawing.titleChapter!)
+                    counts[chapter, default: 0] += 1
+                }
+
+                newChapterCountsByDay[day] = counts
+            }
+
+            // 기존 집계와 병합 (prepend 구간 날짜 키는 새로 추가되는 값)
+            var mergedChapterCounts = existingChapterCountsByDay
+            for (day, counts) in newChapterCountsByDay {
+                mergedChapterCounts[day] = counts
+            }
+
+            await send(
+                .setFetchedDailyData(
+                    dailyRecords: newRecords + existingRecords,
+                    chapterCountsByDay: mergedChapterCounts
+                )
+            )
             
             // 스크롤 선두 복원(점프 방지): 기존 선두 + 추가된 일 수
             let appendedDays = daysToAppend.count
