@@ -9,18 +9,25 @@
 import Foundation
 import Domain
 import CarveToolkit
+import ClientInterfaces
 
 import ComposableArchitecture
 
 @Reducer
 public struct DrawingWeeklySummaryFeature {
     @ObservableState
-    public struct State: Equatable {
-        // MARK: - Inputs (부모가 주입)
+    public struct State {
+        /// 광고 상태
+        public var adSlotState: SponsorAdSlotFeature.State = .init(
+            placement: .chartCard
+        )
+        /// 주간 차트 기준 startOfDay
         public var scrollPosition: Date = Calendar.current.startOfDay(for: Date())
+        /// 전체 일별 필사 기록
         public var dailyRecords: [DailyRecord] = []
+        /// 날짜(startOfDay) 기준 장별 카운트
         public var chapterCountsByDay: [Date: [BibleChapter: Int]] = [:]
-        
+        /// 표시용 최근 항목들
         public var recentVerses: [RecentVerseItem] = []
         public var recentChapters: [BibleChapter] = []
         
@@ -31,14 +38,11 @@ public struct DrawingWeeklySummaryFeature {
         private var pageStartDate: Date {
             Calendar.current.startOfDay(for: scrollPosition)
         }
-        private var currentWeekEnd: Date {
-            Calendar.current.date(byAdding: .day, value: 6, to: pageStartDate)!
-        }
-        
+        /// 주간 범위
         private var pageEndExclusive: Date {
             Calendar.current.date(byAdding: .day, value: 7, to: pageStartDate)!
         }
-        
+        /// 주간 범위 계산
         private var currentWeekRecords: [DailyRecord] {
             let cal = Calendar.current
             return dailyRecords.filter { record in
@@ -46,7 +50,6 @@ public struct DrawingWeeklySummaryFeature {
                 return (pageStartDate <= day) && (day < pageEndExclusive)
             }
         }
-        
         /// 이번 주 총 합
         public var weekTotalCount: Int {
             Log.debug(currentWeekRecords)
@@ -81,19 +84,17 @@ public struct DrawingWeeklySummaryFeature {
             guard let best = merged.max(by: { $0.value < $1.value }) else { return nil }
             return (best.key, best.value)
         }
-        /// 표시용 텍스트
-        public var topChapterText: String {
-            guard let top = topChapter else { return "이번 주 기록이 없어요" }
-            return "\(top.chapter.title.koreanTitle()) \(top.chapter.chapter)장 (총 \(top.count)절)"
-        }
     }
     
     public enum Action: ViewAction {
+        case adSlot(SponsorAdSlotFeature.Action)
         case view(View)
+        /// 네비게이션 트리거
         case openVerse(BibleVerse)
         case openChapter(BibleChapter)
         
         public enum View {
+            case onAppear
             case recentVerseTapped(RecentVerseItem)
             case recentChapterTapped(BibleChapter)
             case topChapterTapped
@@ -101,21 +102,28 @@ public struct DrawingWeeklySummaryFeature {
     }
     
     public var body: some Reducer<State, Action> {
+        Scope(state: \.adSlotState, action: \ .adSlot) {
+            SponsorAdSlotFeature()
+        }
+
         Reduce { state, action in
             switch action {
+            case .view(.onAppear):
+                return .send(.adSlot(.startLoad))
+                
             case let .view(.recentVerseTapped(item)):
                 return .send(.openVerse(item.verse))
-                
+
             case let .view(.recentChapterTapped(chapter)):
                 return .send(.openChapter(chapter))
-                
+
             case .view(.topChapterTapped):
                 guard let chapter = state.topChapter?.chapter else { return .none }
                 return .send(.openChapter(chapter))
                 
-            default: return .none
+            default:
+                return .none
             }
         }
-        ._printChanges()
     }
 }

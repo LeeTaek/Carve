@@ -7,8 +7,10 @@ let dependencies: [TargetDependency] = [
     .CarveFeature,
     .ChartFeature,
     .SettingsFeature,
+    .ClientInterfaces,
     .FirebaseAnalytics,
     .FirebaseMessaging,
+    .GoogleAds,
     
     .TCAArchitecture
 ]
@@ -31,10 +33,12 @@ let settings: Settings = .settings(
         ]),
     configurations: [
         .debug(name: "Debug", settings: [
-            "CLOUDKIT_CONTAINER_ID": "iCloud.Carve.SwiftData.iCloud.dev"
+            "CLOUDKIT_CONTAINER_ID": "iCloud.Carve.SwiftData.iCloud.dev",
+            "ADMOB_NATIVE_CHART_AD_UNIT_ID": "ca-app-pub-3940256099942544/3986624511"
         ]),
         .release(name: "Release", settings: [
-            "CLOUDKIT_CONTAINER_ID": "iCloud.Carve.SwiftData.iCloud"
+            "CLOUDKIT_CONTAINER_ID": "iCloud.Carve.SwiftData.iCloud",
+            "ADMOB_NATIVE_CHART_AD_UNIT_ID": "ca-app-pub-7073697298801242/6417626074"
         ])
     ]
 )

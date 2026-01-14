@@ -17,6 +17,7 @@ public extension TargetDependency {
     static let Domain: Self = .project(target: "Domain", path: .relativeToRoot("Domain/Domain"))
     static let CarveToolkit: Self = .project(target: "CarveToolkit", path: .relativeToRoot("Supports/CarveToolkit"))
     static let UIComponents: Self = .project(target: "UIComponents", path: .relativeToRoot("Supports/UIComponents"))
+    static let ClientInterfaces: Self = .project(target: "ClientInterfaces", path: .relativeToRoot("Supports/ClientInterfaces"))
     static let Resources: Self = .project(target: "Resources", path: .relativeToRoot("Shared/Resources"))
     
     /// 외부 라이브러리: Tuist + SPM
@@ -25,6 +26,7 @@ public extension TargetDependency {
     static let FirebaseAnalytics: Self = .external(name:  "FirebaseAnalytics")
     static let FirebaseMessaging: Self = .external(name:  "FirebaseMessaging")
     static let FirebaseCrashlytics: Self = .external(name: "FirebaseCrashlytics")
+    static let GoogleAds: Self = .external(name: "GoogleMobileAds")
 }
 
 
