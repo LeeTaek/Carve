@@ -13,6 +13,7 @@ let projectName = "CarveFeature"
 
 let dependencies: [TargetDependency] = [
     .Domain,
+    .UIComponents,
     .TCAArchitecture,
     .Resources
 ]

@@ -8,6 +8,7 @@
 import Domain
 import SwiftData
 import SwiftUI
+import ClientInterfaces
 
 import ComposableArchitecture
 import CarveFeature
@@ -21,16 +22,23 @@ struct CarveApp: App {
     // Firebase 초기화
     @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
     // 전역 네비게이션을 담당하는 Store
-    private var store: StoreOf<AppCoordinatorFeature>
+    private let store: StoreOf<AppCoordinatorFeature>
     // SwiftData의 ModelContainer
-    var modelContainer: ModelContainer
+    let modelContainer: ModelContainer
+    /// 광고용 인스턴스
+    private let nativeAdClient: any NativeAdClient
     
     // 앱 시작 시 필요한 의존성(ContainerID, ModelContainer, Store)을 생성하는 생성자.
     init() {
         let containerID = Self.makeContainerID()
         let modelContainer = Self.makeModelContainer(containerID: containerID)
         self.modelContainer = modelContainer
-        self.store = Self.makeStore(containerID: containerID, modelContainer: modelContainer)
+        self.nativeAdClient = GoogleNativeAdClient()
+        self.store = Self.makeStore(
+            containerID: containerID,
+            modelContainer: modelContainer,
+            nativeAdClient: nativeAdClient
+        )
     }
     
     var body: some Scene {
@@ -71,10 +79,15 @@ extension CarveApp {
 
     /// AppCoordinatorFeature의 Store를 생성.
     /// 의존성 주입은 한 번에 묶어 루트 Store 생성 시점에만 수행.
-    private static func makeStore(containerID: ContainerID, modelContainer: ModelContainer) -> StoreOf<AppCoordinatorFeature> {
+    private static func makeStore(
+        containerID: ContainerID,
+        modelContainer: ModelContainer,
+        nativeAdClient: any NativeAdClient
+    ) -> StoreOf<AppCoordinatorFeature> {
         withDependencies {
             $0.containerId = containerID
             $0.modelContainer = modelContainer
+            $0.nativeAdClient = nativeAdClient
         } operation: {
             Store(initialState: .initialState) {
                 AppCoordinatorFeature()
