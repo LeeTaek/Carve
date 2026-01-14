@@ -69,20 +69,15 @@ public struct CarveNavigationView: View {
         .toolbar {
             ToolbarItemGroup(placement: .bottomBar) {
                 HStack {
-//                    Button {
-//                        send(.navigationToDrewLog)
-//                    } label: {
-//                        Image(asset: CarveFeatureAsset.chart)
-//                            .resizable()
-//                            .aspectRatio(contentMode: .fit)
-//                            .foregroundStyle(.black)
-//                            .frame(width: 35, height: 35)
-//                    }
-                    
-//                    if #available(iOS 26.0, *) {
-//                        ToolbarSpacer(.fixed)
-//                    }
-                    
+                    Button {
+                        send(.moveToChart)
+                    } label: {
+                        Image(asset: CarveFeatureAsset.chart)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .foregroundStyle(.black)
+                            .frame(width: 35, height: 35)
+                    }
                     
                     Button {
                         send(.moveToSetting)
@@ -127,14 +122,6 @@ public struct CarveNavigationView: View {
                 )
             ) { store in
                 SentenceSettingsView(store: store)
-            }
-            .fullScreenCover(
-                item: $store.scope(
-                    state: \.detailNavigation?.drewLog,
-                    action: \.view.detailNavigation.drewLog)
-            ) { store in
-                DrewLogView(store: store)
-                    .toolbar(.visible, for: .navigationBar)
             }
         }
     }

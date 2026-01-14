@@ -41,6 +41,8 @@ public struct CarveNavigationFeature {
     }
     public enum Action: ViewAction, CarveToolkit.ScopeAction, BindableAction {
         case binding(BindingAction<State>)
+        case moveToChapter(BibleChapter)
+        case moveToVerse(BibleVerse)
         case view(View)
         case scope(ScopeAction)
         
@@ -48,12 +50,11 @@ public struct CarveNavigationFeature {
         public enum View {
             /// 설정 화면으로 이동
             case moveToSetting
+            case moveToChart
             /// NavigationSplitView를 닫고 DetailOnly로 변경
             case closeNavigationBar
             /// detail Content 안에서 네비게이션 래핑
             case detailNavigation(PresentationAction<DetailDestination.Action>)
-            /// DrawingHistoryChart로 이동
-            case navigationToDrewLog
         }
     }
 
@@ -67,8 +68,6 @@ public struct CarveNavigationFeature {
     public enum DetailDestination {
         /// 문장 폰트 등 설정 화면 시트
         case sentenceSettings(SentenceSettingsFeature)
-        /// DrawingHistoryChart로 이동
-        case drewLog(DrewLogFeature)
     }
     
     public var body: some Reducer<State, Action> {
@@ -99,6 +98,25 @@ public struct CarveNavigationFeature {
         
         Reduce { state, action in
             switch action {
+            case .moveToChapter(let chapter):
+                state.selectedTitle = chapter.title
+                state.selectedChapter = chapter.chapter
+                state.$currentTitle.withLock { $0 = chapter }
+                state.columnVisibility = .detailOnly
+                state.carveDetailState.verseRowState.removeAll()
+                
+                return .none
+                
+            case .moveToVerse(let verse):
+                let chapter = verse.title
+                state.selectedTitle = chapter.title
+                state.selectedChapter = chapter.chapter
+                state.$currentTitle.withLock { $0 = chapter }
+                state.columnVisibility = .detailOnly
+                state.carveDetailState.verseRowState.removeAll()
+
+                return .send(.scope(.carveDetailAction(.setScrollTarget(verse))))
+                
             case .scope(.carveDetailAction(.scope(.headerAction(.view(.titleDidTapped))))):
                 return handleTitleDidTapped(state: &state)
                 
@@ -112,13 +130,12 @@ public struct CarveNavigationFeature {
                 Log.debug("move To settings")
                 return .none
                 
-            case .view(.closeNavigationBar):
-                state.columnVisibility = .detailOnly
+            case .view(.moveToChart):
+                Log.debug("move To Charts")
                 return .none
                 
-            case .view(.navigationToDrewLog):
+            case .view(.closeNavigationBar):
                 state.columnVisibility = .detailOnly
-                state.detailNavigation = .drewLog(.initialState)
                 return .none
                 
             case .scope(.carveDetailAction(.scope(.headerAction(.view(.sentenceSettingsDidTapped))))):

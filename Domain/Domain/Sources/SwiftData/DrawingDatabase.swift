@@ -68,6 +68,24 @@ public struct DrawingDatabase: Sendable {
         Log.debug("Drew Log Count:", storedDrawing.count)
         return storedDrawing
     }
+
+    public func fetchDrawings(date: Date) async throws -> [BibleDrawing]? {
+        let calendar = Calendar.current
+        let startOfDay = calendar.startOfDay(for: date)
+        let endOfDay = calendar.date(byAdding: DateComponents(day: 1, second: -1), to: startOfDay)!
+
+        let predicate = #Predicate<BibleDrawing> {
+            if let updateDate = $0.updateDate {
+                  return updateDate >= startOfDay && updateDate <= endOfDay
+              } else {
+                  return false
+              }
+        }
+        let descriptor = FetchDescriptor(predicate: predicate)
+        let storedDrawing: [BibleDrawing]? = try await actor.fetch(descriptor)
+        Log.debug("Drew Log Count:", storedDrawing?.count)
+        return storedDrawing
+    }
     
     /// 여러 절의 필사 데이터를 한 번에 업데이트(update)
     /// - Parameter requests: 각 절에 대한 업데이트 정보를 담은 요청 배열
@@ -190,6 +208,40 @@ public struct DrawingDatabase: Sendable {
         }
     }
     
+    /// 최근 range 사이에 업데이트 된 drawing을 최신순으로 반환
+    public func fetchDrawings(in range: DateInterval) async throws -> [BibleDrawing] {
+        let predicate = #Predicate<BibleDrawing> {
+            if let updateDate = $0.updateDate {
+                return updateDate >= range.start && updateDate < range.end
+            } else {
+                return false
+            }
+        }
+
+        let descriptor = FetchDescriptor(
+            predicate: predicate,
+            sortBy: [SortDescriptor(\.updateDate, order: .reverse)]
+        )
+
+        return try await actor.fetch(descriptor)
+    }
+    
+    /// 최근 필사 Verse 리스트용 (최신순, 제한)
+    public func fetchRecentDrawings(limit: Int) async throws -> [BibleDrawing] {
+        guard limit > 0 else { return [] }
+
+        let predicate = #Predicate<BibleDrawing> {
+            $0.updateDate != nil
+        }
+
+        var descriptor = FetchDescriptor(
+            predicate: predicate,
+            sortBy: [SortDescriptor(\.updateDate, order: .reverse)]
+        )
+        descriptor.fetchLimit = limit
+
+        return try await actor.fetch(descriptor)
+    }
 }
 
 extension DrawingDatabase: DependencyKey {

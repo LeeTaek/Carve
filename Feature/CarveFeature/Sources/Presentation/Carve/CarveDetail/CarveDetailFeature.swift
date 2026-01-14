@@ -30,6 +30,8 @@ public struct CarveDetailFeature {
         var lastUsedPencil: PKInkingTool.InkType = .pencil
         /// global 좌표계 기준 CombinedCanvasView의 frame (Canvas 기준 verse 별 rect 계산용)
         var canvasGlobalFrame: CGRect = .zero
+        /// 특정 Verse로 스크롤 필요할 때 사용
+        public var pendingScrollVerse: BibleVerse?
         
         /// 성경 문장 출력시 자간 폰트 등 설정
         @Shared(.appStorage("sentenceSetting")) public var sentenceSetting: SentenceSetting = .initialState
@@ -45,6 +47,8 @@ public struct CarveDetailFeature {
     public enum Action: ViewAction, CarveToolkit.ScopeAction {
         /// 화면 최상단으로 스크롤
         case scrollToTop
+        case setScrollTarget(BibleVerse)
+        case scrollToVerse
         case view(View)
         case scope(ScopeAction)
         
@@ -138,7 +142,23 @@ public struct CarveDetailFeature {
                 return .send(.scrollToTop)
                 
             case .scrollToTop:
-                return scrollToTop(state: &state)
+                guard let id = state.verseRowState.first?.id else { return .none }
+                withAnimation(.easeInOut(duration: 0.5)) {
+                    state.proxy?.scrollTo(id, anchor: .bottom)
+                }
+                
+                return .run { send in
+                    try? await Task.sleep(nanoseconds: 150_000_000)
+                    await send(.scrollToVerse)
+                }
+                
+            case .setScrollTarget(let verse):
+                state.pendingScrollVerse = verse
+                return .none
+                
+            case .scrollToVerse:
+                return scrollToPendingVerseIfPossible(state: &state)
+
 
             case .view(.switchToEraser):
                 // monoline을 지우개로 사용
@@ -260,6 +280,22 @@ extension CarveDetailFeature {
         withAnimation(.easeInOut(duration: 0.5)) {
             state.proxy?.scrollTo(id, anchor: .bottom)
         }
+        return .none
+    }
+    
+    private func scrollToPendingVerseIfPossible(state: inout State) -> Effect<Action> {
+        guard let verse = state.pendingScrollVerse,
+              let proxy = state.proxy,
+              let rowID = state.verseRowState
+            .first(where: { $0.sentence.verse == verse.verse })?
+            .id
+        else { return .none }
+        
+        withAnimation(.easeInOut(duration: 0.5)) {
+            proxy.scrollTo(rowID, anchor: .center)
+        }
+        
+        state.pendingScrollVerse = nil
         return .none
     }
     
