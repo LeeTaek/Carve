@@ -17,10 +17,10 @@ public struct VerseRowView: View {
     @Bindable public var store: StoreOf<VerseRowFeature>
     /// sentence와 canvas 영역 배치를 위한 너비
     @Binding private var halfWidth: CGFloat
-    /// 1절일때만 상단 여백 추가
-    private var topDrawingInset: CGFloat {
-        store.sentence.verse == 1 ? 25 : 0
-    }
+    /// Root 좌표계 기준 Canvas frame
+    private let canvasRootFrame: CGRect
+    /// ScrollView의 스크롤 offset (content 기준, down = 양수)
+    private let scrollOffset: CGFloat
     /// Text.LayoutKey(텍스트 레이아웃 변경 이벤트)를 상위(CarveDetailFeature)로 전달하기 위한 클로저.
     /// - Note: 원래는 VerseTextFeature.Action.setUnderlineOffsets로 직접 액션을 보냈으나,
     ///         ForEachReducer에서 missing element warning이 발생하는 문제를 피하기 위해
@@ -32,10 +32,14 @@ public struct VerseRowView: View {
     public init(
         store: StoreOf<VerseRowFeature>,
         halfWidth: Binding<CGFloat>,
+        canvasRootFrame: CGRect,
+        scrollOffset: CGFloat,
         onUnderlineLayoutChange: @escaping (VerseRowFeature.State.ID, Text.LayoutKey.Value) -> Void
     ) {
         self.store = store
         self._halfWidth = halfWidth
+        self.canvasRootFrame = canvasRootFrame
+        self.scrollOffset = scrollOffset
         self.onUnderlineLayoutChange = onUnderlineLayoutChange
     }
     
@@ -80,7 +84,6 @@ public struct VerseRowView: View {
             }
         )
         .frame(width: halfWidth * 0.95, alignment: .leading)
-        .padding(.top, topDrawingInset)
     }
     
     /// 각 장의 제목
@@ -94,12 +97,21 @@ public struct VerseRowView: View {
     /// glbalRect를 측정해 상위로 전달
     private var underLineView: some View {
         let underlineOffsets = store.verseTextState.underlineOffsets
+        let sendFrame: (CGRect) -> Void = { rect in
+            let adjusted = CGRect(
+                x: rect.minX - canvasRootFrame.minX,
+                y: rect.minY - canvasRootFrame.minY + scrollOffset,
+                width: rect.width,
+                height: rect.height
+            )
+            send(.updateVerseFrame(adjusted))
+        }
         
         return Canvas { context, size in
             for y in underlineOffsets {
                 var path = Path()
-                path.move(to: CGPoint(x: 0, y: y + topDrawingInset))
-                path.addLine(to: CGPoint(x: size.width, y: y + topDrawingInset))
+                path.move(to: CGPoint(x: 0, y: y))
+                path.addLine(to: CGPoint(x: size.width, y: y))
                 context.stroke(path, with: .color(.gray), style: StrokeStyle(lineWidth: 1, dash: [5]))
             }
         }
@@ -110,13 +122,22 @@ public struct VerseRowView: View {
                 Color.clear
                     .onAppear {
                         DispatchQueue.main.async {
-                            let rectInScroll = proxy.frame(in: .named("Scroll"))
-                            send(.updateVerseFrame(rectInScroll))
+                            sendFrame(proxy.frame(in: .named("Root")))
                         }
                     }
-                    .onChange(of: proxy.frame(in: .named("Scroll"))) { _, rect in
+                    .onChange(of: proxy.frame(in: .named("Root"))) { _, rect in
                         DispatchQueue.main.async {
-                            send(.updateVerseFrame(rect))
+                            sendFrame(rect)
+                        }
+                    }
+                    .onChange(of: canvasRootFrame) { _, _ in
+                        DispatchQueue.main.async {
+                            sendFrame(proxy.frame(in: .named("Root")))
+                        }
+                    }
+                    .onChange(of: scrollOffset) { _, _ in
+                        DispatchQueue.main.async {
+                            sendFrame(proxy.frame(in: .named("Root")))
                         }
                     }
             }
@@ -132,7 +153,10 @@ public struct VerseRowView: View {
         }
     @Previewable @State var halfWidth = UIScreen().bounds.width / 2
     
-    VerseRowView(store: store, halfWidth: $halfWidth) { _, layout in
+    VerseRowView(store: store,
+                 halfWidth: $halfWidth,
+                 canvasRootFrame: .zero,
+                 scrollOffset: 0) { _, layout in
         let offsets =  VerseTextFeature.makeUnderlineOffsets(
             from: layout,
             sentenceSetting: store.verseTextState.sentenceSetting

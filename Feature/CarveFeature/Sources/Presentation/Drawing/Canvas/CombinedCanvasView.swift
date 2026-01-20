@@ -17,9 +17,23 @@ import ComposableArchitecture
 public struct CombinedCanvasView: UIViewRepresentable {
     public typealias UIViewType = PKCanvasView
     private var store: StoreOf<CombinedCanvasFeature>
+    private var viewportSize: CGSize
+    private var contentHeight: CGFloat
+    private var scrollOffset: CGFloat
+    private var bottomBuffer: CGFloat
 
-    init(store: StoreOf<CombinedCanvasFeature>) {
+    init(
+        store: StoreOf<CombinedCanvasFeature>,
+        viewportSize: CGSize = .zero,
+        contentHeight: CGFloat = 0,
+        scrollOffset: CGFloat = 0,
+        bottomBuffer: CGFloat = 0
+    ) {
         self.store = store
+        self.viewportSize = viewportSize
+        self.contentHeight = contentHeight
+        self.scrollOffset = scrollOffset
+        self.bottomBuffer = bottomBuffer
     }
     
 
@@ -27,15 +41,21 @@ public struct CombinedCanvasView: UIViewRepresentable {
         let canvas: PKCanvasView = {
             let canvas = PKCanvasView()
 
+#if DEBUG
+            canvas.drawingPolicy = .anyInput
+#else
             canvas.drawingPolicy = .pencilOnly
+#endif
+
             canvas.backgroundColor = .clear
             canvas.isOpaque = false
             canvas.translatesAutoresizingMaskIntoConstraints = false
             
             canvas.isScrollEnabled = false
-            canvas.bounces = false
-            canvas.alwaysBounceVertical = false
+            canvas.bounces = true
+            canvas.alwaysBounceVertical = true
             canvas.alwaysBounceHorizontal = false
+            canvas.contentInsetAdjustmentBehavior = .never
             canvas.minimumZoomScale = 1
             canvas.maximumZoomScale = 1
             canvas.zoomScale = 1
@@ -62,6 +82,13 @@ public struct CombinedCanvasView: UIViewRepresentable {
         // SwiftUI 리사이즈/회전 중에도 PKCanvasView 내부 UIScrollView 상태가 남지 않도록
         // 매 업데이트 타이밍에 안전하게 정규화.
         context.coordinator.normalizeCanvasForOverlay(canvas)
+        context.coordinator.applyScrollState(
+            canvas,
+            viewportSize: viewportSize,
+            contentHeight: contentHeight,
+            scrollOffset: scrollOffset,
+            bottomBuffer: bottomBuffer
+        )
         // publisher 구독 타이밍과 엇갈려도 SwiftUI update cycle에서 drawing을 확실히 반영
         context.coordinator.applyStoreDrawingIfNeeded(canvas, store.combinedDrawing)
     }
@@ -174,7 +201,11 @@ public struct CombinedCanvasView: UIViewRepresentable {
             // 손가락 입력 설정 Bind
             store.$allowFingerDrawing.publisher
                 .sink { allow in
+#if DEBUG
+                    canvas.drawingPolicy = .anyInput
+#else
                     canvas.drawingPolicy = allow ? .anyInput : .pencilOnly
+#endif
                 }
                 .store(in: &cancellables)
         }
@@ -198,22 +229,12 @@ public struct CombinedCanvasView: UIViewRepresentable {
         func normalizeCanvasForOverlay(_ canvas: PKCanvasView) {
             // 스크롤/줌 고정
             canvas.isScrollEnabled = false
-            canvas.bounces = false
-            canvas.alwaysBounceVertical = false
+            canvas.bounces = true
+            canvas.alwaysBounceVertical = true
             canvas.alwaysBounceHorizontal = false
             canvas.minimumZoomScale = 1
             canvas.maximumZoomScale = 1
             if canvas.zoomScale != 1 { canvas.zoomScale = 1 }
-
-            // inset/offset 초기화
-            if canvas.contentInset != .zero { canvas.contentInset = .zero }
-            if canvas.contentOffset != .zero { canvas.contentOffset = .zero }
-
-            // contentSize는 bounds에 맞춰 고정 (bounds가 0이면 생략)
-            if !canvas.bounds.isEmpty {
-                let desired = canvas.bounds.size
-                if canvas.contentSize != desired { canvas.contentSize = desired }
-            }
 
             // 화면 스케일 고정 (윈도우 모드 전환 시 contentsScale mismatch 방지)
             let scale = UIScreen.main.scale
@@ -227,6 +248,40 @@ public struct CombinedCanvasView: UIViewRepresentable {
                 canvas.setNeedsLayout()
                 canvas.layoutIfNeeded()
             }
+        }
+        
+        
+        /// 부모(예: SwiftUI ScrollView)의 스크롤 상태를 PKCanvasView 내부 UIScrollView에 동기화.
+        /// 캔버스 자체의 스크롤을 막아두고 부모스크롤(SwiftUI ScrollView)가 스크롤된 만큼 Canvas 내부 스크롤.
+        /// - Parameters:
+        ///   - canvas: 스크롤 동기화할 Canvas
+        ///   - viewportSize: contentSize 계산할때 사용할 최소 기준.
+        ///   - contentHeight: 캔버스가 표현해야하는 전체 컨텐츠 높이
+        ///   - scrollOffset: 부모 scrollView의 현재 세로 스크롤 offset
+        ///   - bottomBuffer: 콘텐츠 아래 rubber-band를 표현할 여백
+        func applyScrollState(
+            _ canvas: PKCanvasView,
+            viewportSize: CGSize,
+            contentHeight: CGFloat,
+            scrollOffset: CGFloat,
+            bottomBuffer: CGFloat
+        ) {
+            // contentSize: 캔버스 내부 좌표계의 “총 높이/너비”를 확정.
+            let width = max(viewportSize.width, canvas.bounds.width)
+            let height = max(contentHeight, viewportSize.height)
+            if width > 0, height > 0 {
+                let desiredSize = CGSize(width: width, height: height)
+                if canvas.contentSize != desiredSize { canvas.contentSize = desiredSize }
+            }
+            
+            // rubber-Band 액션을 위해 contentInset(하단 여백) 확보
+            let inset = UIEdgeInsets(top: 0, left: 0, bottom: bottomBuffer, right: 0)
+            if canvas.contentInset != inset { canvas.contentInset = inset }
+            
+
+            // contentOffset: 부모 ScrollView의 스크롤 위치를 캔버스에 적용.
+            let desiredOffset = CGPoint(x: 0, y: scrollOffset)
+            if canvas.contentOffset != desiredOffset { canvas.contentOffset = desiredOffset }
         }
         
     }

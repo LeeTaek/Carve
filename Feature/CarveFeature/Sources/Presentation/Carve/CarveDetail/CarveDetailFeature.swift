@@ -66,8 +66,6 @@ public struct CarveDetailFeature {
             case switchToEraser
             /// 펜 타입을 이전으로 전환
             case switchToPreviousPenType
-            /// 캔버스 전체 프레임 변경
-            case canvasFrameChanged(CGRect)
             /// 한 손가락 탭 액션: 헤더 노출/숨김
             case tapForHeaderHidden
             /// 두손가락 더블탭 액션: undo
@@ -188,10 +186,6 @@ public struct CarveDetailFeature {
                     globalRect: globalRect
                 )
                 
-            case .view(.canvasFrameChanged(let rect)):
-                state.canvasGlobalFrame = rect
-                return .none
-
             case .scope(.canvasAction(.undoStateChanged(let canUndo, let canRedo))):
                 state.headerState.palatteSetting.canUndo = canUndo
                 state.headerState.palatteSetting.canRedo = canRedo
@@ -300,11 +294,11 @@ extension CarveDetailFeature {
     }
     
     
-    /// Sentence 셀에서 전달된 global 좌표를 Canvas 기준 로컬 좌표로 변환하고,
+    /// Sentence 셀에서 전달된 content 좌표를 Canvas 기준 좌표로 사용하고,
     /// 각 절의 rect를 CombinedCanvasFeature에 전달.
     /// - Parameters:
     ///   - id: 각 절의 상태 ID
-    ///   - globalRect: 각 절의 Rect
+    ///   - globalRect: 각 절의 Rect (Content 좌표계)
     private func updateVerseFrame(
         state: inout State,
         id: VerseRowFeature.State.ID,
@@ -316,17 +310,8 @@ extension CarveDetailFeature {
         let sentenceState = state.verseRowState[index]
         let verse = sentenceState.sentence.verse
 
-        let canvasFrame = state.canvasGlobalFrame
-        guard canvasFrame.width > 0, canvasFrame.height > 0 else { return .none }
-
-        // canvas 기준 로컬 rect로 변환
-        let localRect = CGRect(
-            x: globalRect.minX - canvasFrame.minX,
-            y: globalRect.minY - canvasFrame.minY,
-            width: globalRect.width,
-            height: globalRect.height
-        )
-
+        // content 좌표를 그대로 canvas 좌표로 사용
+        let localRect = globalRect
         state.canvasState.drawingRect[verse] = localRect
 
         // baseWidth/baseHeight self-healing은 verse drawing이 메모리에 로드된 이후에만 가능

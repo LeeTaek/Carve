@@ -18,7 +18,14 @@ public struct CarveDetailView: View {
     @State private(set) var halfWidth: CGFloat = 0
     /// iPad 멀티윈도우/회전 등으로 레이아웃(특히 width)이 바뀔 때 PKCanvasView 내부 상태를 리셋하기 위한 트리거
     @State private var canvasLayoutVersion: Int = 0
-    @State private var lastObservedScrollSize: CGSize = .zero
+    /// ScrollView의 스크롤 offset (content 기준, down = 양수)
+    @State private var scrollOffset: CGFloat = 0
+    /// ScrollView 내부 콘텐츠 높이 (LazyVStack 특성상 증가만 반영)
+    @State private var contentHeight: CGFloat = 0
+    /// ScrollView viewport 크기
+    @State private var viewportSize: CGSize = .zero
+    /// Root 좌표계 기준 Canvas frame
+    @State private var canvasRootFrame: CGRect = .zero
     
     public init(store: StoreOf<CarveDetailFeature>) {
         self.store = store
@@ -59,93 +66,128 @@ public struct CarveDetailView: View {
     
     private var detailScroll: some View {
         ScrollViewReader { proxy in
-            ScrollView {
-                ZStack {
+            ZStack(alignment: .top) {
+                ScrollView {
                     contentView
                         .padding(.top, store.headerState.headerHeight)
                         .offsetY { previous, current in
+                            let newOffset = -current
+                            if scrollOffset != newOffset {
+                                scrollOffset = newOffset
+                            }
                             delay {
                                 send(.headerAnimation(previous, current))
                             }
                         }
+                        .background(
+                            GeometryReader { proxy in
+                                Color.clear
+                                    .preference(key: ContentHeightKey.self, value: proxy.size.height)
+                            }
+                        )
                         .onChange(of: store.verseRowState) {
                             send(.setProxy(proxy))
                         }
-                    
-                    CombinedCanvasView(
-                        store: self.store.scope(
-                            state: \.canvasState,
-                            action: \.scope.canvasAction
-                        )
-                    )
-                    .id("\(store.canvasState.chapter)-\(canvasLayoutVersion)")
-                    .transaction { $0.animation = nil }
-                    .background(
-                        GeometryReader { proxy in
-                            Color.clear
-                                .onAppear {
-                                    let frame = proxy.frame(in: .named("Scroll"))
-                                    send(.canvasFrameChanged(frame))
-                                }
-                                .onChange(of: proxy.frame(in: .named("Scroll"))) { _, frame in
-                                    send(.canvasFrameChanged(frame))
-                                }
-                        }
-                    )
-                    .frame(width: halfWidth)
-                    .frame(
-                        maxWidth: .infinity,
-                        alignment: store.isLeftHanded ? .leading : .trailing
-                    )
                 }
-                .onAppear {
-                    send(.fetchSentence)
+                .onTapGesture {
+                    send(.tapForHeaderHidden)
+                }
+                .onTwoFingerDoubleTap {
+                    send(.twoFingerDoubleTapForUndo)
+                }
+                .coordinateSpace(name: "Scroll")
+                
+                CombinedCanvasView(
+                    store: self.store.scope(
+                        state: \.canvasState,
+                        action: \.scope.canvasAction
+                    ),
+                    viewportSize: CGSize(width: halfWidth, height: viewportSize.height),
+                    contentHeight: contentHeight,
+                    scrollOffset: scrollOffset,
+                    bottomBuffer: canvasBuffer
+                )
+                .id("\(store.canvasState.chapter)-\(canvasLayoutVersion)")
+                .transaction { $0.animation = nil }
+                .background(
+                    GeometryReader { proxy in
+                        Color.clear
+                            .onAppear {
+                                canvasRootFrame = proxy.frame(in: .named("Root"))
+                            }
+                            .onChange(of: proxy.frame(in: .named("Root"))) { _, frame in
+                                canvasRootFrame = frame
+                            }
+                    }
+                )
+                .frame(width: halfWidth, height: viewportSize.height)
+                .frame(
+                    maxWidth: .infinity,
+                    maxHeight: .infinity,
+                    alignment: store.isLeftHanded ? .topLeading : .topTrailing
+                )
+            }
+            .coordinateSpace(name: "Root")
+            .onAppear {
+                send(.fetchSentence)
+            }
+            .onChange(of: store.canvasState.chapter) { _, _ in
+                contentHeight = 0
+            }
+            .onChange(of: store.sentenceSetting) { _, _ in
+                contentHeight = 0
+            }
+            .onPreferenceChange(ContentHeightKey.self) { height in
+                if height > contentHeight {
+                    contentHeight = height
                 }
             }
-            .onTapGesture {
-                send(.tapForHeaderHidden)
-            }
-            .onTwoFingerDoubleTap {
-                send(.twoFingerDoubleTapForUndo)
-            }
-            .coordinateSpace(name: "Scroll")
         }
         .onGeometryChange(for: CGSize.self) { proxy in
-            return proxy.size
+            proxy.size
         } action: { size in
             let newHalfWidth = size.width / 2
-            if self.halfWidth != newHalfWidth {
-                self.halfWidth = newHalfWidth
+            if halfWidth != newHalfWidth {
+                halfWidth = newHalfWidth
             }
-
-            // PKCanvasView를 재생성하도록 version을 올린다.
-            if self.lastObservedScrollSize != size {
-                self.lastObservedScrollSize = size
-                self.canvasLayoutVersion &+= 1
+            
+            let viewportChanged = (viewportSize != size)
+            if viewportChanged {
+                viewportSize = size
+                // iPad 멀티윈도우/회전 등으로 viewport가 바뀌면 PKCanvasView를 재생성하도록 version을 올린다.
+                canvasLayoutVersion &+= 1
+                // LazyVStack 콘텐츠 높이 측정값도 리셋
+                contentHeight = 0
             }
         }
     }
     
     private var contentView: some View {
-        LazyVStack(pinnedViews: .sectionHeaders) {
-            Section {
-                ForEach(
-                    store.scope(state: \.verseRowState,
-                                action: \.scope.verseRowAction),
-                    id: \.state.id
-                ) { childStore in
-                    VerseRowView(
-                        store: childStore,
-                        halfWidth: $halfWidth,
-                        onUnderlineLayoutChange: { id, layout in
-                            send(.underlineLayoutChanged(id: id, layout: layout))
-                        }
-                    )
-                    .padding(.horizontal, 10)
-                }
+        LazyVStack {
+            ForEach(
+                store.scope(state: \.verseRowState,
+                            action: \.scope.verseRowAction),
+                id: \.state.id
+            ) { childStore in
+                VerseRowView(
+                    store: childStore,
+                    halfWidth: $halfWidth,
+                    canvasRootFrame: canvasRootFrame,
+                    scrollOffset: scrollOffset,
+                    onUnderlineLayoutChange: { id, layout in
+                        send(.underlineLayoutChanged(id: id, layout: layout))
+                    }
+                )
+                .padding(.horizontal, 10)
             }
+            
         }
         .id("\(store.sentenceSetting)-\(halfWidth)")
+    }
+    
+    private var canvasBuffer: CGFloat {
+        guard viewportSize.height > 0 else { return 0 }
+        return max(80, viewportSize.height * 0.25)
     }
     
     /// 헤더 스크롤 애니메이션 등 과도한 이벤트 호출을 방지하기 위한 딜레이
@@ -154,6 +196,14 @@ public struct CarveDetailView: View {
         _ action: @escaping () -> Void
     ) {
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: action)
+    }
+}
+
+/// ScrollView 콘텐츠 높이를 상위로 전달하기 위한 PreferenceKey.
+private struct ContentHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }
 
