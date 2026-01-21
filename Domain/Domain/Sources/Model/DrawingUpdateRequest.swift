@@ -20,6 +20,7 @@ public struct DrawingUpdateRequest: Sendable {
     public let updateDate: Date
     public let baseWidth: Double?
     public let baseHeight: Double?
+    public let baseFirstUnderlineOffset: Double?
     
     public init(
         chapter: BibleChapter,
@@ -27,7 +28,8 @@ public struct DrawingUpdateRequest: Sendable {
         updateLineData: Data,
         updateDate: Date = .now,
         baseWidth: Double? = nil,
-        baseHeight: Double? = nil
+        baseHeight: Double? = nil,
+        baseFirstUnderlineOffset: Double? = nil
     ) {
         self.chapter = chapter
         self.verse = verse
@@ -35,5 +37,6 @@ public struct DrawingUpdateRequest: Sendable {
         self.updateDate = updateDate
         self.baseWidth = baseWidth
         self.baseHeight = baseHeight
+        self.baseFirstUnderlineOffset = baseFirstUnderlineOffset
     }
 }

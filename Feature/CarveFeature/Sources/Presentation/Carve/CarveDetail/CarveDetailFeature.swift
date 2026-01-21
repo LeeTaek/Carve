@@ -32,6 +32,8 @@ public struct CarveDetailFeature {
         var canvasGlobalFrame: CGRect = .zero
         /// 특정 Verse로 스크롤 필요할 때 사용
         public var pendingScrollVerse: BibleVerse?
+        /// underline 레이아웃 변경 전파용 버전
+        public var underlineLayoutVersion: Int = 0
         
         /// 성경 문장 출력시 자간 폰트 등 설정
         @Shared(.appStorage("sentenceSetting")) public var sentenceSetting: SentenceSetting = .initialState
@@ -130,10 +132,16 @@ public struct CarveDetailFeature {
                     from: layout,
                     sentenceSetting: setting
                 )
+                guard offsets != row.verseTextState.underlineOffsets else { return .none }
+
                 row.verseTextState.underlineOffsets = offsets
                 state.verseRowState[id: id] = row
+                state.underlineLayoutVersion &+= 1
 
-                return .none
+                let verse = row.sentence.verse
+                return .send(.scope(.canvasAction(
+                    .verseUnderlineOffsetsUpdated(verse: verse, offsets: offsets)
+                )))
                 
             case .view(.setProxy(let proxy)):
                 state.proxy = proxy
@@ -312,18 +320,7 @@ extension CarveDetailFeature {
 
         // content 좌표를 그대로 canvas 좌표로 사용
         let localRect = globalRect
-        state.canvasState.drawingRect[verse] = localRect
 
-        // baseWidth/baseHeight self-healing은 verse drawing이 메모리에 로드된 이후에만 가능
-        if let index = state.canvasState.drawings.firstIndex(where: { $0.verse == verse }) {
-            if state.canvasState.drawings[index].baseWidth == nil {
-                state.canvasState.drawings[index].baseWidth = Double(localRect.width)
-            }
-            if state.canvasState.drawings[index].baseHeight == nil {
-                state.canvasState.drawings[index].baseHeight = Double(localRect.height)
-            }
-        }
-        
         return .send(.scope(.canvasAction(
             .verseFrameUpdated(verse: verse, rect: localRect)
         )))

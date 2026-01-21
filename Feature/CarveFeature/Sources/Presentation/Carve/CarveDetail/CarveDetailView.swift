@@ -18,6 +18,8 @@ public struct CarveDetailView: View {
     @State private(set) var halfWidth: CGFloat = 0
     /// iPad 멀티윈도우/회전 등으로 레이아웃(특히 width)이 바뀔 때 PKCanvasView 내부 상태를 리셋하기 위한 트리거
     @State private var canvasLayoutVersion: Int = 0
+    /// verse 레이아웃 변경 시 underline frame 재측정을 위한 트리거
+    @State private var verseLayoutVersion: Int = 0
     /// ScrollView의 스크롤 offset (content 기준, down = 양수)
     @State private var scrollOffset: CGFloat = 0
     /// ScrollView 내부 콘텐츠 높이 (LazyVStack 특성상 증가만 반영)
@@ -149,6 +151,7 @@ public struct CarveDetailView: View {
             let newHalfWidth = size.width / 2
             if halfWidth != newHalfWidth {
                 halfWidth = newHalfWidth
+                verseLayoutVersion &+= 1
             }
             
             let viewportChanged = (viewportSize != size)
@@ -156,6 +159,7 @@ public struct CarveDetailView: View {
                 viewportSize = size
                 // iPad 멀티윈도우/회전 등으로 viewport가 바뀌면 PKCanvasView를 재생성하도록 version을 올린다.
                 canvasLayoutVersion &+= 1
+                verseLayoutVersion &+= 1
                 // LazyVStack 콘텐츠 높이 측정값도 리셋
                 contentHeight = 0
             }
@@ -174,6 +178,7 @@ public struct CarveDetailView: View {
                     halfWidth: $halfWidth,
                     canvasRootFrame: canvasRootFrame,
                     scrollOffset: scrollOffset,
+                    layoutVersion: verseLayoutVersion + store.underlineLayoutVersion,
                     onUnderlineLayoutChange: { id, layout in
                         send(.underlineLayoutChanged(id: id, layout: layout))
                     }

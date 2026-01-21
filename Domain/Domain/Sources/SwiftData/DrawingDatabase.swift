@@ -108,6 +108,9 @@ public struct DrawingDatabase: Sendable {
                         // base size는 요청에 값이 있을 때만 반영 (nil이면 기존값 유지)
                         if let bw = req.baseWidth { old.baseWidth = bw }
                         if let bh = req.baseHeight { old.baseHeight = bh }
+                        if let offset = req.baseFirstUnderlineOffset {
+                            old.baseFirstUnderlineOffset = offset
+                        }
                     }
                     Log.debug("updated drawing verse:", req.verse)
                 } else {
@@ -121,6 +124,9 @@ public struct DrawingDatabase: Sendable {
                     // base size는 요청에 값이 있을 때만 세팅
                     if let bw = req.baseWidth { new.baseWidth = bw }
                     if let bh = req.baseHeight { new.baseHeight = bh }
+                    if let offset = req.baseFirstUnderlineOffset {
+                        new.baseFirstUnderlineOffset = offset
+                    }
                     try await actor.insert(new)
                     Log.debug("inserted new drawing verse:", req.verse)
                 }

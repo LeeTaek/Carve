@@ -28,7 +28,8 @@ enum DrawingDataMigrationPlan: SchemaMigrationPlan {
             DrawingSchemaV1.self,
             DrawingSchemaV2.self,
             DrawingSchemaV3.self,
-            DrawingSchemaV3Minor1.self
+            DrawingSchemaV3Minor1.self,
+            DrawingSchemaV3Minor2.self
         ]
     }
 
@@ -90,13 +91,19 @@ enum DrawingDataMigrationPlan: SchemaMigrationPlan {
         fromVersion: DrawingSchemaV3.self,
         toVersion: DrawingSchemaV3Minor1.self
     )
+    
+    static let migrationV3Minor1toMinor2 = MigrationStage.lightweight(
+        fromVersion: DrawingSchemaV3Minor1.self,
+        toVersion: DrawingSchemaV3Minor2.self
+    )
 
     /// 정의된 순서대로 마이그레이션 실행 (V1 -> V2, V2 -> V3)
     static var stages: [MigrationStage] {
         [
             migrationV1toV2,
             migrationV2toV3,
-            migrationV3toMinor1
+            migrationV3toMinor1,
+            migrationV3Minor1toMinor2
         ]
     }
 }

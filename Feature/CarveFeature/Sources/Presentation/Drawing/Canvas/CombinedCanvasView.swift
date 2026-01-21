@@ -110,12 +110,19 @@ public struct CombinedCanvasView: UIViewRepresentable {
         private var previousStrokeCount = 0
         /// 마지막으로 정규화(normalize)했던 bounds (리사이즈 감지)
         private var lastNormalizedBounds: CGRect = .zero
+        /// programmatic drawing 업데이트로 인한 save 방지용
+        private var suppressSaveVersion: Int = 0
 
         init(store: StoreOf<CombinedCanvasFeature>) {
             self.store = store
         }
         
         public func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
+            if suppressSaveVersion > 0 {
+                suppressSaveVersion = 0
+                notifyUndoState(from: canvasView)
+                return
+            }
             // undo/redo 중에는 save 무시
             if canvasView.undoManager?.isUndoing == true ||
                 canvasView.undoManager?.isRedoing == true {
@@ -156,6 +163,7 @@ public struct CombinedCanvasView: UIViewRepresentable {
               .receive(on: DispatchQueue.main)
               .sink { [weak self] newDrawing in
                 guard let self else { return }
+                self.markProgrammaticUpdate()
                 canvas.drawing = newDrawing
                 self.previousStrokeCount = newDrawing.strokes.count
               }
@@ -209,10 +217,12 @@ public struct CombinedCanvasView: UIViewRepresentable {
                 }
                 .store(in: &cancellables)
         }
+
         
         /// SwiftUI update cycle에서도 store의 drawing을 PKCanvasView에 확실히 반영
         func applyStoreDrawingIfNeeded(_ canvas: PKCanvasView, _ newDrawing: PKDrawing) {
             guard canvas.drawing.dataRepresentation() != newDrawing.dataRepresentation() else { return }
+            markProgrammaticUpdate()
             canvas.drawing = newDrawing
             self.previousStrokeCount = newDrawing.strokes.count
         }
@@ -222,6 +232,19 @@ public struct CombinedCanvasView: UIViewRepresentable {
             let canUndo = canvas.undoManager?.canUndo ?? false
             let canRedo = canvas.undoManager?.canRedo ?? false
             store.send(.undoStateChanged(canUndo: canUndo, canRedo: canRedo))
+        }
+
+        /// `canvasViewDrawingDidChange` 콜백에서 "사용자 입력"으로 오인되어
+        /// `saveDrawing`이 호출되는 것을 방지하기 위한 플래그 관리.
+        private func markProgrammaticUpdate() {
+            suppressSaveVersion &+= 1
+            let token = suppressSaveVersion
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                if self.suppressSaveVersion == token {
+                    self.suppressSaveVersion = 0
+                }
+            }
         }
         
         /// 리사이즈/회전/윈도우 크기 변경 시 PKCanvasView(UIScrollView) 내부 상태가 남아
