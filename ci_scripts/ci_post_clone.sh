@@ -8,6 +8,29 @@ cd "$script_dir/.."
 echo "[post-clone] start: $(date '+%Y-%m-%d %H:%M:%S')"
 echo "[post-clone] cwd: $(pwd)"
 
+# Compute build number based on commits since the last app version bump.
+INFO_PLIST_SWIFT="Plugins/ProjectDescriptionHelpers/InfoPlist.swift"
+MARKETING_VERSION=""
+if [ -f "$INFO_PLIST_SWIFT" ]; then
+  MARKETING_VERSION=$(sed -nE 's/.*"CFBundleShortVersionString": "([^"]+)".*/\1/p' "$INFO_PLIST_SWIFT" | head -n 1 || true)
+fi
+
+if [ -n "$MARKETING_VERSION" ]; then
+  VERSION_LINE="\"CFBundleShortVersionString\": \"${MARKETING_VERSION}\""
+  LAST_VERSION_COMMIT=$(git log -n 1 -S "$VERSION_LINE" --pretty=%H -- "$INFO_PLIST_SWIFT" || true)
+fi
+
+if [ -n "${LAST_VERSION_COMMIT:-}" ]; then
+  COMMITS_SINCE=$(git rev-list "${LAST_VERSION_COMMIT}..HEAD" --count)
+  CARVE_BUILD_NUMBER=$((COMMITS_SINCE + 1))
+else
+  CARVE_BUILD_NUMBER=1
+fi
+
+export CARVE_BUILD_NUMBER
+echo "[post-clone] marketing version: ${MARKETING_VERSION:-unknown}"
+echo "[post-clone] build number: $CARVE_BUILD_NUMBER"
+
 # Keep-alive to prevent Xcode Cloud 'No activity detected in 15 minutes' timeout
 (
   while true; do
