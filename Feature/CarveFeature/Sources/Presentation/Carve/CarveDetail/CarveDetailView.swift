@@ -122,7 +122,7 @@ public struct CarveDetailView: View {
                             }
                     }
                 )
-                .frame(width: halfWidth, height: viewportSize.height)
+                .frame(width: halfWidth)
                 .frame(
                     maxWidth: .infinity,
                     maxHeight: .infinity,
