@@ -7,6 +7,7 @@
 //
 
 import CarveToolkit
+import Combine
 import Domain
 import Resources
 import SwiftUI
@@ -32,8 +33,6 @@ public struct CarveDetailFeature {
         var canvasGlobalFrame: CGRect = .zero
         /// 특정 Verse로 스크롤 필요할 때 사용
         public var pendingScrollVerse: BibleVerse?
-        /// underline 레이아웃 변경 전파용 버전
-        public var underlineLayoutVersion: Int = 0
         
         /// 성경 문장 출력시 자간 폰트 등 설정
         @Shared(.appStorage("sentenceSetting")) public var sentenceSetting: SentenceSetting = .initialState
@@ -51,6 +50,8 @@ public struct CarveDetailFeature {
         case scrollToTop
         case setScrollTarget(BibleVerse)
         case scrollToVerse
+        /// 문장 설정/레이아웃 변경으로 텍스트 레이아웃을 재측정해야 할 때
+        case invalidateTextLayout
         case view(View)
         case scope(ScopeAction)
         
@@ -62,6 +63,8 @@ public struct CarveDetailFeature {
             case fetchSentence
             /// 스크롤에 따른 헤더 애니메이션
             case headerAnimation(CGFloat, CGFloat)
+            /// 텍스트 레이아웃 재측정을 디바운스하여 요청
+            case invalidateTextLayoutDebounced
             /// scrollView proxy 설정
             case setProxy(ScrollViewProxy)
             /// 펜을 지우개로 전환
@@ -88,6 +91,10 @@ public struct CarveDetailFeature {
     enum CancelID: Hashable {
         /// 성경 불러올떄
         case fetchBible(title: BibleChapter)
+        /// sentenceSetting 변경 관찰
+        case observeSentenceSetting
+        /// 텍스트 레이아웃 재측정 디바운스
+        case invalidateTextLayout
     }
     
     
@@ -105,13 +112,29 @@ public struct CarveDetailFeature {
             switch action {
             case .view(.headerAnimation(let previous, let current)):
                 return .send(.scope(.headerAction(.headerAnimation(previous, current))))
+
+            case .invalidateTextLayout:
+                guard !state.verseRowState.isEmpty else { return .none }
+                for index in state.verseRowState.indices {
+                    state.verseRowState[index].verseTextState.preferenceVersion = UUID()
+                }
+                return .none
+
+            case .view(.invalidateTextLayoutDebounced):
+                return .run { send in
+                    // 레이아웃 변화가 연속으로 발생할 때 최종 상태만 반영한다.
+                    try? await Task.sleep(nanoseconds: 80_000_000)
+                    await send(.invalidateTextLayout)
+                }
+                .cancellable(id: CancelID.invalidateTextLayout, cancelInFlight: true)
                 
             case .view(.fetchSentence):
                 let oldChapter = state.canvasState.chapter
                                 
                 return .merge(
                     .cancel(id: CancelID.fetchBible(title: oldChapter)),
-                    handleFetchSentence(state: &state)
+                    handleFetchSentence(state: &state),
+                    observeSentenceSetting(state: state)
                 )
                 
             case .setFetchedSentence(let chapter, let verses):
@@ -135,8 +158,8 @@ public struct CarveDetailFeature {
                 guard offsets != row.verseTextState.underlineOffsets else { return .none }
 
                 row.verseTextState.underlineOffsets = offsets
+                row.layoutVersion &+= 1
                 state.verseRowState[id: id] = row
-                state.underlineLayoutVersion &+= 1
 
                 let verse = row.sentence.verse
                 return .send(.scope(.canvasAction(
@@ -273,6 +296,18 @@ extension CarveDetailFeature {
             }
         }
         .cancellable(id: CancelID.fetchBible(title: title), cancelInFlight: true)
+    }
+
+    /// sentenceSetting 변경을 관찰하고 텍스트 레이아웃 재측정을 요청.
+    /// - Side Effect: Shared publisher 구독
+    private func observeSentenceSetting(state: State) -> Effect<Action> {
+        let sentenceSettingPublisher = state.$sentenceSetting.publisher.removeDuplicates()
+        return .run { send in
+            for await _ in sentenceSettingPublisher.values {
+                await send(.view(.invalidateTextLayoutDebounced))
+            }
+        }
+        .cancellable(id: CancelID.observeSentenceSetting, cancelInFlight: true)
     }
     
     

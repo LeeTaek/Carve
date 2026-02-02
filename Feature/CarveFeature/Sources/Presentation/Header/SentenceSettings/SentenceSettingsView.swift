@@ -79,16 +79,6 @@ public struct SentenceSettingsView: View {
                 .padding(.vertical)
             }
             Section(
-                header: Text("글자 간격: \(Int(store.setting.traking))").font(.headline).bold()
-            ) {
-                CustomSlider(
-                    value: $store.setting.traking,
-                    minValue: 1,
-                    maxValue: 10
-                )
-                .padding(.vertical)
-            }
-            Section(
                 header: Text("화면 구성 및 필기 설정")
             ) {
                 Toggle("왼손 사용자용 화면", isOn: $store.isLeftHanded)

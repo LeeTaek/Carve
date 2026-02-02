@@ -139,7 +139,13 @@ public struct CarveDetailView: View {
             }
             .onChange(of: store.sentenceSetting) { _, _ in
                 contentHeight = 0
+                send(.invalidateTextLayoutDebounced)
                 PerformanceLog.event("CarveDetail.ContentHeightReset")
+            }
+            .onChange(of: canvasRootFrame) { _, _ in
+                // 회전/분할 등으로 Canvas 기준 좌표가 바뀌면 텍스트 레이아웃을 강제 재측정한다.
+                send(.invalidateTextLayoutDebounced)
+                PerformanceLog.event("CarveDetail.CanvasFrameChanged")
             }
             .onPreferenceChange(ContentHeightKey.self) { height in
                 if height > contentHeight {
@@ -151,28 +157,39 @@ public struct CarveDetailView: View {
         .onGeometryChange(for: CGSize.self) { proxy in
             proxy.size
         } action: { size in
+            // 화면 크기 변경 시 텍스트 레이아웃 재측정 여부를 판단.
+            var shouldInvalidateTextLayout = false
             let newHalfWidth = size.width / 2
             if halfWidth != newHalfWidth {
                 halfWidth = newHalfWidth
                 verseLayoutVersion &+= 1
+                // 너비 변화에 의한 레이아웃 재측정.
+                shouldInvalidateTextLayout = true
                 PerformanceLog.event("CarveDetail.HalfWidthChanged")
             }
             
             let viewportChanged = (viewportSize != size)
             if viewportChanged {
                 viewportSize = size
-                // iPad 멀티윈도우/회전 등으로 viewport가 바뀌면 PKCanvasView를 재생성하도록 version을 올린다.
+                // iPad 멀티윈도우/회전 등으로 viewport가 바뀌면 PKCanvasView 재생성.
                 canvasLayoutVersion &+= 1
                 verseLayoutVersion &+= 1
                 // LazyVStack 콘텐츠 높이 측정값도 리셋
                 contentHeight = 0
+                // viewport 변경에 의한 레이아웃 재측정이 필요.
+                shouldInvalidateTextLayout = true
                 PerformanceLog.event("CarveDetail.ViewportChanged")
+            }
+
+            if shouldInvalidateTextLayout {
+                // 여러 조건으로 중복 호출되지 않도록 한 번만 invalidate.
+                send(.invalidateTextLayoutDebounced)
             }
         }
     }
     
     private var contentView: some View {
-        LazyVStack {
+        LazyVStack(spacing: 0) {
             ForEach(
                 store.scope(state: \.verseRowState,
                             action: \.scope.verseRowAction),
@@ -183,16 +200,19 @@ public struct CarveDetailView: View {
                     halfWidth: $halfWidth,
                     canvasRootFrame: canvasRootFrame,
                     scrollOffset: scrollOffset,
-                    layoutVersion: verseLayoutVersion + store.underlineLayoutVersion,
+                    layoutVersion: verseLayoutVersion,
                     onUnderlineLayoutChange: { id, layout in
                         send(.underlineLayoutChanged(id: id, layout: layout))
                     }
                 )
+                .id(VerseRowLayoutKey(
+                    preferenceVersion: childStore.state.verseTextState.preferenceVersion,
+                    layoutVersion: verseLayoutVersion
+                ))
                 .padding(.horizontal, 10)
             }
             
         }
-        .id("\(store.sentenceSetting)-\(halfWidth)")
     }
     
     private var canvasBuffer: CGFloat {
@@ -207,6 +227,11 @@ public struct CarveDetailView: View {
     ) {
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: action)
     }
+}
+
+private struct VerseRowLayoutKey: Hashable {
+    let preferenceVersion: UUID
+    let layoutVersion: Int
 }
 
 /// ScrollView 콘텐츠 높이를 상위로 전달하기 위한 PreferenceKey.
