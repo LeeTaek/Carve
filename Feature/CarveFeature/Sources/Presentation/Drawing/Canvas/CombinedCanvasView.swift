@@ -294,12 +294,18 @@ public struct CombinedCanvasView: UIViewRepresentable {
             let height = max(contentHeight, viewportSize.height)
             if width > 0, height > 0 {
                 let desiredSize = CGSize(width: width, height: height)
-                if canvas.contentSize != desiredSize { canvas.contentSize = desiredSize }
+                if canvas.contentSize != desiredSize {
+                    canvas.contentSize = desiredSize
+                    PerformanceLog.event("Canvas.ContentSizeUpdated")
+                }
             }
             
             // rubber-Band 액션을 위해 contentInset(하단 여백) 확보
             let inset = UIEdgeInsets(top: 0, left: 0, bottom: bottomBuffer, right: 0)
-            if canvas.contentInset != inset { canvas.contentInset = inset }
+            if canvas.contentInset != inset {
+                canvas.contentInset = inset
+                PerformanceLog.event("Canvas.ContentInsetUpdated")
+            }
             
 
             // contentOffset: 부모 ScrollView의 스크롤 위치를 캔버스에 적용.

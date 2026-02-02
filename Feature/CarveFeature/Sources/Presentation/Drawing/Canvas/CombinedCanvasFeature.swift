@@ -333,6 +333,9 @@ extension CombinedCanvasFeature {
             return
         }
 
+        let signpostID = PerformanceLog.begin("CombinedCanvas.Rebuild")
+        defer { PerformanceLog.end("CombinedCanvas.Rebuild", signpostID) }
+
         var merged = PKDrawing()
 
         for (verse, rect) in state.drawingRect.sorted(by: { $0.key < $1.key }) {

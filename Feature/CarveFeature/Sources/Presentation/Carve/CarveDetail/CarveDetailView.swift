@@ -135,13 +135,16 @@ public struct CarveDetailView: View {
             }
             .onChange(of: store.canvasState.chapter) { _, _ in
                 contentHeight = 0
+                PerformanceLog.event("CarveDetail.ContentHeightReset")
             }
             .onChange(of: store.sentenceSetting) { _, _ in
                 contentHeight = 0
+                PerformanceLog.event("CarveDetail.ContentHeightReset")
             }
             .onPreferenceChange(ContentHeightKey.self) { height in
                 if height > contentHeight {
                     contentHeight = height
+                    PerformanceLog.event("CarveDetail.ContentHeightIncreased")
                 }
             }
         }
@@ -152,6 +155,7 @@ public struct CarveDetailView: View {
             if halfWidth != newHalfWidth {
                 halfWidth = newHalfWidth
                 verseLayoutVersion &+= 1
+                PerformanceLog.event("CarveDetail.HalfWidthChanged")
             }
             
             let viewportChanged = (viewportSize != size)
@@ -162,6 +166,7 @@ public struct CarveDetailView: View {
                 verseLayoutVersion &+= 1
                 // LazyVStack 콘텐츠 높이 측정값도 리셋
                 contentHeight = 0
+                PerformanceLog.event("CarveDetail.ViewportChanged")
             }
         }
     }
