@@ -22,7 +22,31 @@ public struct AppCoordinatorFeature {
         @Presents public var root: Root.State? = .launchProgress(.initialState)
         /// 루트 화면 위에 Push될 화면 Path. (스택 기반)
         public var path: StackState<Path.State> = .init()
+        // analytics key
+        public var currentScreenKey: String {
+            // Stack top이 있으면 그걸 우선(설정/차트 등)
+            if let topPath = path.last {
+                switch topPath {
+                case .settings:
+                    return "Settings"
+                case .chart:
+                    return "Chart"
+                }
+            }
+
+            // Stack이 비어 있으면 root 기준
+            switch root {
+            case .some(.launchProgress):
+                return "LaunchProgress"
+            case .some(.carve):
+                return "Carve"
+            case .none:
+                return "Unknown"
+            }
+        }
     }
+    @Dependency(\.analyticsClient) private var analyticsClient
+    
     public enum Action {
         case root(PresentationAction<Root.Action>)
         /// Path와 관련된 프레젠테이션 액션.
@@ -75,6 +99,19 @@ public struct AppCoordinatorFeature {
                 break
             }
             return .none
+        }
+        .onChange(of: \.currentScreenKey) { _, newScreenKey in
+            Reduce { _, _ in
+                    .run { _ in
+                        analyticsClient.screen(
+                            newScreenKey,
+                            parameters: [
+                                "screen_name": .string(newScreenKey),
+                                "screen_class": .string("AppCoordinator")
+                            ]
+                        )
+                    }
+            }
         }
         .ifLet(\.$root, action: \.root)
         .forEach(\.path, action: \.path)

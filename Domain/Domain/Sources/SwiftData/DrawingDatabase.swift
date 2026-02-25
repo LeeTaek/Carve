@@ -9,12 +9,14 @@
 import CarveToolkit
 import SwiftUI
 import SwiftData
+import ClientInterfaces
 
 import Dependencies
 
 public struct DrawingDatabase: Sendable {
     public typealias Item = BibleDrawing
     @Dependency(\.createSwiftDataActor) public var actor
+    @Dependency(\.analyticsClient) private var analyticsClient
     
     // MARK: - verse 단위 BibleDrawing
     
@@ -83,7 +85,7 @@ public struct DrawingDatabase: Sendable {
         }
         let descriptor = FetchDescriptor(predicate: predicate)
         let storedDrawing: [BibleDrawing]? = try await actor.fetch(descriptor)
-        Log.debug("Drew Log Count:", storedDrawing?.count)
+        Log.debug("Drew Log Count:", storedDrawing?.count ?? 0 )
         return storedDrawing
     }
     
@@ -131,6 +133,12 @@ public struct DrawingDatabase: Sendable {
                     Log.debug("inserted new drawing verse:", req.verse)
                 }
             } catch {
+                analyticsClient.trackErrorShown(
+                    .drawingUpdateDrawingsFailed,
+                    feature: .domain,
+                    context: "DrawingDatabase.updateDrawings",
+                    message: error.localizedDescription
+                )
                 Log.error("❌ updateDrawings failed:", error)
             }
         }
@@ -156,6 +164,12 @@ public struct DrawingDatabase: Sendable {
             }
             Log.debug(" updatePresentDrawing verse:", verse)
         } catch {
+            analyticsClient.trackErrorShown(
+                .drawingUpdatePresentFailed,
+                feature: .domain,
+                context: "DrawingDatabase.updatePresentDrawing",
+                message: error.localizedDescription
+            )
             Log.error("❌ updatePresentDrawing failed:", error)
         }
     }
@@ -210,6 +224,12 @@ public struct DrawingDatabase: Sendable {
                 Log.debug(" inserted page drawing:", chapter)
             }
         } catch {
+            analyticsClient.trackErrorShown(
+                .drawingUpsertPageFailed,
+                feature: .domain,
+                context: "DrawingDatabase.upsertPageDrawing",
+                message: error.localizedDescription
+            )
             Log.error("❌ upsertPageDrawing failed:", error)
         }
     }
