@@ -9,7 +9,7 @@
 import CloudKit
 import Foundation
 import SwiftData
-
+import ClientInterfaces
 import Dependencies
 
 /// ContainerID 주입하기 위한 DependencyKey.
