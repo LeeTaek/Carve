@@ -65,6 +65,11 @@ public struct PickerStyle: ViewModifier {
     var isSelected = true
     var selectionColor: Color = .teal
     
+    public init(isSelected: Bool = true, selectionColor: Color) {
+        self.isSelected = isSelected
+        self.selectionColor = selectionColor
+    }
+    
     public func body(content: Content) -> some View {
         content
             .foregroundColor(isSelected ? .white : .black)

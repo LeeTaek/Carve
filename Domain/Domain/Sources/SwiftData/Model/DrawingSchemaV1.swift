@@ -21,7 +21,7 @@ public enum DrawingSchemaV1: VersionedSchema {
         public static func == (lhs: DrawingVO, rhs: DrawingVO) -> Bool {
             (lhs.id == rhs.id)
         }
-        public var id: String!
+        public var id: String?
         public var titleName: String?
         public var titleChapter: Int?
         public var section: Int?

@@ -30,6 +30,10 @@ public struct CarveDetailFeature {
         var lastUsedPencil: PKInkingTool.InkType = .pencil
         /// global 좌표계 기준 CombinedCanvasView의 frame (Canvas 기준 verse 별 rect 계산용)
         var canvasGlobalFrame: CGRect = .zero
+        /// 특정 Verse로 스크롤 필요할 때 사용
+        public var pendingScrollVerse: BibleVerse?
+        /// underline 레이아웃 변경 전파용 버전
+        public var underlineLayoutVersion: Int = 0
         
         /// 성경 문장 출력시 자간 폰트 등 설정
         @Shared(.appStorage("sentenceSetting")) public var sentenceSetting: SentenceSetting = .initialState
@@ -45,6 +49,8 @@ public struct CarveDetailFeature {
     public enum Action: ViewAction, CarveToolkit.ScopeAction {
         /// 화면 최상단으로 스크롤
         case scrollToTop
+        case setScrollTarget(BibleVerse)
+        case scrollToVerse
         case view(View)
         case scope(ScopeAction)
         
@@ -62,8 +68,6 @@ public struct CarveDetailFeature {
             case switchToEraser
             /// 펜 타입을 이전으로 전환
             case switchToPreviousPenType
-            /// 캔버스 전체 프레임 변경
-            case canvasFrameChanged(CGRect)
             /// 한 손가락 탭 액션: 헤더 노출/숨김
             case tapForHeaderHidden
             /// 두손가락 더블탭 액션: undo
@@ -128,17 +132,39 @@ public struct CarveDetailFeature {
                     from: layout,
                     sentenceSetting: setting
                 )
+                guard offsets != row.verseTextState.underlineOffsets else { return .none }
+
                 row.verseTextState.underlineOffsets = offsets
                 state.verseRowState[id: id] = row
+                state.underlineLayoutVersion &+= 1
 
-                return .none
+                let verse = row.sentence.verse
+                return .send(.scope(.canvasAction(
+                    .verseUnderlineOffsetsUpdated(verse: verse, offsets: offsets)
+                )))
                 
             case .view(.setProxy(let proxy)):
                 state.proxy = proxy
                 return .send(.scrollToTop)
                 
             case .scrollToTop:
-                return scrollToTop(state: &state)
+                guard let id = state.verseRowState.first?.id else { return .none }
+                withAnimation(.easeInOut(duration: 0.5)) {
+                    state.proxy?.scrollTo(id, anchor: .bottom)
+                }
+                
+                return .run { send in
+                    try? await Task.sleep(nanoseconds: 150_000_000)
+                    await send(.scrollToVerse)
+                }
+                
+            case .setScrollTarget(let verse):
+                state.pendingScrollVerse = verse
+                return .none
+                
+            case .scrollToVerse:
+                return scrollToPendingVerseIfPossible(state: &state)
+
 
             case .view(.switchToEraser):
                 // monoline을 지우개로 사용
@@ -168,10 +194,6 @@ public struct CarveDetailFeature {
                     globalRect: globalRect
                 )
                 
-            case .view(.canvasFrameChanged(let rect)):
-                state.canvasGlobalFrame = rect
-                return .none
-
             case .scope(.canvasAction(.undoStateChanged(let canUndo, let canRedo))):
                 state.headerState.palatteSetting.canUndo = canUndo
                 state.headerState.palatteSetting.canRedo = canRedo
@@ -263,12 +285,28 @@ extension CarveDetailFeature {
         return .none
     }
     
+    private func scrollToPendingVerseIfPossible(state: inout State) -> Effect<Action> {
+        guard let verse = state.pendingScrollVerse,
+              let proxy = state.proxy,
+              let rowID = state.verseRowState
+            .first(where: { $0.sentence.verse == verse.verse })?
+            .id
+        else { return .none }
+        
+        withAnimation(.easeInOut(duration: 0.5)) {
+            proxy.scrollTo(rowID, anchor: .center)
+        }
+        
+        state.pendingScrollVerse = nil
+        return .none
+    }
     
-    /// Sentence 셀에서 전달된 global 좌표를 Canvas 기준 로컬 좌표로 변환하고,
+    
+    /// Sentence 셀에서 전달된 content 좌표를 Canvas 기준 좌표로 사용하고,
     /// 각 절의 rect를 CombinedCanvasFeature에 전달.
     /// - Parameters:
     ///   - id: 각 절의 상태 ID
-    ///   - globalRect: 각 절의 Rect
+    ///   - globalRect: 각 절의 Rect (Content 좌표계)
     private func updateVerseFrame(
         state: inout State,
         id: VerseRowFeature.State.ID,
@@ -280,16 +318,8 @@ extension CarveDetailFeature {
         let sentenceState = state.verseRowState[index]
         let verse = sentenceState.sentence.verse
 
-        let canvasFrame = state.canvasGlobalFrame
-        guard canvasFrame.width > 0, canvasFrame.height > 0 else { return .none }
-
-        // canvas 기준 로컬 rect로 변환
-        let localRect = CGRect(
-            x: globalRect.minX - canvasFrame.minX,
-            y: globalRect.minY - canvasFrame.minY,
-            width: globalRect.width,
-            height: globalRect.height
-        )
+        // content 좌표를 그대로 canvas 좌표로 사용
+        let localRect = globalRect
 
         return .send(.scope(.canvasAction(
             .verseFrameUpdated(verse: verse, rect: localRect)
