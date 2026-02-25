@@ -16,7 +16,6 @@ public struct CarveDetailView: View {
     @Bindable public var store: StoreOf<CarveDetailFeature>
     /// CombinedCanvasView의 너비를 화면의 절반으로 맞추기 위해 계산.
     @State private(set) var halfWidth: CGFloat = 0
-    @State private var isInking: Bool = false
     
     public init(store: StoreOf<CarveDetailFeature>) {
         self.store = store
@@ -58,55 +57,46 @@ public struct CarveDetailView: View {
     private var detailScroll: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                contentView
-                    .padding(.top, store.headerState.headerHeight)
-                    .offsetY { previous, current in
-                        delay {
-                            send(.headerAnimation(previous, current))
+                ZStack {
+                    contentView
+                        .padding(.top, store.headerState.headerHeight)
+                        .offsetY { previous, current in
+                            delay {
+                                send(.headerAnimation(previous, current))
+                            }
                         }
-                    }
-                    .onChange(of: store.sentenceWithDrawingState) {
-                        send(.setProxy(proxy))
-                    }
-//                    // ✅ Canvas를 contentView에 overlay로 올려서 높이/레이아웃을 완전히 동일하게 맞춘다.
-//                    // 이렇게 하면 Pencil hover/다운 시점에 Canvas만 별도로 "커지는" 레이아웃 흔들림을 줄일 수 있다.
-//                    .overlay {
-//                        CombinedCanvasView(
-//                            store: self.store.scope(
-//                                state: \.canvasState,
-//                                action: \.scope.canvasAction
-//                            ),
-//                            onInkingChanged: { isInking in
-//                                self.isInking = isInking
-//                            }
-//                        )
-//                        .border(.red)
-//                        .id(store.canvasState.chapter)
-//                        .frame(width: halfWidth)
-//                        .frame(
-//                            maxWidth: .infinity,
-//                            maxHeight: .infinity,
-//                            alignment: store.isLeftHanded ? .leading : .trailing
-//                        )
-//                        .background(
-//                            GeometryReader { proxy in
-//                                Color.clear
-//                                    .allowsHitTesting(false)
-//                                    .onAppear {
-//                                        let frame = proxy.frame(in: .named("CanvasSpace"))
-//                                        send(.canvasFrameChanged(frame))
-//                                    }
-//                                    .onChange(of: proxy.frame(in: .named("CanvasSpace"))) { _, frame in
-//                                        // 최종 레이아웃 기준 프레임을 항상 반영 (split/fullscreen 전환 시 좌표계 어긋남 방지)
-//                                        send(.canvasFrameChanged(frame))
-//                                    }
-//                            }
-//                        )
-//                    }
-                    .coordinateSpace(name: "CanvasSpace")
-                    .onAppear {
-                        send(.fetchSentence)
-                    }
+                        .onChange(of: store.verseRowState) {
+                            send(.setProxy(proxy))
+                        }
+                    
+                    CombinedCanvasView(
+                        store: self.store.scope(
+                            state: \.canvasState,
+                            action: \.scope.canvasAction
+                        )
+                    )
+                    .id(store.canvasState.chapter)
+                    .background(
+                        GeometryReader { proxy in
+                            Color.clear
+                                .onAppear {
+                                    let frame = proxy.frame(in: .global)
+                                    send(.canvasFrameChanged(frame))
+                                }
+                                .onChange(of: proxy.frame(in: .global)) { _, frame in
+                                    send(.canvasFrameChanged(frame))
+                                }
+                        }
+                    )
+                    .frame(width: halfWidth)
+                    .frame(
+                        maxWidth: .infinity,
+                        alignment: store.isLeftHanded ? .leading : .trailing
+                    )
+                }
+                .onAppear {
+                    send(.fetchSentence)
+                }
             }
             .onTapGesture {
                 send(.tapForHeaderHidden)
@@ -119,17 +109,7 @@ public struct CarveDetailView: View {
         .onGeometryChange(for: CGFloat.self) { proxy in
             return proxy.size.width / 2
         } action: { halfWidth in
-            // Drawing 중에는 레이아웃 폭 변경을 반영하지 않아 좌표계 흔들림을 방지
-            guard !isInking else { return }
-
-            let scale = UIScreen.main.scale
-            let newValue = floor(halfWidth * scale) / scale
-
-            var transaction = Transaction()
-            transaction.disablesAnimations = true
-            withTransaction(transaction) {
-                self.halfWidth = newValue
-            }
+            self.halfWidth = halfWidth
         }
     }
     
@@ -137,11 +117,11 @@ public struct CarveDetailView: View {
         LazyVStack(pinnedViews: .sectionHeaders) {
             Section {
                 ForEach(
-                    store.scope(state: \.sentenceWithDrawingState,
-                                action: \.scope.sentenceWithDrawingAction),
+                    store.scope(state: \.verseRowState,
+                                action: \.scope.verseRowAction),
                     id: \.state.id
                 ) { childStore in
-                    SentencesWithDrawingView(
+                    VerseRowView(
                         store: childStore,
                         halfWidth: $halfWidth,
                         onUnderlineLayoutChange: { id, layout in
@@ -152,7 +132,7 @@ public struct CarveDetailView: View {
                 }
             }
         }
-        .id(store.sentenceSetting)
+        .id("\(store.sentenceSetting)-\(halfWidth)")
     }
     
     /// 헤더 스크롤 애니메이션 등 과도한 이벤트 호출을 방지하기 위한 딜레이

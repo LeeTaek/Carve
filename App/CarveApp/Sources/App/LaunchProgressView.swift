@@ -12,7 +12,6 @@ import Domain
 
 import ComposableArchitecture
 
-/// 앱 최초 실행 시 CloudKit 동기화/마이그레이션 진행 상태를 보여주는 Launch 화면.
 @ViewAction(for: LaunchProgressFeature.self)
 struct LaunchProgressView: View {
     @Bindable public var store: StoreOf<LaunchProgressFeature>
@@ -56,7 +55,6 @@ struct LaunchProgressView: View {
         .ignoresSafeArea()
     }
     
-    /// CloudKit 동기화 상태에 따라 적절한 안내 문구(에러/진행/완료).
     @ViewBuilder
     func cloudkitSyncStateMessage(state: PersistentCloudKitContainer.CloudSyncState) -> some View {
         switch state {
@@ -76,8 +74,7 @@ struct LaunchProgressView: View {
         default: EmptyView()
         }
     }
-    
-    /// 공통 상태 메시지 스타일(폰트/색상/정렬)을 적용하는 헬퍼 뷰.
+
     @ViewBuilder
     private func statusText(_ message: String) -> some View {
         Text(message)

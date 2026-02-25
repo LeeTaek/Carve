@@ -12,9 +12,6 @@ import SwiftUI
 
 import ComposableArchitecture
 
-/// AppCoordinatorFeature와 연결된 루트 코디네이터 View.
-/// - Note: RootView는 트리 기반 네비게이션으로,
-///  Settings / Charts(예정) 은 Stack 기반 네비게이션으로 구현.
 public struct AppCoordinatorView: View {
     @Bindable private var store: StoreOf<AppCoordinatorFeature>
     
@@ -22,36 +19,23 @@ public struct AppCoordinatorView: View {
         self.store = store
     }
     
-    /// TCA Path 상태에 따라 Launch/Carve/Settings 중 하나의 화면을 선택적으로 렌더링.
     public var body: some View {
-        NavigationStack(
-          path: $store.scope(state: \.path, action: \.path)
-        ) {
-            // RootView 설정 - Tree 기반
-            switch store.root {
-            case .launchProgress:
-                if let store = store.scope(
-                    state: \.root?.launchProgress,
-                    action: \.root.launchProgress
-                ) {
-                    LaunchProgressView(store: store)
-                }
-            case .carve:
-                if let store = store.scope(
-                    state: \.root?.carve,
-                    action: \.root.carve
-                ) {
-                    CarveNavigationView(store: store)
-                }
-            default:
-                fatalError("RootView init failed")
+        switch store.path {
+        case .launchProgress:
+            if let store = store.scope(state: \.path?.launchProgress,
+                                       action: \.path.launchProgress) {
+                LaunchProgressView(store: store)
             }
-        } destination: { store in
-            // push destination - Stack 기반
-            switch store.case {
-            case .settings(let store):
+        case .carve:
+            if let store = store.scope(state: \.path?.carve, action: \.path.carve) {
+                CarveNavigationView(store: store)
+            }
+        case .settings:
+            if let store = store.scope(state: \.path?.settings, action: \.path.settings) {
                 SettingsView(store: store)
             }
+        default:
+            fatalError("Store init Failed")
         }
     }
 }
