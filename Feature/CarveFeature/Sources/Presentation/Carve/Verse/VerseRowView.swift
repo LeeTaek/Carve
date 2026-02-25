@@ -13,10 +13,6 @@ import ComposableArchitecture
 
 enum VerseLayoutMetrics {
     static let underlineHorizontalInset: CGFloat = 20
-    /// VerseRowView의 HStack에 적용되는 세로 padding. (아래/위 여백)
-    /// - Note: 이 여백 영역에 그려진 스트로크도 인접 verse에 포함되어 저장될 수 있도록
-    ///         underline frame 측정 rect를 동일 값만큼 확장할 때도 사용한다.
-    static let rowVerticalPadding: CGFloat = 2
 }
 
 /// 한 절(verse)에 대한 Row UI를 그리는 뷰.
@@ -37,6 +33,8 @@ public struct VerseRowView: View {
     ///         레이아웃 이벤트만 상위로 올리고, 실제 underlineOffsets 계산 및 상태 갱신은
     ///         CarveDetailFeature에서 처리.
     let onUnderlineLayoutChange: (VerseRowFeature.State.ID, Text.LayoutKey.Value) -> Void
+    /// 마지막으로 전달한 underline frame (중복 업데이트 방지용)
+    @State private var lastSentFrame: CGRect?
 
     
     public init(
@@ -72,7 +70,6 @@ public struct VerseRowView: View {
                 }
             }
             .animation(.easeInOut(duration: 0.3), value: store.isLeftHanded)
-            .padding(.vertical, VerseLayoutMetrics.rowVerticalPadding)
         }
         .touchIgnoringContextMenu(ignoringType: .pencil) {
             UIMenu(children: [
@@ -109,17 +106,30 @@ public struct VerseRowView: View {
     /// glbalRect를 측정해 상위로 전달
     private var underLineView: some View {
         let underlineOffsets = store.verseTextState.underlineOffsets
+        let lineGapPadding = underlineVerticalPadding
+        let underlineMinimumHeight = max(1, (underlineOffsets.max() ?? 0) + 1)
+        let strokeBuffer: CGFloat = 2
+        let combinedLayoutVersion = layoutVersion + store.layoutVersion
         let sendFrame: (CGRect) -> Void = { rect in
-            let verticalPadding = VerseLayoutMetrics.rowVerticalPadding
             let adjusted = CGRect(
                 x: rect.minX - canvasRootFrame.minX,
-                y: rect.minY - canvasRootFrame.minY + scrollOffset - verticalPadding,
+                y: rect.minY - canvasRootFrame.minY + scrollOffset - strokeBuffer,
                 width: rect.width,
-                height: rect.height + verticalPadding * 2
+                height: rect.height + strokeBuffer * 2
             )
-            send(.updateVerseFrame(adjusted))
+            let isValidFrame = adjusted.minX.isFinite
+                && adjusted.minY.isFinite
+                && adjusted.width.isFinite
+                && adjusted.height.isFinite
+            guard isValidFrame else { return }
+            if lastSentFrame != adjusted {
+                lastSentFrame = adjusted
+                PerformanceLog.event("VerseRow.FrameUpdated")
+                send(.updateVerseFrame(adjusted))
+            } else {
+                PerformanceLog.event("VerseRow.FrameSkipped")
+            }
         }
-        
         return Canvas { context, size in
             for y in underlineOffsets {
                 var path = Path()
@@ -128,35 +138,41 @@ public struct VerseRowView: View {
                 context.stroke(path, with: .color(.gray), style: StrokeStyle(lineWidth: 1, dash: [5]))
             }
         }
+        .frame(minHeight: underlineMinimumHeight, alignment: .top)
+        .padding(.vertical, lineGapPadding)
         .padding(.horizontal, VerseLayoutMetrics.underlineHorizontalInset)
         .frame(width: halfWidth, alignment: .topTrailing)
         .background(
             GeometryReader { proxy in
+                let combinedKey = UnderlineLayoutKey(
+                    size: proxy.size,
+                    canvasFrame: canvasRootFrame,
+                    layoutVersion: combinedLayoutVersion
+                )
                 Color.clear
-                    .onAppear {
-                        DispatchQueue.main.async {
-                            sendFrame(proxy.frame(in: .named("Root")))
-                        }
-                    }
-                    .onChange(of: proxy.size) { _, _ in
-                        DispatchQueue.main.async {
-                            sendFrame(proxy.frame(in: .named("Root")))
-                        }
-                    }
-                    .onChange(of: canvasRootFrame) { _, _ in
-                        DispatchQueue.main.async {
-                            sendFrame(proxy.frame(in: .named("Root")))
-                        }
-                    }
-                    .onChange(of: layoutVersion) { _, _ in
-                        DispatchQueue.main.async {
-                            sendFrame(proxy.frame(in: .named("Root")))
-                        }
+                    .task(id: combinedKey) {
+                        // 레이아웃 안정화를 위해 1프레임 정도 대기
+                        await Task.yield()
+                        try? await Task.sleep(nanoseconds: 16_000_000)
+                        sendFrame(proxy.frame(in: .named("Root")))
                     }
             }
         )
     }
+
+    private var underlineVerticalPadding: CGFloat {
+        let setting = store.verseTextState.sentenceSetting
+        let font = setting.fontFamily.font(size: setting.fontSize)
+        let lineGap = max(0, setting.lineSpace - font.lineHeight)
+        return lineGap / 2
+    }
     
+}
+
+private struct UnderlineLayoutKey: Equatable {
+    let size: CGSize
+    let canvasFrame: CGRect
+    let layoutVersion: Int
 }
 
 #Preview {

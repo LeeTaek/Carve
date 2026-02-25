@@ -70,3 +70,7 @@ Derived/
 Tuist/Dependencies
 Tuist/.build/
 .last_version
+
+
+### privacy ###
+./codex/secrets/
