@@ -10,6 +10,7 @@ import CarveToolkit
 import Domain
 import PencilKit
 import UIKit
+import ClientInterfaces
 
 import ComposableArchitecture
 
@@ -45,6 +46,7 @@ public struct CombinedCanvasFeature {
         public static let initialState = Self(chapter: .initialState, drawingRect: [:])
     }
     @Dependency(\.drawingData) var drawingContext
+    @Dependency(\.analyticsClient) var analyticsClient
 
     public enum Action {
         /// SwiftData에서 DrawingData 가져옴
@@ -71,17 +73,54 @@ public struct CombinedCanvasFeature {
         Reduce { state, action in
             switch action {
             case .fetchDrawingData:
-                return .run { [chapter = state.chapter, context = drawingContext] send in
+                return .run { [chapter = state.chapter, context = drawingContext, analyticsClient = analyticsClient] send in
+                    analyticsClient.trackFeatureEntry(
+                        .carve,
+                        extra: [
+                            "title_name": .string(chapter.title.rawValue),
+                            "title_chapter": .int(chapter.chapter)
+                        ]
+                    )
+                    
                     // 1) Fetch verse drawing. (레이아웃 변경 시 재배치의 기준)
                     let fetchedVerseDrawings = await fetchDrawings(chapter: chapter, context: context)
 
                     // 2) page 단위 full drawing은 "초기 표시" 용 캐시로만 사용.
-                    if let pageDrawing = try? await context.fetchPageDrawing(chapter: chapter),
-                       let data = pageDrawing.fullLineData,
-                       let fullDrawing = try? PKDrawing(data: data) {
-                        await send(.setPageDrawing(fullDrawing))
+                    do {
+                        if let pageDrawing = try await context.fetchPageDrawing(chapter: chapter),
+                           let data = pageDrawing.fullLineData {
+                            do {
+                                let fullDrawing = try PKDrawing(data: data)
+                                await send(.setPageDrawing(fullDrawing))
+                            } catch {
+                                analyticsClient.trackErrorShown(
+                                    .canvasDrawingDecodeFailed,
+                                    feature: .carve,
+                                    context: "CombinedCanvasFeature.fetchDrawingData.pageDrawingDecode",
+                                    message: error.localizedDescription,
+                                    extra: [
+                                        "title_name": .string(chapter.title.rawValue),
+                                        "title_chapter": .int(chapter.chapter)
+                                    ]
+                                )
+                                Log.error("❌ pageDrawing decode failed:", error)
+                            }
+                        }
+                    } catch {
+                        // SwiftData fetch 자체가 실패한 케이스
+                        analyticsClient.trackErrorShown(
+                            .swiftDataOperationFailed,
+                            feature: .domain,
+                            context: "CombinedCanvasFeature.fetchDrawingData",
+                            message: error.localizedDescription,
+                            extra: [
+                                "title_name": .string(chapter.title.rawValue),
+                                "title_chapter": .int(chapter.chapter)
+                            ]
+                        )
+                        Log.error("❌ fetchPageDrawing failed:", error)
                     }
-
+                    
                     // 3) verse drawing을 state에 주입. (이후 verseFrameUpdated 시 rebuild)
                     await send(.setDrawing(fetchedVerseDrawings))
                 }
@@ -126,14 +165,29 @@ public struct CombinedCanvasFeature {
             case .saveDrawing(let drawing, let changedRect):
                 state.combinedDrawing = drawing
                 
-                return .run { [chapter = state.chapter, verseRects = state.drawingRect, verseOffsets = state.verseFirstUnderlineOffsets, context = drawingContext] _ in
-                    await saveDrawing(
+                return .run { [
+                    chapter = state.chapter,
+                    verseRects = state.drawingRect,
+                    verseOffsets = state.verseFirstUnderlineOffsets,
+                    context = drawingContext,
+                    analyticsClient = analyticsClient
+                ] _ in
+                    let updatedVerseCount = await saveDrawing(
                         for: chapter,
                         from: changedRect,
                         verseRects: verseRects,
                         verseFirstUnderlineOffsets: verseOffsets,
                         canvasDrawing: drawing,
                         context: context
+                    )
+                    analyticsClient.trackFeatureComplete(
+                        .carve,
+                        success: true,
+                        extra: [
+                            "title_name": .string(chapter.title.rawValue),
+                            "title_chapter": .int(chapter.chapter),
+                            "updated_verse_count": .int(updatedVerseCount)
+                        ]
                     )
                 }
                 
@@ -253,6 +307,8 @@ extension CombinedCanvasFeature {
     ///   - verseRects: rect가 어떤 절에 있는지 정보
     ///   - canvasDrawing: canvas의 전체 그림 정보
     ///   - context: SwiftData Context
+    /// - Return: 업데이트 된 verse count (analytics용)
+    @discardableResult
     private func saveDrawing(
         for chapter: BibleChapter,
         from changedRect: CGRect,
@@ -260,11 +316,11 @@ extension CombinedCanvasFeature {
         verseFirstUnderlineOffsets: [Int: CGFloat],
         canvasDrawing: PKDrawing,
         context: DrawingDatabase
-    ) async {
+    ) async -> Int {
         // 어떤 verse가 변경되었는지 찾기
         let captureRects = captureRects(from: verseRects)
         let affectedVerse = captureRects.filter { $0.value.intersects(changedRect) }
-        guard !affectedVerse.isEmpty else { return }
+        guard !affectedVerse.isEmpty else { return 0 }
             
         // drawing이 여러 절을 지나갈 경우 지나간 해당 절의 drawing data temp
         var updateDrawingList: [DrawingUpdateRequest] = []
@@ -315,6 +371,7 @@ extension CombinedCanvasFeature {
             chapter: chapter,
             fullLineData: canvasDrawing.dataRepresentation()
         )
+        return updateDrawingList.count
     }
     
     
@@ -332,6 +389,9 @@ extension CombinedCanvasFeature {
         guard !state.drawingRect.isEmpty else {
             return
         }
+
+        let signpostID = PerformanceLog.begin("CombinedCanvas.Rebuild")
+        defer { PerformanceLog.end("CombinedCanvas.Rebuild", signpostID) }
 
         var merged = PKDrawing()
 

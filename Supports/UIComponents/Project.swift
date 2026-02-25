@@ -12,6 +12,7 @@ let projectName = "UIComponents"
 
 let dependencies: [TargetDependency] = [
     .TCAArchitecture,
+    .ClientInterfaces,
     .CarveToolkit
         
 ]

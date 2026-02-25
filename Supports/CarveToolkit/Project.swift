@@ -11,6 +11,7 @@ import CarveEnvironment
 let projectName = "CarveToolkit"
 
 let dependencies: [TargetDependency] = [
+    .Resources
 ]
 
 let script: [TargetScript] = [.swiftLint]
