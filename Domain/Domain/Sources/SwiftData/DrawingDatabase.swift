@@ -9,12 +9,14 @@
 import CarveToolkit
 import SwiftUI
 import SwiftData
+import ClientInterfaces
 
 import Dependencies
 
 public struct DrawingDatabase: Sendable {
     public typealias Item = BibleDrawing
     @Dependency(\.createSwiftDataActor) public var actor
+    @Dependency(\.analyticsClient) private var analyticsClient
     
     // MARK: - verse 단위 BibleDrawing
     
@@ -68,6 +70,24 @@ public struct DrawingDatabase: Sendable {
         Log.debug("Drew Log Count:", storedDrawing.count)
         return storedDrawing
     }
+
+    public func fetchDrawings(date: Date) async throws -> [BibleDrawing]? {
+        let calendar = Calendar.current
+        let startOfDay = calendar.startOfDay(for: date)
+        let endOfDay = calendar.date(byAdding: DateComponents(day: 1, second: -1), to: startOfDay)!
+
+        let predicate = #Predicate<BibleDrawing> {
+            if let updateDate = $0.updateDate {
+                  return updateDate >= startOfDay && updateDate <= endOfDay
+              } else {
+                  return false
+              }
+        }
+        let descriptor = FetchDescriptor(predicate: predicate)
+        let storedDrawing: [BibleDrawing]? = try await actor.fetch(descriptor)
+        Log.debug("Drew Log Count:", storedDrawing?.count ?? 0 )
+        return storedDrawing
+    }
     
     /// 여러 절의 필사 데이터를 한 번에 업데이트(update)
     /// - Parameter requests: 각 절에 대한 업데이트 정보를 담은 요청 배열
@@ -77,11 +97,11 @@ public struct DrawingDatabase: Sendable {
     public func updateDrawings(requests: [DrawingUpdateRequest]) async {
         for req in requests {
             do {
-                // 1. 해당 verse 에 대한 기존 drawing fetch
+                // 해당 verse 에 대한 기존 drawing fetch
                 let existing = try await fetchDrawings(chapter: req.chapter, verse: req.verse).mainDrawing()
 
                 if let existing {
-                    // 2. 기존 데이터 업데이트
+                    // 기존 데이터 업데이트
                     let id = existing.persistentModelID
                     try await actor.update(id) { (old: BibleDrawing) async in
                         old.lineData = req.updateLineData
@@ -89,7 +109,7 @@ public struct DrawingDatabase: Sendable {
                     }
                     Log.debug("updated drawing verse:", req.verse)
                 } else {
-                    // 3. 존재하지 않으면 새로 생성
+                    // 존재하지 않으면 새로 생성
                     let new = BibleDrawing(
                         bibleTitle: req.chapter,
                         verse: req.verse,
@@ -100,6 +120,12 @@ public struct DrawingDatabase: Sendable {
                     Log.debug("inserted new drawing verse:", req.verse)
                 }
             } catch {
+                analyticsClient.trackErrorShown(
+                    .drawingUpdateDrawingsFailed,
+                    feature: .domain,
+                    context: "DrawingDatabase.updateDrawings",
+                    message: error.localizedDescription
+                )
                 Log.error("❌ updateDrawings failed:", error)
             }
         }
@@ -125,6 +151,12 @@ public struct DrawingDatabase: Sendable {
             }
             Log.debug(" updatePresentDrawing verse:", verse)
         } catch {
+            analyticsClient.trackErrorShown(
+                .drawingUpdatePresentFailed,
+                feature: .domain,
+                context: "DrawingDatabase.updatePresentDrawing",
+                message: error.localizedDescription
+            )
             Log.error("❌ updatePresentDrawing failed:", error)
         }
     }
@@ -179,6 +211,12 @@ public struct DrawingDatabase: Sendable {
                 Log.debug(" inserted page drawing:", chapter)
             }
         } catch {
+            analyticsClient.trackErrorShown(
+                .drawingUpsertPageFailed,
+                feature: .domain,
+                context: "DrawingDatabase.upsertPageDrawing",
+                message: error.localizedDescription
+            )
             Log.error("❌ upsertPageDrawing failed:", error)
         }
     }

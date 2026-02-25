@@ -9,10 +9,10 @@ import Domain
 import SwiftData
 import SwiftUI
 import ClientInterfaces
+import UIComponents
 
 import ComposableArchitecture
 import CarveFeature
-import FirebaseAnalytics
 
 /// 새기다 전체 앱의 엔트리 포인트.
 /// - SwiftData의 `ModelContainer`와 TCA의 `AppCoordinatorFeature` Store를 초기화하고
@@ -45,14 +45,13 @@ struct CarveApp: App {
         WindowGroup {
             // 앱의 루트 화면. AppCoordinatorFeature의 상태/액션을 사용하는 코디네이터 뷰.
             AppCoordinatorView(store: store)
-                .analyticsScreen(
-                    name: "Screen Name",
-                    extraParameters: [
-                        AnalyticsParameterScreenName: "\(type(of: self))",
-                        AnalyticsParameterScreenClass: "\(type(of: self))"
+                .trackScreen(
+                    "AppCoordinator",
+                    parameters: [
+                        "screen_name": .string("AppCoordinator"),
+                        "screen_class": .string("AppCoordinatorView")
                     ]
                 )
-            
         }
         .modelContainer(modelContainer)
     }
@@ -88,6 +87,7 @@ extension CarveApp {
             $0.containerId = containerID
             $0.modelContainer = modelContainer
             $0.nativeAdClient = nativeAdClient
+            $0.analyticsClient = FirebaseAnalyticsClient()
         } operation: {
             Store(initialState: .initialState) {
                 AppCoordinatorFeature()
