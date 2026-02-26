@@ -21,19 +21,22 @@ public struct CombinedCanvasView: UIViewRepresentable {
     private var contentHeight: CGFloat
     private var scrollOffset: CGFloat
     private var bottomBuffer: CGFloat
+    private var onRenderApplied: ((Int) -> Void)?
 
     init(
         store: StoreOf<CombinedCanvasFeature>,
         viewportSize: CGSize = .zero,
         contentHeight: CGFloat = 0,
         scrollOffset: CGFloat = 0,
-        bottomBuffer: CGFloat = 0
+        bottomBuffer: CGFloat = 0,
+        onRenderApplied: ((Int) -> Void)? = nil
     ) {
         self.store = store
         self.viewportSize = viewportSize
         self.contentHeight = contentHeight
         self.scrollOffset = scrollOffset
         self.bottomBuffer = bottomBuffer
+        self.onRenderApplied = onRenderApplied
     }
     
 
@@ -73,7 +76,11 @@ public struct CombinedCanvasView: UIViewRepresentable {
         }()
         canvas.drawing = store.combinedDrawing
         canvas.delegate = context.coordinator
-        context.coordinator.bind(to: canvas)
+        context.coordinator.bind(
+            to: canvas,
+            initialRenderVersion: store.renderVersion,
+            onRenderApplied: onRenderApplied
+        )
 
         return canvas
     }
@@ -89,8 +96,12 @@ public struct CombinedCanvasView: UIViewRepresentable {
             scrollOffset: scrollOffset,
             bottomBuffer: bottomBuffer
         )
-        // publisher 구독 타이밍과 엇갈려도 SwiftUI update cycle에서 drawing을 확실히 반영
-        context.coordinator.applyStoreDrawingIfNeeded(canvas, store.combinedDrawing)
+        // 버전 기반 fallback sync: state는 바뀌었는데 PKCanvasView 반영이 늦는 레이스를 방지한다.
+        context.coordinator.applyStoreDrawingIfNeeded(
+            canvas,
+            store.combinedDrawing,
+            renderVersion: store.renderVersion
+        )
     }
     
     
@@ -112,6 +123,10 @@ public struct CombinedCanvasView: UIViewRepresentable {
         private var lastNormalizedBounds: CGRect = .zero
         /// programmatic drawing 업데이트로 인한 save 방지용
         private var suppressSaveVersion: Int = 0
+        /// PKCanvasView에 마지막으로 반영한 renderVersion
+        private var lastAppliedRenderVersion: Int = -1
+        /// 부모 뷰에 렌더 적용 완료를 전달하는 콜백
+        private var onRenderApplied: ((Int) -> Void)?
 
         init(store: StoreOf<CombinedCanvasFeature>) {
             self.store = store
@@ -154,22 +169,15 @@ public struct CombinedCanvasView: UIViewRepresentable {
             notifyUndoState(from: canvasView)
         }
         
-        public func bind(to canvas: PKCanvasView) {
-            // Drawing Bind
-            store.publisher.combinedDrawing
-              .removeDuplicates(
-                by: { $0.dataRepresentation() == $1.dataRepresentation() }
-              )
-              .receive(on: DispatchQueue.main)
-              .sink { [weak self] newDrawing in
-                guard let self else { return }
-                self.markProgrammaticUpdate()
-                canvas.drawing = newDrawing
-                self.previousStrokeCount = newDrawing.strokes.count
-              }
-              .store(in: &cancellables)
-            
-            
+        public func bind(
+            to canvas: PKCanvasView,
+            initialRenderVersion: Int,
+            onRenderApplied: ((Int) -> Void)?
+        ) {
+            lastAppliedRenderVersion = initialRenderVersion
+            self.onRenderApplied = onRenderApplied
+            reportRenderApplied(version: initialRenderVersion)
+
             // undo상태 초기화
             notifyUndoState(from: canvas)
             normalizeCanvasForOverlay(canvas)
@@ -219,12 +227,15 @@ public struct CombinedCanvasView: UIViewRepresentable {
         }
 
         
-        /// SwiftUI update cycle에서도 store의 drawing을 PKCanvasView에 확실히 반영
-        func applyStoreDrawingIfNeeded(_ canvas: PKCanvasView, _ newDrawing: PKDrawing) {
-            guard canvas.drawing.dataRepresentation() != newDrawing.dataRepresentation() else { return }
+        /// renderVersion 변경 시에만 `canvas.drawing`를 반영해, 초기 로드 레이스를 막고 스크롤 프레임 비용을 줄인다.
+        func applyStoreDrawingIfNeeded(_ canvas: PKCanvasView, _ newDrawing: PKDrawing, renderVersion: Int) {
+            guard lastAppliedRenderVersion != renderVersion else { return }
             markProgrammaticUpdate()
             canvas.drawing = newDrawing
+            canvas.setNeedsDisplay()
             self.previousStrokeCount = newDrawing.strokes.count
+            lastAppliedRenderVersion = renderVersion
+            reportRenderApplied(version: renderVersion)
         }
         
         /// Undo/Redo 가능 여부를 Feature로 전달
@@ -232,6 +243,14 @@ public struct CombinedCanvasView: UIViewRepresentable {
             let canUndo = canvas.undoManager?.canUndo ?? false
             let canRedo = canvas.undoManager?.canRedo ?? false
             store.send(.undoStateChanged(canUndo: canUndo, canRedo: canRedo))
+        }
+
+        /// `PKCanvasView`에 renderVersion이 적용되었음을 상위 SwiftUI 뷰에 알린다.
+        private func reportRenderApplied(version: Int) {
+            guard version >= 0 else { return }
+            DispatchQueue.main.async { [weak self] in
+                self?.onRenderApplied?(version)
+            }
         }
 
         /// `canvasViewDrawingDidChange` 콜백에서 "사용자 입력"으로 오인되어

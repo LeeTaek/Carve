@@ -122,7 +122,7 @@ public struct VerseRowView: View {
                 && adjusted.width.isFinite
                 && adjusted.height.isFinite
             guard isValidFrame else { return }
-            if lastSentFrame != adjusted {
+            if !rectApproximatelyEqual(lastSentFrame, adjusted, tolerance: 0.5) {
                 lastSentFrame = adjusted
                 PerformanceLog.event("VerseRow.FrameUpdated")
                 send(.updateVerseFrame(adjusted))
@@ -149,11 +149,12 @@ public struct VerseRowView: View {
                     canvasFrame: canvasRootFrame,
                     layoutVersion: combinedLayoutVersion
                 )
+                let rootFrame = proxy.frame(in: .named("Root"))
                 Color.clear
-                    .task(id: combinedKey) {
-                        // 레이아웃 안정화를 위해 1프레임 정도 대기
-                        await Task.yield()
-                        try? await Task.sleep(nanoseconds: 16_000_000)
+                    .onAppear {
+                        sendFrame(rootFrame)
+                    }
+                    .onChange(of: combinedKey) { _, _ in
                         sendFrame(proxy.frame(in: .named("Root")))
                     }
             }
@@ -167,6 +168,14 @@ public struct VerseRowView: View {
         return lineGap / 2
     }
     
+}
+
+private func rectApproximatelyEqual(_ lhs: CGRect?, _ rhs: CGRect, tolerance: CGFloat) -> Bool {
+    guard let lhs else { return false }
+    return abs(lhs.minX - rhs.minX) <= tolerance &&
+        abs(lhs.minY - rhs.minY) <= tolerance &&
+        abs(lhs.width - rhs.width) <= tolerance &&
+        abs(lhs.height - rhs.height) <= tolerance
 }
 
 private struct UnderlineLayoutKey: Equatable {
