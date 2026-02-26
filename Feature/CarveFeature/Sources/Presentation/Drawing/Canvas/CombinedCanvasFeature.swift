@@ -516,9 +516,15 @@ extension CombinedCanvasFeature {
         )
 
         let removalRect = previousRect.map { $0.union(rect) } ?? rect
+        let expandedRemovalRect = CGRect(
+            x: removalRect.minX,
+            y: removalRect.minY - DrawingLayoutMetrics.clipTopPadding,
+            width: removalRect.width,
+            height: removalRect.height + DrawingLayoutMetrics.clipTopPadding
+        )
         state.combinedDrawing = removingStrokes(
             from: state.combinedDrawing,
-            intersecting: removalRect
+            intersecting: expandedRemovalRect
         )
         state.combinedDrawing.append(placed)
     }
