@@ -28,6 +28,10 @@ public struct CarveDetailView: View {
     @State private var viewportSize: CGSize = .zero
     /// Root 좌표계 기준 Canvas frame
     @State private var canvasRootFrame: CGRect = .zero
+    /// PKCanvasView가 마지막으로 실제 적용 완료했다고 보고한 renderVersion
+    @State private var canvasAppliedRenderVersion: Int = -1
+    /// 현재 chapter에서 초기 drawing이 캔버스에 실제로 올라왔는지 여부(스켈레톤 hide 기준)
+    @State private var hasAppliedInitialCanvasDrawing: Bool = false
     
     public init(store: StoreOf<CarveDetailFeature>) {
         self.store = store
@@ -107,10 +111,30 @@ public struct CarveDetailView: View {
                     viewportSize: CGSize(width: halfWidth, height: viewportSize.height),
                     contentHeight: contentHeight,
                     scrollOffset: scrollOffset,
-                    bottomBuffer: canvasBuffer
+                    bottomBuffer: canvasBuffer,
+                    onRenderApplied: { renderVersion in
+                        if canvasAppliedRenderVersion != renderVersion {
+                            canvasAppliedRenderVersion = renderVersion
+                        }
+                        if !hasAppliedInitialCanvasDrawing,
+                           !store.canvasState.combinedDrawing.strokes.isEmpty,
+                           renderVersion >= store.canvasState.renderVersion {
+                            hasAppliedInitialCanvasDrawing = true
+                        }
+                    }
                 )
                 .id("\(store.canvasState.chapter)-\(canvasLayoutVersion)")
                 .transaction { $0.animation = nil }
+                .overlay {
+                    if shouldShowDrawingSkeleton {
+                        DrawingCanvasSkeletonView(
+                            linePitch: max(26, store.sentenceSetting.lineSpace),
+                            horizontalInset: VerseLayoutMetrics.underlineHorizontalInset
+                        )
+                            .allowsHitTesting(false)
+                            .transition(.opacity)
+                    }
+                }
                 .background(
                     GeometryReader { proxy in
                         Color.clear
@@ -135,6 +159,8 @@ public struct CarveDetailView: View {
             }
             .onChange(of: store.canvasState.chapter) { _, _ in
                 contentHeight = 0
+                canvasAppliedRenderVersion = -1
+                hasAppliedInitialCanvasDrawing = false
                 PerformanceLog.event("CarveDetail.ContentHeightReset")
             }
             .onChange(of: store.sentenceSetting) { _, _ in
@@ -218,6 +244,16 @@ public struct CarveDetailView: View {
     private var canvasBuffer: CGFloat {
         guard viewportSize.height > 0 else { return 0 }
         return max(80, viewportSize.height * 0.25)
+    }
+
+    private var shouldShowDrawingSkeleton: Bool {
+        let hasVerseDrawing = store.canvasState.drawings.contains { drawing in
+            drawing.lineData?.containsPKStroke == true
+        }
+        guard hasVerseDrawing else { return false }
+        if !hasAppliedInitialCanvasDrawing { return true }
+        guard store.canvasState.isWaitingInitialVerseRender else { return false }
+        return canvasAppliedRenderVersion < store.canvasState.renderVersion
     }
     
     /// 헤더 스크롤 애니메이션 등 과도한 이벤트 호출을 방지하기 위한 딜레이

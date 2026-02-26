@@ -28,6 +28,12 @@ public struct CombinedCanvasFeature {
         public var drawings: [BibleDrawing] = []
         /// Canvas에 그리기 위한 drawing
         public var combinedDrawing: PKDrawing = PKDrawing()
+        /// 초기 로드 시 verse 기반 첫 렌더링이 끝날 때까지 부분 교체를 막기 위한 플래그
+        public var isWaitingInitialVerseRender: Bool = false
+        /// page drawing 캐시(초기 fallback 용). 첫 렌더 완료 전에는 화면에 바로 올리지 않는다.
+        public var deferredPageDrawing: PKDrawing?
+        /// `combinedDrawing`이 갱신될 때마다 증가하는 버전. UIViewRepresentable에서 저비용 동기화에 사용.
+        public var renderVersion: Int = 0
         /// undo/redo 가능 여부
         public var canUndo: Bool = false
         public var canRedo: Bool = false
@@ -127,6 +133,8 @@ public struct CombinedCanvasFeature {
 
             case .setDrawing(let drawings):
                 state.drawings = drawings
+                let hasVerseDrawing = state.drawings.contains { $0.lineData?.containsPKStroke == true }
+                state.isWaitingInitialVerseRender = hasVerseDrawing
                 if !state.verseFirstUnderlineOffsets.isEmpty {
                     for index in state.drawings.indices {
                         guard state.drawings[index].baseFirstUnderlineOffset == nil,
@@ -156,14 +164,20 @@ public struct CombinedCanvasFeature {
                 // rect가 준비된 이후(verseFrameUpdated) 또는 이미 준비된 경우에만 rebuild.
                 if canRebuild(state) {
                     rebuild(state: &state)
+                } else if !hasVerseDrawing, let deferred = state.deferredPageDrawing {
+                    // verse drawing이 없을 때만 page cache를 fallback으로 사용
+                    state.combinedDrawing = deferred
+                    state.renderVersion &+= 1
                 }
             case .setPageDrawing(let drawing):
-                // page drawing은 초기 표시용 캐시로만 사용.
-                // verse 단위 drawings는 유지하여, 레이아웃 변경 시 verse 기준 재배치(rebuild)
-                state.combinedDrawing = drawing
+                // page drawing은 초기 fallback 용으로만 보관.
+                // 화면 반영은 verse 기반 첫 렌더 불가(또는 drawing 없음)일 때만 수행한다.
+                state.deferredPageDrawing = drawing
                 
             case .saveDrawing(let drawing, let changedRect):
                 state.combinedDrawing = drawing
+                state.isWaitingInitialVerseRender = false
+                state.renderVersion &+= 1
                 
                 return .run { [
                     chapter = state.chapter,
@@ -213,7 +227,10 @@ public struct CombinedCanvasFeature {
                 if didUpdate {
                     if canRebuild(state) {
                         rebuild(state: &state)
-                    } else if let currentRect = state.drawingRect[verse] {
+                    } else if state.isWaitingInitialVerseRender, canRenderInitialSubset(state) {
+                        rebuildInitialRenderableSubset(state: &state)
+                    } else if canPartiallyReplace(state, verse: verse),
+                              let currentRect = state.drawingRect[verse] {
                         replaceDrawing(
                             state: &state,
                             verse: verse,
@@ -244,7 +261,10 @@ public struct CombinedCanvasFeature {
 
                 if canRebuild(state) {
                     rebuild(state: &state)
-                } else if let rect = state.drawingRect[verse] {
+                } else if state.isWaitingInitialVerseRender, canRenderInitialSubset(state) {
+                    rebuildInitialRenderableSubset(state: &state)
+                } else if canPartiallyReplace(state, verse: verse),
+                          let rect = state.drawingRect[verse] {
                     replaceDrawing(
                         state: &state,
                         verse: verse,
@@ -382,6 +402,7 @@ extension CombinedCanvasFeature {
         // verse drawing 자체가 없으면 비움.
         guard !state.drawings.isEmpty else {
             state.combinedDrawing = PKDrawing()
+            state.renderVersion &+= 1
             return
         }
         // rect가 아직 준비되지 않았으면(초기 진입/첫 렌더링)
@@ -413,17 +434,74 @@ extension CombinedCanvasFeature {
         // rect 준비/매칭 이슈로 merged가 비는 경우 pageDrawing(캐시)을 빈 그림으로 덮어쓰지 않도록.
         guard !merged.strokes.isEmpty else { return }
         state.combinedDrawing = merged
+        state.isWaitingInitialVerseRender = false
+        state.renderVersion &+= 1
     }
     
     
     /// rebuild를 수행해도 되는지 판단: 실제 drawing이 있는 verse들의 rect가 준비되어 있어야 함.
     private func canRebuild(_ state: State) -> Bool {
-        let verses = Set(state.drawings.compactMap { $0.verse })
+        let verses: Set<Int> = Set(
+            state.drawings.compactMap { drawing -> Int? in
+                guard drawing.lineData?.containsPKStroke == true else { return nil }
+                return drawing.verse
+            }
+        )
         guard !verses.isEmpty else { return false }
         return verses.allSatisfy { verse in
             guard let rect = state.drawingRect[verse] else { return false }
-            return !rect.isNull && !rect.isEmpty
+            guard !rect.isNull, !rect.isEmpty else { return false }
+            return state.verseFirstUnderlineOffsets[verse] != nil
         }
+    }
+
+    /// 부분 교체는 초기 렌더 대기 상태가 아니고, 해당 verse의 baseline(anchor) 정보가 준비된 경우만 허용한다.
+    private func canPartiallyReplace(_ state: State, verse: Int) -> Bool {
+        guard !state.isWaitingInitialVerseRender else { return false }
+        return state.verseFirstUnderlineOffsets[verse] != nil
+    }
+
+    /// 초기 로드 시 전체 준비를 기다리지 않고, 렌더 가능한 verse subset이 있으면 우선 한 번 렌더한다.
+    private func canRenderInitialSubset(_ state: State) -> Bool {
+        state.drawings.contains { drawing in
+            guard drawing.lineData?.containsPKStroke == true,
+                  let verse = drawing.verse,
+                  let rect = state.drawingRect[verse],
+                  !rect.isNull,
+                  !rect.isEmpty
+            else { return false }
+            return state.verseFirstUnderlineOffsets[verse] != nil
+        }
+    }
+
+    /// 초기 렌더에서 준비된 verse들만 먼저 합성해 표시하고, 이후 verse는 부분 교체/재빌드로 따라붙게 한다.
+    private func rebuildInitialRenderableSubset(state: inout State) {
+        var merged = PKDrawing()
+
+        for drawing in state.drawings {
+            guard let verse = drawing.verse,
+                  drawing.lineData?.containsPKStroke == true,
+                  let rect = state.drawingRect[verse],
+                  !rect.isNull,
+                  !rect.isEmpty,
+                  state.verseFirstUnderlineOffsets[verse] != nil,
+                  let data = drawing.lineData,
+                  let local = try? PKDrawing(data: data)
+            else { continue }
+
+            let placed = placedDrawing(
+                local: local,
+                verseDrawing: drawing,
+                rect: rect,
+                targetFirstUnderlineOffset: state.verseFirstUnderlineOffsets[verse]
+            )
+            merged.append(placed)
+        }
+
+        guard !merged.strokes.isEmpty else { return }
+        state.combinedDrawing = merged
+        state.isWaitingInitialVerseRender = false
+        state.renderVersion &+= 1
     }
 
     /// verse별 underline rect(실제 텍스트/밑줄 영역)를 기반으로, "캡처(저장)"에 사용할 확장 rect를 만든다.
@@ -516,11 +594,18 @@ extension CombinedCanvasFeature {
         )
 
         let removalRect = previousRect.map { $0.union(rect) } ?? rect
+        let expandedRemovalRect = CGRect(
+            x: removalRect.minX,
+            y: removalRect.minY - DrawingLayoutMetrics.clipTopPadding,
+            width: removalRect.width,
+            height: removalRect.height + DrawingLayoutMetrics.clipTopPadding
+        )
         state.combinedDrawing = removingStrokes(
             from: state.combinedDrawing,
-            intersecting: removalRect
+            intersecting: expandedRemovalRect
         )
         state.combinedDrawing.append(placed)
+        state.renderVersion &+= 1
     }
     
     /// verse 단위로 저장된 "로컬 좌표" 드로잉을, 현재 레이아웃의 verse rect에 맞게 배치(스케일/오프셋).
