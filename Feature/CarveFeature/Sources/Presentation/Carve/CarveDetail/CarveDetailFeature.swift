@@ -20,8 +20,6 @@ public struct CarveDetailFeature {
     public struct State {
         /// 헤더 상태
         public var headerState: HeaderFeature.State
-        /// 성경 구절 상태 List
-        public var verseRowState: IdentifiedArrayOf<VerseRowFeature.State> = []
         public var sentenceWithDrawingState: IdentifiedArrayOf<SentencesWithDrawingFeature.State> = []
         /// ScrollView 위치 제어용 프록시
         public var proxy: ScrollViewProxy?
@@ -50,8 +48,6 @@ public struct CarveDetailFeature {
         case view(View)
         case scope(ScopeAction)
         
-        case setFetchedSentence(chapter: BibleChapter, verses: [BibleVerse])
-        
         @CasePathable
         public enum View {
             /// 성경 구절 fetch
@@ -64,8 +60,6 @@ public struct CarveDetailFeature {
             case switchToEraser
             /// 펜 타입을 이전으로 전환
             case switchToPreviousPenType
-            /// 캔버스 전체 프레임 변경
-            case canvasFrameChanged(CGRect)
             /// 한 손가락 탭 액션: 헤더 노출/숨김
             case tapForHeaderHidden
             /// 두손가락 더블탭 액션: undo
@@ -77,7 +71,6 @@ public struct CarveDetailFeature {
 
     @CasePathable
     public enum ScopeAction {
-        case verseRowAction(IdentifiedActionOf<VerseRowFeature>)
         case sentenceWithDrawingAction(IdentifiedActionOf<SentencesWithDrawingFeature>)
         case headerAction(HeaderFeature.Action)
 //        case canvasAction(CombinedCanvasFeature.Action)
@@ -121,17 +114,6 @@ public struct CarveDetailFeature {
                 undoManager.clear()
                 return .none
                 
-            case .setFetchedSentence(let chapter, let verses):
-                state.verseRowState = IdentifiedArrayOf(
-                    uniqueElements: verses.map { VerseRowFeature.State(sentence: $0) }
-                )
-                
-//                state.canvasState = .init(chapter: chapter, drawingRect: [:])
-                
-                // 3) Drawing 데이터 fetch 트리거
-//                return .send(.scope(.canvasAction(.fetchDrawingData)))
-                return .none
-
             case .view(.underlineLayoutChanged(let id, let layout)):
                 guard var row = state.sentenceWithDrawingState[id: id] else { return .none }
 
@@ -278,8 +260,6 @@ extension CarveDetailFeature {
                 
                 try Task.checkCancellation()
                 await send(.setSentence(sentences, drawings))
-                
- //                await send(.setFetchedSentence(chapter: title, verses: sentences))
             } catch {
                 Log.error("Fetch Sentence Error")
             }
@@ -290,7 +270,7 @@ extension CarveDetailFeature {
     
     /// ScrollView 맨 위로 스크롤
     private func scrollToTop(state: inout State) -> Effect<Action> {
-        guard let id = state.verseRowState.first?.id else { return .none }
+        guard let id = state.sentenceWithDrawingState.first?.id else { return .none }
         withAnimation(.easeInOut(duration: 0.5)) {
             state.proxy?.scrollTo(id, anchor: .bottom)
         }

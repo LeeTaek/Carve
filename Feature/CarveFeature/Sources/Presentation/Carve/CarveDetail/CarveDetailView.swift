@@ -14,9 +14,7 @@ import ComposableArchitecture
 @ViewAction(for: CarveDetailFeature.self)
 public struct CarveDetailView: View {
     @Bindable public var store: StoreOf<CarveDetailFeature>
-    /// CombinedCanvasView의 너비를 화면의 절반으로 맞추기 위해 계산.
     @State private(set) var halfWidth: CGFloat = 0
-    @State private var isInking: Bool = false
     
     public init(store: StoreOf<CarveDetailFeature>) {
         self.store = store
@@ -119,17 +117,7 @@ public struct CarveDetailView: View {
         .onGeometryChange(for: CGFloat.self) { proxy in
             return proxy.size.width / 2
         } action: { halfWidth in
-            // Drawing 중에는 레이아웃 폭 변경을 반영하지 않아 좌표계 흔들림을 방지
-            guard !isInking else { return }
-
-            let scale = UIScreen.main.scale
-            let newValue = floor(halfWidth * scale) / scale
-
-            var transaction = Transaction()
-            transaction.disablesAnimations = true
-            withTransaction(transaction) {
-                self.halfWidth = newValue
-            }
+            self.halfWidth = halfWidth
         }
     }
     
@@ -152,7 +140,7 @@ public struct CarveDetailView: View {
                 }
             }
         }
-        .id(store.sentenceSetting)
+        .id("\(store.sentenceSetting)-\(halfWidth)")
     }
     
     /// 헤더 스크롤 애니메이션 등 과도한 이벤트 호출을 방지하기 위한 딜레이
