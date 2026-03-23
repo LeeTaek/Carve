@@ -47,44 +47,56 @@ final class DrawingDatabaseTesting {
                                                 section: section,
                                                 lineData: makeMockDrawingWithStroke())
 
-        let url = URL.applicationSupportDirectory.appending(path: "MigrationTest.sqlite")
-        let config = ModelConfiguration(url: url)
-        var container = try ModelContainer(for: DrawingSchemaV1.DrawingVO.self,
-                                           configurations: config)
-        var context = ModelContext(container)
-        context.insert(drawing)
-        try context.save()
-        
+        let url = URL.temporaryDirectory
+            .appending(path: "MigrationTest-\(UUID().uuidString).sqlite")
+        let sidecarURLs = [
+            url,
+            URL(fileURLWithPath: url.path + "-shm"),
+            URL(fileURLWithPath: url.path + "-wal")
+        ]
+        sidecarURLs.forEach { try? FileManager.default.removeItem(at: $0) }
+        defer {
+            sidecarURLs.forEach { try? FileManager.default.removeItem(at: $0) }
+        }
+
         let titmeName = title.title.rawValue
         let chapter = title.chapter
-        
         let predicate = #Predicate<DrawingSchemaV1.DrawingVO> {
             $0.titleName == titmeName &&
             $0.titleChapter == chapter
         }
         let descriptor = FetchDescriptor(predicate: predicate,
                                          sortBy: [SortDescriptor(\.section)])
-        let fetchedDrawing = try context.fetch(descriptor).first
-        
-        
+        let config = ModelConfiguration(url: url)
+
+        let fetchedLineData: Data?
+        do {
+            let container = try ModelContainer(for: DrawingSchemaV1.DrawingVO.self,
+                                               configurations: config)
+            let context = ModelContext(container)
+            context.insert(drawing)
+            try context.save()
+            fetchedLineData = try context.fetch(descriptor).first?.lineData
+        }
+
         // when
-        container = try ModelContainer(for: DrawingSchemaV2.BibleDrawing.self,
-                                       migrationPlan: DrawingDataMigrationPlan.self,
-                                       configurations: config)
-        context = ModelContext(container)
         let predicateV2 = #Predicate<DrawingSchemaV2.BibleDrawing> {
             $0.titleName == titmeName &&
             $0.titleChapter == chapter
         }
         let descriptorV2 = FetchDescriptor(predicate: predicateV2,
                                      sortBy: [SortDescriptor(\.verse)])
-        let migrationFetchedDrawing = try context.fetch(descriptorV2).first
+        let migrationFetchedDrawing: DrawingSchemaV2.BibleDrawing?
+        do {
+            let container = try ModelContainer(for: DrawingSchemaV2.BibleDrawing.self,
+                                               migrationPlan: DrawingDataMigrationPlan.self,
+                                               configurations: config)
+            let context = ModelContext(container)
+            migrationFetchedDrawing = try context.fetch(descriptorV2).first
+        }
         
         // then
-        #expect(fetchedDrawing?.lineData == migrationFetchedDrawing?.lineData)
-
-        // teardown
-        try await actor.deleteAll(BibleDrawing.self)
+        #expect(fetchedLineData == migrationFetchedDrawing?.lineData)
     }
     
     

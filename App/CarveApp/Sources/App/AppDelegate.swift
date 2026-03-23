@@ -9,6 +9,7 @@
 import UIKit
 
 import FirebaseCore
+import GoogleMobileAds
 
 class AppDelegate: NSObject, UIApplicationDelegate {
     /// Firebase 설정
@@ -18,6 +19,8 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 #if DEBUG
         FirebaseConfiguration.shared.setLoggerLevel(.min)
 #endif
+        MobileAds.shared.start()
+        
         return true
     }
 }

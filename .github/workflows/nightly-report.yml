@@ -1,0 +1,39 @@
+name: Nightly Report
+
+on:
+  schedule:
+    # KST 02:00 = UTC 17:00
+    - cron: "0 17 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  id-token: write
+
+jobs:
+  nightly:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: "projects/1005593663000/locations/global/workloadIdentityPools/github-pool/providers/github-carve"
+          service_account: "carve-nightly-report@carve-cf50b.iam.gserviceaccount.com"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install google-cloud-bigquery requests
+
+      - name: Run report
+        env:
+          GCP_PROJECT_ID: "carve-cf50b"
+          BQ_DATASET: ${{ secrets.BQ_DATASET }}
+          BQ_TABLE_PREFIX: "events_"
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NIGHTLY_ISSUE_NUMBER: ${{ secrets.NIGHTLY_ISSUE_NUMBER }}
+        run: python scripts/nightly_report.py

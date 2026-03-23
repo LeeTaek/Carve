@@ -13,7 +13,7 @@ import UIKit
 
 import ComposableArchitecture
 
-//@available(*, deprecated, message: "CombinedCanvasView / CombinedCanvasFeature로 대체")
+@available(*, deprecated, message: "CombinedCanvasView / CombinedCanvasFeature로 대체")
 @Reducer
 public struct CanvasFeature {
     @ObservableState

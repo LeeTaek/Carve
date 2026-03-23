@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import UIComponents
 
 import ComposableArchitecture
 

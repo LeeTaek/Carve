@@ -16,7 +16,22 @@ public struct CarveDetailView: View {
     @Bindable public var store: StoreOf<CarveDetailFeature>
     /// CombinedCanvasView의 너비를 화면의 절반으로 맞추기 위해 계산.
     @State private(set) var halfWidth: CGFloat = 0
-    @State private var isInking: Bool = false
+    /// iPad 멀티윈도우/회전 등으로 레이아웃(특히 width)이 바뀔 때 PKCanvasView 내부 상태를 리셋하기 위한 트리거
+    @State private var canvasLayoutVersion: Int = 0
+    /// verse 레이아웃 변경 시 underline frame 재측정을 위한 트리거
+    @State private var verseLayoutVersion: Int = 0
+    /// ScrollView의 스크롤 offset (content 기준, down = 양수)
+    @State private var scrollOffset: CGFloat = 0
+    /// ScrollView 내부 콘텐츠 높이 (LazyVStack 특성상 증가만 반영)
+    @State private var contentHeight: CGFloat = 0
+    /// ScrollView viewport 크기
+    @State private var viewportSize: CGSize = .zero
+    /// Root 좌표계 기준 Canvas frame
+    @State private var canvasRootFrame: CGRect = .zero
+    /// PKCanvasView가 마지막으로 실제 적용 완료했다고 보고한 renderVersion
+    @State private var canvasAppliedRenderVersion: Int = -1
+    /// 현재 chapter에서 초기 drawing이 캔버스에 실제로 올라왔는지 여부(스켈레톤 hide 기준)
+    @State private var hasAppliedInitialCanvasDrawing: Bool = false
     
     public init(store: StoreOf<CarveDetailFeature>) {
         self.store = store
@@ -57,102 +72,188 @@ public struct CarveDetailView: View {
     
     private var detailScroll: some View {
         ScrollViewReader { proxy in
-            ScrollView {
-                contentView
-                    .padding(.top, store.headerState.headerHeight)
-                    .offsetY { previous, current in
-                        delay {
-                            send(.headerAnimation(previous, current))
+            ZStack(alignment: .top) {
+                ScrollView {
+                    contentView
+                        .padding(.top, store.headerState.headerHeight)
+                        .offsetY { previous, current in
+                            let newOffset = -current
+                            if scrollOffset != newOffset {
+                                scrollOffset = newOffset
+                            }
+                            delay {
+                                send(.headerAnimation(previous, current))
+                            }
+                        }
+                        .background(
+                            GeometryReader { proxy in
+                                Color.clear
+                                    .preference(key: ContentHeightKey.self, value: proxy.size.height)
+                            }
+                        )
+                        .onChange(of: store.verseRowState) {
+                            send(.setProxy(proxy))
+                        }
+                }
+                .onTapGesture {
+                    send(.tapForHeaderHidden)
+                }
+                .onTwoFingerDoubleTap {
+                    send(.twoFingerDoubleTapForUndo)
+                }
+                .coordinateSpace(name: "Scroll")
+                
+                CombinedCanvasView(
+                    store: self.store.scope(
+                        state: \.canvasState,
+                        action: \.scope.canvasAction
+                    ),
+                    viewportSize: CGSize(width: halfWidth, height: viewportSize.height),
+                    contentHeight: contentHeight,
+                    scrollOffset: scrollOffset,
+                    bottomBuffer: canvasBuffer,
+                    onRenderApplied: { renderVersion in
+                        if canvasAppliedRenderVersion != renderVersion {
+                            canvasAppliedRenderVersion = renderVersion
+                        }
+                        if !hasAppliedInitialCanvasDrawing,
+                           !store.canvasState.combinedDrawing.strokes.isEmpty,
+                           renderVersion >= store.canvasState.renderVersion {
+                            hasAppliedInitialCanvasDrawing = true
                         }
                     }
-                    .onChange(of: store.sentenceWithDrawingState) {
-                        send(.setProxy(proxy))
+                )
+                .id("\(store.canvasState.chapter)-\(canvasLayoutVersion)")
+                .transaction { $0.animation = nil }
+                .overlay {
+                    if shouldShowDrawingSkeleton {
+                        DrawingCanvasSkeletonView(
+                            linePitch: max(26, store.sentenceSetting.lineSpace),
+                            horizontalInset: VerseLayoutMetrics.underlineHorizontalInset
+                        )
+                            .allowsHitTesting(false)
+                            .transition(.opacity)
                     }
-//                    // ✅ Canvas를 contentView에 overlay로 올려서 높이/레이아웃을 완전히 동일하게 맞춘다.
-//                    // 이렇게 하면 Pencil hover/다운 시점에 Canvas만 별도로 "커지는" 레이아웃 흔들림을 줄일 수 있다.
-//                    .overlay {
-//                        CombinedCanvasView(
-//                            store: self.store.scope(
-//                                state: \.canvasState,
-//                                action: \.scope.canvasAction
-//                            ),
-//                            onInkingChanged: { isInking in
-//                                self.isInking = isInking
-//                            }
-//                        )
-//                        .border(.red)
-//                        .id(store.canvasState.chapter)
-//                        .frame(width: halfWidth)
-//                        .frame(
-//                            maxWidth: .infinity,
-//                            maxHeight: .infinity,
-//                            alignment: store.isLeftHanded ? .leading : .trailing
-//                        )
-//                        .background(
-//                            GeometryReader { proxy in
-//                                Color.clear
-//                                    .allowsHitTesting(false)
-//                                    .onAppear {
-//                                        let frame = proxy.frame(in: .named("CanvasSpace"))
-//                                        send(.canvasFrameChanged(frame))
-//                                    }
-//                                    .onChange(of: proxy.frame(in: .named("CanvasSpace"))) { _, frame in
-//                                        // 최종 레이아웃 기준 프레임을 항상 반영 (split/fullscreen 전환 시 좌표계 어긋남 방지)
-//                                        send(.canvasFrameChanged(frame))
-//                                    }
-//                            }
-//                        )
-//                    }
-                    .coordinateSpace(name: "CanvasSpace")
-                    .onAppear {
-                        send(.fetchSentence)
+                }
+                .background(
+                    GeometryReader { proxy in
+                        Color.clear
+                            .onAppear {
+                                canvasRootFrame = proxy.frame(in: .named("Root"))
+                            }
+                            .onChange(of: proxy.frame(in: .named("Root"))) { _, frame in
+                                canvasRootFrame = frame
+                            }
                     }
+                )
+                .frame(width: halfWidth)
+                .frame(
+                    maxWidth: .infinity,
+                    maxHeight: .infinity,
+                    alignment: store.isLeftHanded ? .topLeading : .topTrailing
+                )
             }
-            .onTapGesture {
-                send(.tapForHeaderHidden)
+            .coordinateSpace(name: "Root")
+            .onAppear {
+                send(.fetchSentence)
             }
-            .onTwoFingerDoubleTap {
-                send(.twoFingerDoubleTapForUndo)
+            .onChange(of: store.canvasState.chapter) { _, _ in
+                contentHeight = 0
+                canvasAppliedRenderVersion = -1
+                hasAppliedInitialCanvasDrawing = false
+                PerformanceLog.event("CarveDetail.ContentHeightReset")
             }
-            .coordinateSpace(name: "Scroll")
+            .onChange(of: store.sentenceSetting) { _, _ in
+                contentHeight = 0
+                send(.invalidateTextLayoutDebounced)
+                PerformanceLog.event("CarveDetail.ContentHeightReset")
+            }
+            .onChange(of: canvasRootFrame) { _, _ in
+                // 회전/분할 등으로 Canvas 기준 좌표가 바뀌면 텍스트 레이아웃을 강제 재측정한다.
+                send(.invalidateTextLayoutDebounced)
+                PerformanceLog.event("CarveDetail.CanvasFrameChanged")
+            }
+            .onPreferenceChange(ContentHeightKey.self) { height in
+                if height > contentHeight {
+                    contentHeight = height
+                    PerformanceLog.event("CarveDetail.ContentHeightIncreased")
+                }
+            }
         }
-        .onGeometryChange(for: CGFloat.self) { proxy in
-            return proxy.size.width / 2
-        } action: { halfWidth in
-            // Drawing 중에는 레이아웃 폭 변경을 반영하지 않아 좌표계 흔들림을 방지
-            guard !isInking else { return }
+        .onGeometryChange(for: CGSize.self) { proxy in
+            proxy.size
+        } action: { size in
+            // 화면 크기 변경 시 텍스트 레이아웃 재측정 여부를 판단.
+            var shouldInvalidateTextLayout = false
+            let newHalfWidth = size.width / 2
+            if halfWidth != newHalfWidth {
+                halfWidth = newHalfWidth
+                verseLayoutVersion &+= 1
+                // 너비 변화에 의한 레이아웃 재측정.
+                shouldInvalidateTextLayout = true
+                PerformanceLog.event("CarveDetail.HalfWidthChanged")
+            }
+            
+            let viewportChanged = (viewportSize != size)
+            if viewportChanged {
+                viewportSize = size
+                // iPad 멀티윈도우/회전 등으로 viewport가 바뀌면 PKCanvasView 재생성.
+                canvasLayoutVersion &+= 1
+                verseLayoutVersion &+= 1
+                // LazyVStack 콘텐츠 높이 측정값도 리셋
+                contentHeight = 0
+                // viewport 변경에 의한 레이아웃 재측정이 필요.
+                shouldInvalidateTextLayout = true
+                PerformanceLog.event("CarveDetail.ViewportChanged")
+            }
 
-            let scale = UIScreen.main.scale
-            let newValue = floor(halfWidth * scale) / scale
-
-            var transaction = Transaction()
-            transaction.disablesAnimations = true
-            withTransaction(transaction) {
-                self.halfWidth = newValue
+            if shouldInvalidateTextLayout {
+                // 여러 조건으로 중복 호출되지 않도록 한 번만 invalidate.
+                send(.invalidateTextLayoutDebounced)
             }
         }
     }
     
     private var contentView: some View {
-        LazyVStack(pinnedViews: .sectionHeaders) {
-            Section {
-                ForEach(
-                    store.scope(state: \.sentenceWithDrawingState,
-                                action: \.scope.sentenceWithDrawingAction),
-                    id: \.state.id
-                ) { childStore in
-                    SentencesWithDrawingView(
-                        store: childStore,
-                        halfWidth: $halfWidth,
-                        onUnderlineLayoutChange: { id, layout in
-                            send(.underlineLayoutChanged(id: id, layout: layout))
-                        }
-                    )
-                    .padding(.horizontal, 10)
-                }
+        LazyVStack(spacing: 0) {
+            ForEach(
+                store.scope(state: \.verseRowState,
+                            action: \.scope.verseRowAction),
+                id: \.state.id
+            ) { childStore in
+                VerseRowView(
+                    store: childStore,
+                    halfWidth: $halfWidth,
+                    canvasRootFrame: canvasRootFrame,
+                    scrollOffset: scrollOffset,
+                    layoutVersion: verseLayoutVersion,
+                    onUnderlineLayoutChange: { id, layout in
+                        send(.underlineLayoutChanged(id: id, layout: layout))
+                    }
+                )
+                .id(VerseRowLayoutKey(
+                    preferenceVersion: childStore.state.verseTextState.preferenceVersion,
+                    layoutVersion: verseLayoutVersion
+                ))
+                .padding(.horizontal, 10)
             }
+            
         }
-        .id(store.sentenceSetting)
+    }
+    
+    private var canvasBuffer: CGFloat {
+        guard viewportSize.height > 0 else { return 0 }
+        return max(80, viewportSize.height * 0.25)
+    }
+
+    private var shouldShowDrawingSkeleton: Bool {
+        let hasVerseDrawing = store.canvasState.drawings.contains { drawing in
+            drawing.lineData?.containsPKStroke == true
+        }
+        guard hasVerseDrawing else { return false }
+        if !hasAppliedInitialCanvasDrawing { return true }
+        guard store.canvasState.isWaitingInitialVerseRender else { return false }
+        return canvasAppliedRenderVersion < store.canvasState.renderVersion
     }
     
     /// 헤더 스크롤 애니메이션 등 과도한 이벤트 호출을 방지하기 위한 딜레이
@@ -161,6 +262,19 @@ public struct CarveDetailView: View {
         _ action: @escaping () -> Void
     ) {
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: action)
+    }
+}
+
+private struct VerseRowLayoutKey: Hashable {
+    let preferenceVersion: UUID
+    let layoutVersion: Int
+}
+
+/// ScrollView 콘텐츠 높이를 상위로 전달하기 위한 PreferenceKey.
+private struct ContentHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }
 

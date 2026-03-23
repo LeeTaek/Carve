@@ -12,7 +12,7 @@ import PencilKit
 
 import Dependencies
 
-//@available(*, deprecated, message: "CombinedCanvasView로 대체되며 사용 안 함")
+@available(*, deprecated, message: "CombinedCanvasView로 대체되며 사용 안 함")
 public class SharedUndoManager {
     private var canvasUndoManager = UndoManager()
     private var canvases: [PKCanvasView] = []

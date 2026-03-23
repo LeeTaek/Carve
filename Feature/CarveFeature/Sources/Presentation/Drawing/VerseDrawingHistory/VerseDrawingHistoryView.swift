@@ -69,16 +69,25 @@ public struct VerseDrawingHistoryView: View {
     private func drawingPreview(of drawing: BibleDrawing) -> some View {
         if let drawingData = drawing.lineData,
            let pkDrawing = try? PKDrawing(data: drawingData) {
-            let bounds = pkDrawing.bounds
-            let height = bounds.height
-            let aspectRatio = bounds.height > 0 ? bounds.width / bounds.height : 1.0
-            let width = height * aspectRatio
-            
+            // 저장된 drawing은 local 좌표라고 가정하지만,
+            // padding/변환 과정에서 bounds.minX/minY가 0이 아닐 수 있어 프리뷰에서 잘릴 수 있다.
+            // 항상 (0,0) 기준으로 정규화해서 렌더링한다.
+            let originalBounds = pkDrawing.bounds
+            let normalizedDrawing = pkDrawing.transformed(
+                using: CGAffineTransform(translationX: -originalBounds.minX, y: -originalBounds.minY)
+            )
+            let normalizedBounds = normalizedDrawing.bounds
+
+            // List 셀에서 0 height로 압축되는 것을 방지
+            let previewWidth = max(44, normalizedBounds.width)
+            let previewHeight = max(44, normalizedBounds.height)
+
             Button {
                 send(.selectDrawing(drawing))
             } label: {
-                DrawingPreview(drawing: pkDrawing)
-                    .frame(width: width, height: height)
+                DrawingPreview(drawing: normalizedDrawing)
+                    .frame(width: previewWidth, height: previewHeight)
+                    .frame(maxWidth: .infinity, alignment: .center)
                     .padding()
             }
         } else {

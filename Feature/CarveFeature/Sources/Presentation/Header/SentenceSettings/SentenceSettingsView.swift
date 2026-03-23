@@ -8,6 +8,7 @@
 
 import Domain
 import SwiftUI
+import UIComponents
 
 import ComposableArchitecture
 
@@ -64,16 +65,6 @@ public struct SentenceSettingsView: View {
                     value: $store.setting.lineSpace,
                     minValue: 5,
                     maxValue: 70
-                )
-                .padding(.vertical)
-            }
-            Section(
-                header: Text("글자 간격: \(Int(store.setting.traking))").font(.headline).bold()
-            ) {
-                CustomSlider(
-                    value: $store.setting.traking,
-                    minValue: 1,
-                    maxValue: 10
                 )
                 .padding(.vertical)
             }

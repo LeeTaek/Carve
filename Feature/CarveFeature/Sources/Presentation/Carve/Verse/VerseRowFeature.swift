@@ -30,6 +30,8 @@ public struct VerseRowFeature {
         public var isPresentDrewHistory: Bool = false
         /// verse 그릴 UnderLineView의 global 좌표 Rect
         public var verseFrame: CGRect = .zero
+        /// 해당 row의 underline 레이아웃 변경 전파용 버전
+        public var layoutVersion: Int = 0
         /// 왼손잡이 여부
         @Shared(.appStorage("isLeftHanded")) public var isLeftHanded: Bool = false
 

@@ -7,6 +7,7 @@
 //
 
 import CarveFeature
+import ChartFeature
 import SettingsFeature
 import SwiftUI
 
@@ -51,6 +52,9 @@ public struct AppCoordinatorView: View {
             switch store.case {
             case .settings(let store):
                 SettingsView(store: store)
+                
+            case .chart(let store):
+                DrawingChartView(store: store)
             }
         }
     }
