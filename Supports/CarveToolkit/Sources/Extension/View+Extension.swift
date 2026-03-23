@@ -44,6 +44,23 @@ extension View {
                                      action: @escaping () -> Void) -> some View {
         overlay(TwoFingerTapDoubleTapView(action: action))
     }
+    
+    /// insetGrouped의 섹션 콘텐츠를 카드처럼 띄워 보이게 하는 스타일.
+    public func sectionCardShadow(
+        cornerRadius: CGFloat = 12,
+        shadowRadius: CGFloat = 10,
+        shadowX: CGFloat = 6,
+        shadowY: CGFloat = 8
+    ) -> some View {
+        self
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .shadow(
+                color: Color.Brand.accent.opacity(0.05),
+                radius: shadowRadius,
+                x: shadowX,
+                y: shadowY
+            )
+    }
 }
 
 struct ShakeEffect: GeometryEffect {

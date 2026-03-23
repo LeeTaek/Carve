@@ -23,6 +23,8 @@ public struct CarveDetailFeature {
         public var sentenceWithDrawingState: IdentifiedArrayOf<SentencesWithDrawingFeature.State> = []
         /// ScrollView 위치 제어용 프록시
         public var proxy: ScrollViewProxy?
+        /// 차트 등 외부 화면에서 특정 절로 이동할 때 사용할 스크롤 타깃 ID.
+        public var scrollTargetID: SentencesWithDrawingFeature.State.ID?
         /// 마지막으로 사용한 펜 종류(펜슬 더블탭시 전환용)
         var lastUsedPencil: PKInkingTool.InkType = .pencil
 //        /// global 좌표계 기준 CombinedCanvasView의 frame (Canvas 기준 verse 별 rect 계산용)
@@ -44,6 +46,7 @@ public struct CarveDetailFeature {
         /// 화면 최상단으로 스크롤
         case scrollToTop
         case setSentence([BibleVerse], [BibleDrawing])
+        case setScrollTarget(BibleVerse)
         
         case view(View)
         case scope(ScopeAction)
@@ -112,6 +115,10 @@ public struct CarveDetailFeature {
                 }
                 state.sentenceWithDrawingState = sentenceState
                 undoManager.clear()
+                return .none
+                
+            case .setScrollTarget(let verse):
+                state.scrollTargetID = makeSentenceID(for: verse)
                 return .none
                 
             case .view(.underlineLayoutChanged(let id, let layout)):
@@ -220,6 +227,11 @@ public struct CarveDetailFeature {
 
 
 extension CarveDetailFeature {
+    /// `SentencesWithDrawingFeature.State.id` 규칙과 동일한 스크롤용 ID를 생성.
+    private func makeSentenceID(for verse: BibleVerse) -> SentencesWithDrawingFeature.State.ID {
+        "\(verse.title.title.koreanTitle()).\(verse.title.chapter).\(verse.verse)"
+    }
+    
     /// 성경 본문 가져오기
     /// - Parameter chapter: 가져올 성경의 제목과 장
     private func fetchBible(chapter: BibleChapter) throws(CarveReducerError) -> [BibleVerse] {
@@ -270,7 +282,9 @@ extension CarveDetailFeature {
     
     /// ScrollView 맨 위로 스크롤
     private func scrollToTop(state: inout State) -> Effect<Action> {
-        guard let id = state.sentenceWithDrawingState.first?.id else { return .none }
+        let id = state.scrollTargetID ?? state.sentenceWithDrawingState.first?.id
+        guard let id else { return .none }
+        state.scrollTargetID = nil
         withAnimation(.easeInOut(duration: 0.5)) {
             state.proxy?.scrollTo(id, anchor: .bottom)
         }

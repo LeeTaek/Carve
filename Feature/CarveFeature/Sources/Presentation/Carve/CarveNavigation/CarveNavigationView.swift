@@ -69,21 +69,14 @@ public struct CarveNavigationView: View {
         .toolbar {
             ToolbarItemGroup(placement: .bottomBar) {
                 HStack {
-//                    Button {
-//                        send(.navigationToDrewLog)
-//                    } label: {
-//                        Image(asset: CarveFeatureAsset.chart)
-//                            .resizable()
-//                            .aspectRatio(contentMode: .fit)
-//                            .foregroundStyle(.black)
-//                            .frame(width: 35, height: 35)
-//                    }
-                    
-//                    if #available(iOS 26.0, *) {
-//                        ToolbarSpacer(.fixed)
-//                    }
-                    
-                    
+                    Button {
+                        send(.moveToChart)
+                    } label: {
+                        Image(systemName: "chart.bar.xaxis")
+                            .font(.system(size: 22, weight: .semibold))
+                            .foregroundStyle(.black)
+                    }
+
                     Button {
                         send(.moveToSetting)
                     } label: {

@@ -8,6 +8,7 @@
 
 import SwiftUI
 import CarveFeature
+import ChartFeature
 import SettingsFeature
 
 import ComposableArchitecture
@@ -28,8 +29,8 @@ public struct AppCoordinatorFeature {
                 switch topPath {
                 case .settings:
                     return "Settings"
-//                case .chart:
-//                    return "Chart"
+                case .chart:
+                    return "Chart"
                 }
             }
 
@@ -65,6 +66,8 @@ public struct AppCoordinatorFeature {
     public enum Path {
         /// 앱 설정 화면 흐름.
         case settings(SettingsFeature)
+        /// 필사 통계 차트 화면 흐름.
+        case chart(DrawingChartFeature)
     }
     
     public var body: some Reducer<State, Action> {
@@ -78,9 +81,20 @@ public struct AppCoordinatorFeature {
                 
             case .root(.presented(.carve(.view(.moveToSetting)))):
                 state.path.append(.settings(.initialState))
+                
+            case .root(.presented(.carve(.view(.moveToChart)))):
+                state.path.append(.chart(.initialState))
 
             case .path(.element(id: _, action: .settings(.view(.backToCarve)))):
                 state.path.removeLast()
+                
+            case let .path(.element(id: _, action: .chart(.drawingWeeklySummary(.openChapter(chapter))))):
+                state.path.removeLast()
+                return .send(.root(.presented(.carve(.moveToChapter(chapter)))))
+                
+            case let .path(.element(id: _, action: .chart(.drawingWeeklySummary(.openVerse(verse))))):
+                state.path.removeLast()
+                return .send(.root(.presented(.carve(.moveToVerse(verse)))))
 
             default:
                 break

@@ -5,6 +5,7 @@ let projectName = "CarveApp"
 
 let dependencies: [TargetDependency] = [
     .CarveFeature,
+    .ChartFeature,
     .SettingsFeature,
     .ClientInterfaces,
     .FirebaseAnalytics,
@@ -21,7 +22,7 @@ let settings: Settings = .settings(
         .automaticCodeSigning(devTeam: "H4MSW7FUBB")
         .otherLinkerFlags(["-all_load -Objc"])
         .debugInformationFormat(.dwarfWithDsym)
-        .marketingVersion("1.2.1")
+        .marketingVersion("1.3.0")
         .currentProjectVersion("1")
         .merging([
             "ENABLE_USER_SCRIPT_SANDBOXING": "YES",

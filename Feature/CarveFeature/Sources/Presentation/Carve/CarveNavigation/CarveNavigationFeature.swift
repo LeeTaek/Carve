@@ -41,6 +41,8 @@ public struct CarveNavigationFeature {
     }
     public enum Action: ViewAction, CarveToolkit.ScopeAction, BindableAction {
         case binding(BindingAction<State>)
+        case moveToChapter(BibleChapter)
+        case moveToVerse(BibleVerse)
         case view(View)
         case scope(ScopeAction)
         
@@ -48,6 +50,8 @@ public struct CarveNavigationFeature {
         public enum View {
             /// 설정 화면으로 이동
             case moveToSetting
+            /// 차트 화면으로 이동
+            case moveToChart
             /// NavigationSplitView를 닫고 DetailOnly로 변경
             case closeNavigationBar
             /// detail Content 안에서 네비게이션 래핑
@@ -99,6 +103,27 @@ public struct CarveNavigationFeature {
         
         Reduce { state, action in
             switch action {
+            case .moveToChapter(let chapter):
+                state.selectedTitle = chapter.title
+                state.selectedChapter = chapter.chapter
+                state.$currentTitle.withLock { $0 = chapter }
+                state.columnVisibility = .detailOnly
+                return .run { send in
+                    await send(.scope(.carveDetailAction(.view(.fetchSentence))))
+                }
+                
+            case .moveToVerse(let verse):
+                state.selectedTitle = verse.title.title
+                state.selectedChapter = verse.title.chapter
+                state.$currentTitle.withLock { $0 = verse.title }
+                state.columnVisibility = .detailOnly
+                return .merge(
+                    .send(.scope(.carveDetailAction(.setScrollTarget(verse)))),
+                    .run { send in
+                        await send(.scope(.carveDetailAction(.view(.fetchSentence))))
+                    }
+                )
+                
             case .scope(.carveDetailAction(.scope(.headerAction(.view(.titleDidTapped))))):
                 return handleTitleDidTapped(state: &state)
                 
@@ -110,6 +135,10 @@ public struct CarveNavigationFeature {
                 
             case .view(.moveToSetting):
                 Log.debug("move To settings")
+                return .none
+                
+            case .view(.moveToChart):
+                Log.debug("move To chart")
                 return .none
                 
             case .view(.closeNavigationBar):
@@ -138,7 +167,6 @@ extension CarveNavigationFeature {
     private func handleTitleDidTapped(state: inout State) -> Effect<Action> {
         state.selectedTitle = state.currentTitle.title
         state.selectedChapter = state.currentTitle.chapter
-        state.carveDetailState.sentenceWithDrawingState.removeAll()
         state.columnVisibility = .all
         return .none
     }
