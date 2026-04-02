@@ -8,7 +8,6 @@
 
 import CarveToolkit
 import Domain
-import Resources
 import SwiftUI
 import PencilKit
 
@@ -40,6 +39,7 @@ public struct CarveDetailFeature {
         )
     }
     @Dependency(\.drawingData) var drawingContext
+    @Dependency(\.bibleTextClient) var bibleTextClient
     @Dependency(\.undoManager) var undoManager
     
     public enum Action: ViewAction, CarveToolkit.ScopeAction {
@@ -217,12 +217,6 @@ public struct CarveDetailFeature {
             SentencesWithDrawingFeature()
         }
     }
-    
-    
-    enum CarveReducerError: Error {
-        case fetchSentenceError
-        case chapterConvertError
-    }
 }
 
 
@@ -232,33 +226,6 @@ extension CarveDetailFeature {
         "\(verse.title.title.koreanTitle()).\(verse.title.chapter).\(verse.verse)"
     }
     
-    /// 성경 본문 가져오기
-    /// - Parameter chapter: 가져올 성경의 제목과 장
-    private func fetchBible(chapter: BibleChapter) throws(CarveReducerError) -> [BibleVerse] {
-        let encodingEUCKR = CFStringConvertEncodingToNSStringEncoding(0x0422)
-        var sentences: [BibleVerse] = []
-        guard let textPath = ResourcesResources.bundle.path(forResource: chapter.title.rawValue,
-                                                            ofType: nil)
-        else { return sentences}
-        do {
-            let bible = try String(contentsOfFile: textPath,
-                                   encoding: String.Encoding(rawValue: encodingEUCKR))
-            sentences = try bible.components(separatedBy: "\r")
-                .filter {
-                    guard let num = $0.components(separatedBy: ":").first,
-                          let first = Int(num) else { throw CarveReducerError.chapterConvertError }
-                    return first == chapter.chapter
-                }
-                .map { sentence in
-                    return BibleVerse.init(title: chapter, sentence: sentence)
-                }
-        } catch {
-            throw .fetchSentenceError
-        }
-        return sentences
-    }
-    
-    
     /// 1. 성경 본문 fetch
     /// 2. sentenceWithDrawingState 및 canvasState 초기화,
     /// 3. Drawing데이터 불러옴
@@ -267,7 +234,7 @@ extension CarveDetailFeature {
           
         return .run { send in
             do {
-                let sentences = try fetchBible(chapter: title)
+                let sentences = try bibleTextClient.fetch(chapter: title)
                 let drawings = try await drawingContext.fetch(chapter: title)
                 
                 try Task.checkCancellation()
