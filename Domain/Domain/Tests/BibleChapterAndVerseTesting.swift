@@ -10,9 +10,22 @@ import Testing
 
 struct BibleChapterAndVerseTesting {
     @Test
+    func beforeWrapsFromGenesisToRevelation() {
+        // 첫 권에서 이전으로 이동할 때 마지막 권으로 순환해야 한다.
+        #expect(BibleTitle.genesis.before() == .revelation)
+    }
+
+    @Test
     func nextWrapsFromRevelationToGenesis() {
         // 마지막 권은 배열 범위를 벗어나지 않고 첫 권으로 순환해야 한다.
         #expect(BibleTitle.revelation.next() == .genesis)
+    }
+
+    @Test
+    func isOldTestamentUsesCanonBoundary() {
+        // 말라기까지는 구약, 마태복음부터는 신약으로 구분돼야 한다.
+        #expect(BibleTitle.malachi.isOldtestment)
+        #expect(!BibleTitle.matthew.isOldtestment)
     }
 
     @Test
@@ -45,5 +58,11 @@ struct BibleChapterAndVerseTesting {
     func getTitleFallsBackToGenesisWhenNoMatchExists() {
         // 파일명 규칙이 깨진 입력이 들어와도 기본값은 안정적으로 창세기여야 한다.
         #expect(BibleTitle.getTitle("NotExistingBook.txt") == .genesis)
+    }
+
+    @Test
+    func getTitleMatchesEmbeddedFilenameFragment() {
+        // 리소스 경로 일부만 들어와도 해당 책을 안정적으로 찾아야 한다.
+        #expect(BibleTitle.getTitle("2-04John") == .john)
     }
 }

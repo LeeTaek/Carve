@@ -51,7 +51,7 @@ public struct BibleVerse: Equatable, Sendable {
         sentence: String
     ) {
         self.title = title
-        var chapterTitle: String?
+        var resolvedChapterTitle = chapterTitle
         var chapter: Int?
         var sentenceScript: String = sentence
         
@@ -84,12 +84,12 @@ public struct BibleVerse: Equatable, Sendable {
         // 이후 <소제목> 패턴을 찾아 소제목을 추출하고, 해당 부분을 문자열에서 제거.
         if let match = try? titlePattern.firstMatch(in: sentenceScript) {
             let (_, chapterTitleString) = match.output
-            chapterTitle = String(chapterTitleString)
+            resolvedChapterTitle = String(chapterTitleString)
             sentenceScript.removeSubrange(match.range)
             sentenceScript = sentenceScript.trimmingCharacters(in: .whitespacesAndNewlines)
         }
        
-        self.chapterTitle = chapterTitle
+        self.chapterTitle = resolvedChapterTitle
         self.verse = chapter ?? 0
         self.sentenceScript = sentenceScript
     }
