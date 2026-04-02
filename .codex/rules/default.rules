@@ -1,0 +1,17 @@
+prefix_rule(
+  pattern = ["xcrun", "simctl", "list", "devices"],
+  decision = "allow",
+  justification = "시뮬레이터 사전 점검 허용"
+)
+
+prefix_rule(
+  pattern = ["xcodebuild", "test"],
+  decision = "allow",
+  justification = "로컬 시뮬레이터 테스트 허용"
+)
+
+prefix_rule(
+  pattern = ["gh", "pr", "create"],
+  decision = "prompt",
+  justification = "PR 생성은 확인 후 허용"
+)
