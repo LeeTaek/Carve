@@ -1,0 +1,49 @@
+//
+//  BibleChapterAndVerseTesting.swift
+//  DomainTest
+//
+//  Created by Codex on 4/2/26.
+//
+
+@testable import Domain
+import Testing
+
+struct BibleChapterAndVerseTesting {
+    @Test
+    func nextWrapsFromRevelationToGenesis() {
+        // 마지막 권은 배열 범위를 벗어나지 않고 첫 권으로 순환해야 한다.
+        #expect(BibleTitle.revelation.next() == .genesis)
+    }
+
+    @Test
+    func verseInitParsesChapterTitleVerseAndSentence() {
+        // "<소제목> 장:절 본문" 형식이 한 줄에 함께 들어와도 각 필드가 분리돼야 한다.
+        let verse = BibleVerse(
+            title: BibleChapter(title: .john, chapter: 3),
+            sentence: "<하나님의 사랑> 3:16 하나님이 세상을 이처럼 사랑하사"
+        )
+
+        #expect(verse.chapterTitle == "하나님의 사랑")
+        #expect(verse.verse == 16)
+        #expect(verse.sentenceScript == "하나님이 세상을 이처럼 사랑하사")
+    }
+
+    @Test
+    func bibleTextClientFetchesOnlyRequestedChapterVerses() throws {
+        let chapter = BibleChapter(title: .genesis, chapter: 1)
+
+        // 리소스 파일 전체를 읽더라도 요청한 장 번호에 해당하는 절만 반환해야 한다.
+        let verses = try ResourceBibleTextClient().fetch(chapter: chapter)
+
+        #expect(!verses.isEmpty)
+        #expect(verses.allSatisfy { $0.title == chapter })
+        #expect(verses.allSatisfy { !$0.sentenceScript.isEmpty })
+        #expect(verses.contains { $0.verse == 1 })
+    }
+
+    @Test
+    func getTitleFallsBackToGenesisWhenNoMatchExists() {
+        // 파일명 규칙이 깨진 입력이 들어와도 기본값은 안정적으로 창세기여야 한다.
+        #expect(BibleTitle.getTitle("NotExistingBook.txt") == .genesis)
+    }
+}

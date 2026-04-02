@@ -13,6 +13,7 @@ let projectName = "Domain"
 let dependencies: [TargetDependency] = [
     .CarveToolkit,
     .ClientInterfaces,
+    .Resources,
     .Dependencies
 ]
 

@@ -87,12 +87,11 @@ extension ModelContainer: @retroactive DependencyKey {
     /// 테스트 코드에서 사용할 SwiftData ModelContainer입니다. (테스트 전용 파일 URL 사용)
     public static var testValue: ModelContainer {
         do {
-            let url = URL.applicationSupportDirectory.appending(path: "Carve.test.sqlite")
+            let config = ModelConfiguration(isStoredInMemoryOnly: true)
             let schema = Schema([
                 BibleDrawing.self,
                 BiblePageDrawing.self
             ])
-            let config = ModelConfiguration(url: url)
             return try ModelContainer(for: schema, configurations: config)
         } catch {
             fatalError("Failed to create test ModelContainer")

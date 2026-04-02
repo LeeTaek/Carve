@@ -7,22 +7,12 @@
 
 
 @testable import CarveFeature
-@testable import Domain
 import Testing
 
-import ComposableArchitecture
-
-
 struct CarveDetailReducerTesting {
-    
-    @Test(arguments: [
-        BibleChapter.init(title: .samuel1, chapter: 4),
-        BibleChapter.initialState,
-        BibleChapter(title: .samuel2, chapter: 2)
-    ])
-    func fetchBible(title: BibleChapter) throws {
-//        #expect(throws: Never.self) {
-//            try reducer.fetchBible(chapter: title)
-//        }
+    @Test
+    func featureCanBeInitializedAfterBibleTextClientRefactor() {
+        // 본문 조회 책임 분리 이후에도 Feature 자체는 의존성 선언만으로 정상 구성되어야 한다.
+        _ = CarveDetailFeature()
     }
 }
