@@ -65,4 +65,26 @@ struct BibleChapterAndVerseTesting {
         // 리소스 경로 일부만 들어와도 해당 책을 안정적으로 찾아야 한다.
         #expect(BibleTitle.getTitle("2-04John") == .john)
     }
+
+    @Test("대표 책의 마지막 장 수를 정경 기준으로 반환한다")
+    func lastChapterReturnsCanonicalCountsForRepresentativeBooks() {
+        #expect(BibleTitle.genesis.lastChapter == 50)
+        #expect(BibleTitle.psalms.lastChapter == 150)
+        #expect(BibleTitle.obadiah.lastChapter == 1)
+        #expect(BibleTitle.revelation.lastChapter == 22)
+    }
+
+    @Test("대표 책의 한글 제목을 올바르게 반환한다")
+    func koreanTitleReturnsLocalizedNameForRepresentativeBooks() {
+        #expect(BibleTitle.genesis.koreanTitle() == "창세기")
+        #expect(BibleTitle.john.koreanTitle() == "요한복음")
+        #expect(BibleTitle.revelation.koreanTitle() == "요한계시록")
+    }
+
+    @Test("번호가 붙은 요한서신 파일명 조각도 정확한 책으로 매핑한다")
+    func getTitleMatchesNumberedJohnEpistles() {
+        #expect(BibleTitle.getTitle("2-23John1") == .john1)
+        #expect(BibleTitle.getTitle("2-24John2") == .john2)
+        #expect(BibleTitle.getTitle("2-25John3") == .john3)
+    }
 }
