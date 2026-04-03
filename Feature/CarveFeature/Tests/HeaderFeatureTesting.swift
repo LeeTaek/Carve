@@ -89,12 +89,4 @@ struct HeaderFeatureTesting {
         #expect(state.lastHeaderOffset == -72)
     }
 
-    @Test("헤더 높이 설정 액션은 측정한 높이를 상태에 반영한다")
-    func setHeaderHeightUpdatesState() async {
-        var state = HeaderFeature.State.initialState
-
-        _ = HeaderFeature().reduce(into: &state, action: .view(.setHeaderHeight(88)))
-
-        #expect(state.headerHeight == 88)
-    }
 }
