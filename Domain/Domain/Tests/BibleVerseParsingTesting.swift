@@ -71,4 +71,40 @@ struct BibleVerseParsingTesting {
         #expect(verse.verse == 16)
         #expect(verse.sentenceScript == "하나님이 세상을 이처럼 사랑하사")
     }
+
+    @Test("소제목이 전혀 없으면 chapterTitle은 nil로 유지한다")
+    func keepsChapterTitleNilWhenNoDefaultOrEmbeddedTitleExists() {
+        let verse = BibleVerse(
+            title: BibleChapter(title: .john, chapter: 3),
+            sentence: "3:16 하나님이 세상을 이처럼 사랑하사"
+        )
+
+        #expect(verse.chapterTitle == nil)
+        #expect(verse.verse == 16)
+        #expect(verse.sentenceScript == "하나님이 세상을 이처럼 사랑하사")
+    }
+
+    @Test("장절과 소제목을 제거한 뒤 남은 본문의 앞뒤 공백과 줄바꿈을 정리한다")
+    func trimsWhitespaceAfterRemovingReferenceAndTitle() {
+        let verse = BibleVerse(
+            title: BibleChapter(title: .john, chapter: 3),
+            sentence: "\n  <하나님의 사랑> 3:16   하나님이 세상을 이처럼 사랑하사  \n"
+        )
+
+        #expect(verse.chapterTitle == "하나님의 사랑")
+        #expect(verse.verse == 16)
+        #expect(verse.sentenceScript == "하나님이 세상을 이처럼 사랑하사")
+    }
+
+    @Test("소제목과 장절만 있으면 본문은 빈 문자열로 남긴다")
+    func leavesSentenceEmptyWhenOnlyTitleAndReferenceExist() {
+        let verse = BibleVerse(
+            title: BibleChapter(title: .john, chapter: 3),
+            sentence: "<하나님의 사랑> 3:16"
+        )
+
+        #expect(verse.chapterTitle == "하나님의 사랑")
+        #expect(verse.verse == 16)
+        #expect(verse.sentenceScript.isEmpty)
+    }
 }
