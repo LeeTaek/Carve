@@ -71,4 +71,40 @@ struct BibleVerseParsingTesting {
         #expect(verse.verse == 16)
         #expect(verse.sentenceScript == "하나님이 세상을 이처럼 사랑하사")
     }
+
+    @Test("소제목과 장절 사이 공백이 없어도 본문을 분리한다")
+    func parsesWithoutSpacesBetweenTitleReferenceAndSentence() {
+        let verse = BibleVerse(
+            title: BibleChapter(title: .john, chapter: 3),
+            sentence: "<하나님의 사랑>3:16하나님이 세상을 이처럼 사랑하사"
+        )
+
+        #expect(verse.chapterTitle == "하나님의 사랑")
+        #expect(verse.verse == 16)
+        #expect(verse.sentenceScript == "하나님이 세상을 이처럼 사랑하사")
+    }
+
+    @Test("첫 장절 표기만 제거하고 본문 안의 추가 장절 표기는 유지한다")
+    func keepsLaterVerseLikeTextInsideSentence() {
+        let verse = BibleVerse(
+            title: BibleChapter(title: .john, chapter: 3),
+            sentence: "<하나님의 사랑> 3:16 4:5도 함께 읽습니다"
+        )
+
+        #expect(verse.chapterTitle == "하나님의 사랑")
+        #expect(verse.verse == 16)
+        #expect(verse.sentenceScript == "4:5도 함께 읽습니다")
+    }
+
+    @Test("줄바꿈으로 나뉜 소제목과 장절도 파싱한 뒤 본문 줄바꿈은 유지한다")
+    func preservesInnerLineBreaksAfterParsingTitleAndReference() {
+        let verse = BibleVerse(
+            title: BibleChapter(title: .john, chapter: 3),
+            sentence: "<하나님의 사랑>\n3:16\n하나님이 세상을\n이처럼 사랑하사"
+        )
+
+        #expect(verse.chapterTitle == "하나님의 사랑")
+        #expect(verse.verse == 16)
+        #expect(verse.sentenceScript == "하나님이 세상을\n이처럼 사랑하사")
+    }
 }
