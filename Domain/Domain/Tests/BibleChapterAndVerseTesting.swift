@@ -87,4 +87,22 @@ struct BibleChapterAndVerseTesting {
         #expect(BibleTitle.getTitle("2-24John2") == .john2)
         #expect(BibleTitle.getTitle("2-25John3") == .john3)
     }
+
+    @Test("말라기 다음 책은 신약의 첫 권인 마태복음으로 이어진다")
+    func nextCrossesOldAndNewTestamentBoundary() {
+        #expect(BibleTitle.malachi.next() == .matthew)
+    }
+
+    @Test("마태복음 이전 책은 구약의 마지막 권인 말라기다")
+    func beforeCrossesOldAndNewTestamentBoundary() {
+        #expect(BibleTitle.matthew.before() == .malachi)
+    }
+
+    @Test("번호가 붙은 베드로서신과 디모데서신 파일명 조각도 정확한 책으로 매핑한다")
+    func getTitleMatchesOtherNumberedEpistles() {
+        #expect(BibleTitle.getTitle("2-21Peter1") == .peter1)
+        #expect(BibleTitle.getTitle("2-22Peter2") == .peter2)
+        #expect(BibleTitle.getTitle("2-15Timothy1") == .timothy1)
+        #expect(BibleTitle.getTitle("2-16Timothy2") == .timothy2)
+    }
 }

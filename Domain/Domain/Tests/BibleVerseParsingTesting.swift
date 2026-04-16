@@ -72,6 +72,18 @@ struct BibleVerseParsingTesting {
         #expect(verse.sentenceScript == "하나님이 세상을 이처럼 사랑하사")
     }
 
+    @Test("소제목과 장절 사이 공백이 없어도 본문을 분리한다")
+    func parsesWithoutSpacesBetweenTitleReferenceAndSentence() {
+        let verse = BibleVerse(
+            title: BibleChapter(title: .john, chapter: 3),
+            sentence: "<하나님의 사랑>3:16하나님이 세상을 이처럼 사랑하사"
+        )
+
+        #expect(verse.chapterTitle == "하나님의 사랑")
+        #expect(verse.verse == 16)
+        #expect(verse.sentenceScript == "하나님이 세상을 이처럼 사랑하사")
+    }
+
     @Test("장절만 있고 본문이 없으면 빈 문자열로 정리하고 기본 소제목을 유지한다")
     func keepsProvidedChapterTitleWhenReferenceHasNoBody() {
         let verse = BibleVerse(
@@ -94,6 +106,19 @@ struct BibleVerseParsingTesting {
 
         #expect(verse.chapterTitle == "하나님의 사랑")
         #expect(verse.verse == 16)
+        #expect(verse.sentenceScript == "4:5도 함께 읽습니다")
+    }
+
+    @Test("줄바꿈으로 나뉜 소제목과 장절도 파싱한 뒤 본문 줄바꿈은 유지한다")
+    func preservesInnerLineBreaksAfterParsingTitleAndReference() {
+        let verse = BibleVerse(
+            title: BibleChapter(title: .john, chapter: 3),
+            sentence: "<하나님의 사랑>\n3:16\n하나님이 세상을\n이처럼 사랑하사"
+        )
+
+        #expect(verse.chapterTitle == "하나님의 사랑")
+        #expect(verse.verse == 16)
+        #expect(verse.sentenceScript == "하나님이 세상을\n이처럼 사랑하사")
         #expect(verse.sentenceScript.isEmpty)
     }
 
