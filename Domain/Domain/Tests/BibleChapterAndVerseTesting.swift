@@ -66,6 +66,12 @@ struct BibleChapterAndVerseTesting {
         #expect(BibleTitle.getTitle("2-04John") == .john)
     }
 
+    @Test("정확한 리소스 파일명도 해당 책으로 직접 매핑한다")
+    func getTitleMatchesExactResourceFilename() {
+        #expect(BibleTitle.getTitle("1-01Genesis.txt") == .genesis)
+        #expect(BibleTitle.getTitle("2-18Philemon.txt") == .philemon)
+    }
+
     @Test("대표 책의 마지막 장 수를 정경 기준으로 반환한다")
     func lastChapterReturnsCanonicalCountsForRepresentativeBooks() {
         #expect(BibleTitle.genesis.lastChapter == 50)
@@ -87,6 +93,14 @@ struct BibleChapterAndVerseTesting {
         #expect(BibleTitle.getTitle("2-24John2") == .john2)
         #expect(BibleTitle.getTitle("2-25John3") == .john3)
     }
+
+
+    @Test("번호가 붙은 서신서도 각 권을 구분해 한글 제목을 반환한다")
+    func koreanTitleReturnsLocalizedNameForNumberedEpistles() {
+        #expect(BibleTitle.thessalonians1.koreanTitle() == "데살로니가전서")
+        #expect(BibleTitle.thessalonians2.koreanTitle() == "데살로니가후서")
+        #expect(BibleTitle.peter1.koreanTitle() == "베드로전서")
+        #expect(BibleTitle.peter2.koreanTitle() == "베드로후서")
 
     @Test("말라기 다음 책은 신약의 첫 권인 마태복음으로 이어진다")
     func nextCrossesOldAndNewTestamentBoundary() {
