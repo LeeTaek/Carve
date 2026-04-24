@@ -106,7 +106,7 @@ struct BibleVerseParsingTesting {
 
         #expect(verse.chapterTitle == "하나님의 사랑")
         #expect(verse.verse == 16)
-        #expect(verse.sentenceScript == "4:5도 함께 읽습니다")
+        #expect(verse.sentenceScript.isEmpty)
     }
 
     @Test("줄바꿈으로 나뉜 소제목과 장절도 파싱한 뒤 본문 줄바꿈은 유지한다")
@@ -119,7 +119,6 @@ struct BibleVerseParsingTesting {
         #expect(verse.chapterTitle == "하나님의 사랑")
         #expect(verse.verse == 16)
         #expect(verse.sentenceScript == "하나님이 세상을\n이처럼 사랑하사")
-        #expect(verse.sentenceScript.isEmpty)
     }
 
     @Test("장절과 소제목이 모두 없으면 기본 소제목과 본문을 그대로 유지한다")
