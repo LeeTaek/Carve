@@ -89,4 +89,34 @@ struct HeaderFeatureTesting {
         #expect(state.lastHeaderOffset == -72)
     }
 
+    @Test("헤더 높이를 전달받으면 상태에 그대로 반영한다")
+    func setHeaderHeightStoresMeasuredHeight() async {
+        var state = HeaderFeature.State.initialState
+
+        _ = HeaderFeature().reduce(into: &state, action: .view(.setHeaderHeight(64)))
+
+        #expect(state.headerHeight == 64)
+        #expect(state.headerOffset == 0)
+        #expect(state.lastHeaderOffset == 0)
+    }
+
+    @Test("연필 설정 버튼은 팔레트 표시 상태만 토글한다")
+    func pencilConfigTapTogglesPalatteVisibility() async {
+        var state = HeaderFeature.State.initialState
+        state.headerHeight = 72
+        state.headerOffset = -18
+
+        _ = HeaderFeature().reduce(into: &state, action: .view(.pencilConfigDidTapped))
+
+        #expect(state.showPalatte)
+        #expect(state.headerHeight == 72)
+        #expect(state.headerOffset == -18)
+
+        _ = HeaderFeature().reduce(into: &state, action: .view(.pencilConfigDidTapped))
+
+        #expect(!state.showPalatte)
+        #expect(state.headerHeight == 72)
+        #expect(state.headerOffset == -18)
+    }
+
 }
