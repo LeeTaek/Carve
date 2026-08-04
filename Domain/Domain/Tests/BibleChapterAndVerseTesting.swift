@@ -101,6 +101,7 @@ struct BibleChapterAndVerseTesting {
         #expect(BibleTitle.thessalonians2.koreanTitle() == "데살로니가후서")
         #expect(BibleTitle.peter1.koreanTitle() == "베드로전서")
         #expect(BibleTitle.peter2.koreanTitle() == "베드로후서")
+    }
 
     @Test("말라기 다음 책은 신약의 첫 권인 마태복음으로 이어진다")
     func nextCrossesOldAndNewTestamentBoundary() {
