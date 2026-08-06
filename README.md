@@ -2,12 +2,19 @@
 # 📝 성경필사 앱 - 새기다 
 [📲 App store Link ](https://apps.apple.com/kr/app/%EC%83%88%EA%B8%B0%EB%8B%A4/id6502980733) 
 
+## 화면
+| 필사 | 차트 |
+| --- | --- |
+| ![필사 화면](docs/screenshot-carve.png) | ![차트 화면](docs/screenshot-chart.png) |
+
+Apple Pencil로 본문을 따라 쓰고, 주간 필사량을 차트로 돌아봅니다.
+
 ## 프로젝트 빌드 방법
 1. Tuist 설치
     [tuist documents 참고](https://docs.tuist.io/guides/quick-start/install-tuist)
 2. Git clone 
 3. 터미널에서 클론 받은 경로로 이동 후 tuist install 실행
-4. 프로젝트 생성 명렁어 실행 
+4. 프로젝트 생성 명령어 실행 
     4-1. tuist generate로 프로젝트 생성  
     4-2. SwiftUI의 Preview 기능을 사용할 시에는 TUIST_FOR_PREVIEW=TRUE tuist generate 명령어 실행
      단, 이 경우 프로젝트 빌드시 크래시 발생. Preview 이용시에만 사용. 
@@ -29,9 +36,9 @@
 
 
 ## 모듈 구조
-![quick demo](graph.png)]
+![module graph](graph.png)
 - **CarveApp (앱 진입 모듈)** 
-     - 화면 모듈 전환: TCA Treebase Navigation으로 Featrue 간 의존성 없이 화면 전환
+     - 화면 모듈 전환: TCA Treebase Navigation으로 Feature 간 의존성 없이 화면 전환
 - **CarveFeature (필사 기능 모듈)**
     - 성경 본문 필사와 관련된 주요 화면(DrawingView, CarveView 등)을 포함합니다.
     - SwiftData 및 CloudKit을 통해 데이터를 처리하고, UI와 상태를 TCA로 연결합니다.
