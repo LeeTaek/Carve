@@ -52,15 +52,81 @@ struct DrawingWeeklySummaryStateTesting {
 
         var state = DrawingWeeklySummaryFeature.State()
         state.scrollPosition = start
+        // 창세기 5 vs 요한복음 4 → 동점이 아니므로 tie-break와 무관하게 창세기가 1위.
+        // 시편 20은 현재 주(5/18~5/24) 밖이라 합산에서 제외되어야 한다.
         state.chapterCountsByDay = [
             start: [genesis: 2, john: 1],
-            makeDate(year: 2026, month: 5, day: 20): [john: 4],
+            makeDate(year: 2026, month: 5, day: 20): [john: 3],
             makeDate(year: 2026, month: 5, day: 24): [genesis: 3],
             makeDate(year: 2026, month: 5, day: 25): [psalms: 20]
         ]
 
         #expect(state.topChapter?.chapter == genesis)
         #expect(state.topChapter?.count == 5)
+    }
+
+    @Test("합계가 동점이면 성경 순서가 앞선 권을 반환한다")
+    func topChapterBreaksTieByBibleOrder() {
+        let start = makeDate(year: 2026, month: 5, day: 18)
+        let genesis = BibleChapter(title: .genesis, chapter: 1)
+        let john = BibleChapter(title: .john, chapter: 3)
+
+        var state = DrawingWeeklySummaryFeature.State()
+        state.scrollPosition = start
+        // 창세기 2+3=5, 요한복음 1+4=5 로 동점.
+        state.chapterCountsByDay = [
+            start: [genesis: 2, john: 1],
+            makeDate(year: 2026, month: 5, day: 20): [john: 4],
+            makeDate(year: 2026, month: 5, day: 24): [genesis: 3]
+        ]
+
+        // 성경 순서(BibleTitle.allCases)상 창세기가 요한복음보다 앞서므로 창세기가 선택된다.
+        #expect(state.topChapter?.chapter == genesis)
+        #expect(state.topChapter?.count == 5)
+    }
+
+    @Test("같은 권 안에서 합계가 동점이면 장 번호가 작은 쪽을 반환한다")
+    func topChapterBreaksTieByChapterNumber() {
+        let start = makeDate(year: 2026, month: 5, day: 18)
+        let genesis1 = BibleChapter(title: .genesis, chapter: 1)
+        let genesis5 = BibleChapter(title: .genesis, chapter: 5)
+
+        var state = DrawingWeeklySummaryFeature.State()
+        state.scrollPosition = start
+        state.chapterCountsByDay = [
+            start: [genesis5: 2, genesis1: 2],
+            makeDate(year: 2026, month: 5, day: 21): [genesis5: 1, genesis1: 1]
+        ]
+
+        #expect(state.topChapter?.chapter == genesis1)
+        #expect(state.topChapter?.count == 3)
+    }
+
+    @Test("동점인 권이 여러 개여도 Dictionary 삽입 순서와 무관하게 항상 같은 결과를 반환한다")
+    func topChapterIsDeterministicRegardlessOfInsertionOrder() {
+        let start = makeDate(year: 2026, month: 5, day: 18)
+        let tiedChapters: [BibleChapter] = [
+            BibleChapter(title: .john, chapter: 3),
+            BibleChapter(title: .psalms, chapter: 23),
+            BibleChapter(title: .genesis, chapter: 1),
+            BibleChapter(title: .revelation, chapter: 22),
+            BibleChapter(title: .exodus, chapter: 20)
+        ]
+
+        // 삽입 순서를 매번 섞어도(= Dictionary 순회 순서가 달라져도) 결과가 흔들리면 안 된다.
+        for _ in 0..<50 {
+            var counts: [BibleChapter: Int] = [:]
+            for chapter in tiedChapters.shuffled() {
+                counts[chapter] = 5
+            }
+
+            var state = DrawingWeeklySummaryFeature.State()
+            state.scrollPosition = start
+            state.chapterCountsByDay = [start: counts]
+
+            #expect(state.topChapter?.chapter == BibleChapter(title: .genesis, chapter: 1))
+            #expect(state.topChapter?.count == 5)
+        }
     }
 }
 
