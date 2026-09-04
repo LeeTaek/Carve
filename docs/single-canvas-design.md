@@ -1,7 +1,8 @@
 # CarveFeature 단일 Canvas 전환 설계
 
 > 상태: **설계안 (미구현)** · 대상: `Feature/CarveFeature`, `Domain`
-> rev.6 — Phase 0A-S0(기준선) 추가. 0A-S / 0B 착수 가능. PencilKit·SwiftData API는 iOS 26.2 SDK 헤더로 확인함.
+> rev.8 — **Phase 0A-S0 / S1 / S2 실행 완료.** 측정 결과는 §18.
+> S1에서 §7-4·§7-5의 전제가 뒤집혔고, S2에서 §9-3의 `textLineRanges`가 확정됐습니다. PencilKit·SwiftData API는 iOS 26.2 SDK 헤더로 확인함.
 > 코드 변경·빌드·테스트는 수행하지 않았습니다.
 > "검증 필요" 표시된 항목은 Phase 0A 실기기 확인 전까지 확정하지 않습니다.
 
@@ -275,7 +276,9 @@ struct VerseDrawingSnapshot: Equatable, Sendable {
 
 /// 획 ↔ 절 소유권 대응
 struct OwnershipSnapshot: Equatable, Sendable {
-    let map: [StrokeIdentityKey: Int]      // 획 → verse
+    /// **원본 획 → verse.** canvas stroke 엔트리와 1:1이 아니다 —
+    /// bitmap 지우개 조각들은 같은 IdentityKey 를 공유한다 (§7-2)
+    let map: [StrokeIdentityKey: Int]
     let layoutSignature: String            // 이 소유권이 성립한 레이아웃
 }
 
@@ -341,7 +344,12 @@ Verse 3 writingRect
 
 > **메모리는 측정 전까지 단정하지 않습니다.** Canvas 개수는 N → 1로 줄지만,
 > ① 176개 Row eager 생성 비용 ② 장 전체 높이 `PKCanvasView`의 tile/Metal 리소스가
-> 절약분보다 클 수 있습니다. **Phase 0A에서 실측합니다.**
+> 절약분보다 클 수 있습니다.
+>
+> **S0-4 실측(§18-3)으로 드러난 것:** 현재 구조의 비용은 **진입이 아니라 스크롤에 분산**되어 있습니다.
+> 시편 119편 진입은 +37.4MB / CPU 0.31s 로 창세기와 거의 같지만, 전체 스크롤은 +109MB / CPU 24.7s 입니다.
+> **VStack 전환은 이 스크롤 비용을 진입 시점으로 옮깁니다.**
+> 따라서 통과 기준은 (C)표가 아니라 **(B)표 기준으로 잡아야 합니다.**
 > 완화책 — `(chapter, sentenceSetting, writingWidth, isLeftHanded)` 키로 `ChapterLayout` 캐시.
 
 ### 6-2. 입력 게이트 (P4)
@@ -487,6 +495,21 @@ IdentityKey 동일        → 기존 owner 승계        (§7-3)
 ContentSignature 변경   → 해당 verse를 dirty 판정 (§8-2)
 ```
 
+> **⚠️ `StrokeIdentityKey` 는 canvas stroke 엔트리와 1:1이 아닙니다 (S1-2).**
+> bitmap 지우개가 만든 조각들은 **같은 IdentityKey 를 공유**합니다.
+> 정확히 말하면 이 키는 **"원본 획 → 절"** 의 매핑이지 "canvas 엔트리 → 절" 이 아닙니다.
+> 조각들의 owner 값은 서로 같으므로 `[StrokeIdentityKey: Int]` 자체는 안전하지만,
+> **다음은 금지합니다.**
+>
+> - `map.count` 를 stroke 개수로 쓰기
+> - map 을 순회해 stroke 를 열거하기
+>
+> stroke 열거는 **항상 `drawing.strokes` 배열을 순회하고 map 은 조회에만** 씁니다.
+
+> **⚠️ `maskedPathRanges.isEmpty` 로 "마스크 없음" 을 판정하지 마십시오 (S1-5).**
+> `mask == nil` 인 stroke 의 `maskedPathRanges` 는 빈 배열이 아니라 **path 전체 구간**(`[0.0...9.0]`)입니다.
+> 또한 `mask` 는 지워진 영역이 아니라 **남은(가시) 영역**을 나타내는 clip 입니다.
+
 > **이 분리가 없으면 D7이 재발합니다.**
 > mask를 제외한 키 하나로 dirty를 판정하면, bitmap 지우개는 identity를 바꾸지 않으므로
 > "owner 승계는 성공했지만 지우기가 저장되지 않는" 상태가 됩니다.
@@ -495,10 +518,13 @@ ContentSignature 변경   → 해당 verse를 dirty 판정 (§8-2)
 
 편집 때마다 전량 재판정하면 리플로우 후 소유권이 옆 절로 흘러갑니다. 기존 획은 소유권을 **승계**합니다.
 
-1. `StrokeIdentityKey` 완전 일치 → 기존 owner 승계
+1. `StrokeIdentityKey` 완전 일치 → 기존 owner 승계 ← **S1-2 결과, bitmap 지우개 경로는 여기서 전부 해결됨**
 2. `randomSeed` 또는 `creationTime` 일치 + bounds/path 유사도 높음 → 승계
-3. 지우개 분할 후보 → 기존 획과 **공간적으로 가장 많이 겹치는** owner 승계
+3. 공간적으로 가장 많이 겹치는 owner 승계 ← **fallback.** `.vector` 전환이나 예외 상황용
 4. 대응 없음 → 첫 control point의 captureRect로 신규 귀속
+
+> S1-4 실측: 지우개 후에도 `randomSeed` / `creationDate` / `path.count` 는 물론
+> **control point 10개의 값까지 전부 불변**이었습니다. 1번 규칙의 신뢰도가 높습니다.
 
 동일 후보가 복수일 때는 **결정적 순서**(verse 오름차순 → 겹침 면적 내림차순)로 선택합니다.
 
@@ -508,8 +534,19 @@ ContentSignature 변경   → 해당 verse를 dirty 판정 (§8-2)
 
 ### 7-4. 지우개 모드 — `.bitmap` 유지로 확정 (U3 해소)
 
-SDK 헤더로 확인된 것은 **API의 존재**이며, 다음 동작은 **구조상 예상되는 것**입니다.
-bitmap 지우개가 획을 자르지 않고 마스킹할 것으로 보입니다 — **Phase 0A-S1에서 확인합니다.**
+**S1-2 실측 결과: bitmap 지우개는 분할과 마스킹을 동시에 합니다.** 초안의 "자르지 않고 마스킹만" 은 절반만 맞았습니다.
+
+```
+BEFORE               strokes = 2
+AFTER (중간만 지움)   strokes = 3        ← 획 하나를 지웠는데 엔트리가 +1
+  [0] seed=956091164  cd=…7905478  pts=10  mask=(203,6,112,8)  ranges=[5.003…9.0]
+  [1] seed=956091164  cd=…7905478  pts=10  mask=( 51,5,112,8)  ranges=[0.0…3.663]
+  [2] seed=491497907  cd=…1357799  pts=10  mask=nil            ranges=[0.0…9.0]
+```
+
+두 조각은 `path` 의 **control point 10개 값까지 원본과 완전히 동일**합니다.
+path 를 잘라 나눠 갖는 것이 아니라, **같은 path 를 공유하는 엔트리가 복제되고
+`mask` / `maskedPathRanges` / `renderBounds` 만 달라집니다.** `drawing.bounds` 도 변하지 않습니다.
 
 ```
 PKStroke.mask              "The mask pre-transform that is used to clip the rendering of the stroke."
@@ -517,30 +554,58 @@ PKStroke.maskedPathRanges  "parametric parameter ranges of points in strokePath
                             that intersect the stroke's mask."
 ```
 
-즉 지운 뒤에도 `path` / `creationDate` / `randomSeed`가 보존될 **가능성이 높으며**,
-그렇다면 `.bitmap`이 whole-stroke ownership과 충돌하지 않습니다.
-분할이 실제로 일어난다면 §7-3의 3번 규칙(공간 겹침)이 주 경로가 됩니다.
+**결론은 오히려 강화됩니다.** 조각 전부가 원본과 **같은 `StrokeIdentityKey`** 를 가지므로
+§7-3 **1번 규칙(IdentityKey 완전 일치)만으로 모든 조각이 원본 owner 를 승계**합니다.
+공간 겹침 매칭(3번 규칙)은 bitmap 경로에서 **필요하지 않습니다.**
+
+`.bitmap` 유지 확정.
 
 `.vector` 전환은 "부분 지우기" UX를 바꾸며, **단일 Canvas 전환과 함께 바꾸면 회귀 원인 분리가 어려워집니다.**
 따라서 초기 구현은 `.bitmap`을 유지하고, Phase 0A의 reconciliation spike에서
 승계가 실제로 불가능한 것으로 판명될 때만 별도 제품 변경으로 검토합니다.
 
-### 7-5. "빈 절" 판정 — `strokes.isEmpty`를 쓰면 안 됨 ★
+### 7-5. "빈 절" 판정과 저장 가드 — S1-3에서 전제가 뒤집힘 ★
 
-완전히 마스킹된 획도 `drawing.strokes`에는 **남아 있습니다.**
-따라서 `.clear` 판정을 `strokes.isEmpty`로 하면 "다 지웠는데 clear가 안 나가는" 문제가 생깁니다.
+**초안의 전제는 틀렸습니다.**
 
-```swift
-// ❌ 마스킹된 획이 남아 항상 false
-strokes.isEmpty
+> ❌ (초안) "완전히 마스킹된 획도 `drawing.strokes` 에는 남아 있습니다"
 
-// ✅ 가시 획 존재 여부
-strokes.contains { !$0.renderBounds.isEmpty && !isFullyMasked($0) }
+S1-3 실측 결과, `PKEraserTool(.bitmap)` 로 획을 **완전히** 지우면 그 stroke 는
+`drawing.strokes` 에서 **제거됩니다.**
+
+```
+AFTER_FULL   strokes = 2      ← seed=491497907 (획 B) 가 통째로 사라짐
+             남은 stroke 중 renderBounds 가 빈 것은 하나도 없음
 ```
 
-> 현재 `containsPKStroke`도 `!drawing.strokes.isEmpty`를 사용합니다
-> ([Data+Extension.swift:18](../Supports/CarveToolkit/Sources/Extension/Data+Extension.swift)).
-> **기존 코드의 잠재 버그이며, 새 설계에서 함께 고쳐야 합니다.**
+따라서 `strokes.isEmpty` 는 **정상 동작하며**, 초안이 제안한 `isFullyMasked` 헬퍼는
+bitmap 경로에서 **필요 없습니다.**
+
+#### 그러나 초안이 지목한 증상은 실재합니다 — 원인이 정반대입니다
+
+재현: 마지막 획을 지우고 앱을 재기동하면 **지운 획이 되살아납니다.**
+(DB `length(ZLINEDATA)` 가 그대로 유지됨을 sqlite 로 확인)
+
+| # | 위치 | 문제 |
+|---|---|---|
+| 1 | [CarveDetailFeature.swift:206](../Feature/CarveFeature/Sources/Presentation/Carve/CarveDetail/CarveDetailFeature.swift) | `guard ... containsPKStroke == true else { return }` — 마지막 획을 지워 `strokes` 가 비면 **저장 자체를 건너뜀** |
+| 2 | [CanvasView.swift:66-72](../Feature/CarveFeature/Sources/Presentation/Drawing/Canvas/CanvasView.swift) | `guard now.timeIntervalSince(lastUpdate) > 0.3 else { return }` 는 **leading-edge throttle** — 제스처의 마지막 변경이 유실됨 (debounce 가 아님) |
+
+#### 새 설계에서는 두 원인이 구조적으로 제거됩니다
+
+- **§8-1** 편집 종료 시점(pencil-up) 저장이 throttle 을 대체
+- **§8-2** dirty 집합 → `.clear` mutation 이 저장 가드를 대체 (P7)
+
+즉 P7("빈 결과도 mutation이다")은 **판정식 문제가 아니라 저장 가드 문제**를 푸는 원칙입니다.
+
+#### 그래도 방어적으로 유지할 것
+
+- **`renderBounds` 기반 가시성 검사** — `.vector` 지우개나 향후 OS 버전에서 동작이 달라질 수 있습니다.
+  실측에서 `renderBounds` 가 가시 영역만 반영함이 확인됐습니다(264pt → 112pt).
+- **`maskedPathRanges.isEmpty` 로 마스크 유무를 판정하지 말 것** (§7-2 주의 참조)
+
+> ⚠️ **이 버그는 현재 프로덕션에 존재하며, 단일 Canvas 전환(Phase 3)을 기다릴 필요가 없습니다.**
+> 별도 수정 대상으로 분리합니다.
 
 ---
 
@@ -588,7 +653,8 @@ let mutations: [VerseDrawingMutation] = dirty.map { verse in
         state.activeRowIDs[verse] = newID          // 즉시 예약 — 다음 편집은 같은 행으로
         return .create(verse: verse, rowID: newID, data: data, metadata: meta)
     }
-    // §7-5: strokes.isEmpty 가 아니라 "가시 획 없음"
+    // S1-3: 완전히 지운 stroke 는 실제로 제거되므로 strokes.isEmpty 로 충분하지만,
+    // .vector 지우개/OS 변경 대비로 renderBounds 가시성까지 확인한다 (§7-5)
     guard hasVisibleStroke(strokes) else { return .clear(verse: verse, rowID: rowID) }
     return .replace(verse: verse, rowID: rowID, data: data, metadata: meta)
 }
@@ -788,12 +854,29 @@ CloudKit 충돌로 `isPresent == true` 행이 복수 존재할 수 있으므로 
 
 즉 `rowUUID`는 신규 데이터부터 확실히 적용하고, legacy는 건드리지 않습니다.
 
-> **정리 대상:** `DrawingDatabase.updateDrawing`은 `actor.update(drawing.id)`를 사용하는데
-> 같은 함수 안에서 `drawing.id ?? ""` 로도 씁니다
-> ([DrawingDatabase.swift:227,234](../Domain/Domain/Sources/SwiftData/DrawingDatabase.swift)).
-> `BibleDrawing`이 `var id: String!` 을 선언해 `PersistentModel`의 `id: PersistentIdentifier`
-> (`SwiftData.swiftinterface:555`)와 이름이 겹치면서, 같은 표현이 문맥에 따라 다르게 해석되는 상태로 보입니다.
-> 다른 호출부는 모두 `persistentModelID`를 씁니다. **확인 필요이며 Repository 전환 시 정리합니다.**
+#### `drawing.id` 표현 금지 — S0-3에서 확정 ★
+
+**S0-3 probe로 확정된 사실:**
+
+> `drawing.id` 는 **문맥 의존 오버로드**다.
+> 기대 타입이 없으면 `BibleDrawing` 자신의 저장 프로퍼티 `String!` 로,
+> 기대 타입이 `PersistentIdentifier` 이면 `PersistentModel` extension 의 `id`(= `persistentModelID`)로 해석된다.
+> 즉 [DrawingDatabase.swift:227](../Domain/Domain/Sources/SwiftData/DrawingDatabase.swift)의
+> `actor.update(drawing.id)` 와 234행의 `drawing.id ?? ""` 는 **서로 다른 값을 가리킨다.**
+
+검증: `let probeA: PersistentIdentifier = drawing.id` 와 `let probeB: String? = drawing.id` 가
+**둘 다 컴파일**되고, `let probeC = drawing.id; let probeE: PersistentIdentifier = probeC` 는
+`cannot convert value of type 'String?'` 로 실패했습니다.
+
+**따라서 새 설계에서는 `drawing.id` 표현을 쓰지 않습니다.**
+
+| 의도 | 사용할 표현 |
+|---|---|
+| SwiftData 행 참조 | `drawing.persistentModelID` (명시) |
+| 도메인 문자열 키 | 별도 이름 (예: `drawing.rowKey`) |
+
+> 지금은 리팩터링 중 한쪽 의미가 다른 쪽으로 미끄러져도 **컴파일러가 잡아주지 않습니다.**
+> 과거 두 번의 롤백을 만든 유형의 함정이므로 Phase 3 Repository 전환에서 이름을 분리합니다.
 
 ---
 
@@ -863,14 +946,27 @@ verse + underline index + 해당 underline으로부터의 상대 offset
 | 매핑할 줄 없음 | — | **첫 밑줄 기준으로 보존** + `layoutMismatch` 기록. 임의로 다른 줄에 합치지 않음 (§9-3-1) |
 | metadata 없음 (legacy) | — | 무변환 (§10-2) |
 
-> **검증 필요 (Phase 0A-S2):** SwiftUI `Text.LayoutKey.Value`의 line 원소가 줄별 **문자 범위**를 노출하는지.
-> 현재 코드는 `$0.origin.y`만 사용합니다([VerseTextFeature.swift:83](../Feature/CarveFeature/Sources/Presentation/Carve/Verse/VerseTextFeature.swift)).
+> **✅ S2 확정: `textLineRanges` 는 실현 가능합니다. fallback 불필요.**
 >
-> **SDK 헤더로는 판정할 수 없습니다.** SwiftUI의 textual `.swiftinterface`는 부분적이며
-> (`onPreferenceChange`, `padding`조차 포함되지 않음) `LayoutKey`도 나타나지 않습니다.
-> "없다"의 근거가 되지 못하므로 시뮬레이터 probe로 확인합니다.
+> `Text.Layout.Line` 자체에는 문자 범위가 없지만, `Line` 은 `Run` 의 Collection 이고
+> **`Text.Layout.Run.characterIndices: [Text.Layout.CharacterIndex]`** (iOS 17.0+) 가 줄별 문자 인덱스를 노출합니다.
+> `CharacterIndex` 는 `Strideable(Stride == Int)` 이므로 `distance(to:)` 로 **정수 offset 범위**를 만들어 영속화할 수 있습니다.
 >
-> 노출하지 않으면 `textLineRanges`는 `nil`로 두고 **index 기반 매칭**으로 fallback합니다.
+> ```
+> Text.LayoutKey.Value = [Text.LayoutKey.AnchoredLayout]
+>   AnchoredLayout { origin: Anchor<CGPoint>, layout: Text.Layout }
+>     Text.Layout : Collection of Line
+>       Line { origin, typographicBounds } : Collection of Run
+>         Run  { characterIndices, typographicBounds, layoutDirection }
+> ```
+>
+> 런타임 확인(창세기 1:2, 46자, 폭 180pt): 4줄 → `[0...12, 13...25, 26...39, 40...45]`
+> — 빈틈·겹침 없이 전체를 분할.
+> **배포 타깃 iOS 17.0 에서 그대로 사용 가능하며 `@available` 분기가 필요 없습니다.**
+>
+> ⚠️ 미확정: `CharacterIndex` 의 단위가 Character 기반인지 UTF-16 기반인지.
+> 검증에 쓴 한글 46자는 `String.count == utf16.count` 라 구분되지 않았습니다.
+> 성경 본문에 이모지·결합 문자가 없어 실사용 리스크는 낮으나, 구현 시 한 번 확인하십시오.
 
 ### 9-3-1. `layoutMismatch` — 매핑 실패 시의 확정 동작
 
@@ -894,6 +990,19 @@ verse + underline index + 해당 underline으로부터의 상대 offset
 - 그 절에 첫 편집이 발생하면 새 레이아웃 기준으로 저장되며 mismatch가 해소됨
 
 > 원본을 건드리지 않으므로, 설정을 되돌리면 원래 배치로 복귀합니다.
+
+---
+
+### 9-3-2. 부수 이득 — 밑줄 offset 정밀화
+
+`Text.Layout.Line.typographicBounds` 가 `ascent` / `descent` / `leading` / `rect` 를 직접 제공합니다(S2 확인).
+
+현재 `VerseTextFeature.makeUnderlineOffsets` 는 `UIFont.descender` 로 **근사**하고 있습니다
+([VerseTextFeature.swift:83-89](../Feature/CarveFeature/Sources/Presentation/Carve/Verse/VerseTextFeature.swift)).
+이를 레이아웃 **실측값**으로 대체할 수 있습니다.
+
+> 밑줄 위치는 `baseUnderlineAnchors` 로 영속화되어 reflow 의 기준이 되므로(§10-1),
+> 근사 오차가 저장 데이터에 그대로 굳습니다. **Phase 2에서 함께 교체하는 것을 권합니다.**
 
 ---
 
@@ -1113,8 +1222,8 @@ A도 offset drift 재현                     → 저장·Feature 구현으로 �
 
 | 단계 | 착수 가능 시점 |
 |---|---|
-| **Phase 0A-S0** | **지금** — 나머지 전부의 선행 조건 |
-| **Phase 0A-S, Phase 0B** | S0 완료 후 (0B는 S0-1만 있으면 병행 가능) |
+| **Phase 0A-S0** | ✅ **완료** (§18) |
+| **Phase 0A-S, Phase 0B** | **지금** |
 | Phase 1 · 2 | 시뮬레이터 검증(0A-S)과 migration 테스트 통과 후 |
 | Phase 3 | feature flag 뒤 **구현**까지는 가능. **기본 활성화·배포 판단은 Phase 0A-D 이후** |
 | Phase 4 (구 구조 삭제) | 실기기 검증 및 안정화 후 |
@@ -1122,6 +1231,8 @@ A도 offset drift 재현                     → 저장·Feature 구현으로 �
 ---
 
 ### Phase 0A-S0 — 기준선 확보 (모든 spike의 선행 조건)
+
+**✅ 실행 완료 — 결과는 [§18 부록 B](#18-부록-b--phase-0a-s0-실측-결과-실행-완료).**
 
 **S1~S5보다 먼저 수행합니다.** 비교 대상이 없으면 이후 측정이 무의미해집니다.
 
@@ -1176,6 +1287,8 @@ S0 완료 후 수행합니다.
 | **D4** | Apple Pencil 더블탭(지우개 전환), 두 손가락 더블탭(undo) |
 | **D5** | 시편 119편 layout 시간·peak memory 실측, 스크롤 프레임 드랍 |
 | **D6** | Stage Manager / 외부 디스플레이 (Air M2) |
+| **D7** | **Phase 1 V4 스키마의 CloudKit 제약 검증** — 시뮬레이터는 entitlement가 제거되어 미러링이 전혀 동작하지 않음 (§18-5) |
+| **D8** | 진짜 legacy `lineData` 1회 추출 (S5 fixture 확보, §18-4) |
 
 **보유 기기의 사각지대 — 리스크로 관리:**
 
@@ -1328,16 +1441,24 @@ S0 완료 후 수행합니다.
 | bitmap 지우개의 분할 여부 | 런타임 동작 → **S1-2** |
 | 완전히 지운 stroke의 잔존 여부 | 런타임 동작 → **S1-3** |
 
-### 시뮬레이터에서 확인 (Phase 0A-S)
+### ✅ 시뮬레이터에서 확인 완료 (Phase 0A-S0 / S1 / S2 — 결과 상세는 §18)
 
-1. S1 — PencilKit 데이터 모델 5항목 (§7-2 / §7-4 / §7-5 확정)
-2. S2 — `Text.LayoutKey` probe (§9-3)
-3. S3 — 176절 `ChapterLayout` 정확성 및 게이트 (§6)
-4. S4 — 스크롤 A/B 통과 기준 1~6 (§11)
-5. `DrawingDatabase.updateDrawing`의 `actor.update(drawing.id)`가 어떤 타입으로 해석되는지 (§8-7)
-   — `BibleDrawing.id: String!` 와 `PersistentModel.id: PersistentIdentifier` 이름 충돌 → **S0-3**
-6. 기존 N-Canvas 경로의 시편 119편 baseline (진입 시간·메모리) → **S0-4**
-   — 단일 Canvas 전환 후에는 측정 불가하므로 **지금 확보해야 함**
+| ID | 결과 |
+|---|---|
+| S0-3 | `drawing.id` 는 **문맥 의존 오버로드** — 표현 금지 확정 (§8-7) |
+| S0-4 | N-Canvas baseline 확보 (§18-3) |
+| S0-5 | 현행 스키마 데이터는 시뮬레이터로 생성 가능. **진짜 legacy 는 실기기 필요** (§18-4) |
+| S1-1 | `randomSeed` 라운드트립 **보존** |
+| S1-2 | bitmap 지우개는 **분할 + 마스킹 동시**. 조각들이 IdentityKey 공유 (§7-4) |
+| S1-3 | 완전히 지운 stroke 는 **제거됨** — §7-5 전제 반전 |
+| S1-4 | 지우개 후 IdentityKey 구성요소 **전부 불변** (control point 값까지) |
+| S1-5 | `mask` / `maskedPathRanges` **보존**. 단 `mask == nil` 이면 ranges 는 전체 구간 |
+| S2 | **`textLineRanges` 실현 가능** — `Run.characterIndices` (iOS 17.0+) |
+
+### 남은 시뮬레이터 항목
+
+- **S3** — 176절 `ChapterLayout` 정확성 및 게이트 (§6)
+- **S4** — 스크롤 A/B 통과 기준 1~6 (§11)
 
 ### 실기기에서만 확인 (Phase 0A-D)
 
@@ -1396,3 +1517,212 @@ S0 완료 후 수행합니다.
 | `DrawingDatabase.updateDrawing(drawing:)` | 행 주소지정 정리 후 Repository로 흡수 (§8-7) | 3 |
 | `BibleDrawing.mainDrawing()` | 결정적 선택 규칙으로 수정 (§8-7) | 3 |
 | `VerseDrawingHistoryFeature` | **유지** — 단일 Canvas 복원 경로로 재배선 (§8-7) | 3 |
+
+---
+
+## 18. 부록 B — Phase 0A-S0 실측 결과 (실행 완료)
+
+> 실행 환경: Xcode 26.3 / Swift 6.2.4 / **tuist 4.39.0** / iPad mini (A17 Pro) 시뮬레이터 iOS 26.2
+> 저장소 변경 없음, 커밋 없음.
+
+### 18-1. 재현 조건 — 주의사항
+
+| 항목 | 값 |
+|---|---|
+| tuist | `PATH` 기본값은 **4.44.3**, 프로젝트 고정값은 **4.39.0** (`.mise.toml`) |
+| **재현 시 반드시** | `mise x -- tuist ...` 로 실행. 아니면 다른 버전이 쓰임 |
+| iPad 시뮬레이터 런타임 | **iOS 26.2 하나뿐** (iPad Pro 11" M5, iPad mini A17 Pro). iOS 17/18 iPad 런타임 없음 |
+
+### 18-2. S0-2 — 테스트 기준선 (회귀 판정 기준)
+
+`xcodebuild test -scheme Carve-Workspace`, iPad destination → **57/57 통과, 실패 0**
+
+| 번들 | 개수 |
+|---|---|
+| DomainTest | 31 |
+| CarveFeatureTest | 8 |
+| CarveToolkitTest | 6 |
+| ChartFeatureTest | 6 |
+| SettingsFeatureTest | 3 |
+| UIComponentsTest | 3 |
+
+> **이후 어느 단계에서든 57 미만 통과 또는 실패 1건 이상이면 회귀입니다.**
+
+> ⚠️ **단, 이 기준선은 항상 재현되지 않습니다.**
+> `ChartFeatureTest / DrawingWeeklySummaryStateTesting` 의
+> `"현재 주의 일별 권별 횟수를 합산해 가장 많이 필사한 권을 반환한다"` 가 **flaky** 입니다 (S1에서 발견, 5회 중 1회 실패).
+> 원인: [DrawingWeeklySummaryFeature.swift:71](../Feature/ChartFeature/Sources/Chart/DrawingWeeklySummaryFeature.swift) 의
+> `merged.max(by: { $0.value < $1.value })` 가 **동점 시** Dictionary 순회 순서에 의존하고,
+> Swift 해시 시드는 프로세스마다 달라 비결정적입니다.
+> **회귀 판정 시 이 1건은 별도로 취급하고, 결정적 tie-break 를 넣어 먼저 해소하는 것을 권합니다.**
+
+### 18-3. S0-4 — N-Canvas 경로 baseline ★
+
+**측정 방법 (재측정 시 그대로 반복)**
+
+```
+메모리  vmmap --summary <pid> | grep "Physical footprint"
+        ※ ps RSS는 시뮬레이터 공유 페이지 때문에 320~480MB로 요동 → 비교 지표로 부적합
+CPU     ps -o time= 누적 CPU time 델타, 0.25s 간격 샘플링
+장 지정  UserDefaults "title" 키에 BibleChapter JSON을 -data 로 시드 후 재기동
+스크롤  동일 flick 11회, (372,900) → (372,200), 0.2s  (iPad mini 744×1133pt)
+기준점  cold launch 후 8초 settle
+```
+
+**(A) Cold launch (스크롤 없음)**
+
+| 장 | 절 수 | Physical footprint | peak |
+|---|---:|---:|---:|
+| 창세기 1장 | 31 | **78.2 MB** | 84.6 MB |
+| 시편 119편 | 176 | **86.2 MB** | 87.8 MB |
+
+**(B) 앱 내 장 전환 진입**
+
+| 전환 | 절 수 | footprint 전 → 후 | 증분 | CPU time |
+|---|---:|---|---:|---:|
+| 창세기 1장 → 2장 | 25 | 80.2 → **105.8 MB** | +25.6 MB | 0.25 s |
+| 시편 118편 → 119편 | 176 | 80.9 → **118.3 MB** | +37.4 MB | 0.31 s |
+
+**(C) 장 전체 스크롤 (flick 11회, 끝까지 도달 확인)**
+
+| 장 | 절 수 | footprint 전 → 후 | 증분 | peak | CPU time | CPU>50% 샘플 |
+|---|---:|---|---:|---:|---:|---|
+| 창세기 1장 | 31 | 78.2 → **128.1 MB** | +49.9 MB | 130.8 MB | **9.99 s** | 49 / 348 |
+| 시편 119편 | 176 | 86.2 → **195.2 MB** | +109.0 MB | 197.2 MB | **24.70 s** | 105 / 348 |
+
+선형 근사: **증분 ≈ 37 + 0.41·N (MB)** — 절당 약 0.41 MB, 고정비 약 37 MB
+
+**(D) 메모리 회수 — 되지 않음**
+
+| 시점 | footprint |
+|---|---:|
+| 시편 119편 스크롤 완료 | 195.2 MB |
+| 시편 120편(7절) 진입 6초 후 | **209.3 MB** |
+| 추가 25초 대기 | **209.5 MB** |
+
+작은 장으로 옮겨도 회수되지 않고 오히려 증가합니다.
+**이는 단일 Canvas 전환 이전부터 존재하는 현상이므로, Phase 3 이후 메모리가 안 줄어든다고 해서 새 설계 탓으로 귀결시키면 안 됩니다.**
+
+**체감**
+
+- 진입은 절 수에 **거의 무관** (LazyVStack이 보이는 절만 생성). 시편 119편도 즉시 뜸
+- 비용은 **진입이 아니라 스크롤에 분산**되어 있음. flick 중 한 코어 95~100% 점유 구간 반복
+
+**측정 못 한 것 (코드 변경 필요 → Phase 2 이월)**
+
+- 정밀 레이아웃 소요 시간 (`os_signpost` 필요)
+- 프레임 드랍 / hitch time ratio (`CADisplayLink` 또는 Instruments 필요)
+- PencilKit 캔버스 1개당 실제 점유 메모리
+
+### 18-4. S0-5 — legacy fixture 확보 경로
+
+| 대상 | 시뮬레이터 가능? |
+|---|---|
+| **현행 V3 스키마의 새 필사 데이터** | ✅ 가능. `allowFingerDrawing=true` → 마우스 필기 → `Carve.dev.sqlite`에 `BibleDrawing` 행 생성 확인 (재기동 후 영속성도 확인) |
+| **§10-2가 말하는 진짜 legacy `lineData`** (V1 `DrawingVO` / 구 PencilKit 인코딩) | ❌ 불가. 지금 그리면 현재 스키마·현재 PencilKit으로 저장될 뿐 |
+
+**진짜 legacy 확보 경로 두 가지**
+
+```
+(a) 실기기에서 dev CloudKit 컨테이너로 내려받기   ← 시뮬레이터는 entitlement가 제거되어 불가
+(b) 실기기/실사용자의 Carve.sqlite 를 시뮬레이터 컨테이너에 파일 복사 후 마이그레이션 태우기
+```
+
+> **S5는 "실데이터 1회 추출"만 실기기 의존이고, 파일만 확보되면 이후 반복·자동화는 시뮬레이터에서 가능합니다.**
+
+저장소 위치: `<data container>/Library/Application Support/Carve.dev.sqlite`
+(Debug는 `CLOUDKIT_CONTAINER_ID`에 `dev`가 있어 `Carve.dev.sqlite`로 분기 — [SwiftDataContextProvider.swift:26](../Domain/Domain/Sources/SwiftData/SwiftDataContextProvider.swift))
+
+### 18-5. S0에서 나온 후속 영향
+
+| # | 발견 | 영향 |
+|---|---|---|
+| 1 | **시뮬레이터는 CloudKit 미러링이 전혀 동작하지 않음** — 빌드 entitlement가 비어 있고(`codesign -d --entitlements` → `<dict></dict>`) `CKAccountStatusNoAccount` | **Phase 1 V4 스키마의 CloudKit 제약(전 속성 optional 등)은 시뮬레이터로 검증 불가.** → **Phase 0A-D로 이월** |
+| 2 | Phase 2의 `LazyVStack → VStack`은 비용을 **스크롤에서 진입으로 이동**시킴 | S3/S4 통과 기준을 (C)표가 아니라 **(B)표 기준으로 엄격히** 잡아야 함. 진입 시 +37MB / 0.31s 가 현재 값 |
+| 3 | 장 전환 시 메모리 미회수는 **기존부터 존재** | 새 설계 평가 시 이 baseline을 빼고 판단할 것 |
+| 4 | iPad 시뮬레이터 런타임이 iOS 26.2뿐 | "저사양 iOS 17 iPad" 리스크는 **시뮬레이터로도 보완 불가**. 필요 시 해당 런타임에 iPad 디바이스를 별도 생성해야 함 |
+| 5 | `undoManager is deprecated` 경고 3건 잔존, `CombinedCanvasView`는 주석 처리 상태 | 과거 롤백의 잔해. Phase 3 착수 전 정리 판단 필요 |
+| 6 | tuist PATH 버전(4.44.3) ≠ 프로젝트 고정(4.39.0) | CI/재현 환경에서 어느 쪽이 쓰이는지 확인 필요 |
+
+### 18-6. 시뮬레이터에 남은 상태
+
+S0-5 검증으로 만든 `BibleDrawing` 행 1개(창세기 1:1, lineData 388B)가
+시뮬레이터 `Carve.dev.sqlite`에 남아 있습니다. 제거하려면:
+
+```bash
+xcrun simctl uninstall <UDID> kr.co.carve.leetaek
+```
+
+---
+
+## 19. 부록 C — Phase 0A-S1 / S2 실측 결과
+
+> 환경: Xcode 26.3 / tuist 4.39.0 / iPad mini (A17 Pro) 시뮬레이터 iOS 26.2
+> 앱 코드 변경 없음, 커밋 없음. 신규 테스트 2파일 추가(미커밋).
+
+### 19-1. 결과 요약
+
+| ID | 결과 | 설계 영향 |
+|---|---|---|
+| S1-1 | ✅ `randomSeed` 라운드트립 보존 | `StrokeIdentityKey` 성립 |
+| S1-2 | ⚠️ **분할 + 마스킹 동시** | §7-4 전제 절반 반전. 단 결론은 강화 |
+| S1-3 | ⚠️ 완전히 지운 stroke는 **제거됨** | §7-5 전제 반전 → 저장 가드 문제로 재정의 |
+| S1-4 | ✅ IdentityKey 구성요소 전부 불변 | §7-3 1번 규칙 신뢰도 상승 |
+| S1-5 | ✅ `mask` / `maskedPathRanges` 보존 | `ContentSignature` 성립 |
+| S2 | ✅ **`textLineRanges` 실현 가능** | §9-3 fallback 불필요 |
+
+### 19-2. S1-4 — 지우개 전후 비교 (실측)
+
+| 항목 | 지우기 전 | 지우기 후 (두 조각 모두) |
+|---|---|---|
+| `randomSeed` | 956091164 | 956091164 (동일) |
+| `path.creationDate` | 1788508117.7905478 | 동일 |
+| `path.count` | 10 | 10 |
+| control points | — | **10개 전부 값까지 동일** |
+| `transform` | identity | identity |
+| `renderBounds.width` | 264 pt | 112 / 112 pt (**축소**) |
+| `mask` | nil | 각각 다른 clip 영역 |
+
+### 19-3. S2 — `Text.LayoutKey` 타입 구조
+
+바이너리 swiftmodule 에서 symbol graph 추출로 확정
+(`xcrun swift-symbolgraph-extract -module-name SwiftUICore`).
+**textual `.swiftinterface` 로는 판정 불가**했습니다.
+
+| 타입 | 노출 멤버 | availability |
+|---|---|---|
+| `Text.LayoutKey.Value` | `= [Text.LayoutKey.AnchoredLayout]` | iOS 17.0 |
+| `AnchoredLayout` | `origin: Anchor<CGPoint>`, `layout: Text.Layout` | iOS 17.0 |
+| `Text.Layout` | Collection of `Line`, `count`, `isTruncated`(iOS 18) | iOS 17.0 |
+| `Text.Layout.Line` | `origin`, `typographicBounds`, Collection of `Run` — **문자 범위 없음** | iOS 17.0 |
+| **`Text.Layout.Run`** | **`characterIndices`**, `typographicBounds`, `layoutDirection` | **iOS 17.0** |
+| `Text.Layout.RunSlice` | `characterIndices`, `run`, `indices: Range<Int>` | iOS 17.0 |
+| `Text.Layout.CharacterIndex` | `Strideable`(Stride = Int) · `Comparable` · `Hashable` · `Sendable` | iOS 17.0 |
+| `Text.Layout.TypographicBounds` | `origin`, `width`, `ascent`, `descent`, `leading`, `rect` | iOS 17.0 |
+
+런타임 검증 (창세기 1:2, 46자, 폭 180pt, system 17pt):
+
+```
+lines = 4
+ranges = [0...12, 13...25, 26...39, 40...45]     ← 빈틈·겹침 없이 0..45 전체 분할
+lineOrigins = [(0,16.0), (0,36.287), (0,56.574), (0,76.861)]
+```
+
+### 19-4. 추가된 테스트
+
+| 파일 | 테스트 수 | 내용 |
+|---|---|---|
+| `Feature/CarveFeature/Tests/PencilKitDataModelTesting.swift` | 7 | S1-1 ~ S1-5. 실측 블롭 3개(690B/1266B/1083B)를 base64 상수로 내장 |
+| `Feature/CarveFeature/Tests/TextLayoutKeyProbeTesting.swift` | 3 | S2. `lineCharacterRanges(from:)` 는 §9-3 구현에 그대로 재사용 가능 |
+
+전체 테스트: **67/67 통과** (기준선 57 + 신규 10). SwiftLint 위반 0.
+
+> 블롭을 base64 상수로 내장한 이유: 테스트 타깃에 resource 설정이 없어
+> **프로젝트 설정 변경을 피하기 위함**입니다 (AGENTS.md: 빌드 설정 변경 금지).
+
+### 19-5. S1에서 확인하지 못한 것
+
+- **실제 Apple Pencil 지우개** — 시뮬레이터 마우스(`.anyInput`) 입력으로만 확인 → **D3에서 재확인**
+- **`PKEraserTool(.vector)` 동작** — 이번 범위 밖. 위 결론은 `.bitmap` 한정
+- **`CharacterIndex` 의 단위** (Character vs UTF-16) — 한글 46자에서 `String.count == utf16.count` 라 구분 불가
+- **빈 `PKDrawing` fixture** — §7-5의 저장 가드 때문에 DB에 도달하지 않아 확보 실패
