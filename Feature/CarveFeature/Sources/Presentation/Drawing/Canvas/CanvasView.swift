@@ -56,22 +56,54 @@ public struct CanvasView: UIViewRepresentable {
     
     final public class Coordinator: NSObject, PKCanvasViewDelegate {
         private var store: StoreOf<CanvasFeature>
+        /// 마지막으로 저장한 시각.
         private var lastUpdate = Date()
-        private let debounceInterval: TimeInterval = 0.3
+        /// leading-edge throttle 간격. 필기 중 과도한 저장을 막는 용도다.
+        /// (이전 이름은 `debounceInterval`이었지만 동작은 debounce가 아니라 throttle이다.)
+        private let throttleInterval: TimeInterval = 0.3
+        /// 마지막 변경을 반드시 저장하기 위한 trailing-edge debounce 작업.
+        private var trailingSaveTask: Task<Void, Never>?
         private var cancaellable = Set<AnyCancellable>()
 
         init(store: StoreOf<CanvasFeature>) {
             self.store = store
         }
-        
+
+        deinit {
+            trailingSaveTask?.cancel()
+        }
+
         public func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
             let now = Date()
-            guard now.timeIntervalSince(lastUpdate) > debounceInterval else { return }
-            lastUpdate = now
-            self.store.send(.saveDrawing(canvasView.drawing))
-            self.store.send(.registUndoCanvas(canvasView))
+            if now.timeIntervalSince(lastUpdate) > throttleInterval {
+                lastUpdate = now
+                self.store.send(.saveDrawing(canvasView.drawing))
+                self.store.send(.registUndoCanvas(canvasView))
+            }
+            scheduleTrailingSave(for: canvasView)
         }
-        
+
+        /// 마지막 변경 이후 `throttleInterval` 이 지나면 최종 상태를 한 번 더 저장한다.
+        ///
+        /// 위의 leading-edge throttle 만으로는 제스처의 **마지막** 변경이 버려진다.
+        /// 특히 지우개로 마지막 획까지 지운 결과가 저장되지 않아, 앱을 재기동하면 지웠던 획이 되살아났다.
+        /// (`canvasViewDidEndUsingTool` 은 PencilKit 이 획을 `drawing` 에 반영하기 **전에** 호출되므로
+        ///  최종 상태 저장 지점으로 쓸 수 없다.)
+        /// undo 스택은 기존 동작을 유지하기 위해 여기서 추가로 등록하지 않는다.
+        private func scheduleTrailingSave(for canvasView: PKCanvasView) {
+            trailingSaveTask?.cancel()
+            let delay = throttleInterval
+            trailingSaveTask = Task { @MainActor [weak self, weak canvasView] in
+                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                guard !Task.isCancelled,
+                      let self,
+                      let canvasView
+                else { return }
+                self.lastUpdate = Date()
+                self.store.send(.saveDrawing(canvasView.drawing))
+            }
+        }
+
         public func bind(to canvas: PKCanvasView) {
             store.$pencilConfig.publisher
                 .sink { pencil in

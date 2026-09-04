@@ -50,9 +50,14 @@ public struct CanvasFeature {
             switch action {
             case .saveDrawing(let newDrawing):
                 if let drawing = state.drawing {
+                    // 기존 기록은 획이 0개여도 그대로 반영한다.
+                    // (지우개로 전부 지운 결과가 저장되지 않으면 재기동 시 획이 되살아난다.)
                     drawing.lineData = newDrawing.dataRepresentation()
                     drawing.updateDate = Date.now
                 } else {
+                    // 아직 기록이 없는 절인데 빈 canvas 변경이 올라온 경우(초기 렌더링 등)에는
+                    // 새 기록을 만들지 않는다. 실제로 획이 그려진 뒤에만 생성한다.
+                    guard !newDrawing.strokes.isEmpty else { return .none }
                     state.drawing = BibleDrawing(bibleTitle: state.title,
                                                  verse: state.verse,
                                                  lineData: newDrawing.dataRepresentation())

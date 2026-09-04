@@ -108,7 +108,12 @@ public struct CarveDetailFeature {
             case .setSentence(let sentences, let drawings):
                 var sentenceState: IdentifiedArrayOf<SentencesWithDrawingFeature.State> = []
                 for sentence in sentences {
-                    let candidates = drawings.filter { $0.verse == sentence.verse && $0.lineData?.containsPKStroke == true }
+                    // 획 유무로 후보를 거르지 않는다.
+                    // 지우개로 전부 지운 절은 "stroke 0개인 유효한 drawing"으로 저장되는데,
+                    // 여기서 걸러버리면 더 오래된(획이 남아 있는) 기록이 대표로 선택되어
+                    // 지운 결과가 다시 살아난 것처럼 보인다.
+                    // 대표 선택 규칙은 도메인의 `mainDrawing()`(isPresent 우선 → updateDate 최신)과 동일하게 맞춘다.
+                    let candidates = drawings.filter { $0.verse == sentence.verse }
                     let drawing = candidates.first(where: { $0.isPresent == true })
                     ?? candidates.sorted(by: { ($0.updateDate ?? Date.distantPast) > ($1.updateDate ?? Date.distantPast) }).first
                     sentenceState.append(SentencesWithDrawingFeature.State(sentence: sentence, drawing: drawing))
@@ -200,12 +205,9 @@ public struct CarveDetailFeature {
                       let index = state.sentenceWithDrawingState.firstIndex(where: { $0.id == id }) else {
                     return .none
                 }
-                let sentenceState = state.sentenceWithDrawingState[index]
+                let drawing = state.sentenceWithDrawingState[index].canvasState.drawing
                 return .run { _ in
-                    guard let drawing = sentenceState.canvasState.drawing,
-                          drawing.lineData?.containsPKStroke == true
-                    else { return }
-                    try await drawingContext.updateDrawing(drawing: drawing)
+                    try await persistDrawing(drawing)
                 }
                 
                      
@@ -221,6 +223,18 @@ public struct CarveDetailFeature {
 
 
 extension CarveDetailFeature {
+    /// Canvas에서 올라온 변경(획 추가 / 지우개)을 SwiftData에 반영.
+    ///
+    /// - Important: 획 유무를 조건으로 걸지 않는다.
+    ///   `PKEraserTool(.bitmap)`으로 마지막 획까지 지우면 그 stroke는 `PKDrawing.strokes`에서 제거되어
+    ///   `lineData?.containsPKStroke == false`가 된다. 예전에는 이 조건을 저장의 전제로 삼아
+    ///   "전부 지운 순간"의 저장이 통째로 건너뛰어졌고, 앱을 재기동하면 지웠던 획이 되살아났다.
+    ///   따라서 stroke가 0개인 drawing도 그대로 저장한다.
+    func persistDrawing(_ drawing: BibleDrawing?) async throws {
+        guard let drawing else { return }
+        try await drawingContext.updateDrawing(drawing: drawing)
+    }
+
     /// `SentencesWithDrawingFeature.State.id` 규칙과 동일한 스크롤용 ID를 생성.
     private func makeSentenceID(for verse: BibleVerse) -> SentencesWithDrawingFeature.State.ID {
         "\(verse.title.title.koreanTitle()).\(verse.title.chapter).\(verse.verse)"
