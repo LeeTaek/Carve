@@ -1,6 +1,14 @@
 # CarveFeature 단일 Canvas 전환 설계
 
-> 상태: **Phase 0B 진행 중** · 대상: `Feature/CarveFeature`, `Domain`
+> 상태: **Phase 0B 완료 · Phase 0A-S4 완료** · 대상: `Feature/CarveFeature`, `Domain`
+> rev.12 — **Phase 0B 완료** (`f5206814` 레이아웃 · `0c071d29` 소유권/승계 · `565dfe69` line band reflow)
+> **· Phase 0A-S4 완료** (`b53cbfd8` 스크롤 A/B spike 하네스).
+> **★ S4 는 A 와 B 를 구별하지 못했습니다** — 8개 시나리오 전부 A·B 모두 max **0.000pt** PASS 였습니다 (§11 "S4 실행 결과").
+> 따라서 현시점 "B 우세" 의 근거는 **수치가 아니라 구조**이며,
+> **A/B 의 실질적 판정은 Phase 0A-D 의 D1/D2 로 이월됩니다** (§12).
+> reflow 구현에서 결정한 §9 명세 공백 4건과, B 구조의 캔버스 좌표 규정·하단 인셋 미결을 §5 에 반영했습니다.
+> `StableCanvasView` 가 "460줄 별도 파일" 이라는 서술을 정정했습니다 (§2 D5 · §11 · 부록).
+> 회귀 기준선 **122 → 155**.
 > rev.11 — **Phase 0B 착수.** `ChapterLayout` / `ChapterLayoutBuilder` 구현 완료 (`f5206814`).
 > 구현 중 드러난 §5 명세 공백 2건(여유 높이 귀속 · 캔버스 폭 가정)을 보강하고,
 > signature 의 `chapter` 포함 여부를 미결로 명시했습니다. 회귀 기준선 **82 → 95**.
@@ -53,11 +61,30 @@ e698a3c9  1.2.1  drawing rallback          ← 1차 롤백
 | D2 | **매 저장마다 전체 재절단** — 해당 절 데이터가 "그 순간 rect 안에 보이는 것"으로 덮어써짐 | [CombinedCanvasFeature.swift:167](../Feature/CarveFeature/Sources/Presentation/Drawing/Canvas/CombinedCanvasFeature.swift) |
 | D3 | **좌표계 구분자 없음** — `normalizedForVerseRect(tolerance: 20)`으로 절대/로컬을 추측. `drawingVersion`은 전부 `1`로만 쓰이는 죽은 필드 | [PKDrawing+Extension.swift:20](../Feature/CarveFeature/Sources/Extension/PKDrawing+Extension.swift) |
 | D4 | **LazyVStack + 전체 캔버스는 원리적 충돌** — 화면 밖 절의 rect를 알 수 없어 `drawingRect` 맵이 항상 불완전 | [CombinedCanvasFeature.swift:106](../Feature/CarveFeature/Sources/Presentation/Drawing/Canvas/CombinedCanvasFeature.swift) |
-| D5 | **스크롤 컨테이너 2개** — `PKCanvasView`는 `UIScrollView`(SDK 확인)인데 SwiftUI `ScrollView` 안에 넣어 offset drift. `StableCanvasView` 460줄과 issue #6의 원인 | [CombinedCanvasView.swift:21](../Feature/CarveFeature/Sources/Presentation/Drawing/Canvas/CombinedCanvasView.swift) |
+| D5 | **스크롤 컨테이너 2개** — `PKCanvasView`는 `UIScrollView`(SDK 확인)인데 SwiftUI `ScrollView` 안에 넣어 offset drift. `StableCanvasView`(아래 정정 참조)와 issue #6의 원인 | [CombinedCanvasView.swift:21](../Feature/CarveFeature/Sources/Presentation/Drawing/Canvas/CombinedCanvasView.swift) |
 | D6 | **레이아웃 메타데이터 없음** — 어떤 폭/폰트에서 그려졌는지 기록이 없어 G4가 원리적으로 불가능 | [DrawingSchemaV3.swift](../Domain/Domain/Sources/SwiftData/Model/DrawingSchemaV3.swift) |
 | D7 | **지우개/undo 저장 누락** — stroke 수 증가시에만 변경 영역 계산, 빈 결과는 skip → 마지막 획 삭제가 DB에 반영 안 됨 | [CombinedCanvasView.swift](../Feature/CarveFeature/Sources/Presentation/Drawing/Canvas/CombinedCanvasView.swift), [CombinedCanvasFeature.swift:186](../Feature/CarveFeature/Sources/Presentation/Drawing/Canvas/CombinedCanvasFeature.swift) |
 | D8 | **저장이 원자적이지 않음** — 요청마다 개별 `save()`, 에러를 per-item으로 삼킴 → 부분 갱신 상태 발생 | [DrawingDatabase.swift:97](../Domain/Domain/Sources/SwiftData/DrawingDatabase.swift) |
 | D9 | **편집 순서 미보장** — 연속 편집의 비동기 저장이 직렬화되지 않으면 최신 편집이 과거 편집에 덮일 수 있음 | 신규 |
+
+#### 정정 — `StableCanvasView` 는 별도 파일이 아닙니다 (rev.12)
+
+rev.11 이하는 "`StableCanvasView` 460줄" 이라고 적었으나, 실제로는
+[CombinedCanvasView.swift](../Feature/CarveFeature/Sources/Presentation/Drawing/Canvas/CombinedCanvasView.swift)
+**한 파일 안에 함께 선언된 클래스(21~458행)** 입니다. 같은 파일의 나머지가 `CombinedCanvasView` 본체입니다(파일 전체 726줄).
+
+하는 일은 셋뿐입니다.
+
+| # | 하는 일 | D5 와의 관계 |
+|---|---|---|
+| ① | `contentScaleFactor` / `layer.contentsScale` / `CAMetalLayer.drawableSize` 를 screen scale 로 강제 동기화 | 라이브 스트로크가 확대돼 보이는 증상 대응 |
+| ② | `contentSize = bounds.size`, `contentInset`·`contentOffset` 0, zoom 1 리셋 | **중첩 스크롤 보정 그 자체** |
+| ③ | 대량 디버그 덤프 (레이어 트리 / presentation layer / subview / Metal layer) | 부록의 "디버그 dump(~400줄)" 가 가리키는 것 |
+
+> **Phase 0A-S4 가 ②에 대해 확인한 것:** B 구조(캔버스가 유일한 `UIScrollView`)에는
+> **②가 보정할 대상 자체가 존재하지 않습니다.** 그리고 A 구조에서도 ② 상당의 정규화를
+> **꺼둔 채로** 시뮬레이터 통과 기준 1~6 이 전부 통과했습니다 — 즉 프로그램 스크롤 경로에는
+> 보정할 drift 가 없었습니다. 상세는 §11 "S4 실행 결과".
 
 ---
 
@@ -359,6 +386,40 @@ gap 은 midpoint 로 분할되므로 **여유 공간의 절반이 다음 절 소
 > ⚠️ **Phase 2 에서 재검토가 필요합니다.** 호스팅 뷰가 본문 텍스트까지 포함하는
 > 컬럼보다 넓은 캔버스를 쓰면 `writingRect.minX` 와 `captureRect` 의 x 범위를
 > 별도로 규정해야 합니다. §11 의 A/B 판정 결과에 달려 있습니다.
+
+#### 그 재검토를 S4 실측으로 구체화합니다 ★ (rev.12)
+
+**B 구조에서는 이 경고가 이미 현실입니다.** B 는 `PKCanvasView` 가 유일한 스크롤 컨테이너이므로
+**캔버스가 화면 전폭**이고, 필사 컬럼은 그 안의 한 영역일 뿐입니다.
+따라서 위의 `writingRect.minX == 0` 가정과 **정면으로 충돌합니다.**
+
+S4 하네스는 `ChapterLayout` 을 고치지 않고 **평행이동 한 겹**으로 풀었습니다
+([CanvasScrollSpikeHosting.swift](../Feature/CarveFeature/Sources/Debug/CanvasScrollSpikeHosting.swift)).
+
+```
+캔버스 content 좌표 = layout 좌표 + columnOrigin
+
+columnOrigin.x = isLeftHanded ? 0 : max(0, containerWidth − writingWidth)
+columnOrigin.y = 0
+```
+
+- `ChapterLayout` 은 여전히 "필사 컬럼 = 원점" 좌표계를 유지합니다 — DTO 변경이 없습니다.
+- 왼손/오른손 전환은 `columnOrigin.x` 만 바뀌며, S4 통과 기준 4 는 이 상태에서 **0.000pt** 였습니다.
+- A 구조는 캔버스 자체가 컬럼이므로 `columnOrigin == .zero` 입니다. **두 구조의 차이가 이 한 값에 모입니다.**
+
+> ⚠️ **B 를 채택하면 이 평행이동의 소유자를 정해야 합니다.**
+> §4 는 "좌표 **영역** 계산 = `ChapterLayoutBuilder`, **transform 적용** = `DrawingCodecClient`" 로 나눠 뒀습니다.
+> `columnOrigin` 은 영역이 아니라 transform 이므로 Codec 쪽이 자연스럽지만,
+> `captureRect` 로 소유권을 판정하는 §7-1 이 **캔버스 좌표의 첫 control point** 를 입력으로 받으므로
+> 판정 직전에 역변환이 필요합니다. Phase 3 착수 전에 **어느 계층이 `columnOrigin` 을 아는지** 확정하십시오.
+
+> ❓ **신규 미결 — B 의 하단 safe area 인셋 (rev.12)**
+> S4 의 B 는 `contentInsetAdjustmentBehavior = .never` 라 **하단 safe area 가 반영되지 않습니다.**
+> A(SwiftUI `ScrollView`)는 같은 화면에서 adjusted inset bottom 20 이 자동으로 들어갔습니다.
+> 스크롤 정합에는 영향이 없었지만(양쪽 다 0.000pt), **마지막 절의 필사 영역이 홈 인디케이터에 가릴지**는
+> 인셋 정책의 문제입니다. `.never` 를 유지하고 `totalHeight` 하단에 여백을 더할지,
+> `.always` 로 두고 `contentOffset` 기준을 조정할지 **Phase 3 에서 정해야 합니다.**
+> `.never` 를 고른 이유 자체는 유효합니다 — 자동 인셋 조정은 §11 이 경계하는 offset drift 의 원인 중 하나입니다.
 
 > ❓ **미결 — signature 에 `chapter` 를 넣을 것인가.**
 > §6-5 의 구성요소 목록에는 `chapter` 가 없어, 장이 달라도 같은 signature 가 나옵니다.
@@ -1026,6 +1087,14 @@ verse + underline index + 해당 underline으로부터의 상대 offset
                                     밑줄과 어긋남
 ```
 
+> **✅ rev.12 부수 확인 — reflow 는 `StrokeIdentityKey` 를 깨뜨리지 않습니다.**
+> `PKDrawing.transformed(using:)` 이 `randomSeed` / `path.creationDate` / `path.count` 를
+> **전부 보존**함을 실사용 fixture 5건으로 확인했습니다 (§20-3 의 blob 재사용).
+> 즉 reflow 를 거친 drawing 도 §7-2 의 `StrokeIdentityKey` 가 그대로이므로
+> **§7-3 의 1번 규칙(IdentityKey 완전 일치)에 의한 owner 승계가 살아남습니다.**
+> reflow 후 첫 편집에서 소유권이 옆 절로 흘러가지 않는 근거가 이것입니다.
+> (구현: [LineBandReflow.swift](../Feature/CarveFeature/Sources/Drawing/LineBandReflow.swift))
+
 ### 9-3. 정책 표
 
 | 상황 | 원인 | 처리 |
@@ -1034,10 +1103,15 @@ verse + underline index + 해당 underline으로부터의 상대 offset
 | writing width 감소 | 폭 축소 | 종횡비 유지 uniform 축소 |
 | writing width 증가 | 폭 확대 | **확대하지 않음.** 원래 크기 유지 |
 | 줄 수 증가 | 폭 감소 / 폰트 증가 / 자간 증가 | 남는 밑줄은 빈 줄 |
-| 줄 수 감소 | 폭 증가 / 폰트 감소 / 자간 감소 | 초과 band는 마지막 간격 연장 + §6-3의 effectiveHeight로 공간 확보 |
-| 줄바꿈만 달라짐 | — | `textLineRanges`가 있으면 문자 범위 겹침이 가장 큰 밑줄로 이동 |
-| 매핑할 줄 없음 | — | **첫 밑줄 기준으로 보존** + `layoutMismatch` 기록. 임의로 다른 줄에 합치지 않음 (§9-3-1) |
-| metadata 없음 (legacy) | — | 무변환 (§10-2) |
+| 줄 수 감소 | 폭 증가 / 폰트 감소 / 자간 감소 | 초과 band는 마지막 간격 연장 + §6-3의 effectiveHeight로 공간 확보 (**"마지막 간격" 정의는 아래 4번**) |
+| 줄바꿈만 달라짐 | — | `textLineRanges`가 있으면 문자 범위 겹침이 가장 큰 밑줄로 이동 (**rev.12: 미구현 — 아래 참조**) |
+| 매핑할 줄 없음 | — | **첫 밑줄 기준으로 보존** + `layoutMismatch` 기록. 임의로 다른 줄에 합치지 않음 (§9-3-1). **성립 조건은 아래 1번** |
+| metadata 없음 (legacy) | — | 무변환 (§10-2). **출력 좌표계는 아래 3번** |
+
+> **rev.12 — "줄바꿈만 달라짐" 은 구현하지 않았습니다.**
+> 현재 줄의 문자 범위(`Input.currentTextLineRanges`)는 `Text.Layout.Run.characterIndices` **실측**이 있어야
+> 채울 수 있고, 그 통로는 Phase 2 의 측정 경로에 달려 있습니다.
+> 자리만 남기고 **읽지 않습니다.** 임의 구현하면 §9-3-1 로 가야 할 절이 조용히 잘못된 줄에 앉습니다.
 
 > **✅ S2 확정: `textLineRanges` 는 실현 가능합니다. fallback 불필요.**
 >
@@ -1083,6 +1157,51 @@ verse + underline index + 해당 underline으로부터의 상대 offset
 - 그 절에 첫 편집이 발생하면 새 레이아웃 기준으로 저장되며 mismatch가 해소됨
 
 > 원본을 건드리지 않으므로, 설정을 되돌리면 원래 배치로 복귀합니다.
+
+#### 구현에서 확정한 명세 공백 4건 ★ (rev.12 — `565dfe69`)
+
+§9-3 / §9-3-1 을 코드로 옮기면서 **문서가 답을 주지 않는 지점 4곳**이 드러났습니다.
+전부 확정하며, 근거를 함께 남깁니다 ([LineBandReflow.swift](../Feature/CarveFeature/Sources/Drawing/LineBandReflow.swift)).
+
+**1. "매핑할 줄 없음" 의 조건이 없었습니다 → 다음 셋으로 확정합니다.**
+
+| # | 조건 | 이유 |
+|---|---|---|
+| ① | 저장 band 가 0개 (`baseUnderlineAnchors` 가 비어 있음) | band 판정 기준 자체가 없음 |
+| ② | 현재 밑줄이 0개 | 옮겨 앉을 줄이 없음 |
+| ③ | 줄 수가 **줄었는데** 마지막 간격이 0 이하 | 아래 참조 |
+
+> ③ 을 그냥 진행하면 초과 band 가 **전부 같은 y 에 겹쳐 쌓입니다.**
+> 그것은 §9-3-1 의 **"임의로 다른 줄에 합치거나 분산시키지 않는다"** 를 정확히 위반하는 결과입니다.
+> 그래서 "겹쳐 쌓기" 대신 **`layoutMismatch` 로 포기하는 것**이 규정에 맞습니다.
+
+**2. §9-3-1 에 uniform 축소를 적용할지가 불명확했습니다 → 적용합니다.**
+
+`layoutMismatch` 로 빠진 절에도 `scale = min(1, now / base)` 를 그대로 적용합니다.
+
+- 축소는 **절 안의 상대 배치를 바꾸지 않습니다.** 무엇이 어느 줄에 앉는지의 문제와 직교합니다.
+- 적용하지 않으면 폭이 줄었을 때 **잉크가 좁아진 컬럼 밖으로 샙니다.** 표시가 더 나빠집니다.
+
+**3. "legacy 무변환" 의 출력 좌표계가 불명확했습니다 → 좌표를 전혀 건드리지 않습니다.**
+
+결과에 `legacyPassthrough` 표시를 달고 **입력 좌표를 그대로** 내보냅니다.
+
+> ⚠️ **따라서 장 단위 합성에서 legacy 절의 위치는 보장되지 않습니다.**
+> 다른 절은 캔버스 절대좌표인데 legacy 절만 절 로컬(또는 절대) 좌표이므로 **좌표계가 섞입니다.**
+> 임의 배치를 지어내지 않은 것은 §10-2-1 때문입니다 — 휴리스틱으로 좌표계를 추측하면
+> 실데이터의 71% 에서 틀립니다.
+> **→ Phase 3 의 런타임 legacy 판별(§10-2 의 3번)이 이 절들의 합성보다 반드시 먼저 와야 합니다.**
+
+**4. "마지막 간격" 이 밑줄 1개일 때 정의되지 않았습니다 → `writingRect` 상단 ~ 첫 밑줄 거리를 한 줄 높이로 봅니다.**
+
+```
+current.count >= 2 → lastGap = current[n-1] − current[n-2]
+current.count == 1 → lastGap = current[0] − writingRect.minY
+```
+
+밑줄이 하나뿐이면 잴 간격이 없지만, 그 절의 "한 줄 높이" 는
+**writingRect 상단부터 첫 밑줄까지** 로 이미 화면에 존재합니다. 새 상수를 만들 필요가 없습니다.
+이렇게 얻은 `lastGap` 이 0 이하이면 위 1번의 ③ 으로 넘어갑니다.
 
 ---
 
@@ -1251,12 +1370,14 @@ A. SwiftUI ScrollView
    └─ content-sized PKCanvasView overlay
       · 기존 시도와 동일한 구조 (검증된 실패 이력 있음)
       · StableCanvasView 수준의 contentInset/offset/zoom 정규화 필요
+        (rev.12: S4 에서 이 정규화를 꺼도 통과 기준 1~6 이 전부 통과했습니다 — 아래 참조)
 
 B. PKCanvasView가 유일한 UIScrollView
    └─ PKCanvasView의 scroll content 내부에
       UIHostingController로 텍스트/밑줄 배치
       · drawingPolicy = .pencilOnly 이면 손가락=스크롤 / 펜슬=필기를 PencilKit이 처리
       · 성공 시 StableCanvasView 대부분 제거 가능
+        (§2 D5 정정 참조 — 별도 파일이 아니라 CombinedCanvasView.swift 21~458행)
 ```
 
 > **금지:** PKCanvasView와 **별개인** SwiftUI 텍스트에 `contentOffset`만 전달하는 방식.
@@ -1278,31 +1399,112 @@ Debug 전용 CanvasScrollSpike
 
 ### 통과 기준
 
-| # | 기준 | Sim | Device |
-|---|---|:--:|:--:|
-| 1 | 스크롤 전후 동일 content point의 stroke 오차 **≤ 1pt** | ✅ | ✅ |
-| 2 | 빠른 fling/rebound 후 텍스트·밑줄·Drawing 오차 없음 | ✅ | ✅ |
-| 3 | Split View resize 후 재필기 위치가 맞음 | ✅ | ✅ |
-| 4 | 왼손잡이 레이아웃 전환 후 좌표 정합 | ✅ | ✅ |
-| 5 | 헤더 애니메이션 / 롱프레스 메뉴 / 탭 제스처 동작 | ✅ | ✅ |
-| 6 | 앱 재진입·장 변경 후 `contentOffset` 복원이 일관됨 | ✅ | ✅ |
-| 7 | live stroke가 pencil-up 순간 확대·이동하지 않음 | ❌ | ✅ |
-| 8 | Pencil hover 중 좌표 변화 없음 | ❌ | ✅ |
-| 9 | `.pencilOnly`에서 한 손가락 스크롤 가능 | ❌ | ✅ |
-| 10 | `allowFingerDrawing == true`일 때 스크롤 방법이 명확함 | ❌ | ✅ |
-| 11 | 시편 119편 layout 시간·peak memory (baseline 대비) | △ | ✅ |
+"Sim" / "Device" 는 **그 기준을 어디서 확인할 수 있는가**이고, "S4 판정" 은 **실제로 확인한 결과**입니다(rev.12).
+
+| # | 기준 | Sim | Device | S4 판정 |
+|---|---|:--:|:--:|---|
+| 1 | 스크롤 전후 동일 content point의 stroke 오차 **≤ 1pt** | ✅ | ✅ | ✅ **A·B** — 왕복 9000pt, 프로브 3곳, max 0.000pt |
+| 2 | 빠른 fling/rebound 후 텍스트·밑줄·Drawing 오차 없음 | ✅ | ✅ | △ **부분** — bounce 프로그램 왕복 PASS. **관성 fling 미수행** |
+| 3 | Split View resize 후 재필기 위치가 맞음 | ✅ | ✅ | ✅ **근사** — 폭축소 토글 재계산 후 0.000pt. 실제 창 조작 미수행 |
+| 4 | 왼손잡이 레이아웃 전환 후 좌표 정합 | ✅ | ✅ | ✅ 전환 후 0.000pt |
+| 5 | 헤더 애니메이션 / 롱프레스 메뉴 / 탭 제스처 동작 | ✅ | ✅ | △ **부분** — 헤더 애니메이션 중 스크롤 PASS. 탭/롱프레스는 **구조만 확인** |
+| 6 | 앱 재진입·장 변경 후 `contentOffset` 복원이 일관됨 | ✅ | ✅ | ✅ 재진입·장 전환 모두 Δ0.00 |
+| 7 | live stroke가 pencil-up 순간 확대·이동하지 않음 | ❌ | ✅ | 미수행 (실기기 전용) |
+| 8 | Pencil hover 중 좌표 변화 없음 | ❌ | ✅ | 미수행 (실기기 전용) |
+| 9 | `.pencilOnly`에서 한 손가락 스크롤 가능 | ❌ | ✅ | 미수행 (실기기 전용) |
+| 10 | `allowFingerDrawing == true`일 때 스크롤 방법이 명확함 | ❌ | ✅ | 미수행 (실기기 전용) |
+| 11 | 시편 119편 layout 시간·peak memory (baseline 대비) | △ | ✅ | **미측정** — `vmmap` 권한 오류 |
 
 △ = 시뮬레이터 수치는 절대값으로 쓸 수 없고 **A/B 상대 비교와 알고리즘 복잡도 확인**에만 사용합니다.
+
+#### 기준 1 의 "오차" 는 무엇인가 ★ (rev.12 — 신규 보강)
+
+**원문에 정의가 없었고, 그대로 두면 측정이 가짜 FAIL 을 만듭니다.**
+
+오차를 **화면 절대 위치**로 잡으면 **컨테이너가 움직인 것까지 오차로 잡힙니다.**
+S4 실측에서 **헤더 접힘 애니메이션만으로 105pt(헤더 높이) 짜리 가짜 FAIL** 이 났습니다 —
+스크롤 정합은 완벽한데 viewport 자체가 화면에서 위로 올라간 것뿐이었습니다.
+
+> **기준 1 이 묻는 것은 "content point → viewport 매핑이 `contentOffset` 만큼의 평행이동인가" 이지,
+> viewport 가 화면 어디에 있는가가 아닙니다.**
+
+따라서 측정은 다음 형태여야 합니다.
+
+```
+residual = (point 의 window 좌표) − viewportOriginInWindow + contentOffset
+           └ 스크롤해도 불변이어야 하는 값. 그 변동폭이 곧 오차다.
+
+viewportOriginInWindow = scrollView.convert(scrollView.bounds.origin, to: nil)
+```
+
+`viewportOrigin` 을 빼는 항이 **컨테이너 이동을 제거하는 지점**입니다.
+헤더 접힘·Split View·safe area 변화는 전부 여기로 흡수됩니다.
 
 ### 판정
 
 ```
-B가 기능 기준(1~6)을 모두 통과            → B 잠정 채택, 실기기에서 7~11 확인
+B가 기능 기준(1~6)을 모두 통과            → B 잠정 채택, 실기기에서 7~11 확인   ← ✅ 여기에 해당 (rev.12)
 B에 수정 가능한 gesture 문제만 존재        → B 보완 후 재검증
 B에서 text hosting / offset / render 문제  → A 검증
 A도 offset drift 재현                     → 저장·Feature 구현으로 넘어가지 않고
                                             호스팅 구조 재설계
 ```
+
+---
+
+### S4 실행 결과 — Phase 0A-S4 (rev.12, `b53cbfd8`)
+
+> 환경: **iPad mini (A17 Pro) 시뮬레이터 iOS 26.2 / Xcode 26.3**
+> 176절 mock layout, 총 높이 **16184pt**. Debug 전용 하네스이며 SwiftData·실사용 Drawing 과 연결되지 않습니다.
+> 하네스 구조와 측정 방법의 상세는 **§20-4**.
+
+**8개 시나리오 전부 — A 와 B 모두 max 0.000pt PASS**
+
+| # | 시나리오 | A | B |
+|---|---|:--:|:--:|
+| 1 | AUTO 시작 (모드 표시) | 0.000 | 0.000 |
+| 2 | 왕복 스크롤 9000pt | 0.000 | 0.000 |
+| 3 | 오버스크롤 (bounce) | 0.000 | 0.000 |
+| 4 | 헤더 애니메이션 중 스크롤 | 0.000 | 0.000 |
+| 5 | 왼손 레이아웃 전환 후 왕복 | 0.000 | 0.000 |
+| 6 | 폭축소(resize) 후 왕복 | 0.000 | 0.000 |
+| 7 | 재진입 복원 (요청 4200.0 → 실제 4200.0, Δ0.00) | 0.000 | 0.000 |
+| 8 | 장 전환 왕복 복원 (동일) | 0.000 | 0.000 |
+
+- 프로브 3곳(**v1 / v88 / v176**) 전부 0.00 — 장 상단·중간·하단 모두.
+- **깊은 offset 15000 에서 166~174절의 텍스트·잉크가 정상 렌더**됐습니다.
+  B 의 16184pt `UIHostingController` 가 깊은 위치에서 렌더되는지가 이 spike 의 **최대 우려**였고, 재현되지 않았습니다.
+- A 는 **"A정규화"(`StableCanvasView` 수준의 매-레이아웃 offset/inset/zoom 리셋)를 꺼도** 0.000pt 였습니다.
+  **이 경로에는 보정할 drift 자체가 없었습니다.**
+
+#### ★ 이번 측정은 A 와 B 를 구별하지 못했습니다
+
+> **가장 중요한 결론입니다. 수치만 보고 "B 가 검증됐다" 고 읽으면 안 됩니다.**
+>
+> A 도 정규화 없이 전부 통과했으므로, **현시점의 "B 우세" 근거는 수치가 아니라 구조**입니다.
+>
+> | 근거 | 내용 |
+> |---|---|
+> | 구조 | 스크롤 컨테이너가 1개라 **offset 동기화 코드가 0줄** — §11 이 금지한 "별개 SwiftUI 텍스트에 `contentOffset` 전달" 을 **구조적으로** 회피 |
+> | 구조 | `StableCanvasView` 의 ②(offset/inset/zoom 리셋)가 **보정하던 대상 자체가 존재하지 않음** (§2 D5 정정) |
+> | 수치 | **없음.** 두 구조가 같은 값을 냈습니다 |
+
+**이것은 예상된 결과입니다.**
+D5 / issue #6 의 실패는 **프로그램 스크롤에서 나오지 않습니다.**
+라이브 Pencil 입력·hover·렌더 타이밍에서 나오며, 그건 **통과 기준 7·8 — 실기기 전용**입니다.
+
+> **→ A/B 의 실질적 판정은 Phase 0A-D 의 D1/D2 로 넘어갑니다.** (§12 · §13)
+> S4 가 확정한 것은 "B 에서 text hosting / offset / render 문제가 **나오지 않았다**" 까지이며,
+> 위 판정 블록의 첫 번째 분기(**B 잠정 채택**)에 해당합니다.
+
+#### 확인하지 못한 것
+
+| 항목 | 사유 |
+|---|---|
+| 기준 2 의 **관성 fling** | 시뮬레이터 터치 주입 도구가 `xcode-select` 설정 때문에 사용 불가. 해소하려면 `sudo xcode-select` 가 필요해 **시스템 설정을 바꾸지 않았습니다** |
+| 기준 5 의 **탭 / 롱프레스 동작** | 같은 사유. **구조만 확인** — `tapGR=1`, `longGR=3` 이 draw/pan 제스처와 **동시 활성**임을 확인했고, 실제 동작은 미확인 |
+| 기준 3 의 **실제 Split View 창 조작** | 폭축소 토글로 **같은 코드 경로**(레이아웃 재계산)를 태웠습니다. 창 조작 자체는 미수행 |
+| 기준 11 의 **A/B 메모리 비교** | `vmmap` 이 권한 오류로 실패 |
 
 ---
 
@@ -1314,7 +1516,20 @@ A도 offset drift 재현                     → 저장·Feature 구현으로 �
 | **U2** | 절당 다중 행 / 히스토리 | **기존 다중 행과 히스토리 유지** → mutation을 행 주소지정으로 | **확정** (§8-7) |
 | **U3** | 지우개 모드 | **`.bitmap` 유지** | **확정** (§7-4) |
 
-미결로 남은 것은 **스크롤 구조(A/B)** 하나이며 Phase 0A spike에서 확정합니다.
+미결로 남은 것은 **스크롤 구조(A/B)** 하나입니다.
+
+> **rev.12 갱신 — B 잠정 채택, 최종 판정은 D1/D2.**
+>
+> | 항목 | 상태 |
+> |---|---|
+> | Phase 0A-S4 (시뮬레이터, `b53cbfd8`) | ✅ 완료. 기능 기준 1~6 통과 → **B 잠정 채택** |
+> | 그 판정의 근거 | **구조**(스크롤 컨테이너 1개, offset 동기화 코드 0줄). **수치가 아닙니다** — A·B 모두 max 0.000pt 로 **구별되지 않았습니다** |
+> | 최종 판정 | **Phase 0A-D 의 D1(Pencil hover / live stroke)·D2(`.pencilOnly` 손가락 스크롤)** 로 이월 |
+>
+> **"S4 통과 = A/B 확정" 이 아닙니다.** issue #6 의 실패 모드는 프로그램 스크롤이 아니라
+> 라이브 Pencil 입력·렌더 타이밍이며, 시뮬레이터에는 그 입력이 없습니다 (§11 "S4 실행 결과").
+> 그동안의 구현은 **B 를 전제로 진행하되**, §5 의 `columnOrigin` 평행이동과 하단 인셋 미결처럼
+> **B 에서만 발생하는 규정**은 A 로 후퇴할 여지를 남겨 두고 작성해야 합니다.
 
 ### U2 결정의 파급
 
@@ -1346,11 +1561,20 @@ A도 offset drift 재현                     → 저장·Feature 구현으로 �
 | **Phase 0A-S0** | ✅ **완료** (§18) |
 | **Phase 0A-S1 / S2** | ✅ **완료** (§19) |
 | **Phase 0A-D · D8** | ✅ **완료** — S5 fixture 확보 (§20-3). 나머지 D 항목은 유료 멤버십 필요 |
-| **Phase 0B** | 🔄 **진행 중** — `ChapterLayoutBuilder` 완료(`f5206814`), owner resolver / reflow 남음 |
-| **Phase 0A-S3 / S4** | **지금 착수 가능** (시뮬레이터) |
-| Phase 1 · 2 | 시뮬레이터 검증(0A-S)과 migration 테스트 통과 후 |
+| **Phase 0B** | ✅ **완료** — `f5206814` 레이아웃 · `0c071d29` 소유권/승계 · `565dfe69` line band reflow |
+| **Phase 0A-S4** | ✅ **완료** (`b53cbfd8`) — 기능 기준 1~6 통과. **단 A/B 판정은 D1/D2 로 이월** (§11 · §12) |
+| **Phase 0A-S3** | ❌ **미수행** — 아래 참조 |
+| Phase 1 · 2 | ✅ **착수 가능** — 0B 완료 + S4 통과. S3 잔여분(실측 줄 수)은 Phase 2 측정 경로와 함께 해소 |
 | Phase 3 | feature flag 뒤 **구현**까지는 가능. **기본 활성화·배포 판단은 Phase 0A-D 이후** |
 | Phase 4 (구 구조 삭제) | 실기기 검증 및 안정화 후 |
+
+> **S3 는 왜 여전히 미수행인가 (rev.12)**
+> S4 하네스가 `ChapterLayoutBuilder` 로 176절 layout 을 만들어 `gate PASS` 를 확인했으므로
+> **§6-2 게이트와 176절 규모의 좌표 계산은 부수적으로 확인**됐습니다.
+> 그러나 S4 는 줄 수를 **결정적 규칙 `1 + (verse − 1) % 4` 로 고정**했습니다 —
+> **실제 텍스트 측정 기반 줄 수는 여전히 확인되지 않았습니다.**
+> S3 의 본질(Pass 1 측정 → `ChapterLayout` 정확성)은 Phase 2 의 측정 경로 없이는 검증할 수 없으므로,
+> **Phase 2 와 함께 수행**하는 것이 자연스럽습니다.
 
 ---
 
@@ -1392,7 +1616,7 @@ S0 완료 후 수행합니다.
 | S1-5 | `mask` / `maskedPathRanges`가 직렬화에서 보존되는가 | ContentSignature 성립 여부 |
 | **S2** | `Text.LayoutKey.Value` probe — 줄별 문자 범위 노출 여부 | `textLineRanges` 실현 가능성 (§9-3) |
 | **S3** | 레이아웃 파이프라인 — 176절 VStack `ChapterLayout` 정확성, 게이트 동작, 디버그 오버레이 | §6 전체 |
-| **S4** | 스크롤 A/B 골격 + 통과 기준 1~6 (§11) | 호스팅 구조 잠정 결정 |
+| **S4** | ✅ **완료** (`b53cbfd8`) — 스크롤 A/B 골격 + 통과 기준 1~6 (§11) | 호스팅 구조 **잠정** 결정 (B). 최종 판정은 D1/D2 |
 | **S5** | legacy `lineData` 회귀 fixture 확보 (dev CloudKit 컨테이너) | Phase 0B 입력 |
 
 > S1은 시뮬레이터에서 `drawingPolicy = .anyInput`으로 마우스 필기가 가능하므로 검증됩니다.
@@ -1405,8 +1629,8 @@ S0 완료 후 수행합니다.
 
 | ID | 항목 |
 |---|---|
-| **D1** | Apple Pencil 입력 — hover 중 offset, live stroke가 pencil-up에 확대·이동하는지 (issue #6 핵심) |
-| **D2** | `.pencilOnly`에서 한 손가락 스크롤 / `allowFingerDrawing == true`일 때 스크롤 UX |
+| **D1** | Apple Pencil 입력 — hover 중 offset, live stroke가 pencil-up에 확대·이동하는지 (issue #6 핵심) ← **A/B 최종 판정이 여기로 이월됨 (rev.12)** |
+| **D2** | `.pencilOnly`에서 한 손가락 스크롤 / `allowFingerDrawing == true`일 때 스크롤 UX ← **A/B 최종 판정 (rev.12)** |
 | **D3** | 실제 Pencil 지우개로 S1 결과 재확인 |
 | **D4** | Apple Pencil 더블탭(지우개 전환), 두 손가락 더블탭(undo) |
 | **D5** | 시편 119편 layout 시간·peak memory 실측, 스크롤 프레임 드랍 |
@@ -1423,11 +1647,24 @@ S0 완료 후 수행합니다.
 
 **산출물:** A/B 최종 결정, 승계 전략 확정, 메모리·성능 수치
 
-### Phase 0B — 순수 로직과 회귀 fixture
-- `ChapterLayoutBuilder` (2-pass, 안정 signature 포함)
-- owner resolver / reconciler / line band reflow
-- **실제 legacy `lineData` 샘플 fixture 확보** ← 회귀 판정의 기준
-- UI 변경 없음
+> **rev.12 — D1/D2 의 무게가 커졌습니다.**
+> S4 가 A 와 B 를 구별하지 못했으므로(§11 "S4 실행 결과"), **A/B 를 실제로 가르는 측정은 D1/D2 뿐입니다.**
+> S4 하네스는 릴리즈에서 제외된 채 저장소에 남아 있으므로, D1/D2 는 새 하네스를 만들지 말고
+> **같은 하네스를 실기기에서 그대로 돌려** 시뮬레이터 결과와 나란히 비교하십시오
+> (`-CanvasScrollSpike`, §20-4). 그때 미수행으로 남은 기준 2 의 fling 과 기준 5 의 탭/롱프레스도 함께 해소됩니다.
+
+### Phase 0B — 순수 로직과 회귀 fixture ✅ 완료 (rev.12)
+
+| 항목 | 커밋 | 산출물 |
+|---|---|---|
+| `ChapterLayoutBuilder` (2-pass, 안정 signature 포함) | `f5206814` | [Domain/Sources/Layout/](../Domain/Domain/Sources/Layout/) — `ChapterLayout` / `ChapterLayoutSignature` / `ChapterLayoutBuilder` |
+| owner resolver / reconciler | `0c071d29` | `ChapterLayoutPointQuery` · [StrokeOwnershipResolver.swift](../Feature/CarveFeature/Sources/Drawing/StrokeOwnershipResolver.swift) · `StrokeIdentityKey` / `StrokeContentSignature` / `OwnershipSnapshot` |
+| line band reflow + `DrawingLayoutMetadata` DTO | `565dfe69` | [LineBandReflow.swift](../Feature/CarveFeature/Sources/Drawing/LineBandReflow.swift) · [DrawingLayoutMetadata.swift](../Domain/Domain/Sources/Layout/DrawingLayoutMetadata.swift) |
+| **실제 legacy `lineData` 샘플 fixture 확보** | `0e9a8449` | §20-3 — 실사용 blob 5건 |
+| UI 변경 없음 | — | 어디서도 호출되지 않는 순수 로직. **배선은 Phase 2~3** |
+
+- SwiftData V4 스키마는 **만들지 않았습니다** — 그것은 Phase 1 입니다.
+- reflow 구현에서 결정한 명세 공백 4건은 §9-3-1 하위 절에 반영했습니다.
 
 ### Phase 1 — V4 additive schema
 - optional metadata 필드만 추가, **legacy 자동 변환 금지**
@@ -1450,7 +1687,7 @@ S0 완료 후 수행합니다.
 - `CanvasFeature` / `CanvasView`
 - `SharedUndoManager`
 - `clippedPrecisely` / `normalizedForVerseRect` (판별 로직만 Codec으로 이관)
-- `StableCanvasView` 디버그 코드 (~400줄)
+- `StableCanvasView` 디버그 코드 (~400줄) — 단, **별도 파일이 아니라 `CombinedCanvasView.swift` 21~458행** (rev.12 정정)
 - `VerseRowFeature` (죽은 리듀서 — `State.ID` 타입 별칭으로만 참조됨)
 
 #### SharedUndoManager를 제거해야 하는 근거
@@ -1565,7 +1802,7 @@ S0 완료 후 수행합니다.
 | bitmap 지우개의 분할 여부 | 런타임 동작 → **S1-2** |
 | 완전히 지운 stroke의 잔존 여부 | 런타임 동작 → **S1-3** |
 
-### ✅ 시뮬레이터에서 확인 완료 (Phase 0A-S0 / S1 / S2 — 결과 상세는 §18)
+### ✅ 시뮬레이터에서 확인 완료 (Phase 0A-S0 / S1 / S2 — 결과 상세는 §18·§19 / **S4 — §11·§20-4**)
 
 | ID | 결과 |
 |---|---|
@@ -1579,6 +1816,7 @@ S0 완료 후 수행합니다.
 | S1-4 | 지우개 후 IdentityKey 구성요소 **전부 불변** (control point 값까지) |
 | S1-5 | `mask` / `maskedPathRanges` **보존**. 단 `mask == nil` 이면 ranges 는 전체 구간 |
 | S2 | **`textLineRanges` 실현 가능** — `Run.characterIndices` (iOS 17.0+) |
+| **S4** (rev.12) | **A·B 모두 8개 시나리오 max 0.000pt PASS.** 기능 기준 1·3·4·6 통과, 2·5 부분, 7~11 미수행. 깊은 offset 15000 에서 B 의 16184pt `UIHostingController` 정상 렌더. **★ 그러나 A 와 B 가 구별되지 않았습니다** — 판정은 D1/D2 로 이월 (§11 · §20-4) |
 
 ### 검증에서 파생된 기존 코드 수정 (검증 항목 자체가 아니라 그 부산물)
 
@@ -1593,13 +1831,17 @@ S0 완료 후 수행합니다.
 ### 남은 시뮬레이터 항목
 
 - **S3** — 176절 `ChapterLayout` 정확성 및 게이트 (§6)
-- **S4** — 스크롤 A/B 통과 기준 1~6 (§11)
+  > rev.12: **게이트 동작과 176절 규모 좌표 계산은 S4 하네스에서 부수적으로 확인**됐습니다(`gate PASS`).
+  > 남은 것은 **실제 텍스트 측정 기반 줄 수** 입니다 — S4 는 `1 + (verse − 1) % 4` 로 고정했습니다.
+  > 이 잔여분은 Phase 2 의 측정 경로와 함께 해소하십시오 (§13).
+- ~~**S4** — 스크롤 A/B 통과 기준 1~6 (§11)~~ → ✅ **완료** (rev.12, `b53cbfd8`)
 
 ### 실기기에서만 확인 (Phase 0A-D)
 
-6. Pencil hover / live stroke 스냅 (§11 기준 7~8)
-7. `.pencilOnly` 손가락 스크롤 (§11 기준 9~10)
+6. Pencil hover / live stroke 스냅 (§11 기준 7~8) ← **A/B 최종 판정이 여기 있습니다 (rev.12)**
+7. `.pencilOnly` 손가락 스크롤 (§11 기준 9~10) ← **A/B 최종 판정 (rev.12)**
 8. 시편 119편 실제 layout 시간·peak memory (§6-1)
+9. (rev.12 추가) §11 기준 2 의 **관성 fling**, 기준 5 의 **탭/롱프레스 동작** — 시뮬레이터 터치 주입 불가로 미수행 (§20-4)
 
 ### 코드 외부 확인
 
@@ -1633,6 +1875,8 @@ S0 완료 후 수행합니다.
 - [x] 모듈 배치 — 순환 의존 회피 (§4)
 - [x] 장 전환 요청/승인 흐름 (§8-5)
 - [ ] PKCanvas 단독 스크롤 구조는 Phase 0A spike 전까지 확정하지 않음
+      → rev.12: **S4 완료로 B 잠정 채택.** 여전히 미확정입니다 — S4 가 A/B 를 구별하지 못했으므로
+        **최종 판정은 D1/D2** 입니다 (§11 · §12)
 
 ---
 
@@ -1643,7 +1887,7 @@ S0 완료 후 수행합니다.
 | `CanvasFeature` / `CanvasView` | 삭제 | 4 |
 | `SharedUndoManager` | 삭제 (구현 자체가 깨져 있음) | 4 |
 | `clippedPrecisely` / `normalizedForVerseRect` | 삭제 (판별 로직만 Codec으로 이관) | 4 |
-| `StableCanvasView` 디버그 dump | 삭제 (~400줄) | 4 |
+| `StableCanvasView` | **별도 파일이 아닙니다 (rev.12 정정)** — `CombinedCanvasView.swift` 21~458행에 함께 선언된 클래스입니다. 따라서 "파일 삭제" 가 아니라 **`CombinedCanvasView` 재작성(Phase 3)에 흡수**되며, 남는 것은 디버그 덤프 제거뿐입니다. 스케일 강제 동기화(①)는 라이브 렌더 이슈 대응이라 D1 결과를 보고 존폐를 정하십시오 | 3~4 |
 | `VerseRowFeature` | 삭제 (죽은 리듀서) | 4 |
 | `CombinedCanvasFeature` / `CombinedCanvasView` | `ChapterCanvasFeature`로 재작성 | 3 |
 | `Data.containsPKStroke` | **의미 유지 — 수정 대상 아님.** 호출부만 수정 완료 (`7ba5bc46`). V1→V2 마이그레이션이 `"stroke 가 있는가"` 의미에 의존하므로 정의를 바꾸지 않습니다 (§7-5, §20-2) | ✅ 완료 |
@@ -1954,8 +2198,29 @@ lineOrigins = [(0,16.0), (0,36.287), (0,56.574), (0,76.861)]
 
 커밋별: `f5206814` 82 → 95 (+13) · `0c071d29` 95 → 122 (+27).
 
-> **현재 회귀 기준선은 122/122 입니다.** 이후 어느 단계에서든 122 미만 통과 또는 실패 1건 이상이면 회귀입니다.
+122 는 rev.11 시점 기록입니다.
+
+**rev.12 — Phase 0B 완료 · S4 후: 155/155** ★
+
+| 번들 | rev.11 (122) | +reflow (`565dfe69`) | +S4 (`b53cbfd8`) |
+|---|---:|---:|---:|
+| DomainTest | 54 | **63** (Swift Testing 61 + XCTest 2) | 63 |
+| CarveFeatureTest | 47 | **71** | 71 |
+| CarveToolkitTest | 6 | 6 | 6 |
+| ChartFeatureTest | 9 | 9 | 9 |
+| SettingsFeatureTest | 3 | 3 | 3 |
+| UIComponentsTest | 3 | 3 | 3 |
+| **합계** | **122** | **155** | **155** |
+
+커밋별 누적: 82 → 95 (`f5206814`) → 122 (`0c071d29`) → **155** (`565dfe69`) → 155 유지 (`b53cbfd8`).
+
+> `b53cbfd8` 은 **테스트를 추가하지 않았습니다.** S4 하네스는 Debug 전용 UI 이고,
+> 그 판정은 단위 테스트가 아니라 **하네스 자체의 HUD 측정**으로 얻습니다 (§20-4).
+> 대신 같은 커밋에서 **릴리즈 누출 확인**(CarveFeature Release 빌드의 spike `.o` 7개에 실제 심볼 0개)을 했습니다.
+
+> **현재 회귀 기준선은 155/155 입니다.** 이후 어느 단계에서든 155 미만 통과 또는 실패 1건 이상이면 회귀입니다.
 > 실행 환경은 위와 동일 (Xcode 26.3 / Swift 6.2.4 / iPad mini (A17 Pro) iOS 26.2).
+> 구성은 **Swift Testing 153 + XCTest 2** 입니다.
 
 **같이 확인된 것**
 
@@ -2000,10 +2265,15 @@ lineOrigins = [(0,16.0), (0,36.287), (0,56.574), (0,76.861)]
 > Phase 0A-S0 / S1 검증 과정에서 **드러난** 기존 코드 버그를, 새 아키텍처를 기다리지 않고 먼저 고친 기록입니다.
 > 둘 다 **기존 N-Canvas 구조 위의 수정**이며, §4~§11의 새 설계는 여전히 미구현입니다.
 
+> **제목은 rev.9 시점의 것입니다.** 이후 §20-3(rev.10, D8 legacy 추출)과 §20-4(rev.12, S4 하네스)가
+> 덧붙었습니다. 절 번호를 바꾸면 문서 안 상호 참조가 깨지므로 번호는 그대로 두고 뒤에 이어 붙입니다.
+
 | 커밋 | 파생 | 제목 |
 |---|---|---|
 | `19be99ea` | S0-2 | 주간 요약 topChapter 동점 시 비결정적 결과 수정 |
 | `7ba5bc46` | S1-3 | 지우개로 전부 지운 필사 내용이 저장되지 않던 문제 수정 |
+| `0e9a8449` | D8 | 실기기 legacy 데이터 추출과 Phase 0B fixture (rev.10, §20-3) |
+| `b53cbfd8` | S4 | 스크롤 A/B spike 하네스 (rev.12, §20-4) — 버그 수정이 아니라 **검증 산출물**입니다 |
 
 ### 20-1. `19be99ea` — 주간 요약 동점 tie-break (S0-2 파생)
 
@@ -2126,3 +2396,92 @@ D3 실패 모드 2건의 실측 근거는 §10-2-1 을 보십시오.
 
 > **개인정보:** 추출 원본은 실사용자의 필사 기록입니다. 저장소 밖(`~/carve-device-dump/`)에 두고
 > 커밋하지 않았습니다. fixture 에 넣은 5건은 권·장·절·날짜 등 식별 메타를 제거했습니다.
+
+### 20-4. `b53cbfd8` — Phase 0A-S4 스크롤 A/B spike 하네스 (rev.12)
+
+> 실행 환경: **Xcode 26.3 / iPad mini (A17 Pro) 시뮬레이터 iOS 26.2.**
+> 176절 mock layout, 총 높이 **16184pt**. 측정 결과 요약은 §11 "S4 실행 결과".
+
+#### 하네스 구조
+
+Debug 전용이며 **SwiftData·실사용 Drawing 과 연결되지 않습니다**(§11 "실험 범위").
+파일 단위 `#if DEBUG` 로 릴리즈 빌드에서 완전히 제외됩니다.
+
+| 파일 | 역할 |
+|---|---|
+| [CanvasScrollSpikeView.swift](../Feature/CarveFeature/Sources/Debug/CanvasScrollSpikeView.swift) | 루트 화면. 모드 전환·토글·헤더 애니메이션 |
+| [CanvasScrollSpikeHosting.swift](../Feature/CarveFeature/Sources/Debug/CanvasScrollSpikeHosting.swift) | **A / B 두 호스팅 구조의 실체** |
+| [CanvasScrollSpikeMetrics.swift](../Feature/CarveFeature/Sources/Debug/CanvasScrollSpikeMetrics.swift) | 자체 측정기 (아래) |
+| [CanvasScrollSpikeContent.swift](../Feature/CarveFeature/Sources/Debug/CanvasScrollSpikeContent.swift) | mock layout·drawing 생성 |
+| [CanvasScrollSpikeColumn.swift](../Feature/CarveFeature/Sources/Debug/CanvasScrollSpikeColumn.swift) | 텍스트 컬럼 + 프로브 마커 |
+| [CanvasScrollSpikeStore.swift](../Feature/CarveFeature/Sources/Debug/CanvasScrollSpikeStore.swift) | 상태 + launch argument 파싱 + 무인 시나리오 |
+| [CanvasScrollSpikeHUD.swift](../Feature/CarveFeature/Sources/Debug/CanvasScrollSpikeHUD.swift) | 측정값·게이트·판정 표시 |
+
+```
+A  SwiftUI ScrollView + content-sized PKCanvasView overlay
+   캔버스는 isScrollEnabled = false, inset/offset 0, zoom 1 고정.
+   StableCanvasView 수준의 매-레이아웃 정규화는 "A정규화" 토글로 분리해 유무를 비교할 수 있다.
+
+B  PKCanvasView 가 유일한 UIScrollView.
+   텍스트는 UIHostingController 로 캔버스의 scroll content **내부**에 삽입.
+   → offset 동기화 코드가 한 줄도 없다.
+     §11 이 금지한 "별개 SwiftUI 텍스트에 contentOffset 전달" 을 구조적으로 회피한 지점이다.
+```
+
+진입점은 [App.swift](../App/CarveApp/Sources/App/App.swift) 의 `WindowGroup` 안 `#if DEBUG` 분기 1건입니다
+(하네스 외부에서 수정한 **유일한** 기존 파일).
+
+```bash
+xcrun simctl launch <UDID> kr.co.carve.leetaek -CanvasScrollSpike
+```
+
+#### 측정을 하네스가 직접 합니다
+
+통과 기준 1("스크롤 전후 동일 content point 오차 ≤ 1pt")은 **눈대중으로 판정할 수 없습니다.**
+HUD 가 매 프레임 델타를 계산해 표시하고 peak 를 누적하며, 임계 초과 시 색으로 구분합니다.
+
+> **측정에 `contentOffset` 산술을 쓰지 않습니다 — 그것이 검증 대상이기 때문입니다.**
+> 세 값(잉크 / 텍스트 마커 / viewport 원점) 모두 **UIKit `convert(_:to:)`** 로만 얻습니다.
+> 컨테이너 이동은 `viewportOrigin` 을 빼서 제거합니다. 이 항이 없으면 헤더 접힘 애니메이션만으로
+> **105pt 짜리 가짜 FAIL** 이 납니다 — 그 근거와 기준 1 의 정의는 §11 에 적었습니다.
+
+| 프로브 | 위치 |
+|---|---|
+| v1 / v88 / v176 | 장 상단·중간·하단. 세 곳 전부 0.00 |
+
+#### launch argument 무인 시나리오
+
+터치 주입 수단이 없어 시나리오를 인자로 구동합니다. 결과가 HUD 로그로 남아
+**스크린샷 한 장에 시나리오 전체 판정이 찍힙니다.**
+
+| 인자 | 뜻 |
+|---|---|
+| `-CanvasScrollSpike` | 하네스 진입 (필수) |
+| `-CanvasScrollSpikeMode A` / `B` | 호스팅 구조 선택 (기본 B) |
+| `-CanvasScrollSpikeAuto` | 8개 시나리오 무인 실행 |
+| `-CanvasScrollSpikeJump <pt>` | 지정 offset 으로 이동해 정지 (깊은 위치 렌더 확인) |
+| `-CanvasScrollSpikeLeftHanded` | 통과 기준 4 |
+| `-CanvasScrollSpikeNarrow` | 통과 기준 3 (필사 컬럼 폭 축소) |
+| `-CanvasScrollSpikeAnyInput` | `.anyInput` ↔ `.pencilOnly` |
+| `-CanvasScrollSpikeNormalizeA` | A 의 "A정규화" 활성화 |
+
+#### ⚠️ 환경 제약 2건 — 고치지 않고 기록합니다
+
+| # | 제약 | 영향 | 왜 해소하지 않았는가 |
+|---|---|---|---|
+| 1 | 시뮬레이터 **터치 주입 도구가 `xcode-select` 설정 때문에 사용 불가** | §11 기준 2 의 **관성 fling**, 기준 5 의 **탭/롱프레스 동작** 미검증 (기준 5 는 `tapGR=1`·`longGR=3` 이 draw/pan 과 동시 활성임을 **구조로만** 확인) | 해소하려면 `sudo xcode-select` 로 **시스템 설정을 바꿔야** 합니다. 검증 목적으로 개발 머신의 전역 툴체인 선택을 변경하지 않았습니다 |
+| 2 | **`vmmap` 권한 오류** | §11 기준 11 의 A/B **상대 메모리 비교 미측정** | 시뮬레이터 수치는 애초에 △(상대 비교 전용)이고, 절대값은 D5 에서 실기기로 얻습니다 |
+
+> 두 제약 모두 **실기기(Phase 0A-D)에서는 성립하지 않습니다.** D1/D2 를 수행할 때
+> 같은 하네스를 실기기에서 그대로 돌리면 fling·탭/롱프레스·메모리가 함께 해소됩니다 (§13).
+
+#### 이 커밋이 설계에 남긴 것
+
+| 항목 | 반영 위치 |
+|---|---|
+| A/B 가 수치로 구별되지 않음 → **판정 D1/D2 로 이월** | §11 · §12 · §13 |
+| 기준 1 의 "오차" 정의 (컨테이너 이동 배제) | §11 |
+| B 의 캔버스 좌표 = layout 좌표 + `columnOrigin` | §5 |
+| B 의 하단 safe area 미반영 (`contentInsetAdjustmentBehavior = .never`) | §5 (신규 미결) |
+| `StableCanvasView` 가 별도 파일이 아니라는 정정 | §2 D5 · 부록 |
+| S3 잔여분이 "실측 줄 수" 로 좁혀짐 | §13 · §16 |
