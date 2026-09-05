@@ -96,22 +96,8 @@ public enum DrawingSchemaV3: VersionedSchema {
     }
 }
 
-public typealias BibleDrawing = DrawingSchemaV3.BibleDrawing
-public typealias BiblePageDrawing = DrawingSchemaV3.BiblePageDrawing
-
-extension Array where Element == BibleDrawing {
-    /// 여러 BibleDrawing 중 메인 Drawing 하나를 선택
-     /// 1. isPresent == true 가 있으면 그걸 우선
-     /// 2. 없으면 updateDate 기준으로 최신 것을 선택
-     public func mainDrawing() -> BibleDrawing? {
-         // 1) isPresent == true 데이터 우선
-         if let active = self.first(where: { $0.isPresent == true }) {
-             return active
-         }
-         
-         // 2) updateDate 기준 최신 데이터
-         return self.max {
-             ($0.updateDate ?? .distantPast) < ($1.updateDate ?? .distantPast)
-         }
-     }
-}
+// MARK: - 별칭은 V4 로 이동했습니다
+//
+// `BibleDrawing` / `BiblePageDrawing` 별칭과 `Array.mainDrawing()` 은
+// **현재 스키마**를 가리키는 표현이므로 DrawingSchemaV4.swift 로 옮겼습니다.
+// 이 파일은 V1·V2 와 마찬가지로 **동결된 과거 스키마 정의**만 담습니다.
