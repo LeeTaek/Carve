@@ -66,6 +66,10 @@ struct ChapterLayoutMeasurement: Equatable, Sendable {
     private(set) var savedBandCounts: [Int: Int] = [:]
     /// 절별 캔버스 영역의 실측 frame (`ChapterLayoutHosting.coordinateSpaceName` 좌표). **검증 전용.**
     private(set) var measuredFrames: [Int: CGRect] = [:]
+    /// 절별 행 frame (콘텐츠 좌표) — `measuredFrames` 를 만들기 위한 절반.
+    private(set) var rowFrames: [Int: CGRect] = [:]
+    /// 절별 캔버스 영역 (행 안 좌표) — 나머지 절반.
+    private(set) var canvasFramesInRow: [Int: CGRect] = [:]
     /// 필사 컬럼 폭 (= 절 캔버스 폭 = `ChapterLayout.writingWidth`).
     private(set) var writingWidth: CGFloat = 0
     /// 전 절 측정으로 완성된 레이아웃. 게이트 판정은 이 값과 `expectedVerseCount` 로 한다.
@@ -146,6 +150,8 @@ struct ChapterLayoutMeasurement: Equatable, Sendable {
         textMeasurements = [:]
         titleHeights = [:]
         measuredFrames = [:]
+        rowFrames = [:]
+        canvasFramesInRow = [:]
         layout = nil
         buildCount = 0
         measureStartedAt = now
@@ -204,6 +210,31 @@ struct ChapterLayoutMeasurement: Equatable, Sendable {
         guard verses.contains(verse), measuredFrames[verse] != frame else { return false }
         measuredFrames[verse] = frame
         return true
+    }
+
+    /// 행 frame(콘텐츠 좌표)을 기록하고, 행 안 캔버스 영역이 이미 있으면 둘을 합쳐 `measuredFrames` 를 갱신한다.
+    /// - Returns: `measuredFrames` 가 실제로 바뀌었으면 true.
+    @discardableResult
+    mutating func recordRowFrame(verse: Int, frame: CGRect) -> Bool {
+        guard verses.contains(verse) else { return false }
+        rowFrames[verse] = frame
+        return combineFrames(verse: verse)
+    }
+
+    /// 행 안 캔버스 영역(행 좌표)을 기록하고, 행 frame 이 이미 있으면 둘을 합쳐 `measuredFrames` 를 갱신한다.
+    /// - Returns: `measuredFrames` 가 실제로 바뀌었으면 true.
+    @discardableResult
+    mutating func recordCanvasFrameInRow(verse: Int, frame: CGRect) -> Bool {
+        guard verses.contains(verse) else { return false }
+        canvasFramesInRow[verse] = frame
+        return combineFrames(verse: verse)
+    }
+
+    private mutating func combineFrames(verse: Int) -> Bool {
+        guard let row = rowFrames[verse], let inner = canvasFramesInRow[verse] else { return false }
+        return recordFrame(verse: verse, frame: CGRect(
+            x: row.minX + inner.minX, y: row.minY + inner.minY, width: inner.width, height: inner.height
+        ))
     }
 
     // MARK: 레이아웃 계산

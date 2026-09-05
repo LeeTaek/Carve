@@ -38,6 +38,13 @@ enum ChapterLayoutHosting {
     /// 헤더 padding 이나 스크롤 offset 은 이 공간 **밖**이므로 실측 frame 에 섞이지 않는다.
     static let coordinateSpaceName = "ChapterContent"
 
+    /// 절 행 **안**의 좌표 공간 이름. 행의 루트 `VStack` 에 붙인다.
+    ///
+    /// 행 본문은 `touchIgnoringContextMenu` 가 만드는 중첩 `UIHostingController` 안에 있어 바깥 `ChapterContent` 공간을
+    /// 볼 수 없다 — 이름이 해석되지 않으면 SwiftUI 는 **조용히 global 로 대체**한다 (Phase 3 실측: named == global).
+    /// 그래서 캔버스 영역은 행 안에서 이 공간으로 재고, 행 자체의 frame 은 바깥 트리에서 `ChapterContent` 로 재어 합친다.
+    static let rowCoordinateSpaceName = "VerseRow"
+
     /// 빌더에 넘길 배치 여백. 행 padding 과 stack spacing 을 `writingRect` 사이의 gap 으로 환산한 값이다.
     ///
     /// ```

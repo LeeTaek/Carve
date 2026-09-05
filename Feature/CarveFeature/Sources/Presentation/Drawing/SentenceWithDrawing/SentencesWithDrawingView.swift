@@ -40,8 +40,9 @@ public struct SentencesWithDrawingView: View, Equatable {
     let onUnderlineLayoutChange: (VerseRowFeature.State.ID, Text.LayoutKey.Value) -> Void
     /// 소제목 높이 실측 → 상위(`CarveDetailFeature`)로 전달. 레이아웃의 `leadingInset` 이 된다.
     let onTitleHeightChange: (VerseRowFeature.State.ID, CGFloat) -> Void
-    /// 캔버스 영역의 실측 frame(`ChapterLayoutHosting.coordinateSpaceName` 좌표) → 상위로 전달. 레이아웃 검증용.
-    let onCanvasFrameChange: (VerseRowFeature.State.ID, CGRect) -> Void
+    /// 캔버스 영역의 실측 frame(**행 안** `ChapterLayoutHosting.rowCoordinateSpaceName` 좌표) → 상위로 전달. 레이아웃 검증용.
+    /// 행 자체의 frame 은 상위가 바깥 트리에서 재어 더한다 (중첩 호스팅 때문 — `rowCoordinateSpaceName` 참조).
+    let onCanvasFrameInRowChange: (VerseRowFeature.State.ID, CGRect) -> Void
 
     
     public init(
@@ -51,7 +52,7 @@ public struct SentencesWithDrawingView: View, Equatable {
         isCanvasActive: Bool = true,
         onUnderlineLayoutChange: @escaping (VerseRowFeature.State.ID, Text.LayoutKey.Value) -> Void,
         onTitleHeightChange: @escaping (VerseRowFeature.State.ID, CGFloat) -> Void = { _, _ in },
-        onCanvasFrameChange: @escaping (VerseRowFeature.State.ID, CGRect) -> Void = { _, _ in }
+        onCanvasFrameInRowChange: @escaping (VerseRowFeature.State.ID, CGRect) -> Void = { _, _ in }
     ) {
         self.store = store
         self._halfWidth = halfWidth
@@ -59,7 +60,7 @@ public struct SentencesWithDrawingView: View, Equatable {
         self.isCanvasActive = isCanvasActive
         self.onUnderlineLayoutChange = onUnderlineLayoutChange
         self.onTitleHeightChange = onTitleHeightChange
-        self.onCanvasFrameChange = onCanvasFrameChange
+        self.onCanvasFrameInRowChange = onCanvasFrameInRowChange
     }
     
     public var body: some View {
@@ -87,6 +88,8 @@ public struct SentencesWithDrawingView: View, Equatable {
             .animation(.easeInOut(duration: 0.3), value: store.isLeftHanded)
             .padding(.vertical, ChapterLayoutHosting.rowVerticalPadding)
         }
+        // 행 안 실측의 기준 공간. 아래 touchIgnoringContextMenu 의 중첩 호스팅 안쪽이라 바깥 공간은 보이지 않는다.
+        .coordinateSpace(name: ChapterLayoutHosting.rowCoordinateSpaceName)
         .touchIgnoringContextMenu(ignoringType: .pencil) {
             UIMenu(children: [
                 UIAction(title: "이전 필사 내용 보기") {_ in send(.presentDrewHistory(true)) }
@@ -127,9 +130,9 @@ public struct SentencesWithDrawingView: View, Equatable {
         }
         .frame(width: halfWidth, alignment: .topTrailing)
         .onGeometryChange(for: CGRect.self) { proxy in
-            proxy.frame(in: .named(ChapterLayoutHosting.coordinateSpaceName))
+            proxy.frame(in: .named(ChapterLayoutHosting.rowCoordinateSpaceName))
         } action: { frame in
-            onCanvasFrameChange(store.id, frame)
+            onCanvasFrameInRowChange(store.id, frame)
         }
     }
     

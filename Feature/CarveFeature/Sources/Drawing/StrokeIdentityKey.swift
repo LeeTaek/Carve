@@ -23,7 +23,7 @@ import PencilKit
 ///
 /// > 저장 내용이 바뀌었는지(dirty)는 이 키가 아니라 `StrokeContentSignature` 로 판정한다.
 /// > 하나의 키로 둘 다 하면 "승계는 됐지만 지우기가 저장되지 않는" D7 이 재발한다.
-struct StrokeIdentityKey: Hashable, Sendable {
+public struct StrokeIdentityKey: Hashable, Sendable {
     /// `PKStroke.randomSeed` (iOS 16+).
     let randomSeed: UInt32
     /// `PKStrokePath.creationDate` 의 epoch 초.

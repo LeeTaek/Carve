@@ -37,6 +37,24 @@ public struct CarveDetailFeature {
         var layoutSignpostID: UInt64?
         /// 마지막으로 편집(획 추가/지우개)이 올라온 절. 디버그 오버레이의 dirtyBounds 표시용.
         var lastEditedVerseID: SentencesWithDrawingFeature.State.ID?
+
+        // MARK: Phase 3 — feature flag 뒤 단일 Canvas (설계 §13 Phase 3)
+
+        /// 단일 Canvas 경로 사용 여부. 기본 off — flag off 가 §10-3 의 유일한 롤백 수단이다.
+        /// UI 토글은 아직 없다. `defaults write kr.co.carve.leetaek singleCanvasEnabled -bool YES` 또는 Debug 실행 인자 `-SingleCanvas`.
+        @Shared(.appStorage("singleCanvasEnabled")) public var isSingleCanvasEnabled: Bool = false
+        /// 단일 Canvas 상태. flag off 일 때는 아무 액션도 받지 않는다.
+        var chapterCanvas = ChapterCanvasFeature.State(chapter: .initialState)
+        /// 외부 진입(차트 등)으로 이동할 절 번호. 단일 Canvas 는 `ScrollViewProxy` 가 없어 절 번호로 스크롤한다.
+        var scrollTargetVerse: Int?
+
+        /// flag 또는 Debug 실행 인자로 단일 Canvas 를 쓸지.
+        public var usesSingleCanvas: Bool {
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("-SingleCanvas") { return true }
+            #endif
+            return isSingleCanvasEnabled
+        }
         
         /// 성경 문장 출력시 자간 폰트 등 설정
         @Shared(.appStorage("sentenceSetting")) public var sentenceSetting: SentenceSetting = .initialState
@@ -84,6 +102,8 @@ public struct CarveDetailFeature {
             case verseGeometryMeasured([VerseRowFeature.State.ID: VerseRowGeometry])
             /// 필사 컬럼 폭이 바뀜 (Phase 2 — `ChapterLayout.writingWidth`)
             case layoutHostingChanged(writingWidth: CGFloat)
+            /// 앱이 비활성/백그라운드로 감 — 단일 Canvas 의 미저장분을 저장한다 (§8-5, best-effort)
+            case appWillResignActive
         }
     }
 
@@ -91,6 +111,8 @@ public struct CarveDetailFeature {
     public enum ScopeAction {
         case sentenceWithDrawingAction(IdentifiedActionOf<SentencesWithDrawingFeature>)
         case headerAction(HeaderFeature.Action)
+        /// Phase 3 — 단일 Canvas
+        case chapterCanvasAction(ChapterCanvasFeature.Action)
 //        case canvasAction(CombinedCanvasFeature.Action)
     }
     
@@ -105,6 +127,10 @@ public struct CarveDetailFeature {
         Scope(state: \.headerState,
               action: \.scope.headerAction) {
             HeaderFeature()
+        }
+        Scope(state: \.chapterCanvas,
+              action: \.scope.chapterCanvasAction) {
+            ChapterCanvasFeature()
         }
 
         Reduce { state, action in
@@ -136,21 +162,37 @@ public struct CarveDetailFeature {
                 state.sentenceWithDrawingState = sentenceState
                 undoManager.clear()
                 beginLayoutMeasurement(state: &state, sentences: sentences)
-                return .none
+                guard state.usesSingleCanvas else { return .none }
+                // 단일 Canvas: 본문이 확정된 시점에 조회를 시작한다 (§6-4). 레이아웃은 실측이 끝나면 따로 들어간다.
+                let chapter = sentences.first?.title ?? state.headerState.currentTitle
+                return .send(.scope(.chapterCanvasAction(.load(chapter: chapter, expectedVerseCount: sentences.count))))
                 
             case .setScrollTarget(let verse):
                 state.scrollTargetID = makeSentenceID(for: verse)
+                state.scrollTargetVerse = verse.verse
                 return .none
                 
             case .view(.verseGeometryMeasured(let batch)):
                 applyVerseGeometry(state: &state, batch: batch)
-                return .none
+                return forwardLayoutToSingleCanvas(state: &state)
 
             case .view(.layoutHostingChanged(let writingWidth)):
                 if state.chapterLayout.setWritingWidth(writingWidth) {
                     rebuildLayoutIfNeeded(state: &state)
                 }
-                return .none
+                return forwardLayoutToSingleCanvas(state: &state)
+
+            case .view(.appWillResignActive):
+                guard state.usesSingleCanvas else { return .none }
+                return .send(.scope(.chapterCanvasAction(.flushPending)))
+
+            case .scope(.headerAction(.palatteAction(.view(.undo)))):
+                guard state.usesSingleCanvas else { return .none }
+                return .send(.scope(.chapterCanvasAction(.undoTapped)))
+
+            case .scope(.headerAction(.palatteAction(.view(.redo)))):
+                guard state.usesSingleCanvas else { return .none }
+                return .send(.scope(.chapterCanvasAction(.redoTapped)))
                 
             case .view(.setProxy(let proxy)):
                 state.proxy = proxy
@@ -309,9 +351,12 @@ extension CarveDetailFeature {
                state.chapterLayout.recordTitleHeight(verse: verse, height: height) {
                 layoutInputChanged = true
             }
-            if let frame = geometry.canvasFrame {
-                // 검증 전용 입력이다. 레이아웃 계산에 쓰지 않으므로 재계산 조건에 넣지 않는다.
-                state.chapterLayout.recordFrame(verse: verse, frame: frame)
+            // 검증 전용 입력이다. 레이아웃 계산에 쓰지 않으므로 재계산 조건에 넣지 않는다.
+            if let frame = geometry.rowFrame {
+                state.chapterLayout.recordRowFrame(verse: verse, frame: frame)
+            }
+            if let frame = geometry.canvasFrameInRow {
+                state.chapterLayout.recordCanvasFrameInRow(verse: verse, frame: frame)
             }
         }
         if layoutInputChanged {
@@ -376,13 +421,36 @@ extension CarveDetailFeature {
     
     /// ScrollView 맨 위로 스크롤
     private func scrollToTop(state: inout State) -> Effect<Action> {
+        if state.usesSingleCanvas {
+            let verse = state.scrollTargetVerse ?? state.sentenceWithDrawingState.first?.sentence.verse
+            state.scrollTargetID = nil
+            state.scrollTargetVerse = nil
+            guard let verse else { return .none }
+            return .send(.scope(.chapterCanvasAction(.scrollToVerse(verse))))
+        }
         let id = state.scrollTargetID ?? state.sentenceWithDrawingState.first?.id
         guard let id else { return .none }
         state.scrollTargetID = nil
+        state.scrollTargetVerse = nil
         withAnimation(.easeInOut(duration: 0.5)) {
             state.proxy?.scrollTo(id, anchor: .bottom)
         }
         return .none
+    }
+
+    /// Phase 3 — 완성된 `ChapterLayout` 과 `columnOrigin` 을 단일 Canvas 에 넘긴다. 값이 바뀐 것만 보낸다.
+    ///
+    /// `columnOrigin` 의 y 는 0 이다 — 헤더는 `contentInset.top` 으로 비우므로 콘텐츠 좌표는 헤더와 무관하다.
+    private func forwardLayoutToSingleCanvas(state: inout State) -> Effect<Action> {
+        guard state.usesSingleCanvas, let layout = state.chapterLayout.layout else { return .none }
+        var effects: [Effect<Action>] = []
+        if let origin = state.chapterLayout.columnOrigin, origin != state.chapterCanvas.columnOrigin {
+            effects.append(.send(.scope(.chapterCanvasAction(.columnOriginChanged(origin)))))
+        }
+        if layout != state.chapterCanvas.layout && layout != state.chapterCanvas.pendingLayout {
+            effects.append(.send(.scope(.chapterCanvasAction(.layoutCompleted(layout)))))
+        }
+        return effects.isEmpty ? .none : .merge(effects)
     }
     
 //    

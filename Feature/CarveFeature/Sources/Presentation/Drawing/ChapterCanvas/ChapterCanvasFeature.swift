@@ -16,7 +16,7 @@ import ComposableArchitecture
 // MARK: - 편집 계약 DTO (설계 §5 · §8-1)
 
 /// 편집 종료 시점 스냅샷 (PencilKit 타입 없음).
-struct CanvasEditSnapshot: Equatable, Sendable {
+public struct CanvasEditSnapshot: Equatable, Sendable {
     /// 편집 직후 캔버스 content 좌표 drawing.
     let drawingData: Data
     /// 변경 영역. 디버그 표시용이며 저장 계산에는 쓰지 않는다.
@@ -24,7 +24,7 @@ struct CanvasEditSnapshot: Equatable, Sendable {
     let reason: EditReason
 }
 
-enum EditReason: Equatable, Sendable { case ink, erase, undo, redo }
+public enum EditReason: Equatable, Sendable { case ink, erase, undo, redo }
 
 /// 저장 중 도착한 최신 편집을 보호하기 위해 revision 과 장을 함께 보관한다 (§8-3).
 struct PendingDrawingMutation: Equatable, Sendable {
@@ -41,7 +41,7 @@ enum SaveStatus: Equatable, Sendable {
 }
 
 /// 조회 실패. `Error` 는 Equatable 이 아니라 메시지만 옮긴다.
-struct DrawingLoadFailure: Error, Equatable, Sendable {
+public struct DrawingLoadFailure: Error, Equatable, Sendable {
     let message: String
 }
 
@@ -66,9 +66,9 @@ struct DrawingLoadFailure: Error, Equatable, Sendable {
 /// 레이아웃·`columnOrigin` 변경과 히스토리 복원은 **미저장분을 먼저 저장한 뒤 DB 에서 다시 합성**한다.
 /// 캔버스에는 아직 저장되지 않은 잉크가 있을 수 있는데, DB 스냅샷으로 곧바로 다시 합성하면 그 잉크가 화면에서 사라지기 때문이다.
 @Reducer
-struct ChapterCanvasFeature {
+public struct ChapterCanvasFeature {
     @ObservableState
-    struct State: Equatable {
+    public struct State: Equatable {
         var chapter: BibleChapter
 
         // §6-4 — 도착 순서가 보장되지 않는 두 입력과 게이트
@@ -108,12 +108,23 @@ struct ChapterCanvasFeature {
         var reloadWhenSettled = false
         var isReloading = false
 
-        var canUndo = false
-        var canRedo = false
+        /// 헤더 팔레트가 읽는 undo/redo 가능 여부 — `PencilPalatteFeature` 와 같은 in-memory 키를 공유한다.
+        @Shared(.inMemory("canUndo")) var canUndo: Bool = false
+        @Shared(.inMemory("canRedo")) var canRedo: Bool = false
+        /// 뷰가 캔버스의 undoManager 에 undo/redo 를 수행하도록 하는 요청 카운터.
+        var undoRequestVersion = 0
+        var redoRequestVersion = 0
+        /// 특정 절로 스크롤 요청 (차트 등 외부 진입). 토큰이 바뀔 때만 뷰가 수행한다.
+        var scrollRequest: ScrollRequest?
 
         struct QueuedEdit: Equatable, Sendable {
             let revision: Int
             let snapshot: CanvasEditSnapshot
+        }
+
+        struct ScrollRequest: Equatable, Sendable {
+            let verse: Int
+            let token: Int
         }
 
         init(chapter: BibleChapter) {
@@ -129,7 +140,7 @@ struct ChapterCanvasFeature {
         }
     }
 
-    enum Action: Equatable {
+    public enum Action: Equatable {
         /// 장 진입. 이전 장의 미저장분은 버리지 않고 자기 장으로 저장된다.
         case load(chapter: BibleChapter, expectedVerseCount: Int)
         case drawingsLoaded(requestID: UUID, Result<[VerseDrawingSnapshot], DrawingLoadFailure>)
@@ -138,6 +149,8 @@ struct ChapterCanvasFeature {
 
         case editBegan
         case editEnded(CanvasEditSnapshot)
+        /// 도구는 댔지만 drawing 이 바뀌지 않은 경우 (탭 등). 보류된 레이아웃을 적용한다.
+        case editCancelled
         case mutationsPrepared(revision: Int, DrawingEditResult)
         case saveFinished(revision: Int, failure: DrawingRepositoryError?)
         /// 장 전환 · 백그라운드 진입 시 대기열 저장 (§8-5). 실패했던 저장의 재시도이기도 하다.
@@ -145,13 +158,16 @@ struct ChapterCanvasFeature {
         /// 히스토리에서 다른 회차를 선택해 `isPresent` 가 바뀐 뒤. mutation 을 만들지 않고 다시 합성한다 (§8-7).
         case verseRowRestored(verse: Int, rowID: BibleDrawingRowID)
         case undoStateChanged(canUndo: Bool, canRedo: Bool)
+        case undoTapped
+        case redoTapped
+        case scrollToVerse(Int)
     }
 
     @Dependency(\.drawingCodec) var codec
     @Dependency(\.drawingRepository) var repository
     @Dependency(\.uuid) var uuid
 
-    var body: some Reducer<State, Action> {
+    public var body: some Reducer<State, Action> {
         Reduce { state, action in
             switch action {
             case .load(let chapter, let expectedVerseCount):
@@ -188,6 +204,12 @@ struct ChapterCanvasFeature {
                 state.isEditing = true
                 return .none
 
+            case .editCancelled:
+                state.isEditing = false
+                guard let pending = state.pendingLayout else { return .none }
+                state.pendingLayout = nil
+                return applyLayout(state: &state, layout: pending)
+
             case .editEnded(let snapshot):
                 state.isEditing = false
                 state.editRevision += 1
@@ -213,8 +235,23 @@ struct ChapterCanvasFeature {
                 return reloadAfterSettling(state: &state)
 
             case .undoStateChanged(let canUndo, let canRedo):
-                state.canUndo = canUndo
-                state.canRedo = canRedo
+                state.$canUndo.withLock { $0 = canUndo }
+                state.$canRedo.withLock { $0 = canRedo }
+                return .none
+
+            case .undoTapped:
+                guard state.isInputEnabled, state.canUndo else { return .none }
+                state.undoRequestVersion += 1
+                return .none
+
+            case .redoTapped:
+                guard state.isInputEnabled, state.canRedo else { return .none }
+                state.redoRequestVersion += 1
+                return .none
+
+            case .scrollToVerse(let verse):
+                let token = (state.scrollRequest?.token ?? 0) + 1
+                state.scrollRequest = State.ScrollRequest(verse: verse, token: token)
                 return .none
             }
         }
@@ -242,8 +279,9 @@ extension ChapterCanvasFeature {
         state.isEditing = false
         state.isReloading = false
         state.reloadWhenSettled = false
-        state.canUndo = false
-        state.canRedo = false
+        state.scrollRequest = nil
+        state.$canUndo.withLock { $0 = false }
+        state.$canRedo.withLock { $0 = false }
         return requestLoad(state: &state)
     }
 

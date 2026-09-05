@@ -28,7 +28,7 @@ import PencilKit
 /// - Note: PencilKit 타입에서 유도되는 키를 담으므로 Domain 이 아니라 `CarveFeature` 에 둔다.
 ///         P9("Feature 는 PencilKit 을 모른다")의 경계는 모듈이 아니라 **Reducer** 이며,
 ///         `CarveFeature` 는 이미 PencilKit 을 의존한다(설계 §4). Reducer 에서 쓰지 않기만 하면 된다.
-struct OwnershipSnapshot: Equatable, Sendable {
+public struct OwnershipSnapshot: Equatable, Sendable {
     /// 원본 획 → 절 번호.
     let map: [StrokeIdentityKey: Int]
     /// 이 소유권이 성립한 레이아웃의 signature.

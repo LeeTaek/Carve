@@ -317,7 +317,8 @@ struct VerseGeometryCollectorTesting {
         collector.onFlush = { received.append($0) }
 
         collector.reportUnderlineOffsets(id: "창세기.1.1", offsets: [30, 60])
-        collector.reportCanvasFrame(id: "창세기.1.1", frame: CGRect(x: 382, y: 2, width: 372, height: 60))
+        collector.reportRowFrame(id: "창세기.1.1", frame: CGRect(x: 10, y: 2, width: 733, height: 60))
+        collector.reportCanvasFrameInRow(id: "창세기.1.1", frame: CGRect(x: 372, y: 0, width: 372, height: 60))
         collector.reportTitleHeight(id: "창세기.1.2", height: 26)
         collector.reportUnderlineOffsets(id: "창세기.1.1", offsets: [30])   // 나중 값이 이긴다
         #expect(received.isEmpty)
@@ -327,7 +328,8 @@ struct VerseGeometryCollectorTesting {
         #expect(received.count == 1)
         #expect(received.first?["창세기.1.1"] == VerseRowGeometry(
             underlineOffsets: [30],
-            canvasFrame: CGRect(x: 382, y: 2, width: 372, height: 60)
+            rowFrame: CGRect(x: 10, y: 2, width: 733, height: 60),
+            canvasFrameInRow: CGRect(x: 372, y: 0, width: 372, height: 60)
         ))
         #expect(received.first?["창세기.1.2"] == VerseRowGeometry(titleHeight: 26))
         #expect(collector.pendingGeometry.isEmpty)
@@ -356,12 +358,13 @@ struct VerseGeometryCollectorTesting {
 
     @Test("merge 에서 nil 은 '보고 없음' 이라 기존 값을 지우지 않는다")
     func mergeKeepsExistingFieldsWhenOtherIsNil() {
-        var geometry = VerseRowGeometry(underlineOffsets: [30], titleHeight: 26, canvasFrame: .zero)
-        geometry.merge(VerseRowGeometry(canvasFrame: CGRect(x: 1, y: 2, width: 3, height: 4)))
+        var geometry = VerseRowGeometry(underlineOffsets: [30], titleHeight: 26, rowFrame: .zero, canvasFrameInRow: .zero)
+        geometry.merge(VerseRowGeometry(canvasFrameInRow: CGRect(x: 1, y: 2, width: 3, height: 4)))
 
         #expect(geometry.underlineOffsets == [30])
         #expect(geometry.titleHeight == 26)
-        #expect(geometry.canvasFrame == CGRect(x: 1, y: 2, width: 3, height: 4))
+        #expect(geometry.rowFrame == .zero)
+        #expect(geometry.canvasFrameInRow == CGRect(x: 1, y: 2, width: 3, height: 4))
     }
 }
 
@@ -431,7 +434,11 @@ struct CarveDetailLayoutMeasurementTesting {
         reduce(&state, .setSentence(sentences(count: 3), []))
 
         measured(&state, [
-            rowID(1): VerseRowGeometry(underlineOffsets: [30], canvasFrame: CGRect(x: 382, y: 2, width: 372, height: 55)),
+            rowID(1): VerseRowGeometry(
+                underlineOffsets: [30],
+                rowFrame: CGRect(x: 10, y: 2, width: 733, height: 55),
+                canvasFrameInRow: CGRect(x: 372, y: 0, width: 372, height: 55)
+            ),
             rowID(2): VerseRowGeometry(underlineOffsets: [30, 60], titleHeight: 26),
             rowID(3): VerseRowGeometry(underlineOffsets: [30])
         ])
@@ -439,6 +446,7 @@ struct CarveDetailLayoutMeasurementTesting {
         #expect(state.isLayoutReady)
         #expect(state.chapterLayout.buildCount == 1)
         #expect(state.chapterLayout.titleHeights[2] == 26)
+        // 행 frame(콘텐츠) + 행 안 캔버스 영역 = 콘텐츠 좌표의 캔버스 영역.
         #expect(state.chapterLayout.measuredFrames[1] == CGRect(x: 382, y: 2, width: 372, height: 55))
     }
 
@@ -464,7 +472,8 @@ struct CarveDetailLayoutMeasurementTesting {
             rowID(1): VerseRowGeometry(
                 underlineOffsets: [30, 60],
                 titleHeight: 20,
-                canvasFrame: CGRect(x: 0, y: 0, width: 1, height: 1)
+                rowFrame: CGRect(x: 0, y: 0, width: 1, height: 1),
+                canvasFrameInRow: CGRect(x: 0, y: 0, width: 1, height: 1)
             )
         ])
 
@@ -499,7 +508,10 @@ struct CarveDetailLayoutMeasurementTesting {
         #expect(state.chapterLayout.layout != before)
 
         let frame = CGRect(x: 382, y: 2, width: 372, height: 55)
-        measured(&state, [rowID(1): VerseRowGeometry(canvasFrame: frame)])
+        // 한쪽만 오면 아직 합칠 수 없다.
+        measured(&state, [rowID(1): VerseRowGeometry(rowFrame: CGRect(x: 10, y: 2, width: 733, height: 55))])
+        #expect(state.chapterLayout.measuredFrames[1] == nil)
+        measured(&state, [rowID(1): VerseRowGeometry(canvasFrameInRow: CGRect(x: 372, y: 0, width: 372, height: 55))])
         #expect(state.chapterLayout.measuredFrames[1] == frame)
         #expect(state.chapterLayout.buildCount == 2)
         #expect(state.chapterLayout.columnOrigin == CGPoint(x: 382, y: 0))

@@ -14,6 +14,7 @@ import ComposableArchitecture
 @ViewAction(for: CarveDetailFeature.self)
 public struct CarveDetailView: View {
     @Bindable public var store: StoreOf<CarveDetailFeature>
+    @Environment(\.scenePhase) private var scenePhase
     @State private(set) var halfWidth: CGFloat = 0
     /// 행들의 실측 콜백을 모아 런루프 한 번에 한 액션으로 보내는 수집기 (Phase 2).
     /// 참조 객체이므로 `@State` 는 수명만 잡아 줄 뿐, 값이 바뀌어도 뷰를 다시 그리지 않는다.
@@ -63,8 +64,16 @@ public struct CarveDetailView: View {
         if ChapterLayoutDebugScenario.isScrollEnabled {
             Task { @MainActor in
                 await ChapterLayoutDebugScenario.runScroll(
-                    verseIDs: { store.sentenceWithDrawingState.map(\.id) },
-                    proxy: { store.proxy }
+                    verses: { store.sentenceWithDrawingState.map(\.sentence.verse) },
+                    scrollTo: { verse in
+                        if store.usesSingleCanvas {
+                            store.send(.scope(.chapterCanvasAction(.scrollToVerse(verse))))
+                        } else if let row = store.sentenceWithDrawingState.first(where: { $0.sentence.verse == verse }) {
+                            withAnimation(.easeInOut(duration: 0.4)) {
+                                store.proxy?.scrollTo(row.id, anchor: .bottom)
+                            }
+                        }
+                    }
                 )
             }
         }
@@ -119,7 +128,23 @@ public struct CarveDetailView: View {
         // "행 폭 → ScrollView 폭 → halfWidth → 행 폭" 이 발산한다 (Phase 2 실측: 372 → 376.7 → 381.3 → …, 고정점 1120).
         // LazyVStack 은 제안 폭을 그대로 보고해 이 순환이 드러나지 않았을 뿐이다.
         GeometryReader { container in
-            scrollBody
+            Group {
+                if store.usesSingleCanvas {
+                    singleCanvasBody
+                } else {
+                    scrollBody
+                }
+            }
+                .onAppear {
+                    geometryCollector.onFlush = { batch in
+                        send(.verseGeometryMeasured(batch))
+                    }
+                    send(.fetchSentence)
+                    startDebugScenarioIfNeeded()
+                }
+                .onChange(of: scenePhase) { _, phase in
+                    if phase != .active { send(.appWillResignActive) }
+                }
                 .onChange(of: container.size.width, initial: true) { _, width in
                     let half = width / 2
                     guard half > 0, half != halfWidth else { return }
@@ -215,13 +240,6 @@ public struct CarveDetailView: View {
 //                        )
 //                    }
                     .coordinateSpace(name: "CanvasSpace")
-                    .onAppear {
-                        geometryCollector.onFlush = { batch in
-                            send(.verseGeometryMeasured(batch))
-                        }
-                        send(.fetchSentence)
-                        startDebugScenarioIfNeeded()
-                    }
             }
             .onTapGesture {
                 send(.tapForHeaderHidden)
@@ -233,6 +251,30 @@ public struct CarveDetailView: View {
         }
     }
     
+    /// Phase 3 — 단일 Canvas (B 구조). `PKCanvasView` 가 유일한 스크롤 뷰이고 텍스트 컬럼은 그 안에 있다.
+    ///
+    /// 컬럼은 N-Canvas 경로와 **같은 행 뷰**를 캔버스 없이(`isCanvasActive: false`) 쓴다. 실측·게이트·오버레이도 같다.
+    /// 헤더는 콘텐츠를 밀지 않고 `contentInset.top` 으로 비우므로 컬럼에 상단 padding 을 주지 않는다.
+    private var singleCanvasBody: some View {
+        ChapterCanvasView(
+            store: store.scope(state: \.chapterCanvas, action: \.scope.chapterCanvasAction),
+            display: ChapterCanvasView.Display(store.chapterCanvas),
+            topInset: store.headerState.headerHeight,
+            column: AnyView(verseColumn(isCanvasActive: { _ in false })),
+            onScroll: { previous, current in
+                delay {
+                    send(.headerAnimation(previous, current))
+                }
+            }
+        )
+        .onTapGesture {
+            send(.tapForHeaderHidden)
+        }
+        .onTwoFingerDoubleTap {
+            send(.twoFingerDoubleTapForUndo)
+        }
+    }
+
     /// Phase 2 — `LazyVStack` 을 비지연 `VStack` 으로 전환 (설계 §6-1 · rev.15).
     ///
     /// 전 절의 geometry 가 있어야 장 전체 레이아웃이 성립하므로 보이는 절만 만드는 지연 스택을 쓸 수 없다.
@@ -240,6 +282,13 @@ public struct CarveDetailView: View {
     /// 뷰포트 근처에서만 만든다 — 실측 결과 캔버스까지 즉시 만들면 진입 비용이 (B)표 기준을 한 자릿수 넘었다 (설계 §20-8).
     /// 간격은 `ChapterLayoutHosting` 상수로 명시해 `ChapterLayoutBuilder` 가 같은 값으로 좌표를 예측하게 한다.
     private var contentView: some View {
+        verseColumn(isCanvasActive: { activeCanvasIDs.contains($0) })
+    }
+
+    /// 절 행 컬럼 — N-Canvas 경로와 단일 Canvas 경로가 공유한다. 차이는 행에 `PKCanvasView` 를 두는지뿐이다.
+    private func verseColumn(
+        isCanvasActive: @escaping (SentencesWithDrawingFeature.State.ID) -> Bool
+    ) -> some View {
         VStack(spacing: ChapterLayoutHosting.rowSpacing) {
             // 폭을 모르는 첫 패스에서는 행을 만들지 않는다 — 176개 행을 폭 0 으로 한 번 더 배치·실측하는 낭비를 막는다.
             if halfWidth > 0 {
@@ -252,7 +301,7 @@ public struct CarveDetailView: View {
                         store: childStore,
                         halfWidth: $halfWidth,
                         isLayoutReady: store.isLayoutReady,
-                        isCanvasActive: activeCanvasIDs.contains(childStore.id),
+                        isCanvasActive: isCanvasActive(childStore.id),
                         onUnderlineLayoutChange: { id, layout in
                             // 실측 콜백은 행마다 따로 오지만 액션은 수집기가 한 틱에 하나로 모은다.
                             geometryCollector.reportUnderlineOffsets(
@@ -266,13 +315,19 @@ public struct CarveDetailView: View {
                         onTitleHeightChange: { id, height in
                             geometryCollector.reportTitleHeight(id: id, height: height)
                         },
-                        onCanvasFrameChange: { id, frame in
-                            geometryCollector.reportCanvasFrame(id: id, frame: frame)
+                        onCanvasFrameInRowChange: { id, frame in
+                            geometryCollector.reportCanvasFrameInRow(id: id, frame: frame)
                         }
                     )
                     // 부모가 다시 그려져도(헤더 애니메이션 등) 입력이 같은 행은 body 를 건너뛴다.
                     // 비지연 VStack 에서는 행 176개가 전부 살아 있어 이 생략이 없으면 매 갱신이 행 수만큼 비싸진다.
                     .equatable()
+                    // 행 frame 은 **바깥 트리**에서 잰다 — 행 안은 중첩 호스팅이라 ChapterContent 공간을 보지 못한다.
+                    .onGeometryChange(for: CGRect.self) { proxy in
+                        proxy.frame(in: .named(ChapterLayoutHosting.coordinateSpaceName))
+                    } action: { [id = childStore.id] frame in
+                        geometryCollector.reportRowFrame(id: id, frame: frame)
+                    }
                     .padding(.horizontal, 10)
                 }
             }

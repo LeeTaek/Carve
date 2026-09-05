@@ -29,26 +29,26 @@ enum ChapterLayoutDebugScenario {
     static var isScrollEnabled: Bool { ProcessInfo.processInfo.arguments.contains(scrollArgument) }
     static var isNextChapterEnabled: Bool { ProcessInfo.processInfo.arguments.contains(nextChapterArgument) }
 
-    /// §18-3 (C) 근사. 절 목록을 11등분해 각 지점의 절이 화면 하단에 오도록 애니메이션 스크롤한다.
+    /// §18-3 (C) 근사. 절 목록을 11등분해 각 지점의 절이 화면 하단에 오도록 스크롤한다.
+    ///
+    /// 스크롤 수단은 호출부가 준다 — N-Canvas 는 `ScrollViewProxy`, 단일 Canvas 는 `scrollToVerse` 액션.
     /// - Parameters:
-    ///   - verseIDs: 스크롤 대상 행 id (본문 순서).
-    ///   - proxy: 현재 `ScrollViewProxy`.
+    ///   - verses: 스크롤 대상 절 번호 (본문 순서).
+    ///   - scrollTo: 절 하나로 스크롤하는 클로저.
     @MainActor
-    static func runScroll(verseIDs: @escaping () -> [String], proxy: @escaping () -> ScrollViewProxy?) async {
+    static func runScroll(verses: @escaping () -> [Int], scrollTo: @escaping (Int) -> Void) async {
         try? await Task.sleep(for: .seconds(8))
-        let ids = verseIDs()
+        let targets = verses()
         let steps = 11
-        guard !ids.isEmpty else {
+        guard !targets.isEmpty else {
             Log.info("AUTOSCROLL 대상 없음")
             return
         }
-        Log.info("AUTOSCROLL start", "verses=\(ids.count)")
+        Log.info("AUTOSCROLL start", "verses=\(targets.count)")
         for step in 1...steps {
-            let index = max(0, min(ids.count - 1, Int((Double(ids.count) * Double(step) / Double(steps)).rounded()) - 1))
-            withAnimation(.easeInOut(duration: 0.4)) {
-                proxy()?.scrollTo(ids[index], anchor: .bottom)
-            }
-            Log.info("AUTOSCROLL step", "\(step)/\(steps)", ids[index])
+            let index = max(0, min(targets.count - 1, Int((Double(targets.count) * Double(step) / Double(steps)).rounded()) - 1))
+            scrollTo(targets[index])
+            Log.info("AUTOSCROLL step", "\(step)/\(steps)", "verse=\(targets[index])")
             try? await Task.sleep(for: .seconds(1))
         }
         Log.info("AUTOSCROLL done")

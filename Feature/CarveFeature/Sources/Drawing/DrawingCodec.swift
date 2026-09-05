@@ -28,7 +28,7 @@ struct ComposedChapterDrawing: Equatable, Sendable {
 }
 
 /// 편집 하나의 계산 결과 (설계 §8-2).
-struct DrawingEditResult: Equatable, Sendable {
+public struct DrawingEditResult: Equatable, Sendable {
     /// 편집 후 소유권 (승계 반영).
     let ownership: OwnershipSnapshot
     /// 절 오름차순의 저장 명령. dirty 가 아닌 절은 없다.

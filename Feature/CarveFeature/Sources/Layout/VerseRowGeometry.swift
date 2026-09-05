@@ -17,20 +17,31 @@ public struct VerseRowGeometry: Equatable, Sendable {
     public var underlineOffsets: [CGFloat]?
     /// 절 위 소제목의 높이. 소제목이 없는 절은 보고하지 않는다.
     public var titleHeight: CGFloat?
-    /// 절 캔버스 영역의 frame — `ChapterLayoutHosting.coordinateSpaceName` 좌표.
-    public var canvasFrame: CGRect?
+    /// 행 전체의 frame — `ChapterLayoutHosting.coordinateSpaceName` 좌표 (바깥 트리에서 실측).
+    public var rowFrame: CGRect?
+    /// 캔버스 영역의 frame — **행 안** `ChapterLayoutHosting.rowCoordinateSpaceName` 좌표 (행 안에서 실측).
+    ///
+    /// 두 값을 더한 것이 콘텐츠 좌표의 캔버스 영역이다. 둘로 나눈 이유는 `ChapterLayoutHosting.rowCoordinateSpaceName` 참조.
+    public var canvasFrameInRow: CGRect?
 
-    public init(underlineOffsets: [CGFloat]? = nil, titleHeight: CGFloat? = nil, canvasFrame: CGRect? = nil) {
+    public init(
+        underlineOffsets: [CGFloat]? = nil,
+        titleHeight: CGFloat? = nil,
+        rowFrame: CGRect? = nil,
+        canvasFrameInRow: CGRect? = nil
+    ) {
         self.underlineOffsets = underlineOffsets
         self.titleHeight = titleHeight
-        self.canvasFrame = canvasFrame
+        self.rowFrame = rowFrame
+        self.canvasFrameInRow = canvasFrameInRow
     }
 
     /// 나중에 도착한 값으로 덮어쓴다. nil 은 "보고 없음" 이지 "지움" 이 아니다.
     public mutating func merge(_ other: VerseRowGeometry) {
         if let offsets = other.underlineOffsets { underlineOffsets = offsets }
         if let height = other.titleHeight { titleHeight = height }
-        if let frame = other.canvasFrame { canvasFrame = frame }
+        if let frame = other.rowFrame { rowFrame = frame }
+        if let frame = other.canvasFrameInRow { canvasFrameInRow = frame }
     }
 }
 
@@ -74,8 +85,12 @@ final class VerseGeometryCollector {
         report(id: id, VerseRowGeometry(titleHeight: height))
     }
 
-    func reportCanvasFrame(id: RowID, frame: CGRect) {
-        report(id: id, VerseRowGeometry(canvasFrame: frame))
+    func reportRowFrame(id: RowID, frame: CGRect) {
+        report(id: id, VerseRowGeometry(rowFrame: frame))
+    }
+
+    func reportCanvasFrameInRow(id: RowID, frame: CGRect) {
+        report(id: id, VerseRowGeometry(canvasFrameInRow: frame))
     }
 
     /// 모인 값을 즉시 흘려보낸다. 예약된 flush 는 취소되지 않지만 빈 상태에서는 아무것도 하지 않는다.
