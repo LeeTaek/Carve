@@ -17,6 +17,14 @@
 
 ## 0-A. 개정 이력
 
+### rev.4 — Phase 2 가 `os_signpost` 를 추가함 (정밀 layout 시간 측정 가능)
+
+§7-3 표가 "정밀 layout 시간 → `os_signpost` → 코드 변경 필요 → Phase 2 이월" 로 남긴 항목이 닫혔습니다.
+Phase 2 (설계 §20-8) 가 `ChapterLayoutSignpost` 를 추가해, Instruments **os_signpost** 계측기에서
+카테고리 **`ChapterLayout`** 의 `measure` 인터벌(장 진입 → 전 절 실측 완료 → 첫 레이아웃 완성)과
+`rebuild` 이벤트를 볼 수 있습니다. 같은 값은 Debug 빌드의 `Log.info("ChapterLayout 완성 …")` 로도 남습니다
+(시뮬레이터 실측: 시편 119편 176절 **0.71 s**, 설계 §20-8). **실기기에서는 아직 재지 않았습니다.**
+
 ### rev.3 — 실기기 실행 결과 반영 (D5 · D1 · D2 완료, 차단 전면 해제)
 
 **무엇이 바뀌었나 — 전제 하나가 해소됐습니다**
@@ -1771,7 +1779,7 @@ codesign -d --entitlements - \
 | **프레임 드랍 / hitch** | **Instruments `Animation Hitches`** | 스크롤 hitch 를 ms/s 비율로 정량화. §18-3 이 "`CADisplayLink` 또는 Instruments 필요" 로 이월한 항목 그대로 | ✅ 템플릿 존재 |
 | **CPU 분포** | **Instruments `Time Profiler`** | §18-3 의 "flick 중 한 코어 95~100%" 재현 확인 | ✅ 템플릿 존재 |
 | **레이아웃 비용 근사** | **Instruments `SwiftUI`** | View body 평가·Core Animation commit. 코드 변경 없이 얻을 수 있는 최선의 layout 근사 | ✅ 템플릿 존재 |
-| **정밀 layout 시간** | **`os_signpost`** | **코드 변경 필요 → Phase 2 이월.** 저장소에 signpost 0건 | ❌ 지금 불가 |
+| **정밀 layout 시간** | **`os_signpost`** | ~~코드 변경 필요 → Phase 2 이월. 저장소에 signpost 0건~~ → **rev.4: Phase 2 가 추가함** (카테고리 `ChapterLayout`, 인터벌 `measure`) | ✅ 가능 (실기기 미측정) |
 | **MetricKit** | **쓰지 않습니다 (지금은)** | ① 저장소에 `MetricKit` 0건 → 구독 코드 추가가 필요(코드 변경), ② 보고가 **하루 단위 집계**로 도착해 A/B 스파이크에 부적합, ③ 개별 조작과 수치를 대응시킬 수 없음 | ❌ 지금 불가 |
 
 > ★ **MetricKit 은 버리지 말고 위치를 옮기십시오.**

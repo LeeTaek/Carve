@@ -1,6 +1,15 @@
 # CarveFeature 단일 Canvas 전환 설계
 
-> 상태: **Phase 0B · S4 · Phase 1(구현) · Phase 0A-D 의 D5 · D1 · D2 완료** · 대상: `Feature/CarveFeature`, `Domain`
+> 상태: **Phase 0B · S4 · Phase 1(구현) · Phase 0A-D (D1~D8) · Phase 2(구현) 완료** · 대상: `Feature/CarveFeature`, `Domain`
+> rev.15 — **Phase 2 구현 완료 (시뮬레이터 검증 · 실기기 미측정)** — `LazyVStack → VStack` · 전 절 실측 파이프라인 · §6-2 입력 게이트 · 디버그 오버레이/HUD · `os_signpost`.
+> **S3 해소:** 시편 119편 176절을 **실제 텍스트 실측 줄 수**로 만든 `ChapterLayout` 이 실제 행 배치와 **Δ 0.00pt** (전 절 top·height 일치, 게이트 176/176 PASS, 완성 0.71 s — §20-8).
+> ★ **구현 중 실측으로 드러나 설계를 고친 것 3건** (§6-1 rev.15 · §20-8):
+> ① 행별 실측 액션 528건이 각각 TCA 스코프 스토어 ~700개를 재평가해 **O(N²)** → `VerseGeometryCollector` 가 런루프 한 틱에 한 액션으로 모음.
+> ② `VStack` 은 내용 폭을 그대로 보고해 **세로 `ScrollView` 폭이 발산**(372 → 376.7 → 381.3 → … , 캔버스 9,000개 생성) → 폭은 바깥 컨테이너에서 읽고 콘텐츠 폭을 고정.
+> ③ 캔버스 176개를 진입 시점에 전부 만들면 CPU 16~18 s · footprint 560~610 MB 로 **§18-5 (B)표 기준을 한 자릿수 넘음** → **텍스트 행은 즉시 · `PKCanvasView` 는 뷰포트 근처에서 지연(sticky) 생성.**
+> 결과(시뮬레이터, 옛 코드와 같은 날·같은 절차): 시편 119편 진입 83 → 187 MB · CPU 3.1 → 5.3 s (텍스트 행 176개의 값), 전체 스크롤 후 458 vs 541 MB · 스크롤 CPU 13.3 vs 13.1 s (동일). **§18-3 (C) 의 195 MB 는 오늘 옛 코드로도 재현되지 않았습니다** (458 MB).
+> `VerseLayoutInput` 에 `leadingInset`(장 중간 절의 소제목) · `topPadding`(1절 상단 여백 25) 추가 — additive, DTO 변경 없음. `columnOrigin.x = 366.70` 실측 (§5).
+> 회귀 기준선 **175 → 203** (§19-4-2).
 > rev.14 — **실기기 검증 D5 · D1 · D2 완료. 스크롤 구조를 B 로 확정합니다** (§11 "D1/D2 실행 결과" · §12).
 > **★ 실기기 Pencil 입력이 A 와 B 를 갈랐습니다.** S4(시뮬레이터)가 구별하지 못한 그 지점입니다.
 > 모드 A 는 **그리는 동안 획이 다른 위치에 렌더되고 펜을 떼면 정상 위치로 점프**하며, hover 좌표도 크게 어긋납니다.
@@ -458,6 +467,22 @@ columnOrigin.y = 0
 > `captureRect` 로 소유권을 판정하는 §7-1 이 **캔버스 좌표의 첫 control point** 를 입력으로 받으므로
 > 판정 직전에 역변환이 필요합니다. Phase 3 착수 전에 **어느 계층이 `columnOrigin` 을 아는지** 확정하십시오.
 
+> ✅ **rev.15 — Phase 2 가 `columnOrigin` 을 실측했고, 소유 계층을 다음처럼 제안합니다.**
+> N-Canvas 구조에서 절 캔버스의 실측 frame 으로부터 `ChapterLayoutMeasurement.columnOrigin` 을 얻습니다 —
+> 오른손 · iPad mini 세로에서 **x = 366.70** 입니다. 행 폭(0.95h + 8 + h + 20 = 753pt)이 제안 폭 744pt 를 9pt 넘쳐
+> HStack 이 가운데 정렬되므로 `halfWidth + 10 = 382` 가 **아닙니다.** "예측하지 말고 실측하라" 는 근거가 여기서도 확인됩니다.
+> y 는 0 (레이아웃 원점 = 콘텐츠 원점).
+>
+> | 계층 | `columnOrigin` 에 대해 하는 일 |
+> |---|---|
+> | 호스팅 (View · Coordinator) | **값의 출처.** 캔버스 content 좌표계에서 필사 컬럼 원점을 실측(또는 B 에서는 S4 처럼 계산)해 Feature 에 `CGPoint` 로 올린다. PencilKit 타입 없음 |
+> | Feature | **보관·전달만** 한다 (`ChapterLayoutMeasurement.columnOrigin`). 좌표 변환은 하지 않는다 |
+> | `DrawingCodecClient` | **적용의 유일한 지점.** 합성 시 `layout → content` 평행이동, 소유권 판정 직전 `content → layout` 역변환을 파라미터로 받은 `columnOrigin` 으로 수행한다 |
+>
+> §4 의 "영역 = Builder, transform 적용 = Codec" 이 그대로 유지되고, §7-1 의 판정 입력(첫 control point)은
+> Codec 안에서 역변환된 뒤 `ChapterLayout.verse(containing:)` 로 들어갑니다. **확정은 Phase 3 착수 시**입니다 —
+> 값의 출처가 실측이든 계산이든 위 배치는 같습니다.
+
 > ❓ **신규 미결 — B 의 하단 safe area 인셋 (rev.12)**
 > S4 의 B 는 `contentInsetAdjustmentBehavior = .never` 라 **하단 safe area 가 반영되지 않습니다.**
 > A(SwiftUI `ScrollView`)는 같은 화면에서 adjusted inset bottom 20 이 자동으로 들어갔습니다.
@@ -491,6 +516,49 @@ columnOrigin.y = 0
 > 따라서 통과 기준은 (C)표가 아니라 **(B)표 기준으로 잡아야 합니다.**
 > 완화책 — `(chapter, sentenceSetting, writingWidth, isLeftHanded)` 키로 `ChapterLayout` 캐시.
 
+#### rev.15 — Phase 2 실측: `VStack` 은 유지하되 캔버스는 지연 생성합니다 ★
+
+**"측정 전까지 단정하지 않는다" 던 메모리·CPU 를 쟀습니다. 문자 그대로의 전환(행 176개 + `PKCanvasView` 176개 즉시 생성)은 출시할 수 없습니다.**
+
+| 구성 (시편 119편 cold launch, 시뮬레이터 Debug) | 누적 CPU | footprint peak | 첫 레이아웃 완성 | 캔버스 생성 |
+|---|---:|---:|---:|---:|
+| 행별 실측 액션 (일괄 처리 전) | **2분 넘게 완료 못 함** | 2.9 GB ↑ | — | 9,000개 ↑ (폭 발산과 겹침) |
+| `VStack` + 캔버스 176개 즉시 + 행별 중첩 `UIHostingController` | 18.4 s | 613 MB | 9.03 s | 176 |
+| `VStack` + 캔버스 176개 즉시, 중첩 호스팅 제거 | 16.2 s | 559 MB | 6.79 s | 176 |
+| **`VStack` + 캔버스 지연(sticky) + 중첩 호스팅 유지 — 채택** | **5.4 s** | **198 MB** | **0.71 s** | **30** |
+| `VStack` + 캔버스 지연, 중첩 호스팅 제거 | 5.4 s | 180 MB | 0.48 s | 32 |
+| (참고) Phase 2 이전 `LazyVStack`, 같은 날 같은 절차 | 3.1 s | 83 MB | — | 20 |
+
+> 누적 CPU 는 기동 후 ~20 s 시점의 프로세스 CPU time 이며 앱 기동 자체(약 2.7 s)를 포함합니다. 절차와 근거는 §20-8.
+
+**결정 — `LazyVStack → VStack` 은 유지하되, 비지연으로 만드는 것은 텍스트 행까지입니다.**
+전 절 geometry 가 필요한 이유(§6-1 본문)는 **텍스트 실측**이지 캔버스가 아닙니다. 행(본문·밑줄·frame 실측)은 176개 전부
+즉시 만들고, `PKCanvasView` 는 뷰포트 위아래 1.5 화면 안에 들어온 행에만 만들되 **한 번 만든 것은 유지**합니다
+(`LazyVStack` 이 만든 행을 버리지 않던 것과 같은 의미 — `CarveDetailView.activeCanvasIDs`). 그 결과:
+
+- **진입:** 옛 코드 대비 **+100 MB · +2.3 s** (= 텍스트 행 176개의 값). 옛 코드의 진입은 절 수에 거의 무관했으므로(§18-3) 이 증분은 **전부 새 비용**입니다.
+- **스크롤:** 전체 스크롤 후 458 MB (옛) vs 541 MB (새), 스크롤 CPU 13.3 s vs 13.1 s — **같습니다.** "비용이 스크롤에서 진입으로 옮겨진다" 는 예측은 캔버스에는 해당하지 않고(지연 생성이므로) 텍스트 행에만 해당합니다.
+- **장 전환 (118 → 119):** +18 MB / 0.25 s (옛) → +65 MB / 2.7 s (새, peak 248 MB). 사용자가 체감할 수 있는 크기이며 **실기기 값은 아직 없습니다.**
+
+**함께 드러난 구조적 함정 2건 — Phase 3 의 B 구조에도 그대로 적용됩니다.**
+
+| # | 함정 | 증상 | 조치 |
+|---|---|---|---|
+| 1 | **행별 실측 액션.** `underlineLayoutChanged` 처럼 행마다 액션을 보내면 액션 하나가 부모 상태를 바꾸고, 그때마다 TCA 가 스코프 스토어(행 176 × 자식 4) 를 전부 재평가한다. 옛 코드에도 있던 경로지만 `LazyVStack` 은 보이는 행만 있어 드러나지 않았다 | 176절 × 3종 = 528건 → `sample` 의 메인 스레드 85% 가 `Store.send → CurrentValueRelay → ScopedCore.state` | `VerseGeometryCollector` — 콜백은 행마다 받되 **런루프 한 틱에 한 액션** (`verseGeometryMeasured([id: VerseRowGeometry])`). 시편 119편에서 배치 1건(176 id) |
+| 2 | **`VStack` 은 내용 폭을 보고한다.** 행 폭이 `halfWidth` 의 함수(1.95h + 28)로 제안 폭을 넘으면 세로 `ScrollView` 가 가로로 같이 넓어지고, 그 폭에서 다시 `halfWidth` 를 읽는다. `LazyVStack` 은 제안 폭을 그대로 보고해 이 순환이 없었다 | `halfWidth` 372 → 376.7 → 381.3 → 385.8 → … (W' = 0.975W + 28, 고정점 1120), 매 단계 `.id` 가 바뀌어 행 176개(캔버스 176개)를 통째로 재생성 — 2분에 캔버스 9,000개 | 폭은 바깥 `GeometryReader` 에서 읽고(`detailScroll`), 콘텐츠를 `.frame(width: halfWidth × 2)` 로 고정 |
+
+> **B 구조에서의 의미.** 텍스트 컬럼이 캔버스 안의 `UIHostingController` 하나에 들어가더라도, 절별 `Text.LayoutKey`
+> 실측을 절마다 액션으로 올리면 1번이 그대로 재발합니다. Phase 3 의 `layoutCompleted` 는 **수집기를 거친 한 번의 액션**이어야 합니다.
+> 2번은 S4 의 B 하네스처럼 컨테이너 폭을 명시적으로 넘기면 생기지 않습니다.
+
+**행별 중첩 `UIHostingController` (`touchIgnoringContextMenu`) — 유지하되 삭제 대상으로 등록합니다.**
+행마다 롱프레스 메뉴를 붙이는 이 modifier 는 행 전체를 `UIHostingController` 에 다시 담습니다. 바깥 `VStack` 이 매 패스마다
+176개 행의 `sizeThatFits` 를 중첩 그래프로 계산하게 되며, **캔버스를 즉시 만드는 구성에서는** 위 표에서 CPU +2.2 s · footprint +55 MB · 완성 +2.2 s 의 몫이었습니다.
+그러나 **채택한 지연 생성 구성에서는 CPU 차이가 없고 footprint +18 MB · 완성 +0.23 s** 에 그칩니다 — 비용의 대부분은 캔버스와의 결합에서 났습니다.
+사용자 동작 변화 없이 Phase 2 를 마치기 위해 그대로 두었고, 행 자체가 사라지는 Phase 3~4 에서 함께 삭제됩니다 (부록).
+
+캐시 완화책은 구현하지 않았습니다 — N-Canvas 에서는 실측이 SwiftUI 렌더링에 내재해 캐시가 줄여 주는 비용이 없습니다. B 구조(Phase 3)에서 검토합니다.
+
 ### 6-2. 입력 게이트 (P4)
 
 아래 조건을 모두 만족하기 전에는 **합성·입력·저장을 모두 금지**합니다.
@@ -511,6 +579,14 @@ canvas.drawingGestureRecognizer.isEnabled = isLayoutReady   // PKCanvasView.h:87
 ```
 
 현재 `verseFrameUpdated`는 rect가 하나 들어올 때마다 재합성하여 부분 레이아웃을 정상 상태처럼 취급합니다 — 이를 금지합니다.
+
+> ✅ **rev.15 — 구현 (Phase 2).** `CanvasView(isInputEnabled:)` 가 `drawingGestureRecognizer.isEnabled` 를 그대로 바인딩하고,
+> 판정은 `ChapterLayoutMeasurement.isReady` (= `layout.satisfiesCompositionGate(expectedVerseCount:)`) **한 곳**입니다.
+> 시편 119편에서 176/176 → PASS 까지 **0.71 s** (`ChapterLayoutSignpost` 의 `measure` 인터벌 · HUD `first`).
+>
+> ⚠️ **프로덕션 경로에 들어온 새 실패 모드.** 어떤 절의 `Text.LayoutKey` 가 끝내 도착하지 않으면 게이트가 열리지 않아
+> **그 장 전체가 필기 불가**가 됩니다. 옛 코드에서는 같은 결함이 "그 절의 밑줄만 없음" 으로 그쳤습니다.
+> 시뮬레이터 176절에서 누락은 없었고 HUD 의 `missing` 줄로 관찰할 수 있지만, **실기기·저사양 기기에서의 확인은 남아 있습니다.**
 
 ### 6-3. 2-pass 높이 계산
 
@@ -558,6 +634,12 @@ func canCompose(_ state: State) -> Bool {
 **장 전환 시 취소:** 장을 바꾸면 새 `loadRequestID`를 발급하고,
 이전 requestID로 도착한 조회 결과와 geometry 이벤트는 **폐기**합니다.
 빠른 연속 장 전환에서 이전 장의 Drawing이 새 장에 합성되는 사고를 막습니다.
+
+> ✅ **rev.15 — Phase 2 배선.** `ChapterLayoutMeasurement` 가 **레이아웃 입력**(텍스트 실측 · 소제목 높이 · 필사 폭)과
+> **검증 입력**(행 frame)을 따로 보관하고, 전 절 텍스트 + 폭이 모여야만 계산합니다. 도착 순서 무관은
+> `arrivalOrderDoesNotChangeLayout` · `widthArrivingLastCompletesLayout` 로, 이전 장 이벤트 폐기는
+> `staleChapterEventsAreDiscarded` 로 고정했습니다. `loadRequestID` 는 따로 두지 않았습니다 — 행 id
+> (`"창세기.1.3"`) 가 장을 포함하므로 **id 조회 실패 = 폐기**로 같은 효과가 납니다. Phase 3 이 Drawing 조회까지 묶을 때 requestID 를 도입하십시오.
 
 ---
 
@@ -1739,9 +1821,9 @@ D5 / issue #6 의 실패는 **프로그램 스크롤에서 나오지 않습니�
 | **Phase 0A-D 나머지** | ⏳ **D3 · D4 · D6 · D7 — 전부 "지금 가능".** 멤버십이 활성화돼 개발 서명 설치가 실제로 성공했고(§20-6), V4 스키마도 저장소에 있으므로 D7 의 "산출물 부재" 차단도 풀렸습니다 |
 | **Phase 0B** | ✅ **완료** — `f5206814` 레이아웃 · `0c071d29` 소유권/승계 · `565dfe69` line band reflow |
 | **Phase 0A-S4** | ✅ **완료** (`b53cbfd8`) — 기능 기준 1~6 통과. A/B 판정은 D1/D2 로 이월했고 **rev.14 에서 해소** (§11 · §12) |
-| **Phase 0A-S3** | ❌ **미수행** — 아래 참조 |
+| **Phase 0A-S3** | ✅ **완료 (rev.15)** — Phase 2 의 실측 경로로 시편 119편 176절 **Δ 0.00pt**, 게이트 PASS (§20-8) |
 | **Phase 1** | ✅ **구현 완료** (`b68b6101`) — **단 배포 가능 아님.** V3 → V4 마이그레이션이 **실기기에서, CloudKit entitlement 가 활성인 상태로 성공**했습니다(§20-6). 다만 **미러링 검증은 여전히 미완**이므로 D7 은 열려 있습니다. §10-3 forward-only |
-| **Phase 2** | ✅ **착수 가능 (rev.14)** — D5 baseline 을 확보했습니다 (**§18-3-a**). 아래 참조 |
+| **Phase 2** | ✅ **구현 완료 (rev.15)** — 시뮬레이터 검증만. **실기기 미측정.** §6-1 이 실측으로 수정됐습니다(캔버스 지연 생성). 상세 §20-8 |
 | Phase 3 | feature flag 뒤 **구현**까지는 가능. **기본 활성화·배포 판단은 Phase 0A-D 이후** |
 | Phase 4 (구 구조 삭제) | 실기기 검증 및 안정화 후 |
 
@@ -1888,10 +1970,24 @@ S0 완료 후 수행합니다.
 - **flag off 경로(기존 N Canvas)가 V4 저장소에서 동작하는지 먼저 확보** (§10-3)
 - 마이그레이션 안정화에만 집중해 단독 배포
 
-### Phase 2 — VStack + layout gate + debug overlay
+### Phase 2 — VStack + layout gate + debug overlay ✅ 구현 완료 (rev.15)
 - 기존 N개 Canvas 유지, 사용자 동작 변화 없음
 - **debug overlay:** `writingRect` / `captureRect` / `underlineAnchors` / `dirtyBounds` 시각화
   → 이전 두 번의 시도에서 "왜 어긋나는지 볼 수단"이 없었던 것이 디버깅을 어렵게 만들었습니다
+
+**한 것 (§20-8):**
+
+| 항목 | 산출물 |
+|---|---|
+| `LazyVStack → VStack` | `CarveDetailView.contentView` — 텍스트 행 176개 즉시, **캔버스는 뷰포트 근처에서 지연(sticky)** (§6-1 rev.15) |
+| 전 절 실측 파이프라인 | `ChapterLayoutMeasurement` (측정 상태 · 게이트 · 예측 vs 실측 Δ) · `VerseGeometryCollector` (한 틱 한 액션) · `ChapterLayoutHosting` (뷰와 빌더가 공유하는 배치 상수) |
+| 빌더 입력 보강 | `VerseLayoutInput.leadingInset` (장 중간 절의 소제목, `writingRect` 밖) · `topPadding` (1절 상단 여백 25, `writingRect` 안) |
+| §6-2 게이트 | `CanvasView(isInputEnabled:)` → `drawingGestureRecognizer.isEnabled` |
+| 디버그 오버레이 + HUD | `-ChapterLayoutOverlay` — 절별 `writingRect`(파랑) · `captureRect`(초록 점선) · `underlineAnchors`(주황) · 실측 frame(빨강 점선) · `dirtyBounds`(자홍), HUD 에 게이트·Δ·소요 시간 |
+| `os_signpost` | `ChapterLayoutSignpost` — 카테고리 `ChapterLayout`, `measure` 인터벌 · `rebuild` 이벤트 |
+| 무인 시나리오 | `-ChapterLayoutAutoScroll` · `-ChapterLayoutAutoNext` (§18-3 절차의 재현, 터치 주입 대체) |
+
+**하지 않은 것:** 실기기 측정(D5 절차의 Phase 2 후 재측정) · `ChapterLayout` 캐시 · 하단 safe area 인셋 · signature 의 `chapter` 포함 여부 · `columnOrigin` 소유 계층의 확정(§5 제안만).
 
 ### Phase 3 — feature flag 뒤 단일 Canvas
 - whole-stroke ownership, editBegan/editEnded 계약
@@ -1908,6 +2004,8 @@ S0 완료 후 수행합니다.
   별도 파일이 아니라 `CombinedCanvasView.swift` 21~458행이며(rev.12 정정),
   D1 실측 결과 **offset 리셋은 구조 A 에서 원리적으로 성립하지 않고 B 에서는 대상이 없습니다** (§2 D5 · 부록)
 - `VerseRowFeature` (죽은 리듀서 — `State.ID` 타입 별칭으로만 참조됨)
+- (rev.15) `touchIgnoringContextMenu` 의 **행별 중첩 `UIHostingController`** — 행이 사라지면 함께 사라집니다. B 구조의 롱프레스 메뉴는 캔버스(스크롤 뷰) 한 곳의 제스처 + `ChapterLayout.verse(containing:)` 로 다시 설계하십시오 (§6-1 rev.15)
+- (rev.15) `CarveDetailView.activeCanvasIDs` 의 캔버스 지연 생성 — 캔버스가 하나가 되면 불필요
 
 #### SharedUndoManager를 제거해야 하는 근거
 
@@ -1963,6 +2061,15 @@ S0 완료 후 수행합니다.
 16. V4 저장소를 유지한 채 feature flag를 껐을 때 기존 N Canvas 경로가 정상 동작하는지
 17. undo/redo 후 앱을 재실행해도 결과가 유지되는지
 
+**Phase 2 (rev.15) 에서 추가·고정된 것** — 순수 계산이라 UI 없이 검증됩니다.
+
+| 대상 | 테스트 |
+|---|---|
+| `leadingInset` / `topPadding` (Domain) | 소제목이 `writingRect` 밖 gap 이고 midpoint 로 분할됨 · 첫 절의 inset · `topPadding` 이 rect 안이고 근사 anchor 를 내림 · 실측 anchor 우선 · Pass 2 와 독립 · signature 비구성요소 · 음수 정규화 (`ChapterLayoutBuilderInsetTesting`, 7건) |
+| 측정 상태 (§6-2 · §6-4) | begin 직후 닫힘 · 전 절 + 폭이 있어야 열림 · 폭 0 · 빈 실측 무시 · 다른 장 절 무시 · 장 전환 초기화 · 재계산과 첫 소요 시간 보존 · **도착 순서 무관** · 소제목 → `leadingInset` · 1절 `topPadding` · band 수 → Pass 2 · frame 은 Δ/`columnOrigin` 만 (`ChapterLayoutMeasurementTesting`, 12건) |
+| 수집기 | 필드별 merge · flush 1회 · `onFlush` 없을 때 보관 (3건) |
+| Reducer 배선 | 전 절 실측 후 게이트 · 배치 1건이면 계산 1회 · **이전 장 이벤트 폐기 (6-3)** · 소제목 재계산/frame 비재계산 · 폭이 마지막에 도착 · metadata 유무별 band 수 (`CarveDetailLayoutMeasurementTesting`, 6건) |
+
 ### 라운드트립 판정 기준
 
 > **"비트 단위 동일"은 기준으로 너무 강합니다.**
@@ -1997,6 +2104,10 @@ S0 완료 후 수행합니다.
 | **V4 이후 버전 다운그레이드 불가** | flag off 경로를 Phase 1 배포 전에 확보 (§10-3) |
 | 히스토리 유지로 행 식별자가 핵심 경로가 됨 (`id` 초 단위 충돌 가능) | 신규 행만 `rowUUID` 발급, legacy는 business `id` 유지 (비파괴) (§8-7) |
 | `clear`를 행 삭제로 구현하면 과거 회차가 승격되어 지운 획이 되살아남 | 행 유지 + `lineData` 비움으로 규정 (§8-7) |
+| **(rev.15) 절별 실측을 절마다 액션으로 올리면 스코프 스토어 재평가로 O(N²)** — B 구조에서도 재발 가능 | `VerseGeometryCollector` 로 한 틱 한 액션. Phase 3 의 `layoutCompleted` 도 같은 규율 (§6-1 rev.15) |
+| **(rev.15) `VStack` 은 내용 폭을 보고해 세로 `ScrollView` 폭이 발산** | 폭은 컨테이너에서 읽고 콘텐츠 폭 고정. B 는 컨테이너 폭을 명시적으로 넘김 (§6-1 rev.15) |
+| **(rev.15) 텍스트 행 176개 즉시 생성의 진입 비용 (+100 MB · +2.3 s, 시뮬레이터)** — 실기기·저사양 기기 값 없음 | Phase 2 후 D5 절차 재측정. B 구조는 행이 단일 호스팅이라 다를 수 있음 |
+| **(rev.15) 게이트가 열리지 않으면 장 전체가 필기 불가** | HUD `missing` 으로 관찰. 실기기 확인 필요 (§6-2 rev.15) |
 
 ---
 
@@ -2036,6 +2147,7 @@ S0 완료 후 수행합니다.
 | S1-4 | 지우개 후 IdentityKey 구성요소 **전부 불변** (control point 값까지) |
 | S1-5 | `mask` / `maskedPathRanges` **보존**. 단 `mask == nil` 이면 ranges 는 전체 구간 |
 | S2 | **`textLineRanges` 실현 가능** — `Run.characterIndices` (iOS 17.0+) |
+| **S3** (rev.15) | **시편 119편 176절 실측 → `ChapterLayout` Δ 0.00pt.** 게이트 176/176 PASS, 첫 완성 0.71 s, `columnOrigin.x` 366.70, 소제목·1절 여백 모델링 포함. 진입/스크롤/장 전환 실측 표는 §20-8 |
 | **S4** (rev.12) | **A·B 모두 8개 시나리오 max 0.000pt PASS.** 기능 기준 1·3·4·6 통과, 2·5 부분, 7~11 미수행. 깊은 offset 15000 에서 B 의 16184pt `UIHostingController` 정상 렌더. **★ 그러나 A 와 B 가 구별되지 않았습니다** — 판정은 D1/D2 로 이월 (§11 · §20-4) → **rev.14 에서 해소** |
 
 ### ✅ 실기기에서 확인 완료 (Phase 0A-D — 결과 상세는 **§11 "D1/D2 실행 결과"** · **§18-3-a** · **§20-6**)
@@ -2061,7 +2173,7 @@ S0 완료 후 수행합니다.
 
 ### 남은 시뮬레이터 항목
 
-- **S3** — 176절 `ChapterLayout` 정확성 및 게이트 (§6)
+- ~~**S3** — 176절 `ChapterLayout` 정확성 및 게이트 (§6)~~ → ✅ **완료** (rev.15, Phase 2 — Δ 0.00pt, §20-8)
   > rev.12: **게이트 동작과 176절 규모 좌표 계산은 S4 하네스에서 부수적으로 확인**됐습니다(`gate PASS`).
   > 남은 것은 **실제 텍스트 측정 기반 줄 수** 입니다 — S4 는 `1 + (verse − 1) % 4` 로 고정했습니다.
   > 이 잔여분은 Phase 2 의 측정 경로와 함께 해소하십시오 (§13).
@@ -2071,7 +2183,7 @@ S0 완료 후 수행합니다.
 
 6. ~~Pencil hover / live stroke 스냅 (§11 기준 7~8)~~ → ✅ **완료 (rev.14, D1)** — **B 확정**
 7. ~~`.pencilOnly` 손가락 스크롤 (§11 기준 9~10)~~ → ✅ **완료 (rev.14, D2)**
-8. 시편 119편 실제 layout 시간·peak memory (§6-1) → **부분 완료 (rev.14, D5).** peak memory 는 §18-3-a. **layout 시간은 `os_signpost` 부재로 Phase 2 이월**
+8. 시편 119편 실제 layout 시간·peak memory (§6-1) → **부분 완료 (rev.14, D5).** peak memory 는 §18-3-a. ~~layout 시간은 `os_signpost` 부재로 Phase 2 이월~~ → **rev.15: signpost 추가됨** (`ChapterLayout` / `measure`). 시뮬레이터 0.71 s. **실기기 값은 Phase 2 코드로 D5 절차를 다시 돌려야 얻습니다**
 9. (rev.12 추가) §11 기준 2 의 **관성 fling**, 기준 5 의 **탭/롱프레스 동작** — 시뮬레이터 터치 주입 불가로 미수행 (§20-4)
    > ⚠️ **rev.14: 실기기 세션에서도 미수행입니다.** §20-4 가 "실기기에서 함께 해소된다" 고 적었으나
    > 이번 세션은 기준 7~10 에 집중했습니다. **D3/D4 수행 시 같은 하네스로 함께 처리하십시오.**
@@ -2120,6 +2232,10 @@ S0 완료 후 수행합니다.
       → rev.12: S4 완료로 **B 잠정 채택.** S4 가 A/B 를 구별하지 못해 최종 판정을 D1/D2 로 이월
       → **rev.14: D1/D2 완료로 B 확정** (U4). 기준 7·8 이 실기기에서 **A ❌ / B ✅** 로 갈렸고,
         `A정규화` 를 켜도 A 는 동일하게 실패했습니다 (§11 "D1/D2 실행 결과" · §12)
+- [x] (rev.15) 전 절 실측 파이프라인 — 도착 순서 무관 · 이전 장 폐기 · 절별 액션 금지(수집기) (§6-4 · §6-1)
+- [x] (rev.15) §6-2 게이트를 실제 캔버스 입력에 연결 (`drawingGestureRecognizer.isEnabled`)
+- [x] (rev.15) 디버그 오버레이 — 어긋남을 **볼 수 있는** 수단 확보 (`-ChapterLayoutOverlay`)
+- [x] (rev.15) `LazyVStack → VStack` 의 비용 실측 — 캔버스는 지연 생성으로 조정 (§6-1)
 
 ---
 
@@ -2139,6 +2255,9 @@ S0 완료 후 수행합니다.
 | `DrawingDatabase.updateDrawing(drawing:)` | 행 주소지정 정리 후 Repository로 흡수 (§8-7) | 3 |
 | `BibleDrawing.mainDrawing()` | 결정적 선택 규칙으로 수정 (§8-7) | 3 |
 | `VerseDrawingHistoryFeature` | **유지** — 단일 Canvas 복원 경로로 재배선 (§8-7) | 3 |
+| (rev.15) `touchIgnoringContextMenu` 의 행별 중첩 `UIHostingController` | 삭제 — 행이 사라지면 함께. B 구조에서는 스크롤 뷰 한 곳의 제스처 + `ChapterLayout.verse(containing:)` 로 재설계 (§6-1 rev.15) | 3~4 |
+| (rev.15) `CarveDetailView.activeCanvasIDs` (캔버스 지연 생성) | 삭제 — 캔버스가 하나가 되면 불필요 | 3 |
+| (rev.15) `ChapterLayoutMeasurement` · `VerseGeometryCollector` · `ChapterLayoutHosting` · `ChapterLayoutSignpost` | **유지·이관** — B 구조의 텍스트 컬럼 측정에 그대로 쓴다. `ChapterLayoutHosting` 의 상수만 B 의 컬럼 배치로 교체 | 3 |
 
 ---
 
@@ -2364,7 +2483,7 @@ CPU     ps -o time= 누적 CPU time 델타, 0.25s 간격 샘플링
 | # | 발견 | 영향 |
 |---|---|---|
 | 1 | **시뮬레이터는 CloudKit 미러링이 전혀 동작하지 않음** — 빌드 entitlement가 비어 있고(`codesign -d --entitlements` → `<dict></dict>`) `CKAccountStatusNoAccount` | **Phase 1 V4 스키마의 CloudKit 제약(전 속성 optional 등)은 시뮬레이터로 검증 불가.** → **Phase 0A-D로 이월** |
-| 2 | Phase 2의 `LazyVStack → VStack`은 비용을 **스크롤에서 진입으로 이동**시킴 | S3/S4 통과 기준을 (C)표가 아니라 **(B)표 기준으로 엄격히** 잡아야 함. 진입 시 +37MB / 0.31s 가 현재 값 |
+| 2 | Phase 2의 `LazyVStack → VStack`은 비용을 **스크롤에서 진입으로 이동**시킴 | S3/S4 통과 기준을 (C)표가 아니라 **(B)표 기준으로 엄격히** 잡아야 함. 진입 시 +37MB / 0.31s 가 현재 값. **→ rev.15 실측:** 캔버스까지 즉시 만들면 (B)표 기준을 한 자릿수 넘어(§6-1 rev.15) 캔버스는 지연 생성으로 바꿨고, 남은 진입 증분은 텍스트 행 176개의 +100 MB / +2.3 s (시뮬레이터, §20-8) |
 | 3 | 장 전환 시 메모리 미회수는 **기존부터 존재** | 새 설계 평가 시 이 baseline을 빼고 판단할 것 |
 | 4 | iPad 시뮬레이터 런타임이 iOS 26.2뿐 | "저사양 iOS 17 iPad" 리스크는 **시뮬레이터로도 보완 불가**. 필요 시 해당 런타임에 iPad 디바이스를 별도 생성해야 함 |
 | 5 | `undoManager is deprecated` 경고 3건 잔존, `CombinedCanvasView`는 주석 처리 상태 | 과거 롤백의 잔해. Phase 3 착수 전 정리 판단 필요 |
@@ -2569,9 +2688,25 @@ lineOrigins = [(0,16.0), (0,36.287), (0,56.574), (0,76.861)]
 
 증분 20건은 V3 → V4 마이그레이션 검증 11건 + §10-3 등가 검증 9건입니다.
 
-> **현재 회귀 기준선은 175/175 입니다.** 이후 어느 단계에서든 175 미만 통과 또는 실패 1건 이상이면 회귀입니다.
+> ~~**현재 회귀 기준선은 175/175 입니다.**~~ → rev.15 에서 **203** 으로 갱신 (아래).
 > 실행 환경은 위와 동일 (Xcode 26.3 / Swift 6.2.4 / iPad mini (A17 Pro) iOS 26.2).
-> 구성은 **Swift Testing 173 + XCTest 2** 입니다.
+> 175 의 구성은 **Swift Testing 173 + XCTest 2** 였습니다.
+
+**rev.15 — Phase 2 추가 후: 203/203** ★
+
+| 번들 | rev.13 (175) | rev.15 | 증분 |
+|---|---:|---:|---|
+| DomainTest | 83 | **90** (Swift Testing 88 + XCTest 2) | +7 — `VerseLayoutInput.leadingInset` / `topPadding` (`ChapterLayoutBuilderInsetTesting`) |
+| CarveFeatureTest | 71 | **92** | +21 — 측정 상태 12 · 수집기 3 · Reducer 배선 6 (`ChapterLayoutMeasurementTesting`) |
+| CarveToolkitTest | 6 | 6 | — |
+| ChartFeatureTest | 9 | 9 | — |
+| SettingsFeatureTest | 3 | 3 | — |
+| UIComponentsTest | 3 | 3 | — |
+| **합계** | **175** | **203** | **+28** |
+
+> **현재 회귀 기준선은 203/203 입니다.** 이후 어느 단계에서든 203 미만 통과 또는 실패 1건 이상이면 회귀입니다.
+> 구성은 **Swift Testing 201 + XCTest 2**. 실행 환경은 위와 동일하며 전량 1회 실행 (`** TEST SUCCEEDED **`, 실패 0).
+> 로그의 `error:` 는 rev.13 과 같은 CoreData persistent history 정리 노이즈뿐입니다.
 
 **같이 확인된 것**
 
@@ -3091,3 +3226,150 @@ Phase 1 이 "코드상으로만 만족" 으로 유보한 항목을 실기기에�
 > 5번에서 **CloudKit 스키마 승격 함정**이 드러났습니다. Phase 3 배포 전 필수 절차를
 > **§10-1-a** 에 규정했습니다. 이번 세션에서 가장 값진 발견 중 하나입니다 —
 > 그대로 뒀다면 V4 가 forward-only 로 배포된 **뒤에** Phase 3 에서 터졌을 문제입니다.
+
+
+### 20-8. Phase 2 — `VStack` + 실측 파이프라인 + 게이트 + 오버레이 (rev.15)
+
+> 실행 환경: **Xcode 26.3 / Swift 6.2.4 / tuist 4.39.0 / iPad mini (A17 Pro) 시뮬레이터 iOS 26.2 / Debug** — §18-3 과 같은 환경.
+> **실기기에서는 아무것도 재지 않았습니다.** 여기 수치는 전부 시뮬레이터이며 §18-3 과는 비교해도 되고, §18-3-a(실기기)와는 비교하면 안 됩니다.
+
+#### 구현 — 파일과 역할
+
+| 파일 | 역할 |
+|---|---|
+| [ChapterLayoutBuilder.swift](../Domain/Domain/Sources/Layout/ChapterLayoutBuilder.swift) | `VerseLayoutInput.leadingInset`(절 위 소제목, `writingRect` 밖 gap) · `topPadding`(1절 상단 여백 25, `writingRect` 안). additive — DTO(`VerseCanvasRegion`) 변경 없음 |
+| [ChapterLayoutHosting.swift](../Feature/CarveFeature/Sources/Layout/ChapterLayoutHosting.swift) | N-Canvas `VStack` 의 배치 상수. **뷰와 빌더가 같은 값을 쓴다** (S4 의 `CanvasScrollSpikeContent.metrics` 와 같은 원칙) |
+| [ChapterLayoutMeasurement.swift](../Feature/CarveFeature/Sources/Layout/ChapterLayoutMeasurement.swift) | 절별 실측을 모아 전 절 + 폭이 갖춰졌을 때만 `ChapterLayoutBuilder` 호출. 게이트(`isReady`) · 예측 vs 실측 Δ · `columnOrigin` |
+| [VerseRowGeometry.swift](../Feature/CarveFeature/Sources/Layout/VerseRowGeometry.swift) | 행 실측 DTO + `VerseGeometryCollector` (런루프 한 틱에 한 액션) |
+| [ChapterLayoutSignpost.swift](../Feature/CarveFeature/Sources/Layout/ChapterLayoutSignpost.swift) | `os_signpost` — 카테고리 `ChapterLayout`, `measure` 인터벌 · `rebuild` 이벤트 |
+| [ChapterLayoutDebugOverlay.swift](../Feature/CarveFeature/Sources/Debug/ChapterLayoutDebugOverlay.swift) | `-ChapterLayoutOverlay` — 절 단위 `Canvas` 타일로 그리는 오버레이 + 하단 HUD (Debug 전용) |
+| [ChapterLayoutDebugScenario.swift](../Feature/CarveFeature/Sources/Debug/ChapterLayoutDebugScenario.swift) | `-ChapterLayoutAutoScroll` · `-ChapterLayoutAutoNext` — §18-3 절차의 무인 재현 (Debug 전용) |
+| `CarveDetailFeature` · `CarveDetailView` · `SentencesWithDrawingView` · `CanvasView` · `CanvasFeature` | 배선 — `verseGeometryMeasured` 배치 액션, 폭·뷰포트, 캔버스 지연 생성, 게이트, `lastDrawingBounds` |
+
+`ChapterLayout` 좌표계는 **필사 컬럼 = 원점** 그대로이며(§5), 오버레이만 `columnOrigin.x` 로 평행이동해 그립니다.
+
+#### 실측 파이프라인이 실제로 하는 일
+
+```
+행 (SentencesWithDrawingView)
+  Text.LayoutKey → 밑줄 offset      ─┐
+  소제목 높이 (onGeometryChange)     ├─ VerseGeometryCollector (한 틱에 모음)
+  캔버스 영역 frame (onGeometryChange)┘        ↓ verseGeometryMeasured([id: VerseRowGeometry])  ← 시편 119편에서 1건
+CarveDetailFeature
+  ChapterLayoutMeasurement.recordText / recordTitleHeight / recordFrame
+  전 절 텍스트 + writingWidth  →  ChapterLayoutBuilder.build(...)   ← 0.71 s (signpost `measure`)
+  isReady  →  CanvasView.drawingGestureRecognizer.isEnabled
+```
+
+- 밑줄 anchor 는 캔버스 영역 안에서 1절만 25pt 내려 그려지므로, 레이아웃 anchor 도 같은 값을 더한 뒤 `topPadding` 으로 `writingRect` 높이에 포함시킵니다.
+  legacy 1절 데이터가 그 25pt 아래에서 시작하므로 `writingRect` 밖으로 빼면 25pt 위로 밀려 보입니다 — 그래서 `leadingInset` 이 아니라 `topPadding` 입니다.
+- 소제목은 장 중간 절에도 붙습니다 (창세기 2:4 "에덴 동산"). 절 본문이 아니므로 `writingRect` 밖 gap(`leadingInset`)이고 `captureRect` 가 midpoint 로 나눠 갖습니다.
+- 행 frame 은 **검증 전용**입니다. 레이아웃 입력으로 쓰면 "빌더가 실제 배치를 재현하는가" 를 확인할 수 없습니다.
+
+#### S3 결과 — 시편 119편 176절
+
+HUD 판독 (`-ChapterLayoutOverlay`, 스크린샷 `diag3`):
+
+```
+LAYOUT 시편 119장 176/176  gate PASS  build #1  first 6856 ms   ← 캔버스 즉시 생성 빌드. 최종 빌드는 710 ms
+W 372.00  H 16049.00  columnX 366.70  frames 176  sig cl1-11965ed2f2
+Δ max 0.00  worst v1  top +0.00  height +0.00  tol 1.00pt
+```
+
+| 항목 | 값 |
+|---|---|
+| 게이트 | 176/176 **PASS** |
+| 예측 `writingRect` vs 실측 행 frame | **Δ 0.00pt** — 176절 전부 top·height 일치 |
+| `totalHeight` | 16049.0 (S4 의 mock `1 + (verse−1) % 4` 줄 수는 16184 였습니다) |
+| `columnOrigin.x` | 366.70 (§5 참조 — `halfWidth + 10` 이 아님) |
+| 첫 완성 소요 | **0.71 s** (최종 빌드) · 6.86~9.03 s (캔버스 즉시 생성 빌드) |
+| 소제목 | 시편 119편에는 없음. 창세기 1장은 1절 소제목 1개 — Δ 0.00 유지 여부는 시뮬레이터 육안 확인만 했고 HUD 수치는 시편 119편만 기록 |
+
+**S3 가 묻던 "실제 텍스트 실측 줄 수" 는 이것으로 답이 났습니다.** `lineCount × lineSpace` 가 실제 행 높이와 일치하며,
+`VerseTextView` 의 `lineSpacing` / 상하 padding 계산이 정확히 `lineCount × lineSpace` 를 만듭니다.
+
+#### 진입 · 장 전환 · 전체 스크롤 — 옛 코드와 같은 날 같은 절차
+
+측정 절차 (재측정 시 그대로 반복):
+
+```
+메모리  /usr/bin/footprint <pid>  (vmmap 은 이 머신에서 권한 오류 — 같은 physical footprint 지표)
+CPU     ps -o time= 누적 CPU time, 0.25 s 샘플링
+장 지정  ★ 먼저 simctl uninstall 로 컨테이너를 비운다 — 앱이 한 번 장을 바꾸면 Saved Application State 가 마지막 장을 복원해
+         어떤 plist 시드도 무시된다 (시편 120편이 뜨는 무효 측정을 여러 번 했다). 그 뒤 설치 → simctl spawn defaults write … title -data <JSON hex>
+         → 로그의 "ChapterLayout 완성: <권>.<장>" 으로 확인
+로그     앱 실행 전에 log stream --level debug 를 붙인다 (Log.info 는 log show 에 남지 않음)
+스크롤   -ChapterLayoutAutoScroll: settle 8 s 뒤 1 s 간격으로 11단계, 각 단계 = 절 목록의 1/11 지점 절이 화면 하단에 오도록 애니메이션 scrollTo
+장 전환  -ChapterLayoutAutoNext: settle 8 s 뒤 moveToNext (시편 118편 29절 → 119편)
+캔버스 수 com.apple.pencilkit 의 isGenerationToolEnabled 로그 3줄 = PKCanvasView 1개
+```
+
+| 시나리오 | Phase 2 이전 (`LazyVStack`) | **Phase 2 (`VStack` + 캔버스 지연)** | 차이 |
+|---|---|---|---|
+| (A) 시편 119편 cold launch, settle 후 | 83 MB · CPU 3.06 s · 캔버스 20 | **187~198 MB · CPU 5.3~5.4 s · 캔버스 30** · 완성 0.71 s | **+100 MB · +2.3 s** = 텍스트 행 176개 |
+| (B) 시편 118편 → 119편 전환 | 83 → 100 MB (+18) · CPU +0.25 s · peak 102 | 123 → 188 MB (+65) · CPU +2.7 s · peak 248 | +47 MB · +2.4 s |
+| (C) 전체 스크롤 11단계 | 83 → 458 MB (+375) · peak 461 · CPU +13.3 s · 캔버스 176 | 187 → 541 MB (+354) · peak 546 · CPU +13.1 s · 캔버스 176 | **스크롤 비용 동일** |
+| 참고 — §18-3 (A) | 86.2 MB | | 오늘 83 MB 로 재현 ✓ |
+| 참고 — §18-3 (B) | +37.4 MB / 0.31 s | | 오늘 +18 MB / 0.25 s — 같은 자릿수 ✓ |
+| 참고 — §18-3 (C) | +109 MB → 195 MB / 24.7 s | | **오늘 458 MB — 재현 안 됨.** 캔버스당 ≈2.1 MB (§18-3 은 ≈0.6 MB). 원인 미상 — 시뮬레이터/OS 의 Metal 회계 차이 가능성. **Phase 3 이후 비교의 기준은 §18-3 (C) 가 아니라 이 표의 458 MB 여야 합니다** |
+
+> CPU 는 프로세스 누적 CPU time 입니다. (A) 는 앱 기동(약 2.7 s, 본문 없이 잰 값)을 포함합니다.
+> 스크롤 시나리오의 캔버스 176 도달은 "뷰포트 ±1.5 화면" 활성 규칙이 11단계 애니메이션 스크롤로 전 절을 지나기 때문입니다 — 옛 코드의 `LazyVStack` 도 같은 수에 도달했습니다.
+
+**판정.** 스크롤 비용은 그대로이고 진입에 텍스트 행 176개 값(+100 MB · +2.3 s)이 더해졌습니다.
+설계 §18-5 2번의 "(B)표 기준으로 엄격히" 를 그대로 적용하면 **통과가 아닙니다** (+18 → +65 MB, 0.25 → 2.7 s).
+다만 이 증분은 캔버스가 아니라 **전 절 텍스트 실측 자체의 비용**이며, B 구조(Phase 3)도 같은 실측을 필요로 합니다.
+받아들일지 줄일지는 **실기기 값**을 본 뒤 정해야 합니다 — 시뮬레이터 Debug 의 2.7 s 가 실기기에서 어느 정도인지 아직 모릅니다.
+줄일 여지는 셋입니다: ① 행별 중첩 `UIHostingController` 제거 — 단 채택 구성에서 실측한 이득은 footprint −18 MB · 완성 −0.23 s 뿐이고 CPU 는 같습니다 (5.4 s),
+② 텍스트 실측을 SwiftUI 렌더링 없이 하는 경로(TextKit 측정 — 단 `Text.LayoutKey` 와 같은 줄바꿈을 보장해야 함), ③ 절별 밑줄 `Canvas` 를 `Path` 로 교체.
+
+#### 구현 중 드러난 함정 3건 — 근거
+
+**① 행별 실측 액션 → TCA 스코프 스토어 재평가 O(N²)**
+
+`sample` (4 s, 메인 스레드 3065 샘플) 의 2586 샘플이 `Update.dispatchActions` 안이었고, 그중 1329 가 `PreferenceBinder`(`Text.LayoutKey` → `send(.underlineLayoutChanged)`),
+1257 이 `GeometryActionBinder`(`onGeometryChange` → `send(.verseCanvasFrameChanged)`) 였습니다. 두 경로 모두
+`Store.send → RootCore._send → state.didSet → CurrentValueRelay.send → (스코프 스토어마다) ScopedCore.isInvalid / state.getter` 로 이어집니다.
+행 176 × 자식 스토어(행·캔버스·텍스트·히스토리) 가 액션마다 재평가되고, 액션은 528건이었습니다. 기동 40 s 후에도 레이아웃이 완성되지 않았습니다.
+**옛 코드에도 같은 경로가 있었으나** `LazyVStack` 은 보이는 행 ~10개만 만들어 드러나지 않았습니다.
+→ `VerseGeometryCollector`: 콜백은 행마다 받고, `DispatchQueue.main.async` 한 번으로 모아 **`verseGeometryMeasured` 1건**을 보냅니다. 시편 119편에서 배치 1건(176 id).
+
+**② `VStack` 의 폭 발산**
+
+임시 진단 로그:
+
+```
+DIAG halfWidth: 372.0
+DIAG makeUIView: count=1 verse=1 … count=151 verse=151      ← 176개 생성
+DIAG halfWidth: 376.7
+DIAG makeUIView: count=201 verse=25 … count=351 verse=175    ← 또 176개
+DIAG halfWidth: 381.28249999999997
+DIAG halfWidth: 385.7504375
+DIAG halfWidth: 390.10667656249996
+…                                                            ← 2분에 PKCanvasView 5,000~9,000개, footprint 2.8 GB
+```
+
+행 폭 = 0.95h + 8 + h + 20 = 1.95h + 28 이 제안 폭 744 를 넘고, 세로 `ScrollView` 는 내용이 더 넓으면 가로로 같이 넓어지며,
+`halfWidth` 는 그 폭의 절반이었습니다 → W' = 0.975 W + 28 (고정점 1120). `.id("\(sentenceSetting)-\(halfWidth)")` 가 매 단계 바뀌어 행 전체가 재생성됐습니다.
+`LazyVStack` 은 제안 폭을 그대로 보고하므로 옛 코드에서는 일어나지 않았습니다.
+→ `GeometryReader { container in … }` 의 **컨테이너 폭**에서 `halfWidth` 를 읽고, 콘텐츠를 `.frame(width: halfWidth × 2)` 로 고정. 이후 생성 수는 정확히 176.
+
+**③ 캔버스 176개 즉시 생성 비용 + 행별 중첩 호스팅**
+
+첫 실행의 `sample` 은 메인 스레드 2941 샘플 중 2472 가 **한 레이아웃 트랜잭션** 안에 있었고, 그 아래 1544 가
+`PlatformViewLayoutEngine.sizeThatFits → _UIHostingView._layoutSizeThatFits` — `touchIgnoringContextMenu` 가 행마다 만드는 중첩 `UIHostingController` 의 사이즈 계산이었습니다.
+바깥 `VStack` 의 `sizeChildrenIdeally` 가 176개 행의 중첩 그래프를 패스마다 다시 계산하고, ①의 액션마다 패스가 다시 돌았습니다 (패스당 ≈0.85 s × 528).
+①·② 를 고친 뒤에도 캔버스를 전부 만드는 구성은 §6-1 rev.15 표의 값(16~18 s · 560~610 MB)이라 채택하지 않았습니다.
+→ 캔버스는 실측 frame 으로 뷰포트 ±1.5 화면 안의 행에만 만들고(sticky), 중첩 호스팅은 유지하되 Phase 3~4 삭제 대상으로 등록.
+
+#### 남겨둔 것
+
+| 항목 | 상태 |
+|---|---|
+| 실기기 측정 (D5 절차를 Phase 2 코드로) | ❌ 미수행. 진입 +2.7 s 가 실기기에서 얼마인지가 (B)표 판정의 관건 |
+| `touchIgnoringContextMenu` 중첩 호스팅 제거 | 유지. 채택 구성에서의 이득은 footprint −18 MB · 완성 −0.23 s 이고 CPU 는 같음 (5.4 s). 롱프레스 메뉴 UX 변경이 따르므로 별도 결정 |
+| `ChapterLayout` 캐시 (§6-1 완화책) | 미구현 — N-Canvas 에서는 이득 없음. B 구조에서 검토 |
+| 하단 safe area 인셋 · signature 의 `chapter` | 그대로 미결 (§5) |
+| `columnOrigin` 소유 계층 | §5 에 제안. 확정은 Phase 3 착수 시 |
+| `dirtyBounds` 오버레이 | 배선됐으나(`CanvasFeature.lastDrawingBounds` → 콘텐츠 좌표) 시뮬레이터에 펜 입력 수단이 없어 **표시를 확인하지 못함** |
+| 창세기 1장(소제목 있음)의 HUD Δ | 기록하지 않음 — 시편 119편만 수치로 남김 |

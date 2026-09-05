@@ -79,6 +79,25 @@ mise x -- swiftlint lint --quiet --config .swiftlint.yml <파일들>
 - 기록 중에는 **`pgrep`/`pkill` 로 프로세스를 건드리지 않는다.** 마무리 단계에 끼어들면
   트레이스가 템플릿 메타데이터 없이 저장되어 `xctrace export` 가 실패한다.
 
+## 시뮬레이터 측정
+
+설계 §18-3 의 절차를 이 머신에서 재현할 때 (Phase 2 에서 확인):
+
+- **`vmmap` 은 권한 오류로 실패한다** (`Failed to get DYLD info for task`). 같은 physical footprint 는
+  `/usr/bin/footprint <pid>` 로 읽는다. CPU 는 §18-3 그대로 `ps -o time=` 델타.
+- **`Log.debug` / `Log.info` 는 `log show` 에 남지 않는다.** 앱을 띄우기 **전에**
+  `xcrun simctl spawn <UDID> log stream --level debug --predicate 'subsystem == "kr.co.carve.leetaek"'`
+  를 붙여야 보인다. `PKCanvasView` 생성 1회당 `com.apple.pencilkit` 의 `isGenerationToolEnabled` 가 3줄 찍히므로
+  캔버스 생성 횟수는 이 줄 수로 센다.
+- **터치 주입은 불가하다.** MCP 시뮬레이터 제어는 `xcode-select` 가 CLT 를 가리켜 막혀 있고(S4 §20-4 와 같음),
+  호스트 쪽 도구(cliclick · Quartz)도 없다. 시스템 설정을 바꾸지 말고 **Debug 전용 실행 인자 시나리오**를 쓴다:
+  `-ChapterLayoutAutoScroll`(11단계 스크롤) · `-ChapterLayoutAutoNext`(다음 장) · `-ChapterLayoutOverlay`(레이아웃 오버레이·HUD).
+- **장 지정 시드는 저장된 앱 상태에 밀린다.** 앱이 한 번 장을 바꾼 뒤에는 컨테이너의
+  `Library/Saved Application State` 가 마지막 장을 복원해, `title` 을 어느 plist 에 써도 무시된다
+  (Phase 2 에서 시편 120편이 뜨는 무효 측정을 여러 번 했다). **`xcrun simctl uninstall <UDID> kr.co.carve.leetaek` 로
+  컨테이너를 비운 뒤** 설치 → `xcrun simctl spawn <UDID> defaults write kr.co.carve.leetaek title -data <BibleChapter JSON 의 hex>` → 실행.
+  시드가 먹었는지는 앱 로그의 `ChapterLayout 완성: <권>.<장>` 으로 반드시 확인한다. (dev sqlite 도 함께 지워진다 — 시뮬레이터에는 테스트 행뿐이다.)
+
 ## 변경 정책
 - 변경은 최소 범위로 유지한다.
 - 폴더 구조를 재구성하지 않는다.
