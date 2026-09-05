@@ -1,9 +1,12 @@
 # CarveFeature 단일 Canvas 전환 설계
 
-> 상태: **설계안 (미구현)** · 대상: `Feature/CarveFeature`, `Domain`
-> rev.8 — **Phase 0A-S0 / S1 / S2 실행 완료.** 측정 결과는 §18.
+> 상태: **설계안 (새 아키텍처 미착수)** · 대상: `Feature/CarveFeature`, `Domain`
+> rev.9 — **Phase 0A-S0 / S1 / S2 실행 완료** (측정 결과는 §18·§19) **+ 검증에서 파생된 기존 코드 버그 2건 수정 완료** (§16·§20).
 > S1에서 §7-4·§7-5의 전제가 뒤집혔고, S2에서 §9-3의 `textLineRanges`가 확정됐습니다. PencilKit·SwiftData API는 iOS 26.2 SDK 헤더로 확인함.
-> 코드 변경·빌드·테스트는 수행하지 않았습니다.
+> **rev.8의 "코드 변경·빌드·테스트는 수행하지 않았습니다"는 더 이상 사실이 아닙니다.**
+> 기존 N-Canvas 구조 위의 수정 커밋 2건이 존재합니다 — `19be99ea`(주간 요약 동점 tie-break, S0-2 파생), `7ba5bc46`(지우개 저장 누락, S1-3 파생).
+> **단, 새 아키텍처(Phase 0B 이후)는 여전히 미착수입니다.**
+> `ChapterLayout` / `ChapterCanvasFeature` / `DrawingCodecClient` / `DrawingRepository` / `DrawingSchemaV4` 는 저장소에 **존재하지 않으며**(grep 확인, 스키마는 V3까지), 이 문서의 §4~§11은 전부 미구현 설계입니다.
 > "검증 필요" 표시된 항목은 Phase 0A 실기기 확인 전까지 확정하지 않습니다.
 
 ---
@@ -586,10 +589,12 @@ bitmap 경로에서 **필요 없습니다.**
 재현: 마지막 획을 지우고 앱을 재기동하면 **지운 획이 되살아납니다.**
 (DB `length(ZLINEDATA)` 가 그대로 유지됨을 sqlite 로 확인)
 
+> 아래 위치·행 번호는 **수정 전(rev.8 시점) 코드 기준**입니다. 현재 코드는 아래 "✅ 분리 수정 완료" 절을 보십시오.
+
 | # | 위치 | 문제 |
 |---|---|---|
-| 1 | [CarveDetailFeature.swift:206](../Feature/CarveFeature/Sources/Presentation/Carve/CarveDetail/CarveDetailFeature.swift) | `guard ... containsPKStroke == true else { return }` — 마지막 획을 지워 `strokes` 가 비면 **저장 자체를 건너뜀** |
-| 2 | [CanvasView.swift:66-72](../Feature/CarveFeature/Sources/Presentation/Drawing/Canvas/CanvasView.swift) | `guard now.timeIntervalSince(lastUpdate) > 0.3 else { return }` 는 **leading-edge throttle** — 제스처의 마지막 변경이 유실됨 (debounce 가 아님) |
+| 1 | [CarveDetailFeature.swift](../Feature/CarveFeature/Sources/Presentation/Carve/CarveDetail/CarveDetailFeature.swift) (당시 206행) | `guard ... containsPKStroke == true else { return }` — 마지막 획을 지워 `strokes` 가 비면 **저장 자체를 건너뜀** |
+| 2 | [CanvasView.swift](../Feature/CarveFeature/Sources/Presentation/Drawing/Canvas/CanvasView.swift) (당시 66-72행) | `guard now.timeIntervalSince(lastUpdate) > 0.3 else { return }` 는 **leading-edge throttle** — 제스처의 마지막 변경이 유실됨 (debounce 가 아님) |
 
 #### 새 설계에서는 두 원인이 구조적으로 제거됩니다
 
@@ -598,14 +603,48 @@ bitmap 경로에서 **필요 없습니다.**
 
 즉 P7("빈 결과도 mutation이다")은 **판정식 문제가 아니라 저장 가드 문제**를 푸는 원칙입니다.
 
+> ⚠️ 단, "편집 종료 시점" 을 `canvasViewDidEndUsingTool` 로 구현하면 **안 됩니다.** 아래 실측 참조.
+
 #### 그래도 방어적으로 유지할 것
 
 - **`renderBounds` 기반 가시성 검사** — `.vector` 지우개나 향후 OS 버전에서 동작이 달라질 수 있습니다.
   실측에서 `renderBounds` 가 가시 영역만 반영함이 확인됐습니다(264pt → 112pt).
 - **`maskedPathRanges.isEmpty` 로 마스크 유무를 판정하지 말 것** (§7-2 주의 참조)
 
-> ⚠️ **이 버그는 현재 프로덕션에 존재하며, 단일 Canvas 전환(Phase 3)을 기다릴 필요가 없습니다.**
-> 별도 수정 대상으로 분리합니다.
+#### ✅ 분리 수정 완료 — `7ba5bc46` (rev.9)
+
+> rev.8은 "이 버그는 현재 프로덕션에 존재하며, 단일 Canvas 전환(Phase 3)을 기다릴 필요가 없다. 별도 수정 대상으로 분리한다"고 적었습니다.
+> **그 분리 수정이 실제로 수행됐습니다.** 위 표의 두 원인을 **기존 N-Canvas 구조 위에서** 고쳤습니다. 상세는 §20-2.
+
+| # | 원인 | 조치 |
+|---|---|---|
+| 1 | 저장 가드 | 저장 경로를 [CarveDetailFeature.persistDrawing(_:)](../Feature/CarveFeature/Sources/Presentation/Carve/CarveDetail/CarveDetailFeature.swift) 로 분리하고 **획 유무 조건을 제거**. `setSentence`의 대표 drawing 선택에서도 같은 필터를 제거 (남아 있으면 "전부 지운 최신 기록"이 후보에서 빠져 더 오래된 기록이 대표로 승격됨) |
+| 2 | leading-edge throttle | throttle은 그대로 두고 그 옆에 **trailing-edge debounce**를 추가해 제스처의 **마지막** 변경을 반드시 저장 ([CanvasView.swift:93](../Feature/CarveFeature/Sources/Presentation/Drawing/Canvas/CanvasView.swift)) |
+| 3 | (부수) | trailing 저장이 생기면서 필사하지 않은 절까지 빈 레코드가 생기는 것이 관측되어, [CanvasFeature.swift:60](../Feature/CarveFeature/Sources/Presentation/Drawing/Canvas/CanvasFeature.swift) 에서 **기록이 없는 절 + 빈 canvas** 조합은 새 행을 만들지 않도록 함 |
+
+**`containsPKStroke` 의 의미 자체는 바꾸지 않았습니다.**
+`"stroke 가 있는가"` 라는 뜻은 그 자체로 옳고, 무엇보다
+[DrawingDataMigrationPlan.swift:40](../Domain/Domain/Sources/SwiftData/DrawingDataMigrationPlan.swift) 의 **V1→V2 마이그레이션이
+빈 레거시 레코드를 삭제하는 판단에 같은 의미를 그대로 쓰고 있습니다.**
+의미를 "가시 획" 으로 바꾸면 마이그레이션 동작이 조용히 달라지므로, **호출부만** 고쳤습니다.
+(비활성 상태인 `CombinedCanvasFeature` 의 호출부는 손대지 않았습니다.)
+
+**`canvasViewDidEndUsingTool` 은 최종 저장 지점으로 쓸 수 없습니다 — 실측 확인.**
+PencilKit이 획을 `drawing` 에 반영하기 **전에** 호출되어 **빈 drawing 이 저장됩니다**(시뮬레이터 확인).
+그래서 pencil-up 델리게이트가 아니라 trailing-edge debounce 를 택했습니다.
+이는 §8-1의 `editEnded` 계약을 구현할 때도 그대로 유효한 제약입니다 — **`canvasViewDidEndUsingTool` 을 편집 종료 저장 지점으로 삼으면 안 됩니다.**
+
+#### Phase 3에서 이 수정이 흡수되는 방식
+
+이번 수정은 기존 구조 위의 국소 처방이며, 새 설계가 두 축을 각각 **대체**합니다.
+
+| 지금 (N-Canvas, `7ba5bc46`) | Phase 3 대체 | 근거 |
+|---|---|---|
+| trailing-edge debounce 로 마지막 변경 보장 | **§8-1** 편집 종료(`editEnded`) 계약에 의한 저장 | 시간 기반 추측이 아니라 편집 경계가 명시됨 |
+| 저장 가드 제거 + stroke 0개도 그대로 저장 | **§8-2** dirty 집합 → `.clear` mutation (P7) | "빈 결과도 mutation" 을 판정이 아니라 명령으로 표현 |
+| `strokes.isEmpty` 로 신규 행 생성 억제 | **§8-7** `activeRowIDs` + rowID 선발급 | 행 생성 시점이 편집 계약에 종속됨 |
+
+→ Phase 3 도입 시 debounce 와 `strokes.isEmpty` 가드는 **삭제 대상**입니다.
 
 ---
 
@@ -1445,15 +1484,26 @@ S0 완료 후 수행합니다.
 
 | ID | 결과 |
 |---|---|
+| S0-2 | 테스트 기준선 **57/57** 확보 (§18-2). 여기서 드러난 flaky 1건은 `19be99ea` 로 **해소** (§20-1) |
 | S0-3 | `drawing.id` 는 **문맥 의존 오버로드** — 표현 금지 확정 (§8-7) |
 | S0-4 | N-Canvas baseline 확보 (§18-3) |
 | S0-5 | 현행 스키마 데이터는 시뮬레이터로 생성 가능. **진짜 legacy 는 실기기 필요** (§18-4) |
 | S1-1 | `randomSeed` 라운드트립 **보존** |
 | S1-2 | bitmap 지우개는 **분할 + 마스킹 동시**. 조각들이 IdentityKey 공유 (§7-4) |
-| S1-3 | 완전히 지운 stroke 는 **제거됨** — §7-5 전제 반전 |
+| S1-3 | 완전히 지운 stroke 는 **제거됨** — §7-5 전제 반전. 여기서 드러난 프로덕션 버그는 `7ba5bc46` 으로 **수정 완료** (§20-2) |
 | S1-4 | 지우개 후 IdentityKey 구성요소 **전부 불변** (control point 값까지) |
 | S1-5 | `mask` / `maskedPathRanges` **보존**. 단 `mask == nil` 이면 ranges 는 전체 구간 |
 | S2 | **`textLineRanges` 실현 가능** — `Run.characterIndices` (iOS 17.0+) |
+
+### 검증에서 파생된 기존 코드 수정 (검증 항목 자체가 아니라 그 부산물)
+
+| 파생 항목 | 커밋 | 내용 | 문서 |
+|---|---|---|---|
+| **S0-2** | `19be99ea` | `DrawingWeeklySummaryFeature.topChapter` 가 동점에서 비결정적 → `TopChapterRank(Comparable)` 전순서로 해소 | §18-2, §20-1 |
+| **S1-3** | `7ba5bc46` | 지우개로 전부 지운 결과가 저장되지 않던 문제 → 저장 가드 + throttle 수정 | §7-5, §20-2 |
+
+> 둘 다 **기존 N-Canvas 구조 위의 수정**이며, 새 아키텍처 착수(Phase 0B 이후)와는 무관합니다.
+> 따라서 아래 "남은 시뮬레이터 항목" 은 rev.8과 동일합니다.
 
 ### 남은 시뮬레이터 항목
 
@@ -1511,7 +1561,7 @@ S0 완료 후 수행합니다.
 | `StableCanvasView` 디버그 dump | 삭제 (~400줄) | 4 |
 | `VerseRowFeature` | 삭제 (죽은 리듀서) | 4 |
 | `CombinedCanvasFeature` / `CombinedCanvasView` | `ChapterCanvasFeature`로 재작성 | 3 |
-| `Data.containsPKStroke` | "가시 획" 판정으로 수정 (§7-5) | 3 |
+| `Data.containsPKStroke` | **의미 유지 — 수정 대상 아님.** 호출부만 수정 완료 (`7ba5bc46`). V1→V2 마이그레이션이 `"stroke 가 있는가"` 의미에 의존하므로 정의를 바꾸지 않습니다 (§7-5, §20-2) | ✅ 완료 |
 | `BiblePageDrawing` | 캐시/복구 전용으로 격하 → 장기 제거 | 3~ |
 | `DrawingDatabase.updateDrawings(requests:)` | `DrawingRepository.apply(_:)` atomic batch로 대체 | 3 |
 | `DrawingDatabase.updateDrawing(drawing:)` | 행 주소지정 정리 후 Repository로 흡수 (§8-7) | 3 |
@@ -1547,14 +1597,21 @@ S0 완료 후 수행합니다.
 | UIComponentsTest | 3 |
 
 > **이후 어느 단계에서든 57 미만 통과 또는 실패 1건 이상이면 회귀입니다.**
+> (이 57은 **rev.8 시점의 기록**입니다. 이후 테스트가 추가되어 현재 선언 수는 다릅니다 — §19-4.)
 
-> ⚠️ **단, 이 기준선은 항상 재현되지 않습니다.**
+> ⚠️ **(rev.8 기록) 단, 이 기준선은 항상 재현되지 않았습니다.**
 > `ChartFeatureTest / DrawingWeeklySummaryStateTesting` 의
-> `"현재 주의 일별 권별 횟수를 합산해 가장 많이 필사한 권을 반환한다"` 가 **flaky** 입니다 (S1에서 발견, 5회 중 1회 실패).
-> 원인: [DrawingWeeklySummaryFeature.swift:71](../Feature/ChartFeature/Sources/Chart/DrawingWeeklySummaryFeature.swift) 의
+> `"현재 주의 일별 권별 횟수를 합산해 가장 많이 필사한 권을 반환한다"` 가 **flaky** 였습니다 (S1에서 발견, 5회 중 1회 실패).
+> 원인: [DrawingWeeklySummaryFeature.swift](../Feature/ChartFeature/Sources/Chart/DrawingWeeklySummaryFeature.swift) 의 (당시 71행)
 > `merged.max(by: { $0.value < $1.value })` 가 **동점 시** Dictionary 순회 순서에 의존하고,
-> Swift 해시 시드는 프로세스마다 달라 비결정적입니다.
-> **회귀 판정 시 이 1건은 별도로 취급하고, 결정적 tie-break 를 넣어 먼저 해소하는 것을 권합니다.**
+> Swift 해시 시드는 프로세스마다 달라 비결정적이었습니다.
+> rev.8은 **"회귀 판정 시 이 1건은 별도로 취급하고, 결정적 tie-break 를 넣어 먼저 해소하는 것을 권합니다"** 라고 적었습니다.
+
+> ✅ **rev.9 — 해소됨 (`19be99ea`).**
+> `TopChapterRank(Comparable)` 를 도입해 **전순서(total order)** 로 1위를 선택합니다
+> ([DrawingWeeklySummaryFeature.swift:78](../Feature/ChartFeature/Sources/Chart/DrawingWeeklySummaryFeature.swift)).
+> 우선순위는 **① 합계 내림차순 → ② 성경 순서(`BibleTitle.allCases` 인덱스) 오름차순 → ③ 장 번호 오름차순** 입니다.
+> **회귀 판정 시 별도 취급하던 예외가 사라졌습니다.** 상세는 §20-1.
 
 ### 18-3. S0-4 — N-Canvas 경로 baseline ★
 
@@ -1627,6 +1684,16 @@ CPU     ps -o time= 누적 CPU time 델타, 0.25s 간격 샘플링
 (a) 실기기에서 dev CloudKit 컨테이너로 내려받기   ← 시뮬레이터는 entitlement가 제거되어 불가
 (b) 실기기/실사용자의 Carve.sqlite 를 시뮬레이터 컨테이너에 파일 복사 후 마이그레이션 태우기
 ```
+
+> ⚠️ **rev.9 정정 — (a)는 성립하지 않습니다.**
+> Debug 빌드는 dev CloudKit 컨테이너(`iCloud.Carve.SwiftData.iCloud.dev`)에 붙는데
+> ([Project.swift:36](../App/CarveApp/Project.swift)), **실사용자의 legacy 데이터는 prod 컨테이너**
+> (`iCloud.Carve.SwiftData.iCloud`)에 있습니다. dev 컨테이너를 채운 적이 없으므로 (a)로는 아무것도 내려오지 않습니다.
+> **실제로 성립하는 경로는 (b) 파일 복사뿐입니다.** 절차는 [phase-0a-d-device-test.md](./phase-0a-d-device-test.md) §6-1.
+
+> ⚠️ **`lineData` 는 `@Attribute(.externalStorage)` 입니다** ([DrawingSchemaV3.swift](../Domain/Domain/Sources/SwiftData/Model/DrawingSchemaV3.swift)).
+> 큰 블롭은 sqlite 파일 **바깥**에 별도 파일로 저장되므로, `Carve.sqlite` 하나만 복사하면 필사 데이터가 누락됩니다.
+> **`Library/Application Support/` 디렉터리 전체**를 가져와야 합니다.
 
 > **S5는 "실데이터 1회 추출"만 실기기 의존이고, 파일만 확보되면 이후 반복·자동화는 시뮬레이터에서 가능합니다.**
 
@@ -1712,13 +1779,100 @@ lineOrigins = [(0,16.0), (0,36.287), (0,56.574), (0,76.861)]
 
 | 파일 | 테스트 수 | 내용 |
 |---|---|---|
-| `Feature/CarveFeature/Tests/PencilKitDataModelTesting.swift` | 7 | S1-1 ~ S1-5. 실측 블롭 3개(690B/1266B/1083B)를 base64 상수로 내장 |
-| `Feature/CarveFeature/Tests/TextLayoutKeyProbeTesting.swift` | 3 | S2. `lineCharacterRanges(from:)` 는 §9-3 구현에 그대로 재사용 가능 |
+| `Feature/CarveFeature/Tests/PencilKitDataModelTesting.swift` | 8 | S1-1 ~ S1-5. 실측 블롭 3개(690B/1266B/1083B)를 base64 상수로 내장 |
+| `Feature/CarveFeature/Tests/TextLayoutKeyProbeTesting.swift` | 2 | S2. `lineCharacterRanges(from:)` 는 §9-3 구현에 그대로 재사용 가능 |
 
 전체 테스트: **67/67 통과** (기준선 57 + 신규 10). SwiftLint 위반 0.
 
+> **rev.9 정정:** 파일별 분포는 **8 / 2** 입니다. rev.8 표의 `7 / 3` 은 오기였습니다 —
+> 두 파일은 `eef5ac1c` 이후 변경된 적이 없고, 그 커밋 시점에도 `@Test` 선언은 8과 2였습니다.
+> **합계 10과 "67/67 통과" 라는 당시 실행 기록 자체는 그대로 유효합니다.**
+
 > 블롭을 base64 상수로 내장한 이유: 테스트 타깃에 resource 설정이 없어
 > **프로젝트 설정 변경을 피하기 위함**입니다 (AGENTS.md: 빌드 설정 변경 금지).
+
+### 19-4-1. rev.9 — 그 이후 추가된 테스트 ★
+
+> 아래 표는 저장소의 `@Test` / `func test_` 선언을 직접 센 값입니다.
+> (`.build` 및 동기화 충돌 사본인 `"… 2.swift"` 파일은 집계에서 제외했습니다.)
+> **선언 수 76은 이후 전량 실행으로 확정됐습니다 — §19-4-2.**
+
+| 커밋 | 파일 | 증분 |
+|---|---|---|
+| `7ba5bc46` | `Feature/CarveFeature/Tests/DrawingErasePersistenceTesting.swift` (신규) | **+6** |
+| `19be99ea` | `Feature/ChartFeature/Tests/DrawingWeeklySummaryStateTesting.swift` (3 → 6) | **+3** |
+
+**번들별 선언 수**
+
+| 번들 | rev.8 기준선 | 현재 선언 |
+|---|---:|---:|
+| DomainTest | 31 | 31 |
+| CarveFeatureTest | 8 | **24** |
+| CarveToolkitTest | 6 | 6 |
+| ChartFeatureTest | 6 | **9** |
+| SettingsFeatureTest | 3 | 3 |
+| UIComponentsTest | 3 | 3 |
+| **합계** | **57** | **76** |
+
+```
+76 = 기준선 57 + S1/S2 검증 10 + 지우개 회귀 6 + 동점 규칙 3
+```
+
+**각 커밋이 남긴 그 시점의 실행 기록** (전체 76건을 한 번에 돌린 기록은 **없습니다**):
+
+| 커밋 | 실행 범위 | 결과 |
+|---|---|---|
+| `19be99ea` | `-scheme ChartFeatureTest`, iPad mini (A17 Pro) / iOS 26.2, 7회 반복 | 9 tests 전부 통과 |
+| `7ba5bc46` | `CarveFeatureTest` | 18 → 24. 수정 전 코드로 되돌리면 저장/대표선택/trailing 저장 테스트가 실제로 실패함을 확인 |
+
+### 19-4-2. rev.9 — 76건 전량 실행 결과 ★ 새 회귀 기준선
+
+> 실행 환경: **Xcode 26.3 (Build 17C529) / Swift 6.2.4 / tuist 4.39.0 /
+> iPad mini (A17 Pro) 시뮬레이터 iOS 26.2** — §18-1 기록 환경과 동일.
+> `DerivedData` 삭제 후 클린 빌드, `xcodebuild test -scheme Carve-Workspace`.
+
+```
+** TEST SUCCEEDED **     실패 0
+```
+
+| 번들 | rev.8 기준선 | 실행 결과 |
+|---|---:|---:|
+| DomainTest | 31 | **31** (Swift Testing 29 + XCTest 2) |
+| CarveFeatureTest | 8 | **24** |
+| CarveToolkitTest | 6 | **6** |
+| ChartFeatureTest | 6 | **9** |
+| SettingsFeatureTest | 3 | **3** |
+| UIComponentsTest | 3 | **3** |
+| **합계** | **57** | **76** |
+
+> **새 회귀 기준선은 76/76 입니다.** 이후 어느 단계에서든 76 미만 통과 또는 실패 1건 이상이면 회귀입니다.
+> §18-2의 57은 rev.8 시점 기록으로 보존하되, 판정 기준으로는 이 값을 씁니다.
+
+**같이 확인된 것**
+
+- §18-2의 flaky 예외가 사라졌습니다. 다만 이번은 **1회 실행**이므로, 비결정성 부재의 근거는
+  반복 실행이 아니라 `TopChapterRank` 가 전순서라는 **구조적 성질**입니다 (§20-1).
+  `19be99ea` 당시 7회 반복 통과 기록이 별도로 있습니다.
+- 로그의 `error:` 3건은 전부 런타임 노이즈입니다 — PencilKit 필기인식 권한
+  (`com.apple.corehandwriting Code=-1003`), CoreData persistent history 정리.
+  빌드·테스트 실패가 아닙니다.
+
+**전량 실행에서 드러난 기존 결함 1건 (별도 수정)**
+
+`UIComponentsTest` 만 테스트 타깃에 프레임워크 의존성이 빠져 있어
+(`makeTestTarget` 의 `dependencies` 기본값이 `[]`), 클린 빌드에서
+`@testable import UIComponents` 가 해석되지 않았습니다.
+나머지 6개 모듈은 모두 `dependencies: [.target(name: projectName)]` 를 넘깁니다.
+증분 빌드에서는 다른 타깃이 먼저 만들어 둔 프레임워크를 찾아 우연히 통과하다가
+클린 빌드에서 드러난 잠복 결함입니다. 같은 패턴으로 맞췄습니다
+([Supports/UIComponents/Project.swift](../Supports/UIComponents/Project.swift)).
+
+> ⚠️ **툴체인 주의 — Xcode 26.3 이 아니면 빌드되지 않습니다.**
+> TCA 는 `Tuist/Package.swift` 에 `exact: "1.20.2"` 로 고정돼 있는데,
+> 이 버전은 **Swift 6.3.3 이상에서 컴파일되지 않습니다**
+> (`WritableKeyPath<Root, BindingState<Value>>` 의 `Sendable` 미충족 — Xcode 26.6 에서 실측).
+> Xcode 27 은 여기에 더해 의존성 배포 타깃(iOS 12/13, macOS 10.15)을 거부합니다.
+> **§18·§19 의 모든 수치는 Xcode 26.3 / Swift 6.2.4 기준입니다.**
 
 ### 19-5. S1에서 확인하지 못한 것
 
@@ -1726,3 +1880,89 @@ lineOrigins = [(0,16.0), (0,36.287), (0,56.574), (0,76.861)]
 - **`PKEraserTool(.vector)` 동작** — 이번 범위 밖. 위 결론은 `.bitmap` 한정
 - **`CharacterIndex` 의 단위** (Character vs UTF-16) — 한글 46자에서 `String.count == utf16.count` 라 구분 불가
 - **빈 `PKDrawing` fixture** — §7-5의 저장 가드 때문에 DB에 도달하지 않아 확보 실패
+  > ✅ **rev.9 해소:** `7ba5bc46` 이 저장 가드를 제거해 stroke 0개인 drawing 도 DB에 도달합니다.
+  > 커밋이 남긴 실측: 획 1개일 때 `ZBIBLEDRAWING(verse 3)` `length 515 / strokes 1` → 전부 지운 뒤 **`length 317 / strokes 0`**
+  > (수정 전에는 515 그대로였음). 빈 `PKDrawing` 블롭 fixture 를 이제 시뮬레이터에서 확보할 수 있습니다.
+
+---
+
+## 20. 부록 D — rev.9에서 반영한 코드 수정 2건
+
+> Phase 0A-S0 / S1 검증 과정에서 **드러난** 기존 코드 버그를, 새 아키텍처를 기다리지 않고 먼저 고친 기록입니다.
+> 둘 다 **기존 N-Canvas 구조 위의 수정**이며, §4~§11의 새 설계는 여전히 미구현입니다.
+
+| 커밋 | 파생 | 제목 |
+|---|---|---|
+| `19be99ea` | S0-2 | 주간 요약 topChapter 동점 시 비결정적 결과 수정 |
+| `7ba5bc46` | S1-3 | 지우개로 전부 지운 필사 내용이 저장되지 않던 문제 수정 |
+
+### 20-1. `19be99ea` — 주간 요약 동점 tie-break (S0-2 파생)
+
+**증상.** §18-2의 회귀 기준선(57/57)을 재현할 때
+`ChartFeatureTest / DrawingWeeklySummaryStateTesting` 의 1건이 5회 중 1회꼴로 실패했습니다.
+
+**원인.** `merged.max(by: { $0.value < $1.value })` 는 최댓값이 **동점**이면
+`Dictionary` 순회 순서에 결과가 좌우되고, Swift 해시 시드는 프로세스마다 달라 비결정적입니다.
+당시 테스트 데이터가 우연히 동점(창세기 2+3=5, 요한복음 1+4=5)이었습니다.
+
+**수정.** 정렬 키 `TopChapterRank(Comparable)` 를 도입해 **전순서(total order)** 로 1위를 뽑습니다
+([DrawingWeeklySummaryFeature.swift:78](../Feature/ChartFeature/Sources/Chart/DrawingWeeklySummaryFeature.swift)).
+
+```
+① 합계 내림차순
+② 성경 순서 오름차순   (BibleTitle.allCases 인덱스)
+③ 장 번호 오름차순
+```
+
+> ②를 고른 이유: 성경 순서는 이미 `BibleTitle.allCases` 나열 순서로 도메인에 정의돼 있어
+> 새 규칙을 만들 필요가 없고, 사용자가 목록·네비게이션에서 보는 순서와도 일치해
+> "동점이면 앞쪽 권" 이라는 결과를 설명하기 쉽습니다.
+
+**테스트.** 기존 테스트 데이터를 동점이 아니게 조정해 "합산 1위" 자체를 검증하도록 바꾸고,
+동점 규칙은 **별도 3건**으로 명시 검증합니다 (성경 순서 tie-break / 같은 권 내 장 번호 tie-break /
+삽입 순서를 50회 섞어도 결과 동일).
+
+**설계 문서와의 관계.** 이 수정은 §18-2의 회귀 기준선 예외를 제거할 뿐이며,
+단일 Canvas 설계 자체에는 영향이 없습니다. 다만 §7-3의
+**"동일 후보가 복수일 때는 결정적 순서로 선택한다"** 와 §8-7의
+**"`mainDrawing()` 을 결정적으로 만들 것"** 이 요구하는 것과 **같은 유형의 결함**이므로,
+새 구현에서도 Dictionary/Set 순회 순서에 결과를 맡기지 않도록 주의해야 합니다.
+
+### 20-2. `7ba5bc46` — 지우개 저장 누락 (S1-3 파생)
+
+**증상.** 한 절의 획을 지우개로 전부 지운 뒤 앱을 재기동하면 지웠던 획이 되살아납니다
+(§7-5에 기록된 그 버그).
+
+**원인.** §7-5 표의 두 곳이 겹쳐 있었습니다 — 저장 가드(`containsPKStroke`)와 leading-edge throttle.
+
+**수정 요약.** 상세 표는 §7-5의 "✅ 분리 수정 완료" 절에 있습니다. 핵심 판단 세 가지만 다시 적습니다.
+
+| 판단 | 내용 |
+|---|---|
+| `containsPKStroke` **의미 불변** | `"stroke 가 있는가"` 는 그 자체로 옳고, [DrawingDataMigrationPlan.swift:40](../Domain/Domain/Sources/SwiftData/DrawingDataMigrationPlan.swift) 의 V1→V2 마이그레이션이 **빈 레거시 레코드 삭제 판단에 같은 의미를 사용**합니다. 정의를 "가시 획" 으로 바꾸면 마이그레이션 동작이 조용히 달라지므로 **호출부만** 수정 |
+| `canvasViewDidEndUsingTool` **사용 불가** | PencilKit이 획을 `drawing` 에 반영하기 **전에** 호출되어 빈 drawing 이 저장됨을 시뮬레이터에서 확인. 그래서 pencil-up 델리게이트 대신 **trailing-edge debounce** 를 사용 |
+| 대표 drawing 선택 필터 제거 | `setSentence` 가 획 유무로 후보를 거르면 "전부 지운 최신 기록" 이 후보에서 빠지고 더 오래된 기록이 대표로 승격되어 **지운 결과가 되살아난 것처럼 보임**. 선택 규칙을 도메인 `mainDrawing()`(isPresent 우선 → updateDate 최신)과 일치시킴 |
+
+> 세 번째 항목은 §8-7의 **"`clear` 는 행을 삭제하지 않는다 ★"** 와 **정확히 같은 함정**입니다.
+> 그때는 "행 삭제 → 과거 회차 승격" 이었고, 여기서는 "필터로 후보 제외 → 과거 회차 승격" 이었습니다.
+> 원인이 삭제냐 필터냐만 다를 뿐 결과가 동일하므로, Phase 3 구현에서도
+> **"빈 것을 후보에서 빼는" 모든 경로를 의심**해야 합니다.
+
+**변경 파일**
+
+| 파일 | 변경 |
+|---|---|
+| [CarveDetailFeature.swift](../Feature/CarveFeature/Sources/Presentation/Carve/CarveDetail/CarveDetailFeature.swift) | 저장 경로를 `persistDrawing(_:)`(233행)으로 분리, 획 유무 조건 제거. `setSentence`(116행) 후보 필터 제거 |
+| [CanvasView.swift](../Feature/CarveFeature/Sources/Presentation/Drawing/Canvas/CanvasView.swift) | `debounceInterval` → `throttleInterval` 로 이름을 실제 동작에 맞추고, `scheduleTrailingSave(for:)`(93행) 추가. **undo 등록은 trailing 경로에서 하지 않음** (기존 undo 동작 유지) |
+| [CanvasFeature.swift](../Feature/CarveFeature/Sources/Presentation/Drawing/Canvas/CanvasFeature.swift) | `saveDrawing` 에서 **기록이 없는 절 + 빈 canvas** 조합은 새 행을 만들지 않도록 함(60행). trailing 저장 도입으로 필사하지 않은 절에까지 빈 레코드가 생기는 것을 시뮬레이터에서 확인해 함께 차단 |
+| `DrawingErasePersistenceTesting.swift` | 회귀 테스트 6건 신규 |
+
+**손대지 않은 것**
+
+- 비활성(주석 처리) 상태인 `CombinedCanvasFeature` 의 `containsPKStroke` 호출부
+  ([CombinedCanvasFeature.swift:141](../Feature/CarveFeature/Sources/Presentation/Drawing/Canvas/CombinedCanvasFeature.swift)) —
+  Phase 3에서 `ChapterCanvasFeature` 로 재작성될 파일입니다(부록 표).
+
+**Phase 3에서의 흡수** — §7-5의 "Phase 3에서 이 수정이 흡수되는 방식" 표 참조.
+trailing debounce 는 §8-1(편집 종료 저장)로, 저장 가드 제거는 §8-2(`.clear` mutation, P7)로,
+`strokes.isEmpty` 신규 행 억제는 §8-7(rowID 선발급)로 각각 대체됩니다.
