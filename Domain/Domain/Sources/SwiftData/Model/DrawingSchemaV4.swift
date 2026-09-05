@@ -193,22 +193,16 @@ public typealias BibleDrawing = DrawingSchemaV4.BibleDrawing
 public typealias BiblePageDrawing = DrawingSchemaV4.BiblePageDrawing
 
 extension Array where Element == BibleDrawing {
-    /// 여러 BibleDrawing 중 메인 Drawing 하나를 선택
-     /// 1. isPresent == true 가 있으면 그걸 우선
-     /// 2. 없으면 updateDate 기준으로 최신 것을 선택
-     ///
-     /// - Note: 설계 §8-7 은 CloudKit 충돌로 `isPresent == true` 행이 복수 존재할 때를 대비해
-     ///         "updateDate 최신 → 동률이면 rowID 사전순" 으로 **결정적**으로 만들 것을 요구합니다.
-     ///         그 변경은 행 주소지정 재배선과 함께 가는 **Phase 3** 범위이므로 여기서는 현행 동작을 유지합니다.
-     public func mainDrawing() -> BibleDrawing? {
-         // 1) isPresent == true 데이터 우선
-         if let active = self.first(where: { $0.isPresent == true }) {
-             return active
-         }
-
-         // 2) updateDate 기준 최신 데이터
-         return self.max {
-             ($0.updateDate ?? .distantPast) < ($1.updateDate ?? .distantPast)
-         }
-     }
+    /// 여러 BibleDrawing 중 메인 Drawing 하나를 선택 — **결정적 규칙** (설계 §8-7, Phase 3).
+    ///
+    /// 1. `isPresent == true` 인 행들 중 `updateDate` 최신
+    /// 2. 동률이면 행 키(`rowUUID` 또는 business `id`) 사전순
+    /// 3. `isPresent` 행이 없으면 `updateDate` 최신 → 동률이면 행 키 사전순
+    ///
+    /// 이전 구현은 `first(where: isPresent)` 라 배열 순서에 의존했다. CloudKit 충돌로 `isPresent == true` 가
+    /// 둘 이상이면 실행마다 대표가 달라질 수 있었으므로 `DrawingRepresentativeRule` 로 고정한다.
+    /// `isPresent` 행이 하나뿐인 보통의 경우 결과는 이전과 같다.
+    public func mainDrawing() -> BibleDrawing? {
+        DrawingRepresentativeRule.pick(self)
+    }
 }
