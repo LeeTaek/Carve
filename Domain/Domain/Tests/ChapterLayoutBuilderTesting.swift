@@ -308,3 +308,126 @@ struct ChapterLayoutBuilderTesting {
         )
     }
 }
+
+// MARK: - Phase 2 — leadingInset / topPadding (실측 파이프라인 입력)
+
+/// `VerseLayoutInput.leadingInset` / `topPadding` — Phase 2 의 실측 파이프라인이 추가한 두 여백 입력.
+struct ChapterLayoutBuilderInsetTesting {
+    private let builder = ChapterLayoutBuilder()
+    private let chapter = BibleChapter(title: .genesis, chapter: 1)
+
+    private func makeLayout(
+        verses: [VerseLayoutInput],
+        metrics: ChapterLayoutMetrics = .zero
+    ) -> ChapterLayout {
+        builder.build(
+            chapter: chapter,
+            writingWidth: 320,
+            setting: SentenceSetting(
+                lineSpace: 30, fontSize: 20, traking: 1, baseLineHeight: 20,
+                textHeight: .zero, fontFamily: .gothic, lineCount: 3
+            ),
+            isLeftHanded: false,
+            verses: verses,
+            metrics: metrics
+        )
+    }
+
+    @Test("leadingInset 은 writingRect 밖의 gap 이고 captureRect 가 midpoint 로 나눠 갖는다")
+    func leadingInsetIsPlacedOutsideWritingRectAndSplitByCaptureRects() {
+        let metrics = ChapterLayoutMetrics(topInset: 2, verseSpacing: 12, bottomInset: 2)
+        let layout = makeLayout(
+            verses: [
+                VerseLayoutInput(verse: 1, textLineCount: 2),
+                VerseLayoutInput(verse: 2, textLineCount: 1, leadingInset: 30),   // 소제목 30pt
+                VerseLayoutInput(verse: 3, textLineCount: 1)
+            ],
+            metrics: metrics
+        )
+
+        // 1절: y 2, h 60 → maxY 62. 2절: 62 + 12 + 30(소제목) = 104, h 30 → maxY 134. 3절: 134 + 12 = 146.
+        #expect(layout.regions[0].writingRect == CGRect(x: 0, y: 2, width: 320, height: 60))
+        #expect(layout.regions[1].writingRect == CGRect(x: 0, y: 104, width: 320, height: 30))
+        #expect(layout.regions[2].writingRect == CGRect(x: 0, y: 146, width: 320, height: 30))
+        // 소제목은 writingRect 에 포함되지 않고 밑줄도 늘지 않는다.
+        #expect(layout.regions[1].underlineAnchors == [30])
+        // captureRect 경계는 소제목까지 포함한 gap 의 midpoint 다: (62 + 104) / 2.
+        let expectedBoundary: CGFloat = 83
+        #expect(layout.regions[0].captureRect.maxY == expectedBoundary)
+        #expect(layout.regions[1].captureRect.minY == expectedBoundary)
+        let expectedTotalHeight: CGFloat = 146 + 30 + 2
+        #expect(layout.totalHeight == expectedTotalHeight)
+    }
+
+    @Test("첫 절의 leadingInset 은 topInset 뒤에 더해지고 captureRect 는 여전히 캔버스 상단부터다")
+    func leadingInsetOnFirstVerseFollowsTopInset() {
+        let layout = makeLayout(
+            verses: [VerseLayoutInput(verse: 1, textLineCount: 1, leadingInset: 40)],
+            metrics: ChapterLayoutMetrics(topInset: 10)
+        )
+
+        let expectedMinY: CGFloat = 50
+        #expect(layout.regions[0].writingRect.minY == expectedMinY)
+        #expect(layout.regions[0].captureRect.minY == 0)
+    }
+
+    @Test("topPadding 은 writingRect 안에 포함되고 근사 anchor 를 그만큼 내린다")
+    func topPaddingIsInsideWritingRectAndShiftsApproximatedAnchors() {
+        let layout = makeLayout(
+            verses: [
+                VerseLayoutInput(verse: 1, textLineCount: 3, topPadding: 25),
+                VerseLayoutInput(verse: 2, textLineCount: 2)
+            ],
+            metrics: ChapterLayoutMetrics(topInset: 2, verseSpacing: 12)
+        )
+
+        let first = layout.regions[0]
+        #expect(first.writingRect == CGRect(x: 0, y: 2, width: 320, height: 25 + 90))
+        #expect(first.underlineAnchors == [55, 85, 115])
+        #expect(first.storageOrigin == CGPoint(x: 0, y: 2 + 55))
+        // 다음 절은 padding 만큼 아래에서 시작하고, 자기 anchor 는 영향을 받지 않는다.
+        let expectedSecondMinY: CGFloat = 2 + 115 + 12
+        #expect(layout.regions[1].writingRect.minY == expectedSecondMinY)
+        #expect(layout.regions[1].underlineAnchors == [30, 60])
+    }
+
+    @Test("topPadding 이 있는 절의 실측 anchor 는 padding 을 이미 포함한 값으로 받아 그대로 쓴다")
+    func measuredAnchorsWithTopPaddingAreUsedVerbatim() {
+        let layout = makeLayout(verses: [
+            VerseLayoutInput(verse: 1, textLineCount: 2, measuredUnderlineAnchors: [49.5, 79.5], topPadding: 25)
+        ])
+
+        #expect(layout.regions[0].underlineAnchors == [49.5, 79.5])
+        let expectedHeight: CGFloat = 25 + 60
+        #expect(layout.regions[0].writingRect.height == expectedHeight)
+    }
+
+    @Test("topPadding 이 있어도 Pass 2 여유 높이는 band 개수로만 더해진다")
+    func topPaddingDoesNotInterfereWithPassTwo() {
+        let layout = makeLayout(verses: [
+            VerseLayoutInput(verse: 1, textLineCount: 2, savedBandCount: 4, topPadding: 25)
+        ])
+
+        let expectedHeight: CGFloat = 25 + 60 + 60
+        #expect(layout.regions[0].writingRect.height == expectedHeight)
+        #expect(layout.regions[0].underlineAnchors == [55, 85])
+    }
+
+    @Test("leadingInset 과 topPadding 은 signature 구성요소가 아니다")
+    func insetsAreNotSignatureComponents() {
+        let base = makeLayout(verses: [VerseLayoutInput(verse: 1, textLineCount: 1)])
+        let withInsets = makeLayout(verses: [
+            VerseLayoutInput(verse: 1, textLineCount: 1, leadingInset: 30, topPadding: 25)
+        ])
+
+        #expect(base.signature == withInsets.signature)
+    }
+
+    @Test("음수 여백은 0 으로 정규화된다")
+    func negativeInsetsAreClampedToZero() {
+        let input = VerseLayoutInput(verse: 1, textLineCount: 1, leadingInset: -5, topPadding: -7)
+
+        #expect(input.leadingInset == 0)
+        #expect(input.topPadding == 0)
+    }
+}

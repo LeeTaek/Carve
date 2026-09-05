@@ -17,7 +17,8 @@ public struct VerseTextView: View {
     
     /// Text.LayoutKey(텍스트 레이아웃 변경 이벤트)를 상위로 전달하기 위한 클로저.
     /// - Note: 실제 이 클로저를 통해 CarveDetailFeature의
-    ///         `.view(.underlineLayoutChanged)`액션을 보내어 밑줄 offset 계산 및 상태 갱신.
+    ///         `CarveDetailView` 가 offset 을 계산해 `VerseGeometryCollector` 에 모으고,
+    ///         `.view(.verseGeometryMeasured)` 액션 한 번으로 상태를 갱신한다.
     ///         이렇게 레이아웃 이벤트만 상위로 올려 처리함으로써 ForEachReducer의
     ///         missing element warning을 회피한다.
     let onLayoutChange: (Text.LayoutKey.Value) -> Void

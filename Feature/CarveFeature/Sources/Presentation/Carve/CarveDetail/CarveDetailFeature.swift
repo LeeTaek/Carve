@@ -28,6 +28,15 @@ public struct CarveDetailFeature {
         var lastUsedPencil: PKInkingTool.InkType = .pencil
 //        /// global 좌표계 기준 CombinedCanvasView의 frame (Canvas 기준 verse 별 rect 계산용)
 //        var canvasGlobalFrame: CGRect = .zero
+
+        /// Phase 2 — 장 전체 레이아웃 측정 상태 (설계 §6). 절별 실측이 모이면 `ChapterLayout` 이 완성된다.
+        var chapterLayout = ChapterLayoutMeasurement()
+        /// 설계 §6-2 입력 게이트. false 인 동안 모든 절 캔버스의 펜 입력이 막힌다.
+        public var isLayoutReady: Bool { chapterLayout.isReady }
+        /// 진행 중인 측정 구간의 `os_signpost` ID (`ChapterLayoutSignpost`).
+        var layoutSignpostID: UInt64?
+        /// 마지막으로 편집(획 추가/지우개)이 올라온 절. 디버그 오버레이의 dirtyBounds 표시용.
+        var lastEditedVerseID: SentencesWithDrawingFeature.State.ID?
         
         /// 성경 문장 출력시 자간 폰트 등 설정
         @Shared(.appStorage("sentenceSetting")) public var sentenceSetting: SentenceSetting = .initialState
@@ -67,8 +76,14 @@ public struct CarveDetailFeature {
             case tapForHeaderHidden
             /// 두손가락 더블탭 액션: undo
             case twoFingerDoubleTapForUndo
-            /// 밑줄 레이아웃 계산 (ForEachReducer missing element warning 회피를 위해 VerseRow가 아닌 상위에서 처리)
-            case underlineLayoutChanged(id: VerseRowFeature.State.ID, layout: Text.LayoutKey.Value)
+            /// 여러 행의 실측값(밑줄 offset · 소제목 높이 · 캔버스 frame)을 **한 번에** 반영 (Phase 2 — 설계 §6).
+            ///
+            /// 행마다 액션을 보내면 안 된다 — 액션 하나가 부모 상태를 바꿔 스코프 스토어 전체와 `VStack` 전체 패스를
+            /// 다시 돌리므로 행 수의 제곱으로 비용이 늘어난다 (`VerseGeometryCollector` 참조).
+            /// 밑줄 offset 을 여기서(행이 아닌 상위에서) 반영하는 것은 ForEachReducer missing element warning 회피이기도 하다.
+            case verseGeometryMeasured([VerseRowFeature.State.ID: VerseRowGeometry])
+            /// 필사 컬럼 폭이 바뀜 (Phase 2 — `ChapterLayout.writingWidth`)
+            case layoutHostingChanged(writingWidth: CGFloat)
         }
     }
 
@@ -120,23 +135,21 @@ public struct CarveDetailFeature {
                 }
                 state.sentenceWithDrawingState = sentenceState
                 undoManager.clear()
+                beginLayoutMeasurement(state: &state, sentences: sentences)
                 return .none
                 
             case .setScrollTarget(let verse):
                 state.scrollTargetID = makeSentenceID(for: verse)
                 return .none
                 
-            case .view(.underlineLayoutChanged(let id, let layout)):
-                guard var row = state.sentenceWithDrawingState[id: id] else { return .none }
+            case .view(.verseGeometryMeasured(let batch)):
+                applyVerseGeometry(state: &state, batch: batch)
+                return .none
 
-                let setting = row.sentenceState.sentenceSetting
-                let offsets = VerseTextFeature.makeUnderlineOffsets(
-                    from: layout,
-                    sentenceSetting: setting
-                )
-                row.sentenceState.underlineOffsets = offsets
-                state.sentenceWithDrawingState[id: id] = row
-
+            case .view(.layoutHostingChanged(let writingWidth)):
+                if state.chapterLayout.setWritingWidth(writingWidth) {
+                    rebuildLayoutIfNeeded(state: &state)
+                }
                 return .none
                 
             case .view(.setProxy(let proxy)):
@@ -205,6 +218,7 @@ public struct CarveDetailFeature {
                       let index = state.sentenceWithDrawingState.firstIndex(where: { $0.id == id }) else {
                     return .none
                 }
+                state.lastEditedVerseID = id
                 let drawing = state.sentenceWithDrawingState[index].canvasState.drawing
                 return .run { _ in
                     try await persistDrawing(drawing)
@@ -238,6 +252,105 @@ extension CarveDetailFeature {
     /// `SentencesWithDrawingFeature.State.id` 규칙과 동일한 스크롤용 ID를 생성.
     private func makeSentenceID(for verse: BibleVerse) -> SentencesWithDrawingFeature.State.ID {
         "\(verse.title.title.koreanTitle()).\(verse.title.chapter).\(verse.verse)"
+    }
+
+    // MARK: - Phase 2 — 장 레이아웃 측정 (설계 §6)
+
+    /// 새 장의 본문이 확정된 시점에 측정을 시작한다. 이전 장의 실측값은 전부 버린다.
+    ///
+    /// `expectedVerseCount` 는 여기서 확정된 절 개수이며(§6-4), 게이트는 이 값과 완성된 레이아웃의 절 수를 비교한다.
+    /// - Parameters:
+    ///   - state: Feature 상태.
+    ///   - sentences: fetch 된 본문.
+    private func beginLayoutMeasurement(state: inout State, sentences: [BibleVerse]) {
+        let chapter = sentences.first?.title ?? state.headerState.currentTitle
+        var savedBandCounts: [Int: Int] = [:]
+        for row in state.sentenceWithDrawingState {
+            if let count = Self.savedBandCount(of: row.canvasState.drawing) {
+                savedBandCounts[row.sentence.verse] = count
+            }
+        }
+        state.chapterLayout.begin(
+            chapter: chapter,
+            verses: sentences.map(\.verse),
+            savedBandCounts: savedBandCounts,
+            now: ContinuousClock().now
+        )
+        state.layoutSignpostID = ChapterLayoutSignpost.beginMeasure(chapter: chapter, verseCount: sentences.count)
+        // 폭은 장이 바뀌어도 그대로이므로 이미 알고 있으면 곧바로 계산 조건에 포함된다.
+        rebuildLayoutIfNeeded(state: &state)
+    }
+
+    /// 행들의 실측값을 한 번에 반영한다.
+    ///
+    /// 이전 장의 행에서 늦게 도착한 값은 id 조회에 실패해 버려진다 (설계 §6-4 의 요청 취소).
+    /// 레이아웃 재계산은 배치 전체를 반영한 뒤 **한 번만** 한다.
+    /// - Parameters:
+    ///   - state: Feature 상태.
+    ///   - batch: 행 id → 실측값.
+    private func applyVerseGeometry(state: inout State, batch: [VerseRowFeature.State.ID: VerseRowGeometry]) {
+        var layoutInputChanged = false
+        for (id, geometry) in batch {
+            guard var row = state.sentenceWithDrawingState[id: id] else { continue }
+            let verse = row.sentence.verse
+
+            if let offsets = geometry.underlineOffsets {
+                if row.sentenceState.underlineOffsets != offsets {
+                    row.sentenceState.underlineOffsets = offsets
+                    state.sentenceWithDrawingState[id: id] = row
+                }
+                // 밑줄은 캔버스 영역 안에서 1절의 상단 여백만큼 내려 그려지므로, 레이아웃 anchor 도 같은 값을 더한다.
+                let anchors = offsets.map { $0 + ChapterLayoutHosting.topPadding(forVerse: verse) }
+                if state.chapterLayout.recordText(verse: verse, underlineAnchors: anchors) {
+                    layoutInputChanged = true
+                }
+            }
+            if let height = geometry.titleHeight,
+               state.chapterLayout.recordTitleHeight(verse: verse, height: height) {
+                layoutInputChanged = true
+            }
+            if let frame = geometry.canvasFrame {
+                // 검증 전용 입력이다. 레이아웃 계산에 쓰지 않으므로 재계산 조건에 넣지 않는다.
+                state.chapterLayout.recordFrame(verse: verse, frame: frame)
+            }
+        }
+        if layoutInputChanged {
+            rebuildLayoutIfNeeded(state: &state)
+        }
+    }
+
+    /// 입력이 전부 모였으면 레이아웃을 (재)계산하고 계측을 남긴다.
+    /// - Parameter state: Feature 상태.
+    private func rebuildLayoutIfNeeded(state: inout State) {
+        let wasBuilt = state.chapterLayout.buildCount > 0
+        guard let layout = state.chapterLayout.rebuildIfComplete(
+            setting: state.sentenceSetting,
+            isLeftHanded: state.isLeftHanded,
+            metrics: ChapterLayoutHosting.metrics,
+            now: ContinuousClock().now
+        ) else { return }
+
+        if wasBuilt {
+            ChapterLayoutSignpost.rebuildEvent(layout: layout, buildCount: state.chapterLayout.buildCount)
+            return
+        }
+        if let signpostID = state.layoutSignpostID, let duration = state.chapterLayout.firstBuildDuration {
+            ChapterLayoutSignpost.endMeasure(rawID: signpostID, layout: layout, duration: duration)
+            state.layoutSignpostID = nil
+            Log.info("ChapterLayout 완성", "\(layout.chapter.title.rawValue).\(layout.chapter.chapter)",
+                     "\(layout.regions.count)절", "H=\(layout.totalHeight)", "\(duration)")
+        }
+    }
+
+    /// 저장된 필사의 band 수 (설계 §6-3 의 `N_saved`). metadata 가 없는 legacy 행이면 nil.
+    /// - Parameter drawing: 절의 대표 행.
+    /// - Returns: band 수.
+    static func savedBandCount(of drawing: BibleDrawing?) -> Int? {
+        guard let data = drawing?.layoutMetadataData,
+              let metadata = try? JSONDecoder().decode(DrawingLayoutMetadata.self, from: data) else {
+            return nil
+        }
+        return metadata.savedBandCount
     }
     
     /// 1. 성경 본문 fetch

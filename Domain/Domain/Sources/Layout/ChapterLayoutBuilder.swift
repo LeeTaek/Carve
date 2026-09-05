@@ -26,18 +26,36 @@ public struct VerseLayoutInput: Equatable, Sendable {
     /// nil이거나 개수가 `textLineCount`와 다르면 빌더가 `lineSpace` 기반 band 하단으로 근사한다.
     /// 이 값은 `baseUnderlineAnchors`로 영속화되어 reflow의 기준이 되므로(설계 §9-3-2),
     /// 가능하면 실측값을 넣는 쪽이 좋다.
+    /// `topPadding` 이 있으면 실측값도 그 여백을 **포함한** 값이어야 한다(둘 다 `writingRect` 상단 기준이므로).
     public let measuredUnderlineAnchors: [CGFloat]?
+    /// 절 **위**에 놓이는 추가 여백 (Phase 2 — 실측 파이프라인에서 추가).
+    ///
+    /// `writingRect` 에 포함되지 **않는다.** 절 사이 gap 처럼 취급되어 `captureRect` 가 midpoint 로 나눠 갖는다.
+    /// 장 중간 절에 붙는 소제목(예: 창세기 2:4 "에덴 동산")의 높이가 여기에 들어간다.
+    /// 소제목은 절 본문이 아니므로 그 위에 그은 획을 특정 절의 필사로 강하게 귀속시킬 이유가 없다.
+    public let leadingInset: CGFloat
+    /// `writingRect` **안**에 포함되는 상단 여백 (Phase 2 — 실측 파이프라인에서 추가).
+    ///
+    /// 밑줄 anchor 는 이 값 아래에서 시작한다. 즉 근사 anchor 는 `topPadding + (index + 1) × lineSpace` 다.
+    /// 현재 N-Canvas 구조에서 장의 첫 절이 갖는 상단 여백 25pt 가 여기에 해당한다 —
+    /// 그 여백은 절의 캔버스 **안**에 있어서 legacy 절-로컬 좌표가 그만큼 아래에서 시작하므로,
+    /// `writingRect` 밖으로 빼면 legacy 데이터가 25pt 위로 밀려 보인다.
+    public let topPadding: CGFloat
 
     public init(
         verse: Int,
         textLineCount: Int,
         savedBandCount: Int? = nil,
-        measuredUnderlineAnchors: [CGFloat]? = nil
+        measuredUnderlineAnchors: [CGFloat]? = nil,
+        leadingInset: CGFloat = 0,
+        topPadding: CGFloat = 0
     ) {
         self.verse = verse
         self.textLineCount = textLineCount
         self.savedBandCount = savedBandCount
         self.measuredUnderlineAnchors = measuredUnderlineAnchors
+        self.leadingInset = max(0, leadingInset)
+        self.topPadding = max(0, topPadding)
     }
 }
 
@@ -94,13 +112,14 @@ public struct ChapterLayoutBuilder: Sendable {
 
         // ── Pass 1 ──────────────────────────────────────────────────────────
         // 텍스트 줄 수만으로 각 절의 밑줄 개수와 높이를 구한다. 아직 좌표를 만들지 않는다.
+        // `topPadding` 은 `writingRect` 안의 여백이므로 텍스트 높이에 더해지고 근사 anchor 도 그만큼 내려간다.
         var lineCounts: [Int] = []
         var textHeights: [CGFloat] = []
         var anchors: [[CGFloat]] = []
         for input in verses {
             let lineCount = max(0, input.textLineCount)
             lineCounts.append(lineCount)
-            textHeights.append(CGFloat(lineCount) * lineSpace)
+            textHeights.append(input.topPadding + CGFloat(lineCount) * lineSpace)
             anchors.append(Self.underlineAnchors(for: input, lineCount: lineCount, lineSpace: lineSpace))
         }
 
@@ -118,12 +137,14 @@ public struct ChapterLayoutBuilder: Sendable {
 
         // ── 배치 ────────────────────────────────────────────────────────────
         // Pass 2로 확정된 높이를 위에서부터 쌓는다.
+        // `leadingInset` 은 `writingRect` 밖의 여백이라 절 사이 gap 처럼 cursor 만 밀고 rect 에는 들어가지 않는다.
         var writingRects: [CGRect] = []
         var cursorY = metrics.topInset
         for (index, height) in effectiveHeights.enumerated() {
             if index > 0 {
                 cursorY += metrics.verseSpacing
             }
+            cursorY += verses[index].leadingInset
             writingRects.append(CGRect(x: 0, y: cursorY, width: width, height: height))
             cursorY += height
         }
@@ -185,7 +206,7 @@ public struct ChapterLayoutBuilder: Sendable {
 
     /// 밑줄 anchor를 `writingRect` 기준 **상대값**으로 만든다. 절대좌표를 만들지 않는다(설계 §5).
     ///
-    /// 실측값이 들어오면 그대로 쓰고, 없으면 band 하단(`(index + 1) × lineSpace`)으로 근사한다.
+    /// 실측값이 들어오면 그대로 쓰고, 없으면 band 하단(`topPadding + (index + 1) × lineSpace`)으로 근사한다.
     /// 근사값은 `UIFont` 메트릭을 쓰지 않으므로 빌더의 순수성이 유지된다.
     private static func underlineAnchors(
         for input: VerseLayoutInput,
@@ -195,7 +216,7 @@ public struct ChapterLayoutBuilder: Sendable {
         if let measured = input.measuredUnderlineAnchors, measured.count == lineCount {
             return measured
         }
-        return (0..<lineCount).map { CGFloat($0 + 1) * lineSpace }
+        return (0..<lineCount).map { input.topPadding + CGFloat($0 + 1) * lineSpace }
     }
 
     /// 두 y 좌표의 중간값.

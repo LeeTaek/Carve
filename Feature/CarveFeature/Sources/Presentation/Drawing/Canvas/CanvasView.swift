@@ -17,8 +17,16 @@ import ComposableArchitecture
 public struct CanvasView: UIViewRepresentable {
     public typealias UIViewType = PKCanvasView
     private var store: StoreOf<CanvasFeature>
-    init(store: StoreOf<CanvasFeature>) {
+    /// 설계 §6-2 입력 게이트 (Phase 2).
+    ///
+    /// false 면 `drawingGestureRecognizer` 를 꺼서 펜 입력을 막는다. `PKCanvasViewDrawingPolicy` 에는
+    /// "입력 금지" 값이 없으므로(§16 SDK 확인) 제스처 인식기가 유일한 게이트 수단이다.
+    /// 장 전체 레이아웃(`ChapterLayout`)이 전 절 측정으로 완성되기 전에는 닫혀 있다.
+    private let isInputEnabled: Bool
+
+    init(store: StoreOf<CanvasFeature>, isInputEnabled: Bool = true) {
         self.store = store
+        self.isInputEnabled = isInputEnabled
     }
     
     public func makeUIView(context: Context) -> PKCanvasView {
@@ -35,6 +43,7 @@ public struct CanvasView: UIViewRepresentable {
             return canvas
         }()
         canvas.drawing = toDrawing(from: store.drawing?.lineData)
+        canvas.drawingGestureRecognizer.isEnabled = isInputEnabled
         canvas.delegate = context.coordinator
         context.coordinator.bind(to: canvas)
         
@@ -42,6 +51,9 @@ public struct CanvasView: UIViewRepresentable {
     }
     
     public func updateUIView(_ uiView: PKCanvasView, context: Context) {
+        if uiView.drawingGestureRecognizer.isEnabled != isInputEnabled {
+            uiView.drawingGestureRecognizer.isEnabled = isInputEnabled
+        }
         Task { @MainActor in
             let newDrawing = toDrawing(from: store.drawing?.lineData)
             if uiView.drawing != newDrawing {

@@ -56,7 +56,7 @@ public struct VerseTextFeature {
     
     public enum Action {
         /// 각 라인의 밑줄 Offset을 상태에 반영하는 액션.
-        /// 밑줄 offset 계산 및 갱신은 Feature(CarveDetailFeature)의 .view(.underlineLayoutChanged)`에서 수행,
+        /// 밑줄 offset 계산은 View(`CarveDetailView`)가, 상태 갱신은 `CarveDetailFeature` 의 `.view(.verseGeometryMeasured)` 가 수행,
         /// 이 액션은 주로 Preview 환경에서 레이아웃 변경 결과를 직접 상태에 주입할 때 사용.
         case setUnderlineOffsets([CGFloat])
     }

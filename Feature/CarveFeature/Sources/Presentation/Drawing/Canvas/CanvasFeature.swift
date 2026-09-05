@@ -22,6 +22,11 @@ public struct CanvasFeature {
         public var drawing: BibleDrawing?
         public var title: BibleChapter
         public var verse: Int
+        /// 마지막으로 캔버스에서 올라온 drawing 의 bounds (**이 절 캔버스의 로컬 좌표**).
+        ///
+        /// Phase 2 디버그 오버레이가 `dirtyBounds` 로 표시하는 값이다. 빈 drawing 이면 nil.
+        /// 저장·소유권 판정에는 쓰지 않는다 — 그 계약(§8-1 `CanvasEditSnapshot.dirtyBounds`)은 Phase 3 의 것이다.
+        public var lastDrawingBounds: CGRect?
         @Shared(.appStorage("pencilConfig")) public var pencilConfig: PencilPalatte = .initialState
         @Shared(.inMemory("canUndo")) public var canUndo: Bool = false
         @Shared(.inMemory("canRedo")) public var canRedo: Bool = false
@@ -49,6 +54,8 @@ public struct CanvasFeature {
         Reduce { state, action in
             switch action {
             case .saveDrawing(let newDrawing):
+                let bounds = newDrawing.bounds
+                state.lastDrawingBounds = (bounds.isNull || bounds.isEmpty) ? nil : bounds
                 if let drawing = state.drawing {
                     // 기존 기록은 획이 0개여도 그대로 반영한다.
                     // (지우개로 전부 지운 결과가 저장되지 않으면 재기동 시 획이 되살아난다.)
