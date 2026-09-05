@@ -43,17 +43,32 @@ struct CarveApp: App {
     
     var body: some Scene {
         WindowGroup {
-            // 앱의 루트 화면. AppCoordinatorFeature의 상태/액션을 사용하는 코디네이터 뷰.
-            AppCoordinatorView(store: store)
-                .trackScreen(
-                    "AppCoordinator",
-                    parameters: [
-                        "screen_name": .string("AppCoordinator"),
-                        "screen_class": .string("AppCoordinatorView")
-                    ]
-                )
+            #if DEBUG
+            // 설계 §11 Phase 0A-S4 스크롤 A/B spike 전용 진입 경로.
+            // `-CanvasScrollSpike` 실행 인자가 있을 때만 Debug 하네스를 루트로 띄운다.
+            // SwiftData·실제 사용자 Drawing과 연결되지 않는 격리 하네스이며 릴리즈 빌드에는 포함되지 않는다.
+            if ProcessInfo.processInfo.arguments.contains("-CanvasScrollSpike") {
+                CanvasScrollSpikeView()
+            } else {
+                rootView
+            }
+            #else
+            rootView
+            #endif
         }
         .modelContainer(modelContainer)
+    }
+
+    /// 앱의 루트 화면. AppCoordinatorFeature의 상태/액션을 사용하는 코디네이터 뷰.
+    private var rootView: some View {
+        AppCoordinatorView(store: store)
+            .trackScreen(
+                "AppCoordinator",
+                parameters: [
+                    "screen_name": .string("AppCoordinator"),
+                    "screen_class": .string("AppCoordinatorView")
+                ]
+            )
     }
 }
 
