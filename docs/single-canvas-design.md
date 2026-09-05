@@ -1,6 +1,9 @@
 # CarveFeature 단일 Canvas 전환 설계
 
-> 상태: **설계안 (새 아키텍처 미착수)** · 대상: `Feature/CarveFeature`, `Domain`
+> 상태: **Phase 0B 진행 중** · 대상: `Feature/CarveFeature`, `Domain`
+> rev.11 — **Phase 0B 착수.** `ChapterLayout` / `ChapterLayoutBuilder` 구현 완료 (`f5206814`).
+> 구현 중 드러난 §5 명세 공백 2건(여유 높이 귀속 · 캔버스 폭 가정)을 보강하고,
+> signature 의 `chapter` 포함 여부를 미결로 명시했습니다. 회귀 기준선 **82 → 95**.
 > rev.10 — **D8(실기기 legacy 데이터 추출) 완료.** S5 fixture 확보로 Phase 0B 가 열렸습니다 (§18-4·§20-3).
 > 그 과정에서 **`normalizedForVerseRect` 휴리스틱이 실데이터의 71%에서 실패**함이 실측됐습니다 (§10-2-1).
 > 회귀 기준선 **76 → 82** (§19-4-2).
@@ -238,7 +241,8 @@ enum SaveStatus: Equatable, Sendable {
 /// 절 하나의 캔버스 좌표 정보
 struct VerseCanvasRegion: Equatable, Sendable {
     let verse: Int
-    /// 밑줄이 실제 표시되는 영역
+    /// 절이 차지하는 영역. **§6-3 Pass 2의 여유 높이(extraHeight)를 포함한다.**
+    /// 밑줄이 그려지는 구간은 그중 텍스트 줄 수만큼이고, 나머지는 초과 band용 여유다.
     let writingRect: CGRect
     /// 획 소유권을 판정하는 영역 (인접 절과의 midpoint로 분할)
     let captureRect: CGRect
@@ -339,6 +343,29 @@ Verse 3 writingRect
 ```
 
 첫 절 위쪽과 마지막 절 아래쪽은 각각 캔버스 끝까지 확장합니다.
+
+#### 여유 높이는 `writingRect` 안에 둡니다 ★ (rev.11 — 구현 중 확정)
+
+§6-3 Pass 2 의 `extraHeight` 를 **절 사이 gap 으로 두면 안 됩니다.**
+gap 은 midpoint 로 분할되므로 **여유 공간의 절반이 다음 절 소유가 되어** 소유권이 어긋납니다.
+초과 band 는 그 절의 것이므로 `writingRect` 하단에 포함하고, `underlineAnchors` 는
+텍스트 줄 수만큼만 만듭니다 ([ChapterLayoutBuilder.swift](../Domain/Domain/Sources/Layout/ChapterLayoutBuilder.swift)).
+
+#### 캔버스 폭과 원점 — 현재 가정 (rev.11)
+
+`ChapterLayout` 에는 캔버스 폭·원점 개념이 없고, 현재 구현은
+**필사 컬럼 = 캔버스** 로 보아 `writingRect.minX == 0`, `captureRect` 는 폭 전체로 둡니다.
+
+> ⚠️ **Phase 2 에서 재검토가 필요합니다.** 호스팅 뷰가 본문 텍스트까지 포함하는
+> 컬럼보다 넓은 캔버스를 쓰면 `writingRect.minX` 와 `captureRect` 의 x 범위를
+> 별도로 규정해야 합니다. §11 의 A/B 판정 결과에 달려 있습니다.
+
+> ❓ **미결 — signature 에 `chapter` 를 넣을 것인가.**
+> §6-5 의 구성요소 목록에는 `chapter` 가 없어, 장이 달라도 같은 signature 가 나옵니다.
+> "레이아웃 **형식** 호환성" 판정용이라면 지금이 맞고,
+> "이 필사가 **이 장의** 이 레이아웃에서 그려졌다" 를 보장하려면 `chapter` 가 필요합니다.
+> 현재 구현은 문서 그대로 `chapter` 를 넣지 않았습니다. §9-3 의 `layoutMismatch` 정책을
+> 확정할 때 함께 결정하십시오.
 
 ---
 
@@ -469,6 +496,18 @@ stroke 전체를 ownerVerse Drawing에 저장 (자르지 않음)
 "4절 영역에 걸친 부분은 반드시 4절과 함께 이동" 요구가 향후 생기면 손실 없는 path 분할(보간 clipping)
 또는 chapter-level stroke 모델이 필요하며, 그때는 별도 설계 대상입니다.
 
+> ⚠️ **미결 — 앵커가 캔버스 밖일 때 (rev.11, 구현 중 발견)**
+> 첫 control point 가 `captureRect` 어디에도 들어가지 않으면 소유자를 정할 수 없습니다.
+> 현재 구현은 **map 에 넣지 않습니다** — "조회 실패 = 소유자 없음" 이며 `0` 같은 대체값을 만들지 않습니다
+> ([StrokeOwnershipResolver.swift](../Feature/CarveFeature/Sources/Drawing/StrokeOwnershipResolver.swift)).
+>
+> **그 결과 소유자 없는 획은 저장에서 빠집니다 — 유실입니다.**
+> 손가락이나 펜슬이 캔버스 좌·우 바깥에서 시작해 안으로 들어오는 획이 해당합니다.
+> 세로는 첫 절 위/마지막 절 아래가 캔버스 끝까지 확장돼 있어 문제가 없고, **가로가 위험 구간**입니다.
+>
+> 선택지: ① 가장 가까운 `captureRect` 로 클램프 ② 획 전체의 `renderBounds` 중심으로 재판정
+> ③ 소유자 없는 획을 별도 버킷에 보관. **Phase 3 착수 전에 결정해야 합니다.**
+
 ### 7-2. 두 종류의 키 — identity와 content signature ★
 
 **하나의 fingerprint로는 안 됩니다.** 용도가 정반대이기 때문입니다.
@@ -532,7 +571,19 @@ ContentSignature 변경   → 해당 verse를 dirty 판정 (§8-2)
 > S1-4 실측: 지우개 후에도 `randomSeed` / `creationDate` / `path.count` 는 물론
 > **control point 10개의 값까지 전부 불변**이었습니다. 1번 규칙의 신뢰도가 높습니다.
 
-동일 후보가 복수일 때는 **결정적 순서**(verse 오름차순 → 겹침 면적 내림차순)로 선택합니다.
+동일 후보가 복수일 때는 **결정적 순서**로 선택합니다.
+
+> **rev.11 정정 — 우선순위는 "면적 → verse" 입니다.**
+> 위 문장을 "verse 오름차순 → 겹침 면적 내림차순" 으로 문자 그대로 읽으면 verse 가 1차 키가 되어
+> **면적이 무의미해집니다.** 실제로 필요한 것은 **겹침 면적 최대가 1차, 동점일 때 verse 최소**입니다.
+> 구현은 절 번호 오름차순으로 훑으며 면적이 더 클 때만 교체하므로 두 표현이 같은 코드로 수렴합니다.
+
+> **rev.11 보강 — 3번 규칙의 "겹침" 은 무엇과의 겹침인가.**
+> 원문에 대상이 없습니다. `captureRect` 와의 겹침으로 읽으면 4번(첫 control point → captureRect)과
+> 사실상 같아져 fallback 이 무의미해집니다.
+> **이전 세대 stroke 의 `renderBounds` 를 owner 별로 모아 비교**하는 것으로 확정합니다.
+> 그래서 승계 함수는 이전 `OwnershipSnapshot` 뿐 아니라 **이전 `PKDrawing` 도 함께** 받습니다 —
+> map 만으로는 기하를 얻을 수 없고, map 순회는 §7-2 가 금지하기 때문입니다.
 
 > `StrokeIdentityKey`는 공개 API가 보장하는 영구 ID가 **아닙니다.**
 > DB에는 이미 절별로 그룹화되어 저장되므로, fingerprint는 **한 편집 세션 안에서 owner를 승계하기 위한 도구**로만 사용합니다.
@@ -1293,7 +1344,10 @@ A도 offset drift 재현                     → 저장·Feature 구현으로 �
 | 단계 | 착수 가능 시점 |
 |---|---|
 | **Phase 0A-S0** | ✅ **완료** (§18) |
-| **Phase 0A-S, Phase 0B** | **지금** |
+| **Phase 0A-S1 / S2** | ✅ **완료** (§19) |
+| **Phase 0A-D · D8** | ✅ **완료** — S5 fixture 확보 (§20-3). 나머지 D 항목은 유료 멤버십 필요 |
+| **Phase 0B** | 🔄 **진행 중** — `ChapterLayoutBuilder` 완료(`f5206814`), owner resolver / reflow 남음 |
+| **Phase 0A-S3 / S4** | **지금 착수 가능** (시뮬레이터) |
 | Phase 1 · 2 | 시뮬레이터 검증(0A-S)과 migration 테스트 통과 후 |
 | Phase 3 | feature flag 뒤 **구현**까지는 가능. **기본 활성화·배포 판단은 Phase 0A-D 이후** |
 | Phase 4 (구 구조 삭제) | 실기기 검증 및 안정화 후 |
@@ -1887,7 +1941,20 @@ lineOrigins = [(0,16.0), (0,36.287), (0,56.574), (0,76.861)]
 | 그 외 5개 번들 | 52 | 52 | — |
 | **합계** | **76** | **82** | **+6** |
 
-> **현재 회귀 기준선은 82/82 입니다.** 이후 어느 단계에서든 82 미만 통과 또는 실패 1건 이상이면 회귀입니다.
+82 는 rev.10 시점 기록입니다.
+
+**rev.11 — Phase 0B 진행에 따른 누적** ★
+
+| 번들 | rev.10 | +`ChapterLayoutBuilder` | +소유권/승계 |
+|---|---:|---:|---:|
+| DomainTest | 31 | 44 | **54** |
+| CarveFeatureTest | 30 | 30 | **47** |
+| 그 외 4개 번들 | 21 | 21 | 21 |
+| **합계** | **82** | **95** | **122** |
+
+커밋별: `f5206814` 82 → 95 (+13) · `0c071d29` 95 → 122 (+27).
+
+> **현재 회귀 기준선은 122/122 입니다.** 이후 어느 단계에서든 122 미만 통과 또는 실패 1건 이상이면 회귀입니다.
 > 실행 환경은 위와 동일 (Xcode 26.3 / Swift 6.2.4 / iPad mini (A17 Pro) iOS 26.2).
 
 **같이 확인된 것**
