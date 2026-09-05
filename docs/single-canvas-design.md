@@ -1,6 +1,15 @@
 # CarveFeature 단일 Canvas 전환 설계
 
-> 상태: **Phase 0B 완료 · Phase 0A-S4 완료** · 대상: `Feature/CarveFeature`, `Domain`
+> 상태: **Phase 0B · S4 · Phase 1(구현) 완료** · 대상: `Feature/CarveFeature`, `Domain`
+> rev.13 — **Phase 1 (V4 additive schema) 구현 완료** (`b68b6101`).
+> optional 필드 2개(`layoutMetadataData` · `rowUUID`)만 추가하고 lightweight 마이그레이션 한 단계.
+> **`drawingVersion` 을 건드리지 않고 좌표도 변환하지 않습니다** (§10-2).
+> V3 → V4 마이그레이션을 임시 store 로 **실제로 태워** 검증했고, §10-3 의 등가 검증
+> (기존 N-Canvas 경로가 마이그레이션된 V4 저장소에서 동작)을 확보했습니다 (§20-5).
+> **⚠️ 구현 완료 ≠ 배포 가능** — CloudKit 제약은 D7 이월, V4 는 forward-only 입니다 (§13).
+> 회귀 기준선 **155 → 175**.
+> 멤버십 재결제 완료, **활성화 전파 대기 중** — 전파되면 Phase 0A-D 전체가 열립니다.
+> **⚠️ Phase 2 는 D5 측정 이후에 착수합니다** — `LazyVStack` 을 걷어내면 baseline 측정 기회가 사라집니다 (§13).
 > rev.12 — **Phase 0B 완료** (`f5206814` 레이아웃 · `0c071d29` 소유권/승계 · `565dfe69` line band reflow)
 > **· Phase 0A-S4 완료** (`b53cbfd8` 스크롤 A/B spike 하네스).
 > **★ S4 는 A 와 B 를 구별하지 못했습니다** — 8개 시나리오 전부 A·B 모두 max **0.000pt** PASS 였습니다 (§11 "S4 실행 결과").
@@ -1560,13 +1569,29 @@ D5 / issue #6 의 실패는 **프로그램 스크롤에서 나오지 않습니�
 |---|---|
 | **Phase 0A-S0** | ✅ **완료** (§18) |
 | **Phase 0A-S1 / S2** | ✅ **완료** (§19) |
-| **Phase 0A-D · D8** | ✅ **완료** — S5 fixture 확보 (§20-3). 나머지 D 항목은 유료 멤버십 필요 |
+| **Phase 0A-D · D8** | ✅ **완료** — S5 fixture 확보 (§20-3) |
+| **Phase 0A-D 나머지** | ⏳ **대기** — 멤버십 재결제 완료, **활성화 전파 대기 중**. 전파되면 D1·D2(S4 하네스로 A/B 최종 판정) · D3 · D4 · D5 · D6 · D7 전부 착수 가능 |
 | **Phase 0B** | ✅ **완료** — `f5206814` 레이아웃 · `0c071d29` 소유권/승계 · `565dfe69` line band reflow |
 | **Phase 0A-S4** | ✅ **완료** (`b53cbfd8`) — 기능 기준 1~6 통과. **단 A/B 판정은 D1/D2 로 이월** (§11 · §12) |
 | **Phase 0A-S3** | ❌ **미수행** — 아래 참조 |
-| Phase 1 · 2 | ✅ **착수 가능** — 0B 완료 + S4 통과. S3 잔여분(실측 줄 수)은 Phase 2 측정 경로와 함께 해소 |
+| **Phase 1** | ✅ **구현 완료** (`b68b6101`) — **단 배포 가능 아님.** CloudKit 제약 미검증(D7 이월), §10-3 forward-only |
+| **Phase 2** | ⚠️ **D5 이후에 착수** — `LazyVStack → VStack` 전환이 N-Canvas baseline 측정 기회를 **영구히 없앱니다**. 아래 참조 |
 | Phase 3 | feature flag 뒤 **구현**까지는 가능. **기본 활성화·배포 판단은 Phase 0A-D 이후** |
 | Phase 4 (구 구조 삭제) | 실기기 검증 및 안정화 후 |
+
+> ⚠️ **Phase 2 착수 전에 D5 를 재야 합니다 (rev.13).**
+> D5 는 **현재 N-Canvas 경로의 실기기 성능 baseline** 입니다. Phase 2 가 `LazyVStack` 을 걷어내는
+> 순간 그 경로가 사라져 **다시는 측정할 수 없습니다.** §18-3 이 시뮬레이터 baseline 을 Phase 2 이전에
+> 확보해둔 것과 같은 논리이며, 실기기 수치는 아직 없습니다.
+>
+> 순서: **멤버십 활성화 → D5 → Phase 2**. 이 순서를 어기면 되돌릴 방법이 없습니다.
+
+> **Phase 1 이 "구현 완료" 이지 "배포 가능" 이 아닌 이유 (rev.13)**
+> ① CloudKit 제약(전 속성 optional·unique 금지)을 **코드상으로만** 만족합니다. 시뮬레이터에
+> entitlement 가 없어(§18-5) `NSPersistentCloudKitContainer` 가 V4 를 실제로 수용하는지 검증하지
+> 못했습니다 — **D7 이월**.
+> ② §10-3 이 V4 를 **forward-only**(되돌릴 수 없는 지점)로 규정합니다.
+> → **배포 판단은 D7 확인 이후여야 합니다.**
 
 > **S3 는 왜 여전히 미수행인가 (rev.12)**
 > S4 하네스가 `ChapterLayoutBuilder` 로 176절 layout 을 만들어 `gate PASS` 를 확인했으므로
@@ -2218,9 +2243,21 @@ lineOrigins = [(0,16.0), (0,36.287), (0,56.574), (0,76.861)]
 > 그 판정은 단위 테스트가 아니라 **하네스 자체의 HUD 측정**으로 얻습니다 (§20-4).
 > 대신 같은 커밋에서 **릴리즈 누출 확인**(CarveFeature Release 빌드의 spike `.o` 7개에 실제 심볼 0개)을 했습니다.
 
-> **현재 회귀 기준선은 155/155 입니다.** 이후 어느 단계에서든 155 미만 통과 또는 실패 1건 이상이면 회귀입니다.
+155 는 rev.12 시점 기록입니다.
+
+**rev.13 — Phase 1 (V4 스키마) 추가 후: 175/175** ★
+
+| 번들 | rev.12 | +V4 스키마 (`b68b6101`) |
+|---|---:|---:|
+| DomainTest | 63 | **83** (Swift Testing 81 + XCTest 2) |
+| 그 외 5개 번들 | 92 | 92 |
+| **합계** | **155** | **175** |
+
+증분 20건은 V3 → V4 마이그레이션 검증 11건 + §10-3 등가 검증 9건입니다.
+
+> **현재 회귀 기준선은 175/175 입니다.** 이후 어느 단계에서든 175 미만 통과 또는 실패 1건 이상이면 회귀입니다.
 > 실행 환경은 위와 동일 (Xcode 26.3 / Swift 6.2.4 / iPad mini (A17 Pro) iOS 26.2).
-> 구성은 **Swift Testing 153 + XCTest 2** 입니다.
+> 구성은 **Swift Testing 173 + XCTest 2** 입니다.
 
 **같이 확인된 것**
 
@@ -2485,3 +2522,87 @@ HUD 가 매 프레임 델타를 계산해 표시하고 peak 를 누적하며, �
 | B 의 하단 safe area 미반영 (`contentInsetAdjustmentBehavior = .never`) | §5 (신규 미결) |
 | `StableCanvasView` 가 별도 파일이 아니라는 정정 | §2 D5 · 부록 |
 | S3 잔여분이 "실측 줄 수" 로 좁혀짐 | §13 · §16 |
+
+### 20-5. `b68b6101` — Phase 1 V4 additive schema (rev.13)
+
+**범위.** §13 이 규정한 대로 optional 필드만 추가하고 legacy 자동 변환은 하지 않습니다.
+UI·Canvas 구조 배선 없음.
+
+| 추가 필드 | 형태 | 설계 |
+|---|---|---|
+| `layoutMetadataData` | `Data?` · `@Attribute(.externalStorage)` | §10-1 — `DrawingLayoutMetadata` blob |
+| `rowUUID` | `String?` | §8-7 — **신규 행에만** 발급. legacy 행은 `nil` 유지 |
+
+> **`drawingVersion` 은 새 필드가 아닙니다.** §10-1 의 코드 블록이 추가 필드처럼 적어 두었으나
+> V2 부터 존재하며, §20-3 이 "죽은 필드" 로 진단한 그것입니다. V4 는 새로 만들지 않고
+> **의미만 확정**했습니다 (nil/1 = legacy, 2 = verse local + top-left, 3 = verse local + underline anchor).
+
+**마이그레이션은 `MigrationStage.lightweight` 한 줄입니다.**
+`drawingVersion` 을 읽거나 쓰는 코드, 좌표를 만지는 코드가 한 줄도 없습니다 (§10-2).
+legacy 행에 `rowUUID` 를 소급 발급하지도 않습니다 — 두 기기가 서로 다른 UUID 를 부여할 수 있고,
+단순 조회가 쓰기를 유발해 비파괴 원칙(§9-4)을 깨기 때문입니다.
+
+**typealias 이동.** `BibleDrawing` / `BiblePageDrawing` 별칭과 `Array.mainDrawing()` 확장을
+V3 파일에서 V4 파일로 옮겼습니다. 별칭은 "현재 스키마" 를 가리키는 표현이지 V3 의 일부가 아니며,
+V3 에 두면 그 파일이 V4 타입을 조용히 재지정하는 모양이 됩니다.
+이제 V3 는 V1·V2 와 마찬가지로 **동결된 과거 스키마 정의**만 담습니다.
+
+> §8-7 이 요구하는 **결정적 `mainDrawing()`**(updateDate → rowID 사전순 tie-break)은
+> 적용하지 않았습니다. 행 주소지정 재배선과 함께 가야 의미가 있어 **Phase 3 범위**입니다.
+
+#### 마이그레이션을 실제로 태워 검증했습니다
+
+스키마만 정의하고 "lightweight 니까 되겠지" 로 끝내지 않았습니다.
+임시 파일에 **V3 스키마로** store 를 만들어 데이터를 넣고 닫은 뒤,
+**같은 파일을 앱과 동일한 표현으로** 다시 열었습니다.
+
+| 확인 | 결과 |
+|---|---|
+| 기존 행 생존 · 필드 보존 | ✅ |
+| `lineData` 바이트 동일 | ✅ 실사용 legacy blob 이 마이그레이션 후에도 `PKDrawing` 으로 디코드됨 |
+| `.externalStorage` 경로 | ✅ **1,869,327 byte blob 이 `_EXTERNAL_DATA` 로 실제 승격**된 것을 확인하고 마이그레이션 후 파일 생존까지 단언 |
+| 새 필드 | ✅ 둘 다 `nil` |
+| **`drawingVersion` 불변** | ✅ 1은 1로, nil은 nil로. 2/3 이 나타나지 않음을 별도 확인 |
+
+> 부수 실측: `.externalStorage` **승격 임계값은 1MB 근방**입니다 (934KB 는 인라인으로 남음).
+
+#### §10-3 등가 검증 — Phase 1 의 존재 이유
+
+> "V4 저장소를 유지한 채 flag 를 껐을 때 기존 N Canvas 경로가 정상 동작해야 한다.
+> Phase 3 의 유일한 안전망이다."
+
+feature flag 가 아직 없으므로 **"flag off = 기존 코드 경로"** 로 치환하고,
+저장소는 새로 만든 V4 가 아니라 **V3 에서 실제로 마이그레이션된 V4** 를 썼습니다
+— flag off 상황이 정확히 그 상태이기 때문입니다.
+
+그 컨테이너에 기존 `DrawingDatabase` API 를 전부 태웠습니다 (fetch 5종 · `updateDrawings(requests:)` ·
+`updateDrawing` · `updateDrawings` · `updatePresentDrawing` · page drawing 2종),
+앱 재기동에 해당하는 **재오픈 시 재마이그레이션 없음**까지 확인했습니다.
+
+특히 `updateDrawings(requests:)` 가 legacy 행을 갱신할 때
+`drawingVersion == 1` · `layoutMetadataData == nil` · `rowUUID == nil` 이 유지되는지 단언했습니다 —
+**기존 경로의 쓰기가 좌표 형식을 거짓말하거나 legacy 행에 rowUUID 를 소급 발급하지 않음**을 고정한 것입니다.
+
+#### ⚠️ CloudKit 미검증 — D7 이월
+
+시뮬레이터에 entitlement 가 없어(§18-5) `cloudKitDatabase` 컨테이너로는 **테스트 자체가 불가능**합니다.
+모든 검증은 로컬 파일 store 로 했습니다. 다음은 미검증입니다.
+
+| # | 미검증 항목 |
+|---|---|
+| 1 | `NSPersistentCloudKitContainer` 가 V4 스키마를 실제로 수용하는지 (optional-only · no-unique 를 **코드상으로만** 만족) |
+| 2 | `layoutMetadataData` 의 `.externalStorage` 가 CKAsset 으로 미러링되는지 |
+| 3 | 마이그레이션 이후 다른 기기에서 계속 도착하는 **메타데이터 없는 행**의 동작 |
+| 4 | `isPresent == true` 복수 존재 충돌 |
+
+> §10-3 이 V4 를 forward-only 로 규정하므로 **배포 판단은 D7 확인 이후여야 합니다.**
+
+#### 남겨둔 것
+
+- **런타임 legacy 판별 경로 전체** (§10-2 7단계) — 지금은 `drawingVersion` 이 legacy 표식으로 읽힐 준비만 됨
+- **`layoutMetadataData` 쓰기 경로** — 필드와 라운드트립만 확보. 실제 인코딩·저장은 §8-2 mutation 과 함께 Phase 3
+- **`drawingVersion = 3` 승격** — 절을 실제로 편집해 저장할 때만 일어나야 함 (§10-2 정책 5번). 현재 어떤 경로도 2/3 을 쓰지 않음
+- **`rowUUID` 선발급 + `activeRowIDs`** 배선 — Phase 3.
+  ⚠️ 현재 지정 이니셜라이저의 `rowUUID` 기본값이 `UUID().uuidString` 이라 **새 행은 자동으로 UUID 를 갖습니다**(§10-1 "신규 행 생성 시에만 발급" 과 일치).
+  다만 Phase 3 은 저장 **전에** 선발급해 pending 큐 키로 쓰므로, 그 경로에서 기본값 생성에 맡기면 **큐 키와 행 값이 어긋납니다.** 반드시 선발급 값을 인자로 넘겨야 합니다
+- **`BiblePageDrawing` 제거 판단** — §20-3 실측상 실데이터 0행이라 부담이 없으나 additive-only 원칙에 따라 Phase 1 에서는 유지. Phase 4 후보
