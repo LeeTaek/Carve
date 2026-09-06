@@ -162,6 +162,8 @@ public struct CarveDetailFeature {
                 state.sentenceWithDrawingState = sentenceState
                 undoManager.clear()
                 beginLayoutMeasurement(state: &state, sentences: sentences)
+                // 단일 Canvas 면 팔레트의 undo/redo 는 캔버스가 처리한다 — 팔레트가 SharedUndoManager 값으로 공유 canUndo 를 덮지 않게.
+                state.headerState.palatteSetting.delegatesUndoToCanvas = state.usesSingleCanvas
                 guard state.usesSingleCanvas else { return .none }
                 // 단일 Canvas: 본문이 확정된 시점에 조회를 시작한다 (§6-4). 레이아웃은 실측이 끝나면 따로 들어간다.
                 let chapter = sentences.first?.title ?? state.headerState.currentTitle
@@ -337,12 +339,15 @@ extension CarveDetailFeature {
             let verse = row.sentence.verse
 
             if let offsets = geometry.underlineOffsets {
-                if row.sentenceState.underlineOffsets != offsets {
-                    row.sentenceState.underlineOffsets = offsets
-                    state.sentenceWithDrawingState[id: id] = row
-                }
                 // 밑줄은 캔버스 영역 안에서 1절의 상단 여백만큼 내려 그려지므로, 레이아웃 anchor 도 같은 값을 더한다.
                 let anchors = offsets.map { $0 + ChapterLayoutHosting.topPadding(forVerse: verse) }
+                // 절 캔버스의 첫 밑줄 y — 단일 Canvas 가 첫 밑줄 원점(v3)으로 저장한 행을 N-Canvas 가 제자리에 보이게 하는 기준 (§10-3 flag off).
+                let firstUnderlineY = anchors.first ?? 0
+                if row.sentenceState.underlineOffsets != offsets || row.canvasState.firstUnderlineY != firstUnderlineY {
+                    row.sentenceState.underlineOffsets = offsets
+                    row.canvasState.firstUnderlineY = firstUnderlineY
+                    state.sentenceWithDrawingState[id: id] = row
+                }
                 if state.chapterLayout.recordText(verse: verse, underlineAnchors: anchors) {
                     layoutInputChanged = true
                 }
@@ -444,7 +449,8 @@ extension CarveDetailFeature {
     private func forwardLayoutToSingleCanvas(state: inout State) -> Effect<Action> {
         guard state.usesSingleCanvas, let layout = state.chapterLayout.layout else { return .none }
         var effects: [Effect<Action>] = []
-        if let origin = state.chapterLayout.columnOrigin, origin != state.chapterCanvas.columnOrigin {
+        if let origin = state.chapterLayout.columnOrigin,
+           origin != state.chapterCanvas.columnOrigin, origin != state.chapterCanvas.pendingColumnOrigin {
             effects.append(.send(.scope(.chapterCanvasAction(.columnOriginChanged(origin)))))
         }
         if layout != state.chapterCanvas.layout && layout != state.chapterCanvas.pendingLayout {

@@ -14,7 +14,6 @@ import ComposableArchitecture
 @ViewAction(for: CarveDetailFeature.self)
 public struct CarveDetailView: View {
     @Bindable public var store: StoreOf<CarveDetailFeature>
-    @Environment(\.scenePhase) private var scenePhase
     @State private(set) var halfWidth: CGFloat = 0
     /// 행들의 실측 콜백을 모아 런루프 한 번에 한 액션으로 보내는 수집기 (Phase 2).
     /// 참조 객체이므로 `@State` 는 수명만 잡아 줄 뿐, 값이 바뀌어도 뷰를 다시 그리지 않는다.
@@ -142,9 +141,8 @@ public struct CarveDetailView: View {
                     send(.fetchSentence)
                     startDebugScenarioIfNeeded()
                 }
-                .onChange(of: scenePhase) { _, phase in
-                    if phase != .active { send(.appWillResignActive) }
-                }
+                // scenePhase 훅은 여기 두지 않는다 — 사이드바가 열리면 이 뷰가 트리에서 빠져 훅이 돌지 않는다.
+                // 항상 트리에 있는 CarveNavigationView 가 appWillResignActive 를 보낸다 (§8-5).
                 .onChange(of: container.size.width, initial: true) { _, width in
                     let half = width / 2
                     guard half > 0, half != halfWidth else { return }
@@ -272,6 +270,11 @@ public struct CarveDetailView: View {
         }
         .onTwoFingerDoubleTap {
             send(.twoFingerDoubleTapForUndo)
+        }
+        .onChange(of: store.sentenceWithDrawingState) {
+            // N-Canvas 의 setProxy → scrollToTop 과 같은 자리. 장 전환·딥링크(setScrollTarget)의 스크롤 요청을 여기서 낸다.
+            // 레이아웃이 아직 없으면 컨트롤러가 요청을 들고 있다가 layout 이 오면 수행한다.
+            store.send(.scrollToTop)
         }
     }
 

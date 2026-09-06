@@ -227,6 +227,11 @@ public struct DrawingDatabase: Sendable {
                 try await actor.update(drawing.id) { (oldValue: BibleDrawing) async in
                     oldValue.lineData = drawing.lineData
                     oldValue.updateDate = drawing.updateDate
+                    // 좌표 형식 표식과 metadata 도 함께 옮긴다 (설계 §10-3 flag off 경로).
+                    // N-Canvas 가 첫 밑줄 원점(v3) 행을 편집하면 좌상단 원점(v2)으로 내리는데,
+                    // lineData 만 바꾸면 행은 v3 인 채 내용만 v2 가 되어 단일 Canvas 가 잘못된 위치에 놓는다.
+                    oldValue.drawingVersion = drawing.drawingVersion
+                    oldValue.layoutMetadataData = drawing.layoutMetadataData
                 }
             } else {
                 try await actor.insert(drawing)

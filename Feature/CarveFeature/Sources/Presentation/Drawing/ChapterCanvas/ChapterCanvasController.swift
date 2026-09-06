@@ -33,9 +33,12 @@ final class ChapterPKCanvasView: PKCanvasView {
 ///
 /// 하는 일은 셋이다.
 /// 1. **표시:** `renderedRevision` 이 바뀔 때만 `Data` 를 디코드해 `drawing` 에 넣고 undo 스택을 비운다 (§4 · §9-5).
-/// 2. **편집 계약:** 도구 시작 → `editBegan`, drawing 변경 → trailing debounce 뒤 `editEnded`, 변경 없이 도구 종료 → `editCancelled` (§8-1).
+///    교체 직전에 아직 보고하지 않은 편집이 있으면 **이전 세대 번호로** 먼저 보고한다 — 장 전환 직전의 마지막 획.
+/// 2. **편집 계약:** 도구 시작 → `editBegan`, drawing 변경 → trailing debounce 뒤 `editEnded(세대)`, 변경 없이 도구 종료 → `editCancelled` (§8-1).
 ///    `canvasViewDidEndUsingTool` 을 저장 지점으로 쓰지 않는다 — PencilKit 이 획을 반영하기 전에 호출된다 (§7-5 실측).
-/// 3. **기하:** 텍스트 컬럼 높이 = content 높이, 헤더는 `contentInset.top` 으로 비운다 (콘텐츠 좌표는 헤더와 무관).
+///    새 획이 시작되면 직전 획의 trailing 보고를 **취소**한다. 획 도중 `editEnded` 가 나가면 `isEditing` 이 풀려 보류된 레이아웃이
+///    획 중간에 적용된다. 미보고 변경은 다음 도구 종료 뒤에 함께 보고한다.
+/// 3. **기하:** 텍스트 컬럼 높이 = 컬럼 자신의 높이(content 높이가 아니다), 헤더는 `contentInset.top` 으로 비운다 (콘텐츠 좌표는 헤더와 무관).
 ///    하단은 safe area 만큼 inset 을 더해 마지막 절이 홈 인디케이터에 가리지 않게 한다 (§5 미결 → `.never` + inset 채택).
 final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
 
@@ -69,7 +72,8 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
     let canvas = ChapterPKCanvasView()
     private let host = UIHostingController<AnyView>(rootView: AnyView(EmptyView()))
 
-    private var appliedRevision = -1
+    /// 캔버스가 지금 표시하는 내용의 세대 (`renderedRevision`). `editEnded` 에 실어 보낸다.
+    private(set) var appliedRevision = -1
     private var appliedUndoVersion = 0
     private var appliedRedoVersion = 0
     private var appliedScrollToken = 0
@@ -77,7 +81,9 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
     private var columnHeight: CGFloat = 0
     private var isApplyingDrawing = false
     private var isPerformingHistory: EditReason?
-    private var didChangeSinceToolBegan = false
+    /// drawing 이 바뀌었는데 아직 `editEnded` 로 보고하지 않았다.
+    private(set) var hasUnreportedChange = false
+    private var unreportedReason: EditReason = .ink
     private var trailingEditTask: Task<Void, Never>?
     private var cancelCheckTask: Task<Void, Never>?
     private var lastReportedTop: CGFloat = 0
@@ -85,6 +91,8 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
 
     /// pencil-up 판정용 trailing debounce (CanvasView 와 같은 값).
     private let editSettleInterval: TimeInterval = 0.3
+    /// 변경 없이 도구 사용이 끝났다고 보는 대기 시간. trailing 보고보다 길어야 한다.
+    private let cancelCheckInterval: TimeInterval = 0.35
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -145,15 +153,19 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
         canvas.drawingPolicy = configuration.drawingPolicy
 
         if configuration.topInset != appliedTopInset {
-            let isFirst = appliedTopInset < 0
+            // 헤더 높이는 첫 apply 뒤에 실측돼 온다 (0 → 실제 높이). 맨 위에 있던 스크롤은 새 인셋만큼 다시 내려
+            // 콘텐츠 상단이 헤더에 가리지 않게 한다. 이미 내려가 있으면 건드리지 않는다.
+            let previousInset = max(0, appliedTopInset)
+            let wasAtTop = canvas.contentOffset.y <= -previousInset + 0.5
             appliedTopInset = configuration.topInset
             updateContentGeometry()
-            if isFirst { canvas.setContentOffset(CGPoint(x: 0, y: -configuration.topInset), animated: false) }
+            if wasAtTop { canvas.setContentOffset(CGPoint(x: 0, y: -configuration.topInset), animated: false) }
         }
 
         if configuration.renderedRevision != appliedRevision {
+            let previousRevision = appliedRevision
             appliedRevision = configuration.renderedRevision
-            applyDrawing(configuration.renderedData)
+            applyDrawing(configuration.renderedData, replacingGeneration: previousRevision)
         }
 
         if configuration.undoRequestVersion != appliedUndoVersion {
@@ -173,7 +185,10 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
 
     // MARK: 표시
 
-    private func applyDrawing(_ data: Data?) {
+    private func applyDrawing(_ data: Data?, replacingGeneration previousGeneration: Int) {
+        // 내용을 바꾸기 전에, 아직 보고하지 않은 편집을 이전 세대 번호로 보고한다 (장 전환 직전의 마지막 획, §8-5).
+        flushUnreportedEdit(generation: previousGeneration)
+
         let drawing: PKDrawing
         if let data, !data.isEmpty, let decoded = try? PKDrawing(data: data) {
             drawing = decoded
@@ -185,10 +200,31 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
         isApplyingDrawing = false
         // 합성·복원·reflow 뒤에는 이전 undo 스택이 의미를 잃는다 (§9-5).
         canvas.undoManager?.removeAllActions()
-        trailingEditTask?.cancel()
         cancelCheckTask?.cancel()
-        didChangeSinceToolBegan = false
         reportUndoState()
+    }
+
+    /// 미보고 변경을 지금 캔버스 내용으로 보고한다. 이벤트는 다음 턴에 보낸다 — 뷰 갱신(`updateUIViewController`) 도중에
+    /// 액션을 보내지 않기 위함이며, 세대 번호를 들고 가므로 늦게 도착해도 Feature 가 자기 세대의 문맥으로 계산한다.
+    private func flushUnreportedEdit(generation: Int) {
+        trailingEditTask?.cancel()
+        guard hasUnreportedChange else { return }
+        hasUnreportedChange = false
+        let snapshot = makeSnapshot(generation: generation)
+        Task { @MainActor [weak self] in
+            self?.onEvent?(.editEnded(snapshot))
+        }
+    }
+
+    private func makeSnapshot(generation: Int) -> CanvasEditSnapshot {
+        let drawing = canvas.drawing
+        let bounds = drawing.bounds
+        return CanvasEditSnapshot(
+            drawingData: drawing.dataRepresentation(),
+            dirtyBounds: (bounds.isNull || bounds.isEmpty) ? nil : bounds,
+            reason: unreportedReason,
+            generation: generation
+        )
     }
 
     private func updateContentGeometry() {
@@ -197,20 +233,46 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
         let inset = max(0, appliedTopInset)
         let height = max(columnHeight, view.bounds.height - inset)
         canvas.contentInset = UIEdgeInsets(top: inset, left: 0, bottom: view.safeAreaInsets.bottom + 24, right: 0)
-        canvas.contentFrame = CGRect(x: 0, y: 0, width: width, height: height)
+        // 텍스트 호스트의 frame 은 **컬럼 자신의 높이**다. content 높이(뷰포트 이상)로 늘리면 UIHostingController 가 내용을
+        // 세로 중앙에 놓아, 짧은 장에서 텍스트가 레이아웃 좌표(컬럼 상단 = content 상단)보다 아래로 내려가 잉크·소유권과 어긋난다.
+        canvas.contentFrame = CGRect(x: 0, y: 0, width: width, height: columnHeight > 0 ? columnHeight : height)
         canvas.contentSize = CGSize(width: width, height: height)
         canvas.setNeedsLayout()
     }
 
     private func scroll(toVerse verse: Int, layout: ChapterLayout) {
         guard let region = layout.region(verse: verse) else { return }
-        // 이전(N-Canvas) 동작과 같이 해당 절이 화면 하단 근처에 오도록 한다.
-        let visibleHeight = canvas.bounds.height - canvas.contentInset.top - canvas.contentInset.bottom
-        let target = region.writingRect.maxY - visibleHeight + 40
-        let minOffset = -canvas.contentInset.top
-        let maxOffset = max(minOffset, canvas.contentSize.height - canvas.bounds.height + canvas.contentInset.bottom)
-        let offsetY = min(max(target, minOffset), maxOffset)
+        let offsetY = Self.scrollOffset(
+            bringingBottomOf: region.writingRect,
+            viewportHeight: canvas.bounds.height,
+            contentInset: canvas.contentInset,
+            contentHeight: canvas.contentSize.height
+        )
         canvas.setContentOffset(CGPoint(x: 0, y: offsetY), animated: true)
+    }
+
+    /// 절이 화면 하단 근처에 오도록 하는 `contentOffset.y` (N-Canvas 의 `scrollTo(anchor: .bottom)` 과 같은 의미).
+    ///
+    /// 뷰포트 `[offset, offset + height]` 에서 헤더(`contentInset.top`)는 위쪽을, 하단 inset 은 아래쪽을 가리므로
+    /// **보이는 하단 = offset + height − inset.bottom** 이다. top inset 은 여기에 관여하지 않는다.
+    /// - Parameters:
+    ///   - rect: 대상 절의 `writingRect` (content 좌표).
+    ///   - viewportHeight: 캔버스 `bounds.height`.
+    ///   - contentInset: 캔버스 인셋.
+    ///   - contentHeight: `contentSize.height`.
+    ///   - bottomMargin: 절 하단과 보이는 하단 사이 여백.
+    /// - Returns: 범위 안으로 클램프된 offset y.
+    static func scrollOffset(
+        bringingBottomOf rect: CGRect,
+        viewportHeight: CGFloat,
+        contentInset: UIEdgeInsets,
+        contentHeight: CGFloat,
+        bottomMargin: CGFloat = 40
+    ) -> CGFloat {
+        let target = rect.maxY + bottomMargin - (viewportHeight - contentInset.bottom)
+        let minOffset = -contentInset.top
+        let maxOffset = max(minOffset, contentHeight - viewportHeight + contentInset.bottom)
+        return min(max(target, minOffset), maxOffset)
     }
 
     // MARK: undo / redo
@@ -236,43 +298,49 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
     // MARK: PKCanvasViewDelegate — 편집 계약 (§8-1)
 
     func canvasViewDidBeginUsingTool(_ canvasView: PKCanvasView) {
+        // 직전 획의 trailing 보고가 이 획 도중에 나가면 isEditing 이 풀려 보류된 레이아웃이 획 중간에 적용된다.
+        // 취소하고, 미보고 변경(hasUnreportedChange)은 이 도구 사용이 끝난 뒤 함께 보고한다.
+        trailingEditTask?.cancel()
         cancelCheckTask?.cancel()
-        didChangeSinceToolBegan = false
         onEvent?(.editBegan)
     }
 
     func canvasViewDidEndUsingTool(_ canvasView: PKCanvasView) {
-        // 변경 없이 끝난 도구 사용(탭 등)은 editEnded 가 오지 않으므로, 잠시 뒤에도 변경이 없으면 취소로 알린다.
         cancelCheckTask?.cancel()
+        if hasUnreportedChange {
+            // 직전 획의 보고가 이 획 시작에 취소됐다. 이번 획이 변경을 만들면 canvasViewDrawingDidChange 가 다시 예약하므로
+            // 마지막 변경까지 한 번에 보고되고, 변경이 없었다면(탭 등) 여기서 예약한 보고가 직전 획을 실어 나간다.
+            scheduleTrailingEdit()
+            return
+        }
+        // 변경 없이 끝난 도구 사용(탭 등)은 editEnded 가 오지 않으므로, 잠시 뒤에도 변경이 없으면 취소로 알린다.
         cancelCheckTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .seconds(0.35))
-            guard let self, !Task.isCancelled, !self.didChangeSinceToolBegan else { return }
+            try? await Task.sleep(for: .seconds(self?.cancelCheckInterval ?? 0.35))
+            guard let self, !Task.isCancelled, !self.hasUnreportedChange else { return }
             self.onEvent?(.editCancelled)
         }
     }
 
     func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
         guard !isApplyingDrawing else { return }
-        didChangeSinceToolBegan = true
+        hasUnreportedChange = true
         cancelCheckTask?.cancel()
-        let reason: EditReason
         if let history = isPerformingHistory {
-            reason = history
+            unreportedReason = history
         } else {
-            reason = canvasView.tool is PKEraserTool ? .erase : .ink
+            unreportedReason = canvasView.tool is PKEraserTool ? .erase : .ink
         }
         // 제스처의 마지막 변경까지 반드시 포함시키기 위한 trailing debounce (§7-5).
+        scheduleTrailingEdit()
+    }
+
+    private func scheduleTrailingEdit() {
         trailingEditTask?.cancel()
-        trailingEditTask = Task { @MainActor [weak self, weak canvasView] in
+        trailingEditTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(self?.editSettleInterval ?? 0.3))
-            guard let self, let canvasView, !Task.isCancelled else { return }
-            let drawing = canvasView.drawing
-            let bounds = drawing.bounds
-            self.onEvent?(.editEnded(CanvasEditSnapshot(
-                drawingData: drawing.dataRepresentation(),
-                dirtyBounds: (bounds.isNull || bounds.isEmpty) ? nil : bounds,
-                reason: reason
-            )))
+            guard let self, !Task.isCancelled, self.hasUnreportedChange else { return }
+            self.hasUnreportedChange = false
+            self.onEvent?(.editEnded(self.makeSnapshot(generation: self.appliedRevision)))
             self.reportUndoState()
         }
     }

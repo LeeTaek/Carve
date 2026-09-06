@@ -42,7 +42,7 @@ public struct CanvasView: UIViewRepresentable {
             
             return canvas
         }()
-        canvas.drawing = toDrawing(from: store.drawing?.lineData)
+        canvas.drawing = displayDrawing()
         canvas.drawingGestureRecognizer.isEnabled = isInputEnabled
         canvas.delegate = context.coordinator
         context.coordinator.bind(to: canvas)
@@ -55,7 +55,7 @@ public struct CanvasView: UIViewRepresentable {
             uiView.drawingGestureRecognizer.isEnabled = isInputEnabled
         }
         Task { @MainActor in
-            let newDrawing = toDrawing(from: store.drawing?.lineData)
+            let newDrawing = displayDrawing()
             if uiView.drawing != newDrawing {
                 uiView.drawing = newDrawing
             }
@@ -138,6 +138,13 @@ public struct CanvasView: UIViewRepresentable {
         }
     }
     
+    /// 저장 행을 캔버스 로컬 좌표로 옮긴 drawing. 단일 Canvas 가 첫 밑줄 원점으로 저장한 행(v3)은 첫 밑줄만큼 내린다 (§10-3 flag off).
+    private func displayDrawing() -> PKDrawing {
+        let stored = toDrawing(from: store.drawing?.lineData)
+        let transform = store.displayTransform
+        return transform.isIdentity ? stored : stored.transformed(using: transform)
+    }
+
     private func toDrawing(from data: Data?) -> PKDrawing {
         guard let data else { return PKDrawing() }
         do {

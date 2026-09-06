@@ -65,11 +65,14 @@ struct ChapterCanvasView: UIViewControllerRepresentable {
         context.coordinator.onScroll = onScroll
 
         controller.setColumn(AnyView(
-            column.onGeometryChange(for: CGFloat.self) { proxy in
-                proxy.size.height
-            } action: { [weak controller] height in
-                controller?.setColumnHeight(height)
-            }
+            column
+                .onGeometryChange(for: CGFloat.self) { proxy in
+                    proxy.size.height
+                } action: { [weak controller] height in
+                    controller?.setColumnHeight(height)
+                }
+                // 호스트 frame 이 컬럼보다 커도 컬럼은 상단에 붙는다 — 레이아웃 좌표의 원점은 컬럼 상단이다 (짧은 장의 세로 중앙 배치 금지).
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         ))
         controller.apply(ChapterCanvasController.Configuration(
             renderedData: display.renderedData,

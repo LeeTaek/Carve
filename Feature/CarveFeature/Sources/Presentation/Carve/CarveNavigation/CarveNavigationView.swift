@@ -16,6 +16,7 @@ import ComposableArchitecture
 @ViewAction(for: CarveNavigationFeature.self)
 public struct CarveNavigationView: View {
     @Bindable public var store: StoreOf<CarveNavigationFeature>
+    @Environment(\.scenePhase) private var scenePhase
     /// 구약 성경의 DisclosureGroup 접힘/펼침
     @State private var isShowOldTestment: Bool
     /// 신약 성경의 DisclosureGroup 접힘/펼침
@@ -38,6 +39,13 @@ public struct CarveNavigationView: View {
             detailView()
         }
         .navigationSplitViewStyle(.prominentDetail)
+        .onChange(of: scenePhase) { _, phase in
+            // 앱이 비활성/백그라운드로 가면 단일 Canvas 의 미저장분을 저장한다 (§8-5, best-effort).
+            // CarveDetailView 는 사이드바가 열리면 트리에서 빠지므로, 항상 있는 이 뷰에서 건다.
+            if phase != .active {
+                store.send(.scope(.carveDetailAction(.view(.appWillResignActive))))
+            }
+        }
     }
     
     /// 성경 제목(구약/신약) 사이드바

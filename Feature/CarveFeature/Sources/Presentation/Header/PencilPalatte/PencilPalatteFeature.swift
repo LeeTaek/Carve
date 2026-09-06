@@ -30,6 +30,12 @@ public struct PencilPalatteFeature {
         @Shared(.appStorage("lineWidthSet")) public var lineWidths: [CGFloat] = [2.0, 4.0, 6.0]
         @Shared(.inMemory("canUndo")) public var canUndo: Bool = false
         @Shared(.inMemory("canRedo")) public var canRedo: Bool = false
+        /// undo/redo 를 팔레트가 아니라 캔버스(단일 Canvas, `ChapterCanvasFeature`)가 처리한다.
+        ///
+        /// true 면 `SharedUndoManager` 를 건드리지 않고 공유 `canUndo`/`canRedo` 도 덮어쓰지 않는다 —
+        /// 단일 Canvas 는 자기 undoManager 상태를 같은 키에 써 두는데, 팔레트가 비어 있는 `SharedUndoManager` 값(false)으로
+        /// 덮으면 undo 직후 버튼이 꺼진다. 값은 `CarveDetailFeature` 가 장 진입 때 정한다.
+        public var delegatesUndoToCanvas: Bool = false
 
         @Presents var navigation: Destination.State?
                 
@@ -96,16 +102,21 @@ public struct PencilPalatteFeature {
                 state.$pencilConfig.withLock { $0.lineColor = state.palatteColors[state.selectedColorIndex] }
                 state.$pencilConfig.withLock { $0.lineWidth = state.lineWidths[state.selectedWidthIndex] }
             case .view(.undo):
+                // 단일 Canvas 경로에서는 부모(CarveDetailFeature)가 이 액션을 캔버스의 undoTapped 로 옮긴다.
+                guard !state.delegatesUndoToCanvas else { return .none }
                 undoManager.undo()
                 return .run { send in
                     await send(.setCanUndo)
                 }
             case .view(.redo):
+                guard !state.delegatesUndoToCanvas else { return .none }
                 undoManager.redo()
                 return .run { send in
                     await send(.setCanUndo)
                 }
             case .setCanUndo:
+                // 캔버스가 처리할 때는 공유 값의 주인이 캔버스다 — SharedUndoManager 값으로 덮지 않는다.
+                guard !state.delegatesUndoToCanvas else { return .none }
                 state.$canUndo.withLock { $0 = undoManager.canUndo }
                 state.$canRedo.withLock { $0 = undoManager.canRedo }
             default: break

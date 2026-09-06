@@ -25,6 +25,11 @@ struct ComposedChapterDrawing: Equatable, Sendable {
     let layoutMismatchVerses: Set<Int>
     /// metadata 없이 무변환 배치한 절 (§10-2 — `drawingVersion` nil/1). 복구 로그·사용자 확인 대상.
     let legacyVerses: Set<Int>
+    /// `lineData` 가 있는데 PencilKit 이 디코드하지 못한 절. **표시와 활성 행에서 모두 뺀다.**
+    ///
+    /// 빈 절로 취급해 활성 행으로 두면 다음 편집의 `replace` 가 원본 blob 을 조용히 덮어쓴다.
+    /// 활성 행에서 빼면 다음 편집은 `create` 로 새 행을 만들고 원본 행은 손대지 않는다 (§9-4 비파괴).
+    let undecodableVerses: Set<Int>
 }
 
 /// 편집 하나의 계산 결과 (설계 §8-2).
@@ -87,13 +92,18 @@ struct DrawingCodec: Sendable {
         var map: [StrokeIdentityKey: Int] = [:]
         var mismatch: Set<Int> = []
         var legacy: Set<Int> = []
+        var undecodable: Set<Int> = []
         var activeRowIDs: [Int: BibleDrawingRowID] = [:]
 
         for verse in representatives.keys.sorted() {
             guard let snapshot = representatives[verse] else { continue }
+            guard let stored = Self.decodeStored(snapshot.lineData) else {
+                // 디코드 실패 — 활성 행으로 두지 않는다. 다음 편집은 새 행(create)으로 가고 원본은 그대로 남는다.
+                undecodable.insert(verse)
+                continue
+            }
             activeRowIDs[verse] = snapshot.rowID
             guard let region = layout.region(verse: verse) else { continue }
-            let stored = Self.decode(snapshot.lineData)
             guard !stored.strokes.isEmpty else { continue }
 
             let placed: PKDrawing
@@ -122,7 +132,8 @@ struct DrawingCodec: Sendable {
             ownership: OwnershipSnapshot(map: map, layoutSignature: layout.signature),
             activeRowIDs: activeRowIDs,
             layoutMismatchVerses: mismatch,
-            legacyVerses: legacy
+            legacyVerses: legacy,
+            undecodableVerses: undecodable
         )
     }
 
@@ -246,6 +257,13 @@ struct DrawingCodec: Sendable {
     private static func decode(_ data: Data?) -> PKDrawing {
         guard let data, !data.isEmpty, let drawing = try? PKDrawing(data: data) else { return PKDrawing() }
         return drawing
+    }
+
+    /// 저장 행의 `lineData` 디코드. nil/빈 Data 는 "비워진 행"(`clear` 이후)이라 빈 drawing 이고,
+    /// 내용이 있는데 디코드가 실패하면 nil — 호출부가 그 절을 활성 행에서 빼도록 구분한다.
+    private static func decodeStored(_ data: Data?) -> PKDrawing? {
+        guard let data, !data.isEmpty else { return PKDrawing() }
+        return try? PKDrawing(data: data)
     }
 
     private static func translation(_ point: CGPoint) -> CGAffineTransform {
