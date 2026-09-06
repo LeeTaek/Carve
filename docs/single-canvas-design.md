@@ -1,6 +1,7 @@
 # CarveFeature 단일 Canvas 전환 설계
 
 > 상태: **Phase 0B · S4 · Phase 1(구현) · Phase 0A-D (D1~D8) · Phase 2(구현) · Phase 3 (2/3, flag 뒤 구현) 완료** · 대상: `Feature/CarveFeature`, `Domain`
+> rev.17 — **Phase 3 (2/3) 리뷰 결함 15건 수정** (flag 기본 **off** 유지 · D9 착수의 선행 조건 · §20-10). 편집 계약에 **세대**(`CanvasEditSnapshot.generation`)를 넣고 직전 세대의 문맥(`EditSession`)을 물려 두어, 장 전환·재합성 뒤에 도착한 편집이 **자기 장·자기 기준**으로 계산돼 저장됩니다 — 이전엔 새 장 기준으로 처리돼 오저장·입력 잠금이었습니다. 편집 중 `columnOrigin`·복원 재합성 보류, 재합성 게이트의 실패 출구(`DB 내용 ⊕ 미저장분` 으로 합성), `coalesce (clear, replace) → create`, 디코드 불가 행의 비파괴, B 호스팅 기하 4건(짧은 장의 텍스트 세로 중앙 배치 · 늦게 오는 헤더 높이 · 스크롤 목표 · 스크롤 토큰), flag 경계 3건(v3 행을 N-Canvas 가 첫 밑줄만큼 내려 표시하고 편집하면 v2 로 내림 · 단일 Canvas 의 `scrollToTop` · 팔레트 undo 가 공유 canUndo 를 덮던 것), 장 전환 flush · 사이드바가 열린 채 백그라운드 진입. 회귀 기준선 **237 → 259** (CarveFeature 113 → 135).
 > rev.16 — **Phase 3 (2/3) 구현 완료 — feature flag 뒤 단일 Canvas (시뮬레이터 검증 · 실기기 미검증 · 펜 입력 경로는 리듀서 테스트만)** — `2cde2ad1` 저장 계층 · `DrawingCodec` · `ChapterCanvasFeature`, 이어서 B 구조 호스팅(`ChapterCanvasController` · `ChapterCanvasView`) + flag `singleCanvasEnabled` / Debug 인자 `-SingleCanvas`. 기본은 **off** — 사용자 동작 변화 없음 (§13 · §20-9).
 > ★ **rev.15 의 "Δ 0.00pt" 는 정정합니다.** `.named(ChapterContent)` 좌표 공간이 `touchIgnoringContextMenu` 의 행별 중첩 `UIHostingController` **안에서는 해석되지 않아 조용히 `.global` 로 대체**되고 있었습니다 — N-Canvas · 단일 Canvas 양쪽 모두. rev.15 의 Δ 0.00 은 중첩 호스팅을 뺀 실험 구성에서 잰 값이고, **출시 구성의 frame 검증은 오염돼 있었습니다** (레이아웃 자체는 맞았고 검증 입력만 틀렸습니다). 행 frame 을 **바깥 트리**에서, 행 안의 캔버스 영역을 행 자신의 named 공간에서 재어 합치는 방식으로 고쳐 **양쪽 경로 · 출시 구성에서 Δ 0.00 · `columnOrigin.x` 366.70 을 다시 확인**했습니다 (시편 119편 176/176 · 창세기 1장 31/31 — §6-1 rev.16 · §20-9).
 > §5 미결 3건과 §7-1 미결을 **확정**했습니다 (§12 U5~U8): `columnOrigin` 은 호스팅이 출처 · Feature 는 보관 · **Codec 만 적용**(rev.15 제안 그대로) / 앵커가 캔버스 밖이면 **① 캔버스 안으로 클램프** / 하단 인셋은 **`.never` 유지 + `contentInset.bottom = safeArea + 24`** / signature 에 **`chapter` 를 넣지 않음**.
@@ -2083,6 +2084,7 @@ S0 완료 후 수행합니다.
 - coalescing + 직렬 저장 + atomic replace/clear/create ✅
 - 런타임 legacy 판별 ✅ (`drawingVersion` nil/1 → 무변환 배치, `legacyVerses`)
 - **flag off로 롤백** (V4 저장소는 유지) ✅ — 기본이 off 이고, 두 경로가 같은 행 뷰 · 실측 · 저장소를 공유
+- **rev.17 — (2/3) 리뷰 결함 15건 수정** ✅ (§20-10). 편집 세대 · 물러난 세션 · 재합성 출구 · v3 행의 N-Canvas 호환. **D9 는 이 수정 뒤에** 진행
 
 **한 것 (§20-9):**
 
@@ -2178,6 +2180,14 @@ S0 완료 후 수행합니다.
 | 저장 계층 (Domain, `DrawingRepositoryTesting`, 13건) | `create` 가 선발급 rowID 를 `rowUUID` 로 쓰고 `drawingVersion 3` · `isPresent` · metadata 기록 · legacy 행의 business id 주소지정과 `replace` 승격 (§10-2 정책 5) · **`clear` 는 행을 지우지 않는다 (5)** · **batch 중 하나 실패 시 전부 롤백 (3)** · 같은 rowID `create` 재도착 upsert (5-7) · 행 없는 `clear` 는 빈 행 생성 · 행 없는 `replace` 는 `rowNotFound` · 다른 장 미간섭 · `load` 정렬 결정성 / 대표 행 규칙 4건 — **`isPresent` 복수 시 결정적 (5-4)** · `isPresent` 없을 때 · 절별 하나 · 모델 `mainDrawing()` 동일 규칙 |
 | 코덱 (`DrawingCodecTesting`, 11건) | **legacy 무변환 배치 (13)** · v3 행 reflow 배치 · 대표 행만 합성 · **무변경 라운드트립에 mutation 없음 (9)** · **경계 획은 시작 절에 통째로 `create` (1)** · 활성 행에 `replace` + 첫 밑줄 원점 localize · **전부 지우면 `clear`, 행 유지 (2)** · **mask 만 바뀐 획은 owner 유지 + dirty (5-6)** · 미변경 절 무 mutation · **앵커 밖 클램프 (§7-1 ①)** · 실사용 blob 의 소수 `columnOrigin` 라운드트립 signature 불변 |
 | 리듀서 (`ChapterCanvasFeatureTesting`, 10건) | **조회/레이아웃 도착 순서 무관 + 한쪽만 있으면 입력 차단 (6-2 · 10)** · 절 수 불일치 레이아웃 미합성 · **이전 장 조회 결과 폐기 (6-3)** · 조회 실패 = 닫힌 게이트 / **편집은 pencil-up 순서로 하나씩, 신규 rowID 즉시 예약 (5-7 · §8-7)** · **저장 중 도착한 최신 편집 보호 — create 위의 replace 는 create 로 (6-1)** · **저장 실패 시 화면 유지 + 큐 보존 + flush 재시도 (8)** · **편집 중 레이아웃은 pencil-up 뒤 적용, 저장 후 재합성 (11)** · **히스토리 복원은 mutation 없이 재합성, 미저장분 선저장 (5-2 · 5-3)** · **장 전환 뒤에도 이전 장 미저장분은 자기 장으로 저장 (7)** |
+
+**Phase 3 (rev.17) 에서 추가·고정된 것** — 22건 (§20-10 의 결함 수정과 1:1).
+
+| 대상 | 테스트 |
+|---|---|
+| 리듀서 (`ChapterCanvasFeatureTesting`, +8) | 장 진입이 세대를 올리고 스크롤 토큰이 이어짐 · `coalesce (clear, replace) → create` · 편집 중 `columnOrigin` 보류 · **장 전환 뒤 이전 장 편집이 물러난 세션에서 이전 장으로 저장 (7)** · 미지 세대 편집 폐기 · 재합성 대기 중 저장 실패 → `DB ⊕ 미저장분` 합성으로 입력 재개 · 재조회 실패 → 마지막 내용으로 합성 · 실패한 채 떠났다 돌아온 장에 미저장분 겹침. 장 전환이 이전 장 batch 를 곧바로 재시도하도록 기존 테스트 1건 갱신 |
+| 컨트롤러 (`ChapterCanvasControllerTesting`, 7) | 다음 획 시작이 trailing 보고를 취소하고 도구 종료 뒤 합쳐 보고 · 취소된 보고가 탭 뒤에 살아남음 · 변경 없는 도구 사용 → `editCancelled` · 내용 교체 직전 미보고 편집을 이전 세대로 보고 · 호스트 frame = 컬럼 높이 · 늦은 헤더 높이의 상단 재고정 · `scrollOffset` 의 top inset 미차감과 클램프 |
+| flag off 롤백 (`SingleCanvasRollbackTesting`, 7) | v3 행의 표시 변환 · 편집 시 v2 강등 + metadata 제거 · legacy 행 불변 · 강등이 DB 에 반영 (`updateDrawing` 이 `drawingVersion`·metadata 를 옮김) · **디코드 불가 행은 활성 행에서 빠져 다음 편집이 `create`** · 비워진 행은 활성 유지 · 팔레트 undo 위임 시 공유 canUndo 불변 (**16 의 일부**) |
 
 > **아직 테스트로 고정되지 않은 필수 항목:** 4(fingerprint 동점 — Phase 0B 승계 테스트가 부분 커버) · 12(줄 수 감소 — Phase 0B) · 14(reflow 후 undo 초기화 — UI) · 15(signature 영속 — canonical 문자열, Phase 0B) ·
 > **16(flag off 경로)** 은 자동 테스트가 아니라 **오늘 N-Canvas 경로를 같은 V4 저장소에서 실행**해 확인 · **17(undo/redo 후 재실행)** 은 펜 입력이 필요해 미수행 (D9).
@@ -3622,3 +3632,63 @@ flag off 로 돌아가면 N-Canvas 가 단일 Canvas 가 저장한 행(`drawingV
 | CloudKit (D7) | ❌ §20-5 미검증 4건 그대로 |
 | `ChapterLayout` 캐시 · `touchIgnoringContextMenu` 제거 · `activeCanvasIDs` 삭제 | 미착수 — N-Canvas 경로가 남는 동안 유지 |
 | `dirtyBounds` 오버레이 (단일 Canvas) | 절반만 — `CanvasEditSnapshot.dirtyBounds` 까지는 오지만 오버레이는 N-Canvas 의 `CanvasFeature.lastDrawingBounds` 만 읽음. 펜 입력이 없어 확인할 수 없는 상태라 두었음 |
+
+### 20-10. Phase 3 (2/3) 리뷰 결함 15건 수정 (rev.17)
+
+rev.16 코드 리뷰가 검증한 결함 15건을 고쳤습니다. flag 는 기본 **off** 그대로이며, 이 수정이 **D9(실기기 단일 Canvas 검증)와 (3/3) 착수의 선행 조건**입니다.
+네 뿌리로 묶어 설계했습니다.
+
+#### ① 편집 계약에 세대가 없고 재합성 게이트에 출구가 없음 (5건 + 미검증 후보 1건)
+
+| 위치 | 증상 | 수정 |
+|---|---|---|
+| `ChapterCanvasFeature` `editEnded` | 장 전환 뒤 도착한 이전 장 편집이 **새 장 기준**으로 계산돼 오저장·잠금 | `CanvasEditSnapshot.generation` (= 편집 당시 캔버스의 `renderedRevision`). 합성·장 진입마다 직전 문맥을 **`EditSession` 으로 물려 둠**(`retiredSession`: 세대 · 장 · 합성 시점 레이아웃 · `columnOrigin` · 활성 행 · 소유권 · 기준 drawing). 편집은 자기 세대의 세션에서 계산되고, 어느 세대도 아니면 로그와 함께 폐기. 코덱은 `renderedLayout`·`renderedColumnOrigin`(합성 시점 값)으로 계산 — `layout`·`columnOrigin` 은 다음 합성용 최신값이라 큐가 남아 있을 때 기준이 어긋났음 |
+| `load` | `renderedRevision` 미증가 → 이전 장 잉크가 새 장 본문 위에 남음 | 장 진입이 세대를 올려 뷰가 빈 캔버스를 즉시 표시 |
+| `columnOriginChanged` | 편집 중 즉시 reload → 획 유실 · `editQueue` 교착 | `pendingColumnOrigin` 으로 보류, pencil-up 뒤 `pendingLayout`·`pendingReload`(복원)와 **한 번에** 적용. `drainEditQueue` 의 `!isReloading` 가드 제거 — 재조회는 큐가 빌 때까지 시작하지 않으므로 기준은 유효하고, 막으면 큐와 재조회가 서로를 기다림 |
+| 재합성 중 저장 재시도·재조회 실패 | `isReloading` 미해제 → 입력 영구 잠금 | 합성 입력을 **항상 `DB 내용(loadedDrawings) ⊕ 이 장의 미저장분(pendingMutations)`** 으로 정의. 저장 실패 시 그 입력으로 지금 합성해 입력을 열고(`reloadWhenSettled` 유지 → 다음 저장 성공 뒤 재조회), 재조회 실패 시 마지막 내용으로 합성. 성공한 저장은 `loadedDrawings` 에 겹쳐 두 값의 합이 항상 현재 내용. 코덱이 편집을 계산하는 중이면 결과가 세대를 잃지 않도록 큐가 빌 때까지 미룸(`recoverFromReloadFailure`) |
+| `scrollToVerse` | 장 전환 후 첫 토큰(1)이 컨트롤러 잔존 토큰과 충돌 | `scrollRequestToken` 은 장이 바뀌어도 이어짐 |
+| (미검증 후보) `load` 시점에 코덱 진행 중인 편집 폐기 | **확인됨** — `editQueue = []` 와 `finishEdit` 의 "큐에 없으면 버림" | 위의 물러난 세션이 해결. 컨트롤러도 내용 교체 직전 미보고 편집을 **이전 세대 번호로 먼저 보고**(`flushUnreportedEdit`, 다음 턴에 전달) → 장 전환 직전의 마지막 획까지 이전 장으로 저장. 장 진입은 flush 지점이기도 하다 — 이전 장의 실패 batch 를 곧바로 재시도 |
+
+#### ② 저장 명령 의미의 비대칭 (3건)
+
+| 위치 | 증상 | 수정 |
+|---|---|---|
+| `coalesce` | `(clear, replace)` 가 `replace` 로 남아, 그 `clear` 가 미저장 `create` 를 덮은 것이면 `rowNotFound` 로 **장 전체 저장이 영구 실패** | `(clear, replace) → create` (upsert). 표는 `coalesce` 주석 |
+| `DrawingCodec.compose` | 디코드 실패 blob 을 빈 절로 합성 → 다음 편집의 `replace` 가 원본을 무로그로 덮음 | `undecodableVerses` — 표시와 **활성 행에서 제외**해 다음 편집은 새 행(`create`), 원본 행 보존 (§9-4). Feature 가 `Log.error` |
+| `CarveDetailFeature` · 뷰 | 장 전환에 flush 없음 · 사이드바가 열리면 `CarveDetailView` 가 트리에서 빠져 scenePhase 훅도 없음 | 장 진입(`beginLoad`)이 `startSaveIfPossible(allowRetry:)` 를 함께 냄. scenePhase 훅은 항상 트리에 있는 `CarveNavigationView` 로 이동 |
+
+#### ③ B 호스팅 기하 (4건)
+
+| 위치 | 증상 | 수정 |
+|---|---|---|
+| `updateContentGeometry` | 텍스트 호스트 frame 을 content 높이(≥ 뷰포트)로 늘려 짧은 장에서 `UIHostingController` 가 컬럼을 **세로 중앙**에 놓음 → 잉크·소유권과 어긋남 (가장 심각) | 호스트 frame 높이 = **컬럼 자신의 높이**, `contentSize` 만 뷰포트 이상. 컬럼 루트에 `.frame(maxHeight: .infinity, alignment: .top)` 도 추가 |
+| `apply` 첫 인셋 | 첫 apply 가 헤더 높이 0 으로 offset 보정을 소진 → 실측 높이가 오면 상단이 헤더에 가림 | 인셋이 바뀔 때 **맨 위에 있던 스크롤만** 새 인셋으로 다시 고정 |
+| `scroll(toVerse:)` | `contentInset.top` 을 두 번 빼 목표가 헤더 높이만큼 위 | `scrollOffset(bringingBottomOf:…)` — 보이는 하단 = `offset + bounds − inset.bottom`, top 미관여 |
+| trailing 보고 | 다음 획 시작이 trailing `editEnded` 를 취소하지 않아 획 중 `isEditing` 해제 → 보류 레이아웃이 획 중간에 적용 | `canvasViewDidBeginUsingTool` 이 trailing 취소, `hasUnreportedChange` 를 도구 종료 뒤 다시 예약해 합쳐 보고. 취소 판정(`cancelCheck`)은 미보고 변경이 있으면 내지 않음 |
+
+#### ④ flag 경계 (3건)
+
+| 위치 | 증상 | 수정 |
+|---|---|---|
+| v3 행 ↔ N-Canvas | 단일 Canvas 가 첫 밑줄 원점으로 쓴 행을 flag off N-Canvas 가 좌상단 원점으로 그려 첫 밑줄만큼 위로 어긋남 → §10-3 롤백 안전망 불성립 | `CanvasFeature.State.firstUnderlineY`(실측 첫 밑줄, `CarveDetailFeature.applyVerseGeometry` 가 채움) 로 **표시만** 내림(`displayTransform`). N-Canvas 가 그 행을 편집하면 자기 형식인 **v2**(좌상단 원점)로 내리고 metadata 를 지움 — 단일 Canvas 가 다음 편집 때 다시 v3 로 올림. `DrawingDatabase.updateDrawing` 이 `drawingVersion`·`layoutMetadataData` 를 함께 옮기도록 수정 |
+| `CarveDetailView.singleCanvasBody` | `scrollToTop` 트리거가 없어 딥링크·장 전환 스크롤 미동작 | `onChange(of: sentenceWithDrawingState)` → `scrollToTop`. 레이아웃이 없으면 컨트롤러가 요청을 들고 있다가 수행 |
+| `PencilPalatteFeature` | 단일 Canvas undo 직후 팔레트가 `SharedUndoManager` 값(false)으로 공유 `canUndo/canRedo` 를 덮음 | `delegatesUndoToCanvas` — `CarveDetailFeature.setSentence` 가 `usesSingleCanvas` 로 정함. true 면 `undo/redo/setCanUndo` 가 `SharedUndoManager` 를 건드리지 않음 |
+
+#### 미검증 후보 2건의 확인 결과
+
+| 후보 | 결과 |
+|---|---|
+| load 시점에 코덱 진행 중인 편집이 폐기됨 | **결함 확인 → 수정** (①). 테스트 "장 전환 뒤 도착한 이전 장의 editEnded 는 물러난 세션에서 계산돼 이전 장으로 저장된다" · 컨트롤러 "내용이 교체되면 미보고 편집은 이전 세대 번호로 먼저 보고된다" |
+| 승계 규칙 3(겹침)이 U1(시작 절 귀속)보다 먼저 적용됨 | **코드상 사실이며 설계 문제입니다 — 고치지 않았습니다.** `reconcile` 은 identity 불일치 획에 규칙 3(이전 세대 획의 `renderBounds` 겹침)을 규칙 4(첫 control point → `captureRect`)보다 먼저 적용합니다. `.bitmap` 지우개는 규칙 1 이 전부 처리하므로(§7-4) 규칙 3 이 실제로 발동하는 것은 **새 획**뿐이고, 새 획이 이웃 절 잉크의 bounds 와 겹치면(절 경계 근처의 긴 획 · 큰 글씨) 시작 절이 아니라 **이웃 절**에 귀속돼 reflow 때 그 절과 함께 움직입니다. §7-3 의 규칙 순서(1→3→4)와 그 순서를 고정한 테스트 2건("겹침이 동점이면…", "겹침 면적이 다르면…")이 이 동작을 의도로 못 박고 있어 **설계 결정(rev.18)** 이 필요합니다. 제안: 규칙 3 을 규칙 2 의 전제(`randomSeed` 또는 `creationTime` 일치)가 있을 때만 적용하고, 그 밖의 새 획은 규칙 4 로 |
+
+#### 검증
+
+- `CarveFeatureTest` 135건 · `DomainTest` 101건 전량 통과 (iPad mini (A17 Pro) · iOS 26.2). 워크스페이스 전량 **259** (rev.16 237 + 22).
+- 컨트롤러 편집 계약은 `PKCanvasViewDelegate` 메서드를 직접 불러 검증했습니다 — 시뮬레이터에 펜 입력이 없어 **실기기(D9)에서의 확인은 여전히 남아 있습니다.**
+- `DrawingDatabase.testValue` 는 프로세스에서 한 번 만들어진 actor 를 쓰므로, 저장 결과를 다른 context 로 검증하는 테스트는 **그 actor 의 `modelContainer`** 로 검증 context 를 만들어야 합니다 (`@Dependency(\.modelContainer)` 는 테스트마다 새 컨테이너). `DrawingErasePersistenceTesting.emptyDrawingIsPersisted` 는 아직 후자를 써서 실행 순서에 따라 깨질 수 있습니다 — 별도 정리 대상.
+
+#### 남은 위험
+
+- 재시도 횟수(`SaveStatus.failed.retryCount`)는 `.saving` 을 거치며 1 로 돌아옵니다 — 로그용 값이라 두었습니다.
+- N-Canvas 가 v3 행을 편집하면 그 행은 v2 가 되어 다음 폰트 변경 때 reflow 되지 않습니다(legacy 와 같은 무변환 배치). flag on 에서 한 번 편집하면 v3 로 돌아옵니다.
+- 같은 장 안의 재합성(레이아웃 변경) 직전에 커밋된 부분 획은 물러난 세션으로 저장되지만, 화면에는 다음 재조회 때 올라옵니다 (`finishEdit` 이 `reloadWhenSettled` 를 켬).
