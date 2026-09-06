@@ -43,6 +43,7 @@ public struct SettingsView: View {
         List(selection: $store.path.sending(\.push)) {
             Section("앱 설정") {
                 NavigationLink("iCloud 설정", value: SettingsFeature.Path.State.iCloud(.initialState))
+                NavigationLink("필사 캔버스", value: SettingsFeature.Path.State.canvas(.initialState))
             }
             Section("지원") {
                 NavigationLink("의견 보내기", value: SettingsFeature.Path.State.sendFeedback(.initialState))
@@ -60,6 +61,10 @@ public struct SettingsView: View {
         case .iCloud:
             if let store = store.scope(state: \.path?.iCloud, action: \.path.iCloud) {
                 CloudSettingView(store: store)
+            }
+        case .canvas:
+            if let store = store.scope(state: \.path?.canvas, action: \.path.canvas) {
+                CanvasSettingsView(store: store)
             }
         case .sendFeedback:
             if let store = store.scope(state: \.path?.sendFeedback, action: \.path.sendFeedback) {

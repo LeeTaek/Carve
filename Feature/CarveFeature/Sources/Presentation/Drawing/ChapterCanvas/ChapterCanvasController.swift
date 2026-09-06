@@ -40,7 +40,10 @@ final class ChapterPKCanvasView: PKCanvasView {
 ///    획 중간에 적용된다. 미보고 변경은 다음 도구 종료 뒤에 함께 보고한다.
 /// 3. **기하:** 텍스트 컬럼 높이 = 컬럼 자신의 높이(content 높이가 아니다), 헤더는 `contentInset.top` 으로 비운다 (콘텐츠 좌표는 헤더와 무관).
 ///    하단은 safe area 만큼 inset 을 더해 마지막 절이 홈 인디케이터에 가리지 않게 한다 (§5 미결 → `.never` + inset 채택).
-final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
+/// 4. **히스토리 메뉴:** 텍스트 호스트는 터치를 받지 않으므로(`isUserInteractionEnabled = false`) 행별 컨텍스트 메뉴가 닿지 않는다.
+///    대신 캔버스 한 곳의 손가락 롱프레스 → `UIEditMenuInteraction` 메뉴 → `historyRequested(at:)` 로 알리고,
+///    절 판정은 Feature 가 `ChapterLayout.verse(containing:)` 로 한다 (§8-7 rev.16 부록 — (3/3)).
+final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate, UIEditMenuInteractionDelegate {
 
     /// 컨트롤러가 밖으로 알리는 사건. Coordinator 가 Feature 액션으로 옮긴다.
     enum Event {
@@ -50,6 +53,8 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
         case undoStateChanged(canUndo: Bool, canRedo: Bool)
         /// SwiftUI `offsetY` 와 같은 의미의 (이전, 현재) 콘텐츠 상단 y. 맨 위에서 0, 내려가면 음수.
         case scrolled(previous: CGFloat, current: CGFloat)
+        /// 롱프레스 메뉴에서 "이전 필사 내용 보기" 를 골랐다. 좌표는 캔버스 content 좌표.
+        case historyRequested(at: CGPoint)
     }
 
     /// 뷰가 매 업데이트마다 넘기는 표시 상태.
@@ -88,6 +93,10 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
     private var cancelCheckTask: Task<Void, Never>?
     private var lastReportedTop: CGFloat = 0
     private var lastBounds: CGRect = .zero
+    /// 롱프레스 메뉴. 메뉴 항목이 눌리면 `historyMenuPoint` 를 실어 보낸다.
+    private var historyMenuInteraction: UIEditMenuInteraction?
+    private let historyLongPress = UILongPressGestureRecognizer()
+    private var historyMenuPoint: CGPoint?
 
     /// pencil-up 판정용 trailing debounce (CanvasView 와 같은 값).
     private let editSettleInterval: TimeInterval = 0.3
@@ -123,6 +132,37 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
         canvas.insertSubview(host.view, at: 0)
         host.didMove(toParent: self)
         canvas.contentHostView = host.view
+
+        // 히스토리 메뉴 — 손가락 롱프레스만 받는다. 펜슬은 필기용이라 제외 (N-Canvas 의 `touchIgnoringContextMenu(ignoringType: .pencil)` 과 같은 규칙).
+        let interaction = UIEditMenuInteraction(delegate: self)
+        canvas.addInteraction(interaction)
+        historyMenuInteraction = interaction
+        historyLongPress.allowedTouchTypes = [NSNumber(value: UITouch.TouchType.direct.rawValue)]
+        historyLongPress.addTarget(self, action: #selector(handleHistoryLongPress(_:)))
+        canvas.addGestureRecognizer(historyLongPress)
+    }
+
+    // MARK: 히스토리 메뉴 (§8-7)
+
+    @objc private func handleHistoryLongPress(_ recognizer: UILongPressGestureRecognizer) {
+        guard recognizer.state == .began, let interaction = historyMenuInteraction else { return }
+        // 스크롤 뷰의 좌표 = content 좌표. 메뉴도 같은 좌표계로 띄운다.
+        let point = recognizer.location(in: canvas)
+        historyMenuPoint = point
+        interaction.presentEditMenu(with: UIEditMenuConfiguration(identifier: nil, sourcePoint: point))
+    }
+
+    func editMenuInteraction(
+        _ interaction: UIEditMenuInteraction,
+        menuFor configuration: UIEditMenuConfiguration,
+        suggestedActions: [UIMenuElement]
+    ) -> UIMenu? {
+        UIMenu(children: [
+            UIAction(title: "이전 필사 내용 보기") { [weak self] _ in
+                guard let self, let point = self.historyMenuPoint else { return }
+                self.onEvent?(.historyRequested(at: point))
+            }
+        ])
     }
 
     override func viewDidLayoutSubviews() {

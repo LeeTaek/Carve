@@ -32,6 +32,8 @@ public struct SettingsFeature {
     @Reducer(state: .hashable)
     public enum Path {
         case iCloud(CloudSettingsFeature)
+        /// 필사 캔버스 — 단일 Canvas flag 토글 (설계 §13 Phase 3 (3/3)).
+        case canvas(CanvasSettingsFeature)
         case sendFeedback(SendFeedbackFeature)
         case appVersion(AppVersionFeature)
     }

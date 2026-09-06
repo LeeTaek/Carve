@@ -121,6 +121,8 @@ struct ChapterCanvasView: UIViewControllerRepresentable {
                 store.send(.undoStateChanged(canUndo: canUndo, canRedo: canRedo))
             case .scrolled(let previous, let current):
                 onScroll(previous, current)
+            case .historyRequested(let point):
+                store.send(.historyRequested(at: point))
             }
         }
     }

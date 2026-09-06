@@ -106,8 +106,10 @@ enum CanvasTestSupport {
         DrawingLayoutMetadata(baseWritingWidth: 320, baseWritingHeight: 30, baseUnderlineAnchors: [0], layoutSignature: layout.signature)
     }
 
-    static func edit(_ tag: String, reason: EditReason = .ink, generation: Int = composedGeneration) -> CanvasEditSnapshot {
-        CanvasEditSnapshot(drawingData: Data("edit-\(tag)".utf8), dirtyBounds: nil, reason: reason, generation: generation)
+    static func edit(
+        _ tag: String, reason: EditReason = .ink, generation: Int = composedGeneration, dirtyBounds: CGRect? = nil
+    ) -> CanvasEditSnapshot {
+        CanvasEditSnapshot(drawingData: Data("edit-\(tag)".utf8), dirtyBounds: dirtyBounds, reason: reason, generation: generation)
     }
 
     static let newRow = BibleDrawingRowID(raw: "new-row")

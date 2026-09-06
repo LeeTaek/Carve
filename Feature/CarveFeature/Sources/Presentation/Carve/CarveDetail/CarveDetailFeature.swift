@@ -41,17 +41,19 @@ public struct CarveDetailFeature {
         // MARK: Phase 3 — feature flag 뒤 단일 Canvas (설계 §13 Phase 3)
 
         /// 단일 Canvas 경로 사용 여부. 기본 off — flag off 가 §10-3 의 유일한 롤백 수단이다.
-        /// UI 토글은 아직 없다. `defaults write kr.co.carve.leetaek singleCanvasEnabled -bool YES` 또는 Debug 실행 인자 `-SingleCanvas`.
-        @Shared(.appStorage("singleCanvasEnabled")) public var isSingleCanvasEnabled: Bool = false
+        /// 설정 > 필사 캔버스 의 토글(`CanvasSettingsFeature`)이 같은 키에 쓴다. Debug 실행 인자 `-SingleCanvas` 도 같은 효과다.
+        @Shared(.appStorage(SingleCanvasFlag.appStorageKey)) public var isSingleCanvasEnabled: Bool = false
         /// 단일 Canvas 상태. flag off 일 때는 아무 액션도 받지 않는다.
         var chapterCanvas = ChapterCanvasFeature.State(chapter: .initialState)
         /// 외부 진입(차트 등)으로 이동할 절 번호. 단일 Canvas 는 `ScrollViewProxy` 가 없어 절 번호로 스크롤한다.
         var scrollTargetVerse: Int?
+        /// 단일 Canvas 의 절 필사 기록 시트 (§8-7 히스토리 UI, B 구조). 롱프레스 → `ChapterCanvasFeature.Delegate.showHistory` 로 연다.
+        @Presents var chapterHistory: VerseDrawingHistoryFeature.State?
 
         /// flag 또는 Debug 실행 인자로 단일 Canvas 를 쓸지.
         public var usesSingleCanvas: Bool {
             #if DEBUG
-            if ProcessInfo.processInfo.arguments.contains("-SingleCanvas") { return true }
+            if ProcessInfo.processInfo.arguments.contains(SingleCanvasFlag.debugLaunchArgument) { return true }
             #endif
             return isSingleCanvasEnabled
         }
@@ -74,6 +76,8 @@ public struct CarveDetailFeature {
         case scrollToTop
         case setSentence([BibleVerse], [BibleDrawing])
         case setScrollTarget(BibleVerse)
+        /// 단일 Canvas 의 절 필사 기록 시트.
+        case chapterHistory(PresentationAction<VerseDrawingHistoryFeature.Action>)
         
         case view(View)
         case scope(ScopeAction)
@@ -164,7 +168,11 @@ public struct CarveDetailFeature {
                 beginLayoutMeasurement(state: &state, sentences: sentences)
                 // 단일 Canvas 면 팔레트의 undo/redo 는 캔버스가 처리한다 — 팔레트가 SharedUndoManager 값으로 공유 canUndo 를 덮지 않게.
                 state.headerState.palatteSetting.delegatesUndoToCanvas = state.usesSingleCanvas
-                guard state.usesSingleCanvas else { return .none }
+                state.chapterHistory = nil
+                guard state.usesSingleCanvas else {
+                    // flag 를 끄고 돌아온 장 — 단일 Canvas 에 남은 미저장분은 여기서 마저 저장한다 (§8-5).
+                    return state.chapterCanvas.isFullyPersisted ? .none : .send(.scope(.chapterCanvasAction(.flushPending)))
+                }
                 // 단일 Canvas: 본문이 확정된 시점에 조회를 시작한다 (§6-4). 레이아웃은 실측이 끝나면 따로 들어간다.
                 let chapter = sentences.first?.title ?? state.headerState.currentTitle
                 return .send(.scope(.chapterCanvasAction(.load(chapter: chapter, expectedVerseCount: sentences.count))))
@@ -185,8 +193,21 @@ public struct CarveDetailFeature {
                 return forwardLayoutToSingleCanvas(state: &state)
 
             case .view(.appWillResignActive):
-                guard state.usesSingleCanvas else { return .none }
+                // flag 와 무관하게 보낸다 — 방금 flag 를 끈 뒤에도 단일 Canvas 에 미저장분이 남아 있을 수 있다. 없으면 no-op.
                 return .send(.scope(.chapterCanvasAction(.flushPending)))
+
+            case .scope(.chapterCanvasAction(.delegate(.showHistory(let verse)))):
+                state.chapterHistory = VerseDrawingHistoryFeature.State(title: state.chapterCanvas.chapter, verse: verse)
+                return .none
+
+            case .chapterHistory(.presented(.setPresentDrawing(let drawing))):
+                // §8-7 복원 흐름 — ② isPresent 이전은 시트가 이미 DB 에 반영했다. ③ mutation 없이 다시 합성하며,
+                // 그 안에서 ① 미저장분이 먼저 저장된다 (rowID 주소지정이라 이전 활성 행의 변경도 유실되지 않는다).
+                guard let verse = state.chapterHistory?.verse else { return .none }
+                state.chapterHistory = nil
+                return .send(.scope(.chapterCanvasAction(
+                    .verseRowRestored(verse: drawing.verse ?? verse, rowID: BibleDrawingRowID(raw: drawing.rowKey))
+                )))
 
             case .scope(.headerAction(.palatteAction(.view(.undo)))):
                 guard state.usesSingleCanvas else { return .none }
@@ -275,6 +296,9 @@ public struct CarveDetailFeature {
         .forEach(\.sentenceWithDrawingState,
                   action: \.scope.sentenceWithDrawingAction) {
             SentencesWithDrawingFeature()
+        }
+        .ifLet(\.$chapterHistory, action: \.chapterHistory) {
+            VerseDrawingHistoryFeature()
         }
     }
 }

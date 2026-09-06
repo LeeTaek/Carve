@@ -117,6 +117,9 @@ public struct ChapterCanvasFeature {
         var legacyVerses: Set<Int> = []
         /// 디코드하지 못한 행의 절. 활성 행에서 빠져 있어 다음 편집은 새 행으로 간다 (`DrawingCodec`).
         var undecodableVerses: Set<Int> = []
+        /// 마지막 편집 스냅샷의 `dirtyBounds`(content 좌표)와 그 상단이 속한 절. 디버그 오버레이 표시용이며 저장 계산에 쓰지 않는다.
+        var lastDirtyBounds: CGRect?
+        var lastEditedVerse: Int?
 
         // §8-1 편집 계약
         var editRevision = 0
@@ -220,6 +223,15 @@ public struct ChapterCanvasFeature {
         case undoTapped
         case redoTapped
         case scrollToVerse(Int)
+        /// 캔버스를 길게 눌러 그 자리(content 좌표)의 절 필사 기록을 요청 (§8-7 히스토리 UI, B 구조).
+        case historyRequested(at: CGPoint)
+        case delegate(Delegate)
+
+        /// 부모(`CarveDetailFeature`)가 처리하는 사건.
+        public enum Delegate: Equatable, Sendable {
+            /// 이 절의 필사 기록 시트를 열어 달라.
+            case showHistory(verse: Int)
+        }
     }
 
     @Dependency(\.drawingCodec) var codec
@@ -262,9 +274,16 @@ public struct ChapterCanvasFeature {
             case .editEnded(let snapshot):
                 state.isEditing = false
                 var effects: [Effect<Action>] = []
-                if state.session(for: snapshot.generation) != nil {
+                if let session = state.session(for: snapshot.generation) {
                     state.editRevision += 1
                     state.editQueue.append(State.QueuedEdit(revision: state.editRevision, snapshot: snapshot))
+                    state.lastDirtyBounds = snapshot.dirtyBounds
+                    state.lastEditedVerse = snapshot.dirtyBounds.flatMap { bounds in
+                        session.layout.verse(containing: CGPoint(
+                            x: min(max(bounds.minX - session.columnOrigin.x, 0), session.layout.writingWidth),
+                            y: bounds.minY - session.columnOrigin.y
+                        ))
+                    }
                     effects.append(drainEditQueue(state: &state))
                 } else {
                     // 계산할 기준이 없는 세대 — 장이 두 번 바뀌었거나 재합성 뒤에 도착했다. 새 내용 기준으로 처리하면 오저장이다.
@@ -310,6 +329,20 @@ public struct ChapterCanvasFeature {
                 state.scrollRequestToken += 1
                 state.scrollRequest = State.ScrollRequest(verse: verse, token: state.scrollRequestToken)
                 return .none
+
+            case .historyRequested(let point):
+                // 표시 중인 레이아웃(합성 시점 값)으로 절을 찾는다. 텍스트 쪽(컬럼 왼쪽)을 눌러도 같은 행이 되도록 x 만 컬럼 안으로 당긴다.
+                guard state.isInputEnabled, let layout = state.renderedLayout else { return .none }
+                let origin = state.renderedColumnOrigin
+                let layoutPoint = CGPoint(
+                    x: min(max(point.x - origin.x, 0), layout.writingWidth),
+                    y: point.y - origin.y
+                )
+                guard let verse = layout.verse(containing: layoutPoint) else { return .none }
+                return .send(.delegate(.showHistory(verse: verse)))
+
+            case .delegate:
+                return .none
             }
         }
     }
@@ -342,6 +375,8 @@ extension ChapterCanvasFeature {
         state.layoutMismatchVerses = []
         state.legacyVerses = []
         state.undecodableVerses = []
+        state.lastDirtyBounds = nil
+        state.lastEditedVerse = nil
         state.baselineData = nil
         state.isEditing = false
         state.isReloading = false

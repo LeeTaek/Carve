@@ -98,7 +98,13 @@ public struct CarveDetailView: View {
 
     #if DEBUG
     /// 마지막 편집 절의 drawing bounds 를 콘텐츠 좌표로 옮긴 값. 절 캔버스 로컬 좌표에 실측 frame 원점을 더한다.
+    ///
+    /// 단일 Canvas 는 `CanvasEditSnapshot.dirtyBounds`(캔버스 content 좌표 = 컬럼 좌표)를 그대로 쓴다 — 장 전체 잉크의 bounds 다.
     private var lastEditForOverlay: (verse: Int, bounds: CGRect)? {
+        if store.usesSingleCanvas {
+            guard let bounds = store.chapterCanvas.lastDirtyBounds else { return nil }
+            return (store.chapterCanvas.lastEditedVerse ?? 0, bounds)
+        }
         guard let id = store.lastEditedVerseID,
               let row = store.sentenceWithDrawingState[id: id],
               let local = row.canvasState.lastDrawingBounds,
@@ -143,6 +149,10 @@ public struct CarveDetailView: View {
                 }
                 // scenePhase 훅은 여기 두지 않는다 — 사이드바가 열리면 이 뷰가 트리에서 빠져 훅이 돌지 않는다.
                 // 항상 트리에 있는 CarveNavigationView 가 appWillResignActive 를 보낸다 (§8-5).
+                .onChange(of: store.usesSingleCanvas) { _, _ in
+                    // 설정 토글(또는 defaults write)로 경로가 바뀌면 현재 장을 새 경로로 다시 불러온다.
+                    send(.fetchSentence)
+                }
                 .onChange(of: container.size.width, initial: true) { _, width in
                     let half = width / 2
                     guard half > 0, half != halfWidth else { return }
@@ -275,6 +285,10 @@ public struct CarveDetailView: View {
             // N-Canvas 의 setProxy → scrollToTop 과 같은 자리. 장 전환·딥링크(setScrollTarget)의 스크롤 요청을 여기서 낸다.
             // 레이아웃이 아직 없으면 컨트롤러가 요청을 들고 있다가 layout 이 오면 수행한다.
             store.send(.scrollToTop)
+        }
+        // 절 필사 기록 — N-Canvas 는 행마다 시트를 갖지만 B 구조는 캔버스 한 곳의 롱프레스가 절을 골라 여기서 연다 (§8-7).
+        .sheet(item: $store.scope(state: \.chapterHistory, action: \.chapterHistory)) { store in
+            VerseDrawingHistoryView(store: store)
         }
     }
 
