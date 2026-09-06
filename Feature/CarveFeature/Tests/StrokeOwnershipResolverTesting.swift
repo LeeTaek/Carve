@@ -321,14 +321,41 @@ struct StrokeOwnershipReconcileTesting {
 
     // MARK: 규칙 3 — 공간 겹침 fallback 과 결정성
 
-    /// 이전 세대 획 2개와, 그 둘 사이를 세로로 가로지르는 새 획 하나.
-    private func overlapScenario(tallSecond: Bool) -> (previous: [PKStroke], candidate: PKStroke) {
+    /// 이전 세대 획 2개와, 그 둘 사이를 세로로 가로지르는 획 하나.
+    ///
+    /// 후보는 `creationTime` 을 첫 획과 공유한다 — "같은 논리적 획의 변형" 이라는 규칙 2 의 전제가 있어야 규칙 3 이 적용된다 (rev.19).
+    /// `fresh: true` 면 seed 도 creationTime 도 새것인 **새 획**이라 규칙 3 을 건너뛰고 규칙 4(U1)로 간다.
+    private func overlapScenario(tallSecond: Bool, fresh: Bool = false) -> (previous: [PKStroke], candidate: PKStroke) {
         let first = OwnershipTestSupport.stroke(from: CGPoint(x: 100, y: 100), to: CGPoint(x: 200, y: 100), seed: 11, creationTime: 1_000)
         let second = tallSecond
             ? OwnershipTestSupport.stroke(from: CGPoint(x: 100, y: 280), to: CGPoint(x: 200, y: 320), seed: 22, creationTime: 2_000)
             : OwnershipTestSupport.stroke(from: CGPoint(x: 100, y: 300), to: CGPoint(x: 200, y: 300), seed: 22, creationTime: 2_000)
-        let candidate = OwnershipTestSupport.stroke(from: CGPoint(x: 140, y: 60), to: CGPoint(x: 140, y: 340), seed: 33, creationTime: 3_000)
+        let candidate = OwnershipTestSupport.stroke(
+            from: CGPoint(x: 140, y: 60), to: CGPoint(x: 140, y: 340), seed: 33, creationTime: fresh ? 3_000 : 1_000
+        )
         return ([first, second], candidate)
+    }
+
+    @Test("새 획은 이전 획과 겹쳐도 시작 절에 귀속된다 — 규칙 3 은 seed·creationTime 부분 일치가 있을 때만 (U1 · rev.19)")
+    func freshStrokeKeepsStartingVerseEvenWhenOverlapping() {
+        let tall = OwnershipTestSupport.uniformLayout(verseCount: 5, lineSpace: 100)
+        let (previous, candidate) = overlapScenario(tallSecond: true, fresh: true)
+        #expect(overlapArea(candidate, previous[1]) > 0)
+
+        var map: [StrokeIdentityKey: Int] = [:]
+        map[StrokeIdentityKey(stroke: previous[0])] = 5
+        map[StrokeIdentityKey(stroke: previous[1])] = 4
+        let ownership = resolver.reconcile(
+            previous: OwnershipSnapshot(map: map, layoutSignature: tall.signature),
+            previousDrawing: PKDrawing(strokes: previous),
+            drawing: PKDrawing(strokes: previous + [candidate]),
+            layout: tall
+        )
+
+        // 이전 구현은 겹침(규칙 3)으로 v4 를 줬다. 앵커 (140, 60) 은 v1 이다.
+        #expect(ownership.owner(of: candidate) == 1)
+        #expect(ownership.owner(of: previous[0]) == 5)
+        #expect(ownership.owner(of: previous[1]) == 4)
     }
 
     private func overlapArea(_ lhs: PKStroke, _ rhs: PKStroke) -> CGFloat {

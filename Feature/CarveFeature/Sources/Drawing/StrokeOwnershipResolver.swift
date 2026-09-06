@@ -74,14 +74,19 @@ struct StrokeOwnershipResolver: Sendable {
     /// 1. `StrokeIdentityKey` 완전 일치 → 기존 owner 승계.
     ///    S1-2/S1-4 실측상 **bitmap 지우개 경로는 전부 여기서 해결된다.**
     ///    조각들은 원본과 같은 키를 가지므로 자동으로 같은 owner 를 받는다.
-    /// 2. *(설계의 2번 규칙 — 이 구현에서는 생략)* `randomSeed` 또는 `creationTime` 일치 + 유사도 승계.
-    ///    → 아래 "2번 규칙을 생략한 근거" 참조.
-    /// 3. 공간적으로 가장 많이 겹치는 owner 승계 — fallback.
+    /// 2. *(설계의 2번 규칙 — 유사도 판정은 생략)* `randomSeed` **또는** `creationTime` 이 이전 세대의 어떤 획과 일치하면
+    ///    "같은 논리적 획의 변형" 으로 보고 **3번으로 넘긴다.** 유사도 임계값 대신 3번의 겹침이 그 역할을 한다.
+    /// 3. 2번의 전제가 있는 획에 한해, 이전 세대 획과 공간적으로 가장 많이 겹치는 owner 승계.
     ///    `.vector` 지우개 전환이나 예외 상황용이다.
-    /// 4. 대응 없음 → 첫 control point 의 `captureRect` 로 신규 귀속 (§7-1).
+    /// 4. 그 밖(= **새 획**) → 첫 control point 의 `captureRect` 로 신규 귀속 (§7-1, U1).
     ///
-    /// ### 2번 규칙을 생략한 근거
-    /// 2번은 "부분 일치 + **유사도가 높음**" 이라는 임계값을 요구한다. 그런데
+    /// ### 3번을 2번의 전제 위에서만 적용하는 이유 (rev.19)
+    /// 이전 구현은 identity 가 맞지 않는 모든 획에 3번을 4번보다 먼저 적용했다. 그런데 `.bitmap` 지우개는 1번이 전부 처리하므로
+    /// 3번이 실제로 발동하는 것은 **새 획**뿐이었고, 새 획이 이웃 절 잉크의 `renderBounds` 와 겹치면(절 경계 근처의 긴 획 · 큰 글씨)
+    /// 시작 절이 아니라 **이웃 절**에 귀속돼 reflow 때 그 절과 함께 움직였다 — U1("시작한 절에 속한다")의 위반이다.
+    /// 새 획은 seed 도 creationTime 도 새것이라 2번의 전제가 없고, 곧바로 4번으로 간다.
+    ///
+    /// ### 2번의 유사도 판정을 생략한 근거
     /// - S1-4 실측(§19-2)에서 지우개 전후로 `randomSeed` / `creationDate` / `path.count` 는 물론
     ///   control point 10개의 값까지 전부 불변이었다. 즉 `.bitmap` 경로는 1번이 100% 처리한다.
     /// - 1번이 실패하는 경우는 키 구성요소 중 하나 이상이 실제로 달라진 경우인데,
@@ -108,6 +113,7 @@ struct StrokeOwnershipResolver: Sendable {
         layout: ChapterLayout
     ) -> OwnershipSnapshot {
         let previousGeometry = ownerGeometry(of: previousDrawing, ownership: previous)
+        let previousIdentities = PartialIdentityIndex(previousDrawing)
         let groups = groupByIdentity(drawing)
 
         var resolved: [StrokeIdentityKey: Int] = [:]
@@ -115,10 +121,11 @@ struct StrokeOwnershipResolver: Sendable {
         for group in groups {
             if let inherited = previous.owner(of: group.key) {
                 resolved[group.key] = inherited                                  // 규칙 1
-            } else if let overlapped = overlapOwner(of: group.strokes, in: previousGeometry) {
+            } else if previousIdentities.partiallyMatches(group.key),           // 규칙 2 의 전제
+                      let overlapped = overlapOwner(of: group.strokes, in: previousGeometry) {
                 resolved[group.key] = overlapped                                 // 규칙 3
             } else if let fresh = freshOwner(of: group.strokes, in: layout) {
-                resolved[group.key] = fresh                                      // 규칙 4
+                resolved[group.key] = fresh                                      // 규칙 4 (U1)
             }
             // 어느 규칙에도 걸리지 않으면(앵커가 캔버스 밖 등) map 에 넣지 않는다.
             // "조회 실패 = 소유자 없음" 이며, 0 같은 대체값을 만들지 않는다.
@@ -127,6 +134,29 @@ struct StrokeOwnershipResolver: Sendable {
     }
 
     // MARK: - 내부 구현
+
+    /// 이전 세대 획들의 `randomSeed` · `creationTime` 집합 — 규칙 2 의 전제("같은 논리적 획의 변형인가") 판정용.
+    ///
+    /// 여기서도 열거는 `drawing.strokes` 다 (§7-2). 새 획은 seed 도 creationTime 도 새것이라 어느 쪽에도 없다.
+    private struct PartialIdentityIndex {
+        private let seeds: Set<UInt32>
+        private let creationTimes: Set<TimeInterval>
+
+        init(_ drawing: PKDrawing) {
+            var seeds: Set<UInt32> = []
+            var creationTimes: Set<TimeInterval> = []
+            for stroke in drawing.strokes {
+                seeds.insert(stroke.randomSeed)
+                creationTimes.insert(stroke.path.creationDate.timeIntervalSince1970)
+            }
+            self.seeds = seeds
+            self.creationTimes = creationTimes
+        }
+
+        func partiallyMatches(_ key: StrokeIdentityKey) -> Bool {
+            seeds.contains(key.randomSeed) || creationTimes.contains(key.creationTime)
+        }
+    }
 
     /// 같은 `StrokeIdentityKey` 를 공유하는 stroke 묶음.
     private struct IdentityGroup {
