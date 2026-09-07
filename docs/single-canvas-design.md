@@ -1,8 +1,12 @@
 # CarveFeature 단일 Canvas 전환 설계
 
-> **상태 (rev.19):** Phase 0A~3 **구현 완료.** 단일 Canvas 는 feature flag `singleCanvasEnabled` 뒤에 있고 **기본 off** 입니다.
+> **상태 (rev.20):** Phase 0A~3 **구현 완료.** 단일 Canvas 는 feature flag `singleCanvasEnabled` 뒤에 있고 **기본 off** 입니다.
 > 남은 것은 **실기기 검증 D9** (기본 활성화·배포 판단의 선행 조건, §16) 와 **Phase 4** (구 구조 제거) 입니다.
-> 회귀 기준선 **265** (§19-4-2). 대상: `Feature/CarveFeature`, `Feature/SettingsFeature`, `Domain`.
+> D9 의 실행 절차와 기록 양식은 [런북 §6-9 · §8-7](./phase-0a-d-device-test.md) (rev.5) 에 있습니다.
+>
+> ⛔ **D9 진행 중 레이아웃 결함 2건이 나왔습니다.** R16 은 종결됐고 **R13 이 남아 기본 활성화를 막습니다** (§16 · 런북 §8-7).
+> **필기 검증(D9-1)은 두 건이 닫힐 때까지 보류**입니다 — 잉크가 잘못된 절에 귀속되고, 그것을 저장 경로 결함으로 오진하게 됩니다.
+> 회귀 기준선 **267** (§19-4-2). 대상: `Feature/CarveFeature`, `Feature/SettingsFeature`, `Domain`.
 >
 > **읽는 법.** §1~§17 이 설계이고 §18~§20 은 실측·변경 기록입니다. 절 번호는 코드 주석과 AGENTS.md 가 참조하므로 **바꾸지 않습니다.**
 > 결정이 끝난 항목은 결정만 남기고 논의 과정은 지웠습니다 (rev.19 정리). 과정이 필요하면 git 이력(`git log -- docs/single-canvas-design.md`)을 보십시오.
@@ -20,6 +24,7 @@
 | 17 | (2/3) 리뷰 결함 15건 수정 — 편집 세대 · 재합성 출구 · v3 행 호환 | §20-10 |
 | 18 | (3/3) — 히스토리 메뉴 재설계 · 설정 토글 | §20-11 |
 | 19 | 승계 규칙 3 을 규칙 2 의 전제 위에서만 적용 (U1 보장) · 문서 정리 | §7-3 · §20-12 |
+| 20 | **D9 실기기 검증에서 레이아웃 결함 2건** — 절당 0.5pt 누적(R13) · 장 전환 시 컬럼 신장(R16) | §11 · §15 · §16 · §20-13 |
 
 ---
 
@@ -756,6 +761,35 @@ residual = (point 의 window 좌표) − viewportOriginInWindow + contentOffset 
 
 **S4 와 다른 점** — S4 는 컬럼 폭을 명시적으로 넘겼고, 제품 코드는 Phase 2 의 `GeometryReader` 경로를 그대로 쓰며 컬럼 높이는 `onGeometryChange` 로 잽니다.
 
+#### ⛔ D9 결함 — 텍스트 컬럼은 **절대 세로로 늘어나면 안 됩니다** (R16)
+
+**컬럼 상단이 레이아웃 좌표계의 원점이고 컬럼 높이가 곧 좌표 스케일입니다.** 컬럼이 늘어나면 잉크 좌표계 자체가 깨집니다.
+
+실기기에서 **긴 장 → 짧은 장** 전환(창세기 1장 31절 → 2장 25절)만으로 마지막 절이 **1335.78pt** 어긋났고 자가 복구되지 않았습니다. 고리는 이렇습니다:
+
+```
+columnHeight 가 장 전환에 초기화되지 않음 (컨트롤러는 장을 넘어 생존)
+   → 짧은 장의 호스트 frame 이 이전 장의 큰 높이를 가짐
+   → 컬럼 루트가 maxHeight: .infinity 라 초과 높이가 컬럼에 제안됨
+   → 행의 underLineView(maxHeight: .infinity)가 흡수해 행이 실제로 늘어남
+   → 늘어난 컬럼을 다시 재도 높이가 같아 setColumnHeight 가드에 걸림  ★ 안정 고정점
+```
+
+**N-Canvas 는 무사합니다** — `ScrollView` 가 무한 높이를 제안해 초과분 자체가 없습니다. 즉 이것은 **B 구조 호스팅 고유의 함정**입니다.
+
+`updateContentGeometry` 의 주석이 인접한 함정(“content 높이로 늘리면 세로 중앙 배치”)을 이미 알고 있었지만, 중앙 배치를 `alignment: .top` 으로 막았을 뿐 **초과 높이 자체는 남아 있었습니다.** 규칙을 다음과 같이 못박습니다.
+
+> **컬럼은 항상 자기 이상적 높이를 갖는다.** 호스트 frame 이 더 커도 컬럼이 그 높이를 먹지 않는다.
+> 호스트 frame 계산에 쓰는 컬럼 높이는 **현재 장의 것**이어야 한다.
+
+**수정 (rev.20).** `ChapterCanvasView.hostedColumn(_:reportHeight:)` 로 호스트 컬럼 조합을 모으고, `column` 에 **`.fixedSize(horizontal: false, vertical: true)` 를 `.onGeometryChange` 보다 안쪽에** 걸었습니다. 컬럼이 어떤 제안을 받아도 자기 이상적 높이를 보고하므로 되먹임 고리가 구조적으로 사라집니다. 바깥 `.frame(maxHeight: .infinity, alignment: .top)` 은 유지 — 호스트가 더 커도 상단에 붙어야 합니다.
+
+`columnHeight` 리셋은 **넣지 않았습니다.** 쓸 수 있는 신호(`Configuration.layout?.chapter`)가 원리적으로 늦기 때문입니다 — 장 전환 리듀서가 `layout` 을 nil 로 지우고 새 값은 실측 완료 뒤에 오므로, 리셋이 필요한 창이 정확히 `layout == nil` 구간입니다. nil 을 "장 바뀜" 으로 취급하면 정상 구간에서 리셋이 튀는 새 실패 모드가 생깁니다. `fixedSize` 가 있으면 낡은 `columnHeight` 도 다음 측정에서 곧바로 수렴합니다.
+
+**행 뷰는 건드리지 않았습니다** — `underLineView` 의 `maxHeight: .infinity` 는 N-Canvas 와 공유라 그대로입니다.
+
+절차·기록은 [런북 §8-7 R16](./phase-0a-d-device-test.md).
+
 ---
 
 ## 12. 결정사항
@@ -874,6 +908,43 @@ residual = (point 의 window 좌표) − viewportOriginInWindow + contentOffset 
 >
 > **TestStore 주의:** TCA 1.20.2 + Xcode 26.3 에서 `receive` 가 기대 액션을 못 받으면 issue 기록 경로에서 xctest 가 `EXC_BAD_ACCESS` 로 죽고 나머지가 재시작된 프로세스에서 돕니다. 크래시는 증상이고 원인은 그 위의 ✘ 단언입니다. 비exhaustive 스토어는 다음 `send` 전에 미수신 액션을 자동 소비하므로 "나중에 도착하는 결과" 는 `RepositorySpy.holdNextLoadCall / holdNextApply` 게이트로 순서를 강제합니다. `DrawingDatabase.testValue` 는 프로세스에서 한 번 만들어진 actor 를 쓰므로, 저장 결과를 다른 context 로 검증하려면 **그 actor 의 `modelContainer`** 로 검증 actor 를 만듭니다.
 
+### D9 결함 대응 테스트안 (rev.20)
+
+두 결함 모두 **기존 테스트가 놓칠 수밖에 없는 자리**에 있었습니다. 무엇을 못 잡았는지부터 정리합니다.
+
+| 결함 | 왜 안 잡혔나 | 고정할 방법 |
+|---|---|---|
+| **R13** 행 높이 예측 | `ChapterLayoutBuilderTesting` 은 빌더를 **합성 입력**으로만 검증합니다. "빌더의 모델 = SwiftUI 의 실제 렌더" 는 **뷰 계층과의 통합 성질**이라 순수 단위 테스트로 잡을 수 없습니다 | ① `VerseLayoutInput` 에 실측 높이를 additive 로 넣고, **fallback 예측과 실측이 다를 때 실측이 이긴다**를 빌더 테스트로 고정 ② 실측이 없을 때 기존 식으로 떨어지는 것도 고정 ③ `captureRect` 경계가 새 높이로도 빈틈·겹침 없이 분할되는지 (기존 불변식 재확인) |
+| **R16** 컬럼 신장 | `ChapterCanvasControllerTesting` 의 "호스트 frame" 테스트는 **한 장 안에서만** 봅니다. 장 전환 **시퀀스**가 없었습니다 | ④ **긴 장 → 짧은 장 시퀀스**에서 `contentFrame.height` 가 이전 장 높이를 물려받지 않는다 ⑤ 호스트가 컬럼보다 커도 컬럼이 그 높이를 먹지 않는다 ⑥ 뷰포트보다 짧은 장에서 세로 중앙 배치가 일어나지 않는다 (기존 주석이 경계하는 함정) |
+
+#### 일반화 — 컨트롤러의 **이월 상태**를 감사해야 합니다
+
+`columnHeight` 는 한 사례일 뿐입니다. `ChapterCanvasController` 는 장 전환에도 **살아남고**, "밖에서 들어온 값을 캐시하고 `!=` 가드로 중복 적용을 막는" 프로퍼티가 여럿 있습니다. 그 패턴은 전부 같은 방식으로 낡을 수 있습니다.
+
+| 프로퍼티 | 장 전환 시 검토할 것 |
+|---|---|
+| **`columnHeight`** | ★ R16 본체 |
+| `appliedScrollToken` | 새 장의 첫 `scrollToTop` 토큰이 같은 값이면 **요청이 무시**될 수 있다 |
+| `appliedUndoVersion` · `appliedRedoVersion` | 새 장에서 버전이 리셋되면 요청 1회가 누락되거나 중복될 수 있다 |
+| `appliedRevision` | 세대 비교의 기준. Feature 쪽 리셋 규칙과 짝이 맞는지 |
+| `isPerformingHistory` · `historyMenuPoint` | 전환 중 남으면 **다른 장의 절**에 적용될 수 있다 |
+| `lastReportedTop` · `lastBounds` | 새 장의 첫 보고가 스킵될 수 있다 |
+| `hasUnreportedChange` · `unreportedReason` | **의도적 이월** (§8-1 교체 직전 flush). 감사 대상이지만 바꾸면 안 된다 |
+
+> **테스트 형태의 제안:** 개별 프로퍼티마다 테스트를 쓰기보다, **"장 A 를 적용 → 장 B 를 적용" 시퀀스를 한 번 태우고 B 의 관측 가능한 기하·요청이 A 와 무관함을 확인**하는 테스트를 하나 두는 편이 낫습니다. 새 이월 상태가 생겨도 같은 테스트가 잡습니다.
+
+#### 게이트는 Δ 를 보지 않습니다 — 그대로 둘지 결정이 필요합니다
+
+`ChapterLayoutMeasurement.isReady` 는 절 개수만 확인하므로, **Δ 가 87.5pt 여도 `gate PASS` 이고 입력이 열립니다.** 그 상태의 필기는 잘못된 절에 귀속됩니다 (G3 위반).
+
+| 선택지 | 평가 |
+|---|---|
+| 그대로 둔다 | 지금 상태. 결함이 **조용히** 잘못된 데이터를 만든다 |
+| Δ 를 게이트에 넣는다 | ❌ 위험 — 오탐 하나로 **장 전체가 필기 불가**가 된다 (§15 리스크) |
+| **Debug 에서 시끄럽게 알린다 + 한 줄 이상 어긋날 때만 게이트** | ✅ **권장.** 허용치 초과는 로그·계측으로 남기고, `Δ > lineSpace`(귀속이 확실히 틀어지는 크기)일 때만 입력을 막는다 |
+
+셋째 안을 택하면 R13 이 남아 있어도 **잘못된 데이터가 조용히 쌓이지는 않습니다.** 다만 이것은 **결함의 대체재가 아니라 안전망**입니다.
+
 ### 라운드트립 판정 기준
 
 "비트 단위 동일" 은 너무 강합니다 (`dataRepresentation()` 이 canonical 이라는 보장이 없음). stroke 수 / control point 수 · 좌표와 bounds(허용 오차) · ink · transform · `randomSeed` 를 비교합니다. 프레임워크는 Swift Testing.
@@ -895,6 +966,8 @@ residual = (point 의 window 좌표) − viewportOriginInWindow + contentOffset 
 | `.named` 좌표 공간이 중첩 호스팅 안에서 조용히 `.global` 로 대체됨 | 행 frame 2분할 측정. Δ 검증은 출시 구성에서 (§6-1) |
 | 단일 Canvas 의 편집·저장 경로가 시뮬레이터에서 실행되지 않음 | flag 기본 off. **D9 전에는 활성화하지 않음** |
 | 손가락 롱프레스가 `allowFingerDrawing` 의 그리기 제스처와 겹침 (가만히 0.5 s 누르면 메뉴 + 점) | N-Canvas 의 행별 메뉴도 같은 조건. D9 에서 확인 |
+| ⛔ **빌더가 행 높이를 예측한다** (`lineCount × lineSpace`) — 파이프라인에서 유일하게 실측이 아닌 값. 실기기(iOS 27)에서 절당 0.5pt 어긋나 176절에서 87.5pt 누적 (R13) | **미해결.** 뷰의 `lineSpacing`/`lineGapPadding` 조합이 실수 연산으로만 `N × lineSpace` 와 일치하고 픽셀 스냅에서 깨진다. **OS 판올림마다 재발할 구조** |
+| **B 구조에서 텍스트 컬럼이 세로로 늘어날 수 있다** — 장 전환 시 1335pt 어긋남 (R16, §11) | ✅ **`fixedSize` 로 고정 · 실기기 4건 통과 (rev.20).** 컬럼 높이가 좌표 스케일이므로 이 불변식은 앞으로도 지켜야 한다 |
 | N-Canvas 가 v3 행을 편집하면 v2 가 되어 다음 폰트 변경 때 reflow 되지 않음 | flag on 에서 한 번 편집하면 v3 로 복귀 |
 | CloudKit 스키마 승격 순서 (§10-1-a) | 기본 활성화 전 dev 저장 → promote |
 
@@ -927,7 +1000,9 @@ residual = (point 의 window 좌표) − viewportOriginInWindow + contentOffset 
 
 | ID | 내용 |
 |---|---|
-| **D9** | **단일 Canvas 실기기 검증** — flag on 으로 시편 119편 필기 → 저장 → 재실행 복원 · 지우개 / undo · 장 전환 flush · 손가락 롱프레스 → 메뉴 → 히스토리 시트 → 회차 복원 · 설정 토글로 경로 전환 뒤 장 재로드 · flag off 로 돌아가 N-Canvas 가 같은 데이터를 표시하는지 (§14 16) · 잉크 있는 장의 렌더 · 진입/스크롤 footprint 를 §18-3-a 절차로. §11 기준 2 (fling) · 5 (탭/롱프레스). **기본 활성화의 선행 조건** |
+| ⛔ **R13** | **절당 0.5pt 누적** — 빌더가 행 높이를 `lineCount × lineSpace` 로 **예측**한다. 시편 119편 87.50pt · 창세기 1장 15.00pt (= (N−1) × 0.5). 방향·폰트·경로 무관, **장 길이에 선형.** 시뮬레이터(iOS 26.2) 0.00 / 실기기(iOS 27.0 beta) 0.5. 게이트가 Δ 를 보지 않으므로 **입력이 열린 채로** 하단 절이 잘못 귀속된다 |
+| ✅ **R16 (종결)** | **장 전환 시 텍스트 컬럼 신장** — `columnHeight` 미초기화 → 이전 장의 큰 높이가 호스트 frame → 행이 초과분을 흡수 → 1335.78pt 어긋남, 자가 복구 불가 (§11). **Phase 3 단일 Canvas 전용** |
+| **D9** | **절차: [런북 §6-9](./phase-0a-d-device-test.md) · 기록: 런북 §8-7.** **단일 Canvas 실기기 검증** — flag on 으로 시편 119편 필기 → 저장 → 재실행 복원 · 지우개 / undo · 장 전환 flush · 손가락 롱프레스 → 메뉴 → 히스토리 시트 → 회차 복원 · 설정 토글로 경로 전환 뒤 장 재로드 · flag off 로 돌아가 N-Canvas 가 같은 데이터를 표시하는지 (§14 16) · 잉크 있는 장의 렌더 · 진입/스크롤 footprint 를 §18-3-a 절차로. §11 기준 2 (fling) · 5 (탭/롱프레스). **기본 활성화의 선행 조건** |
 | D7 나머지 | 기기 2대가 필요한 미러링 항목 2건 · §10-1-a 승격 절차 |
 | 기기 사각지대 | 보유 기기(iPad mini A17 Pro · iPad Air M2)는 60Hz · 8GB. ProMotion 과 저메모리 iPad 는 TestFlight 베타에서 |
 | 코드 외부 | 1.2.0 배포 기간의 절대좌표 데이터 실존 여부 — App Store Connect 이력으로만 확인됨 |
@@ -949,6 +1024,7 @@ residual = (point 의 window 좌표) − viewportOriginInWindow + contentOffset 
 - [x] 승계 규칙 3 은 규칙 2 의 전제 위에서만 — 새 획은 시작 절 (rev.19)
 - [x] 단일 Canvas 는 flag 뒤, 기본 off — 설정 토글 · v3 행의 N-Canvas 호환 · 히스토리 메뉴
 - [ ] §8-5 장 전환 요청/승인 흐름 — 미구현 (현재는 flush + 물러난 세션)
+- [ ] **R13 · R16 수정** (§16) — 기본 활성화의 선행 조건
 - [ ] 실기기 **D9** → 기본 활성화 판단 → Phase 4
 
 ---
@@ -1084,7 +1160,8 @@ peak **363.6 MB** · 최종 정지 **109.7 MB** · CPU > 90% 샘플 47 / 188. **
 | 16 | 237 | 저장 계층 13 · 코덱 11 · 리듀서 10 |
 | 17 | 259 | 결함 수정 22 |
 | 18 | 264 | (3/3) 5 |
-| **19** | **265** | 승계 규칙 3 전제 1. **현재 기준선** — CarveFeatureTest 140 · DomainTest 101 (XCTest 2 포함) · SettingsFeatureTest 4 · ChartFeatureTest 9 · CarveToolkitTest 6 · UIComponentsTest 3 |
+| 19 | 265 | 승계 규칙 3 전제 1 |
+| **20** | **267** | R16 회귀 2 (장 전환 컬럼 신장). **현재 기준선** — CarveFeatureTest 142 · DomainTest 101 (XCTest 2 포함) · SettingsFeatureTest 4 · ChartFeatureTest 9 · CarveToolkitTest 6 · UIComponentsTest 3 |
 
 로그의 `error:` 는 런타임 노이즈입니다 (PencilKit 필기인식 권한 `com.apple.corehandwriting -1003`, CoreData persistent history 정리). rev.16 클린 빌드에서 `UIComponentsTest` 의 테스트 타깃 의존성 누락을 고쳤습니다.
 
@@ -1277,3 +1354,20 @@ v3 행을 N-Canvas 가 첫 밑줄만큼 내려 표시하고 편집하면 v2 로 
 **수정 (`df15ba45`).** `StrokeOwnershipResolver.reconcile` 이 이전 세대 획의 `randomSeed` · `creationTime` 집합(`PartialIdentityIndex`)을 만들고, **부분 일치가 있는 획에만** 규칙 3 을 적용합니다. 그 밖은 규칙 4 (첫 control point). 규칙 3 의 기존 테스트 2건은 후보가 `creationTime` 을 공유하도록 바꿨고, "새 획은 이전 획과 겹쳐도 시작 절에 귀속된다" 를 추가했습니다. 전량 265.
 
 **문서 정리.** 절 번호를 유지한 채 결정이 끝난 논의 과정 · rev 별 정정 문구 · 초안 시점의 State/DTO 코드 블록 · 중복 기록을 걷어내고 결정과 실측 사실만 남겼습니다 (3,760 → 약 1,280 줄). 과정은 git 이력에 있습니다.
+
+### 20-13. D9 실기기 검증 — 레이아웃 결함 2건 (rev.20)
+
+Phase 3 이후 처음으로 **제품 코드의 단일 Canvas 경로를 실기기에서** 봤습니다 (iPad mini A17 Pro · iOS 27.0 beta · USB). 필기(D9-1)에 들어가기 전 스모크에서 결함 2건이 나왔고, **둘 다 시뮬레이터에서는 드러나지 않았습니다.**
+
+| ID | 결함 | 범위 | 상태 |
+|---|---|---|---|
+| **R13** | 빌더가 행 높이를 `lineCount × lineSpace` 로 예측 → 절당 0.5pt 어긋나 선형 누적 (176절 87.50pt) | Phase 2 공용 (N-Canvas·단일 Canvas 동일) | 미해결 |
+| **R16** | `columnHeight` 미초기화 → 장 전환 시 컬럼이 초과 높이를 흡수해 신장 (1335.78pt, 자가 복구 불가) | **Phase 3 단일 Canvas 전용** | ✅ **종결** — 수정 (§11) · 실기기 4건 통과 |
+
+**R16 수정과 회귀 테스트.** `hostedColumn` 의 `fixedSize` 한 줄이 본체이고, 회귀 2건을 붙여 기준선이 265 → **267** 이 됐습니다. 테스트는 **출하 조합(`ChapterCanvasView.hostedColumn`)을 그대로 호출**하고 `UIWindow` 에 올려 실제 SwiftUI 배치를 돌립니다 — `.fixedSize` 를 일시 제거하면 컬럼이 300 대신 1,175 로 늘어나 두 건 모두 실패하는 것을 확인했습니다.
+
+**기존 테스트가 놓친 이유가 사각지대를 가리킵니다.** 기존 기하 테스트는 `setColumnHeight` 를 **직접 호출해** `contentFrame` 만 확인했습니다 — 컬럼을 실제로 배치·측정하지 않으니 "컬럼이 제안된 높이만큼 늘어나 같은 값을 되보고한다" 는 되먹임 고리가 테스트 경로에 아예 없었습니다. → **SwiftUI 호스팅을 실제로 돌리지 않는 기하 테스트 전반**이 같은 사각지대입니다 (§14).
+
+**R13 의 구조적 논점.** 측정 파이프라인은 줄 수·밑줄 위치·소제목 높이·컬럼 폭을 전부 **실측**하는데 **행 높이만 예측**입니다. 그 예측은 뷰의 `lineSpacing = lineSpace − font.lineHeight` · `lineGapPadding = (lineSpace − font.lineHeight) / 2` 조합이 실수 연산으로 정확히 `N × lineSpace` 가 되는 것에 의존합니다. 수식은 맞지만 **SwiftUI 가 픽셀 그리드에 스냅하면 깨집니다.** 시뮬레이터 iOS 26.2 에서 0.00 이던 것이 실기기 iOS 27.0 beta 에서 0.5 로 나타났습니다 — **OS 판올림마다 재발할 구조**입니다. 수정 방향은 `VerseLayoutInput` 에 실측 높이를 additive 로 추가하고 빌더가 있으면 그것을 쓰는 것입니다 (Pass 2 의 band 모델은 `lineSpace` 유지 — reflow §9-2 무영향).
+
+**R15 — 계측이 값을 했습니다.** Phase 2 의 Δ 오버레이가 정확히 이 계열을 잡으라고 만든 것이고, 잡았습니다. 오버레이가 없었다면 "장 아래쪽에서 필기가 이상하다" 는 재현 어려운 제보로 왔을 것입니다. D9 중에 절별 Δ 프로파일 한 줄(`h[min max]` · `slope` · 샘플 절의 `top`)을 추가해 원인 판별에 썼습니다.

@@ -33,12 +33,20 @@
 `google-mobile-ads` 는 iOS 13 을 선언한다. TCA 핀 상향은 `@Shared` 의미론 변경 위험이 있어
 별도 작업으로 분리한다.
 
-**macOS 27 beta 에서는 Xcode GUI 실행이 막힌다.** `xcode-select` 도 Command Line Tools 를
-가리키고 있을 수 있다. 두 문제 모두 `DEVELOPER_DIR` 로 우회한다 — GUI 게이팅은
-앱 번들 안의 CLI 바이너리(`xcodebuild` / `simctl` / `devicectl` / `xctrace`)에 적용되지 않는다.
+**Xcode 앱의 경로는 머신마다 다르다.** 아래 우회는 **macOS 27 beta 머신 전용**이다.
+
+| 머신 | 상태 |
+|---|---|
+| macOS 27 beta | Xcode GUI 실행이 막히고 `xcode-select` 가 Command Line Tools 를 가리킬 수 있다. `DEVELOPER_DIR` 로 우회한다 — GUI 게이팅은 앱 번들 안의 CLI 바이너리(`xcodebuild` / `simctl` / `devicectl` / `xctrace`)에 적용되지 않는다 |
+| macOS 26.3 (26.3 / 17C529 가 `/Applications/Xcode.app`) | `xcode-select` 가 이미 올바른 곳을 가리킨다. 우회 불필요 |
+
+**경로를 하드코딩하지 말고 먼저 확인한다** — `Xcode-26.3.0.app` 이 없는 머신에서 그대로 쓰면
+`missing DEVELOPER_DIR path` 로 모든 명령이 죽는다.
 
 ```bash
-export DEVELOPER_DIR=/Applications/Xcode-26.3.0.app/Contents/Developer
+xcode-select -p                       # 이미 26.3 을 가리키면 아래는 불필요
+xcodebuild -version                   # Xcode 26.3 / Build 17C529 확인
+export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer   # 필요할 때만
 ```
 
 **tuist 는 `.mise.toml` 로 4.39.0 에 고정돼 있다.** `PATH` 기본값과 다르므로 반드시
@@ -47,9 +55,10 @@ export DEVELOPER_DIR=/Applications/Xcode-26.3.0.app/Contents/Developer
 ## 공통 명령어
 
 ```bash
-export DEVELOPER_DIR=/Applications/Xcode-26.3.0.app/Contents/Developer   # 모든 명령의 전제
+# xcode-select 가 26.3 을 가리키지 않을 때만 (위 표 참고)
+# export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 
-mise x -- tuist generate --no-open        # 프로젝트 생성
+mise x -- tuist generate --no-open        # ★ .xcodeproj 는 gitignore — 클론·브랜치 전환 후 반드시 먼저
 xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace \
   -destination 'platform=iOS Simulator,name=iPad mini (A17 Pro),OS=26.2'
 mise x -- swiftlint lint --quiet --config .swiftlint.yml <파일들>
@@ -63,7 +72,8 @@ mise x -- swiftlint lint --quiet --config .swiftlint.yml <파일들>
 
 ## 실기기 검증
 
-절차 전문은 `docs/phase-0a-d-device-test.md` 에 있다. 요점만:
+절차 전문은 `docs/phase-0a-d-device-test.md` 에 있다.
+**단일 Canvas 검증(D9)은 그 문서 §6-9, 기록 양식은 §8-7** — 설계 §13 의 마지막 게이트다. 요점만:
 
 - **Instruments 기록에는 USB 연결이 필수다.** Wi-Fi(`Transport Type: localNetwork`)에서는
   1~2초 만에 `Device disconnected` 로 끊기고, `Deferred` 모드라 그때까지의 데이터도 유실된다.
