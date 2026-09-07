@@ -83,6 +83,9 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate, UIE
     private var appliedRedoVersion = 0
     private var appliedScrollToken = 0
     private var appliedTopInset: CGFloat = -1
+    /// 컬럼이 마지막으로 보고한 자기 높이. 컨트롤러는 장 전환에도 살아남으므로 새 장의 첫 프레임에는 **이전 장의 값**이 들어 있다.
+    /// 그래도 안전한 이유는 컬럼이 `ChapterCanvasView.hostedColumn` 에서 `fixedSize` 로 고정돼 제안된 높이만큼 늘어나지 않기 때문이다
+    /// — 늘어나면 다시 잰 높이가 이전 값과 같아져 아래 `guard` 에 걸리는 고정점이 된다 (D9).
     private var columnHeight: CGFloat = 0
     private var isApplyingDrawing = false
     private var isPerformingHistory: EditReason?

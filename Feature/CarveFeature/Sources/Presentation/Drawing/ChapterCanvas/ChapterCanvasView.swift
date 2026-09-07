@@ -64,16 +64,9 @@ struct ChapterCanvasView: UIViewControllerRepresentable {
         context.coordinator.store = store
         context.coordinator.onScroll = onScroll
 
-        controller.setColumn(AnyView(
-            column
-                .onGeometryChange(for: CGFloat.self) { proxy in
-                    proxy.size.height
-                } action: { [weak controller] height in
-                    controller?.setColumnHeight(height)
-                }
-                // 호스트 frame 이 컬럼보다 커도 컬럼은 상단에 붙는다 — 레이아웃 좌표의 원점은 컬럼 상단이다 (짧은 장의 세로 중앙 배치 금지).
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        ))
+        controller.setColumn(Self.hostedColumn(column) { [weak controller] height in
+            controller?.setColumnHeight(height)
+        })
         controller.apply(ChapterCanvasController.Configuration(
             renderedData: display.renderedData,
             renderedRevision: display.renderedRevision,
@@ -90,6 +83,32 @@ struct ChapterCanvasView: UIViewControllerRepresentable {
 
     func makeCoordinator() -> Coordinator {
         Coordinator(store: store, onScroll: onScroll)
+    }
+
+    /// 호스트(`ChapterCanvasController` 의 `UIHostingController`)에 넣을 컬럼 조합.
+    /// 컨트롤러의 기하 계약(`setColumnHeight` → `contentFrame`)과 한 쌍이라 한곳에 모아 둔다 — 테스트도 같은 조합을 쓴다.
+    ///
+    /// **`.fixedSize(horizontal: false, vertical: true)` 가 핵심이다.** 호스트 frame 의 높이는 직전에 보고된 `columnHeight` 이고,
+    /// 그 값은 장이 바뀐 직후에는 **이전 장(더 긴 장)의 값**이다. 이 고정이 없으면 초과 높이가 컬럼에 그대로 제안되고,
+    /// 행 안 밑줄 뷰(`maxHeight: .infinity`)가 세로로 늘어나 컬럼이 제안된 높이만큼 실제로 커진다.
+    /// 그러면 다시 잰 높이가 이전 장 값과 같아 `setColumnHeight` 의 `guard` 에 걸려 아무 일도 일어나지 않는다 —
+    /// 스스로 빠져나올 수 없는 고정점이다(D9 실기기: 창세기 1장 → 2장 전환 시 마지막 절 1335.78pt 어긋남).
+    /// 컬럼이 어떤 제안을 받아도 자기 이상적 높이를 보고하면 다음 측정에서 곧바로 수렴하므로 되먹임 고리가 구조적으로 사라진다.
+    ///
+    /// 바깥 `.frame(maxHeight: .infinity, alignment: .top)` 은 그대로 둔다 — 호스트가 컬럼보다 커도 컬럼은 상단에 붙어야 한다.
+    /// 레이아웃 좌표의 원점이 컬럼 상단이므로 세로 중앙 배치는 곧 좌표 어긋남이다.
+    @MainActor
+    static func hostedColumn(_ column: AnyView, reportHeight: @escaping (CGFloat) -> Void) -> AnyView {
+        AnyView(
+            column
+                .fixedSize(horizontal: false, vertical: true)
+                .onGeometryChange(for: CGFloat.self) { proxy in
+                    proxy.size.height
+                } action: { height in
+                    reportHeight(height)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        )
     }
 
     /// 팔레트 설정 → PencilKit 도구. `CanvasView` 와 같은 규칙(monoline = 지우개, §7-4 `.bitmap`).

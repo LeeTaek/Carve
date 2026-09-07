@@ -140,6 +140,7 @@ struct ChapterLayoutDebugHUD: View {
             headline
             geometryLine
             deltaLine
+            profileLine
             editLine
             if !measurement.missingVerses.isEmpty {
                 Text("missing \(missingSummary)").foregroundStyle(.yellow)
@@ -192,6 +193,38 @@ struct ChapterLayoutDebugHUD: View {
                 Text("(실측 frame 대기)").foregroundStyle(.gray)
             }
             Text("tol \(fmt(tolerance))pt").foregroundStyle(.gray)
+        }
+    }
+
+    /// 절별 Δ 프로파일 — 누적 기울기와 height delta 의 분포를 한 줄로 본다 (D9 진단).
+    ///
+    /// `top` 이 절 번호에 선형으로 늘고 `h` 의 min == max 면 **절당 상수 오차의 누적**이다.
+    /// `h` 가 절마다 다르면 텍스트 높이 예측 자체가 흔들리는 것이므로 원인이 다르다.
+    private var profileLine: some View {
+        let deltas = measurement.frameDeltas.sorted { $0.verse < $1.verse }
+        return Group {
+            if deltas.count >= 2 {
+                let heights = deltas.map(\.heightDelta)
+                let minHeight = heights.min() ?? 0
+                let maxHeight = heights.max() ?? 0
+                // 첫 절·1/4·1/2·마지막 지점의 top delta 를 뽑는다.
+                let picks = [0, deltas.count / 4, deltas.count / 2, deltas.count - 1]
+                let samples = Array(Set(picks)).sorted().map { deltas[$0] }
+                let slope = deltas.count > 1
+                    ? (deltas[deltas.count - 1].topDelta - deltas[0].topDelta) / CGFloat(deltas.count - 1)
+                    : 0
+                VStack(alignment: .leading, spacing: 1) {
+                    HStack(spacing: 10) {
+                        Text("h[min \(signed(minHeight)) max \(signed(maxHeight))]")
+                            .foregroundStyle(minHeight == maxHeight ? Color.orange : Color.yellow)
+                        Text("slope \(String(format: "%+.3f", slope))/절")
+                            .foregroundStyle(.orange)
+                    }
+                    Text("top " + samples.map { "v\($0.verse) \(signed($0.topDelta))" }.joined(separator: " · "))
+                }
+            } else {
+                Text("prof —").foregroundStyle(.gray)
+            }
         }
     }
 
