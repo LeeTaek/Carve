@@ -125,6 +125,29 @@ private struct ChapterLayoutRegionMarks: View {
     }
 }
 
+// MARK: - 합성 프로브 (E-4 진단)
+
+/// 캔버스가 **실제로 합성에 쓴** 상태. 측정 쪽 레이아웃이 캔버스까지 갔는지를 본다.
+///
+/// HUD 의 `sig` 는 `CarveDetailFeature` 의 측정 레이아웃이지 캔버스의 것이 아니다.
+/// 둘이 갈라지면 (측정은 새 레이아웃을 지었는데 캔버스는 옛것으로 합성돼 있으면)
+/// 본문은 재배치되는데 잉크는 제자리에 남는다 — 그 상태를 눈으로 보려고 만든 줄이다.
+struct CanvasComposeProbe: Equatable {
+    /// 캔버스가 마지막 합성에 쓴 레이아웃의 서명.
+    let renderedSignature: String?
+    let renderedRevision: Int
+    let isReloading: Bool
+    let reloadWhenSettled: Bool
+    let isEditing: Bool
+    let hasPendingLayout: Bool
+    /// §9-3-1 통짜 변환된 절.
+    let mismatchVerses: [Int]
+    /// metadata 없는 행 — band reflow 없이 평행이동만 된다 (§9-3). N-Canvas 가 만든 v1 행이 여기 들어온다.
+    let legacyVerses: [Int]
+    /// 디코드 실패로 표시에서 빠진 절.
+    let undecodableVerses: [Int]
+}
+
 // MARK: - HUD
 
 /// 화면 하단에 고정되는 측정 요약. 스크린샷 한 장으로 게이트·정확성·소요 시간을 판정할 수 있게 한다 (S4 HUD 와 같은 원칙).
@@ -134,6 +157,8 @@ struct ChapterLayoutDebugHUD: View {
     let lastEdit: (verse: Int, bounds: CGRect)?
     /// Δ 안전망이 단일 Canvas 에 실제로 넘긴 판정 (§14 — D9 R13). N-Canvas 경로에서는 nil (안전망이 적용되지 않는다).
     var safetyNet: LayoutDeltaVerdict?
+    /// 캔버스가 실제로 합성에 쓴 상태 (E-4 진단). N-Canvas 경로에서는 nil.
+    var compose: CanvasComposeProbe?
 
     private let tolerance = LayoutDeltaVerdict.tolerance
 
@@ -144,6 +169,7 @@ struct ChapterLayoutDebugHUD: View {
             deltaLine
             profileLine
             guardLine
+            composeLine
             editLine
             if !measurement.missingVerses.isEmpty {
                 Text("missing \(missingSummary)").foregroundStyle(.yellow)
@@ -253,6 +279,50 @@ struct ChapterLayoutDebugHUD: View {
                 Text("guard — (단일 Canvas 아님 또는 실측 대기)").foregroundStyle(.gray)
             }
         }
+    }
+
+    /// 측정 레이아웃이 캔버스까지 갔는지 (E-4 진단).
+    ///
+    /// `compose STALE` 은 캔버스가 **옛 레이아웃으로 합성된 채**라는 뜻이다 — 본문만 재배치되고 잉크는 남는다.
+    /// 그때 `ed`(편집 중) · `pend`(보류된 레이아웃) · `rl`/`rws`(재합성 대기) 중 무엇이 켜져 있는지가 원인을 가른다.
+    private var composeLine: some View {
+        Group {
+            if let compose {
+                let measured = measurement.layout?.signature
+                let isSynced = compose.renderedSignature == measured
+                HStack(spacing: 10) {
+                    Text(isSynced ? "compose SYNC" : "compose STALE")
+                        .font(.system(size: 14, weight: .bold, design: .monospaced))
+                        .foregroundStyle(isSynced ? Color.green : Color.red)
+                    Text("csig \(compose.renderedSignature.map { String($0.prefix(14)) } ?? "—")")
+                    Text("rev \(compose.renderedRevision)")
+                    Text(flagSummary(compose)).foregroundStyle(.gray)
+                    Text("mism \(verseSummary(compose.mismatchVerses))")
+                    Text("leg \(verseSummary(compose.legacyVerses))")
+                        .foregroundStyle(compose.legacyVerses.isEmpty ? Color.white : Color.yellow)
+                    Text("und \(verseSummary(compose.undecodableVerses))")
+                }
+            } else {
+                Text("compose — (단일 Canvas 아님)").foregroundStyle(.gray)
+            }
+        }
+    }
+
+    /// `3 [4·7·12]` 처럼 개수와 절 번호를 함께 보여준다. 많으면 앞의 6개만.
+    private func verseSummary(_ verses: [Int]) -> String {
+        guard !verses.isEmpty else { return "0" }
+        let shown = verses.prefix(6).map(String.init).joined(separator: "·")
+        return verses.count > 6 ? "\(verses.count) [\(shown)…]" : "\(verses.count) [\(shown)]"
+    }
+
+    private func flagSummary(_ probe: CanvasComposeProbe) -> String {
+        let flags = [
+            "rl \(probe.isReloading ? 1 : 0)",
+            "rws \(probe.reloadWhenSettled ? 1 : 0)",
+            "ed \(probe.isEditing ? 1 : 0)",
+            "pend \(probe.hasPendingLayout ? 1 : 0)"
+        ]
+        return flags.joined(separator: "·")
     }
 
     private var editLine: some View {

@@ -86,6 +86,24 @@ public struct CarveDetailView: View {
         #endif
     }
 
+    /// 캔버스가 실제로 합성에 쓴 상태 (E-4 진단 — HUD `compose` 줄).
+    #if DEBUG
+    private var composeProbe: CanvasComposeProbe {
+        let canvas = store.chapterCanvas
+        return CanvasComposeProbe(
+            renderedSignature: canvas.renderedLayout?.signature,
+            renderedRevision: canvas.renderedRevision,
+            isReloading: canvas.isReloading,
+            reloadWhenSettled: canvas.reloadWhenSettled,
+            isEditing: canvas.isEditing,
+            hasPendingLayout: canvas.pendingLayout != nil,
+            mismatchVerses: canvas.layoutMismatchVerses.sorted(),
+            legacyVerses: canvas.legacyVerses.sorted(),
+            undecodableVerses: canvas.undecodableVerses.sorted()
+        )
+    }
+    #endif
+
     /// Phase 2 디버그 HUD. Debug 빌드에서 `-ChapterLayoutOverlay` 실행 인자가 있을 때만 보인다.
     @ViewBuilder
     private var layoutDebugHUD: some View {
@@ -95,7 +113,8 @@ public struct CarveDetailView: View {
                 measurement: store.chapterLayout,
                 lastEdit: lastEditForOverlay,
                 // 안전망은 단일 Canvas 경로에만 붙는다 — N-Canvas 는 판정 자체가 없으므로 nil 이다 (§14).
-                safetyNet: store.usesSingleCanvas ? store.chapterCanvas.layoutDelta : nil
+                safetyNet: store.usesSingleCanvas ? store.chapterCanvas.layoutDelta : nil,
+                compose: store.usesSingleCanvas ? composeProbe : nil
             )
         }
         #endif
