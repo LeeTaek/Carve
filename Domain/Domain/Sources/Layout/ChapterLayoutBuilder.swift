@@ -28,6 +28,25 @@ public struct VerseLayoutInput: Equatable, Sendable {
     /// 가능하면 실측값을 넣는 쪽이 좋다.
     /// `topPadding` 이 있으면 실측값도 그 여백을 **포함한** 값이어야 한다(둘 다 `writingRect` 상단 기준이므로).
     public let measuredUnderlineAnchors: [CGFloat]?
+    /// View 계층이 실측한 **행의 실제 높이** (`topPadding` 을 포함한 `writingRect` 높이). nil 이면 예측식으로 떨어진다.
+    ///
+    /// **R13 (D9 실기기) 의 수정이다.** 측정 파이프라인은 줄 수·밑줄 위치·소제목 높이·컬럼 폭을 전부 실측하는데
+    /// 행 높이만 `lineCount × lineSpace` 로 **예측**했다. 그 예측은 뷰의
+    /// `lineSpacing = lineSpace − font.lineHeight` · `lineGapPadding = (lineSpace − font.lineHeight) / 2` 조합이
+    /// 실수 연산으로 정확히 `N × lineSpace` 가 되는 것에 의존하는데, SwiftUI 가 픽셀 그리드에 스냅하면 깨진다 —
+    /// 실기기(iOS 27.0 beta)에서 절당 정확히 0.5pt(= @2x 의 1픽셀)씩 어긋나 시편 119편 176절에서 87.50pt 가 누적됐다.
+    /// 빌더가 SwiftUI 의 내부 반올림을 모델링하는 구조라 **OS 판올림마다 재발**한다. 그래서 실측을 쓴다.
+    ///
+    /// **좌표가 아니라 크기다.** 설계 §6-3 이 "Pass 2 는 좌표를 전혀 참조하지 않는다" 로 순환을 막는 것과 어긋나지 않는다 —
+    /// 이 값은 `measuredUnderlineAnchors` 와 같은 범주의 실측 **입력**이고, 배치(좌표)는 여전히 빌더가 위에서부터 쌓아 만든다.
+    ///
+    /// **순환하지 않는 근거 (R16 의 `fixedSize` 가 이 입력의 전제다).**
+    /// `layout → totalHeight → contentSize/호스트 높이 → 컬럼 → 행 높이 → layout` 이 닫힌 고리가 될 수 있지만,
+    /// ① 호스트 frame 높이는 `totalHeight` 가 아니라 **컬럼이 스스로 보고한 높이**이고
+    /// ② 컬럼은 `ChapterCanvasView.hostedColumn` 의 `.fixedSize(horizontal: false, vertical: true)` 로 고정돼
+    /// 제안된 높이를 먹지 않으므로 행 높이가 제안에 의존하지 않는다 (N-Canvas 는 `ScrollView` 가 무한 높이를 제안해 애초에 없다).
+    /// 그 `fixedSize` 를 없애면 고리가 닫히고 R16 이 되살아난다.
+    public let measuredHeight: CGFloat?
     /// 절 **위**에 놓이는 추가 여백 (Phase 2 — 실측 파이프라인에서 추가).
     ///
     /// `writingRect` 에 포함되지 **않는다.** 절 사이 gap 처럼 취급되어 `captureRect` 가 midpoint 로 나눠 갖는다.
@@ -47,6 +66,7 @@ public struct VerseLayoutInput: Equatable, Sendable {
         textLineCount: Int,
         savedBandCount: Int? = nil,
         measuredUnderlineAnchors: [CGFloat]? = nil,
+        measuredHeight: CGFloat? = nil,
         leadingInset: CGFloat = 0,
         topPadding: CGFloat = 0
     ) {
@@ -54,6 +74,7 @@ public struct VerseLayoutInput: Equatable, Sendable {
         self.textLineCount = textLineCount
         self.savedBandCount = savedBandCount
         self.measuredUnderlineAnchors = measuredUnderlineAnchors
+        self.measuredHeight = measuredHeight.map { max(0, $0) }
         self.leadingInset = max(0, leadingInset)
         self.topPadding = max(0, topPadding)
     }
@@ -111,15 +132,19 @@ public struct ChapterLayoutBuilder: Sendable {
         let width = max(0, writingWidth)
 
         // ── Pass 1 ──────────────────────────────────────────────────────────
-        // 텍스트 줄 수만으로 각 절의 밑줄 개수와 높이를 구한다. 아직 좌표를 만들지 않는다.
-        // `topPadding` 은 `writingRect` 안의 여백이므로 텍스트 높이에 더해지고 근사 anchor 도 그만큼 내려간다.
+        // 각 절의 밑줄 개수와 높이를 구한다. 아직 좌표를 만들지 않는다.
+        // 높이는 **실측이 있으면 실측**이고, 없을 때만 `topPadding + 줄 수 × lineSpace` 로 예측한다 (R13).
+        // 예측은 뷰가 정확히 `N × lineSpace` 로 렌더된다는 가정인데 SwiftUI 의 픽셀 스냅이 그것을 깬다
+        // (`VerseLayoutInput.measuredHeight` 주석 참조). 실측이 있으면 그것이 언제나 이긴다.
+        // `topPadding` 은 `writingRect` 안의 여백이라 예측 높이에 더해지고 근사 anchor 도 그만큼 내려간다 —
+        // 실측 높이는 행 전체를 잰 값이라 이미 그 여백을 **포함**하므로 다시 더하지 않는다.
         var lineCounts: [Int] = []
         var textHeights: [CGFloat] = []
         var anchors: [[CGFloat]] = []
         for input in verses {
             let lineCount = max(0, input.textLineCount)
             lineCounts.append(lineCount)
-            textHeights.append(input.topPadding + CGFloat(lineCount) * lineSpace)
+            textHeights.append(input.measuredHeight ?? (input.topPadding + CGFloat(lineCount) * lineSpace))
             anchors.append(Self.underlineAnchors(for: input, lineCount: lineCount, lineSpace: lineSpace))
         }
 
@@ -128,6 +153,7 @@ public struct ChapterLayoutBuilder: Sendable {
         //   N_saved > N_now  →  extraHeight = (N_saved - N_now) × lineSpace
         // Pass 2는 좌표를 전혀 참조하지 않는다. 이것이 "reflow 결과 → 레이아웃 → reflow" 순환을
         // 만들지 않는 근거다(설계 §6-3). 따라서 이 단계에 좌표 계산을 추가하면 안 된다.
+        // band 모델은 실측 높이와 무관하게 `lineSpace` 를 그대로 쓴다 — reflow(§9-2)의 band 폭과 같은 값이어야 한다.
         var effectiveHeights: [CGFloat] = []
         for (index, input) in verses.enumerated() {
             let savedBandCount = max(0, input.savedBandCount ?? 0)

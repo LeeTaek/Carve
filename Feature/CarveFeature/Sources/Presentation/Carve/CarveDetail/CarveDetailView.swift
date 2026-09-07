@@ -91,7 +91,12 @@ public struct CarveDetailView: View {
     private var layoutDebugHUD: some View {
         #if DEBUG
         if ChapterLayoutDebugFlags.isOverlayEnabled {
-            ChapterLayoutDebugHUD(measurement: store.chapterLayout, lastEdit: lastEditForOverlay)
+            ChapterLayoutDebugHUD(
+                measurement: store.chapterLayout,
+                lastEdit: lastEditForOverlay,
+                // 안전망은 단일 Canvas 경로에만 붙는다 — N-Canvas 는 판정 자체가 없으므로 nil 이다 (§14).
+                safetyNet: store.usesSingleCanvas ? store.chapterCanvas.layoutDelta : nil
+            )
         }
         #endif
     }

@@ -380,12 +380,16 @@ extension CarveDetailFeature {
                state.chapterLayout.recordTitleHeight(verse: verse, height: height) {
                 layoutInputChanged = true
             }
-            // 검증 전용 입력이다. 레이아웃 계산에 쓰지 않으므로 재계산 조건에 넣지 않는다.
+            // 행 frame 은 원점만 쓰인다 (`columnOrigin` · Δ 의 topDelta). 검증 전용이라 재계산 조건에 넣지 않는다.
             if let frame = geometry.rowFrame {
                 state.chapterLayout.recordRowFrame(verse: verse, frame: frame)
             }
-            if let frame = geometry.canvasFrameInRow {
-                state.chapterLayout.recordCanvasFrameInRow(verse: verse, frame: frame)
+            // 행 안 캔버스 영역의 **높이**는 레이아웃 입력이다 (R13 — `VerseLayoutInput.measuredHeight`).
+            // 빌더의 `줄 수 × lineSpace` 예측이 실기기에서 절당 0.5pt 씩 어긋나 누적됐으므로 실측을 쓴다.
+            // 따라서 재계산 조건에 **포함한다** — 예측으로 지은 레이아웃이 실측이 도착하면 다시 지어진다.
+            if let frame = geometry.canvasFrameInRow,
+               state.chapterLayout.recordCanvasFrameInRow(verse: verse, frame: frame) {
+                layoutInputChanged = true
             }
         }
         if layoutInputChanged {
@@ -467,9 +471,13 @@ extension CarveDetailFeature {
         return .none
     }
 
-    /// Phase 3 — 완성된 `ChapterLayout` 과 `columnOrigin` 을 단일 Canvas 에 넘긴다. 값이 바뀐 것만 보낸다.
+    /// Phase 3 — 완성된 `ChapterLayout` · `columnOrigin` · Δ 안전망 판정을 단일 Canvas 에 넘긴다. 값이 바뀐 것만 보낸다.
     ///
     /// `columnOrigin` 의 y 는 0 이다 — 헤더는 `contentInset.top` 으로 비우므로 콘텐츠 좌표는 헤더와 무관하다.
+    ///
+    /// **안전망은 단일 Canvas 경로에만 붙는다** (설계 §14 — D9 R13). 이 함수 자체가 `usesSingleCanvas` 로 막혀 있으므로
+    /// N-Canvas 에서는 판정이 아예 나가지 않는다 — N-Canvas 는 절마다 자기 캔버스가 있고 잉크가 절-로컬이라
+    /// 레이아웃 Δ 가 귀속을 틀지 않는다. 거기서 입력을 막으면 무해한 조건으로 필기를 못 하게 만드는 회귀다.
     private func forwardLayoutToSingleCanvas(state: inout State) -> Effect<Action> {
         guard state.usesSingleCanvas, let layout = state.chapterLayout.layout else { return .none }
         var effects: [Effect<Action>] = []
@@ -479,6 +487,10 @@ extension CarveDetailFeature {
         }
         if layout != state.chapterCanvas.layout && layout != state.chapterCanvas.pendingLayout {
             effects.append(.send(.scope(.chapterCanvasAction(.layoutCompleted(layout)))))
+        }
+        let verdict = state.chapterLayout.layoutDeltaVerdict
+        if verdict != state.chapterCanvas.layoutDelta {
+            effects.append(.send(.scope(.chapterCanvasAction(.layoutDeltaEvaluated(verdict)))))
         }
         return effects.isEmpty ? .none : .merge(effects)
     }

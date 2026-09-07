@@ -307,6 +307,147 @@ struct ChapterLayoutBuilderTesting {
                 != ChapterLayoutSignature.make(setting: setting, writingWidth: 320, isLeftHanded: false)
         )
     }
+
+}
+
+// MARK: - R13 실측 높이 (D9)
+
+/// `VerseLayoutInput.measuredHeight` — 빌더의 `줄 수 × lineSpace` 예측 대신 View 실측을 쓰는 입력 (R13).
+/// 예측식은 SwiftUI 의 픽셀 스냅에 의존해 실기기에서 절당 0.5pt 씩 누적됐다.
+struct ChapterLayoutBuilderHeightTesting {
+    private let builder = ChapterLayoutBuilder()
+    private let chapter = BibleChapter(title: .genesis, chapter: 1)
+
+    private func makeLayout(
+        verses: [VerseLayoutInput],
+        metrics: ChapterLayoutMetrics = .zero
+    ) -> ChapterLayout {
+        builder.build(
+            chapter: chapter,
+            writingWidth: 320,
+            setting: SentenceSetting(
+                lineSpace: 30, fontSize: 20, traking: 1, baseLineHeight: 20,
+                textHeight: .zero, fontFamily: .gothic, lineCount: 3
+            ),
+            isLeftHanded: false,
+            verses: verses,
+            metrics: metrics
+        )
+    }
+
+    @Test("실측 높이가 있으면 줄 수 × lineSpace 예측을 이기고, 이후 절이 그 차이만큼 밀린다")
+    func measuredHeightWinsOverPredictedHeight() {
+        let metrics = ChapterLayoutMetrics(topInset: 2, verseSpacing: 12, bottomInset: 2)
+        let predicted = makeLayout(
+            verses: [
+                VerseLayoutInput(verse: 1, textLineCount: 2),
+                VerseLayoutInput(verse: 2, textLineCount: 2)
+            ],
+            metrics: metrics
+        )
+        // 실기기 R13 의 모양 그대로 — 실제 렌더가 예측보다 절당 0.5pt 크다.
+        let measured = makeLayout(
+            verses: [
+                VerseLayoutInput(verse: 1, textLineCount: 2, measuredHeight: 60.5),
+                VerseLayoutInput(verse: 2, textLineCount: 2, measuredHeight: 60.5)
+            ],
+            metrics: metrics
+        )
+
+        #expect(predicted.regions[0].writingRect.height == 60)
+        #expect(measured.regions[0].writingRect.height == 60.5)
+        // 어긋남은 누적된다 — 2절은 앞 절의 0.5pt 만큼 아래에서 시작한다.
+        #expect(measured.regions[1].writingRect.minY == predicted.regions[1].writingRect.minY + 0.5)
+        #expect(measured.regions[1].writingRect.height == 60.5)
+        #expect(measured.totalHeight == predicted.totalHeight + 1)
+        // 밑줄 anchor 는 실측 anchor 가 따로 담당한다 — 높이 실측이 근사 anchor 를 바꾸지 않는다.
+        #expect(measured.regions[0].underlineAnchors == predicted.regions[0].underlineAnchors)
+    }
+
+    @Test("실측 높이가 없는 절만 기존 예측식으로 떨어진다 (additive 이고 fallback 이 남는다)")
+    func missingMeasuredHeightFallsBackToPrediction() {
+        let metrics = ChapterLayoutMetrics(topInset: 2, verseSpacing: 12, bottomInset: 2)
+        let mixed = makeLayout(
+            verses: [
+                VerseLayoutInput(verse: 1, textLineCount: 2, measuredHeight: 61),
+                VerseLayoutInput(verse: 2, textLineCount: 2),
+                VerseLayoutInput(verse: 3, textLineCount: 3, measuredHeight: nil)
+            ],
+            metrics: metrics
+        )
+
+        #expect(mixed.regions[0].writingRect.height == 61)
+        #expect(mixed.regions[1].writingRect.height == 60)    // 2 × 30 예측
+        #expect(mixed.regions[2].writingRect.height == 90)    // 3 × 30 예측
+        // 실측이 하나도 없으면 이 수정 전과 완전히 같은 레이아웃이다.
+        let allPredicted = makeLayout(
+            verses: [
+                VerseLayoutInput(verse: 1, textLineCount: 2),
+                VerseLayoutInput(verse: 2, textLineCount: 2),
+                VerseLayoutInput(verse: 3, textLineCount: 3)
+            ],
+            metrics: metrics
+        )
+        #expect(allPredicted.regions[0].writingRect.height == 60)
+        #expect(allPredicted.totalHeight == mixed.totalHeight - 1)
+        // 음수 실측은 0 으로 정규화된다.
+        #expect(VerseLayoutInput(verse: 1, textLineCount: 2, measuredHeight: -3).measuredHeight == 0)
+    }
+
+    @Test("실측 높이로 지어도 captureRect 가 [0, totalHeight] 를 빈틈·겹침 없이 분할한다 (소유권의 근거)")
+    func captureRectsStillPartitionCanvasWithMeasuredHeights() {
+        // 절마다 다른 소수 실측 — 반올림 잔차가 경계에 구멍을 내지 않는지 본다.
+        let layout = makeLayout(
+            verses: [
+                VerseLayoutInput(verse: 1, textLineCount: 2, measuredHeight: 60.5, leadingInset: 0, topPadding: 25),
+                VerseLayoutInput(verse: 2, textLineCount: 1, measuredHeight: 30.5, leadingInset: 34, topPadding: 0),
+                VerseLayoutInput(verse: 3, textLineCount: 3, measuredHeight: 91.25, leadingInset: 0, topPadding: 0),
+                VerseLayoutInput(verse: 4, textLineCount: 2, savedBandCount: 4, measuredHeight: 60.5)
+            ],
+            metrics: ChapterLayoutMetrics(topInset: 2, verseSpacing: 12, bottomInset: 2)
+        )
+
+        #expect(layout.regions.first?.captureRect.minY == 0)
+        #expect(layout.regions.last?.captureRect.maxY == layout.totalHeight)
+        for index in 0..<(layout.regions.count - 1) {
+            // 같은 값이어야 빈틈도 겹침도 없다.
+            #expect(layout.regions[index].captureRect.maxY == layout.regions[index + 1].captureRect.minY)
+        }
+        // 분할의 합이 정확히 전체 높이다.
+        #expect(layout.regions.map(\.captureRect.height).reduce(0, +) == layout.totalHeight)
+        // 각 절의 writingRect 는 자기 captureRect 안에 온전히 들어 있다.
+        for region in layout.regions {
+            #expect(region.captureRect.minY <= region.writingRect.minY)
+            #expect(region.captureRect.maxY >= region.writingRect.maxY)
+        }
+    }
+
+    @Test("실측 높이와 함께 있어도 leadingInset · topPadding · Pass 2 extraBands 가 규정대로 적재된다")
+    func measuredHeightComposesWithInsetsAndPassTwo() {
+        let metrics = ChapterLayoutMetrics(topInset: 2, verseSpacing: 12, bottomInset: 2)
+        let layout = makeLayout(
+            verses: [
+                // 실측 높이는 topPadding 을 이미 포함한 값이다 — 빌더가 다시 더하지 않는다.
+                VerseLayoutInput(verse: 1, textLineCount: 2, measuredHeight: 85.5, topPadding: 25),
+                // Pass 2 는 실측 높이 **위에** band 개수만큼 더한다 (band 모델은 lineSpace 그대로).
+                VerseLayoutInput(verse: 2, textLineCount: 2, savedBandCount: 4, measuredHeight: 60.5, leadingInset: 34)
+            ],
+            metrics: metrics
+        )
+
+        // 1절: 실측 그대로. topPadding 이 두 번 더해지면 110.5 가 됐을 것이다.
+        #expect(layout.regions[0].writingRect.minY == 2)
+        #expect(layout.regions[0].writingRect.height == 85.5)
+        // 근사가 아닌 규정대로의 anchor — topPadding 아래에서 시작한다.
+        #expect(layout.regions[0].underlineAnchors == [55, 85])
+
+        // 2절: leadingInset 은 writingRect **밖**의 gap 이라 cursor 만 민다.
+        #expect(layout.regions[1].writingRect.minY == 2 + 85.5 + 12 + 34)
+        // 실측 60.5 + 초과 band 2개 × 30.
+        #expect(layout.regions[1].writingRect.height == 60.5 + 60)
+        #expect(layout.regions[1].underlineAnchors == [30, 60])
+        #expect(layout.totalHeight == 2 + 85.5 + 12 + 34 + 120.5 + 2)
+    }
 }
 
 // MARK: - Phase 2 — leadingInset / topPadding (실측 파이프라인 입력)

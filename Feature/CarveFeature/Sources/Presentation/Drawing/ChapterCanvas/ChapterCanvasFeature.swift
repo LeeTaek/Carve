@@ -103,6 +103,9 @@ public struct ChapterCanvasFeature {
         var loadFailure: DrawingLoadFailure?
         /// 캔버스 content 좌표 = layout 좌표 + columnOrigin (§5). 값은 호스팅이 준다.
         var columnOrigin: CGPoint = .zero
+        /// 예측 좌표와 실제 렌더의 Δ 안전망 판정 (설계 §14 — D9 R13). `CarveDetailFeature` 가 실측에서 계산해 넘긴다.
+        /// **합성·저장에는 관여하지 않는다** — `isDrawingInputEnabled` 하나만 읽는다.
+        var layoutDelta: LayoutDeltaVerdict?
 
         // 합성 결과
         var renderedData: Data?
@@ -177,6 +180,13 @@ public struct ChapterCanvasFeature {
         var isComposed: Bool { renderedData != nil }
         /// §6-2 입력 게이트 — 합성이 끝났고 다시 합성하는 중이 아닐 때만 입력을 받는다.
         var isInputEnabled: Bool { isComposed && !isReloading }
+        /// **새 획 입력만** 여는 게이트 (설계 §14 — D9 안전망). 캔버스의 `drawingGestureRecognizer` 하나가 읽는다.
+        ///
+        /// 레이아웃이 실제 렌더와 한 줄 이상 어긋나면(`LayoutDeltaVerdict.blocksInput`) 그 상태의 새 획은
+        /// 잘못된 절에 귀속되므로 받지 않는다. **합성·표시·저장·flush·복원은 그대로 돈다** — 그 경로들은
+        /// `isComposed` / `isReloading` / `isFullyPersisted` 만 보므로 이 값과 무관하다.
+        /// 여기서 게이트를 `isReady`(§6-4 합성 게이트)로 올리면 기존 잉크가 안 보이거나 미저장분이 유실될 수 있다.
+        var isDrawingInputEnabled: Bool { isInputEnabled && layoutDelta?.blocksInput != true }
         /// 미저장 여부의 판정 기준 (§8-3). `persistedRevision` 이 아니라 큐가 비었는가로 본다.
         var isFullyPersisted: Bool {
             pendingMutations.isEmpty && saveStatus == .idle && editQueue.isEmpty && !isPreparingEdit
@@ -208,6 +218,8 @@ public struct ChapterCanvasFeature {
         case drawingsLoaded(requestID: UUID, Result<[VerseDrawingSnapshot], DrawingLoadFailure>)
         case layoutCompleted(ChapterLayout)
         case columnOriginChanged(CGPoint)
+        /// 예측 좌표와 실제 렌더의 Δ 안전망 판정이 갱신됐다 (§14 — D9 R13). 새 입력만 좌우한다.
+        case layoutDeltaEvaluated(LayoutDeltaVerdict?)
 
         case editBegan
         case editEnded(CanvasEditSnapshot)
@@ -262,6 +274,14 @@ public struct ChapterCanvasFeature {
                     return .none
                 }
                 return applyColumnOrigin(state: &state, origin: origin)
+
+            case .layoutDeltaEvaluated(let verdict):
+                // 편집 중에도 곧바로 반영한다 — 이 값은 재합성을 일으키지 않고 새 획 입력만 좌우하므로
+                // 그리던 획이 사라지지 않는다 (`layoutCompleted` / `columnOriginChanged` 와 다른 점).
+                let previous = state.layoutDelta
+                state.layoutDelta = verdict
+                LayoutDeltaVerdict.logIfNoteworthy(previous: previous, current: verdict, chapter: state.chapter)
+                return .none
 
             case .editBegan:
                 state.isEditing = true
@@ -363,6 +383,8 @@ extension ChapterCanvasFeature {
         state.layout = nil
         state.pendingLayout = nil
         state.pendingColumnOrigin = nil
+        // 안전망 판정은 장마다 새로 낸다 — 이전 장의 Δ 로 새 장의 입력을 막지 않는다 (§14 이월 상태 감사).
+        state.layoutDelta = nil
         state.pendingReload = false
         state.loadedDrawings = nil
         state.loadFailure = nil

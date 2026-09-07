@@ -32,7 +32,8 @@ struct ChapterCanvasView: UIViewControllerRepresentable {
         init(_ state: ChapterCanvasFeature.State) {
             renderedData = state.renderedData
             renderedRevision = state.renderedRevision
-            isInputEnabled = state.isInputEnabled
+            // 새 획 입력만 여는 게이트다 — Δ 안전망(§14)이 여기 하나에만 걸린다. 합성·저장은 이 값을 보지 않는다.
+            isInputEnabled = state.isDrawingInputEnabled
             undoRequestVersion = state.undoRequestVersion
             redoRequestVersion = state.redoRequestVersion
             scrollRequest = state.scrollRequest

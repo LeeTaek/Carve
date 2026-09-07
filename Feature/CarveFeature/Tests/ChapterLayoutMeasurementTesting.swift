@@ -286,6 +286,112 @@ struct ChapterLayoutMeasurementTesting {
         #expect(measurement.worstFrameDelta?.verse == 2)
         #expect(measurement.worstFrameDelta?.magnitude == 3)
     }
+
+    @Test("실측 높이를 레이아웃 입력으로 쓰면 heightDelta 는 구조적으로 0 이고 topDelta 만 독립 검증으로 남는다 (R13 부작용)")
+    func measuredHeightMakesHeightDeltaStructurallyZero() throws {
+        var measurement = begun(verses: [1, 2])
+        measurement.setWritingWidth(300)
+        measurement.recordText(verse: 1, underlineAnchors: anchors(verse: 1, lineCount: 1))
+        measurement.recordText(verse: 2, underlineAnchors: anchors(verse: 2, lineCount: 1))
+        // 실기기 R13 의 모양 — 실제 렌더가 예측보다 절당 0.5pt 크다.
+        measurement.recordCanvasFrameInRow(verse: 1, frame: CGRect(x: 0, y: 0, width: 300, height: 55.5))
+        measurement.recordCanvasFrameInRow(verse: 2, frame: CGRect(x: 0, y: 0, width: 300, height: 30.5))
+        let layout = try #require(rebuild(&measurement))
+
+        // 예측이었다면 55 / 30 이었을 값이 실측으로 지어졌다.
+        #expect(layout.regions[0].writingRect.height == 55.5)
+        #expect(layout.regions[1].writingRect.height == 30.5)
+
+        // 실제 배치가 레이아웃과 정확히 일치하는 경우 — Δ 가 전부 0.
+        measurement.recordRowFrame(verse: 1, frame: CGRect(x: 0, y: layout.regions[0].writingRect.minY, width: 300, height: 55.5))
+        measurement.recordRowFrame(verse: 2, frame: CGRect(x: 0, y: layout.regions[1].writingRect.minY, width: 300, height: 30.5))
+        #expect(measurement.frameDeltas.allSatisfy { $0.heightDelta == 0 && $0.topDelta == 0 })
+
+        // 배치 여백(metrics)이 어긋나면 heightDelta 는 여전히 0 이지만 topDelta 가 그것을 잡는다.
+        measurement.recordRowFrame(verse: 2, frame: CGRect(x: 0, y: layout.regions[1].writingRect.minY + 7, width: 300, height: 30.5))
+        let worst = try #require(measurement.worstFrameDelta)
+        #expect(worst.verse == 2)
+        #expect(worst.heightDelta == 0)
+        #expect(worst.topDelta == 7)
+    }
+
+    // MARK: Δ 안전망 (§14 — D9 R13)
+
+    @Test("Δ 가 허용치 이내면 판정이 열려 있고, 허용치를 넘어도 한 줄 이하면 차단하지 않는다")
+    func verdictStaysOpenBelowOneLine() throws {
+        var measurement = begun(verses: [1, 2])
+        measurement.setWritingWidth(300)
+        measurement.recordText(verse: 1, underlineAnchors: anchors(verse: 1, lineCount: 1))
+        measurement.recordText(verse: 2, underlineAnchors: anchors(verse: 2, lineCount: 1))
+        let layout = try #require(rebuild(&measurement))
+        let region = try #require(layout.region(verse: 2))
+
+        // 실측이 없으면 판정 자체가 없다.
+        #expect(measurement.layoutDeltaVerdict == nil)
+
+        // 0.5pt — 허용치(1pt) 이내.
+        measurement.recordFrame(verse: 2, frame: CGRect(
+            x: 380, y: region.writingRect.minY + 0.5, width: 300, height: region.writingRect.height
+        ))
+        let small = try #require(measurement.layoutDeltaVerdict)
+        #expect(small.magnitude == 0.5)
+        #expect(!small.exceedsTolerance)
+        #expect(!small.blocksInput)
+        #expect(small.lineSpace == 30)
+
+        // 12pt — 허용치는 넘지만 한 줄(30pt)보다 작다. 로그는 남기되 막지 않는다.
+        measurement.recordFrame(verse: 2, frame: CGRect(
+            x: 380, y: region.writingRect.minY + 12, width: 300, height: region.writingRect.height
+        ))
+        let medium = try #require(measurement.layoutDeltaVerdict)
+        #expect(medium.exceedsTolerance)
+        #expect(!medium.blocksInput)
+    }
+
+    @Test("Δ 가 한 줄(lineSpace)을 넘으면 판정이 차단으로 바뀐다")
+    func verdictBlocksBeyondOneLine() throws {
+        var measurement = begun(verses: [1, 2])
+        measurement.setWritingWidth(300)
+        measurement.recordText(verse: 1, underlineAnchors: anchors(verse: 1, lineCount: 1))
+        measurement.recordText(verse: 2, underlineAnchors: anchors(verse: 2, lineCount: 1))
+        let layout = try #require(rebuild(&measurement))
+        let region = try #require(layout.region(verse: 2))
+
+        // D9 시편 119편의 모양 — 하단 절이 87.5pt 아래에 있다.
+        measurement.recordFrame(verse: 2, frame: CGRect(
+            x: 380, y: region.writingRect.minY + 87.5, width: 300, height: region.writingRect.height
+        ))
+        let verdict = try #require(measurement.layoutDeltaVerdict)
+
+        #expect(verdict.verse == 2)
+        #expect(verdict.magnitude == 87.5)
+        #expect(verdict.topDelta == 87.5)
+        #expect(verdict.exceedsTolerance)
+        #expect(verdict.blocksInput)
+        // 합성 게이트는 Δ 를 보지 않는다 — 안전망이 열려도 닫혀도 §6-2 는 그대로다.
+        #expect(measurement.isReady)
+    }
+
+    @Test("Pass 2 여유 높이가 있는 장에서는 Δ 로 판정할 수 없어 차단하지 않는다")
+    func verdictDoesNotBlockWhenPassTwoSlackIsPresent() throws {
+        // 2절의 저장 band 4개 > 현재 1줄 → writingRect 가 의도적으로 90pt 부풀려진다.
+        var measurement = begun(verses: [1, 2], savedBandCounts: [2: 4])
+        measurement.setWritingWidth(300)
+        measurement.recordText(verse: 1, underlineAnchors: anchors(verse: 1, lineCount: 1))
+        measurement.recordText(verse: 2, underlineAnchors: anchors(verse: 2, lineCount: 1))
+        let layout = try #require(rebuild(&measurement))
+        let region = try #require(layout.region(verse: 2))
+
+        #expect(measurement.hasReflowSlack)
+        // 행은 여유만큼 커지지 않으므로 Δ 가 의도적으로 크다.
+        measurement.recordFrame(verse: 2, frame: CGRect(x: 380, y: region.writingRect.minY, width: 300, height: 30))
+        let verdict = try #require(measurement.layoutDeltaVerdict)
+
+        #expect(verdict.magnitude == 90)
+        #expect(verdict.exceedsTolerance)
+        // 의도한 여유와 예측 결함을 구별할 수 없다 — 막지 않는다.
+        #expect(!verdict.blocksInput)
+    }
 }
 
 private extension VerseCanvasRegion {
@@ -491,8 +597,8 @@ struct CarveDetailLayoutMeasurementTesting {
         #expect(state.chapterLayout.layout?.regions.count == 3)
     }
 
-    @Test("소제목 높이는 재계산을 일으키고, 실측 frame 은 레이아웃을 바꾸지 않는다")
-    func titleHeightRebuildsButFrameDoesNot() {
+    @Test("소제목 높이와 실측 높이는 재계산을 일으키고, 행 frame 은 원점만 주므로 재계산하지 않는다 (R13)")
+    func titleHeightAndMeasuredHeightRebuildButRowFrameDoesNot() {
         var state = CarveDetailFeature.State.initialState
         reduce(&state, .view(.layoutHostingChanged(writingWidth: 372)))
         reduce(&state, .setSentence(sentences(count: 2), []))
@@ -507,14 +613,81 @@ struct CarveDetailLayoutMeasurementTesting {
         #expect(state.chapterLayout.buildCount == 2)
         #expect(state.chapterLayout.layout != before)
 
-        let frame = CGRect(x: 382, y: 2, width: 372, height: 55)
-        // 한쪽만 오면 아직 합칠 수 없다.
+        // 행 frame 만 오면 합칠 수도 없고, 레이아웃 입력도 아니다.
+        let afterTitle = state.chapterLayout.layout
         measured(&state, [rowID(1): VerseRowGeometry(rowFrame: CGRect(x: 10, y: 2, width: 733, height: 55))])
         #expect(state.chapterLayout.measuredFrames[1] == nil)
-        measured(&state, [rowID(1): VerseRowGeometry(canvasFrameInRow: CGRect(x: 372, y: 0, width: 372, height: 55))])
-        #expect(state.chapterLayout.measuredFrames[1] == frame)
         #expect(state.chapterLayout.buildCount == 2)
+        #expect(state.chapterLayout.layout == afterTitle)
+
+        // 행 안 캔버스 영역이 오면 원점이 합쳐지고, **높이는 레이아웃 입력이라 재계산된다** (R13).
+        measured(&state, [rowID(1): VerseRowGeometry(canvasFrameInRow: CGRect(x: 372, y: 0, width: 372, height: 57))])
+        #expect(state.chapterLayout.measuredFrames[1] == CGRect(x: 382, y: 2, width: 372, height: 57))
+        #expect(state.chapterLayout.buildCount == 3)
+        // 예측은 topPadding 25 + 1줄 30 = 55 였다. 실측 57 이 이긴다.
+        #expect(state.chapterLayout.layout?.regions[0].writingRect.height == 57)
         #expect(state.chapterLayout.columnOrigin == CGPoint(x: 382, y: 0))
+
+        // 같은 값이 다시 오면 재계산하지 않는다.
+        measured(&state, [rowID(1): VerseRowGeometry(canvasFrameInRow: CGRect(x: 372, y: 0, width: 372, height: 57))])
+        #expect(state.chapterLayout.buildCount == 3)
+    }
+
+    @Test("실측 높이가 없어도 게이트가 열리고, 도착해 재계산돼도 게이트는 닫히지 않는다 (R13)")
+    func gateOpensBeforeMeasuredHeightsAndStaysOpenAfterRebuild() {
+        var state = CarveDetailFeature.State.initialState
+        reduce(&state, .view(.layoutHostingChanged(writingWidth: 372)))
+        reduce(&state, .setSentence(sentences(count: 2), []))
+
+        // 밑줄 실측만으로 게이트가 열린다 — 실측 높이는 레이아웃 완성의 조건이 아니다.
+        measured(&state, [
+            rowID(1): VerseRowGeometry(underlineOffsets: [30, 60]),
+            rowID(2): VerseRowGeometry(underlineOffsets: [30])
+        ])
+        #expect(state.isLayoutReady)
+        #expect(state.chapterLayout.buildCount == 1)
+        let padding = ChapterLayoutHosting.firstVerseTopPadding
+        #expect(state.chapterLayout.layout?.regions[0].writingRect.height == padding + 60)   // 예측
+        #expect(state.chapterLayout.canvasFramesInRow.isEmpty)
+
+        // 실측 높이가 뒤늦게 도착 — 예측 → 실측으로 한 번 더 지어지고, 그 사이 게이트는 닫히지 않는다.
+        measured(&state, [
+            rowID(1): VerseRowGeometry(canvasFrameInRow: CGRect(x: 372, y: 0, width: 372, height: 86)),
+            rowID(2): VerseRowGeometry(canvasFrameInRow: CGRect(x: 372, y: 0, width: 372, height: 30.5))
+        ])
+        #expect(state.isLayoutReady)
+        #expect(state.chapterLayout.buildCount == 2)
+        #expect(state.chapterLayout.layout?.regions[0].writingRect.height == 86)
+        #expect(state.chapterLayout.layout?.regions[1].writingRect.height == 30.5)
+    }
+
+    @Test("이전 장 행의 실측 높이는 새 장 레이아웃에 적용되지 않는다 (§14 6-3 계열)")
+    func staleChapterMeasuredHeightIsNotApplied() {
+        var state = CarveDetailFeature.State.initialState
+        reduce(&state, .view(.layoutHostingChanged(writingWidth: 372)))
+        reduce(&state, .setSentence(sentences(count: 2), []))
+        measured(&state, [
+            rowID(1): VerseRowGeometry(underlineOffsets: [30], canvasFrameInRow: CGRect(x: 372, y: 0, width: 372, height: 99)),
+            rowID(2): VerseRowGeometry(underlineOffsets: [30], canvasFrameInRow: CGRect(x: 372, y: 0, width: 372, height: 99))
+        ])
+        #expect(state.chapterLayout.layout?.regions[0].writingRect.height == 99)
+
+        let next = BibleChapter(title: .genesis, chapter: 2)
+        reduce(&state, .setSentence(sentences(count: 2, chapter: next), []))
+        measured(&state, [
+            rowID(1, chapter: next): VerseRowGeometry(underlineOffsets: [30]),
+            rowID(2, chapter: next): VerseRowGeometry(underlineOffsets: [30])
+        ])
+        let padding = ChapterLayoutHosting.firstVerseTopPadding
+        #expect(state.chapterLayout.layout?.regions[0].writingRect.height == padding + 30)
+        let buildCount = state.chapterLayout.buildCount
+
+        // 이전 장 행 id 로 늦게 도착한 실측 높이 — id 조회에 실패해 버려진다.
+        measured(&state, [rowID(1): VerseRowGeometry(canvasFrameInRow: CGRect(x: 372, y: 0, width: 372, height: 99))])
+
+        #expect(state.chapterLayout.canvasFramesInRow.isEmpty)
+        #expect(state.chapterLayout.buildCount == buildCount)
+        #expect(state.chapterLayout.layout?.regions[0].writingRect.height == padding + 30)
     }
 
     @Test("폭이 나중에 도착해도 이미 모인 실측으로 곧바로 레이아웃이 완성된다 (§6-4 도착 순서 무관)")

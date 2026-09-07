@@ -6,6 +6,7 @@
 //  Copyright © 2026 leetaek. All rights reserved.
 //
 
+import CarveToolkit
 import CoreGraphics
 import Domain
 import Foundation
@@ -20,6 +21,76 @@ struct VerseTextMeasurement: Equatable, Sendable {
     let underlineAnchors: [CGFloat]
 }
 
+// MARK: - 레이아웃 Δ 안전망 (설계 §14 — D9 R13)
+
+/// 예측 좌표와 실제 렌더가 얼마나 어긋났는지에 대한 판정.
+///
+/// **§6-2 합성 게이트(`ChapterLayoutMeasurement.isReady`)와 별개다.** 합성 게이트는 절 개수만 보므로
+/// Δ 가 87.5pt 여도 `gate PASS` 이고, 그 상태의 필기는 장 하단에서 잘못된 절에 귀속된다 (G3 위반).
+/// 그렇다고 Δ 를 합성 게이트에 넣으면 오탐 하나로 **기존 잉크가 안 보이거나 미저장분이 유실**될 수 있다 (§15).
+/// 그래서 이 판정은 **새 입력만** 막는다 — 합성·표시·저장은 무엇이 어긋나든 계속 돈다.
+///
+/// | 조건 | 동작 |
+/// |---|---|
+/// | Δ > `tolerance` (1pt) | Debug 로그 |
+/// | Δ > `lineSpace` (한 줄 — 귀속이 확실히 틀어지는 크기) | 그 위에 더해 **새 입력 차단** |
+///
+/// 이것은 **결함의 대체재가 아니라 안전망**이다. R13 수정(실측 높이)이 본체다.
+public struct LayoutDeltaVerdict: Equatable, Sendable {
+    /// Debug 로그 허용치. 디버그 HUD 의 `tol` 과 같은 값이다.
+    public static let tolerance: CGFloat = 1
+
+    /// 가장 크게 어긋난 절.
+    public let verse: Int
+    /// 그 절의 Δ (`FrameDelta.magnitude`).
+    public let magnitude: CGFloat
+    public let topDelta: CGFloat
+    public let heightDelta: CGFloat
+    /// 차단 임계값으로 쓴 한 줄 높이.
+    public let lineSpace: CGFloat
+    /// 허용치 초과 — Debug 에서 시끄럽게 알린다.
+    public var exceedsTolerance: Bool { magnitude > Self.tolerance }
+    /// 새 입력을 막아야 하는가. `blocksInput == false` 여도 `exceedsTolerance` 는 참일 수 있다.
+    public let blocksInput: Bool
+
+    public init(verse: Int, magnitude: CGFloat, topDelta: CGFloat, heightDelta: CGFloat, lineSpace: CGFloat, blocksInput: Bool) {
+        self.verse = verse
+        self.magnitude = magnitude
+        self.topDelta = topDelta
+        self.heightDelta = heightDelta
+        self.lineSpace = lineSpace
+        self.blocksInput = blocksInput
+    }
+
+    /// 허용치를 넘은 Δ 를 Debug 에서 시끄럽게 남긴다. 어긋난 절과 값을 함께 적는다.
+    ///
+    /// 실측은 절마다 계속 도착하므로 값이 바뀔 때마다 찍으면 로그가 폭주한다. **의미 있는 변화**에만 남긴다 —
+    /// 차단 여부가 바뀌었을 때 · 허용치를 새로 넘겼을 때 · 최악 절이 바뀌었을 때 · Δ 가 허용치 이상 더 벌어졌을 때.
+    /// - Parameters:
+    ///   - previous: 직전 판정.
+    ///   - current: 새 판정.
+    ///   - chapter: 대상 장.
+    static func logIfNoteworthy(previous: LayoutDeltaVerdict?, current: LayoutDeltaVerdict?, chapter: BibleChapter) {
+        #if DEBUG
+        guard let current, current.exceedsTolerance else { return }
+        let isNoteworthy = previous?.blocksInput != current.blocksInput
+            || previous?.exceedsTolerance != true
+            || previous?.verse != current.verse
+            || abs((previous?.magnitude ?? 0) - current.magnitude) > tolerance
+        guard isNoteworthy else { return }
+        Log.error(
+            current.blocksInput
+                ? "단일 Canvas — 레이아웃 Δ 가 한 줄을 넘어 새 입력을 막는다 (§14 안전망)"
+                : "단일 Canvas — 레이아웃 Δ 가 허용치를 넘었다 (입력은 열어 둔다)",
+            "\(chapter.title.rawValue).\(chapter.chapter)",
+            "worst v\(current.verse)",
+            String(format: "Δ %.2fpt (top %+.2f · height %+.2f)", current.magnitude, current.topDelta, current.heightDelta),
+            String(format: "tol %.2fpt · lineSpace %.2fpt", tolerance, current.lineSpace)
+        )
+        #endif
+    }
+}
+
 // MARK: - 장 전체 측정 상태
 
 /// Phase 2 — 장 전체의 레이아웃 측정을 모아 `ChapterLayout` 을 만드는 순수 상태 (설계 §6).
@@ -32,11 +103,17 @@ struct VerseTextMeasurement: Equatable, Sendable {
 /// | 입력 | 용도 | 없으면 |
 /// |---|---|---|
 /// | 텍스트 실측 (`recordText`) · 소제목 높이 (`recordTitleHeight`) · 필사 폭 (`setWritingWidth`) | **레이아웃 계산의 입력** | 레이아웃을 만들지 않는다 (게이트 닫힘) |
-/// | 행 frame 실측 (`recordFrame`) | **검증 전용** — 예측한 `writingRect` 와 실제 행 위치의 차이(`frameDeltas`) | 레이아웃에는 영향 없음 |
+/// | 행 안 캔버스 영역의 **높이** (`recordCanvasFrameInRow`) | **레이아웃 계산의 입력** (R13) — 절의 실측 높이 | 예측식(`줄 수 × lineSpace`)으로 떨어진다. 게이트는 열린다 |
+/// | 행 frame 의 **원점** (`recordRowFrame`) | **검증 전용** — `columnOrigin` 과 `frameDeltas.topDelta` | 레이아웃에는 영향 없음 |
 ///
-/// 행 frame 을 레이아웃 입력으로 쓰지 않는 이유: 그러면 "빌더가 실제 배치를 재현하는가"(S3) 를 확인할 수 없다.
-/// 빌더는 **선언된 배치 상수**(`ChapterLayoutHosting`)와 텍스트 실측만으로 좌표를 예측하고,
-/// 실측 frame 은 그 예측이 맞는지를 보는 자 역할만 한다.
+/// 원래는 실측 frame 전체가 검증 전용이었다 — "빌더가 실제 배치를 재현하는가"(S3) 를 보기 위해서다.
+/// 그런데 D9 실기기에서 빌더의 **높이 예측만** 실제 렌더와 어긋나(R13, 절당 0.5pt 누적) 그 전제가 깨졌다.
+/// 높이는 실측을 쓰고(`VerseLayoutInput.measuredHeight`), 검증은 `topDelta` 가 이어받는다.
+///
+/// > ⚠️ **알려진 부작용.** 실측 높이를 레이아웃 입력으로 쓰면 `frameDeltas.heightDelta` 가 **구조적으로 0** 이 된다
+/// > (Pass 2 여유 높이가 붙은 절만 예외이며, 그때는 정확히 `−extraBands × lineSpace` 다).
+/// > 즉 높이 Δ 는 더 이상 독립 검증이 아니라 자기 자신을 검증한다. 남는 독립 검증은 **`topDelta`** 이고,
+/// > 그것은 여전히 `metrics`(`topInset`/`verseSpacing`/`bottomInset`)와 `leadingInset` 의 적재를 검증한다.
 ///
 /// - Note: 이 타입은 UIKit/PencilKit/SwiftUI 를 모른다. Reducer 상태에 그대로 들어가며 단위 테스트로 전부 검증한다.
 struct ChapterLayoutMeasurement: Equatable, Sendable {
@@ -68,10 +145,13 @@ struct ChapterLayoutMeasurement: Equatable, Sendable {
     private(set) var measuredFrames: [Int: CGRect] = [:]
     /// 절별 행 frame (콘텐츠 좌표) — `measuredFrames` 를 만들기 위한 절반.
     private(set) var rowFrames: [Int: CGRect] = [:]
-    /// 절별 캔버스 영역 (행 안 좌표) — 나머지 절반.
+    /// 절별 캔버스 영역 (행 안 좌표) — 나머지 절반이자 **실측 높이의 출처**(R13).
     private(set) var canvasFramesInRow: [Int: CGRect] = [:]
     /// 필사 컬럼 폭 (= 절 캔버스 폭 = `ChapterLayout.writingWidth`).
     private(set) var writingWidth: CGFloat = 0
+    /// 마지막 계산에 쓴 `SentenceSetting.lineSpace`. 안전망의 차단 임계값(한 줄)이다.
+    /// 설정값이므로 장이 바뀌어도 유지된다 (`writingWidth` 와 같은 성격).
+    private(set) var lineSpace: CGFloat = 0
     /// 전 절 측정으로 완성된 레이아웃. 게이트 판정은 이 값과 `expectedVerseCount` 로 한다.
     private(set) var layout: ChapterLayout?
     /// 이 장에서 레이아웃을 (재)계산한 횟수. 첫 완성 이후의 재계산은 실측값 갱신에 의한 것이다.
@@ -127,6 +207,31 @@ struct ChapterLayoutMeasurement: Equatable, Sendable {
     /// 가장 크게 어긋난 절. 실측이 없으면 nil.
     var worstFrameDelta: FrameDelta? {
         frameDeltas.max { $0.magnitude < $1.magnitude }
+    }
+
+    /// Pass 2 여유 높이(설계 §6-3)가 실제로 붙은 절이 하나라도 있는가.
+    ///
+    /// 그 여유는 저장된 필사가 현재 텍스트보다 많은 줄을 요구할 때 `writingRect` 를 **의도적으로** 부풀린 값이라
+    /// 행은 그만큼 커지지 않는다. 즉 Δ 가 의도적으로 커지며, 그 상태의 Δ 로는 "의도한 여유" 와 "예측 결함" 을
+    /// 구별할 수 없다. 안전망은 구별할 수 없을 때 **막지 않는다** — 무해한 조건으로 필기를 막는 쪽이 더 나쁜 회귀다.
+    var hasReflowSlack: Bool {
+        verses.contains { verse in
+            guard let saved = savedBandCounts[verse] else { return false }
+            return saved > (textMeasurements[verse]?.lineCount ?? 0)
+        }
+    }
+
+    /// 안전망 판정 (`LayoutDeltaVerdict`). 실측 frame 이 없으면 nil — 판정할 근거가 없다는 뜻이다.
+    var layoutDeltaVerdict: LayoutDeltaVerdict? {
+        guard let worst = worstFrameDelta else { return nil }
+        return LayoutDeltaVerdict(
+            verse: worst.verse,
+            magnitude: worst.magnitude,
+            topDelta: worst.topDelta,
+            heightDelta: worst.heightDelta,
+            lineSpace: lineSpace,
+            blocksInput: lineSpace > 0 && worst.magnitude > lineSpace && !hasReflowSlack
+        )
     }
 
     // MARK: 입력
@@ -213,6 +318,8 @@ struct ChapterLayoutMeasurement: Equatable, Sendable {
     }
 
     /// 행 frame(콘텐츠 좌표)을 기록하고, 행 안 캔버스 영역이 이미 있으면 둘을 합쳐 `measuredFrames` 를 갱신한다.
+    ///
+    /// 행 frame 은 **원점만** 쓰인다 (`columnOrigin` · `topDelta`). 레이아웃 입력이 아니므로 재계산을 일으키지 않는다.
     /// - Returns: `measuredFrames` 가 실제로 바뀌었으면 true.
     @discardableResult
     mutating func recordRowFrame(verse: Int, frame: CGRect) -> Bool {
@@ -222,12 +329,17 @@ struct ChapterLayoutMeasurement: Equatable, Sendable {
     }
 
     /// 행 안 캔버스 영역(행 좌표)을 기록하고, 행 frame 이 이미 있으면 둘을 합쳐 `measuredFrames` 를 갱신한다.
-    /// - Returns: `measuredFrames` 가 실제로 바뀌었으면 true.
+    ///
+    /// **이 frame 의 높이는 레이아웃 입력이다** (`VerseLayoutInput.measuredHeight`, R13). 행 frame 과 달리
+    /// 여기서는 높이만 쓰므로, 행 frame 이 아직 오지 않아 `measuredFrames` 를 합칠 수 없어도 재계산 대상이다.
+    /// - Returns: 레이아웃 입력(높이) 또는 `measuredFrames` 가 실제로 바뀌었으면 true.
     @discardableResult
     mutating func recordCanvasFrameInRow(verse: Int, frame: CGRect) -> Bool {
         guard verses.contains(verse) else { return false }
+        let previousHeight = canvasFramesInRow[verse]?.height
         canvasFramesInRow[verse] = frame
-        return combineFrames(verse: verse)
+        let framesChanged = combineFrames(verse: verse)
+        return framesChanged || previousHeight != frame.height
     }
 
     private mutating func combineFrames(verse: Int) -> Bool {
@@ -242,9 +354,11 @@ struct ChapterLayoutMeasurement: Equatable, Sendable {
     /// 입력이 전부 모였으면 레이아웃을 (재)계산한다.
     ///
     /// 조건: 전 절 텍스트 실측 + `writingWidth > 0`. 하나라도 빠지면 `layout` 을 건드리지 않고 nil 을 돌려준다.
+    /// **실측 높이는 조건이 아니다** — 아직 오지 않은 절은 예측식으로 떨어지므로 게이트가 늦게 열리지 않는다 (R13).
     /// 이미 완성된 뒤 실측값이 갱신되면 다시 계산한다 — 그 사이 게이트는 닫히지 않는다
-    /// (절 개수는 그대로이므로). 잠깐 이전 값이 섞인 레이아웃이 보일 수 있으나 Phase 2 에는 합성이 없어 무해하다.
-    /// Phase 3 은 이 지점에 `isEditing` / `pendingLayout` (설계 §4) 을 끼워야 한다.
+    /// (절 개수는 그대로이므로). 즉 장 진입은 보통 **예측 → 실측**으로 두 번 이상 지어진다.
+    /// Phase 3 은 그 두 번째 레이아웃을 `isEditing` / `pendingLayout` (설계 §4 · §8-1) 이 흡수한다 —
+    /// 편집 중 도착한 레이아웃은 pencil-up 뒤에 적용된다.
     /// - Parameters:
     ///   - setting: 본문 설정.
     ///   - isLeftHanded: 왼손 모드.
@@ -259,6 +373,7 @@ struct ChapterLayoutMeasurement: Equatable, Sendable {
         now: ContinuousClock.Instant
     ) -> ChapterLayout? {
         guard let chapter, isTextComplete, writingWidth > 0 else { return nil }
+        lineSpace = max(0, setting.lineSpace)
 
         let inputs = verses.map { verse -> VerseLayoutInput in
             let text = textMeasurements[verse]
@@ -267,6 +382,8 @@ struct ChapterLayoutMeasurement: Equatable, Sendable {
                 textLineCount: text?.lineCount ?? 0,
                 savedBandCount: savedBandCounts[verse],
                 measuredUnderlineAnchors: text?.underlineAnchors,
+                // R13 — 행 높이는 예측하지 않고 실측을 쓴다. 아직 도착하지 않은 절만 빌더의 예측식으로 떨어진다.
+                measuredHeight: canvasFramesInRow[verse]?.height,
                 leadingInset: ChapterLayoutHosting.leadingInset(titleHeight: titleHeights[verse]),
                 topPadding: ChapterLayoutHosting.topPadding(forVerse: verse)
             )

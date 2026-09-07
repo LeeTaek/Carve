@@ -132,8 +132,10 @@ struct ChapterLayoutDebugHUD: View {
     let measurement: ChapterLayoutMeasurement
     /// 마지막 편집 절 번호와 그 drawing bounds (content 좌표).
     let lastEdit: (verse: Int, bounds: CGRect)?
+    /// Δ 안전망이 단일 Canvas 에 실제로 넘긴 판정 (§14 — D9 R13). N-Canvas 경로에서는 nil (안전망이 적용되지 않는다).
+    var safetyNet: LayoutDeltaVerdict?
 
-    private let tolerance: CGFloat = 1
+    private let tolerance = LayoutDeltaVerdict.tolerance
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -141,6 +143,7 @@ struct ChapterLayoutDebugHUD: View {
             geometryLine
             deltaLine
             profileLine
+            guardLine
             editLine
             if !measurement.missingVerses.isEmpty {
                 Text("missing \(missingSummary)").foregroundStyle(.yellow)
@@ -224,6 +227,30 @@ struct ChapterLayoutDebugHUD: View {
                 }
             } else {
                 Text("prof —").foregroundStyle(.gray)
+            }
+        }
+    }
+
+    /// Δ 안전망의 상태 — 차단 중인지 한눈에 보이게 한다 (§14 — D9 R13).
+    ///
+    /// `guard —` 는 안전망이 적용되지 않는 경로(N-Canvas)이거나 아직 판정할 실측이 없다는 뜻이다.
+    /// `guard BLOCKED` 는 **새 입력만** 막힌 상태다 — 합성·표시·저장은 그대로 돈다.
+    private var guardLine: some View {
+        Group {
+            if let safetyNet {
+                HStack(spacing: 10) {
+                    Text(safetyNet.blocksInput ? "guard BLOCKED" : "guard OPEN")
+                        .font(.system(size: 14, weight: .bold, design: .monospaced))
+                        .foregroundStyle(safetyNet.blocksInput ? Color.red : (safetyNet.exceedsTolerance ? Color.yellow : Color.green))
+                    Text("입력만 차단 · 합성/저장 유지").foregroundStyle(.gray)
+                    Text("v\(safetyNet.verse) Δ \(fmt(safetyNet.magnitude))")
+                    Text("limit \(fmt(safetyNet.lineSpace))pt(1줄)").foregroundStyle(.gray)
+                    if measurement.hasReflowSlack {
+                        Text("slack(§6-3) — 판정 보류").foregroundStyle(.yellow)
+                    }
+                }
+            } else {
+                Text("guard — (단일 Canvas 아님 또는 실측 대기)").foregroundStyle(.gray)
             }
         }
     }
