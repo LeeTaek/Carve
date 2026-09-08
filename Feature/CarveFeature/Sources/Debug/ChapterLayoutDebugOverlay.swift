@@ -135,6 +135,11 @@ private struct ChapterLayoutRegionMarks: View {
 struct CanvasComposeProbe: Equatable {
     /// 캔버스가 마지막 합성에 쓴 레이아웃의 서명.
     let renderedSignature: String?
+    /// 캔버스가 마지막 합성에 쓴 `columnOrigin`. **서명에 들어가지 않으므로 따로 봐야 한다** —
+    /// 합성 좌표가 `layout 좌표 + columnOrigin`(§5) 이라, 서명이 같아도 원점이 낡으면 잉크가 통째로 밀린다.
+    let renderedColumnOrigin: CGPoint
+    /// 다음 합성에 쓸 최신 `columnOrigin`.
+    let columnOrigin: CGPoint
     let renderedRevision: Int
     let isReloading: Bool
     let reloadWhenSettled: Bool
@@ -289,13 +294,17 @@ struct ChapterLayoutDebugHUD: View {
         Group {
             if let compose {
                 let measured = measurement.layout?.signature
+                // 서명과 원점 **둘 다** 맞아야 SYNC 다. 원점만 낡아도 잉크는 통째로 밀린다 (D9 H — 시편 120편).
                 let isSynced = compose.renderedSignature == measured
+                    && compose.renderedColumnOrigin == compose.columnOrigin
                 HStack(spacing: 10) {
                     Text(isSynced ? "compose SYNC" : "compose STALE")
                         .font(.system(size: 14, weight: .bold, design: .monospaced))
                         .foregroundStyle(isSynced ? Color.green : Color.red)
                     Text("csig \(compose.renderedSignature.map { String($0.prefix(14)) } ?? "—")")
                     Text("rev \(compose.renderedRevision)")
+                    Text("org \(fmt(compose.renderedColumnOrigin.x))→\(fmt(compose.columnOrigin.x))")
+                        .foregroundStyle(compose.renderedColumnOrigin == compose.columnOrigin ? Color.white : Color.red)
                     Text(flagSummary(compose)).foregroundStyle(.gray)
                     Text("mism \(verseSummary(compose.mismatchVerses))")
                     Text("leg \(verseSummary(compose.legacyVerses))")

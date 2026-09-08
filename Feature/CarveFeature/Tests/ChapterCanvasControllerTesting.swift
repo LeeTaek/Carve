@@ -33,6 +33,22 @@ private struct StretchyColumnStub: View {
     }
 }
 
+/// 폭이 좁아지면 세로로 길어지는 컬럼 — **텍스트 줄바꿈의 성질만** 재현한다 (회전 시퀀스용).
+///
+/// 실제 절 행은 폭이 줄면 줄 수가 늘어 컬럼이 길어진다. 그 관계를 `면적 / 폭` 으로 모델링하면
+/// 회전을 폭 변경만으로 태울 수 있다 — 시뮬레이터에 회전 명령이 없고(`simctl ui` 에 orientation 없음),
+/// 실기기 회전은 D9 H-4 에서만 볼 수 있기 때문이다.
+private struct WidthDrivenHeightColumn: Layout {
+    let area: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard let width = proposal.width, width > 0 else { return .zero }
+        return CGSize(width: width, height: (area / width).rounded())
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {}
+}
+
 /// `onGeometryChange` 로 온 값을 테스트로 넘기는 상자 (전부 main actor 에서만 만진다).
 @MainActor
 private final class ValueBox<Value> {
@@ -76,6 +92,16 @@ struct ChapterCanvasControllerTesting {
             controller.setColumn(ChapterCanvasView.hostedColumn(AnyView(column)) { [unowned self] height in
                 self.controller.setColumnHeight(height)
             })
+        }
+
+        /// 회전을 폭 변경으로 재현한다 — 창과 컨트롤러 뷰를 함께 바꾼다 (`viewDidLayoutSubviews` 의 `lastBounds` 경로를 태운다).
+        @MainActor
+        func resize(to size: CGSize) {
+            let frame = CGRect(origin: .zero, size: size)
+            window?.frame = frame
+            controller.view.frame = frame
+            controller.view.setNeedsLayout()
+            controller.view.layoutIfNeeded()
         }
 
         /// SwiftUI 배치 → `onGeometryChange` → `setColumnHeight` → `updateContentGeometry` 가 한 바퀴 도는 것을 기다린다.
@@ -286,6 +312,30 @@ struct ChapterCanvasControllerTesting {
         #expect(frame.minY - hostTop <= 0.5)
 
         window.isHidden = true
+    }
+
+    @Test("회전(폭 A→B→A) 왕복 뒤 컬럼 기하가 A 로 정확히 돌아온다 — 낡은 폭·높이가 남지 않는다")
+    func rotationRoundTripRestoresColumnGeometry() async throws {
+        let harness = Harness(inWindow: true)
+        harness.setColumn(WidthDrivenHeightColumn(area: 480_000) { Color.clear })
+
+        // ── 세로 800 × 1,200 → 컬럼 이상적 높이 480,000 / 800 = 600 ──
+        harness.resize(to: CGSize(width: 800, height: 1_200))
+        #expect(await harness.settleContentFrameHeight(expecting: 600) == 600)
+        let portrait = harness.controller.canvas.contentFrame
+        #expect(portrait == CGRect(x: 0, y: 0, width: 800, height: 600))
+
+        // ── 가로 1,200 × 800 → 480,000 / 1,200 = 400 ──
+        harness.resize(to: CGSize(width: 1_200, height: 800))
+        #expect(await harness.settleContentFrameHeight(expecting: 400) == 400)
+        #expect(harness.controller.canvas.contentFrame == CGRect(x: 0, y: 0, width: 1_200, height: 400))
+
+        // ── 다시 세로 — 낡은 값이 남으면 여기서 갈린다 (D9 H-4 실기기 관측) ──
+        harness.resize(to: CGSize(width: 800, height: 1_200))
+        #expect(await harness.settleContentFrameHeight(expecting: 600) == 600)
+        #expect(harness.controller.canvas.contentFrame == portrait)
+        #expect(harness.controller.canvas.contentSize.width == 800)
+        harness.teardown()
     }
 
     @Test("헤더 높이가 첫 apply 뒤에 도착해도 맨 위에 있던 스크롤은 새 인셋만큼 내려 상단이 가리지 않는다")

@@ -92,6 +92,8 @@ public struct CarveDetailView: View {
         let canvas = store.chapterCanvas
         return CanvasComposeProbe(
             renderedSignature: canvas.renderedLayout?.signature,
+            renderedColumnOrigin: canvas.renderedColumnOrigin,
+            columnOrigin: canvas.columnOrigin,
             renderedRevision: canvas.renderedRevision,
             isReloading: canvas.isReloading,
             reloadWhenSettled: canvas.reloadWhenSettled,
