@@ -131,16 +131,16 @@ xcrun devicectl device notification post --device "$CARVE_DEVICE_ID" \
 
 3·4번은 표시 drawing을 바꾸는 실험이다. `isApplyingDrawing`으로 편집 보고를 억제하며, 이 억제를 제거하면 안전성 테스트가 실패하는 것을 확인했다. `clear`를 DB 삭제 명령으로 구현하거나 원본 표본에 새 필기를 추가하지 않는다.
 
-## 6. 자동 비교 모드와 종료
+## 6. 양성 대조(결함 재현) 모드와 종료
 
 ```bash
 xcrun devicectl device process launch --device "$CARVE_DEVICE_ID" \
   --terminate-existing --console kr.co.carve.leetaek -- \
   -SingleCanvas -ChapterLayoutOverlay -CanvasDisplayProbe -CanvasReuseStrokesOnApply \
-  > "$CARVE_DEVICE_LOGS/fresh-apply.log" 2>&1
+  > "$CARVE_DEVICE_LOGS/reuse-apply.log" 2>&1
 ```
 
-§4대로 가로 → 세로 → 가로를 수행한다. 이 모드의 통과는 Debug 비교 실험의 통과다. 정식 수정 검증에서는 이 인자를 빼고 같은 결과가 나와야 한다.
+§4대로 가로 → 세로 → 가로를 수행한다. **이 모드에서는 필기가 밀리는 결함이 재현돼야 정상이다** — 수정을 끄는 opt-out 이기 때문이다. 기본 검증(인자 없음)이 정상이고 이 모드가 결함을 재현하면 양성 대조가 성립한다. 2026-09-08 A/B 에서 실제로 그렇게 나왔다 ([조사 문서](./single-canvas-rotation-display-investigation.md) §3).
 
 `--console` 프로세스에 Ctrl-C를 보내면 신호가 앱으로 전달될 수 있다(`process launch --help`). 이번에는 **콘솔 없이 앱을 다시 실행**해 이전 수집을 끝내고 비교 모드의 앱을 남겼다.
 
@@ -165,6 +165,6 @@ xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace \
   -destination 'platform=iOS Simulator,name=iPad mini (A17 Pro),OS=26.2'
 ```
 
-실제 사용 가능한 iPad 이름·OS로 조정한다. 이번에는 iPhone 시뮬레이터도 켜져 있었지만 검증 destination에는 사용하지 않았다. 함수 단위 `only-testing`으로 0개가 실행된 사례가 있으므로 `TEST SUCCEEDED`만 보지 말고 실제 실행 개수도 확인한다. 현재 전체 기준선은 296개이며 [설계 §19-4-2](./single-canvas-design.md)를 기준으로 유지한다.
+실제 사용 가능한 iPad 이름·OS로 조정한다. 이번에는 iPhone 시뮬레이터도 켜져 있었지만 검증 destination에는 사용하지 않았다. 함수 단위 `only-testing`으로 0개가 실행된 사례가 있으므로 `TEST SUCCEEDED`만 보지 말고 실제 실행 개수도 확인한다. 현재 전체 기준선은 302개이며 [설계 §19-4-2](./single-canvas-design.md)를 기준으로 유지한다.
 
 기록할 항목은 기기·OS build·Xcode·USB 상태, 코드 revision/diff, **전체 실행 인자**, 회전 순서, 안정 후 로그, 사용자 또는 스크린샷의 화면 판정, 실제 테스트 개수와 종료 코드, 미검증 항목이다. `Activity Monitor`를 이용한 성능 기록은 기존 런북을 따르며 이 세션에서 새 성능 측정을 완료한 것으로 적지 않는다.

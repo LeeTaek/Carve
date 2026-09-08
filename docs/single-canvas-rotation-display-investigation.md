@@ -15,7 +15,7 @@
 | Release 유출 | ✅ 바이너리 심볼로 확인 — 진단·플래그 0건 |
 | 편집·저장 왕복 · 긴 장 성능 · 스크롤 중 회전 · 글꼴 변경 | ⚠️ **미수행** (§6) |
 
-관련 문서: [전환 설계](./single-canvas-design.md) §5·§9·§14·§20-15, [D9 런북](./phase-0a-d-device-test.md) §6-9·§8-7, [실기기 조작 절차](./device-debugging-cli.md).
+관련 문서: [전환 설계](./single-canvas-design.md) §5·§9·§14·§20-15·§20-16, [D9 런북](./phase-0a-d-device-test.md) §6-9·§8-7, [실기기 조작 절차](./device-debugging-cli.md).
 
 ## 2. 증상과 기존 진단의 정정
 
@@ -60,7 +60,7 @@
 | 7 | 앱 재실행 후 매 apply에 새 획 생성, 세로 회전 | 추가 복구 명령 없이 정상 |
 | 8 | 위 모드에서 가로 복귀 | 정상 유지 |
 
-조사 종료 시 앱은 `-SingleCanvas -ChapterLayoutOverlay -CanvasFreshStrokesOnApply`로 실행했다. 로그 수집과 원격 실험 모드는 종료했다. 이 실행 상태가 영구 설정이나 Release 수정이라는 뜻은 아니다.
+조사 종료 시 앱은 `-SingleCanvas -ChapterLayoutOverlay -CanvasFreshStrokesOnApply`로 실행했다 (당시의 opt-in 인자 — **지금은 없다.** §4). 로그 수집과 원격 실험 모드는 종료했다.
 
 ### 정식 수정 후 A/B (2026-09-08, `ef053111`)
 
@@ -100,31 +100,32 @@ Apple 내부 캐시 키, 내부 UUID, 실패한 프레임워크 함수는 확인
 | [ChapterCanvasController.swift](../Feature/CarveFeature/Sources/Presentation/Drawing/ChapterCanvas/ChapterCanvasController.swift) | apply/렌더 계측, 수동 실험, Debug 자동 비교 모드 |
 | [ChapterCanvasControllerTesting.swift](../Feature/CarveFeature/Tests/ChapterCanvasControllerTesting.swift) | 실험 시 편집 보고 억제 및 획 좌표·소유권 식별자 보존 테스트 |
 
-`-CanvasFreshStrokesOnApply`는 `applyDrawing` 안에서만 작동한다. 디코딩한 drawing의 각 획을 `PKStroke(ink:path:transform:mask:randomSeed:)`로 다시 구성한다. `path`를 그대로 넘겨 생성 시각과 control point를 유지한다. 이 처리는 `#if DEBUG`와 실행 인자 뒤에 있으므로 **그대로 두면 정식 앱에는 해결책이 적용되지 않는다.**
+표시용 획 재구성은 `applyDrawing` 안에서만 작동한다. 디코딩한 drawing의 각 획을 `PKStroke(ink:path:transform:mask:randomSeed:)`로 다시 구성하고, `path`를 그대로 넘겨 생성 시각과 control point를 유지한다. **이것이 지금의 정식 경로다(Release 포함).** 조사 당시의 `-CanvasFreshStrokesOnApply`(수정을 켜는 opt-in)는 사라졌고, 남은 `-CanvasReuseStrokesOnApply`는 **수정을 끄고 결함을 재현하는** Debug 전용 opt-out이다 — 양성 대조와 성능 비교에만 쓴다.
 
-## 5. 다음 세션의 정식 구현안 — 아직 미구현
+## 5. 정식 구현안 — ✅ 적용 완료 (`ef053111`)
 
-### 후보 비교와 권장 순서
+### 후보 비교와 채택 근거
 
-| 후보 | 확보한 근거 | 채택 전 확인할 점 |
+| 후보 | 확보한 근거 | 판정 |
 |---|---|---|
-| **새 획 생성 후 표시** | 수동 정상화와 자동 회전 왕복 모두 성공 | 모든 필요한 필기 속성·마스크 보존, 긴 장의 할당·렌더 비용 |
-| 빈 drawing을 거쳐 같은 drawing 대입 | 수동 정상화 성공 | 연속 회전, 비동기 delegate, 깜빡임, undo 및 추가 렌더 비용. 자동 회전 적용은 아직 미검증 |
-| setNeedsDisplay / 같은 drawing 재대입 | 효과 없음 | 단독 수정안으로 채택하지 않음 |
-| 컨트롤러 또는 PKCanvasView 재생성 | 이번 조사에서 시험하지 않음 | 스크롤·편집·undo 수명 영향을 늘리므로 우선안 아님 |
+| **새 획 생성 후 표시** | 수동 정상화 · 자동 회전 왕복 · 실기기 3왕복 + 양성 대조 모두 통과 | ✅ **채택** |
+| 빈 drawing을 거쳐 같은 drawing 대입 | 수동 정상화 성공 | 미채택 — 연속 회전·비동기 delegate·깜빡임·undo·추가 렌더 비용이 미검증 |
+| setNeedsDisplay / 같은 drawing 재대입 | 효과 없음 | 미채택 |
+| 컨트롤러 또는 PKCanvasView 재생성 | 시험하지 않음 | 미채택 — 스크롤·편집·undo 수명 영향이 크다 |
 
-**새 획 생성 방식을 우선 검증한다.** 공개 속성만으로 충실히 재구성할 수 없는 잉크/SDK 속성이 발견되면 빈 drawing 경유 방식으로 비교한다. 새 속성 손실 가능성을 무시하고 Debug 코드를 그대로 Release로 옮기지 않는다.
+### 구현 결과 — 지켜진 제약
 
-### 구현 순서
+1. `ChapterCanvasController.applyDrawing`의 **디코딩 후, `canvas.drawing` 대입 직전**에 표시용 획 재구성 helper를 뒀다. Feature/코덱/DB의 좌표 계산이나 저장 데이터 마이그레이션은 건드리지 않았다.
+2. **속성 감사 완료 (iOS 26 SDK).** 지정 가능 속성은 `ink`·`path`·`transform`·`mask`·`randomSeed` 다섯뿐이고 전부 그대로 넘긴다. `renderBounds`·`maskedPathRanges`·`requiredContentVersion`은 읽기 전용 파생값이라 지정 수단이 없다. **손실되는 지정 가능 속성은 없다.** `path`를 통째로 넘기므로 `StrokeIdentityKey`가 쓰는 `randomSeed`+`creationDate`+`path.count`가 보존돼 소유권 승계가 유지된다.
+3. 실제 `renderedRevision` 교체 시에만 실행한다. 일반 `updateUIViewController`·스크롤·도구 설정 변경·사용자 획 delegate에서는 재생성하지 않는다.
+4. 기존 순서를 보존했다: 이전 세대 미보고 편집 flush → 디코드/표시 준비 → `isApplyingDrawing` 보호 안에서 교체 → undo 초기화·다음 턴 보고.
+5. OS 버전 조건이나 런타임 캐시 결함 탐지 로직은 **만들지 않았다** — 근거가 없다.
 
-1. 작업 시작 시 현재 diff를 확인한다. 이 세션의 진단 코드 4개 파일은 미커밋 변경일 수 있으므로 지우거나 중복 구현하지 않는다. 현재 정식 동작과 Debug 비교 모드의 차이를 먼저 확인한다.
-2. `ChapterCanvasController.applyDrawing`의 **디코딩 후, canvas.drawing 대입 직전**에 표시용 획 재구성 helper를 둔다. Feature/코덱/DB의 좌표 계산이나 저장 데이터 마이그레이션으로 옮기지 않는다.
-3. `ink`, `path`, `transform`, `mask`, `randomSeed`와 사용 SDK의 추가 공개 필기 속성을 감사한다. `StrokeIdentityKey`가 쓰는 생성 시각·seed·point 수를 포함해 기존 owner 연결이 유지되어야 한다. `PKStroke` 내부 식별자를 앱의 소유권 키로 채택하지 않는다.
-4. 실제 `renderedRevision` 교체 시에만 실행한다. 일반 `updateUIViewController`, 스크롤, 도구 설정 변경, 사용자 획 delegate마다 전체 획을 재생성하지 않는다.
-5. 기존 순서를 보존한다: 이전 세대 미보고 편집 flush → 데이터 디코드/표시 준비 → `isApplyingDrawing` 보호 안에서 교체 → 기존 undo 초기화·다음 턴 보고. 실험 테스트가 잡은 것처럼 프로그램 대입을 사용자 편집으로 보고하면 저장 오류가 된다.
-6. 검증이 끝난 방식을 정식 경로로 승격하고 실험 분기를 정리한다. 특정 OS 버전만 적용할지는 추가 비교 결과로 결정한다. 근거 없이 정확한 OS 버전 조건이나 런타임 캐시 결함 탐지 로직을 만들지 않는다.
-7. 진단 프로브의 유지 범위를 정한다. 원격 실험 명령은 Debug의 명시적 opt-in 뒤에만 남기거나 조사 종료 시 제거한다. Release에 빈 진단 delegate나 폴링이 생기지 않게 한다.
-8. §6 통과 후 이 문서의 상태와 설계·런북을 “정식 수정 완료”로 갱신한다. 그전에는 D9 H를 종결하지 않는다.
+> ⚠️ **알려진 부작용 — 지우개 조각 절이 1회 재저장된다.** `mask != nil` 인 획을 재구성하면 파생값 `maskedPathRanges`가 재계산되며 미세하게 달라진다(실측 차이 약 6.7e-4). `StrokeContentSignature`는 반올림을 금지하므로(설계 §7-2) 그 절이 한 번 dirty로 잡혀 `.replace`가 한 번 나간다. **저장 내용(획 수·좌표·`StrokeIdentityKey`·`ownership.map`)은 원본과 동일**하고, 재합성하면 mutation이 없는 **고정점**이라 회전마다 되풀이되지 않는다. 다만 `updateDate`가 바뀌므로 히스토리 순서·주간 통계에 영향이 있을 수 있다. (설계 §20-16)
+
+### 남은 정리 항목
+
+- 진단 프로브(`ChapterCanvasDisplayProbe`)와 `-CanvasDisplayExperiments` 원격 실험 명령은 **Debug opt-in 뒤에 남겨 뒀다.** 조사 종료 시 제거할지는 §6 잔여 검증이 끝난 뒤 결정한다. Release에 빈 진단 delegate나 폴링이 생기지 않았음은 바이너리 심볼로 확인했다.
 
 ### 변경하지 않을 계약
 
@@ -135,25 +136,27 @@ Apple 내부 캐시 키, 내부 UUID, 실패한 프레임워크 함수는 확인
 
 ## 6. 검증 계획과 완료 조건
 
-### 이번 세션에서 완료한 검증
+### ✅ 완료한 검증
 
 - Xcode 26.3 실기기 Debug 빌드, Tuist generate, 변경 Swift 파일 SwiftLint, `git diff --check` 통과.
-- iPad mini(A17 Pro), iOS 26.2에서 전체 **296개** 통과: Swift Testing 294개 + XCTest 2개. 세부: CarveFeature 167, Domain 107(XCTest 2 포함), CarveToolkit 6, ChartFeature 9, SettingsFeature 4, UIComponents 3.
-- 인계 기준 295개에서 진단 안전성 테스트 1개 추가. 테스트를 extension으로 옮긴 뒤 컨트롤러 스위트 13개 재검증 통과.
-- 변이: 진단 명령의 `isApplyingDrawing` 억제를 제거하자 새 테스트가 `editEnded` 발생으로 실패(3 issues). 변이 복원 완료.
+- 시뮬레이터 전량 **302개** 통과 (설계 §19-4-2 기준선). rev.23 의 296에서 정식 수정 회귀 6건 추가 — 표시용 재구성의 속성·소유권 보존 · 마스크 파생값 고정점 · 지우개 절 1회 dirty · 빈/디코드 실패 · 같은 revision 무교체 · 회전 flush.
+- 변이 테스트: 진단 명령의 `isApplyingDrawing` 억제를 제거하자 새 테스트가 `editEnded` 발생으로 실패(3 issues). 변이 복원 완료.
 - 함수 단위 `only-testing`이 0개를 선택한 실행은 검증으로 세지 않았다. 스위트 전체로 재실행했다.
+- **실기기 A/B (§3)** — 인자 없이 가로↔세로 3왕복 정상, `-CanvasReuseStrokesOnApply`로 결함 재현.
 
-이 테스트는 **진단 명령의 데이터·편집 계약**을 검증한다. PencilKit의 실제 화면 버그를 자동 검출하는 렌더 회귀 테스트는 아직 없다. 기존 배선 테스트도 drawing 속성까지 검사하므로 이 버그를 배제하지 못한다.
+이 테스트들은 **데이터·편집 계약**을 검증한다. PencilKit의 실제 화면 버그를 자동 검출하는 렌더 회귀 테스트는 **여전히 없다** — 이 결함은 사람이 화면을 봐야만 판정된다.
 
-### 정식 수정에서 추가할 검증
+### ❓ 남은 검증 — 이것이 끝나야 D9 H 종결
 
-- 변환된 여러 획, 다양한 잉크·마스크·지우개 조각의 경계·control point·seed·생성 시각·소유권 보존. 빈 drawing과 디코드 실패의 기존 처리 유지.
-- 같은 revision의 도구/스크롤 갱신은 drawing과 undo를 교체하지 않는지 확인.
-- 회전 직전 미보고 획이 이전 세대로 정확히 flush되고, 프로그램 표시 교체는 저장 mutation을 만들지 않는지 확인. 새 테스트에는 적절한 변이를 넣어 실제 실패를 확인.
-- 실기기에서 기본 실행 조건으로 가로 → 세로 → 가로를 최소 3왕복. `-CanvasFreshStrokesOnApply` 없이 정상이어야 정식 수정의 통과다. 스크롤 중 회전, 글꼴/행간 변경, 좌우 필사 위치도 확인.
-- **증거 표본인 시편 120편 legacy 2·4절에는 새 획을 입력하지 않는다.** 별도 테스트 장/복제 표본에서 새 필기·부분 지우개·undo/redo·장 이동·재실행 복원·N-Canvas 왕복을 검증한다.
-- 시편 119편처럼 긴 장에서 진입/재합성 시간과 physical footprint를 수정 전후 동일 조건으로 비교. 기준은 설계 §18-3 및 런북 D9-8을 사용하고 미측정 수치를 합격으로 기록하지 않는다.
-- 좁은 관련 테스트 → 전체 iPad 시뮬레이터 테스트(현재 296 이상) → Release 빌드까지 확인. 진단 테스트 삭제로 수가 줄면 제거 이유와 대체 정식 회귀 테스트를 명시한다.
+| # | 항목 | 상태 |
+|---|---|---|
+| 1 | 편집·저장 왕복 — 별도 테스트 장/복제 표본에서 새 필기·부분 지우개·undo/redo·장 이동·재실행 복원·N-Canvas 왕복 | ❓ 미수행 |
+| 2 | 회전 직전 미보고 획이 이전 세대로 flush되고, 프로그램 표시 교체가 저장 mutation을 만들지 않는지 **실기기에서** 확인 | ❓ 미수행 |
+| 3 | 긴 장(시편 119편)의 진입/재합성 시간과 physical footprint를 수정 전후 동일 조건 비교. 기준은 설계 §18-3-a 및 런북 §6-9 D9-8 | ❓ 미수행 |
+| 4 | 스크롤 중 회전 | ❓ 미수행 |
+| 5 | 글꼴/행간 변경, 좌우 필사 위치 — **E-4 재판정이 여기에 달려 있다** (런북 §8-7) | ❓ 미수행 |
+
+> **증거 표본인 시편 120편 legacy 2·4절에는 새 획을 입력하지 않는다.** 미측정 수치를 합격으로 기록하지 않는다. 진단 테스트를 지워 기준선이 줄면 제거 이유와 대체 정식 회귀 테스트를 명시한다.
 
 ## 7. 로그와 인계
 
@@ -161,4 +164,4 @@ Apple 내부 캐시 키, 내부 UUID, 실패한 프레임워크 함수는 확인
 
 다음 세션에 전달할 요청:
 
-> 이 문서의 §5 구현안에 따라 D9 H 정식 수정을 구현한다. 현재 해결 처리는 Debug 실행 인자 뒤에만 있다. 기존 미커밋 진단 변경을 보존하며 활용하고, 표시 교체 경계에서 수정한다. §6의 데이터·저장·실제 화면·성능 검증을 수행한다. 실기기 조작은 device-debugging-cli.md를 따른다. 검증되지 않은 항목을 완료로 기록하거나 D9 전체를 통과로 바꾸지 않는다.
+> §5 정식 수정은 이미 적용됐고(`ef053111`) 실기기 A/B로 인과까지 확인했다. 남은 일은 **§6 의 미수행 5건**이다 — 편집·저장 왕복, 회전 직전 flush 의 실기기 확인, 긴 장 성능 비교, 스크롤 중 회전, 글꼴/행간 변경(E-4 재판정). 실기기 조작은 device-debugging-cli.md를 따르고, 기본 검증은 `-CanvasReuseStrokesOnApply` **없이** 돈다. 검증되지 않은 항목을 완료로 기록하거나 D9 전체를 통과로 바꾸지 않는다.

@@ -73,7 +73,8 @@ mise x -- swiftlint lint --quiet --config .swiftlint.yml <파일들>
 ## 실기기 검증
 
 절차 전문은 `docs/phase-0a-d-device-test.md` 에 있다.
-**단일 Canvas 검증(D9)은 그 문서 §6-9, 기록 양식은 §8-7** — 설계 §13 의 마지막 게이트다. 요점만:
+**단일 Canvas 검증(D9)은 그 문서 §6-9, 기록 양식은 §8-7** — 설계 §13 의 마지막 게이트다.
+**실기기 CLI 조작(빌드·설치·회전·로그 수집·표시 진단)은 `docs/device-debugging-cli.md`** 를 따른다. 요점만:
 
 - **Instruments 기록에는 USB 연결이 필수다.** Wi-Fi(`Transport Type: localNetwork`)에서는
   1~2초 만에 `Device disconnected` 로 끊기고, `Deferred` 모드라 그때까지의 데이터도 유실된다.
@@ -103,6 +104,8 @@ mise x -- swiftlint lint --quiet --config .swiftlint.yml <파일들>
   호스트 쪽 도구(cliclick · Quartz)도 없다. 시스템 설정을 바꾸지 말고 **Debug 전용 실행 인자 시나리오**를 쓴다:
   `-ChapterLayoutAutoScroll`(11단계 스크롤) · `-ChapterLayoutAutoNext`(다음 장) · `-ChapterLayoutOverlay`(레이아웃 오버레이·HUD) ·
   `-SingleCanvas`(단일 Canvas 경로 강제 — Phase 3 flag `singleCanvasEnabled` 와 같은 효과, 기본은 N-Canvas. 앱 안에서는 **설정 > 필사 캔버스** 토글, 키는 Domain `SingleCanvasFlag`).
+- **표시 진단 인자(Debug 전용, 주로 실기기).** `-CanvasDisplayProbe`(읽기 전용 상태·drawing 샘플링) · `-CanvasDisplayExperiments`(원격 실험 명령 수신) ·
+  ⚠️ **`-CanvasReuseStrokesOnApply` 는 D9 H 수정을 끄고 결함을 재현하는 opt-out** 이다 — 기본 검증은 이 인자 **없이** 돈다. 절차는 `docs/device-debugging-cli.md`.
 - **장 지정 시드는 저장된 앱 상태에 밀린다.** 앱이 한 번 장을 바꾼 뒤에는 컨테이너의
   `Library/Saved Application State` 가 마지막 장을 복원해, `title` 을 어느 plist 에 써도 무시된다
   (Phase 2 에서 시편 120편이 뜨는 무효 측정을 여러 번 했다). **`xcrun simctl uninstall <UDID> kr.co.carve.leetaek` 로
