@@ -338,6 +338,76 @@ struct ChapterCanvasControllerTesting {
         harness.teardown()
     }
 
+
+    // MARK: 회전 뒤 재합성 표시 (D9 — 합성물이 캔버스까지 가는가)
+
+    /// 지정한 content x 범위에 획 하나를 놓은 drawing 데이터.
+    private func inkData(minX: CGFloat, maxX: CGFloat) -> Data {
+        PKDrawing(strokes: [
+            OwnershipTestSupport.stroke(
+                from: CGPoint(x: minX, y: 100), to: CGPoint(x: maxX, y: 100),
+                seed: UInt32(minX), creationTime: Double(minX)
+            )
+        ]).dataRepresentation()
+    }
+
+    /// `canvas.drawing` 의 x 범위 (획 굵기 때문에 bounds 는 양쪽으로 조금 넓다).
+    private func inkRangeX(_ canvas: PKCanvasView) -> ClosedRange<CGFloat>? {
+        let bounds = canvas.drawing.bounds
+        guard !bounds.isNull, !bounds.isEmpty else { return nil }
+        return bounds.minX...bounds.maxX
+    }
+
+    @Test("회전 왕복 중 revision 이 오른 합성물은 캔버스에 실제로 적용된다 — 이전 방향의 렌더가 남지 않는다 (D9)")
+    func rotationRoundTripAppliesLatestComposition() async throws {
+        let harness = Harness(inWindow: true)
+        harness.setColumn(WidthDrivenHeightColumn(area: 480_000) { Color.clear })
+
+        let landscapeInk = inkData(minX: 573, maxX: 728)
+        let portraitInk = inkData(minX: 383, maxX: 538)
+        let canvas = harness.controller.canvas
+
+        // ① 가로 진입 — rev 2, 잉크 x[573…728].
+        harness.resize(to: CGSize(width: 1_200, height: 800))
+        _ = await harness.settleContentFrameHeight(expecting: 400)
+        harness.apply(revision: 2, data: landscapeInk)
+        let first = try #require(inkRangeX(canvas))
+        #expect(abs(first.lowerBound - 573) < 5)
+
+        // ② 세로로 회전 — 재합성 rev 3, 잉크 x[383…538].
+        harness.resize(to: CGSize(width: 800, height: 1_200))
+        _ = await harness.settleContentFrameHeight(expecting: 600)
+        harness.apply(revision: 3, data: portraitInk)
+        let rotated = try #require(inkRangeX(canvas))
+        #expect(abs(rotated.lowerBound - 383) < 5)
+
+        // ③ 다시 가로 — 재합성 rev 4. 여기서 ② 의 잉크가 남으면 결함이다 (실기기 D9 관측).
+        harness.resize(to: CGSize(width: 1_200, height: 800))
+        _ = await harness.settleContentFrameHeight(expecting: 400)
+        harness.apply(revision: 4, data: landscapeInk)
+        let restored = try #require(inkRangeX(canvas))
+        #expect(abs(restored.lowerBound - 573) < 5)
+        #expect(harness.controller.appliedRevision == 4)
+        harness.teardown()
+    }
+
+    @Test("합성 적용은 뷰 갱신 도중에 액션을 내보내지 않는다 — undo 상태 보고도 다음 턴으로 미룬다 (D9)")
+    func applyDoesNotEmitEventsDuringViewUpdate() async throws {
+        let harness = Harness()
+        harness.apply(revision: 1)
+        harness.events.removeAll()
+
+        // `apply` 는 `updateUIViewController` 안에서 불린다. 여기서 store 로 액션이 들어가면
+        // SwiftUI 가 **갱신 도중 상태 변경**을 보게 되고, 그 턴에 예약된 다른 갱신이 함께 무너질 수 있다.
+        // `flushUnreportedEdit` 이 이미 같은 이유로 이벤트를 다음 턴에 보낸다 — undo 상태 보고만 예외였다.
+        harness.apply(revision: 2, data: inkData(minX: 573, maxX: 728))
+        #expect(harness.events.isEmpty)
+
+        // 미루기만 할 뿐 유실되지는 않는다.
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(harness.events.contains { if case .undoStateChanged = $0 { return true } else { return false } })
+    }
+
     @Test("헤더 높이가 첫 apply 뒤에 도착해도 맨 위에 있던 스크롤은 새 인셋만큼 내려 상단이 가리지 않는다")
     func lateHeaderHeightRepinsTop() {
         let harness = Harness()

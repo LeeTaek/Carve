@@ -244,7 +244,11 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate, UIE
         // 합성·복원·reflow 뒤에는 이전 undo 스택이 의미를 잃는다 (§9-5).
         canvas.undoManager?.removeAllActions()
         cancelCheckTask?.cancel()
-        reportUndoState()
+        // 보고는 다음 턴에 보낸다 — 이 경로는 `updateUIViewController` 안에서 돌고,
+        // `undoStateChanged` 는 헤더 팔레트가 관찰하는 `@Shared(.inMemory) canUndo/canRedo` 를 바꾼다.
+        // 뷰 갱신 도중에 관찰 상태를 바꾸면 같은 턴에 예약된 갱신이 함께 무너져 **다음 세대의 `apply` 가 오지 않을 수** 있다
+        // (D9 — 회전 뒤 화면이 이전 합성에 머무는 증상). 바로 위 `flushUnreportedEdit` 이 이미 같은 이유로 미룬다.
+        reportUndoState(deferred: true)
     }
 
     /// 미보고 변경을 지금 캔버스 내용으로 보고한다. 이벤트는 다음 턴에 보낸다 — 뷰 갱신(`updateUIViewController`) 도중에
@@ -331,11 +335,20 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate, UIE
         }
     }
 
-    private func reportUndoState() {
-        onEvent?(.undoStateChanged(
+    /// undo/redo 가능 여부를 알린다.
+    /// - Parameter deferred: 뷰 갱신(`updateUIViewController`) 안에서 부를 때 `true`. 값은 지금 읽고 보고만 다음 턴에 한다.
+    private func reportUndoState(deferred: Bool = false) {
+        let event = Event.undoStateChanged(
             canUndo: canvas.undoManager?.canUndo ?? false,
             canRedo: canvas.undoManager?.canRedo ?? false
-        ))
+        )
+        guard deferred else {
+            onEvent?(event)
+            return
+        }
+        Task { @MainActor [weak self] in
+            self?.onEvent?(event)
+        }
     }
 
     // MARK: PKCanvasViewDelegate — 편집 계약 (§8-1)
