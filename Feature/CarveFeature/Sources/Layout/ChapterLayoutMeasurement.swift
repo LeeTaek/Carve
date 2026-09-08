@@ -237,6 +237,19 @@ struct ChapterLayoutMeasurement: Equatable, Sendable {
     // MARK: 입력
 
     /// 새 장의 측정을 시작한다. 이전 장의 모든 실측값을 버린다 (설계 §6-4 의 요청 취소에 해당).
+    ///
+    /// **같은 장을 다시 시작할 때는 기하 실측값을 유지한다.** `rowFrames`·`canvasFramesInRow`·`titleHeights` 는
+    /// SwiftUI 의 `onGeometryChange` 로만 들어오는데, 그것은 **값이 바뀔 때만** 부른다. 같은 장을 같은 폭·설정으로
+    /// 다시 불러오면(설정 토글에 따른 재로드 등) 기하가 그대로여서 콜백이 다시 오지 않고, 여기서 지운 값은
+    /// **아무도 복구할 수 없다.** 그 상태에서는 세 가지가 함께 무너진다 (R24, 2026-09-08 실기기 실측):
+    ///
+    /// 1. `measuredFrames` 가 비어 `CarveDetailView.updateActiveCanvases()` 가 항상 즉시 반환한다
+    ///    → N-Canvas 에서 **새 행에 캔버스가 붙지 않아 필기가 보이지 않는다.**
+    /// 2. `canvasFramesInRow` 가 비어 레이아웃이 **실측 높이 대신 예측식으로 후퇴**한다 — R13 이 없앤 그 상태다
+    ///    (시편 122편 `H` 3016.00 → 2977.00).
+    /// 3. `frameDeltas` 가 비어 **Δ 안전망이 눈을 감는다** (`deltaMax=unmeasured`).
+    ///
+    /// 폭·설정이 실제로 바뀌면 컬럼이 다시 지어져 콜백이 오고 이 값들은 덮인다. 즉 유지해도 낡은 값이 남지 않는다.
     /// - Parameters:
     ///   - chapter: 대상 장.
     ///   - verses: 본문 순서대로의 절 번호.
@@ -248,15 +261,19 @@ struct ChapterLayoutMeasurement: Equatable, Sendable {
         savedBandCounts: [Int: Int],
         now: ContinuousClock.Instant
     ) {
+        // 장 자체가 바뀌면 이전 장의 기하는 의미가 없다. 같은 장이면 기하는 여전히 참이다.
+        let isSameChapter = self.chapter == chapter && self.verses == verses
         self.chapter = chapter
         self.expectedVerseCount = verses.count
         self.verses = verses
         self.savedBandCounts = savedBandCounts
         textMeasurements = [:]
-        titleHeights = [:]
-        measuredFrames = [:]
-        rowFrames = [:]
-        canvasFramesInRow = [:]
+        if !isSameChapter {
+            titleHeights = [:]
+            measuredFrames = [:]
+            rowFrames = [:]
+            canvasFramesInRow = [:]
+        }
         layout = nil
         buildCount = 0
         measureStartedAt = now

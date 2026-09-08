@@ -79,6 +79,20 @@ rg 'CanvasDisplay (create|apply|sample|finish|experiment)' "$CARVE_DEVICE_LOGS/b
 
 `sample`의 `store / delivered / applied`, `attached`, `storeDiff`, `deliveredDiff`, 전체 bounds, offset/zoom/transform을 본다. `finish`의 `appliedAtCallback`은 완료 세대가 아니다. 전체 콘솔이나 기기 정보에는 작업과 무관한 식별 정보가 있을 수 있으므로 공유 기록에는 필요한 값만 추린다.
 
+### HUD 값을 콘솔에서 읽기
+
+Debug 빌드에서 `-ChapterLayoutOverlay`를 켜면 화면 HUD와 함께 `ChapterHUD` 로그가 출력된다. 최초 표시와 진단 문자열이 바뀐 시점에만 출력하며, 같은 값으로 화면이 다시 그려질 때는 반복하지 않는다. 화면 재진입 시에는 최초 상태를 다시 남긴다. Release에는 이 경로가 포함되지 않는다.
+
+위 §3의 `--console` 실행으로 수집한 파일에서 다음처럼 확인한다.
+
+```bash
+rg 'ChapterHUD ' "$CARVE_DEVICE_LOGS/baseline.log"
+```
+
+각 줄에는 장·Canvas 모드, gate·실측 개수·build·최초 빌드 시간, 폭·전체 높이·컬럼 원점·서명, 미측정 절, 최대 Δ·최악 절·높이 범위·누적 기울기·대표 절 Δ, guard·slack, compose·revision·합성 전후 원점·편집/재조회/보류 상태, mismatch/legacy/디코드 실패 절, legacy 잉크 bounds와 마지막 dirty bounds를 남긴다. 서명과 절 목록은 HUD처럼 줄이지 않고 기록한다. 아직 측정되지 않은 Δ는 `unmeasured`로 구분한다.
+
+HUD와 같은 입력에서 만들어진 상태 로그다. `compose=SYNC`와 `deltaMax=0.00`은 실제 픽셀 표시의 정상화를 보증하지 않는다. 렌더링 결함 조사에서는 `CanvasDisplay` 로그와 회전 전후 캡처를 함께 사용한다. 로그 수집을 위해 `--terminate-existing`으로 재실행할 때에는 진행 중인 필기를 먼저 마친다.
+
 ## 4. 회전과 화면 판정
 
 ```bash
@@ -89,14 +103,23 @@ xcrun devicectl device orientation set --device "$CARVE_DEVICE_ID" landscapeLeft
 
 **방향은 위치 인자다. `--orientation portrait`가 아니다.** 이 툴체인의 `--help`와 실제 실행으로 확인했다. 명령 성공은 방향 설정 성공일 뿐 필기 표시 정상의 증거가 아니다. 매 단계에서 화면 판정을 먼저 남기고 다음 실험을 진행한다.
 
-이번 세션은 CLI 로그를 수집하면서 사용자에게 “필기가 오른쪽/왼쪽으로 밀렸는가, 정상화됐는가”를 물어 실제 화면 결과를 얻었다. 필기를 새로 입력할 필요가 없다. 시편 120편의 legacy 2·4절은 증거 표본이므로 건드리지 않는다.
+초기 원인 조사에서는 CLI 로그를 수집하면서 사용자에게 “필기가 오른쪽/왼쪽으로 밀렸는가, 정상화됐는가”를 물어 실제 화면 결과를 얻었다. 이후 아래 Xcode 캡처 경로도 실제 성공했으므로, 후속 회전 검증은 직접 캡처해 판정할 수 있다. 필기를 새로 입력할 필요가 없다. 시편 120편의 legacy 2·4절은 증거 표본이므로 건드리지 않는다.
 
 ### 화면 캡처와 GUI의 범위
 
-- 이번에 사용한 `devicectl` 명령에는 스크린샷 캡처 명령이 없었다. 원본 PNG는 사용자가 제공했고 새 실험의 화면은 사용자 확인으로 판정했다.
-- Xcode의 **Window → Devices and Simulators → 기기 선택 → Take Screenshot** UI 경로가 존재한다. 이번에는 메뉴와 버튼까지만 확인했고 **대상 iPad 캡처 성공은 확인하지 못했다.** “자동 캡처 성공”으로 기록하지 않는다.
-- Codex에서 GUI를 확인할 때는 CUA의 `cua.getApp('com.apple.dt.Xcode')` 후 최신 AX 상태를 읽고 메뉴를 조작했다. 사용자 창이 바뀌었다는 응답이 오면 이전 element index로 계속 클릭하지 않는다. 빌드·테스트는 계속 CLI로 수행한다.
-- 실제 필기·지우개 입력은 이 세션에서 자동 주입하지 않았다. 다른 앱이나 본문 위를 클릭해 필기를 만들지 않는다.
+**2026-09-08 16:54에 실제 iPad 화면 캡처와 HUD 판독에 성공했다.** 초기 조사 당시에는 버튼만 확인했지만 후속 확인에서 아래 절차를 끝까지 검증했다.
+
+1. CUA의 `cua.getApp('com.apple.dt.Xcode')`로 Xcode를 선택하고 최신 AX 상태를 읽는다.
+2. **Window → Devices and Simulators → 연결된 iPad 선택 → Take Screenshot**을 클릭한다. iPhone이 함께 연결돼 있으므로 기기 이름과 모델을 확인한다.
+3. 이번 환경에서는 저장 대화상자 없이 `~/Desktop/Screenshot <날짜> at <시간>.png`가 생성됐다. 버튼 클릭 후 AX 상태가 그대로여도 실패로 판단하지 않는다. Desktop에서 클릭 이후 생성된 PNG를 찾는다. 파일명 공백에 유니코드 문자가 포함될 수 있으므로 경로를 직접 조립하지 않고 실제 파일명을 사용한다.
+4. 생성된 파일을 이미지 읽기 도구(`view_image`)로 열어 **iPad 화면 자체**를 확인한다. CUA의 Xcode 창 스크린샷은 Devices 창을 보여줄 뿐 iPad 화면을 대신하지 않는다.
+5. CLI로 회전한 뒤 레이아웃이 안정되면 다시 캡처한다. 장·방향·Canvas 모드·HUD·필기 위치를 함께 기록한다. `gate PASS`와 `Δ max 0.00`만으로 필기 표시 정상 여부를 판정하지 않는다.
+
+실제 판독 표본은 시편 122장 세로 화면, `9/9`, `gate PASS`, `W 372.00`, `H 3016.00`, `columnX 366.70`, `Δ max 0.00`이었다. `guard —`, `compose — (단일 Canvas 아님)`이므로 **N-Canvas 화면**이며 D9 H 수정 검증 결과로 세지 않는다. 캡처는 Desktop에 보관되며 저장소에 포함하지 않았다.
+
+직접 수행 가능한 범위는 확인된 CLI 회전·앱 실행·진단 통지와 Xcode 캡처를 조합한 화면 판정이다. 자동 스크롤·장 전환은 기존 Debug 실행 인자 시나리오 범위에서 구성할 수 있다. 임의의 실기기 탭·드래그를 원격 주입하는 경로는 이번에 검증하지 않았으며, 캡처 성공이 터치 제어까지 의미하지는 않는다. 실제 Apple Pencil 필기·지우개 입력도 자동 주입하지 않았다.
+
+이번에 사용한 `devicectl` 명령에는 스크린샷 캡처 명령이 없었다. GUI 조작마다 최신 AX 상태를 확인하고 element index를 하드코딩하지 않는다. 사용자 창이 바뀌었다는 응답이 오면 이전 index로 계속 클릭하지 않는다. 빌드·테스트는 계속 CLI로 수행한다.
 
 ## 5. 명시적인 수동 표시 실험
 
@@ -165,6 +188,6 @@ xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace \
   -destination 'platform=iOS Simulator,name=iPad mini (A17 Pro),OS=26.2'
 ```
 
-실제 사용 가능한 iPad 이름·OS로 조정한다. 이번에는 iPhone 시뮬레이터도 켜져 있었지만 검증 destination에는 사용하지 않았다. 함수 단위 `only-testing`으로 0개가 실행된 사례가 있으므로 `TEST SUCCEEDED`만 보지 말고 실제 실행 개수도 확인한다. 현재 전체 기준선은 304개이며 [설계 §19-4-2](./single-canvas-design.md)를 기준으로 유지한다.
+실제 사용 가능한 iPad 이름·OS로 조정한다. 이번에는 iPhone 시뮬레이터도 켜져 있었지만 검증 destination에는 사용하지 않았다. 함수 단위 `only-testing`으로 0개가 실행된 사례가 있으므로 `TEST SUCCEEDED`만 보지 말고 실제 실행 개수도 확인한다. 현재 전체 기준선은 308개이며 [설계 §19-4-2](./single-canvas-design.md)를 기준으로 유지한다.
 
 기록할 항목은 기기·OS build·Xcode·USB 상태, 코드 revision/diff, **전체 실행 인자**, 회전 순서, 안정 후 로그, 사용자 또는 스크린샷의 화면 판정, 실제 테스트 개수와 종료 코드, 미검증 항목이다. `Activity Monitor`를 이용한 성능 기록은 기존 런북을 따르며 이 세션에서 새 성능 측정을 완료한 것으로 적지 않는다.
