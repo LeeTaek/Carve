@@ -30,6 +30,12 @@ struct ComposedChapterDrawing: Equatable, Sendable {
     /// 빈 절로 취급해 활성 행으로 두면 다음 편집의 `replace` 가 원본 blob 을 조용히 덮어쓴다.
     /// 활성 행에서 빼면 다음 편집은 `create` 로 새 행을 만들고 원본 행은 손대지 않는다 (§9-4 비파괴).
     let undecodableVerses: Set<Int>
+    /// `legacyVerses` 로 배치된 잉크의 **content 좌표** 합집합 bounds. 그런 잉크가 없으면 nil.
+    ///
+    /// D9 진단용이다 — 합성이 `columnOrigin` 을 실제로 태웠는지는 상태(`renderedColumnOrigin`)가 아니라
+    /// **결과 좌표**로만 확인된다. `minX < columnOrigin.x` 면 저장 좌표가 음수라는 뜻이고,
+    /// 방향을 바꿔도 이 값이 그대로면 화면에 있는 잉크가 이번 합성물이 아니라는 뜻이다.
+    let legacyInkBounds: CGRect?
 }
 
 /// 편집 하나의 계산 결과 (설계 §8-2).
@@ -77,6 +83,9 @@ struct DrawingCodec: Sendable {
     /// 절별 대표 행을 현재 레이아웃에 배치해 캔버스 하나로 합성한다.
     ///
     /// - `drawingVersion == 3` + metadata: `LineBandReflow` 로 현재 밑줄에 재배치 (§9).
+    /// - `drawingVersion == 3` 인데 metadata 없음: **첫 밑줄(`storageOrigin`) 원점으로 통째 배치** + `layoutMismatch` (§9-3-1).
+    ///   좌표 형식의 진실은 `drawingVersion` 한 곳이므로(§10-1) 형식은 확정돼 있고 band 매핑 근거만 없는 상태다.
+    ///   CloudKit 이 `layoutMetadataData` 를 아직 싣지 않았거나(§10-1-a) blob 디코드가 실패하면 실제로 도달한다.
     /// - 그 밖(legacy · v2): **무변환으로 현재 `writingRect` 원점에 배치** (§14 13). 지금 N-Canvas 가 보여 주는 것과
     ///   정확히 같다 — 각 절 캔버스가 `writingRect` 에 놓이고 `lineData` 를 로컬 좌표로 그리기 때문이다.
     ///   1절의 상단 여백 25pt 가 `writingRect` 안(`topPadding`)에 있는 이유가 이것이다.
@@ -94,6 +103,7 @@ struct DrawingCodec: Sendable {
         var legacy: Set<Int> = []
         var undecodable: Set<Int> = []
         var activeRowIDs: [Int: BibleDrawingRowID] = [:]
+        var legacyInk: CGRect?
 
         for verse in representatives.keys.sorted() {
             guard let snapshot = representatives[verse] else { continue }
@@ -107,6 +117,7 @@ struct DrawingCodec: Sendable {
             guard !stored.strokes.isEmpty else { continue }
 
             let placed: PKDrawing
+            var isLegacyPlacement = false
             if snapshot.hasVersionedLayout, let metadata = snapshot.metadata {
                 let result = reflow.reflow(
                     LineBandReflow.Input(verse: verse, storedDrawing: stored, metadata: metadata),
@@ -114,13 +125,23 @@ struct DrawingCodec: Sendable {
                 )
                 if result.isLayoutMismatch { mismatch.insert(verse) }
                 placed = result.displayDrawing
+            } else if snapshot.drawingVersion == 3 {
+                // v3 인데 metadata 가 없다. 좌표 형식의 진실은 `drawingVersion` 이므로(§10-1) **첫 밑줄 원점**으로 읽는다.
+                // band 를 매핑할 근거가 없으니 §9-3-1 그대로 첫 밑줄 기준 통짜 보존 + mismatch 기록이다.
+                // 여기서 `writingRect` 원점(v2 의미)에 놓으면 첫 밑줄만큼 위로 밀린 채 아무 표식 없이 표시된다.
+                mismatch.insert(verse)
+                placed = stored.transformed(using: Self.translation(region.storageOrigin))
             } else {
-                if snapshot.drawingVersion == nil || snapshot.drawingVersion == 1 { legacy.insert(verse) }
+                if snapshot.drawingVersion == nil || snapshot.drawingVersion == 1 {
+                    legacy.insert(verse)
+                    isLegacyPlacement = true
+                }
                 placed = stored.transformed(using: CGAffineTransform(
                     translationX: region.writingRect.minX, y: region.writingRect.minY
                 ))
             }
             let content = placed.transformed(using: Self.translation(columnOrigin))
+            if isLegacyPlacement { legacyInk = Self.union(legacyInk, content.bounds) }
             for stroke in content.strokes {
                 map[StrokeIdentityKey(stroke: stroke)] = verse
                 strokes.append(stroke)
@@ -133,8 +154,16 @@ struct DrawingCodec: Sendable {
             activeRowIDs: activeRowIDs,
             layoutMismatchVerses: mismatch,
             legacyVerses: legacy,
-            undecodableVerses: undecodable
+            undecodableVerses: undecodable,
+            legacyInkBounds: legacyInk
         )
+    }
+
+    /// 빈/무효 rect 를 섞지 않는 합집합. `CGRect.union` 은 `.null` 이 아닌 빈 rect 를 그대로 흡수해 원점을 (0,0) 으로 끌어당긴다.
+    private static func union(_ accumulated: CGRect?, _ next: CGRect) -> CGRect? {
+        guard !next.isNull, !next.isEmpty else { return accumulated }
+        guard let accumulated else { return next }
+        return accumulated.union(next)
     }
 
     // MARK: 편집 → 저장 명령 (§8-2)

@@ -101,7 +101,8 @@ public struct CarveDetailView: View {
             hasPendingLayout: canvas.pendingLayout != nil,
             mismatchVerses: canvas.layoutMismatchVerses.sorted(),
             legacyVerses: canvas.legacyVerses.sorted(),
-            undecodableVerses: canvas.undecodableVerses.sorted()
+            undecodableVerses: canvas.undecodableVerses.sorted(),
+            legacyInkBounds: canvas.legacyInkBounds
         )
     }
     #endif

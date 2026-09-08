@@ -44,7 +44,7 @@ extension DrawingCodecClient: DependencyKey {
     static let testValue = DrawingCodecClient(
         compose: unimplemented("DrawingCodecClient.compose", placeholder: ComposedChapterDrawing(
             data: Data(), ownership: .empty(layoutSignature: ""), activeRowIDs: [:],
-            layoutMismatchVerses: [], legacyVerses: [], undecodableVerses: []
+            layoutMismatchVerses: [], legacyVerses: [], undecodableVerses: [], legacyInkBounds: nil
         )),
         mutations: unimplemented("DrawingCodecClient.mutations", placeholder: DrawingEditResult(
             ownership: .empty(layoutSignature: ""), mutations: [], issuedRowIDs: [:]

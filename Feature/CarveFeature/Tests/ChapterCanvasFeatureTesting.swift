@@ -98,7 +98,8 @@ enum CanvasTestSupport {
             activeRowIDs: [1: rowA],
             layoutMismatchVerses: [],
             legacyVerses: [1],
-            undecodableVerses: []
+            undecodableVerses: [],
+            legacyInkBounds: nil
         )
     }
 

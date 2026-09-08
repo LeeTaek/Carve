@@ -120,6 +120,9 @@ public struct ChapterCanvasFeature {
         var legacyVerses: Set<Int> = []
         /// 디코드하지 못한 행의 절. 활성 행에서 빠져 있어 다음 편집은 새 행으로 간다 (`DrawingCodec`).
         var undecodableVerses: Set<Int> = []
+        /// 이번 합성에서 legacy 로 배치된 잉크의 content 좌표 bounds (D9 진단, HUD `legInk`).
+        /// `columnOrigin` 이 결과 좌표까지 실제로 갔는지를 상태가 아니라 **좌표**로 확인하는 값이다.
+        var legacyInkBounds: CGRect?
         /// 마지막 편집 스냅샷의 `dirtyBounds`(content 좌표)와 그 상단이 속한 절. 디버그 오버레이 표시용이며 저장 계산에 쓰지 않는다.
         var lastDirtyBounds: CGRect?
         var lastEditedVerse: Int?
@@ -397,6 +400,7 @@ extension ChapterCanvasFeature {
         state.layoutMismatchVerses = []
         state.legacyVerses = []
         state.undecodableVerses = []
+        state.legacyInkBounds = nil
         state.lastDirtyBounds = nil
         state.lastEditedVerse = nil
         state.baselineData = nil
@@ -539,6 +543,7 @@ extension ChapterCanvasFeature {
         state.layoutMismatchVerses = composed.layoutMismatchVerses
         state.legacyVerses = composed.legacyVerses
         state.undecodableVerses = composed.undecodableVerses
+        state.legacyInkBounds = composed.legacyInkBounds
         state.baselineData = composed.data
         state.isReloading = false
         if !composed.undecodableVerses.isEmpty {

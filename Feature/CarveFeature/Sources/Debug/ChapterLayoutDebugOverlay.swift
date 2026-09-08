@@ -151,6 +151,12 @@ struct CanvasComposeProbe: Equatable {
     let legacyVerses: [Int]
     /// 디코드 실패로 표시에서 빠진 절.
     let undecodableVerses: [Int]
+    /// legacy 로 배치된 잉크의 **합성 결과 content 좌표** bounds. 잉크가 없으면 nil.
+    ///
+    /// `org` 는 합성에 넣은 **입력**이고 이 값은 그 합성의 **출력**이다. 둘을 함께 봐야 판정이 갈린다 —
+    /// `minX < org` 면 저장 좌표가 음수(좌표계가 다른 blob)이고, 방향을 바꿔도 이 값이 그대로면
+    /// 화면의 잉크가 이번 합성물이 아니다(표시 경로가 낡았다).
+    let legacyInkBounds: CGRect?
 }
 
 // MARK: - HUD
@@ -310,11 +316,25 @@ struct ChapterLayoutDebugHUD: View {
                     Text("leg \(verseSummary(compose.legacyVerses))")
                         .foregroundStyle(compose.legacyVerses.isEmpty ? Color.white : Color.yellow)
                     Text("und \(verseSummary(compose.undecodableVerses))")
+                    Text("legInk \(inkSummary(compose))")
+                        .foregroundStyle(legacyInkColor(compose))
                 }
             } else {
                 Text("compose — (단일 Canvas 아님)").foregroundStyle(.gray)
             }
         }
+    }
+
+    /// legacy 잉크가 실제로 놓인 content x 범위. `org` 와 나란히 읽어 합성 결과가 컬럼 안인지 판정한다.
+    private func inkSummary(_ probe: CanvasComposeProbe) -> String {
+        guard let bounds = probe.legacyInkBounds else { return "—" }
+        return "x[\(fmt(bounds.minX))…\(fmt(bounds.maxX))]"
+    }
+
+    /// 잉크가 컬럼 왼쪽으로 나갔으면 빨강 — `columnOrigin` 이 적용된 결과라면 나갈 수 없다.
+    private func legacyInkColor(_ probe: CanvasComposeProbe) -> Color {
+        guard let bounds = probe.legacyInkBounds else { return .gray }
+        return bounds.minX < probe.renderedColumnOrigin.x ? .red : .white
     }
 
     /// `3 [4·7·12]` 처럼 개수와 절 번호를 함께 보여준다. 많으면 앞의 6개만.
