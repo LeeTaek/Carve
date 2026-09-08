@@ -450,3 +450,33 @@ struct ChapterCanvasControllerTesting {
         #expect(bottom == maxOffset)
     }
 }
+
+#if DEBUG
+extension ChapterCanvasControllerTesting {
+    @Test("표시 진단 실험은 획 좌표·소유권 식별자를 보존하고 편집을 보고하지 않는다")
+    func displayExperimentsDoNotSaveOrChangeStrokeGeometry() async throws {
+        let harness = Harness(inWindow: true)
+        defer { harness.teardown() }
+        harness.apply(revision: 2, data: inkData(minX: 573, maxX: 728))
+        try await Task.sleep(for: .milliseconds(400))
+        let baseline = try #require(harness.controller.canvas.drawing.strokes.first)
+        harness.events.removeAll()
+
+        for name in ["redraw", "reassign", "clear", "fresh"] {
+            harness.controller.runDisplayExperiment(name)
+            try await Task.sleep(for: .milliseconds(400))
+            let drawing = harness.controller.canvas.drawing
+            let stroke = try #require(drawing.strokes.first)
+            #expect(drawing.strokes.count == 1)
+            #expect(stroke.renderBounds == baseline.renderBounds)
+            #expect(stroke.transform == baseline.transform)
+            #expect(stroke.randomSeed == baseline.randomSeed)
+            #expect(stroke.path.creationDate == baseline.path.creationDate)
+            #expect(stroke.path.map(\.location) == baseline.path.map(\.location))
+            #expect(harness.controller.appliedRevision == 2)
+            #expect(!harness.controller.hasUnreportedChange)
+            #expect(harness.events.isEmpty)
+        }
+    }
+}
+#endif

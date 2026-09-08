@@ -79,6 +79,10 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate, UIE
 
     /// 캔버스가 지금 표시하는 내용의 세대 (`renderedRevision`). `editEnded` 에 실어 보낸다.
     private(set) var appliedRevision = -1
+    #if DEBUG
+    /// 실행 인자로 켜는 표시 계측. 별도의 실험 모드에서만 명시적인 표시 갱신 명령을 받는다.
+    var displayProbe: ChapterCanvasDisplayProbe?
+    #endif
     private var appliedUndoVersion = 0
     private var appliedRedoVersion = 0
     private var appliedScrollToken = 0
@@ -224,7 +228,16 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate, UIE
             appliedScrollToken = request.token
             scroll(toVerse: request.verse, layout: layout)
         }
+        #if DEBUG
+        displayProbe?.recordApply(revision: configuration.renderedRevision, data: configuration.renderedData)
+        #endif
     }
+
+    #if DEBUG
+    func canvasViewDidFinishRendering(_ canvasView: PKCanvasView) {
+        displayProbe?.recordRenderCompletion()
+    }
+    #endif
 
     // MARK: 표시
 
@@ -239,7 +252,16 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate, UIE
             drawing = PKDrawing()
         }
         isApplyingDrawing = true
+        #if DEBUG
+        // D9 원인 분리용 A/B 모드. 좌표는 유지하고 획 객체 재사용만 끈다.
+        if ProcessInfo.processInfo.arguments.contains("-CanvasFreshStrokesOnApply") {
+            canvas.drawing = Self.freshDrawingForDisplay(drawing)
+        } else {
+            canvas.drawing = drawing
+        }
+        #else
         canvas.drawing = drawing
+        #endif
         isApplyingDrawing = false
         // 합성·복원·reflow 뒤에는 이전 undo 스택이 의미를 잃는다 (§9-5).
         canvas.undoManager?.removeAllActions()
@@ -410,3 +432,38 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate, UIE
         onEvent?(.scrolled(previous: previous, current: current))
     }
 }
+
+#if DEBUG
+extension ChapterCanvasController {
+    /// 명시적인 진단 명령으로만 표시를 갱신한다. 편집 중에는 실행하지 않고 저장 액션을 보내지 않는다.
+    func runDisplayExperiment(_ name: String) {
+        guard !hasUnreportedChange,
+              canvas.drawingGestureRecognizer.state != .began,
+              canvas.drawingGestureRecognizer.state != .changed else { return }
+        let drawing = canvas.drawing
+        isApplyingDrawing = true
+        defer { isApplyingDrawing = false }
+        switch name {
+        case "redraw":
+            canvas.setNeedsDisplay()
+            canvas.setNeedsLayout()
+            canvas.layoutIfNeeded()
+        case "reassign":
+            canvas.drawing = drawing
+        case "clear":
+            canvas.drawing = PKDrawing()
+            canvas.drawing = drawing
+        case "fresh":
+            canvas.drawing = Self.freshDrawingForDisplay(drawing)
+        default: break
+        }
+    }
+
+    /// 공개 필기 속성을 유지한 새 획을 만든다. DB에 저장하지 않는 표시 단계 비교 실험용이다.
+    private static func freshDrawingForDisplay(_ drawing: PKDrawing) -> PKDrawing {
+        PKDrawing(strokes: drawing.strokes.map { stroke in
+            PKStroke(ink: stroke.ink, path: stroke.path, transform: stroke.transform, mask: stroke.mask, randomSeed: stroke.randomSeed)
+        })
+    }
+}
+#endif

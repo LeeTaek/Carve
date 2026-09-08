@@ -1,12 +1,13 @@
 # CarveFeature 단일 Canvas 전환 설계
 
-> **상태 (rev.22):** Phase 0A~3 **구현 완료.** 단일 Canvas 는 feature flag `singleCanvasEnabled` 뒤에 있고 **기본 off** 입니다.
+> **상태 (rev.23):** Phase 0A~3 **구현 완료.** 단일 Canvas 는 feature flag `singleCanvasEnabled` 뒤에 있고 **기본 off** 입니다.
 > 남은 것은 **실기기 검증 D9** (기본 활성화·배포 판단의 선행 조건, §16) 와 **Phase 4** (구 구조 제거) 입니다.
-> D9 의 실행 절차와 기록 양식은 [런북 §6-9 · §8-7](./phase-0a-d-device-test.md) (rev.7) 에 있습니다.
+> D9 의 실행 절차와 기록 양식은 [런북 §6-9 · §8-7](./phase-0a-d-device-test.md) (rev.8) 에 있습니다.
 >
 > ✅ **D9 스모크에서 나온 레이아웃 결함 2건(R13 · R16)이 모두 종결됐습니다** (§20-13 · §20-14 · 런북 §8-7).
-> **보류했던 필기 검증(D9-1)이 풀렸습니다** — 실기기 Δ 가 0.00 으로 떨어졌으므로, 이제 D9-1 에서 나오는 결함은 레이아웃이 아니라 저장 경로입니다.
-> 회귀 기준선 **285** (§19-4-2). 대상: `Feature/CarveFeature`, `Feature/SettingsFeature`, `Domain`.
+> **보류했던 필기 검증(D9-1)은 진행 가능합니다.** 다만 Δ 0.00 은 실제 필기 표시의 정상 판정이 아닙니다. 이후 결함을 저장 경로로 단정하지 않습니다.
+> **D9 H 회전 표시 결함은 정식 수정 미적용입니다.** 기존 획 재사용에 따른 PencilKit 표시 갱신 경로로 원인을 좁혔고, Debug 비교 모드의 회전 왕복만 통과했습니다. [원인·구현안](./single-canvas-rotation-display-investigation.md) · [실기기 조작](./device-debugging-cli.md).
+> 회귀 기준선 **296** (§19-4-2). 대상: `Feature/CarveFeature`, `Feature/SettingsFeature`, `Domain`.
 >
 > **읽는 법.** §1~§17 이 설계이고 §18~§20 은 실측·변경 기록입니다. 절 번호는 코드 주석과 AGENTS.md 가 참조하므로 **바꾸지 않습니다.**
 > 결정이 끝난 항목은 결정만 남기고 논의 과정은 지웠습니다 (rev.19 정리). 과정이 필요하면 git 이력(`git log -- docs/single-canvas-design.md`)을 보십시오.
@@ -27,6 +28,7 @@
 | 20 | **D9 실기기 검증에서 레이아웃 결함 2건** — 절당 0.5pt 누적(R13) · 장 전환 시 컬럼 신장(R16) | §11 · §15 · §16 · §20-13 |
 | 21 | **R13 종결** — 행 높이 실측을 레이아웃 입력으로 승격 · Δ 안전망 · D9-1 보류 해제 | §14 · §15 · §16 · §20-14 |
 | 22 | D9-1~D9-6 통과. 합성 프로브 추가 · **E-4 는 결함 아님**(v1 행) · R18 | §14 · §16 · 런북 rev.7 |
+| 23 | D9 H 회전 표시 결함 원인 분리 · Debug A/B 왕복 통과 · **정식 수정 미적용** · 기준선 296 | §19-4-2 · §20-15 · 런북 rev.8 |
 
 ---
 
@@ -1035,6 +1037,7 @@ D9 에서 이걸 결함으로 오독했습니다. 경위는 런북 rev.7 · §8-
 |---|---|
 | ✅ **R13 (종결)** | **절당 0.5pt 누적** — 빌더가 행 높이를 `lineCount × lineSpace` 로 **예측**했다. 시편 119편 87.50pt · 창세기 1장 15.00pt (= (N−1) × 0.5). **실측 높이를 레이아웃 입력으로 승격**해 종결 (§20-14) · 실기기 Δ 0.00 |
 | ✅ **R16 (종결)** | **장 전환 시 텍스트 컬럼 신장** — `columnHeight` 미초기화 → 이전 장의 큰 높이가 호스트 frame → 행이 초과분을 흡수 → 1335.78pt 어긋남, 자가 복구 불가 (§11). **Phase 3 단일 Canvas 전용** |
+| **D9 H (미종결)** | 회전 후 이전 필기 표시. 최종 데이터와 canvas 속성은 일치하지만 실제 화면이 이전 상태에 머묾. 새 획 생성 Debug 모드는 실기기 왕복 통과. **정식 적용·편집 저장·성능 검증은 남음.** [분석 및 구현안](./single-canvas-rotation-display-investigation.md) |
 | **D9** | **절차: [런북 §6-9](./phase-0a-d-device-test.md) · 기록: 런북 §8-7.** 스모크는 통과했고(R13 · R16 종결) **D9-1 이하가 남았습니다.** **단일 Canvas 실기기 검증** — flag on 으로 시편 119편 필기 → 저장 → 재실행 복원 · 지우개 / undo · 장 전환 flush · 손가락 롱프레스 → 메뉴 → 히스토리 시트 → 회차 복원 · 설정 토글로 경로 전환 뒤 장 재로드 · flag off 로 돌아가 N-Canvas 가 같은 데이터를 표시하는지 (§14 16) · 잉크 있는 장의 렌더 · 진입/스크롤 footprint 를 §18-3-a 절차로. §11 기준 2 (fling) · 5 (탭/롱프레스). **기본 활성화의 선행 조건** |
 | D7 나머지 | 기기 2대가 필요한 미러링 항목 2건 · §10-1-a 승격 절차 |
 | 기기 사각지대 | 보유 기기(iPad mini A17 Pro · iPad Air M2)는 60Hz · 8GB. ProMotion 과 저메모리 iPad 는 TestFlight 베타에서 |
@@ -1195,9 +1198,10 @@ peak **363.6 MB** · 최종 정지 **109.7 MB** · CPU > 90% 샘플 47 / 188. **
 | 18 | 264 | (3/3) 5 |
 | 19 | 265 | 승계 규칙 3 전제 1 |
 | 20 | 267 | R16 회귀 2 (장 전환 컬럼 신장). CarveFeatureTest 142 · DomainTest **103** (XCTest 2 포함) · SettingsFeatureTest 4 · ChartFeatureTest 9 · CarveToolkitTest 6 · UIComponentsTest 3 <br>⚠️ rev.20 문서는 DomainTest 를 101 로 적어 per-target 합이 265 로 어긋났습니다 (rev.21 정정) |
-| **21** | **285** | R13 18 (빌더 4 · 파이프라인 3 · 안전망/배선 8 · 부작용 고정 1 · Phase 3 흡수 1 + 변이 보강). **현재 기준선** — CarveFeatureTest 156 · DomainTest 107 (XCTest 2 포함) · SettingsFeatureTest 4 · ChartFeatureTest 9 · CarveToolkitTest 6 · UIComponentsTest 3 |
+| **21** | **285** | R13 18 (빌더 4 · 파이프라인 3 · 안전망/배선 8 · 부작용 고정 1 · Phase 3 흡수 1 + 변이 보강). 당시 기준선 — CarveFeatureTest 156 · DomainTest 107 (XCTest 2 포함) · SettingsFeatureTest 4 · ChartFeatureTest 9 · CarveToolkitTest 6 · UIComponentsTest 3 |
+| **23** | **296** | **현재 실측 기준선** — CarveFeatureTest 167 · DomainTest 107 (XCTest 2 포함) · SettingsFeatureTest 4 · ChartFeatureTest 9 · CarveToolkitTest 6 · UIComponentsTest 3. 조사 인계 기준 295에서 진단 안전성 테스트 1개 추가. rev.21 이후 선행 변경도 포함 (§20-15) |
 
-로그의 `error:` 는 런타임 노이즈입니다 (PencilKit 필기인식 권한 `com.apple.corehandwriting -1003`, CoreData persistent history 정리). rev.16 클린 빌드에서 `UIComponentsTest` 의 테스트 타깃 의존성 누락을 고쳤습니다.
+통과한 실행에서도 PencilKit 필기인식 권한 `com.apple.corehandwriting -1003`와 CoreData persistent history 정리 로그가 관찰됐습니다. 모든 `error:`를 노이즈로 취급하지 말고, 명령 종료 코드·실행 테스트 수·실패 내용을 함께 확인합니다. rev.16 클린 빌드에서 `UIComponentsTest` 의 테스트 타깃 의존성 누락을 고쳤습니다.
 
 ### 19-5. S1에서 확인하지 못한 것
 
@@ -1446,3 +1450,16 @@ Phase 3 이후 처음으로 **제품 코드의 단일 Canvas 경로를 실기기
 
 - 시뮬레이터 전량 **285 통과** (Swift Testing 283 + XCTest 2, 기준선 267 → 285) · SwiftLint 0.
 - 실기기 (iPad mini A17 Pro / iOS 27.0 beta / `-SingleCanvas -ChapterLayoutOverlay`): 시편 119편 Δ **87.50 → 0.00** · `slope` +0.500 → **+0.000/절** · `top` v1~v176 전부 0.00 · 장 전환 4건 `totalHeight` **5138.0 동일**(새 진입 == 창세기 1→2 == 시편 119편→창세기 2) · 정상 상태에서 **`guard OPEN`** (오탐 없음).
+
+
+### 20-15. D9 H — 회전 표시 결함 원인 분리 (rev.23)
+
+2026-09-08, iPad mini(A17 Pro) / iPadOS 27.0 beta `24A5408d` / USB / Xcode 26.3. 조사 시작 HEAD는 `0c01b32c`이며 이 조사에서 커밋·푸시는 하지 않았습니다.
+
+- 기본 경로 가로 → 세로 → 가로에서 동일 컨트롤러의 Store/전달/applied 세대가 2→3→4로 일치했습니다. 44개 획의 경계·변환·seed·point 수도 최종 데이터 디코딩 결과와 일치했지만 화면은 이전 합성 상태에 머물렀습니다.
+- 일반 redraw와 같은 drawing 재대입은 효과가 없었습니다. 빈 drawing 경유 복원 또는 같은 공개 필기 속성의 새 `PKStroke` 생성은 정상화됐습니다.
+- 새 획 생성을 자동 적용하는 `-CanvasFreshStrokesOnApply` Debug 모드에서는 회전 왕복이 정상이라고 사용자가 확인했습니다. 기존 획 재사용에 따른 PencilKit 렌더 캐시/표시 갱신 경로가 유력합니다. Apple 내부 구현까지 확인한 것은 아닙니다.
+- **정식 수정은 미적용입니다.** 기본 경로와 Release는 그대로입니다. 구현 후보·속성 보존·저장 안전성·성능·실기기 완료 기준은 [별도 분석 및 구현안](./single-canvas-rotation-display-investigation.md)에 모았습니다.
+- 전체 테스트 **296개(Swift Testing 294 + XCTest 2)** 통과. 진단 안전성 테스트 1개를 추가했으며 편집 억제 변이를 넣으면 `editEnded` 오보고로 실패하는 것을 확인하고 복원했습니다. 이 테스트는 화면 픽셀 버그 자체를 검출하지 않습니다.
+
+`legInk`는 legacy 절만의 병합 전 값이므로 전체 `canvas.drawing.bounds`와 등치 비교하지 않습니다. `Δ max 0.00`, `compose SYNC`, 렌더 완료 콜백 모두 실제 화면의 최신 표시를 단독으로 증명하지 못합니다. 실기기 제어·로그 수집·단계별 화면 판정은 [CLI 절차](./device-debugging-cli.md)를 따릅니다.

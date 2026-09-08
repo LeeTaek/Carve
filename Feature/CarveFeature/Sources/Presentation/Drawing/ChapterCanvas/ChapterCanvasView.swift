@@ -58,6 +58,13 @@ struct ChapterCanvasView: UIViewControllerRepresentable {
         controller.onEvent = { [coordinator = context.coordinator] event in
             coordinator.handle(event)
         }
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-CanvasDisplayProbe") {
+            controller.displayProbe = ChapterCanvasDisplayProbe(controller: controller) { [store] in
+                (store.renderedRevision, store.renderedData)
+            }
+        }
+        #endif
         return controller
     }
 
