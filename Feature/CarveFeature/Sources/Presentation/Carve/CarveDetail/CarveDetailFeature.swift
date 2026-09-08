@@ -86,6 +86,10 @@ public struct CarveDetailFeature {
         public enum View {
             /// 성경 구절 fetch
             case fetchSentence
+            #if DEBUG
+            /// HUD가 나타나거나 표시할 진단 값이 바뀌었을 때 콘솔에 기록한다.
+            case debugHUDSnapshotChanged(String)
+            #endif
             /// 스크롤에 따른 헤더 애니메이션
             case headerAnimation(CGFloat, CGFloat)
             /// scrollView proxy 설정
@@ -139,6 +143,12 @@ public struct CarveDetailFeature {
 
         Reduce { state, action in
             switch action {
+            #if DEBUG
+            case .view(.debugHUDSnapshotChanged(let snapshot)):
+                return .run { _ in
+                    print("ChapterHUD \(snapshot)")
+                }
+            #endif
             case .view(.headerAnimation(let previous, let current)):
                 return .send(.scope(.headerAction(.headerAnimation(previous, current))))
                 

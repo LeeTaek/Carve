@@ -117,7 +117,8 @@ public struct CarveDetailView: View {
                 lastEdit: lastEditForOverlay,
                 // 안전망은 단일 Canvas 경로에만 붙는다 — N-Canvas 는 판정 자체가 없으므로 nil 이다 (§14).
                 safetyNet: store.usesSingleCanvas ? store.chapterCanvas.layoutDelta : nil,
-                compose: store.usesSingleCanvas ? composeProbe : nil
+                compose: store.usesSingleCanvas ? composeProbe : nil,
+                reportSnapshot: { send(.debugHUDSnapshotChanged($0)) }
             )
         }
         #endif

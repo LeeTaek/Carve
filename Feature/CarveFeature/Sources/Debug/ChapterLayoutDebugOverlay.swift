@@ -171,6 +171,9 @@ struct ChapterLayoutDebugHUD: View {
     /// 캔버스가 실제로 합성에 쓴 상태 (E-4 진단). N-Canvas 경로에서는 nil.
     var compose: CanvasComposeProbe?
 
+    /// HUD와 같은 입력에서 만든 로그를 Feature에 전달한다. View는 콘솔 I/O를 하지 않는다.
+    var reportSnapshot: (String) -> Void = { _ in }
+
     private let tolerance = LayoutDeltaVerdict.tolerance
 
     var body: some View {
@@ -192,6 +195,9 @@ struct ChapterLayoutDebugHUD: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.black.opacity(0.82))
         .allowsHitTesting(false)
+        .onChange(of: consoleSnapshot, initial: true) { _, snapshot in
+            reportSnapshot(snapshot)
+        }
     }
 
     private var headline: some View {
