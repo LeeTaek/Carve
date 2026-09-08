@@ -2,6 +2,12 @@
 
 2026-09-08에 실제 실행한 CLI 중심 절차다. 대상은 iPad이며 테스트에 Xcode MCP를 사용하지 않는다. D9 H 결과·구현안은 [회전 표시 결함 조사](./single-canvas-rotation-display-investigation.md), 일반 백업·성능·필기 검증은 [실기기 런북](./phase-0a-d-device-test.md)을 따른다.
 
+> ⚠️ **2026-09-08 인자 의미가 바뀌었습니다.** 표시용 획 재구성이 **정식 경로**가 됐으므로
+> (`ef053111`) 예전의 `-CanvasFreshStrokesOnApply` 는 사라졌습니다. 지금 남은
+> **`-CanvasReuseStrokesOnApply` 는 의미가 정반대**입니다 — 수정을 **끄고 결함을 재현하는**
+> Debug 전용 opt-out 이며, 회전 왕복 A/B 의 양성 대조와 긴 장 성능 비교에만 씁니다.
+> **기본 검증은 이 인자 없이** 돕니다.
+
 ## 1. 도구와 기기 확인
 
 저장소 루트에서 실행한다. Xcode 앱 경로와 기기 식별자는 머신마다 다시 조회한다.
@@ -94,7 +100,7 @@ xcrun devicectl device orientation set --device "$CARVE_DEVICE_ID" landscapeLeft
 
 ## 5. 명시적인 수동 표시 실험
 
-이 절은 조사 코드가 있는 **Debug 전용**이다. 아래 두 인자가 함께 있어야 원격 실험 명령을 받는다. 자동 해결 비교 인자 `-CanvasFreshStrokesOnApply`는 함께 넣지 않는다.
+이 절은 조사 코드가 있는 **Debug 전용**이다. 아래 두 인자가 함께 있어야 원격 실험 명령을 받는다. 자동 비교 인자 `-CanvasReuseStrokesOnApply`는 함께 넣지 않는다.
 
 ```bash
 xcrun devicectl device process launch --device "$CARVE_DEVICE_ID" \
@@ -130,7 +136,7 @@ xcrun devicectl device notification post --device "$CARVE_DEVICE_ID" \
 ```bash
 xcrun devicectl device process launch --device "$CARVE_DEVICE_ID" \
   --terminate-existing --console kr.co.carve.leetaek -- \
-  -SingleCanvas -ChapterLayoutOverlay -CanvasDisplayProbe -CanvasFreshStrokesOnApply \
+  -SingleCanvas -ChapterLayoutOverlay -CanvasDisplayProbe -CanvasReuseStrokesOnApply \
   > "$CARVE_DEVICE_LOGS/fresh-apply.log" 2>&1
 ```
 
@@ -141,10 +147,10 @@ xcrun devicectl device process launch --device "$CARVE_DEVICE_ID" \
 ```bash
 xcrun devicectl device process launch --device "$CARVE_DEVICE_ID" \
   --terminate-existing kr.co.carve.leetaek -- \
-  -SingleCanvas -ChapterLayoutOverlay -CanvasFreshStrokesOnApply
+  -SingleCanvas -ChapterLayoutOverlay -CanvasReuseStrokesOnApply
 ```
 
-기본 경로로 돌아가려면 위 실행에서 `-CanvasFreshStrokesOnApply`를 뺀다. 재실행은 미저장 필기가 없는 진단 상황에서 한다. 종료 기록에는 마지막 실행 인자를 남겨 다음 사람이 비교 모드를 정식 수정으로 오해하지 않게 한다.
+기본 경로로 돌아가려면 위 실행에서 `-CanvasReuseStrokesOnApply`를 뺀다. 재실행은 미저장 필기가 없는 진단 상황에서 한다. 종료 기록에는 마지막 실행 인자를 남겨 다음 사람이 비교 모드를 정식 수정으로 오해하지 않게 한다.
 
 ## 7. 시뮬레이터와 기록 체크
 

@@ -20,6 +20,14 @@
 
 ## 0-A. 개정 이력
 
+### rev.9 — D9 H 정식 수정 · 실기기 A/B 통과 (종결 아님)
+
+표시용 획 재구성이 정식 경로가 됐고(`ef053111`), 실기기에서 **인자 없이 3왕복 정상 · `-CanvasReuseStrokesOnApply` 로 결함 재현**을 확인했습니다. 회전은 `devicectl device orientation set` 으로 돌리고 화면은 사용자가 판정했습니다.
+
+⚠️ **인자 의미가 바뀌었습니다** — `-CanvasFreshStrokesOnApply` 는 사라졌고, `-CanvasReuseStrokesOnApply` 는 **수정을 끄고 결함을 재현하는** 쪽입니다. 기본 검증은 인자 없이 합니다.
+
+⚠️ **§6 잔여 검증(편집·저장 왕복 · 긴 장 성능 · 스크롤 중 회전 · 글꼴 변경)이 남아 D9 H 를 종결하지 않습니다.** **E-4 재판정도 글꼴 변경 확인에 달려 있습니다** (§8-7).
+
 ### rev.8 — D9 H 회전 표시 결함 원인 분리 · 정식 수정은 다음 세션
 
 기본 경로에서 회전 후 잘못 표시될 때도 동일 컨트롤러에 최신 revision과 drawing이 도착했습니다. 일반 redraw/동일 drawing 재대입은 실패했고, 빈 drawing 경유 복원과 새 획 객체 생성은 정상화됐습니다. 새 획 자동 생성 Debug 모드의 가로 → 세로 → 가로도 정상입니다. **기본/Release 수정과 편집·저장·성능 검증은 아직 남아 있으므로 D9 H를 종결하지 않습니다.**
@@ -2824,7 +2832,7 @@ settle 대기 시간        (§18-3 은 cold launch 후 8초)
 
 | # | 발견 | 영향 | 반영할 곳 |
 |---|---|---|---|
-| **D9 H** | 기존 획 재사용에 따른 PencilKit 표시 갱신 경로로 원인 분리. Debug 새 획 생성 모드 회전 왕복 정상 | **정식 수정·편집 저장·긴 장 성능 검증 미완료** | [분석·구현안](./single-canvas-rotation-display-investigation.md) · [조작 절차](./device-debugging-cli.md) · 설계 §20-15 |
+| **D9 H** | ✅ **정식 수정 적용 + 실기기 A/B 통과** (`ef053111`). 인자 없이 가로↔세로 **3왕복 전부 정상**, `-CanvasReuseStrokesOnApply` 로 **결함 재현**(양성 대조). 계측은 두 실행이 구분되지 않고 화면 판정만 갈린다 | ⚠️ **편집·저장 왕복 · 긴 장 성능 · 스크롤 중 회전 · 글꼴 변경 미수행 — 종결 아님** | [분석](./single-canvas-rotation-display-investigation.md) §3 · [조작 절차](./device-debugging-cli.md) · 설계 **§20-16** |
 | **R13** | ✅ **종결.** 행 높이 실측을 레이아웃 입력으로 승격 + Δ 안전망 (`e98e4679`). 실기기 재검증: 시편 119편 Δ **87.50 → 0.00** · `slope` +0.500 → **+0.000/절** · `top` v1~v176 전부 0.00 · 장 전환 4건 `H` **5138.0 동일** · `guard OPEN` | 기본 활성화 차단 해제. **D9-1 보류 해제** | 설계 §14 · §15 · §16 · **§20-14** |
 | **R18** | ⚠️ **N-Canvas 가 새로 만드는 행이 v2 가 아니라 v1(모델 기본값)로 저장된다.** 같은 함수가 기존 v3 행을 편집할 때는 v2 로 정확히 내린다 ([CanvasFeature.swift:81](../Feature/CarveFeature/Sources/Presentation/Drawing/Canvas/CanvasFeature.swift:81)) | **배치에는 영향 없음** — 코덱이 v1·v2 를 똑같이 `writingRect` 원점으로 옮긴다. 문제는 **라벨**이다: "1.2.0 절대좌표"(진짜 legacy)와 오늘 N-Canvas 로 그린 행이 `legacyVerses` 한 통에 들어가 진단에서 구별되지 않는다. **E-4 오독의 직접 원인** | 저장 경로 별건 |
 | **E-4** | ⚠️ **미확정 (rev.8 에서 "결함 아님" 판정을 되돌림).** 폰트·행간 변경 시 잉크가 재배치되지 않았다. 당시 "그 절들이 v1 이라서" 로 종결했으나 **근거가 부족했다** — v1 은 band reflow 를 하지 않는다는 뜻이지 재배치가 아예 안 된다는 뜻이 아니다. `columnOrigin`·`writingRect` 는 v1 에도 적용되므로(설계 §20-15 의 `writingRect.minX ≡ 0` 논증) 폰트·행간이 바뀌면 v1 잉크도 움직여야 한다 | **D9 H 와 같은 자극일 가능성이 높다** — 폰트 변경과 회전은 둘 다 `verseColumn` 의 `.id("\(sentenceSetting)-\(halfWidth)")` 를 바꿔 컬럼을 통째로 다시 짓는다. 두 경로가 구분되지 않는다. **D9 H 정식 수정 뒤 같은 조작으로 재판정한다** | [D9 H 분석](./single-canvas-rotation-display-investigation.md) · 런북 §6-9 D9-3 · 설계 §14 |

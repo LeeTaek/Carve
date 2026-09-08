@@ -1,13 +1,13 @@
 # CarveFeature 단일 Canvas 전환 설계
 
-> **상태 (rev.23):** Phase 0A~3 **구현 완료.** 단일 Canvas 는 feature flag `singleCanvasEnabled` 뒤에 있고 **기본 off** 입니다.
+> **상태 (rev.24):** Phase 0A~3 **구현 완료.** 단일 Canvas 는 feature flag `singleCanvasEnabled` 뒤에 있고 **기본 off** 입니다.
 > 남은 것은 **실기기 검증 D9** (기본 활성화·배포 판단의 선행 조건, §16) 와 **Phase 4** (구 구조 제거) 입니다.
 > D9 의 실행 절차와 기록 양식은 [런북 §6-9 · §8-7](./phase-0a-d-device-test.md) (rev.8) 에 있습니다.
 >
 > ✅ **D9 스모크에서 나온 레이아웃 결함 2건(R13 · R16)이 모두 종결됐습니다** (§20-13 · §20-14 · 런북 §8-7).
 > **보류했던 필기 검증(D9-1)은 진행 가능합니다.** 다만 Δ 0.00 은 실제 필기 표시의 정상 판정이 아닙니다. 이후 결함을 저장 경로로 단정하지 않습니다.
 > **D9 H 회전 표시 결함은 정식 수정 미적용입니다.** 기존 획 재사용에 따른 PencilKit 표시 갱신 경로로 원인을 좁혔고, Debug 비교 모드의 회전 왕복만 통과했습니다. [원인·구현안](./single-canvas-rotation-display-investigation.md) · [실기기 조작](./device-debugging-cli.md).
-> 회귀 기준선 **296** (§19-4-2). 대상: `Feature/CarveFeature`, `Feature/SettingsFeature`, `Domain`.
+> 회귀 기준선 **302** (§19-4-2). 대상: `Feature/CarveFeature`, `Feature/SettingsFeature`, `Domain`.
 >
 > **읽는 법.** §1~§17 이 설계이고 §18~§20 은 실측·변경 기록입니다. 절 번호는 코드 주석과 AGENTS.md 가 참조하므로 **바꾸지 않습니다.**
 > 결정이 끝난 항목은 결정만 남기고 논의 과정은 지웠습니다 (rev.19 정리). 과정이 필요하면 git 이력(`git log -- docs/single-canvas-design.md`)을 보십시오.
@@ -29,6 +29,7 @@
 | 21 | **R13 종결** — 행 높이 실측을 레이아웃 입력으로 승격 · Δ 안전망 · D9-1 보류 해제 | §14 · §15 · §16 · §20-14 |
 | 22 | D9-1~D9-6 통과. 합성 프로브 추가 · **E-4 는 결함 아님**(v1 행) · R18 | §14 · §16 · 런북 rev.7 |
 | 23 | D9 H 회전 표시 결함 원인 분리 · Debug A/B 왕복 통과 · **정식 수정 미적용** · 기준선 296 | §19-4-2 · §20-15 · 런북 rev.8 |
+| 24 | **D9 H 정식 수정** — 표시용 획 재구성 승격 · 실기기 3왕복 + 양성 대조 통과 · 기준선 302. **§6 잔여 검증은 남음** | §19-4-2 · §20-16 |
 
 ---
 
@@ -1199,7 +1200,8 @@ peak **363.6 MB** · 최종 정지 **109.7 MB** · CPU > 90% 샘플 47 / 188. **
 | 19 | 265 | 승계 규칙 3 전제 1 |
 | 20 | 267 | R16 회귀 2 (장 전환 컬럼 신장). CarveFeatureTest 142 · DomainTest **103** (XCTest 2 포함) · SettingsFeatureTest 4 · ChartFeatureTest 9 · CarveToolkitTest 6 · UIComponentsTest 3 <br>⚠️ rev.20 문서는 DomainTest 를 101 로 적어 per-target 합이 265 로 어긋났습니다 (rev.21 정정) |
 | **21** | **285** | R13 18 (빌더 4 · 파이프라인 3 · 안전망/배선 8 · 부작용 고정 1 · Phase 3 흡수 1 + 변이 보강). 당시 기준선 — CarveFeatureTest 156 · DomainTest 107 (XCTest 2 포함) · SettingsFeatureTest 4 · ChartFeatureTest 9 · CarveToolkitTest 6 · UIComponentsTest 3 |
-| **23** | **296** | **현재 실측 기준선** — CarveFeatureTest 167 · DomainTest 107 (XCTest 2 포함) · SettingsFeatureTest 4 · ChartFeatureTest 9 · CarveToolkitTest 6 · UIComponentsTest 3. 조사 인계 기준 295에서 진단 안전성 테스트 1개 추가. rev.21 이후 선행 변경도 포함 (§20-15) |
+| 23 | 296 | 당시 기준선 — CarveFeatureTest 167 · DomainTest 107 (XCTest 2 포함) · SettingsFeatureTest 4 · ChartFeatureTest 9 · CarveToolkitTest 6 · UIComponentsTest 3. 조사 인계 기준 295에서 진단 안전성 테스트 1개 추가. rev.21 이후 선행 변경도 포함 (§20-15) |
+| **24** | **302** | **현재 실측 기준선** — D9 H 정식 수정 6건 (표시용 재구성의 속성·소유권 보존 · 마스크 파생값 고정점 · 지우개 절 1회 dirty · 빈/디코드 실패 · 같은 revision 무교체 · 회전 flush). CarveFeatureTest 173 · DomainTest 107 (XCTest 2 포함) · SettingsFeatureTest 4 · ChartFeatureTest 9 · CarveToolkitTest 6 · UIComponentsTest 3 |
 
 통과한 실행에서도 PencilKit 필기인식 권한 `com.apple.corehandwriting -1003`와 CoreData persistent history 정리 로그가 관찰됐습니다. 모든 `error:`를 노이즈로 취급하지 말고, 명령 종료 코드·실행 테스트 수·실패 내용을 함께 확인합니다. rev.16 클린 빌드에서 `UIComponentsTest` 의 테스트 타깃 의존성 누락을 고쳤습니다.
 
@@ -1463,3 +1465,17 @@ Phase 3 이후 처음으로 **제품 코드의 단일 Canvas 경로를 실기기
 - 전체 테스트 **296개(Swift Testing 294 + XCTest 2)** 통과. 진단 안전성 테스트 1개를 추가했으며 편집 억제 변이를 넣으면 `editEnded` 오보고로 실패하는 것을 확인하고 복원했습니다. 이 테스트는 화면 픽셀 버그 자체를 검출하지 않습니다.
 
 `legInk`는 legacy 절만의 병합 전 값이므로 전체 `canvas.drawing.bounds`와 등치 비교하지 않습니다. `Δ max 0.00`, `compose SYNC`, 렌더 완료 콜백 모두 실제 화면의 최신 표시를 단독으로 증명하지 못합니다. 실기기 제어·로그 수집·단계별 화면 판정은 [CLI 절차](./device-debugging-cli.md)를 따릅니다.
+
+### 20-16. D9 H 정식 수정 — 표시용 획 재구성 (rev.24)
+
+`ef053111`. 회전 뒤 이전 필기가 표시되는 결함의 처방을 Debug 실행 인자 뒤에서 **기본 경로로 승격**했습니다. `ChapterCanvasController.applyDrawing` 의 **디코딩 후 · `canvas.drawing` 대입 직전**에서 같은 공개 속성으로 획을 새로 만들어 넣습니다. 좌표·저장 데이터·Feature·코덱·DB 는 손대지 않았고, 실행 위치는 `renderedRevision` 이 실제로 바뀔 때 안 그대로입니다.
+
+**속성 감사 (iOS 26 SDK).** `PKStroke` 의 값 지정 가능 속성은 `ink`·`path`·`transform`·`mask`·`randomSeed` 다섯이고 전부 그대로 넘깁니다. `renderBounds`·`maskedPathRanges`·`requiredContentVersion` 은 읽기 전용 파생값이라 지정 수단이 없습니다. **손실되는 지정 가능 속성은 없습니다.** `path` 를 통째로 넘기므로 `creationDate` 와 control point 가 유지되고, **`StrokeIdentityKey` 가 쓰는 `randomSeed`+`creationDate`+`path.count` 셋이 모두 보존**되어 소유권 승계가 유지됩니다.
+
+> ⚠️ **알려진 부작용 — 지우개 조각 절이 1회 재저장됩니다.** `mask != nil` 인 획을 재구성하면 파생값 `maskedPathRanges` 가 재계산되며 미세하게 달라집니다(실측 차이 약 6.7e-4). `StrokeContentSignature` 는 반올림을 금지하므로(§7-2 — D7 재발 방지) 그 절이 한 번 dirty 로 잡혀 `.replace` 가 한 번 나갑니다. **저장 내용(획 수·좌표·`StrokeIdentityKey`·`ownership.map`)은 원본과 동일하고**, 그 결과로 다시 합성·재구성하면 mutation 이 없는 **고정점**이라 회전마다 되풀이되지 않습니다. 다만 `updateDate` 가 바뀌므로 히스토리 순서·주간 통계에 영향이 있을 수 있습니다.
+
+**실기기 A/B 로 인과를 확인했습니다** (2026-09-08, iPad mini A17 Pro / iPadOS 27.0 beta). 인자 없이 가로↔세로 **3왕복 전부 정상**, `-CanvasReuseStrokesOnApply`(Debug opt-out)로 **결함 재현**. **계측은 두 실행이 구분되지 않고 화면 판정만 갈립니다** — `store/delivered/applied` 일치, canvas bounds 기대값과 동일, `offset`·`zoom`·`transform` 동일, 컨트롤러 동일. 상세는 [D9 H 분석](./single-canvas-rotation-display-investigation.md) §3.
+
+**이것이 계측의 한계를 다시 보여줍니다.** `Δ max` · `compose SYNC` · `org` · `legInk` · `applied` · 렌더 완료 콜백 — 전부 "값이 도달했는가" 만 말하고 "화면이 그것인가" 는 말하지 못했습니다. 이 결함은 **사람이 화면을 봐야만** 판정됩니다. 시뮬레이터 테스트도 데이터·계약만 고정하고 PencilKit 의 화면 캐시 자체는 검출하지 못합니다.
+
+**아직 종결이 아닙니다.** §6 의 잔여 검증 — 편집·저장 왕복(새 필기·부분 지우개·undo/redo·장 이동·재실행 복원·N-Canvas 왕복), 긴 장(시편 119편) 재구성 비용, 스크롤 중 회전, 글꼴/행간 변경, 좌우 필사 위치 — 이 남아 있습니다. **E-4 재판정도 그 글꼴 변경 확인에 달려 있습니다** (런북 §8-7).
