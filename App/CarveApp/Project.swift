@@ -44,6 +44,17 @@ let settings: Settings = .settings(
 )
 
 let targets: [Target] = [
+    // 실기기 터치 자동화 (D9-5 · D9-7). Pencil 입력은 범위 밖이다 — .pencilOnly 라 합성 터치가 무시된다.
+    .target(
+        name: "\(projectName)UITests",
+        destinations: [.iPad],
+        product: .uiTests,
+        bundleId: .defaultBundleID + ".UITests",
+        deploymentTargets: .iOS("17.0"),
+        infoPlist: .default,
+        sources: ["UITests/**"],
+        dependencies: [.target(name: projectName)]
+    ),
     .makeAppTarget(
         name: projectName,
         entitlements: .file(path: .relativeToCurrentFile("Support/Carve.entitlements")),
