@@ -42,7 +42,8 @@ public struct CanvasView: UIViewRepresentable {
             
             return canvas
         }()
-        canvas.drawing = displayDrawing()
+        // delegate 는 아래에서 붙으므로 이 대입은 콜백을 부르지 않지만, 순서가 바뀌어도 안전하도록 같은 경로로 넣는다.
+        context.coordinator.applyProgrammatically(displayDrawing(), to: canvas)
         canvas.drawingGestureRecognizer.isEnabled = isInputEnabled
         canvas.delegate = context.coordinator
         context.coordinator.bind(to: canvas)
@@ -54,10 +55,12 @@ public struct CanvasView: UIViewRepresentable {
         if uiView.drawingGestureRecognizer.isEnabled != isInputEnabled {
             uiView.drawingGestureRecognizer.isEnabled = isInputEnabled
         }
+        let coordinator = context.coordinator
         Task { @MainActor in
             let newDrawing = displayDrawing()
             if uiView.drawing != newDrawing {
-                uiView.drawing = newDrawing
+                // 여기가 R23 의 발화 지점이었다 — delegate 가 이미 붙어 있어 대입이 편집으로 보고됐다.
+                coordinator.applyProgrammatically(newDrawing, to: uiView)
             }
         }
     }
@@ -76,6 +79,13 @@ public struct CanvasView: UIViewRepresentable {
         /// 마지막 변경을 반드시 저장하기 위한 trailing-edge debounce 작업.
         private var trailingSaveTask: Task<Void, Never>?
         private var cancaellable = Set<AnyCancellable>()
+        /// 프로그램이 `canvas.drawing` 을 대입하는 동안 켜진다.
+        ///
+        /// PencilKit 은 사용자 입력뿐 아니라 **프로그램 대입에도** `canvasViewDrawingDidChange` 를 부른다.
+        /// 그 콜백이 그대로 `.saveDrawing` 으로 이어지면 장을 **열기만 해도** 저장이 일어나,
+        /// v3 행이 v2 로 강등되고 `layoutMetadataData` 가 지워진다 — 설계 §10-3 은 **편집할 때만** 강등이다.
+        /// 단일 Canvas 는 같은 자리를 `ChapterCanvasController.isApplyingDrawing` 으로 막는다.
+        private var isApplyingDrawing = false
 
         init(store: StoreOf<CanvasFeature>) {
             self.store = store
@@ -86,6 +96,8 @@ public struct CanvasView: UIViewRepresentable {
         }
 
         public func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
+            // 프로그램 대입은 편집이 아니다 (설계 §10-3).
+            guard !isApplyingDrawing else { return }
             let now = Date()
             if now.timeIntervalSince(lastUpdate) > throttleInterval {
                 lastUpdate = now
@@ -93,6 +105,20 @@ public struct CanvasView: UIViewRepresentable {
                 self.store.send(.registUndoCanvas(canvasView))
             }
             scheduleTrailingSave(for: canvasView)
+        }
+
+        /// 표시용 drawing 을 캔버스에 대입한다. 이 구간의 delegate 콜백은 편집으로 보고하지 않는다.
+        ///
+        /// 사용자 편집으로 예약된 trailing save 는 취소하지 않는다 — 취소하면 그 편집을 잃는다.
+        /// 편집이 먼저 store 에 반영되면 `displayDrawing()` 이 캔버스 내용과 같아져 이 대입 자체가 일어나지 않는다.
+        /// - Parameters:
+        ///   - drawing: 대입할 drawing.
+        ///   - canvasView: 대상 캔버스.
+        @MainActor
+        func applyProgrammatically(_ drawing: PKDrawing, to canvasView: PKCanvasView) {
+            isApplyingDrawing = true
+            canvasView.drawing = drawing
+            isApplyingDrawing = false
         }
 
         /// 마지막 변경 이후 `throttleInterval` 이 지나면 최종 상태를 한 번 더 저장한다.

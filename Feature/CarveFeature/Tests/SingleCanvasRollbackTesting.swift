@@ -195,4 +195,81 @@ struct SingleCanvasRollbackTesting {
             #expect(!state.canUndo)
         }
     }
+
+    // MARK: R23 — 장을 여는 것만으로 강등되지 않는다
+
+    /// 실제 `PKCanvasView` 와 delegate 를 붙여 R23 의 경로를 그대로 태운다.
+    ///
+    /// PencilKit 은 사용자 입력뿐 아니라 **프로그램 대입에도** `canvasViewDrawingDidChange` 를 부른다.
+    /// 억제가 없던 구현에서는 장을 열 때 `CanvasView.updateUIView` 의 대입이 곧바로 `.saveDrawing` 으로 이어져
+    /// 그 장의 v3 행이 전부 v2 로 강등되고 `layoutMetadataData` 가 지워졌다 (2026-09-08 실기기 실측, 시편 122편 9개 절).
+    /// 설계 §10-3 은 **편집할 때만** 강등이다.
+    @MainActor
+    @Test("프로그램 대입은 편집이 아니다 — v3 행이 강등되지 않고 metadata 도 남는다 (R23)")
+    func programmaticApplyDoesNotDowngrade() throws {
+        let chapter = BibleChapter(title: .micah, chapter: 4)
+        let sentence = BibleVerse(title: chapter, verse: 1, sentence: "끝날에 이르러는")
+        let row = BibleDrawing(bibleTitle: chapter, verse: 1, lineData: PKDrawing(strokes: [Self.stroke()]).dataRepresentation())
+        row.drawingVersion = 3
+        row.layoutMetadataData = try CanvasTestSupport.metadata().encodedBlob()
+        let originalLineData = row.lineData
+
+        // `.registUndoCanvas` 가 실제 의존성을 건드리지 않게 주입한다 — 이걸 빼면 변이 시 강등이 아니라
+        // "undoManager 에 test 구현이 없다" 로 실패해, 정작 지키려는 계약을 고정하지 못한다.
+        let store = withDependencies {
+            $0.undoManager = SharedUndoManager()
+        } operation: {
+            Store(initialState: CanvasFeature.State(sentence: sentence, drawing: row)) { CanvasFeature() }
+        }
+        let coordinator = CanvasView.Coordinator(store: store)
+        let canvas = PKCanvasView()
+        canvas.delegate = coordinator
+
+        // when: 표시용 drawing 을 프로그램으로 넣는다 (장 진입에서 일어나는 일).
+        coordinator.applyProgrammatically(PKDrawing(strokes: [Self.stroke()]), to: canvas)
+
+        // then: 좌표 형식 표식·metadata·저장 내용이 그대로다.
+        #expect(row.drawingVersion == 3)
+        #expect(row.layoutMetadataData != nil)
+        #expect(row.lineData == originalLineData)
+    }
+
+    /// 위 억제가 **너무 넓지 않은지** 를 함께 고정한다. 억제가 delegate 전체를 막아버리면
+    /// 실제 필기가 저장되지 않는데, 그 회귀는 위 테스트만으로는 드러나지 않는다.
+    @MainActor
+    @Test("사용자 편집 콜백은 그대로 저장으로 이어진다 — 억제가 delegate 전체를 막지 않는다 (R23)")
+    func userEditStillSaves() async throws {
+        let chapter = BibleChapter(title: .micah, chapter: 5)
+        let sentence = BibleVerse(title: chapter, verse: 2, sentence: "베들레헴 에브라다야")
+        let row = BibleDrawing(bibleTitle: chapter, verse: 2, lineData: PKDrawing(strokes: [Self.stroke()]).dataRepresentation())
+        row.drawingVersion = 3
+        row.layoutMetadataData = try CanvasTestSupport.metadata().encodedBlob()
+
+        // `.registUndoCanvas` 가 실제 의존성을 건드리지 않게 주입한다 — 이걸 빼면 변이 시 강등이 아니라
+        // "undoManager 에 test 구현이 없다" 로 실패해, 정작 지키려는 계약을 고정하지 못한다.
+        let store = withDependencies {
+            $0.undoManager = SharedUndoManager()
+        } operation: {
+            Store(initialState: CanvasFeature.State(sentence: sentence, drawing: row)) { CanvasFeature() }
+        }
+        let coordinator = CanvasView.Coordinator(store: store)
+        let canvas = PKCanvasView()
+        canvas.delegate = coordinator
+        canvas.drawing = PKDrawing(strokes: [
+            OwnershipTestSupport.stroke(from: CGPoint(x: 1, y: 2), to: CGPoint(x: 3, y: 4), seed: 7, creationTime: 7_000)
+        ])
+
+        // when: 사용자 입력에 해당하는 콜백을 직접 부른다.
+        coordinator.canvasViewDrawingDidChange(canvas)
+
+        // then: leading throttle 에 걸리면 trailing debounce(0.3s)로 저장된다. 고정 sleep 대신 값이 바뀔 때까지 폴링한다.
+        var downgraded = false
+        for _ in 0..<40 where !downgraded {
+            if row.drawingVersion == 2 { downgraded = true; break }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        #expect(downgraded)
+        #expect(row.layoutMetadataData == nil)
+        #expect(row.lineData == canvas.drawing.dataRepresentation())
+    }
 }
