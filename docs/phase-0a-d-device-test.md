@@ -1559,16 +1559,54 @@ xcrun xctrace record --template 'Activity Monitor' --device "$UDID" \
 - ⚠️ **기록 중 `pgrep`/`pkill` 금지** (AGENTS.md) — 트레이스가 메타데이터 없이 저장돼 `xctrace export` 가 실패합니다
 - ⚠️ 설계 §18-3(시뮬레이터)과 **절대값 비교 금지** (§7-2). D5 와는 같은 기기·같은 OS 빌드라 **비교 가능**합니다
 
-#### D9-CK. CloudKit 스키마 승격 (설계 §10-1-a) ⚠️ 기본 활성화 전 필수
+#### D9-CK. CloudKit 스키마 승격 (설계 §10-1-a) ⚠️ 기본 활성화 전 필수 ★ 절차 (2026-09-09 정리)
 
-**메커니즘이 아니라 순서의 문제입니다.** D9-1 을 끝내면 dev 컨테이너에 `layoutMetadataData` 값이 **처음** 저장되므로, 그 직후가 가장 좋은 시점입니다.
+**메커니즘이 아니라 순서의 문제입니다.** CloudKit **Development** 는 값이 처음 저장될 때 필드를 자동으로 만들지만,
+**Production** 은 Dashboard 에서 명시적으로 배포해야 생깁니다. 승격 없이 배포하면 사용자가 만든 v3 행의
+metadata 가 **서버로 올라가지 못하고**, 기기를 바꾸거나 재설치한 사용자는 그만큼을 잃습니다.
+
+⚠️ **사람이 직접 해야 합니다.** 되돌릴 수 없는 외부 상태 변경이라 자동화하지 않습니다.
+
+**대상 컨테이너**
+
+| 환경 | 컨테이너 ID | 어디서 오나 |
+|---|---|---|
+| Debug | `iCloud.Carve.SwiftData.iCloud.dev` | `App/CarveApp/Project.swift` 의 `CLOUDKIT_CONTAINER_ID` |
+| Release | `iCloud.Carve.SwiftData.iCloud` | 〃 |
+
+⚠️ **둘은 별개 컨테이너입니다.** dev 에서 스키마를 만들어도 운영 컨테이너와는 무관하며,
+**운영 컨테이너의 Development 환경**에서 만들어 **같은 컨테이너의 Production 으로** 배포해야 합니다.
+
+**확인할 필드** — `layoutMetadataData` 하나가 아닙니다
+
+레코드 타입은 `CD_BibleDrawing` (SwiftData 가 `CD_` 접두사를 붙입니다). V4 가 **새로 추가한** 필드는 둘입니다.
+
+| 모델 필드 | 서버 필드(예상) | 언제 생기나 |
+|---|---|---|
+| `layoutMetadataData` (`.externalStorage`) | `CD_layoutMetadataData` | ⚠️ **v3 저장이 한 번 일어나야** — D7 시점에 없던 이유 |
+| `rowUUID` | `CD_rowUUID` | 신규 행 생성 시 |
+| `drawingVersion` · `isPresent` · `lineData` | `CD_drawingVersion` 등 | V3 부터 존재 — 이미 있을 가능성이 큼 |
+
+⚠️ **`.externalStorage` 필드는 서버 이름이 다를 수 있습니다.** D7 실측에서 `CD_lineDataBytes` 가 관측됐으므로
+`CD_layoutMetadataData` 와 `CD_layoutMetadataDataBytes` **둘 다** 확인하십시오. 이 이름 규칙은 실측 1건에 근거한
+것이고 확정된 문서 근거가 없습니다 — **Dashboard 에서 실제 이름을 보고 판단하십시오.**
+
+**절차**
 
 | 순서 | 할 일 | 확인 |
 |---:|---|---|
-| ① | D9-1 수행 (dev DB 에 v3 + metadata 저장) | — |
-| ② | CloudKit Dashboard → **Development** 스키마에 **`CD_layoutMetadataData`** 필드가 생겼는지 | D7 시점에는 **없었습니다** |
-| ③ | Development → **Production 배포(promote)** | ⚠️ **되돌릴 수 없는 외부 상태 변경입니다. 사람이 직접 하십시오** |
-| ④ | 그 다음에야 단일 Canvas 기본 활성화 | 설계 §10-1-a |
+| ① | **운영 컨테이너**(`iCloud.Carve.SwiftData.iCloud`)의 **Development** 환경에 위 필드가 있는지 본다 | 없으면 ②로, 있으면 ③으로 |
+| ② | 없으면 **Release 서명 빌드**로 v3 저장을 한 번 일으켜 필드를 만든다 — 필사 있는 절을 단일 Canvas 에서 편집하면 된다 | Dashboard 에서 필드 생성 확인 |
+| ③ | ⚠️ **Development 스키마에 실험 중 만들어진 불필요한 레코드 타입·필드가 없는지 훑는다** | 승격은 **스키마 전체**를 옮긴다 |
+| ④ | Development → **Production 배포(promote)** | ⚠️ **되돌릴 수 없습니다.** 필드 추가는 영구적이고 삭제할 수 없습니다 |
+| ⑤ | Production 환경에서 필드가 보이는지 재확인 | — |
+| ⑥ | 그 다음에야 단일 Canvas 를 담은 빌드를 **출시** | 설계 §10-1-a |
+
+> **왜 ⑥ 이 마지막인가.** 출시가 먼저면 사용자가 곧바로 v3 + metadata 를 쓰기 시작하는데
+> 서버에 필드가 없어 그 값이 동기화되지 않습니다. 로컬에는 남으므로 즉시 눈에 띄지도 않습니다.
+
+> **이번 세션에서 확인된 것:** D9-CK② (**dev 컨테이너**의 `CD_layoutMetadataData` 생성) ✅.
+> **③ 은 운영 컨테이너 기준으로 다시 봐야 합니다** — dev 컨테이너에서 확인한 것이지 운영 컨테이너가 아닙니다.
 
 > D7 나머지(메타데이터 없는 행의 도착 · `isPresent` 복수 충돌)는 **기기 2대가 필요**하므로 D9 범위 밖입니다.
 
