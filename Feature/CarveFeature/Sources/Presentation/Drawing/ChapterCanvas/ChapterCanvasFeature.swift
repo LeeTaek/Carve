@@ -155,6 +155,13 @@ public struct ChapterCanvasFeature {
         var reloadWhenSettled = false
         var isReloading = false
 
+        // UI-2 지우기 (보관 후 초기화)
+
+        /// 진행 중이거나 실패한 지우기 작업. 진행 중에는 입력·중복 지우기·재합성을 막는다.
+        var eraseTask: VerseEraseTask?
+        /// 지우기 확인창(권·장·절 포함)과 실패 안내를 함께 쓰는 알림.
+        @Presents var eraseAlert: AlertState<Action.EraseAlert>?
+
         /// 헤더 팔레트가 읽는 undo/redo 가능 여부 — `PencilPalatteFeature` 와 같은 in-memory 키를 공유한다.
         @Shared(.inMemory("canUndo")) var canUndo: Bool = false
         @Shared(.inMemory("canRedo")) var canRedo: Bool = false
@@ -181,8 +188,15 @@ public struct ChapterCanvasFeature {
         }
 
         var isComposed: Bool { renderedData != nil }
-        /// §6-2 입력 게이트 — 합성이 끝났고 다시 합성하는 중이 아닐 때만 입력을 받는다.
-        var isInputEnabled: Bool { isComposed && !isReloading }
+        /// §6-2 입력 게이트 — 합성이 끝났고, 다시 합성하지도 지우지도 않는 중일 때만 입력을 받는다.
+        var isInputEnabled: Bool { isComposed && !isReloading && !isErasing }
+        /// 지우기가 실제로 도는 중인가. `.failed` 는 **포함하지 않는다** — 실패하면 잠금을 풀고 필기를 그대로 쓰게 둔다.
+        var isErasing: Bool {
+            switch eraseTask?.phase {
+            case .flushing, .archiving: true
+            case .failed, nil: false
+            }
+        }
         /// **새 획 입력만** 여는 게이트 (설계 §14 — D9 안전망). 캔버스의 `drawingGestureRecognizer` 하나가 읽는다.
         ///
         /// 레이아웃이 실제 렌더와 한 줄 이상 어긋나면(`LayoutDeltaVerdict.blocksInput`) 그 상태의 새 획은
@@ -240,7 +254,20 @@ public struct ChapterCanvasFeature {
         case scrollToVerse(Int)
         /// 캔버스를 길게 눌러 그 자리(content 좌표)의 절 필사 기록을 요청 (§8-7 히스토리 UI, B 구조).
         case historyRequested(at: CGPoint)
+        /// 롱프레스 메뉴의 "지우기" — 그 자리(content 좌표)의 절을 보관 후 초기화한다 (UI-2). 먼저 확인창을 띄운다.
+        case eraseRequested(at: CGPoint)
+        case eraseAlert(PresentationAction<EraseAlert>)
+        /// 보관+초기화 트랜잭션의 결과. 성공하면 `outcome`, 실패하면 `failure` 가 온다.
+        case eraseFinished(outcome: VerseDrawingArchiveOutcome?, failure: DrawingRepositoryError?)
         case delegate(Delegate)
+
+        /// 지우기 확인창·실패 안내의 버튼.
+        public enum EraseAlert: Equatable, Sendable {
+            /// 확인창에서 "지우기" 를 눌렀다.
+            case confirm(verse: Int)
+            /// 실패 안내에서 "다시 시도" 를 눌렀다. **같은 보관 rowID 로** 다시 시도한다.
+            case retry
+        }
 
         /// 부모(`CarveDetailFeature`)가 처리하는 사건.
         public enum Delegate: Equatable, Sendable {
@@ -296,6 +323,14 @@ public struct ChapterCanvasFeature {
 
             case .editEnded(let snapshot):
                 state.isEditing = false
+                if state.eraseTask?.phase == .archiving {
+                    // 보관 트랜잭션이 도는 중에 도착한 편집. 이 편집의 before 는 지우기 **이전** 내용이므로 받아들이면
+                    // 그 절의 획을 활성 행에 다시 써 사용자가 확인한 지우기를 되돌린다. 입력은 확인 시점부터 잠겨 있으므로
+                    // 여기 오는 것은 그 사이(≈트랜잭션 한 번)의 늦은 보고뿐이다. 세대가 맞지 않는 편집과 같이 버린다.
+                    Log.error("단일 Canvas — 지우기(보관+초기화) 중 도착한 편집을 버린다",
+                              "generation=\(snapshot.generation)", "verse=\(state.eraseTask?.verse ?? -1)")
+                    return .none
+                }
                 var effects: [Effect<Action>] = []
                 if let session = state.session(for: snapshot.generation) {
                     state.editRevision += 1
@@ -354,20 +389,46 @@ public struct ChapterCanvasFeature {
                 return .none
 
             case .historyRequested(let point):
-                // 표시 중인 레이아웃(합성 시점 값)으로 절을 찾는다. 텍스트 쪽(컬럼 왼쪽)을 눌러도 같은 행이 되도록 x 만 컬럼 안으로 당긴다.
-                guard state.isInputEnabled, let layout = state.renderedLayout else { return .none }
-                let origin = state.renderedColumnOrigin
-                let layoutPoint = CGPoint(
-                    x: min(max(point.x - origin.x, 0), layout.writingWidth),
-                    y: point.y - origin.y
-                )
-                guard let verse = layout.verse(containing: layoutPoint) else { return .none }
+                guard let verse = Self.verse(at: point, state: state) else { return .none }
                 return .send(.delegate(.showHistory(verse: verse)))
+
+            case .eraseRequested(let point):
+                // 진행 중이거나 실패해 안내 중인 지우기가 있으면 새로 열지 않는다 (중복 지우기 방지).
+                guard state.eraseTask == nil, let verse = Self.verse(at: point, state: state) else { return .none }
+                state.eraseAlert = Self.confirmEraseAlert(chapter: state.chapter, verse: verse)
+                return .none
+
+            case .eraseAlert(.presented(.confirm(let verse))):
+                return beginErase(state: &state, verse: verse)
+
+            case .eraseAlert(.presented(.retry)):
+                return retryErase(state: &state)
+
+            case .eraseAlert(.dismiss):
+                // 실패 안내를 닫으면 그 작업은 끝난다 — 필기는 그대로 남고, 다시 지우려면 메뉴에서 새로 시작한다.
+                if state.eraseTask?.phase == .failed { state.eraseTask = nil }
+                return .none
+
+            case .eraseFinished(let outcome, let failure):
+                return finishErase(state: &state, outcome: outcome, failure: failure)
 
             case .delegate:
                 return .none
             }
         }
+        .ifLet(\.$eraseAlert, action: \.eraseAlert)
+    }
+
+    /// content 좌표가 가리키는 절. 표시 중인 레이아웃(합성 시점 값)으로 찾고, 텍스트 쪽(컬럼 왼쪽)을 눌러도
+    /// 같은 행이 되도록 x 만 컬럼 안으로 당긴다 (§20-11). 합성 전이거나 세로로 벗어나면 nil.
+    static func verse(at point: CGPoint, state: State) -> Int? {
+        guard state.isInputEnabled, let layout = state.renderedLayout else { return nil }
+        let origin = state.renderedColumnOrigin
+        let layoutPoint = CGPoint(
+            x: min(max(point.x - origin.x, 0), layout.writingWidth),
+            y: point.y - origin.y
+        )
+        return layout.verse(containing: layoutPoint)
     }
 }
 
@@ -407,6 +468,9 @@ extension ChapterCanvasFeature {
         state.isEditing = false
         state.isReloading = false
         state.reloadWhenSettled = false
+        // 진행 중이던 지우기는 이전 장의 활성 행을 가리키므로 새 장으로 이어가지 않는다 (§14 이월 상태 감사).
+        state.eraseTask = nil
+        state.eraseAlert = nil
         state.scrollRequest = nil
         state.$canUndo.withLock { $0 = false }
         state.$canRedo.withLock { $0 = false }
@@ -466,7 +530,7 @@ extension ChapterCanvasFeature {
     ///
     /// 코덱이 편집을 계산하는 중이면 미룬다. 지금 합성하면 그 결과가 세대를 잃는다. 큐가 비는 `finishEdit` 이
     /// 저장을 다시 시도하고, 그 실패가 여기로 돌아온다.
-    private func recoverFromReloadFailure(state: inout State) {
+    func recoverFromReloadFailure(state: inout State) {
         guard state.editQueue.isEmpty, !state.isPreparingEdit else {
             state.reloadWhenSettled = true
             return
@@ -554,7 +618,7 @@ extension ChapterCanvasFeature {
     }
 
     /// 저장 명령을 스냅샷 위에 겹친다 — 저장소의 `create`(upsert) · `replace` · `clear`(행 유지, 없으면 빈 행) 와 같은 의미다.
-    private func overlay(_ snapshots: [VerseDrawingSnapshot], with mutations: [VerseDrawingMutation]) -> [VerseDrawingSnapshot] {
+    func overlay(_ snapshots: [VerseDrawingSnapshot], with mutations: [VerseDrawingMutation]) -> [VerseDrawingSnapshot] {
         guard !mutations.isEmpty else { return snapshots }
         let now = date.now
         var result = snapshots
@@ -589,16 +653,21 @@ extension ChapterCanvasFeature {
     }
 
     /// 미저장분이 전부 저장된 뒤 DB 에서 다시 합성한다. 저장할 것이 없으면 즉시 다시 읽는다.
-    private func reloadAfterSettling(state: inout State) -> Effect<Action> {
+    ///
+    /// - Note: `private` 이 아닌 이유는 지우기(`ChapterCanvasEraseFeature.swift`)가 같은 진입점을 쓰기 때문이다.
+    ///         `startSaveIfPossible` · `settleIfNeeded` 도 같다.
+    func reloadAfterSettling(state: inout State) -> Effect<Action> {
         state.reloadWhenSettled = true
         state.isReloading = true
-        if state.isFullyPersisted {
+        // 지우기가 도는 중이면 재조회를 시작하지 않는다 — 보관 트랜잭션과 겹치면 지우기 이전 내용으로 합성될 수 있다.
+        // 예약(`reloadWhenSettled`)은 남으므로 `finishErase` 뒤에 수행된다.
+        if state.isFullyPersisted, !state.isErasing {
             return startReload(state: &state)
         }
         return startSaveIfPossible(state: &state, allowRetry: true)
     }
 
-    private func startReload(state: inout State) -> Effect<Action> {
+    func startReload(state: inout State) -> Effect<Action> {
         state.reloadWhenSettled = false
         state.isReloading = true
         // `loadedDrawings` 는 비우지 않는다 — 재조회가 실패하면 그것이 마지막 근거다.
@@ -688,110 +757,5 @@ extension ChapterCanvasFeature {
             drainEditQueue(state: &state),
             startSaveIfPossible(state: &state, allowRetry: true)
         )
-    }
-}
-
-// MARK: - 저장 (§8-3 · §8-4)
-
-extension ChapterCanvasFeature {
-    /// 같은 rowID 의 pending 항목 위에 새 명령을 겹칠 때의 규칙.
-    ///
-    /// 저장소의 `create` 는 upsert 이고 `clear` 는 행이 없으면 빈 행을 만들지만, **`replace` 는 행이 없으면 실패한다** (§8-6).
-    /// 그래서 행이 아직 DB 에 없을 수 있는 자리에는 `replace` 를 남기지 않는다.
-    ///
-    /// | 기존 | 새 명령 | 결과 | 이유 |
-    /// |---|---|---|---|
-    /// | `create` | `replace` | `create` | 행이 아직 없을 수 있다 |
-    /// | `clear` | `replace` | `create` | 그 `clear` 가 미저장 `create` 를 덮은 것일 수 있다 — `replace` 로 남기면 `rowNotFound` 로 batch 전체가 영구 실패한다 |
-    /// | 그 밖 | — | 새 명령 | `replace` 는 절의 완전한 획 집합이므로 나중 명령이 이긴다 |
-    static func coalesce(existing: VerseDrawingMutation, incoming: VerseDrawingMutation) -> VerseDrawingMutation {
-        switch (existing, incoming) {
-        case (.create(let verse, let rowID, _, _), .replace(_, _, let data, let metadata)),
-             (.clear(let verse, let rowID), .replace(_, _, let data, let metadata)):
-            return .create(verse: verse, rowID: rowID, data: data, metadata: metadata)
-        default:
-            return incoming
-        }
-    }
-
-    /// 저장은 동시에 하나만. `allowRetry` 면 실패 상태에서도 다시 시도한다.
-    private func startSaveIfPossible(state: inout State, allowRetry: Bool) -> Effect<Action> {
-        switch state.saveStatus {
-        case .saving:
-            return .none
-        case .failed where !allowRetry:
-            return .none
-        case .idle, .failed:
-            break
-        }
-        guard !state.pendingMutations.isEmpty else {
-            return settleIfNeeded(state: &state)
-        }
-
-        // 한 batch 는 한 장이다. 이전 장의 미저장분이 남아 있으면 그것부터 보낸다.
-        let chapter = state.pendingMutations.values
-            .map(\.chapter)
-            .min { lhs, rhs in lhs != state.chapter && rhs == state.chapter } ?? state.chapter
-        let batch = state.pendingMutations.filter { $0.value.chapter == chapter }
-        let revision = batch.values.map(\.revision).max() ?? state.editRevision
-        let mutations = batch.values
-            .sorted { $0.mutation.verse != $1.mutation.verse ? $0.mutation.verse < $1.mutation.verse : $0.mutation.rowID < $1.mutation.rowID }
-            .map(\.mutation)
-        state.inFlightBatch = batch.mapValues(\.revision)
-        state.inFlightMutations = mutations
-        state.inFlightChapter = chapter
-        state.saveStatus = .saving(revision: revision)
-
-        return .run { [repository] send in
-            do {
-                try await repository.apply(mutations, chapter: chapter)
-                await send(.saveFinished(revision: revision, failure: nil))
-            } catch let error as DrawingRepositoryError {
-                await send(.saveFinished(revision: revision, failure: error))
-            } catch {
-                await send(.saveFinished(revision: revision, failure: .persistenceFailed("\(error)")))
-            }
-        }
-    }
-
-    private func finishSave(state: inout State, revision: Int, failure: DrawingRepositoryError?) -> Effect<Action> {
-        let batch = state.inFlightBatch
-        let mutations = state.inFlightMutations
-        let chapter = state.inFlightChapter
-        state.inFlightBatch = [:]
-        state.inFlightMutations = []
-        state.inFlightChapter = nil
-
-        if let failure {
-            let retryCount: Int
-            if case .failed(_, let previous) = state.saveStatus { retryCount = previous + 1 } else { retryCount = 1 }
-            state.saveStatus = .failed(revision: revision, retryCount: retryCount)
-            Log.error("단일 Canvas 저장 실패 — 큐 보존, 다음 편집/flush 에서 재시도", "\(failure)", "revision=\(revision)")
-            if state.reloadWhenSettled {
-                // 재합성이 저장 완료를 기다리는 중이다. 입력을 잠근 채 두면 재시도할 편집 자체가 생기지 않는다 —
-                // DB 내용 ⊕ 미저장분으로 지금 합성해 입력을 열고, DB 재조회는 다음 저장 성공 뒤로 미룬다 (reloadWhenSettled 유지).
-                Log.error("단일 Canvas — 저장 실패 상태에서 미저장분을 겹쳐 합성, 재조회는 저장 성공 뒤로")
-                recoverFromReloadFailure(state: &state)
-            }
-            return .none
-        }
-
-        // §8-3 5번 — 저장 중 도착한 더 최신 revision 은 남겨 두고 다음 batch 에서 저장한다.
-        for (rowID, savedRevision) in batch where state.pendingMutations[rowID]?.revision == savedRevision {
-            state.pendingMutations[rowID] = nil
-        }
-        // 저장된 내용을 DB 내용에 겹쳐 둔다 — 재조회가 실패해도 `loadedDrawings ⊕ pendingMutations` 가 현재 내용이 되게.
-        if chapter == state.chapter, let loaded = state.loadedDrawings {
-            state.loadedDrawings = overlay(loaded, with: mutations)
-        }
-        state.persistedRevision = max(state.persistedRevision, revision)
-        state.saveStatus = .idle
-        return startSaveIfPossible(state: &state, allowRetry: false)
-    }
-
-    /// 저장할 것이 없을 때 — 다시 합성하기로 예약돼 있었다면 지금 읽는다.
-    private func settleIfNeeded(state: inout State) -> Effect<Action> {
-        guard state.reloadWhenSettled, state.isFullyPersisted else { return .none }
-        return startReload(state: &state)
     }
 }

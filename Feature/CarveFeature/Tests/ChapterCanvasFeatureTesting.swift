@@ -65,6 +65,42 @@ final class RepositorySpy: DrawingRepository, @unchecked Sendable {
         }
     }
 
+    // MARK: 지우기 (보관 후 초기화, UI-2)
+
+    /// 도착한 보관 명령. 재시도해도 `archiveRowID` 가 같은지 여기서 본다.
+    let archived = LockIsolated<[(chapter: BibleChapter, command: VerseDrawingArchiveCommand)]>([])
+    /// 순서대로 소비되는 보관 실패. 비어 있으면 성공.
+    let archiveFailures = LockIsolated<[DrawingRepositoryError]>([])
+    /// 보관 결과. 기본은 `.archived`.
+    let archiveOutcomes = LockIsolated<[VerseDrawingArchiveOutcome]>([])
+
+    func archiveAndReset(
+        _ command: VerseDrawingArchiveCommand,
+        chapter: BibleChapter
+    ) async throws -> VerseDrawingArchiveOutcome {
+        if let (stream, continuation) = makeArchiveGateIfNeeded() {
+            archiveGate.setValue(continuation)
+            for await _ in stream { break }
+        }
+        archived.withValue { $0.append((chapter, command)) }
+        if let failure = archiveFailures.withValue({ $0.isEmpty ? nil : $0.removeFirst() }) {
+            throw failure
+        }
+        return archiveOutcomes.withValue { $0.isEmpty ? .archived : $0.removeFirst() }
+    }
+
+    /// 다음 `archiveAndReset` 을 `releaseArchive()` 까지 붙잡는다 — 보관 트랜잭션이 도는 동안의 상태를 보기 위함.
+    private let holdNextArchive = LockIsolated(false)
+    let archiveGate = LockIsolated<AsyncStream<Void>.Continuation?>(nil)
+    func holdNextArchiveCall() { holdNextArchive.setValue(true) }
+    func releaseArchive() {
+        archiveGate.withValue { $0?.yield(); $0?.finish(); $0 = nil }
+    }
+    private func makeArchiveGateIfNeeded() -> (AsyncStream<Void>, AsyncStream<Void>.Continuation)? {
+        guard holdNextArchive.withValue({ let value = $0; $0 = false; return value }) else { return nil }
+        return AsyncStream<Void>.makeStream()
+    }
+
     /// `holdNextApply()` 가 켜져 있으면 스트림을 만든다.
     private let holdNext = LockIsolated(false)
     func holdNextApply() { holdNext.setValue(true) }
