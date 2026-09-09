@@ -7,6 +7,7 @@
 //
 
 import CarveToolkit
+import PencilKit
 import SwiftUI
 
 import ComposableArchitecture
@@ -15,57 +16,86 @@ import ComposableArchitecture
 public struct PencilPalatteView: View {
     @Bindable public var store: StoreOf<PencilPalatteFeature>
     private let iconSize: CGFloat = 25
+    private var iconBox: CGFloat { PencilPalatteMetrics.iconBox }
+
     public init(store: StoreOf<PencilPalatteFeature>) {
         self.store = store
     }
-    
+
+    /// 가용 폭에 맞춰 여백 단계를 고른다 (R22). 계산은 `PencilPalatteMetrics` 에 있다.
+    private func metrics(for width: CGFloat) -> PencilPalatteMetrics {
+        PencilPalatteMetrics.fit(
+            in: width,
+            penTypeCount: 4,
+            lineWidthCount: store.lineWidths.count,
+            colorCount: store.palatteColors.count
+        )
+    }
+
     public var body: some View {
-        HStack(spacing: 0) {
-            Spacer()
-            penTypePalatte
-                .frame(maxWidth: .infinity)
+        // 폭을 재서 배치를 고른다. 콘텐츠가 아니라 **컨테이너** 폭을 재므로 되먹임이 없다.
+        GeometryReader { proxy in
+            let metrics = metrics(for: proxy.size.width)
 
-            divider
-            penLineWidth
-                .frame(maxWidth: .infinity)
-
-            divider
-            colorPalatte
-                .frame(maxWidth: .infinity)
-
-            divider
-            doButtons
-                .frame(maxWidth: .infinity)
-
-            Spacer()
+            if metrics.needsScroll {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    row(metrics)
+                }
+                .frame(width: proxy.size.width)
+            } else {
+                row(metrics)
+                    .frame(width: proxy.size.width, alignment: .center)
+            }
         }
-        .frame(maxWidth: .infinity)
+        // ⚠️ 선언 높이는 **종전 값을 그대로 둔다.** 실제 콘텐츠(35pt 아이콘 + 상하 여백)가 더 크지만,
+        //    화면에서 본문과 겹치는 것이 관측된 적이 없다. 그리고 이 값이 `setHeaderHeight` 를 거쳐
+        //    본문 상단 여백(`CarveDetailView` 의 `.padding(.top, headerHeight)`)이 되므로, 정직하게
+        //    올리면 필사 화면의 세로 공간이 그만큼 줄어든다. R22 는 폭 문제이고 높이는 별건이라
+        //    UI-1 에서 건드리지 않는다. 선언/렌더 불일치는 알려진 상태로 남긴다.
         .frame(height: 20)
         .padding(.bottom, 10)
     }
-    
-    private var colorPalatte: some View {
-        HStack {
+
+    private func row(_ metrics: PencilPalatteMetrics) -> some View {
+        HStack(spacing: 0) {
+            penTypePalatte(metrics)
+            divider(metrics)
+            penLineWidth(metrics)
+            divider(metrics)
+            colorPalatte(metrics)
+            divider(metrics)
+            doButtons(metrics)
+        }
+    }
+
+    private func colorPalatte(_ metrics: PencilPalatteMetrics) -> some View {
+        HStack(spacing: PencilPalatteMetrics.itemSpacing) {
             ForEach(Array(store.palatteColors.enumerated()), id: \.offset) { index, color in
+                let isSelected = index == store.selectedColorIndex
                 Circle()
                     .frame(width: iconSize, height: iconSize)
                     .foregroundStyle(Color(uiColor: color.color))
                     .opacity(0.8)
-                    .scaleEffect(index == store.selectedColorIndex ? 0.8 : 1)
+                    .scaleEffect(isSelected ? 0.8 : 1)
                     .overlay {
                         Circle()
                             .stroke(lineWidth: 3)
-                            .foregroundStyle(index == store.selectedColorIndex ? .gray.opacity(0.3) : .clear)
+                            .foregroundStyle(isSelected ? .gray.opacity(0.3) : .clear)
                     }
-                    .padding()
+                    .padding(.horizontal, metrics.horizontalPadding)
+                    .padding(.vertical, PencilPalatteMetrics.verticalPadding)
+                    .contentShape(Rectangle())
                     .onTapGesture {
                         send(.setColor(index))
                     }
                     .gesture(
                         longPressGesture(action: .popoverColor(index))
                     )
+                    .accessibilityElement()
+                    .accessibilityLabel("색상 \(index + 1)")
+                    .accessibilityHint("길게 누르면 색을 바꿉니다")
+                    .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
             }
-            .frame(height: iconSize + 10)
         }
         .simultaneousGesture(DragGesture(minimumDistance: 0)
             .onChanged { value in
@@ -77,41 +107,48 @@ public struct PencilPalatteView: View {
         .popover(
             item: $store.scope(state: \.navigation?.colorPalatte,
                                action : \.navigation.colorPalatte),
-            attachmentAnchor: .rect(.rect(CGRect(x: store.popoverPoint.x, y: iconSize + 10, width: 0, height: 0)))
+            attachmentAnchor: .rect(.rect(CGRect(x: store.popoverPoint.x, y: iconBox, width: 0, height: 0)))
         ) { store in
             ColorPalatteView(store: store)
         }
     }
-    
-    private var divider: some View {
+
+    private func divider(_ metrics: PencilPalatteMetrics) -> some View {
         Rectangle()
             .frame(width: 1, height: iconSize)
             .foregroundStyle(.gray)
-            .padding(.horizontal)
+            .padding(.horizontal, metrics.dividerPadding)
+            .accessibilityHidden(true)
     }
-    
-    private var penLineWidth: some View {
-        HStack {
+
+    private func penLineWidth(_ metrics: PencilPalatteMetrics) -> some View {
+        HStack(spacing: PencilPalatteMetrics.itemSpacing) {
             ForEach(Array(store.lineWidths.enumerated()), id: \.offset) { index, width in
+                let isSelected = index == store.selectedWidthIndex
                 RoundedRectangle(cornerRadius: 20)
-                    .frame(width: iconSize + 10, height: iconSize + 10)
-                    .foregroundStyle(index == store.selectedWidthIndex ? .gray.opacity(0.3) : .clear)
+                    .frame(width: iconBox, height: iconBox)
+                    .foregroundStyle(isSelected ? .gray.opacity(0.3) : .clear)
                     .overlay {
                         RoundedRectangle(cornerRadius: 20)
-                            .frame(width: iconSize + 10, height: width)
+                            .frame(width: iconBox, height: width)
                             .foregroundStyle(.black)
-                            .scaleEffect(index == store.selectedWidthIndex ? 0.8 : 1)
-                            .opacity(index == store.selectedWidthIndex ? 1 : 0.6)
+                            .scaleEffect(isSelected ? 0.8 : 1)
+                            .opacity(isSelected ? 1 : 0.6)
                     }
-                    .padding()
+                    .padding(.horizontal, metrics.horizontalPadding)
+                    .padding(.vertical, PencilPalatteMetrics.verticalPadding)
+                    .contentShape(Rectangle())
                     .onTapGesture {
                         send(.setLineWidth(index))
                     }
                     .gesture(
                         longPressGesture(action: .popoverLineWidth(index))
                     )
+                    .accessibilityElement()
+                    .accessibilityLabel("선 굵기 \(index + 1)")
+                    .accessibilityHint("길게 누르면 굵기를 바꿉니다")
+                    .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
             }
-            .frame(height: iconSize + 10)
         }
         .simultaneousGesture(DragGesture(minimumDistance: 0)
             .onChanged { value in
@@ -123,103 +160,79 @@ public struct PencilPalatteView: View {
         .popover(
             item: $store.scope(state: \.navigation?.lineWidthPalatte,
                                action : \.navigation.lineWidthPalatte),
-            attachmentAnchor: .rect(.rect(CGRect(x: store.popoverPoint.x, y: iconSize + 10, width: 0, height: 0)))
+            attachmentAnchor: .rect(.rect(CGRect(x: store.popoverPoint.x, y: iconBox, width: 0, height: 0)))
         ) { store in
             LineWidthPalatteView(store: store)
         }
     }
-    
-    private var penTypePalatte: some View {
-        HStack {
-            RoundedRectangle(cornerRadius: 20)
-                .frame(width: iconSize + 10, height: iconSize + 10)
-                .foregroundStyle(store.pencilConfig.pencilType == .pencil ? .gray.opacity(0.3) : .clear)
-                .overlay {
-                    CarveFeatureAsset.pencilType.swiftUIImage
-                        .resizable()
-                        .frame(width: iconSize, height: iconSize)
-                        .scaleEffect(store.pencilConfig.pencilType == .pencil ? 0.8 : 1)
-                        .opacity(store.pencilConfig.pencilType == .pencil ? 1 : 0.6)
-                }
-                .padding()
-                .onTapGesture {
-                    send(.setPencilType(.pencil))
-                }
-            
-            RoundedRectangle(cornerRadius: 20)
-                .frame(width: iconSize + 10, height: iconSize + 10)
-                .foregroundStyle(store.pencilConfig.pencilType == .pen ? .gray.opacity(0.3) : .clear)
-                .overlay {
-                    CarveFeatureAsset.penType.swiftUIImage
-                        .resizable()
-                        .frame(width: iconSize, height: iconSize)
-                        .scaleEffect(store.pencilConfig.pencilType == .pen ? 0.8 : 1)
-                        .opacity(store.pencilConfig.pencilType == .pen ? 1 : 0.6)
-                }
-                .padding()
-                .onTapGesture {
-                    send(.setPencilType(.pen))
-                }
-            
-            RoundedRectangle(cornerRadius: 20)
-                .frame(width: iconSize + 10, height: iconSize + 10)
-                .foregroundStyle(store.pencilConfig.pencilType == .marker ? .gray.opacity(0.3) : .clear)
-                .overlay {
-                    CarveFeatureAsset.pencilHighlighter.swiftUIImage
-                        .resizable()
-                        .frame(width: iconSize, height: iconSize)
-                        .scaleEffect(store.pencilConfig.pencilType == .marker ? 0.8 : 1)
-                        .opacity(store.pencilConfig.pencilType == .marker ? 1 : 0.6)
-                }
-                .padding()
-                .onTapGesture {
-                    send(.setPencilType(.marker))
-                    Log.debug("marker")
-                }
-            
-            RoundedRectangle(cornerRadius: 20)
-                .frame(width: iconSize + 10, height: iconSize + 10)
-                .foregroundStyle(store.pencilConfig.pencilType == .monoline ? .gray.opacity(0.3) : .clear)
-                .overlay {
-                    CarveFeatureAsset.eraserType.swiftUIImage
-                        .resizable()
-                        .frame(width: iconSize, height: iconSize)
-                        .scaleEffect(store.pencilConfig.pencilType == .monoline ? 0.8 : 1)
-                        .opacity(store.pencilConfig.pencilType == .monoline ? 1 : 0.6)
-                }
-                .padding()
-                .onTapGesture {
-                    send(.setPencilType(.monoline))
-                }
+
+    private func penTypePalatte(_ metrics: PencilPalatteMetrics) -> some View {
+        HStack(spacing: PencilPalatteMetrics.itemSpacing) {
+            penTypeButton(.pencil, label: "연필", asset: CarveFeatureAsset.pencilType, metrics: metrics)
+            penTypeButton(.pen, label: "펜", asset: CarveFeatureAsset.penType, metrics: metrics)
+            penTypeButton(.marker, label: "형광펜", asset: CarveFeatureAsset.pencilHighlighter, metrics: metrics)
+            penTypeButton(.monoline, label: "지우개", asset: CarveFeatureAsset.eraserType, metrics: metrics)
         }
     }
-    
-    private var doButtons: some View {
-        HStack {
+
+    private func penTypeButton(
+        _ type: PKInkingTool.InkType,
+        label: String,
+        asset: CarveFeatureImages,
+        metrics: PencilPalatteMetrics
+    ) -> some View {
+        let isSelected = store.pencilConfig.pencilType == type
+        return RoundedRectangle(cornerRadius: 20)
+            .frame(width: iconBox, height: iconBox)
+            .foregroundStyle(isSelected ? .gray.opacity(0.3) : .clear)
+            .overlay {
+                asset.swiftUIImage
+                    .resizable()
+                    .frame(width: iconSize, height: iconSize)
+                    .scaleEffect(isSelected ? 0.8 : 1)
+                    .opacity(isSelected ? 1 : 0.6)
+            }
+            .padding(.horizontal, metrics.horizontalPadding)
+            .padding(.vertical, PencilPalatteMetrics.verticalPadding)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                send(.setPencilType(type))
+            }
+            .accessibilityElement()
+            .accessibilityLabel(label)
+            .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+    }
+
+    private func doButtons(_ metrics: PencilPalatteMetrics) -> some View {
+        HStack(spacing: PencilPalatteMetrics.itemSpacing) {
             Button {
                 send(.undo)
             } label: {
                 CarveFeatureAsset.undo.swiftUIImage
                     .resizable()
-                    .frame(width: iconSize + 10, height: iconSize + 10)
+                    .frame(width: iconBox, height: iconBox)
                     .opacity(store.canUndo ? 1 : 0.3)
-                    .padding()
+                    .padding(.horizontal, metrics.horizontalPadding)
+                    .padding(.vertical, PencilPalatteMetrics.verticalPadding)
             }
             .disabled(!store.canUndo)
-            
+            .accessibilityLabel("실행 취소")
+
             Button {
                 send(.redo)
             } label: {
                 CarveFeatureAsset.redo.swiftUIImage
                     .resizable()
-                    .frame(width: iconSize + 10, height: iconSize + 10)
+                    .frame(width: iconBox, height: iconBox)
                     .opacity(store.canRedo ? 1 : 0.3)
-                    .padding()
+                    .padding(.horizontal, metrics.horizontalPadding)
+                    .padding(.vertical, PencilPalatteMetrics.verticalPadding)
             }
             .disabled(!store.canRedo)
+            .accessibilityLabel("다시 실행")
         }
     }
-    
+
     private func longPressGesture(action: PencilPalatteFeature.Action.View) -> some Gesture {
         LongPressGesture(minimumDuration: 0.5)
             .onEnded { _ in
