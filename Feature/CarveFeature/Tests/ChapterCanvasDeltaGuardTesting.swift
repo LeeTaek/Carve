@@ -238,20 +238,33 @@ struct ChapterCanvasDeltaGuardWiringTesting {
 
     @Test("N-Canvas 경로에서는 Δ 가 한 줄을 넘어도 판정이 캔버스로 가지 않고 입력이 닫히지 않는다 (§14)")
     func nCanvasPathIsNeverBlockedByDelta() async throws {
-        let store = makeDetailStore(CarveDetailFeature.State.initialState)
-        #expect(!store.usesSingleCanvas)   // 기본은 N-Canvas
-        measureWithAccumulatingDelta(store)
-        try await Task.sleep(for: .milliseconds(200))
+        // ⚠️ 기본값에 기대지 않고 **명시적으로 flag 를 끈다.** 기본이 단일 Canvas 로 바뀌었으므로
+        // (설계 §10-3 · `SingleCanvasFlag.defaultValue`) 예전처럼 initialState 를 쓰면 이 테스트가
+        // 검증하려던 N-Canvas 경로를 타지 않는다.
+        let suite = "CarveDetailDeltaGuard.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set(false, forKey: SingleCanvasFlag.appStorageKey)
 
-        // 측정 자체는 "차단해야 할 크기" 라고 판정한다 — 즉 이 테스트는 Δ 가 작아서 통과하는 것이 아니다.
-        let verdict = try #require(store.chapterLayout.layoutDeltaVerdict)
-        #expect(verdict.blocksInput)
-        #expect(verdict.magnitude > 30)
+        try await withDependencies {
+            $0.defaultAppStorage = defaults
+        } operation: {
+            let state = CarveDetailFeature.State(headerState: .initialState)
+            try #require(!state.usesSingleCanvas)
+            let store = makeDetailStore(state)
+            measureWithAccumulatingDelta(store)
+            try await Task.sleep(for: .milliseconds(200))
 
-        // effect 를 실제로 태웠는데도 N-Canvas 경로에는 아무것도 전달되지 않았다.
-        #expect(store.chapterCanvas.layoutDelta == nil)
-        #expect(store.chapterCanvas.isDrawingInputEnabled == store.chapterCanvas.isInputEnabled)
-        #expect(store.isLayoutReady)
+            // 측정 자체는 "차단해야 할 크기" 라고 판정한다 — 즉 이 테스트는 Δ 가 작아서 통과하는 것이 아니다.
+            let verdict = try #require(store.chapterLayout.layoutDeltaVerdict)
+            #expect(verdict.blocksInput)
+            #expect(verdict.magnitude > 30)
+
+            // effect 를 실제로 태웠는데도 N-Canvas 경로에는 아무것도 전달되지 않았다.
+            #expect(store.chapterCanvas.layoutDelta == nil)
+            #expect(store.chapterCanvas.isDrawingInputEnabled == store.chapterCanvas.isInputEnabled)
+            #expect(store.isLayoutReady)
+        }
     }
 
     @Test("단일 Canvas 경로에서는 Δ 판정이 effect 로 캔버스까지 전달돼 새 입력이 닫힌다 (§14 안전망 배선)")

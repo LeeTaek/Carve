@@ -24,7 +24,7 @@ public struct CanvasSettingsFeature {
     public struct State: Hashable {
         public static let initialState = Self()
         /// flag 의 현재 값. 화면이 나타날 때 읽고, 토글이 바꾼다.
-        public var isSingleCanvasEnabled: Bool = false
+        public var isSingleCanvasEnabled: Bool = SingleCanvasFlag.defaultValue
 
         public init() { }
     }
@@ -45,7 +45,11 @@ public struct CanvasSettingsFeature {
         Reduce { state, action in
             switch action {
             case .view(.onAppear):
-                state.isSingleCanvasEnabled = appStorage.bool(forKey: SingleCanvasFlag.appStorageKey)
+                // ⚠️ `bool(forKey:)` 는 키가 없으면 무조건 false 다 — 기본값이 true 인 지금은
+                // 그대로 쓰면 앱은 단일 Canvas 인데 토글만 OFF 로 보인다. 키의 존재를 먼저 본다.
+                state.isSingleCanvasEnabled = appStorage.object(forKey: SingleCanvasFlag.appStorageKey) == nil
+                    ? SingleCanvasFlag.defaultValue
+                    : appStorage.bool(forKey: SingleCanvasFlag.appStorageKey)
             case .view(.setSingleCanvasEnabled(let isOn)):
                 state.isSingleCanvasEnabled = isOn
                 appStorage.set(isOn, forKey: SingleCanvasFlag.appStorageKey)

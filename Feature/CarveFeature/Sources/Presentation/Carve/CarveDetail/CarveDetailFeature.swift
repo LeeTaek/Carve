@@ -42,7 +42,8 @@ public struct CarveDetailFeature {
 
         /// 단일 Canvas 경로 사용 여부. 기본 off — flag off 가 §10-3 의 유일한 롤백 수단이다.
         /// 설정 > 필사 캔버스 의 토글(`CanvasSettingsFeature`)이 같은 키에 쓴다. Debug 실행 인자 `-SingleCanvas` 도 같은 효과다.
-        @Shared(.appStorage(SingleCanvasFlag.appStorageKey)) public var isSingleCanvasEnabled: Bool = false
+        @Shared(.appStorage(SingleCanvasFlag.appStorageKey))
+        public var isSingleCanvasEnabled: Bool = SingleCanvasFlag.defaultValue
         /// 단일 Canvas 상태. flag off 일 때는 아무 액션도 받지 않는다.
         var chapterCanvas = ChapterCanvasFeature.State(chapter: .initialState)
         /// 외부 진입(차트 등)으로 이동할 절 번호. 단일 Canvas 는 `ScrollViewProxy` 가 없어 절 번호로 스크롤한다.
