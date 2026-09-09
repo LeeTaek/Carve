@@ -21,17 +21,18 @@
 
 ## 툴체인 제약 ★ 먼저 읽을 것
 
-**Xcode 26.3 이 아니면 빌드되지 않는다.** 다른 버전을 쓰면 자사 코드와 무관한 곳에서 실패한다.
+**기준 툴체인은 Xcode 26.3 (17C529 / Swift 6.2.4) 이다.** 이것만 실제로 검증했다.
 
 | 버전 | 결과 |
 |---|---|
-| **Xcode 26.3** | ✅ 유일하게 동작 (Swift 6.2.4) |
-| Xcode 26.6 | ❌ Swift 6.3.3 에서 TCA 1.20.2 가 컴파일 실패 (`WritableKeyPath<Root, BindingState<Value>>` 의 `Sendable` 미충족) |
-| Xcode 27.x | ❌ 위에 더해 의존성 배포 타깃(iOS 12/13, macOS 10.15)을 거부 |
+| **Xcode 26.3** | ✅ 검증됨 (Swift 6.2.4). 2026-09-09 TCA 1.26.2 로 회귀 312 통과·앱 빌드 성공 |
+| Xcode 26.6 | ⚠️ **미확인**. 과거 TCA **1.20.2** 에서 Swift 6.3.3 컴파일 실패했으나(`WritableKeyPath<Root, BindingState<Value>>` 의 `Sendable` 미충족) 그 핀은 더 이상 쓰지 않는다. 1.23.2 가 "Xcode 26.4 support" 를 넣었으므로 재확인 필요 |
+| Xcode 27.x | ⚠️ **미확인**. TCA 몫의 배포 타깃 문제는 1.24.0 의 iOS 13 → 16 상향으로 해소됐다. `swift-syntax`(macOS 10.15) · `google-mobile-ads`(iOS 13) 는 그대로 남아 있고 확인하지 않았다 |
 
-의존성을 최신으로 올려도 해결되지 않는다 — `swift-syntax` 는 최신도 macOS 10.15,
-`google-mobile-ads` 는 iOS 13 을 선언한다. TCA 핀 상향은 `@Shared` 의미론 변경 위험이 있어
-별도 작업으로 분리한다.
+26.6 · 27.x 의 ❌ 는 TCA 1.20.2 시절 관측이다. **1.26.2 로 올린 뒤 다시 재보지 않았으므로
+"실패" 로도 "동작" 으로도 단정하지 않는다.** 확인하려면 해당 Xcode 를 설치하고 실제로 돌려본 뒤
+이 표를 갱신한다. 무관한 패키지의 배포 타깃을 일괄 변경해 통과시키지 않는다.
+경위는 [로드맵 §4 TECH-0](docs/release-2.0.0-roadmap.md) 에 있다.
 
 **Xcode 앱의 경로는 머신마다 다르다.** 아래 우회는 **macOS 27 beta 머신 전용**이다.
 
@@ -69,6 +70,13 @@ mise x -- swiftlint lint --quiet --config .swiftlint.yml <파일들>
   `line_length` 180, `type_body_length` 300.
 - 툴체인을 바꾼 뒤에는 `DerivedData` 를 지우고 클린 빌드한다. 다른 Swift 버전이 만든
   모듈 캐시가 남아 있으면 `unable to resolve module dependency` 로 실패한다.
+- **매크로를 쓰는 의존성(TCA 등)의 버전을 바꾼 뒤에도 똑같이 클린 빌드한다.** 매크로 타깃은
+  재컴파일돼도 컴파일러가 실제로 로드하는
+  `DerivedData/…/Build/Products/Debug-iphonesimulator/<Macros>` 사본은 갱신되지 않을 수 있다.
+  낡은 플러그인이 새 라이브러리와 짝이 맞지 않으면 자사 코드와 무관해 보이는 적합성 오류가 난다
+  (2026-09-09 TCA 1.26.2 에서 `type 'AppVersionFeature.Path' does not conform to protocol
+  'CaseReducer'`). 진단은 빌드 로그의 `-load-plugin-executable` 경로와 그 바이너리 타임스탬프를
+  본다. `xcodebuild clean` 이면 풀린다.
 
 ## 실기기 검증
 

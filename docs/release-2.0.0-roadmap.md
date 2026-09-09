@@ -35,7 +35,7 @@
 
 | ID / 브랜치 제안 | 범위 | 선행 조건 | 완료 기준 |
 |---|---|---|---|
-| TECH-0 / `codex/tca-1-26-2` | TCA 1.20.2 → 1.26.2 업데이트와 Xcode 27 beta 호환 검증 | 현재 의존성·툴체인 기준선 확인 | 필요한 마이그레이션·전이 의존성 변경 기록, 전체 회귀·앱 빌드 확인. TCA 업데이트 성공과 Xcode 27 전체 빌드 성공을 구별 |
+| ~~TECH-0~~ **TCA 부분 완료** (`develop` 직접 반영) | TCA 1.20.2 → 1.26.2 업데이트와 Xcode 27 beta 호환 검증 | 현재 의존성·툴체인 기준선 확인 | **TCA 1.26.2 적용·회귀 312 유지·앱 빌드 확인 완료(§4). Xcode 27 beta 호환은 beta 미설치로 미수행 — 별도 처리** |
 | DESIGN-0 / `codex/design-direction` | 레퍼런스, 공통 색상·타이포·간격, 필사·이미지·위젯 시안 방향 | 없음 | 출처·채택 이유와 우선 화면 방향 확정. 작은 결함 수정은 이 결정을 기다리지 않음 |
 | ADS-0 / `codex/monetization-plan` | AdMob 차단 설정·실적을 함께 조사, 모델·가격·노출 위치 결정 | 콘솔 접근 | 조사 결과 기록, 광고 제거 구매/광고 확대/확대 이월 중 선택. 기존 광고 안전 조치는 즉시 별도 진행 가능 |
 | COMPAT-0 / `codex/canvas-compatibility-plan` | R27 기존 확인 근거 정리, R28 대응 방식 결정 | 기존 전환 기록 | 필요한 확인·구현·안내와 남는 위험 명시. 최소 버전 게이트의 실제 적용 가능성부터 확인 |
@@ -86,15 +86,24 @@ A 트랙에서도 저장·삭제 위험을 차트 뒤로 고정하지 않는다.
 
 ### TCA 1.26.2 업데이트·Xcode 27 beta 호환 — TECH-0
 
-2026-09-09 사용자 요청으로 **별도 기술 작업**을 추가했다. 현재 `Tuist/Package.swift`는 TCA **1.20.2**에 고정되어 있으며 목표 버전은 **1.26.2**다. 공식 1.26.0 릴리스에는 **Xcode 27 Beta 1 지원 수정**이 명시되어 있고, 확인 시점 최신 릴리스는 1.26.2다. 모든 Xcode 27 beta와 프로젝트 전체 의존성의 호환이 보장된다는 뜻은 아니다.
+2026-09-09 사용자 요청으로 **별도 기술 작업**으로 추가했고, 같은 날 **TCA 업데이트 부분만 수행해 `develop`에 반영**했다(`f21ff538`). 브랜치 제안 `codex/tca-1-26-2`는 만들지 않았다 — 변경이 `Tuist/Package.swift` 한 줄과 lockfile뿐이었다. **Xcode 27 beta 호환 검증은 수행하지 않았다.** 아래 두 판정을 구별해서 읽는다.
 
-- **배치:** 초반에 영향 범위와 호환성을 확인하고 큰 신규 Feature 구현 전에 업데이트를 마치는 것을 목표로 한다. 작은 UI 수정·디자인 조사·콘솔 결정은 기다리지 않아도 된다. 공유 상태·저장·제스처 변경 PR과 섞지 않고, 업데이트 병합 후 후속 작업은 새 기준선을 사용한다.
-- **범위:** TCA 버전 고정과 lockfile, 필요한 최소 API·동작 마이그레이션을 처리한다. 1.20.2부터 1.26.2까지 변경 내역과 전이 의존성 차이를 확인한다. 특히 `@Shared` 영속 상태·관찰·바인딩, Effect 취소·내비게이션·TestStore 동작을 검토한다. TCA 2.0 전환이나 전면 아키텍처 개편은 포함하지 않는다.
-- **검증:** 기존 Xcode 26.3 기준선과 목표 Xcode 27 beta의 정확한 빌드 번호·Swift 버전을 기록한다. 툴체인별 별도 빌드 산출물 경로로 캐시 혼입을 막고, Tuist 생성·앱 빌드·기존 312개와 추가 회귀 전체를 확인한다. 필기 저장·재실행 복원·공유 설정·화면 이동은 보유 iPad에서 스모크 확인한다. 출시에 사용할 툴체인은 앱 archive까지 확인한 뒤 결정한다.
-- **기존 제약:** AGENTS.md의 Xcode 26.3 기준은 현재 의존성 조합에서 확인한 결과다. TCA 수정 외에 Xcode 27에서 지적된 다른 패키지의 최소 배포 타깃 문제는 별도 확인해야 한다. 이를 해결하려고 무관한 패키지·배포 타깃을 일괄 변경하지 않는다. 막히면 패키지·오류·영향을 기록하고 필요한 추가 작업을 분리한다.
-- **완료 판정:** TCA 1.26.2 적용 여부, 기존 툴체인 회귀 여부, 목표 beta 호환 여부, 출시 툴체인 선택을 각각 기록한다. beta가 막혀도 TCA 업데이트와 호환성 확인을 혼동하지 않는다. 툴체인 지침은 검증 성공 후 실제 지원 조합으로 갱신하며, 이번 문서 추가로 지원 완료라고 변경하지 않는다.
+| 판정 항목 | 결과 |
+|---|---|
+| TCA 1.26.2 적용 | ✅ 적용. 소스 코드 변경 0줄 |
+| 기존 툴체인(Xcode 26.3) 회귀 | ✅ 없음. 312 통과·앱 빌드 성공 |
+| 목표 Xcode 27 beta 호환 | ⛔ **미수행** — 머신에 26.3만 설치됨 |
+| 출시 툴체인 선택 | 미결정. beta 검증 전까지 26.3 유지 |
 
-공식 근거: [TCA 1.26.0 — Xcode 27 Beta 1 지원](https://github.com/pointfreeco/swift-composable-architecture/releases/tag/1.26.0), [TCA 1.26.2](https://github.com/pointfreeco/swift-composable-architecture/releases/tag/1.26.2). 이번에는 로드맵만 수정하며 패키지 버전·툴체인·빌드 설정은 변경하지 않았다.
+- **적용 범위:** `Tuist/Package.swift`의 핀을 `exact: "1.20.2"` → `"1.26.2"`로 올렸다. 전이 의존성은 **3개만** 이동했다 — `swift-composable-architecture` 1.20.2 → 1.26.2, `swift-navigation` 2.3.1 → 2.8.0, `xctest-dynamic-overlay` 1.5.2 → 1.13.1. 나머지 26개(firebase, google-mobile-ads, `swift-syntax` 601.0.1, `swift-sharing` 2.5.2, `swift-dependencies` 1.9.2, `swift-perception` 1.6.0 등)는 변동 없다. `@Shared`가 의존하는 `swift-sharing`이 그대로여서 영속 상태 의미론 변경은 이번 범위에 들어오지 않았다.
+- **마이그레이션:** 필요한 코드 수정이 없었다. 1.24·1.25에서 deprecate된 `@BindingState`·`BindingReducer(Action.view)`·`ViewStore`/`WithViewStore`·`TaskResult`·`AnyCasePath`·`Store.withState`·`BindingViewStore`는 이 코드베이스에 **사용처가 0건**이다. 1.26.2의 루트 `Package.swift`는 swift-tools-version **6.4**라 Swift 6.2.4로는 읽을 수 없지만, 같은 태그의 `Package@swift-6.1.swift`가 선택되어 Xcode 26.3에서 동작한다. 배포 타깃은 iOS 17.0이라 1.24가 올린 iOS 16 요구를 이미 만족한다.
+- **검증 (Xcode 26.3 / 17C529 · Swift 6.2.4 · macOS 26.3 · tuist 4.39.0 · iPad mini (A17 Pro) iOS 26.2):** `mise x -- tuist install` → `generate --no-open` → `xcodebuild clean` → `xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace` = **TEST SUCCEEDED · 312 통과**(기준선 312 유지, 자사 코드 컴파일 오류 0). `xcodebuild build -scheme CarveApp` = **BUILD SUCCEEDED**. 업데이트 전 같은 명령의 기준선도 312 통과로 재확인해 대조했다. **보유 iPad 실기기 스모크(필기 저장·재실행 복원·공유 설정·화면 이동)는 아직 수행하지 않았다.**
+- **새 경고 30건 — 전부 deprecation, 빌드는 통과.** 증분 빌드가 미재컴파일 파일의 경고를 생략하므로 별도 산출물 경로로 1.20.2 **클린 빌드**를 다시 떠서 클린끼리 대조했다. 사라진 경고는 0건이다. ① `@Reducer(state:...)` 인자형 매크로 — 소스 4곳([SettingsFeature](../Feature/SettingsFeature/Sources/Setting/SettingsFeature.swift) L32 · [iCloudSettingReducer](../Feature/SettingsFeature/Sources/Details/iCloud/iCloudSettingReducer.swift) L120 · [SendFeedbackFeature](../Feature/SettingsFeature/Sources/Details/SendFeedback/SendFeedbackFeature.swift) L166 · [AppVersionFeature](../Feature/SettingsFeature/Sources/Details/AppVersion/AppVersionFeature.swift) L29), extension 적합성 선언으로 대체. ② `reduce(into:action:)` 직접 호출 — 테스트 5개 파일 22건(`HeaderFeatureTesting` 7 · `SingleCanvasRollbackTesting` 6 · `DrawingErasePersistenceTesting` 4 · `ChapterLayoutMeasurementTesting` 1 · `SendFeedbackFeatureTesting` 3), TestStore `send`로 대체. 정리는 별도 작업이며 이번에 하지 않았다. 반대로 `GoogleNativeAdClient`의 `default will never be executed`, `contentEdgeInsets`, `BibleDrawing` Sendable 캡처 4건은 1.20.2 클린 빌드에도 있던 **선재 경고**로, 이번 업데이트와 무관하다.
+- **막혔던 지점 — 낡은 매크로 플러그인.** 첫 시도에서 `SettingsFeature`가 `type 'AppVersionFeature.Path' does not conform to protocol 'CaseReducer'`로 실패했다. 코드 문제가 아니라 컴파일러가 로드하는 `-load-plugin-executable .../DerivedData/…/Build/Products/Debug-iphonesimulator/ComposableArchitectureMacros`가 이전 빌드본(1.20.2)이었기 때문이다. 매크로 타깃은 재컴파일되어 `Debug/`로 링크됐지만 `Debug-iphonesimulator/` 사본이 갱신되지 않았다. 근거는 그 바이너리에 `_CaseScopeProtocol` 문자열이 0건이고, 확장 버퍼가 적합성 절 없는 `public enum CaseScope {`와 1.20 시절 `Scope(state:action:child:)`를 생성한 것이다. `xcodebuild clean` 후 통과했다. **매크로를 쓰는 의존성의 버전을 바꾼 뒤에는 툴체인 교체와 같이 클린 빌드가 필요하다** — AGENTS.md에 반영했다.
+- **롤백 시 주의:** 1.26.2 → 1.20.2로 되돌리면 `tuist install`이 `Disabled default traits on package 'swift-composable-architecture' that declares no traits`로 실패한다. 1.26.2가 traits를 선언하기 때문이며 SwiftPM 상태 정리가 필요하다.
+- **남은 작업:** ① Xcode 27 beta 설치 후 호환 확인. 1.24.0의 최소 플랫폼 상향(iOS 13 → 16)으로 AGENTS.md가 지적한 배포 타깃 거부 중 **TCA 몫은 해소**됐지만 `swift-syntax`·`google-mobile-ads`의 배포 타깃 문제는 그대로이며 확인하지 않았다. ② AGENTS.md의 "Xcode 26.6에서 TCA 1.20.2 컴파일 실패" 항목 재확인 — 26.6이 없어 못 했다. 1.23.2가 "Xcode 26.4 support"를 넣었으므로 개선 가능성은 있으나 **검증되지 않았다**. ③ 보유 iPad 스모크. ④ 출시 툴체인은 앱 archive까지 확인한 뒤 결정한다. 무관한 패키지·배포 타깃을 일괄 변경해 beta를 통과시키지 않는다.
+
+공식 근거: [TCA 1.26.0 — Xcode 27 Beta 1 지원](https://github.com/pointfreeco/swift-composable-architecture/releases/tag/1.26.0), [TCA 1.26.2](https://github.com/pointfreeco/swift-composable-architecture/releases/tag/1.26.2).
 
 ### 필사와 차트
 
@@ -196,7 +205,7 @@ R28의 업데이트 안내는 완화 수단일 뿐이다. 새 버전의 팝업�
 
 보유 기기는 **iPad mini 7세대(A17 Pro), iPad Air M2 11인치**다. 구기기·120Hz 기기는 직접 검증할 수 없으며, 그 확보를 출시 선행 조건으로 삼지 않는다. 현재 기록된 실기기 결과는 mini 기준이며 Air의 과거 미수행 결과는 그대로 남긴다.
 
-브랜치별로 가장 좁은 관련 검증부터 수행한다. 도구는 CLI 중심이며 TECH-0 검증 전에는 Xcode 26.3을 기준으로 한다. TECH-0 이후에는 검증해 기록한 툴체인 경로를 확인하고 Tuist는 `mise x -- tuist`로 실행한다. 테스트 destination은 iPad만 사용한다. 문구·중복 UI 제거에 구현을 그대로 따라 쓰는 테스트는 추가하지 않는다. 제스처와 필기 데이터에 영향이 있는 변경은 재현 동작·취소·저장 왕복을 확인한다.
+브랜치별로 가장 좁은 관련 검증부터 수행한다. 도구는 CLI 중심이며 **기준 툴체인은 Xcode 26.3 / 17C529 (Swift 6.2.4)**다 — TECH-0의 TCA 업데이트를 이 툴체인에서 검증했고 Xcode 27 beta는 확인하지 않았으므로 당분간 26.3을 계속 쓴다. Tuist는 `mise x -- tuist`로 실행한다. 테스트 destination은 iPad만 사용한다. 문구·중복 UI 제거에 구현을 그대로 따라 쓰는 테스트는 추가하지 않는다. 제스처와 필기 데이터에 영향이 있는 변경은 재현 동작·취소·저장 왕복을 확인한다.
 
 **회귀 기준선 운영:** 각 PR은 가장 좁은 관련 검증을 수행하고, 캔버스·저장·공통 레이아웃 변경은 영향받는 회귀 범위를 확대한다. 문서·단순 문구 변경까지 312개 전체 실행을 요구하지 않는다. INTEGRATION 후보에서는 기존 312개와 이후 추가 테스트 전체를 검증한다. 기존 테스트 삭제·비활성화를 다른 테스트 수로 상쇄하지 않는다. 실패가 없어야 하며 실행 수 감소는 원인을 확인한다. 실행하지 못한 명령·이유는 남기고 통과로 표시하지 않는다.
 
@@ -244,7 +253,7 @@ TestFlight에서는 후보 빌드 설치·기존 상태를 가진 앱의 업데�
 |---|---|
 | 현재 합의한 2.0.0 핵심 범위 | 단일 Canvas, 필사 도구·메뉴·차트 결함 수정, 저장 실패 안내·데이터 설정 오류/설명 보완, 절 롱탭 네 메뉴·이미지 저장·지정 당시 필사 위젯, 업데이트 안내·짧은 도움말, 기존 광고 안전 설정 |
 | 추가 예정·포함 버전 결정 | 영어 성경(BIBLE-EN): WEB·KJB/KJV 후보. 판본·권리·기존 데이터 영향 확인 후 SCOPE에서 2.0.0 포함 여부 결정 |
-| 기술 기반 업데이트 | TECH-0: TCA 1.26.2 적용·회귀 검증, Xcode 27 beta 호환 결과와 출시 툴체인 결정. beta 채택은 검증 결과에 따름 |
+| 기술 기반 업데이트 | TECH-0: TCA 1.26.2 적용·회귀 검증 **완료**. Xcode 27 beta 호환과 출시 툴체인 결정은 **미수행 — SCOPE에서 처리 방향을 정한다**. beta 채택은 검증 결과에 따름 |
 | 기본 완성도 | 핵심 화면의 가독성·접근성·일관성·화면 적응, 데이터 호환성 대응 결정과 필요한 보완, 통합 검증·베타·운영 준비 |
 | 먼저 축소·이월할 수 있는 범위 | 추가 화면의 전면 디자인 개편, 수익화 확대. SCOPE에서 결정하고 제품 설명을 함께 갱신 |
 | 별도 합의 없이는 이월하지 않는 범위 | 절 메뉴·이미지 저장·필사 위젯. 이번에 합의한 목표이므로 일정 압박만으로 제외하지 않음 |
@@ -261,7 +270,7 @@ TestFlight에서는 후보 빌드 설치·기존 상태를 가진 앱의 업데�
 - [ ] ADS-1 검증, 수익화 확대 구현 또는 명시적 이월 결정.
 - [ ] COMPAT-0·1에서 R27·R28 근거·대응·남는 제한을 기록. 결정 필요 상태를 출시까지 방치하지 않음.
 - [ ] BIBLE-EN의 판본·권리·데이터 영향과 포함 버전 결정. 2.0.0에 포함하면 번역본 전환·기존 필사 보존·이미지/위젯 검증 완료.
-- [ ] TECH-0의 TCA 1.26.2 적용·전체 회귀 결과, Xcode 27 beta 호환 여부와 출시 툴체인 기록. 미완료 시 SCOPE에서 처리 방향 명시.
+- [~] TECH-0 — TCA 1.26.2 적용·전체 회귀 312 통과·앱 빌드 확인 기록 완료(§4). **Xcode 27 beta 호환 여부와 출시 툴체인은 미수행이며 SCOPE에서 처리 방향을 명시한다.**
 - [ ] SCOPE·RC 완료, 2.0.0 후보 커밋·빌드 번호 고정.
 - [ ] 기존 312개와 추가 회귀 전체 통과, mini·Air 통합 스모크와 TestFlight 확인. 미검증은 별도 표시.
 - [ ] 최종 스크린샷·설명·NEWS·구매/개인정보 표시와 후보 기능 일치, 필요한 심사 완료.
