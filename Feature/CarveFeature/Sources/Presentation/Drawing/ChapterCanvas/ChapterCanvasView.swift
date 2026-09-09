@@ -60,7 +60,7 @@ struct ChapterCanvasView: UIViewControllerRepresentable {
         }
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains(ChapterCanvasMemoryProbe.launchArgument) {
-            controller.memoryProbe = ChapterCanvasMemoryProbe()
+            controller.memoryProbe = ChapterCanvasMemoryProbe(controller: controller)
         }
         if ProcessInfo.processInfo.arguments.contains("-CanvasDisplayProbe") {
             controller.displayProbe = ChapterCanvasDisplayProbe(controller: controller) { [store] in
@@ -75,9 +75,12 @@ struct ChapterCanvasView: UIViewControllerRepresentable {
         context.coordinator.store = store
         context.coordinator.onScroll = onScroll
 
-        controller.setColumn(Self.hostedColumn(column) { [weak controller] height in
-            controller?.setColumnHeight(height)
-        })
+        controller.setColumn(
+            Self.hostedColumn(column) { [weak controller] height in
+                controller?.setColumnHeight(height)
+            },
+            chapter: display.layout?.chapter
+        )
         controller.apply(ChapterCanvasController.Configuration(
             renderedData: display.renderedData,
             renderedRevision: display.renderedRevision,

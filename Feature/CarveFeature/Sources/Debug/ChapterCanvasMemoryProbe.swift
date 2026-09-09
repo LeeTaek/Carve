@@ -21,17 +21,21 @@ import CarveToolkit
 import Darwin
 import Foundation
 import os
+import SwiftUI
 
 /// 100 ms 간격으로 footprint 와 잔여 메모리를 재고, **최저 여유를 갱신할 때만** 찍는다.
 @MainActor
 final class ChapterCanvasMemoryProbe {
     static let launchArgument = "-CanvasMemoryProbe"
-
+    private weak var controller: ChapterCanvasController?
     private var polling: Task<Void, Never>?
     private var lowestAvailable = Int.max
     private var highestFootprint: UInt64 = 0
+    private var ticks = 0
 
-    init() {
+    init(controller: ChapterCanvasController? = nil) {
+        self.controller = controller
+
         print("MemoryProbe start limitEstimate=\(Self.megabytes(Self.available() + Int(Self.footprint()))) MB")
         polling = Task { @MainActor [weak self] in
             while !Task.isCancelled {
@@ -42,11 +46,18 @@ final class ChapterCanvasMemoryProbe {
         }
     }
 
-    deinit { polling?.cancel() }
+    deinit {
+        polling?.cancel()
+    }
 
     private func sample() {
         let available = Self.available()
         let footprint = Self.footprint()
+        // 최고치 갱신만 찍으면 **감소를 볼 수 없다** — 회수를 확인하려면 현재값이 주기적으로 필요하다 (R26).
+        ticks += 1
+        if ticks % 20 == 0 {
+            print("MemoryNow footprint=\(Self.megabytes(Int(footprint))) MB available=\(Self.megabytes(available)) MB")
+        }
         var changed = false
         if available < lowestAvailable { lowestAvailable = available; changed = true }
         if footprint > highestFootprint { highestFootprint = footprint; changed = true }

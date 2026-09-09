@@ -104,6 +104,13 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate, UIE
     private var lastBounds: CGRect = .zero
     /// 롱프레스 메뉴. 메뉴 항목이 눌리면 `historyMenuPoint` 를 실어 보낸다.
     private var historyMenuInteraction: UIEditMenuInteraction?
+    #if DEBUG
+    /// 장 전환에서 이전 컬럼을 놓은 횟수 (R26 회귀 고정용). 메모리 해제 자체는 단위 테스트로 볼 수 없으므로
+    /// **결정**을 고정한다 — `freshDisplayRebuildCount` 와 같은 관용구다.
+    private(set) var columnReleaseCount = 0
+    #endif
+    /// 지금 호스트에 들어 있는 컬럼의 장 (R26 — 장이 바뀔 때만 이전 컬럼을 놓는다).
+    private var hostedChapter: BibleChapter?
     private let historyLongPress = UILongPressGestureRecognizer()
     private var historyMenuPoint: CGPoint?
     #if DEBUG
@@ -190,11 +197,6 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate, UIE
     // MARK: 밖에서 들어오는 갱신
 
     /// 텍스트 컬럼을 교체한다. 높이는 컬럼이 스스로 보고한다 (`setColumnHeight`).
-    func setColumn(_ column: AnyView) {
-        host.rootView = column
-    }
-
-    /// 컬럼이 `onGeometryChange` 로 보고한 자기 높이.
     func setColumnHeight(_ height: CGFloat) {
         guard height != columnHeight else { return }
         columnHeight = height
@@ -513,3 +515,34 @@ extension ChapterCanvasController {
     }
 }
 #endif
+
+// MARK: - 컬럼 호스팅 (R26)
+
+extension ChapterCanvasController {
+    /// 호스트에 넣을 컬럼. **장이 바뀌면 이전 컬럼을 먼저 놓고 넣는다 (R26).**
+    ///
+    /// 단일 Canvas 는 컨트롤러와 `UIHostingController` 를 장마다 재사용한다(설계 §5 — 재생성 미채택).
+    /// `rootView` 만 갈아끼우면 이전 장 컬럼의 백업이 풀리지 않아 **긴 장을 떠나도 메모리가 돌아오지 않았다** —
+    /// 시편 119편(176절, 744 × 64,651pt)을 거쳐 시편 120편으로 오면 179.7 MB 대신 945 MB 였다.
+    /// 실기기 귀속 실험에서 컬럼만 비우자 **757 MB 가 풀렸고**(잉크는 16 MB) 원인이 컬럼임이 확인됐다.
+    ///
+    /// ⚠️ **장이 바뀔 때만** 비운다. 이 메서드는 SwiftUI 갱신마다 불리므로 매번 비우면 깜빡인다.
+    /// - Parameters:
+    ///   - column: 넣을 컬럼.
+    ///   - chapter: 그 컬럼이 표시하는 장. nil 이면(레이아웃 전) 장 판정을 하지 않는다.
+    func setColumn(_ column: AnyView, chapter: BibleChapter?) {
+        if let chapter, let previous = hostedChapter, previous != chapter {
+            // 새 컬럼을 바로 덮어쓰면 옛 백업이 남는다. 한 번 비우고 레이아웃을 돌려 놓아준 뒤 넣는다.
+            host.rootView = AnyView(Color.clear)
+            host.view.setNeedsLayout()
+            host.view.layoutIfNeeded()
+            #if DEBUG
+            columnReleaseCount += 1
+            #endif
+        }
+        if let chapter { hostedChapter = chapter }
+        host.rootView = column
+    }
+
+    /// 컬럼이 `onGeometryChange` 로 보고한 자기 높이.
+}

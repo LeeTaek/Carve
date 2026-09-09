@@ -93,6 +93,23 @@ rg 'ChapterHUD ' "$CARVE_DEVICE_LOGS/baseline.log"
 
 HUD와 같은 입력에서 만들어진 상태 로그다. `compose=SYNC`와 `deltaMax=0.00`은 실제 픽셀 표시의 정상화를 보증하지 않는다. 렌더링 결함 조사에서는 `CanvasDisplay` 로그와 회전 전후 캡처를 함께 사용한다. 로그 수집을 위해 `--terminate-existing`으로 재실행할 때에는 진행 중인 필기를 먼저 마친다.
 
+### 메모리 여유 읽기 (`-CanvasMemoryProbe`)
+
+footprint 만으로는 죽는지 알 수 없다 — 판정은 **그 기기의 jetsam 한도까지 얼마나 남았는가**로 정해지고 한도는 기기마다 다르다.
+`os_proc_available_memory()`(한도까지 남은 바이트)와 `phys_footprint` 를 100 ms 간격으로 재서 찍는다.
+
+```bash
+rg 'Memory(Probe|Now)' "$CARVE_DEVICE_LOGS/baseline.log"
+```
+
+- `MemoryProbe` 는 **최고치를 갱신할 때만** 찍는다 — peak 을 놓치지 않기 위함이다.
+- `MemoryNow` 는 2초마다 현재값을 찍는다 — **감소(회수)를 보려면 이쪽이 필요하다.**
+- `limit≈` 는 `footprint + available` 로 역산한 값이다. 실측 예: iPad mini(A17 Pro · 8 GB) **≈ 3376 MB**.
+
+⚠️ 한도가 RAM 에 비례한다는 가정으로 저메모리 기기를 추정할 수는 있으나 **한 점에서 뽑은 외삽이다.**
+Apple 의 한도는 계단식이므로 단정하지 않는다. 실제 확인은 배포 후 **MetricKit** 의
+`MXAppExitMetric.cumulativeMemoryResourceLimitExitCount` 로 한다.
+
 ## 4. 회전과 화면 판정
 
 ```bash
@@ -188,6 +205,6 @@ xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace \
   -destination 'platform=iOS Simulator,name=iPad mini (A17 Pro),OS=26.2'
 ```
 
-실제 사용 가능한 iPad 이름·OS로 조정한다. 이번에는 iPhone 시뮬레이터도 켜져 있었지만 검증 destination에는 사용하지 않았다. 함수 단위 `only-testing`으로 0개가 실행된 사례가 있으므로 `TEST SUCCEEDED`만 보지 말고 실제 실행 개수도 확인한다. 현재 전체 기준선은 310개이며 [설계 §19-4-2](./single-canvas-design.md)를 기준으로 유지한다.
+실제 사용 가능한 iPad 이름·OS로 조정한다. 이번에는 iPhone 시뮬레이터도 켜져 있었지만 검증 destination에는 사용하지 않았다. 함수 단위 `only-testing`으로 0개가 실행된 사례가 있으므로 `TEST SUCCEEDED`만 보지 말고 실제 실행 개수도 확인한다. 현재 전체 기준선은 312개이며 [설계 §19-4-2](./single-canvas-design.md)를 기준으로 유지한다.
 
 기록할 항목은 기기·OS build·Xcode·USB 상태, 코드 revision/diff, **전체 실행 인자**, 회전 순서, 안정 후 로그, 사용자 또는 스크린샷의 화면 판정, 실제 테스트 개수와 종료 코드, 미검증 항목이다. `Activity Monitor`를 이용한 성능 기록은 기존 런북을 따르며 이 세션에서 새 성능 측정을 완료한 것으로 적지 않는다.

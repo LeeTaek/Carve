@@ -88,10 +88,11 @@ struct ChapterCanvasControllerTesting {
 
         /// 컬럼을 컨트롤러에 붙인다 — **뷰가 쓰는 조합 그대로**(`ChapterCanvasView.hostedColumn`).
         @MainActor
-        func setColumn(_ column: some View) {
-            controller.setColumn(ChapterCanvasView.hostedColumn(AnyView(column)) { [unowned self] height in
+        func setColumn(_ column: some View, chapter: BibleChapter? = BibleChapter(title: .genesis, chapter: 1)) {
+            let hosted = ChapterCanvasView.hostedColumn(AnyView(column)) { [unowned self] height in
                 self.controller.setColumnHeight(height)
-            })
+            }
+            controller.setColumn(hosted, chapter: chapter)
         }
 
         /// 회전을 폭 변경으로 재현한다 — 창과 컨트롤러 뷰를 함께 바꾼다 (`viewDidLayoutSubviews` 의 `lastBounds` 경로를 태운다).
@@ -751,5 +752,35 @@ extension ChapterCanvasControllerTesting {
             #expect(harness.events.isEmpty)
         }
     }
+
+    // MARK: R26 — 장 전환에서 이전 컬럼을 놓는다
+
+    /// 메모리 해제 자체는 단위 테스트로 볼 수 없다. 대신 **결정**을 고정한다 —
+    /// 실기기 귀속(2026-09-09)에서 컬럼만 비우자 757 MB 가 풀렸고, 잉크는 16 MB 였다.
+    @MainActor
+    @Test("같은 장으로 컬럼을 다시 넣으면 이전 컬럼을 놓지 않는다 — 매번 놓으면 깜빡인다 (R26)")
+    func sameChapterKeepsHostedColumn() {
+        let harness = Harness()
+        let chapter = BibleChapter(title: .genesis, chapter: 1)
+        harness.setColumn(Color.clear, chapter: chapter)
+        harness.setColumn(Color.clear, chapter: chapter)
+        harness.setColumn(Color.clear, chapter: chapter)
+        #expect(harness.controller.columnReleaseCount == 0)
+    }
+
+    @MainActor
+    @Test("장이 바뀌면 새 컬럼을 넣기 전에 이전 컬럼을 놓는다 (R26)")
+    func chapterChangeReleasesPreviousColumn() {
+        let harness = Harness()
+        harness.setColumn(Color.clear, chapter: BibleChapter(title: .psalms, chapter: 119))
+        #expect(harness.controller.columnReleaseCount == 0)   // 첫 장에는 놓을 것이 없다
+
+        harness.setColumn(Color.clear, chapter: BibleChapter(title: .psalms, chapter: 120))
+        #expect(harness.controller.columnReleaseCount == 1)
+
+        harness.setColumn(Color.clear, chapter: BibleChapter(title: .psalms, chapter: 121))
+        #expect(harness.controller.columnReleaseCount == 2)
+    }
+
 }
 #endif
