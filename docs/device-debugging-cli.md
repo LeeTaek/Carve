@@ -5,7 +5,7 @@
 2026-09-08에 실제 실행한 CLI 중심 절차다. 대상은 iPad이며 테스트에 Xcode MCP를 사용하지 않는다. D9 H 결과·구현안은 [회전 표시 결함 조사](./single-canvas-rotation-display-investigation.md), 일반 백업·성능·필기 검증은 [실기기 런북](./phase-0a-d-device-test.md)을 따른다.
 
 > ⚠️ **2026-09-08 인자 의미가 바뀌었습니다.** 표시용 획 재구성이 **정식 경로**가 됐으므로
-> (`ef053111`) 예전의 `-CanvasFreshStrokesOnApply` 는 사라졌습니다. 지금 남은
+> (`f64a7d79`) 예전의 `-CanvasFreshStrokesOnApply` 는 사라졌습니다. 지금 남은
 > **`-CanvasReuseStrokesOnApply` 는 의미가 정반대**입니다 — 수정을 **끄고 결함을 재현하는**
 > Debug 전용 opt-out 이며, 회전 왕복 A/B 의 양성 대조와 긴 장 성능 비교에만 씁니다.
 > **기본 검증은 이 인자 없이** 돕니다.
