@@ -156,6 +156,8 @@ struct ChapterCanvasView: UIViewControllerRepresentable {
                 onScroll(previous, current)
             case .historyRequested(let point):
                 store.send(.historyRequested(at: point))
+            case .eraseRequested(let point):
+                store.send(.eraseRequested(at: point))
             }
         }
     }

@@ -6,6 +6,7 @@
 //  Copyright © 2026 leetaek. All rights reserved.
 //
 
+import CarveToolkit
 import Foundation
 import SwiftData
 
@@ -34,6 +35,13 @@ public struct SwiftDataDrawingRepository: DrawingRepository {
 
     public func apply(_ mutations: [VerseDrawingMutation], chapter: BibleChapter) async throws {
         try await actor.applyDrawingMutations(mutations, chapter: chapter, now: Date())
+    }
+
+    public func archiveAndReset(
+        _ command: VerseDrawingArchiveCommand,
+        chapter: BibleChapter
+    ) async throws -> VerseDrawingArchiveOutcome {
+        try await actor.archiveAndResetVerseDrawing(command, chapter: chapter, now: Date())
     }
 }
 
@@ -132,6 +140,75 @@ extension SwiftDatabaseActor {
                 }
             }
             try modelContext.save()
+        } catch let error as DrawingRepositoryError {
+            modelContext.rollback()
+            throw error
+        } catch {
+            modelContext.rollback()
+            throw DrawingRepositoryError.persistenceFailed(error.localizedDescription)
+        }
+    }
+
+    /// 절의 현재 필사를 보관 행으로 남기고 활성 행을 비운다 — **한 트랜잭션** (UI-2 "지우기", §8-6 과 같은 경계).
+    ///
+    /// 삭제하지 않는다. 두 행 모두 남으며, 달라지는 것은 "어느 행이 대표인가" 와 "활성 행에 획이 있는가" 뿐이다.
+    ///
+    /// | 행 | 결과 |
+    /// |---|---|
+    /// | 보관 행 (`archiveRowID`) | 활성 행의 `lineData` · `layoutMetadataData` · `drawingVersion` 복제, **`isPresent = false`**, `updateDate` 는 원래 필사 시각 유지 |
+    /// | 활성 행 (`activeRowID`) | 행 유지, `lineData = nil`, **`isPresent = true`**(대표 유지), `updateDate = now` |
+    ///
+    /// **보관 행이 다시 대표로 뽑히지 않는 이유가 여기 있다.** `VerseDrawingMutation.clear` 는 기존 행의 `isPresent` 를
+    /// 바꾸지 않으므로 대표 규칙(`DrawingRepresentativeRule`: `isPresent` 우선 → `updateDate` 최신)을 이 작업이 직접
+    /// 보장해야 한다. 보관 행의 `updateDate` 를 원래 값으로 두는 것도 같은 이유다 — `isPresent` 가 하나도 없는
+    /// 예외 상황(CloudKit 충돌)에서도 `now` 인 빈 활성 행이 최신이라 대표를 지킨다. 기록 목록의 "필사 날짜" 도 그 값이 맞다.
+    ///
+    /// **재시도 안전.** `archiveRowID` 는 호출부가 작업당 한 번 발급해 재시도에도 같은 값을 넘긴다. 여기서는 그 rowID 를
+    /// upsert 로 다루므로 재시도가 보관 행을 늘리지 않는다. 게다가 재시도 시점에는 이미 활성 행이 비어 있어
+    /// `alreadyEmpty` 로 조기 반환된다.
+    ///
+    /// - Important: 호출 전에 미저장분이 전부 저장돼 있어야 한다 (§8-5 flush). 이 메서드가 보관하는 것은 **DB 의 활성 행**이다.
+    /// - Parameters:
+    ///   - command: 대상 절 · 활성 행 · 보관 행 식별자.
+    ///   - chapter: 대상 장.
+    ///   - now: 활성 행의 `updateDate` 에 기록할 시각.
+    /// - Returns: 실제로 보관했으면 `.archived`, 비어 있어 아무것도 쓰지 않았으면 `.alreadyEmpty`.
+    public func archiveAndResetVerseDrawing(
+        _ command: VerseDrawingArchiveCommand,
+        chapter: BibleChapter,
+        now: Date
+    ) throws -> VerseDrawingArchiveOutcome {
+        do {
+            // 획이 하나도 없으면 보관본을 만들지 않는다. 지우개로 전부 지운 절은 `lineData` 가 남아 있어도 stroke 가 0개다.
+            guard let active = try drawingRow(rowID: command.activeRowID, chapter: chapter),
+                  active.lineData?.containsPKStroke == true else {
+                return .alreadyEmpty
+            }
+
+            let archived: BibleDrawing
+            if let existing = try drawingRow(rowID: command.archiveRowID, chapter: chapter) {
+                archived = existing
+            } else {
+                let row = BibleDrawing(
+                    bibleTitle: chapter, verse: command.verse, lineData: nil, updateDate: now,
+                    rowUUID: command.archiveRowID.raw
+                )
+                modelContext.insert(row)
+                archived = row
+            }
+            archived.verse = command.verse
+            archived.lineData = active.lineData
+            archived.layoutMetadataData = active.layoutMetadataData
+            archived.drawingVersion = active.drawingVersion
+            archived.isPresent = false
+            archived.updateDate = active.updateDate ?? now
+
+            active.lineData = nil
+            active.isPresent = true
+            active.updateDate = now
+
+            try modelContext.save()
+            return .archived
         } catch let error as DrawingRepositoryError {
             modelContext.rollback()
             throw error

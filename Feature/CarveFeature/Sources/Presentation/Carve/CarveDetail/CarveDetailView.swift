@@ -318,6 +318,11 @@ public struct CarveDetailView: View {
         .sheet(item: $store.scope(state: \.chapterHistory, action: \.chapterHistory)) { store in
             VerseDrawingHistoryView(store: store)
         }
+        // 지우기(보관 후 초기화) 확인창과 실패 안내 (UI-2). 같은 롱프레스 메뉴에서 온다.
+        .alert($store.scope(
+            state: \.chapterCanvas.eraseAlert,
+            action: \.scope.chapterCanvasAction.eraseAlert
+        ))
     }
 
     /// Phase 2 — `LazyVStack` 을 비지연 `VStack` 으로 전환 (설계 §6-1 · rev.15).

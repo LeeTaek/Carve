@@ -55,6 +55,8 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate, UIE
         case scrolled(previous: CGFloat, current: CGFloat)
         /// 롱프레스 메뉴에서 "이전 필사 내용 보기" 를 골랐다. 좌표는 캔버스 content 좌표.
         case historyRequested(at: CGPoint)
+        /// 롱프레스 메뉴에서 "지우기" 를 골랐다 (UI-2). 좌표는 캔버스 content 좌표.
+        case eraseRequested(at: CGPoint)
     }
 
     /// 뷰가 매 업데이트마다 넘기는 표시 상태.
@@ -207,10 +209,17 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate, UIE
         menuFor configuration: UIEditMenuConfiguration,
         suggestedActions: [UIMenuElement]
     ) -> UIMenu? {
+        // 구현이 끝난 항목만 둔다 — "이미지 저장" · "위젯에 표시" 는 아직 없으므로 넣지 않는다 (로드맵 UI-2 규칙).
+        // "지우기" 는 삭제가 아니라 **보관 후 초기화**다. 파괴적 스타일을 주지 않는 이유가 그것이다 —
+        // 확인창에서 "현재 필사는 이전 필사 기록에 남습니다" 를 알린다 (`ChapterCanvasFeature` 지우기 확장 주석).
         UIMenu(children: [
             UIAction(title: "이전 필사 내용 보기") { [weak self] _ in
                 guard let self, let point = self.historyMenuPoint else { return }
                 self.onEvent?(.historyRequested(at: point))
+            },
+            UIAction(title: "지우기") { [weak self] _ in
+                guard let self, let point = self.historyMenuPoint else { return }
+                self.onEvent?(.eraseRequested(at: point))
             }
         ])
     }
