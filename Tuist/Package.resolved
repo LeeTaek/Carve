@@ -1,5 +1,5 @@
 {
-  "originHash" : "cafff8a50777734692e0248ddc3489f0984b55fed4d7c04f8ffd40121a003a34",
+  "originHash" : "a414f7249c2a51ed169ee83a726d88ffffde98289ccd5f3218360fa9cd0d528f",
   "pins" : [
     {
       "identity" : "abseil-cpp-binary",
@@ -150,8 +150,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/pointfreeco/swift-composable-architecture",
       "state" : {
-        "revision" : "6574de2396319a58e86e2178577268cb4aeccc30",
-        "version" : "1.20.2"
+        "revision" : "377da4061db10d26337a71bb279c506bb951f50f",
+        "version" : "1.26.2"
       }
     },
     {
@@ -195,8 +195,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/pointfreeco/swift-navigation",
       "state" : {
-        "revision" : "ae208d1a5cf33aee1d43734ea780a09ada6e2a21",
-        "version" : "2.3.1"
+        "revision" : "32f35241b8be0719c4c7f00eb27713b1cadb6248",
+        "version" : "2.8.0"
       }
     },
     {
@@ -258,8 +258,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/pointfreeco/xctest-dynamic-overlay",
       "state" : {
-        "revision" : "39de59b2d47f7ef3ca88a039dff3084688fe27f4",
-        "version" : "1.5.2"
+        "revision" : "d9308ad679143c26a30dec52daefe82f54af2b82",
+        "version" : "1.13.1"
       }
     }
   ],
