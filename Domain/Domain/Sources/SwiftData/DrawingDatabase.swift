@@ -186,6 +186,21 @@ public struct DrawingDatabase: Sendable {
     ///   - fullLineData: 페이지 전체 기준 PKDrawing.dataRepresentation()
     ///   - drawingVersion: 좌표계/인코딩 버전을 나타내는 버전 값
     ///   - updateDate: 업데이트 일시 (기본값: 현재 시각)
+    /// ⛔ **되살리기 전에 CloudKit 스키마부터 보십시오 (2026-09-09).**
+    ///
+    /// 이 경로는 **호출부가 없습니다.** 유일한 읽기(`fetchPageDrawing`)도 주석 처리된
+    /// `CombinedCanvasFeature` 에만 있어 실행되지 않고, D8 실측상 실데이터도 0행이었습니다.
+    /// 그래서 단일 Canvas 배포 준비 중 **CloudKit 의 `CD_BiblePageDrawing` 레코드 타입을 지웠습니다** —
+    /// 그대로 두면 Production 에 영구히 들어가는데(CloudKit 은 Production 에서 타입을 지울 수 없습니다)
+    /// 아무도 쓰지 않는 것이었기 때문입니다.
+    ///
+    /// ⚠️ **그래서 지금 이 함수를 부르면 Production 에 없는 레코드 타입을 쓰게 됩니다.**
+    /// 로컬 저장은 되지만 CloudKit 동기화가 조용히 실패하고, 원인을 여기와 연결짓기 어렵습니다.
+    /// 되살리려면 **CloudKit Dashboard 에서 레코드 타입을 다시 만들어 Production 으로 배포한 뒤** 쓰십시오
+    /// (절차: 런북 §6-9 D9-CK).
+    ///
+    /// 모델(`BiblePageDrawing`)은 아직 스키마에 등록돼 있습니다 — 엔티티 제거는 V5 마이그레이션이
+    /// 필요해 **Phase 4** 로 미뤄 뒀습니다 (설계 §10-1).
     public func upsertPageDrawing(
         chapter: BibleChapter,
         fullLineData: Data,

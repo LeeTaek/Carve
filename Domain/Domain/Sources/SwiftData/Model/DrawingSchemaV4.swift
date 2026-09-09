@@ -165,6 +165,10 @@ public enum DrawingSchemaV4: VersionedSchema {
         @Attribute(.externalStorage)
         public var fullLineData: Data?   // full PKDrawing
 
+        // ⛔ 이 엔티티는 사실상 죽어 있습니다 — 쓰기 호출부 0건, 실데이터 0행(D8),
+        // CloudKit 레코드 타입도 2026-09-09 에 지웠습니다. 되살리려면 CloudKit 배포가 먼저입니다
+        // (`DrawingDatabase.upsertPageDrawing` 주석). 엔티티 제거 자체는 V5 마이그레이션이 필요해 Phase 4 입니다.
+
         public init() {}
 
         public init(
