@@ -10,7 +10,7 @@
 > ✅ **정지 상태 메모리는 단일 Canvas 가 N-Canvas 보다 ~440 MiB 가볍습니다** (R21, 시편 119편 실측).
 > ✅ **MetricKit 을 붙였습니다** — 보유하지 않은 저메모리·ProMotion 기기의 실태는 배포 후 `mk_daily` · `mk_memory_kill` 이벤트로 받습니다. ⚠️ **매핑 경로는 아직 한 번도 실행되지 않았습니다** (payload 는 하루 한 번, 기기에 과거 payload 도 0건). Xcode 의 **Debug → Simulate MetricKit Payloads** 로 한 번 태워 확인해야 합니다.
 > ⚠️ **그 밖에 살아 있는 항목:** **R20**(회전 시 전이 메모리 peak 1.8 GiB — 저메모리 기기 미검증) · **R17**(Δ 가 R16 계열 미검출) · **R18**(N-Canvas 신규 행이 v1) · **R22**(팔레트 폭). 전부 §16 "남은 것".
-> D9-1 · D9-2 · D9-3-1·2·4 · D9-4-1·4 · **D9-6**(R23·R24 수정 후 재검증) · D9-7-4 · D9-8 · D9-CK② 통과, **D9-5 · D9-7 나머지 · D9-CK③ 미수행** (런북 §8-7).
+> D9-1 · D9-2 · D9-3-1·2·4 · D9-4-1·4 · **D9-5** · **D9-6**(R23·R24 수정 후 재검증) · D9-7-1·3·4 · D9-8 · **D9-CK②·③** 통과. **D9-7-2 만 ❓ 미수행**(Pencil 입력이 필요해 자동화 불가) (런북 §8-7).
 > ⚠️ Δ 0.00 은 실제 필기 표시의 정상 판정이 **아닙니다** — 계측은 "값이 도달했는가" 만 말합니다 (§20-16).
 > [D9 H 분석](./single-canvas-rotation-display-investigation.md) · [실기기 조작](./device-debugging-cli.md).
 > 회귀 기준선 **312** (§19-4-2). 대상: `Feature/CarveFeature`, `Feature/SettingsFeature`, `Domain`.
