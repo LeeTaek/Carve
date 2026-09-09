@@ -1,5 +1,7 @@
 # Carve 실기기 조작 및 표시 진단 절차
 
+> 이 문서는 CLI 조작 절차입니다. 최신 검증 판정은 [런북 §8-7](./phase-0a-d-device-test.md), 출시 범위와 작업 순서는 [2.0.0 로드맵](./release-2.0.0-roadmap.md)을 따릅니다.
+
 2026-09-08에 실제 실행한 CLI 중심 절차다. 대상은 iPad이며 테스트에 Xcode MCP를 사용하지 않는다. D9 H 결과·구현안은 [회전 표시 결함 조사](./single-canvas-rotation-display-investigation.md), 일반 백업·성능·필기 검증은 [실기기 런북](./phase-0a-d-device-test.md)을 따른다.
 
 > ⚠️ **2026-09-08 인자 의미가 바뀌었습니다.** 표시용 획 재구성이 **정식 경로**가 됐으므로

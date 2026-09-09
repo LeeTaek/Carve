@@ -1,14 +1,14 @@
 # CarveFeature 단일 Canvas 전환 설계
 
-> **상태 (rev.25):** Phase 0A~3 **구현 완료.** 단일 Canvas 는 feature flag `singleCanvasEnabled` 뒤에 있고 **기본 off** 입니다.
-> 남은 것은 **실기기 검증 D9** (기본 활성화·배포 판단의 선행 조건, §16) 와 **Phase 4** (구 구조 제거) 입니다.
-> D9 의 실행 절차와 기록 양식은 [런북 §6-9 · §8-7](./phase-0a-d-device-test.md) (rev.10) 에 있습니다.
+> **상태 (rev.34 · 2026-09-09):** Phase 0A~3 구현 및 `develop` 병합 완료. 단일 Canvas 기본값은 **on** (`SingleCanvasFlag.defaultValue = true`)이며 사용자의 명시적 off 는 유지합니다.
+> **2.0.0 작업 순서와 출시 범위는 [로드맵](./release-2.0.0-roadmap.md)을 기준으로 합니다.** Phase 4(구 구조 제거)는 출시 후 안정화 과제입니다.
+> D9 의 실제 통과·미수행 범위는 [런북 §6-9 · §8-7](./phase-0a-d-device-test.md)에 남깁니다. 미보유 구기기·120Hz 검증을 출시 선행 조건으로 두지 않습니다.
 >
 > ✅ **종결:** R13 · R16 · R19 · **D9 H**(회전 표시) · **E-4**(결함 아님, D9 H 와 동일) · **R23**(flag off 로 열기만 해도 v3→v2 강등) · **R24**(같은 장 재로드가 기하 실측을 버려 잉크 미표시·R13 재발·Δ 실명) — 전부 수정·실기기 재확인 완료. §20-13 · §20-14 · §20-16 · 런북 §8-7.
 > ✅ **D9-CK③ 완료 (2026-09-09)** — 운영 컨테이너 Production 에 `CD_layoutMetadataData` · `CD_rowUUID` 를 승격했습니다. **기본 활성화의 하드 블로커가 없습니다.**
-> ⚠️ **출시 전 판단이 필요한 것:** **R25**(롱프레스 메뉴 교체 — 오탭이 전 획 선택으로) · **R22**(세로에서 redo 접근 불가) · **R28**(구버전 기기가 v3 행을 잘못 다룸 — 해석·강등 규칙이 미출시라 **위험 확정**) · **R27**(기존 행의 `rowUUID` 가 서버에 없어 중복 가능) · **R20**(저메모리 미검증).
+> ⚠️ **후속 작업·미확정 항목:** **R25**(롱프레스 메뉴 교체 — 오탭이 전 획 선택으로) · **R22**(세로에서 redo 접근 불가) · **R28**(구버전 기기가 v3 행을 잘못 다룸 — 해석·강등 규칙이 미출시라 **위험 확정**) · **R27**(기존 행의 `rowUUID` 가 서버에 없어 중복 가능) · **R20**(저메모리 미검증).
 > ✅ **정지 상태 메모리는 단일 Canvas 가 N-Canvas 보다 ~440 MiB 가볍습니다** (R21, 시편 119편 실측).
-> ✅ **MetricKit 을 붙였습니다** — 보유하지 않은 저메모리·ProMotion 기기의 실태는 배포 후 `mk_daily` · `mk_memory_kill` 이벤트로 받습니다. ⚠️ **매핑 경로는 아직 한 번도 실행되지 않았습니다** (payload 는 하루 한 번, 기기에 과거 payload 도 0건). Xcode 의 **Debug → Simulate MetricKit Payloads** 로 한 번 태워 확인해야 합니다.
+> ✅ **MetricKit 을 붙였습니다** — 보유하지 않은 저메모리·ProMotion 기기의 실태는 배포 후 `mk_daily` · `mk_memory_kill` 이벤트로 받습니다. ⚠️ **매핑 경로는 아직 한 번도 실행되지 않았습니다** (payload 는 하루 한 번, 기기에 과거 payload 도 0건). 수집 연결의 실제 동작은 아직 미확인으로 남깁니다. 출시 후 수신 여부부터 확인하며, 현재 수집 항목은 메모리·종료 지표입니다. 120Hz 필기감·표시 결함·동기화 중복을 자동 판정하지는 않습니다.
 > ⚠️ **그 밖에 살아 있는 항목:** **R20**(회전 시 전이 메모리 peak 1.8 GiB — 저메모리 기기 미검증) · **R17**(Δ 가 R16 계열 미검출) · **R18**(N-Canvas 신규 행이 v1) · **R22**(팔레트 폭). 전부 §16 "남은 것".
 > D9-1 · D9-2 · D9-3-1·2·4 · D9-4-1·4 · **D9-5** · **D9-6**(R23·R24 수정 후 재검증) · D9-7-1·3·4 · D9-8 · **D9-CK②·③** 통과. **D9-7-2 만 ❓ 미수행**(Pencil 입력이 필요해 자동화 불가) (런북 §8-7).
 > ⚠️ Δ 0.00 은 실제 필기 표시의 정상 판정이 **아닙니다** — 계측은 "값이 도달했는가" 만 말합니다 (§20-16).
@@ -44,7 +44,8 @@
 | 30 | **단일 Canvas 기본 전환 (Phase 3 완료)** — `SingleCanvasFlag.defaultValue` 도입, 읽는 쪽 둘의 기본값 일치. 명시적 off 는 유지(§10-3). **R20 실측**: 한도 3376 MB · 회전 peak 1839.2 MB · N-Canvas 정지 1322 MB 대비 재해석. 기준선 **310** | §10-3 · §16 · §19-4-2 |
 | 31 | **R26 수정** — 장 전환에서 이전 본문 컬럼을 놓는다. 긴 장을 떠난 뒤 **945 → 124.4 MB**. 회전 전이는 콘텐츠 넓이에 비례함을 실측(짧은 장은 전이 0). 기준선 310 → **312** | §5 · §16 · 런북 §8-7 |
 | 32 | **D9-CK③ 완료** — CloudKit 운영 컨테이너에 `CD_layoutMetadataData` · `CD_rowUUID` 승격. 배포 전 죽은 필드 3개와 `CD_BiblePageDrawing` 정리. **기본 활성화 하드 블로커 해소.** R27 · R28 신설 | §10-1-a · §16 · 런북 §8-7 |
-| **33** | **롤백된 옛 단일 Canvas 구현 제거** — `CombinedCanvasFeature`·`CombinedCanvasView` 967줄. 살아 있는 참조가 0건이었고 삭제 후 312 통과. 낡은 deprecation 문구도 실제 대체재(단일 Canvas / `delegatesUndoToCanvas`)로 정정 | §11 · §16 |
+| 33 | **롤백된 옛 단일 Canvas 구현 제거** — `CombinedCanvasFeature`·`CombinedCanvasView` 967줄. 살아 있는 참조가 0건이었고 삭제 후 312 통과. 낡은 deprecation 문구도 실제 대체재(단일 Canvas / `delegatesUndoToCanvas`)로 정정 | §11 · §16 |
+| **34** | **2.0.0 문서 정리** — 기본 on · D9 최신 판정 동기화. 과거 측정 기록은 보존하고 미보유 기기 검증을 출시 후 관측으로 분류. 신규 로드맵 연결 | §16 · §17 · [로드맵](./release-2.0.0-roadmap.md) |
 
 ---
 
@@ -81,12 +82,12 @@ e698a3c9  1.2.1  drawing rallback          ← 1차 롤백
 | # | 원인 | 근거 |
 |---|---|---|
 | D1 | **clipping이 손실적** — control point를 rect로 걸러 `PKStrokePath`를 재구성. 곡선 형태가 변하고 저장→복원→저장이 idempotent하지 않음 | [PKDrawing+Extension.swift:47](../Feature/CarveFeature/Sources/Extension/PKDrawing+Extension.swift) |
-| D2 | **매 저장마다 전체 재절단** — 해당 절 데이터가 "그 순간 rect 안에 보이는 것"으로 덮어써짐 | [CombinedCanvasFeature.swift:167](../Feature/CarveFeature/Sources/Presentation/Drawing/Canvas/CombinedCanvasFeature.swift) |
+| D2 | **매 저장마다 전체 재절단** — 해당 절 데이터가 "그 순간 rect 안에 보이는 것"으로 덮어써짐 | `CombinedCanvasFeature.swift:167`(rev.33에서 삭제된 구현) |
 | D3 | **좌표계 구분자 없음** — `normalizedForVerseRect(tolerance: 20)`으로 절대/로컬을 추측. `drawingVersion`은 전부 `1`로만 쓰이는 죽은 필드 | [PKDrawing+Extension.swift:20](../Feature/CarveFeature/Sources/Extension/PKDrawing+Extension.swift) |
-| D4 | **LazyVStack + 전체 캔버스는 원리적 충돌** — 화면 밖 절의 rect를 알 수 없어 `drawingRect` 맵이 항상 불완전 | [CombinedCanvasFeature.swift:106](../Feature/CarveFeature/Sources/Presentation/Drawing/Canvas/CombinedCanvasFeature.swift) |
-| D5 | **스크롤 컨테이너 2개** — `PKCanvasView`는 `UIScrollView`(SDK 확인)인데 SwiftUI `ScrollView` 안에 넣어 offset drift. `StableCanvasView`와 issue #6의 원인 | [CombinedCanvasView.swift:21](../Feature/CarveFeature/Sources/Presentation/Drawing/Canvas/CombinedCanvasView.swift) |
+| D4 | **LazyVStack + 전체 캔버스는 원리적 충돌** — 화면 밖 절의 rect를 알 수 없어 `drawingRect` 맵이 항상 불완전 | `CombinedCanvasFeature.swift:106`(rev.33에서 삭제된 구현) |
+| D5 | **스크롤 컨테이너 2개** — `PKCanvasView`는 `UIScrollView`(SDK 확인)인데 SwiftUI `ScrollView` 안에 넣어 offset drift. `StableCanvasView`와 issue #6의 원인 | `CombinedCanvasView.swift:21`(rev.33에서 삭제된 구현) |
 | D6 | **레이아웃 메타데이터 없음** — 어떤 폭/폰트에서 그려졌는지 기록이 없어 G4가 원리적으로 불가능 | [DrawingSchemaV3.swift](../Domain/Domain/Sources/SwiftData/Model/DrawingSchemaV3.swift) |
-| D7 | **지우개/undo 저장 누락** — stroke 수 증가시에만 변경 영역 계산, 빈 결과는 skip → 마지막 획 삭제가 DB에 반영 안 됨 | [CombinedCanvasView.swift](../Feature/CarveFeature/Sources/Presentation/Drawing/Canvas/CombinedCanvasView.swift), [CombinedCanvasFeature.swift:186](../Feature/CarveFeature/Sources/Presentation/Drawing/Canvas/CombinedCanvasFeature.swift) |
+| D7 | **지우개/undo 저장 누락** — stroke 수 증가시에만 변경 영역 계산, 빈 결과는 skip → 마지막 획 삭제가 DB에 반영 안 됨 | `CombinedCanvasView.swift`(rev.33에서 삭제된 구현), `CombinedCanvasFeature.swift:186`(rev.33에서 삭제된 구현) |
 | D8 | **저장이 원자적이지 않음** — 요청마다 개별 `save()`, 에러를 per-item으로 삼킴 → 부분 갱신 상태 발생 | [DrawingDatabase.swift:97](../Domain/Domain/Sources/SwiftData/DrawingDatabase.swift) |
 | D9 | **편집 순서 미보장** — 연속 편집의 비동기 저장이 직렬화되지 않으면 최신 편집이 과거 편집에 덮일 수 있음 | 신규 |
 
@@ -850,7 +851,7 @@ columnHeight 가 장 전환에 초기화되지 않음 (컨트롤러는 장을 �
 | Phase 0B (순수 로직) | ✅ `f5206814` 레이아웃 · `0c071d29` 소유권/승계 · `565dfe69` reflow · `0e9a8449` fixture |
 | Phase 1 (V4 additive schema) | ✅ `b68b6101`. 실기기 마이그레이션 성공. CloudKit 미러링 일부 미검증 (§20-5 · §20-7) |
 | Phase 2 (`VStack` + 게이트 + 오버레이) | ✅ rev.15 (§20-8). 실기기 미측정 |
-| Phase 3 (flag 뒤 단일 Canvas) | ✅ (3/3) rev.18 + 결함 수정 rev.17 + 승계 수정 rev.19. **flag 기본 off.** 기본 활성화·배포 판단은 **D9 뒤** |
+| Phase 3 (flag 뒤 단일 Canvas) | ✅ (3/3) rev.18 + 결함 수정 rev.17 + 승계 수정 rev.19. **rev.30에서 기본 on 전환 완료.** 이후 출시 작업은 2.0.0 로드맵 참조 |
 | Phase 4 (구 구조 제거) | 실기기 검증 및 안정화 후 |
 
 ### Phase 2 산출물
@@ -1014,11 +1015,11 @@ D9 에서 이 시차를 결함으로 오독했습니다 (E-4). 경위는 런북 
 | 로컬 atomic batch ≠ CloudKit 원자성 | 알려진 한계 (§8-6) |
 | V4 이후 버전 다운그레이드 불가 | flag off 경로 확보 + v3 행의 N-Canvas 호환 (§10-3) |
 | 절별 실측을 절마다 액션으로 올리면 O(N²) | `VerseGeometryCollector` (§6-1) |
-| 텍스트 행 176개 즉시 생성의 진입 비용 (+100 MB · +2.3 s, 시뮬레이터) — 실기기·저사양 값 없음 | D9 에서 D5 절차로 재측정 |
-| 게이트가 열리지 않으면 장 전체가 필기 불가 | HUD `missing` 으로 관찰. 실기기 확인 필요 |
+| 텍스트 행 176개 즉시 생성의 진입 비용 (+100 MB · +2.3 s, 시뮬레이터) — 실기기·저사양 값 없음 | D9-8에서 실기기 측정 완료(R20·R21·R26). 저메모리 기기는 출시 후 관측 |
+| 게이트가 열리지 않으면 장 전체가 필기 불가 | HUD `missing` 으로 관찰. D9 스모크에서 정상 경로 확인; 미검증 환경까지 보장하지 않음 |
 | `.named` 좌표 공간이 중첩 호스팅 안에서 조용히 `.global` 로 대체됨 | 행 frame 2분할 측정. Δ 검증은 출시 구성에서 (§6-1) |
-| 단일 Canvas 의 편집·저장 경로가 시뮬레이터에서 실행되지 않음 | flag 기본 off. **D9 전에는 활성화하지 않음** |
-| 손가락 롱프레스가 `allowFingerDrawing` 의 그리기 제스처와 겹침 (가만히 0.5 s 누르면 메뉴 + 점) | N-Canvas 의 행별 메뉴도 같은 조건. D9 에서 확인 |
+| 단일 Canvas 편집·저장 경로의 검증 범위 | D9-1 실기기 통과 및 기본 on 전환 완료. 세부 미수행은 런북 §8-7 참조 |
+| 손가락 롱프레스가 `allowFingerDrawing` 의 그리기 제스처와 겹침 (가만히 0.5 s 누르면 메뉴 + 점) | D9-5-6에서 점이 생기지 않음을 확인. 별개 메뉴 교체 결함 R25는 후속 수정 |
 | **빌더가 행 높이를 예측한다** (`lineCount × lineSpace`) — 실기기(iOS 27)에서 절당 0.5pt 어긋나 176절에서 87.5pt 누적 (R13) | ✅ **실측 높이를 레이아웃 입력으로 승격 (rev.21, §20-14).** 예측은 실측이 없는 절의 fallback 으로만 남으므로 OS 판올림에 재발하지 않는다. 안전망이 한 줄 초과 시 새 입력을 막는다 |
 | **Δ 계측이 R16 계열(호스트 제안이 행을 늘리는 결함)을 더 이상 검출하지 못한다** — 레이아웃이 실측 높이를 따라가 예측 == 실측이 되기 때문 (rev.21 부작용, §20-14) | 자동 검출은 `hostedColumnKeepsIdealHeightAndStaysAtTop` 하나뿐. 실기기에서는 HUD 의 `H`(totalHeight)를 새 진입값과 비교한다 (런북 §6-9). **`fixedSize` 불변식과 한 쌍이다** |
 | **B 구조에서 텍스트 컬럼이 세로로 늘어날 수 있다** — 장 전환 시 1335pt 어긋남 (R16, §11) | ✅ **`fixedSize` 로 고정 · 실기기 4건 통과 (rev.20).** 컬럼 높이가 좌표 스케일이므로 이 불변식은 앞으로도 지켜야 한다 |
@@ -1066,7 +1067,7 @@ D9 에서 이 시차를 결함으로 오독했습니다 (E-4). 경위는 런북 
 | ✅ **R24** | **같은 장 재로드가 기하 실측을 버려 복구 불가 상태를 만들던 결함 (2026-09-08 수정).** `begin()` 이 `rowFrames`·`canvasFramesInRow`·`measuredFrames`·`titleHeights` 를 지우는데 producer 인 `onGeometryChange` 는 값이 바뀔 때만 부른다 — 같은 장·같은 폭이면 아무도 복구하지 못한다. **증상은 셋이었다**: 캔버스 미활성으로 flag off 시 화면 밖이던 절의 **잉크가 사라짐** · 레이아웃이 **실측 높이 대신 예측식으로 후퇴**(R13 재발, `H` 3016 → 2977) · **Δ 안전망 실명**(`deltaMax=unmeasured`). 장·절 목록이 실제로 바뀔 때만 버리도록 고쳤고, 회귀 4건(304 → **308**)·변이 확인·실기기 재확인을 마쳤다 |
 | ✅ **R21** | **단일 Canvas 가 N-Canvas 보다 가볍다 (2026-09-08 실측).** 열어 둔 이유는 단일 Canvas 의 시편 119편 진입 peak(944.8 MiB)이 D5 의 N-Canvas baseline(363.6 MB)과 어긋난 것이었는데, **같은 절차로 N-Canvas 를 재니 오히려 N-Canvas 가 무거웠습니다** — 정점 **1376/1388 MiB vs 943/948 MiB**, 안정 **1321/1322 MiB vs 874/882 MiB** (순서 바꿔 2회씩). N-Canvas 는 행이 활성화될 때마다 `PKCanvasView` 가 쌓여 **스크롤이 곧 메모리**이고, 단일 Canvas 는 평평합니다. **D5 와의 차이는 경로가 아니라 절차 차이였습니다**(§18-3-a 는 스크롤 절차가 계측되지 않았습니다). 레이아웃 시간도 같습니다(`firstMs` 419 vs 437) |
 
-**살아 있는 항목**
+**후속 작업과 확인된 해결 내역**
 
 | ID | 내용 |
 |---|---|
@@ -1077,10 +1078,11 @@ D9 에서 이 시차를 결함으로 오독했습니다 (E-4). 경위는 런북 
 | ⚠️ **R29** | **`BiblePageDrawing` 이 코드에는 남아 있는데 CloudKit 레코드 타입은 없습니다 (2026-09-09).** 배포 전 정리 때 `CD_BiblePageDrawing` 을 지웠으므로 **이 경로를 되살리면 Production 에 없는 타입을 쓰게 되어 동기화가 조용히 실패합니다** — `DrawingDatabase.upsertPageDrawing` 과 스키마에 경고 주석을 남겼습니다. ✅ **롤백됐던 옛 단일 Canvas 구현(`CombinedCanvasFeature`·`CombinedCanvasView` 967줄)은 삭제했습니다** — 새 단일 Canvas 옆에 남아 있어 혼란만 줬고, 삭제 후에도 312 통과로 정말 죽은 코드였음이 확인됐습니다. 그 결과 `fetchPageDrawing`·`upsertPageDrawing` 의 **제품 코드 호출부가 0건**이 되고 테스트(`DrawingSchemaV4MigrationTesting`)만 남았습니다. **엔티티 제거는 V5 마이그레이션이 필요해 여전히 Phase 4** 입니다 |
 | ⚠️ **R17** | **`Δ max` 가 R16 계열을 검출하지 못합니다** — 레이아웃이 실측 높이를 따라가 예측 == 실측이 되기 때문 (§20-14 부작용 2). 자동 검출은 `hostedColumnKeepsIdealHeightAndStaysAtTop` 하나뿐이고, 실기기 대체 절차는 HUD 의 `H` 비교 (런북 §6-9 D9-0-d) |
 | ⚠️ **R18** | **N-Canvas 가 새로 만드는 행이 v2 가 아니라 v1(모델 기본값)로 저장됩니다.** 배치에는 영향이 없으나(코덱이 v1·v2 를 같게 처리) 진짜 legacy 와 오늘 그린 행이 `legacyVerses` 한 통에 섞여 **진단에서 구별되지 않습니다.** 저장 경로 별건 (런북 §8-7) |
+| ⚠️ **R25** | 롱프레스 메뉴가 PencilKit 메뉴로 교체돼 의도하지 않은 전체 선택·이동으로 이어질 수 있음. 런북 §8-7의 관측을 근거로 2.0.0 필사 UI 후속 브랜치에서 수정 |
 | ⚠️ **R22** | 세로 화면인데 도구 팔레트가 가로 폭으로 배치돼 **redo 버튼이 잘립니다** (2026-09-08 관측). UI 별건이나 undo/redo 접근성이 막힙니다 (런북 §8-7) |
-| **D9 (진행 중)** | **절차: [런북 §6-9](./phase-0a-d-device-test.md) · 기록: 런북 §8-7.** 통과: 스모크 · **D9-1** · **D9-2** · **D9-3-1·2·4** · **D9-4-1·4** · **D9-7-4** · **D9-8**(측정) · D9-CK②. ❌ **D9-6**(flag 롤백 — R23 으로 실패 정정. 이전 ✅ 는 화면만 본 판정이었습니다). 미수행: **D9-5**(히스토리 메뉴) · **D9-7 나머지**(fling·탭/롱프레스) · **D9-CK③**(Production 승격). **기본 활성화의 선행 조건** |
+| **D9 현재 판정** | 스모크 · D9-1 · D9-2 · D9-3-1·2·4 · D9-4-1·4 · D9-5 · **D9-6(R23·R24 수정 후)** · D9-7-1·3·4 · D9-8(측정) · D9-CK②·③ 완료. **D9-7-2는 미수행**. D9-5-4·5는 설계상 판정 불가, D9-3-4의 undo 스택 초기화는 미확인. 세부 판정은 런북 §8-7을 따르며 D9 전체 통과로 확대하지 않음 |
 | D7 나머지 | 기기 2대가 필요한 미러링 항목 2건 · §10-1-a 승격 절차 |
-| 기기 사각지대 | 보유 기기(iPad mini A17 Pro · iPad Air M2)는 60Hz · 8GB. ProMotion 과 저메모리 iPad 는 TestFlight 베타에서 |
+| 기기 사각지대 | 보유: iPad mini 7세대(A17 Pro) · iPad Air M2 11인치. 구기기·120Hz는 미보유로 직접 검증 불가. 출시 선행 조건에서 제외하고 메모리·종료 지표와 사용자 제보로 추적. 실제 120Hz 필기감은 미검증 유지 |
 | 코드 외부 | 1.2.0 배포 기간의 절대좌표 데이터 실존 여부 — App Store Connect 이력으로만 확인됨 |
 
 ---
@@ -1098,10 +1100,11 @@ D9 에서 이 시차를 결함으로 오독했습니다 (E-4). 경위는 런북 
 - [x] 실제 존재하는 입력 게이트 (`drawingGestureRecognizer.isEnabled`) · 디버그 오버레이 · Δ 검증은 출시 구성에서
 - [x] U1~U8 확정 (§12) · 저장 명령 의미 확정 (§8-6)
 - [x] 승계 규칙 3 은 규칙 2 의 전제 위에서만 — 새 획은 시작 절 (rev.19)
-- [x] 단일 Canvas 는 flag 뒤, 기본 off — 설정 토글 · v3 행의 N-Canvas 호환 · 히스토리 메뉴
+- [x] 단일 Canvas 는 flag 뒤, 기본 on(명시적 off 유지) — 설정 토글 · v3 행의 N-Canvas 호환 · 히스토리 메뉴
 - [ ] §8-5 장 전환 요청/승인 흐름 — 미구현 (현재는 flush + 물러난 세션)
 - [x] **R13 · R16 수정** (§16) — 실기기 재검증 통과 (§20-13 · §20-14)
-- [ ] 실기기 **D9** → 기본 활성화 판단 → Phase 4
+- [x] D9 기록에 근거한 기본 활성화 및 Production 스키마 승격 완료(전체 세부 항목 통과를 뜻하지 않음)
+- [ ] Phase 4 — 2.0.0 출시 후 안정화 시 구 구조 제거
 
 ---
 
