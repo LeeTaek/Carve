@@ -59,6 +59,9 @@ struct ChapterCanvasView: UIViewControllerRepresentable {
             coordinator.handle(event)
         }
         #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains(ChapterCanvasMemoryProbe.launchArgument) {
+            controller.memoryProbe = ChapterCanvasMemoryProbe()
+        }
         if ProcessInfo.processInfo.arguments.contains("-CanvasDisplayProbe") {
             controller.displayProbe = ChapterCanvasDisplayProbe(controller: controller) { [store] in
                 (store.renderedRevision, store.renderedData)

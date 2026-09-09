@@ -82,6 +82,8 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate, UIE
     #if DEBUG
     /// 실행 인자로 켜는 표시 계측. 별도의 실험 모드에서만 명시적인 표시 갱신 명령을 받는다.
     var displayProbe: ChapterCanvasDisplayProbe?
+    /// R20 진단 — jetsam 한도까지의 여유 (`-CanvasMemoryProbe`).
+    var memoryProbe: ChapterCanvasMemoryProbe?
     #endif
     private var appliedUndoVersion = 0
     private var appliedRedoVersion = 0

@@ -188,6 +188,6 @@ xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace \
   -destination 'platform=iOS Simulator,name=iPad mini (A17 Pro),OS=26.2'
 ```
 
-실제 사용 가능한 iPad 이름·OS로 조정한다. 이번에는 iPhone 시뮬레이터도 켜져 있었지만 검증 destination에는 사용하지 않았다. 함수 단위 `only-testing`으로 0개가 실행된 사례가 있으므로 `TEST SUCCEEDED`만 보지 말고 실제 실행 개수도 확인한다. 현재 전체 기준선은 308개이며 [설계 §19-4-2](./single-canvas-design.md)를 기준으로 유지한다.
+실제 사용 가능한 iPad 이름·OS로 조정한다. 이번에는 iPhone 시뮬레이터도 켜져 있었지만 검증 destination에는 사용하지 않았다. 함수 단위 `only-testing`으로 0개가 실행된 사례가 있으므로 `TEST SUCCEEDED`만 보지 말고 실제 실행 개수도 확인한다. 현재 전체 기준선은 310개이며 [설계 §19-4-2](./single-canvas-design.md)를 기준으로 유지한다.
 
 기록할 항목은 기기·OS build·Xcode·USB 상태, 코드 revision/diff, **전체 실행 인자**, 회전 순서, 안정 후 로그, 사용자 또는 스크린샷의 화면 판정, 실제 테스트 개수와 종료 코드, 미검증 항목이다. `Activity Monitor`를 이용한 성능 기록은 기존 런북을 따르며 이 세션에서 새 성능 측정을 완료한 것으로 적지 않는다.
