@@ -12,7 +12,10 @@ import PencilKit
 
 import Dependencies
 
-//@available(*, deprecated, message: "CombinedCanvasView로 대체되며 사용 안 함")
+/// N-Canvas(절마다 `PKCanvasView`) 전용 undo 관리자.
+///
+/// 단일 Canvas 는 이것을 쓰지 않습니다 — `canvas.undoManager` 를 쓰고 팔레트가
+/// `delegatesUndoToCanvas` 로 위임합니다 (설계 §11). flag off 롤백 경로를 위해 유지합니다 (§10-3).
 public class SharedUndoManager {
     private var canvasUndoManager = UndoManager()
     private var canvases: [PKCanvasView] = []
@@ -64,14 +67,14 @@ public class SharedUndoManager {
     }
 }
 
-@available(*, deprecated, message: "CombinedCanvasView로 대체되며 사용 안 함")
+@available(*, deprecated, message: "N-Canvas 전용. 단일 Canvas 는 canvas.undoManager 를 쓰고 팔레트가 delegatesUndoToCanvas 로 위임한다 (설계 §11)")
 extension SharedUndoManager: DependencyKey {
     public static var liveValue = SharedUndoManager()
     public static var previewValue = SharedUndoManager()
 }
 
 extension DependencyValues {
-    @available(*, deprecated, message: "CombinedCanvasView로 대체되며 사용 안 함")
+    @available(*, deprecated, message: "N-Canvas 전용. 단일 Canvas 는 canvas.undoManager 를 쓰고 팔레트가 delegatesUndoToCanvas 로 위임한다 (설계 §11)")
     public var undoManager: SharedUndoManager {
         get { self[SharedUndoManager.self] }
         set { self[SharedUndoManager.self] = newValue }

@@ -13,7 +13,7 @@ import Combine
 
 import ComposableArchitecture
 
-//@available(*, deprecated, message: "CombinedCanvasView / CombinedCanvasFeature로 대체")
+// N-Canvas(절마다 PKCanvasView) 경로. 단일 Canvas 는 ChapterCanvasView 가 대체하며, flag off 롤백용으로 유지한다 (설계 §10-3).
 public struct CanvasView: UIViewRepresentable {
     public typealias UIViewType = PKCanvasView
     private var store: StoreOf<CanvasFeature>
