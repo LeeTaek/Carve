@@ -58,6 +58,10 @@ struct ChapterCanvasView: UIViewControllerRepresentable {
         controller.onEvent = { [coordinator = context.coordinator] event in
             coordinator.handle(event)
         }
+        // 메뉴 항목 가용성은 절 판정이 필요하므로 Feature 가 답한다 (UI-2). 동기 조회다.
+        controller.menuAvailability = { [coordinator = context.coordinator] point in
+            ChapterCanvasFeature.menuAvailability(at: point, state: coordinator.store.state)
+        }
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains(ChapterCanvasMemoryProbe.launchArgument) {
             controller.memoryProbe = ChapterCanvasMemoryProbe(controller: controller)
