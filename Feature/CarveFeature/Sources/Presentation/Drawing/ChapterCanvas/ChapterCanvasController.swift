@@ -161,6 +161,35 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate, UIE
         historyLongPress.allowedTouchTypes = [NSNumber(value: UITouch.TouchType.direct.rawValue)]
         historyLongPress.addTarget(self, action: #selector(handleHistoryLongPress(_:)))
         canvas.addGestureRecognizer(historyLongPress)
+        suppressPencilKitEditMenus()
+    }
+
+    /// PencilKit 이 **내부 타일 뷰에 붙인 편집 메뉴**를 걷어낸다 (R25).
+    ///
+    /// 롱프레스하면 우리 메뉴(`historyMenuInteraction`)가 먼저 뜨는데, 잠시 뒤 PencilKit 의 메뉴가 그 자리를
+    /// **교체**한다. 사용자는 우리 항목을 누르는 줄 알고 "전체 선택" 을 누르게 되고, 그대로 획이 선택·이동되어
+    /// **필기 데이터가 바뀐다** (런북 A1 사고의 원인 — §8-7 R25).
+    ///
+    /// 2026-09-09 실측한 배치는 이렇다.
+    ///
+    /// | 뷰 | 편집 메뉴 |
+    /// |---|---|
+    /// | `canvas` 자신 | 우리가 붙인 `UIEditMenuInteraction` |
+    /// | `canvas` 의 하위 타일 뷰 | PencilKit 의 `UIEditMenuInteraction` + 브리지된 컨텍스트 메뉴 |
+    ///
+    /// PencilKit 의 것이 **더 위 뷰**에 있어 우리 것을 덮는다. 이 앱은 올가미 선택·붙여넣기·공간 삽입을
+    /// 제공하지 않으므로(도구 팔레트에 해당 항목이 없다) 그 표면 자체를 닫는다.
+    ///
+    /// - Important: `canvas` **자신의** 상호작용은 건드리지 않는다 — 우리 메뉴가 거기 있다.
+    ///              하위 뷰는 PencilKit 이 레이아웃 중 다시 만들 수 있으므로 `viewDidLayoutSubviews` 에서도 부른다.
+    ///              내부 클래스 이름에 기대지 않고 상호작용의 **종류**로만 판정한다.
+    private func suppressPencilKitEditMenus() {
+        for subview in canvas.subviews {
+            for interaction in subview.interactions
+            where interaction is UIEditMenuInteraction || interaction is UIContextMenuInteraction {
+                subview.removeInteraction(interaction)
+            }
+        }
     }
 
     // MARK: 히스토리 메뉴 (§8-7)
@@ -188,6 +217,8 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate, UIE
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
+        // PencilKit 이 타일 뷰를 다시 만들면 편집 메뉴도 다시 붙는다 (R25).
+        suppressPencilKitEditMenus()
         if view.bounds != lastBounds {
             lastBounds = view.bounds
             updateContentGeometry()
@@ -546,3 +577,4 @@ extension ChapterCanvasController {
 
     /// 컬럼이 `onGeometryChange` 로 보고한 자기 높이.
 }
+
