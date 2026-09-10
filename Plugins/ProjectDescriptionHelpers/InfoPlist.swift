@@ -24,6 +24,14 @@ public extension InfoPlist {
                 "FeedbackAddress": "$(FEEDBACK_ADDRESS)",
                 "UIBackgroundModes": ["remote-notification"],
                 "UIUserInterfaceStyle": "Light",
+                // WIDGET-0 스파이크 — 위젯 탭 → 해당 절 진입용 URL 스킴
+                "CFBundleURLTypes": [
+                    [
+                        "CFBundleTypeRole": "Editor",
+                        "CFBundleURLName": "kr.co.carve.leetaek.verse",
+                        "CFBundleURLSchemes": ["carve"]
+                    ]
+                ],
                 "CLOUDKIT_CONTAINER_ID": "$(CLOUDKIT_CONTAINER_ID)",
                 "GADApplicationIdentifier": "ca-app-pub-7073697298801242~1655419837",
                 "SKAdNetworkItems": [
