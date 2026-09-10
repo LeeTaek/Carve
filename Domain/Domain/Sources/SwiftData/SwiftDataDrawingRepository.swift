@@ -181,7 +181,7 @@ extension SwiftDatabaseActor {
         do {
             // 획이 하나도 없으면 보관본을 만들지 않는다. 지우개로 전부 지운 절은 `lineData` 가 남아 있어도 stroke 가 0개다.
             guard let active = try drawingRow(rowID: command.activeRowID, chapter: chapter),
-                  active.lineData?.containsPKStroke == true else {
+                  DrawingContentRule.hasStrokes(active.lineData) else {
                 return .alreadyEmpty
             }
 
