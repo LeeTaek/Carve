@@ -55,20 +55,11 @@ let targets: [Target] = [
         sources: ["UITests/**"],
         dependencies: [.target(name: projectName)]
     ),
-    // WIDGET-0 스파이크 — 위젯 타깃. 앱이 이 타깃에 의존해야 Tuist 가 PlugIns 에 임베드한다.
-    .makeWidgetExtensionTarget(
-        name: "CarveWidget",
-        displayName: "새기다 위젯",
-        sources: ["WidgetSpike/Sources/**", "WidgetSpike/Shared/**"],
-        entitlements: .file(path: .relativeToCurrentFile("Support/CarveWidget.entitlements"))
-    ),
     .makeAppTarget(
         name: projectName,
-        // WIDGET-0 스파이크 — 공유 페이로드 파일을 앱에도 컴파일한다.
-        sources: ["Sources/**", "WidgetSpike/Shared/**", "WidgetSpike/AppSeed/**"],
         entitlements: .file(path: .relativeToCurrentFile("Support/Carve.entitlements")),
         scripts: script,
-        dependencies: dependencies + [.target(name: "CarveWidget")],
+        dependencies: dependencies,
         launchArguments: [
             .launchArgument(name: "-FIRDebugEnabled", isEnabled: true)
         ]

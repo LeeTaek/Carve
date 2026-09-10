@@ -48,41 +48,6 @@ public extension Target {
     
     
     
-    /// WIDGET-0 스파이크 — 위젯(app extension) 타깃. 기존 makeAppTarget 관용구를 그대로 따른다.
-    /// 서명은 프로젝트 레벨 automaticCodeSigning 을 상속하므로 여기서 다시 지정하지 않는다.
-    static func makeWidgetExtensionTarget(
-        name: String,
-        destination: Destinations = [.iPad],
-        bundleID: String = .defaultBundleID + ".Widget",
-        deploymentTarget: DeploymentTargets = .iOS("17.0"),
-        displayName: String,
-        sources: SourceFilesList,
-        resources: ResourceFileElements? = nil,
-        entitlements: Entitlements? = nil,
-        dependencies: [TargetDependency] = []
-    ) -> Target {
-        return Target.target(
-            name: name,
-            destinations: destination,
-            product: .appExtension,
-            bundleId: bundleID,
-            deploymentTargets: deploymentTarget,
-            infoPlist: .extendingDefault(with: [
-                "CFBundleDisplayName": .string(displayName),
-                // ⚠️ 앱 Info.plist 는 이 값을 리터럴 "1.3.1" 로 박아 두었다. 위젯은 빌드 설정을 참조한다.
-                "CFBundleShortVersionString": "$(MARKETING_VERSION)",
-                "CFBundleVersion": "$(CURRENT_PROJECT_VERSION)",
-                "NSExtension": .dictionary([
-                    "NSExtensionPointIdentifier": "com.apple.widgetkit-extension"
-                ])
-            ]),
-            sources: sources,
-            resources: resources,
-            entitlements: entitlements,
-            dependencies: dependencies
-        )
-    }
-
     static func makeTestTarget(
         projName: String,
         destination: Destinations = [.iPad],

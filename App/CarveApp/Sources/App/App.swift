@@ -39,10 +39,6 @@ struct CarveApp: App {
             modelContainer: modelContainer,
             nativeAdClient: nativeAdClient
         )
-        #if DEBUG
-        // WIDGET-0 스파이크 — `-WidgetSpikeSeed` 인자가 있을 때만 App Group 에 더미 이미지를 쓴다.
-        WidgetSpikeSeed.seedIfRequested()
-        #endif
     }
     
     var body: some Scene {
@@ -66,12 +62,6 @@ struct CarveApp: App {
     /// 앱의 루트 화면. AppCoordinatorFeature의 상태/액션을 사용하는 코디네이터 뷰.
     private var rootView: some View {
         AppCoordinatorView(store: store)
-            // WIDGET-0 스파이크 — 위젯 탭 URL 수신 경로만 증명한다. 실제 절 이동 배선은 WIDGET 본 구현.
-            .onOpenURL { url in
-                VerseWidgetSharing.logger.notice(
-                    "WIDGET-0 openURL: \(url.absoluteString, privacy: .public)"
-                )
-            }
             .trackScreen(
                 "AppCoordinator",
                 parameters: [
