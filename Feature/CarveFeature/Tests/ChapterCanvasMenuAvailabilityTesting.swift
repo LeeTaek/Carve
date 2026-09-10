@@ -146,6 +146,49 @@ struct ChapterCanvasMenuAvailabilityTesting {
         #expect(availability.isEmpty)
     }
 
+    @Test("비대표 행이 있어도 **내용이 없으면** 이전 필사를 띄우지 않는다 — 목록의 필터와 같은 기준")
+    func emptyNonRepresentativeRowDoesNotOfferHistory() async {
+        // 대표(현재 필사)는 그대로 두고 **비대표 행의 내용만** 뒤집어 양방향을 함께 본다.
+        func rows(nonRepresentative lineData: Data?) -> [VerseDrawingSnapshot] {
+            [
+                Self.snapshot(rowID: CanvasTestSupport.rowA, isPresent: true,
+                              lineData: Self.inkData(), updateDate: Date(timeIntervalSince1970: 300)),
+                Self.snapshot(rowID: Self.archiveRow, isPresent: false,
+                              lineData: lineData, updateDate: Date(timeIntervalSince1970: 100))
+            ]
+        }
+
+        // 빈 행뿐이면 목록에 그릴 것이 없다 → 항목을 띄우지 않는다.
+        let emptyState = await composedState(rows: rows(nonRepresentative: nil))
+        #expect(!ChapterCanvasFeature.menuAvailability(at: Self.pointInVerse, state: emptyState).canViewHistory)
+
+        // 같은 자리에 내용이 들어오면 띄운다 (양성 대조 — 조건이 항상 거짓이 된 게 아니다).
+        let carvedState = await composedState(rows: rows(nonRepresentative: Self.inkData()))
+        #expect(ChapterCanvasFeature.menuAvailability(at: Self.pointInVerse, state: carvedState).canViewHistory)
+    }
+
+    @Test("보관본을 골라 대표가 뒤바뀌면 이전 필사를 숨긴다 — 메뉴와 목록이 어긋나던 자리")
+    func selectingArchiveHidesHistoryWhenOnlyEmptyRowRemains() async {
+        // 지우기 → [빈 활성(대표), 보관본] 에서 사용자가 "이전 필사 내용 보기" 로 보관본을 골랐다.
+        // `updatePresentDrawing` 이 isPresent 를 보관본으로 옮기므로 대표가 보관본이 되고,
+        // **빈 행이 비대표로** 남는다. 행 존재만 보면 여기서 메뉴는 항목을 띄우는데 목록은 비어 있었다.
+        let rows = [
+            Self.snapshot(rowID: CanvasTestSupport.rowA, isPresent: false,
+                          lineData: nil, updateDate: Date(timeIntervalSince1970: 200)),
+            Self.snapshot(rowID: Self.archiveRow, isPresent: true,
+                          lineData: Self.inkData(), updateDate: Date(timeIntervalSince1970: 100))
+        ]
+        let state = await composedState(rows: rows)
+
+        let availability = ChapterCanvasFeature.menuAvailability(at: Self.pointInVerse, state: state)
+
+        // 전제 — 대표가 보관본으로 넘어갔다. (넘어가지 않았다면 이 테스트는 다른 것을 재는 셈이다)
+        #expect(rows.representative()?.rowID == Self.archiveRow)
+        #expect(!availability.canViewHistory)
+        // 대표에 획이 있으니 지우기는 그대로 띄운다 — 메뉴가 통째로 사라진 게 아니다.
+        #expect(availability.canErase)
+    }
+
     @Test("획이 있어도 디코딩되지 않는 데이터면 지우기를 띄우지 않는다")
     func undecodableDataIsNotErasable() async {
         // 지우개로 전부 지운 절은 lineData 가 남아 있어도 stroke 가 0개다. 길이로 판정하면 틀린다.

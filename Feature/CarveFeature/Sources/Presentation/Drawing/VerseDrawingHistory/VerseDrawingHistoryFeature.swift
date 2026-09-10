@@ -56,7 +56,19 @@ public struct VerseDrawingHistoryFeature {
                 return fetchDrawings(state: &state)
                 
             case .setDrawings(let drawings):
-                state.drawings = drawings
+                // **빈 행은 목록에서만 숨긴다** (설계 §8-7 · `historyRows()`). 목록 상태에 들어오는 길목이 여기 하나뿐이라
+                // 여기서 거르면 어떤 경로로 채워도 빈 행이 남지 않는다.
+                //
+                // UI-2 의 "지우기" 는 활성 행을 비우고 `updateDate` 를 `now` 로 찍는다. 거르지 않으면 지울 때마다
+                // 목록 **맨 위**에 내용 없는 행이 와서 "불러올 수 없는 필사 데이터입니다." 로 그려지고 진짜 보관본이
+                // 그 아래로 밀린다.
+                //
+                // ⚠️ 거르는 곳은 **목록뿐이다.** 저장소의 `fetchDrawings(chapter:verse:)` 는 그대로 둔다 —
+                // `updateDrawings(requests:)` 와 `updatePresentDrawing(chapter:verse:presentID:)` 이 같은 조회를 쓰고,
+                // 거기서 빈 활성 행이 빠지면 대표가 과거 회차로 승격돼 지운 획이 되살아난다. 회차를 고를 때도
+                // `updatePresentDrawing` 이 DB 의 **모든 행**을 다시 읽어 `isPresent` 를 옮기므로, 목록에서 뺀 빈 행의
+                // 표시도 정상적으로 내려간다.
+                state.drawings = drawings.historyRows()
                 return .none
                 
             case .view(.selectDrawing(let drawing)):
@@ -70,6 +82,8 @@ public struct VerseDrawingHistoryFeature {
 
 extension VerseDrawingHistoryFeature {
     /// 현재 절에 대한 필사 기록들을 비동기로 조회하고, 결과를 setDrawings 액션으로 반영.
+    ///
+    /// 조회는 저장소가 주는 **모든 행** 그대로다. 빈 행을 거르는 것은 `setDrawings` 한 곳이다 (§8-7).
     private func fetchDrawings(state: inout State) -> Effect<Action> {
         let title = state.title
         let verse = state.verse
