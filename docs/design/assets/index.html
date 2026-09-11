@@ -1,0 +1,85 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>Carve · 추가 디자인 시안</title><style>body{margin:0;padding:48px;background:#e8e9e3;color:#303b36;font-family:-apple-system,sans-serif}main{max-width:1180px;margin:auto}h1{font-size:32px}p{line-height:1.8}section{margin:48px 0}img{width:100%;border-radius:24px;box-shadow:0 12px 48px #303b3612}a{color:#476550}table{border-collapse:collapse;width:100%;margin:24px 0;font-size:14px}th,td{text-align:left;padding:10px 12px;border-bottom:1px solid #dfe2db}th{color:#5f6862;font-weight:600}td.n{font-variant-numeric:tabular-nums}h2{margin-top:56px}hr{border:0;border-top:1px solid #dfe2db;margin:64px 0}</style><main><h1>말씀을 읽고, 마음에 새기다.</h1><p>큰 글꼴과 성경 탐색 · 추가 시안<br>Figma에 SVG를 드래그해 가져올 수 있습니다. 설치된 글꼴에 따라 한글 모양이 달라질 수 있습니다.</p><section><h2>01 · 큰 글꼴 필사</h2><p>본문 30pt / 줄 간격 64pt. 줄바꿈에 맞춰 오른쪽 필기 가이드를 추가하고 절 높이를 늘립니다. 필기 샘플은 실제 획이 아닌 글꼴 표현입니다.</p><img src="large-type.svg"><p><a href="large-type.svg" download>SVG 다운로드</a></p></section><section><h2>02 · 성경·장 선택</h2><p>300pt 사이드바와 필사 상세 화면. 구약·신약 → 성경 → 장 순서로 선택합니다. 성경 목록과 장 목록은 각각 스크롤하며, 세로·좁은 화면에서는 사이드바를 오버레이로 표시하는 방향입니다.</p><img src="navigation-split.svg"><p><a href="navigation-split.svg" download>SVG 다운로드</a></p></section><hr><h2>탐색 구조 A/B — 장을 어떻게 고를 것인가</h2>
+<p>2-column 시안(위 02)은 성경 목록과 장 그리드를 한 컬럼에 함께 넣어 그리드 높이가 약 180pt로 줄었습니다.
+한 화면에 약 18장이 보여 현재 앱의 장 목록(약 17장)과 차이가 없습니다.
+아래 두 안은 <strong>한 컬럼에 스크롤 영역을 하나만</strong> 두고, 사이드바가 필사 열 폭을 밀지 않도록(오버레이) 다시 잡은 것입니다.</p>
+<table><thead><tr><th>방식</th><th>한 화면에 보이는 장</th><th>시편 150장</th><th>필사 열 폭</th></tr></thead><tbody>
+<tr><td>현재 앱 (3-column 리스트)</td><td class="n">~17</td><td class="n">8.8 화면</td><td>사이드바 열면 필사 화면이 가려짐</td></tr>
+<tr><td>02 시안 (2-column, 그리드 180pt)</td><td class="n">~18</td><td class="n">8.3 화면</td><td>300pt만큼 밀림</td></tr>
+<tr><td><strong>안 A</strong> (오버레이 400pt + push)</td><td class="n">77</td><td class="n">2.0 화면</td><td>변하지 않음</td></tr>
+<tr><td><strong>안 B</strong> (헤더 팝오버)</td><td class="n">90</td><td class="n">1.7 화면</td><td>변하지 않음</td></tr>
+<tr><td><strong>안 C</strong> 가로 (3-column 오버레이)</td><td class="n">65</td><td class="n">2.3 화면</td><td>변하지 않음</td></tr>
+<tr><td><strong>안 C</strong> 세로 (헤더 팝오버)</td><td class="n">100</td><td class="n">1.5 화면</td><td>변하지 않음</td></tr>
+</tbody></table>
+<section><h2>03 · 안 A — 오버레이 사이드바 400pt + push 계층</h2>
+<p>사이드바가 필사 화면을 밀지 않고 위에 겹칩니다. 폭을 필사 영역에서 빼앗지 않으므로 400pt까지 넓힐 수 있고,
+성경 목록 → 장 그리드를 push 계층으로 나눠 각 단계가 사이드바 전 높이를 씁니다. 장 그리드는 7열 × 11행입니다.</p>
+<img src="nav-option-a-overlay.svg"><p><a href="nav-option-a-overlay.svg" download>SVG 다운로드</a></p></section>
+<section><h2>04 · 안 B — 성경 전용 사이드바 + 헤더 제목 팝오버</h2>
+<p>장 선택을 사이드바에서 빼내 필사 화면 안에서 끝냅니다. 사이드바는 성경만 담아 320pt로 줄고,
+장은 헤더 제목을 탭해 나오는 팝오버에서 10열 × 9행 그리드로 고릅니다. 화면 중앙을 쓰므로 그리드가 가장 넓지만 본문을 잠시 가립니다.</p>
+<img src="nav-option-b-popover.svg"><p><a href="nav-option-b-popover.svg" download>SVG 다운로드</a></p></section>
+<p>두 안 모두 도구 팔레트를 <strong>보이는 영역 기준</strong>으로 중앙 정렬했습니다. 사이드바가 하단 중앙 팔레트를 덮는 문제를 피하기 위한 것으로,
+캔버스 레이아웃이 아니라 팔레트 위치만 움직이므로 필기 좌표 재계산 자극이 아닙니다.
+보조 글자는 <code>#727B74</code>(종이 위 4.15:1, AA 미달) 대신 <code>#5F6862</code>(5.48:1)를 썼습니다.</p>
+<section><h2>05 · 안 C — 3-column 오버레이(가로) + 헤더 팝오버(세로) + Liquid Glass</h2>
+<p>현재 앱의 3-column <code>NavigationSplitView</code>를 그대로 두고, 장 목록만 5열 그리드로 바꾼 안입니다.
+<code>.prominentDetail</code>이 이미 leading 컬럼을 detail 위에 덮으므로 필사 열 폭이 변하지 않습니다.
+세로에서는 600pt 오버레이가 과해서 장 선택만 헤더 팝오버로 뺐습니다.
+세 번째 프레임은 팔레트가 좌측 하단 원형으로 접힌 상태입니다.</p>
+<p><em>유리 표현은 근사입니다.</em> SVG에는 backdrop blur가 없어 뒤 콘텐츠를 블러 복제해 한 겹 깔고 반투명 틴트·상단 스펙큘러·림 라이트를 올린 것으로, 실제 Liquid Glass 재질과 다릅니다.</p>
+<img src="nav-option-c-glass.svg"><p><a href="nav-option-c-glass.svg" download>SVG 다운로드</a></p></section>
+<hr><h2>본문 설정 — 시트에서 인스펙터 팝오버로</h2>
+<p>현재 <code>SentenceSettingsView</code>는 <code>Form</code> 시트이고, 맨 위에 300pt짜리 「예시 문구」(요한복음 3:16) 섹션이 있습니다.
+시트가 본문을 덮기 때문에 미리보기용 샘플이 따로 필요했던 것입니다.
+헤더 「본문」 버튼에 붙는 오른쪽 팝오버로 옮기면 왼쪽 원문 열이 가려지지 않아 <strong>지금 읽는 장에서 바로 미리보기</strong>가 되고, 예시 문구 섹션이 없어집니다.</p>
+<section><h2>06 · 안 D — 본문 설정 팝오버 · 왼손 사용자용 화면</h2>
+<p>팝오버 안은 현재 화면과 같은 항목입니다 — 글꼴 3종(나눔바른고딕·나눔명조·나눔꽃향기), 글자 크기 15–40, 줄 간격 5–70, 자간 1–10, 왼손 사용자용 화면, 손가락 필사 허용.
+「기본값으로 되돌리기」만 새 제안입니다.
+두 번째 프레임은 왼손 설정을 켠 상태로, 필기 열이 왼쪽으로 가고 축소 팔레트도 반대쪽으로 따라갑니다.</p>
+<img src="text-settings-option-d.svg"><p><a href="text-settings-option-d.svg" download>SVG 다운로드</a></p></section>
+<hr><h2>이전 필사 기록 · 앱 설정</h2>
+<section><h2>07 · 안 E — 이전 필사 기록 팝오버</h2>
+<p>지금은 절 롱탭 → 시트입니다. 시트가 본문을 덮어서 「지금 쓴 것과 이전 회차를 견준다」는 목적이 안 됩니다. 팝오버를 절 아래에 두면 그 절의 현재 필기가 위에 그대로 남습니다.</p>
+<p>소스를 보니 회차를 고르는 것은 <strong>덮어쓰기가 아니라 대표 회차 전환</strong>이었습니다(<code>updatePresentDrawing</code>이 <code>isPresent</code>를 옮김). 되돌릴 수 있으니 확인 단계는 넣지 않았고, 대신 현재 화면에 없던 <strong>「지금 보이는 회차」 표시</strong>를 넣었습니다. 썸네일도 <code>pkDrawing.bounds</code> 그대로가 아니라 고정 폭에 맞춰 줄이는 것으로 바꿨습니다.</p>
+<img src="history-popover-option-e.svg"><p><a href="history-popover-option-e.svg" download>SVG 다운로드</a></p></section>
+<section><h2>08 · 안 F — 앱 설정</h2>
+<p>전체 화면 <code>NavigationSplitView</code> + 별도 X 버튼을 900 × 700 시트 + 「완료」로 바꿨습니다. 목록은 필사 · 저장 · 지원 세 묶음이고 항목은 그대로입니다. 본문 설정은 여기 넣지 않고, 어디 있는지 적는 줄만 뒀습니다.</p>
+<p>「모든 필사 데이터 삭제」 확인 대화상자만 유리를 쓰지 않습니다 — 되돌릴 수 없는 동작이라 대비가 먼저입니다.</p>
+<img src="app-settings-option-f.svg"><p><a href="app-settings-option-f.svg" download>SVG 다운로드</a></p></section>
+<section><h2>09 · 안 G — 이미지 저장 · 위젯에 표시</h2>
+<p>절 롱탭 메뉴는 네 항목입니다 — 이전 필사 내용 보기 · 이미지 저장 · 위젯에 표시 · 지우기.
+현재 코드에는 첫 항목과 (단일 캔버스일 때) 마지막 항목만 있고, 나머지 둘은 IMAGE · WIDGET 작업에서 붙습니다.</p>
+<p>절 이미지는 <strong>본문을 위, 필기를 아래</strong>로 뒀습니다. 공유했을 때 좁은 화면에서 좌우 2단은 각각 절반으로 줄어 읽기 어려워집니다.
+위젯 지정 확인은 「지정 당시 이미지」라는 것, 이미 지정된 절이 교체된다는 것, 홈 화면에 위젯을 먼저 추가해야 한다는 것을 한 화면에서 말합니다.</p>
+<p><strong>위젯 다크 모드는 WIDGET-0에서 확인된 위험입니다</strong> — 위젯은 앱의 <code>UIUserInterfaceStyle: Light</code>를 상속하지 않습니다. 종이 유지와 반전 두 방향을 나란히 뒀고, 아직 정하지 않았습니다.</p>
+<img src="image-widget-option-g.svg"><p><a href="image-widget-option-g.svg" download>SVG 다운로드</a></p></section>
+<section><h2>10 · 안 H — 차트</h2>
+<p>주 이동을 좌우 버튼과 기간 표시로 드러냈습니다. 지금 차트는 가로 드래그만 받고 부모 스크롤을 죽이는 구조라 세로 스크롤이 막히는데(CHART 결함), 버튼이 있으면 드래그가 안 먹어도 주를 넘길 수 있습니다. 제스처 수정 자체를 대신하지는 않습니다.</p>
+<p>요약 타일은 「한 주 동안 / 3절 / 최근 … / 필사하셨어요」로 흩어진 문장을 라벨과 값으로 정리했습니다. 빈 상태는 화면 1/3을 빈 문장으로 채우지 않고 돌아갈 길을 줍니다. 차트 텍스트 요약(접근성)도 함께 넣었습니다.</p>
+<img src="chart-option-h.svg"><p><a href="chart-option-h.svg" download>SVG 다운로드</a></p></section>
+<section><h2>11 · 안 I — 도움말 · 패치노트</h2>
+<p>최초 진입 안내는 <strong>본문·필기 위가 아니라 아래 여백</strong>에 뜹니다. 네 걸음이고 언제든 건너뜁니다 — 두 손가락 스크롤, 절 롱탭 메뉴, 이미지 저장, 위젯 지정과 홈 화면 추가.</p>
+<p>패치노트는 기존 설치의 업데이트에서 한 번 뜨고 신규 설치에서는 띄우지 않습니다. 설정 「지원」에 도움말·패치노트를 넣어 언제든 다시 열 수 있게 했습니다.</p>
+<img src="help-patchnote-option-i.svg"><p><a href="help-patchnote-option-i.svg" download>SVG 다운로드</a></p></section>
+<hr><h2>결정용 시안 — 다크 모드 · 광고</h2>
+<section><h2>12 · 안 J — 다크 모드 · 종이 유지</h2>
+<p>원문·필기 영역은 종이 그대로이고, 헤더·바깥 여백·떠 있는 도구만 어두워집니다. 첫 프레임에 같은 화면의 라이트와 다크를 나란히 뒀습니다.</p>
+<p><strong>종이는 배경 장식이어야 합니다.</strong> 원문·필기 열의 x와 폭이 라이트와 같아야 테마 전환이 reflow 자극이 되지 않습니다.
+떠 있는 팔레트의 검정 색 동그라미는 어두운 표면에서 1.16:1로 묻혀 밝은 테두리를 둘렀습니다. 비용은 밤의 밝기입니다 — 종이와 책상의 대비가 15.83:1입니다.</p>
+<img src="dark-paper-option-j.svg"><p><a href="dark-paper-option-j.svg" download>SVG 다운로드</a></p></section>
+<section><h2>13 · 안 K — 광고 자리</h2>
+<p>필사 화면 상시 광고의 기준은 셋입니다 — 필기 열 폭과 절 위치를 바꾸지 않을 것, 말씀·필기를 가리지 않을 것, 펜과 오른손에서 멀 것. 셋을 모두 지키는 자리는 <strong>헤더 줄 좌측</strong>뿐입니다.
+탐색 사이드바 하단은 기존 차트와 같은 네이티브 광고입니다.</p>
+<p>헤더 광고는 로드·실패·제거 어느 경우에도 헤더 높이를 바꾸면 안 됩니다 — 헤더 높이가 본문 시작점이 되기 때문입니다. 세로 화면에서는 제목과 겹쳐 들어가지 않습니다.</p>
+<img src="ads-option-k.svg"><p><a href="ads-option-k.svg" download>SVG 다운로드</a></p></section>
+<section><h2>14 · 디자인 규격 · 다크 모드</h2>
+<p>Figma 규격 보드(3:188) 옆에 붙이는 판입니다. 색은 <strong>컬렉션 하나에 모드 둘</strong>이고, 토큰 이름은 코드의 <code>Color.Brand</code>·색 에셋 이름에 맞췄습니다.</p>
+<p><strong>필사 영역은 라이트로 고정</strong>합니다 — Figma에서는 그 프레임의 변수 모드를 Light로, iOS에서는 필사 영역과 PencilKit 캔버스·도구 선택기를 라이트 외관으로 고정합니다. 위험 색은 모드마다 다릅니다(라이트 <code>#A4453C</code>를 다크 표면에 쓰면 2.24:1).</p>
+<img src="design-spec-dark.svg"><p><a href="design-spec-dark.svg" download>SVG 다운로드</a></p></section>
+<hr><h2>아이콘</h2>
+<p>헤더(서재 · 이전 장 · 다음 장 · 본문 설정)와 사이드바 하단(차트 · 설정)을 글자에서 아이콘으로 바꿨습니다.
+모두 24pt 그림 · 1.7pt 선이고 버튼은 44pt 정사각입니다.
+사이드바 하단의 「개역한글」은 동작이 아니라 현재 값이라 글자로 남겼습니다 — 아이콘은 어떤 번역본인지 말할 수 없습니다.</p>
+<img src="header-icons.svg">
+<p>낱장 파일: <a href="library.svg" download>library</a> · <a href="prev.svg" download>prev</a> · <a href="next.svg" download>next</a> · <a href="textformat.svg" download>textformat</a> · <a href="chart.svg" download>chart</a> · <a href="settings.svg" download>settings</a> · <a href="pen.svg" download>pen</a> · <a href="eraser.svg" download>eraser</a> · <a href="lasso.svg" download>lasso</a> · <a href="undo.svg" download>undo</a> · <a href="redo.svg" download>redo</a></p>
+<p>실제 SwiftUI 구현 시 접근성 이름과 선택·비활성 상태를 제공해야 합니다. 화면 너비 변경 시 기존 필기 좌표 보존은 별도 검증 대상입니다.</p></main></html>
