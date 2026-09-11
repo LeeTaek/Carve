@@ -35,11 +35,24 @@ public struct CarveNavigationView: View {
                 .navigationSplitViewColumnWidth(min: 280, ideal: 300, max: 320)
         } detail: {
             detailView()
+                .overlay {
+                    if store.columnVisibility != .detailOnly {
+                        // 본문을 딤 처리하고 탭하면 탐색을 닫는다. scrim 토큰의 기본 alpha(0.18)에
+                        // 0.55를 곱해 가로 시안의 약 10% 가림막으로 맞춘다.
+                        CarveColor.scrim
+                            .opacity(0.55)
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                send(.closeNavigationBar)
+                            }
+                    }
+                }
         }
+        // 가로 탐색은 필사 화면을 유지한 채 leading 두 열을 본문 위에 겹친다.
         .navigationSplitViewStyle(.prominentDetail)
         .onChange(of: scenePhase) { _, phase in
             // 앱이 비활성/백그라운드로 가면 단일 Canvas 의 미저장분을 저장한다 (§8-5, best-effort).
-            // CarveDetailView 는 사이드바가 열리면 트리에서 빠지므로, 항상 있는 이 뷰에서 건다.
+            // CarveDetailView가 열림 상태와 관계없이 유지되므로, 이 뷰에서 저장을 건다.
             if phase != .active {
                 store.send(.scope(.carveDetailAction(.view(.appWillResignActive))))
             }
@@ -172,7 +185,9 @@ public struct CarveNavigationView: View {
     private func chapterButton(_ chapter: Int) -> some View {
         let isSelected = store.currentTitle.chapter == chapter
         return Button {
-            store.selectedChapter = chapter
+            // selectedChapter 바인딩만 바꾸면 현재 장 헤더만 갱신되고 본문 fetch가 발생하지 않는다.
+            // 도메인 이동 액션으로 보내야 장 상태·detail 전환·본문 로딩이 한 흐름으로 처리된다.
+            store.send(.moveToChapter(BibleChapter(title: store.currentTitle.title, chapter: chapter)))
         } label: {
             Text(chapter.description)
                 .font(CarveTypography.body)

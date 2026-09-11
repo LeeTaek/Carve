@@ -41,6 +41,8 @@ public struct HeaderFeature {
         @Shared(.appStorage("isLeftHanded")) public var isLeftHanded: Bool = false
         /// 탭으로 전환한 축소 헤더 상태. 광고 영역이 생겨도 헤더는 항상 남는다.
         public var isManuallyCollapsed: Bool = false
+        /// NavigationSplitView가 열려 있는지 헤더의 탐색 버튼에 전달한다.
+        public var isNavigationPresented: Bool = false
         
         public enum SwipeDirection {
             case up
@@ -64,6 +66,8 @@ public struct HeaderFeature {
         case view(View)
         
         public enum View {
+            /// 서재 아이콘을 탭해 탐색 열림 상태를 전환한다.
+            case libraryDidTapped
             case titleDidTapped
             case setHeaderHeight(CGFloat)
             /// 하단 접힘 팔레트를 탭해 도구 목록을 펼친다.

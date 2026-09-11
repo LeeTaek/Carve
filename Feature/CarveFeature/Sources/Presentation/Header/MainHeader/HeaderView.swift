@@ -57,6 +57,7 @@ public struct HeaderView: View {
         }
         .animation(.easeInOut(duration: 0.16), value: store.headerOffset)
         .animation(.easeInOut(duration: 0.16), value: store.isManuallyCollapsed)
+        .animation(.easeInOut(duration: 0.16), value: store.isNavigationPresented)
         .ignoresSafeArea(.all, edges: .top)
     }
 
@@ -82,13 +83,26 @@ public struct HeaderView: View {
 
     private var leadingControls: some View {
         HStack(spacing: CarveSpacing.xxSmall) {
-            CarveIconButton(.library, accessibilityLabel: "서재 열기", visualScale: buttonVisualScale) {
-                send(.titleDidTapped)
+            CarveIconButton(
+                navigationIcon,
+                accessibilityLabel: navigationAccessibilityLabel,
+                isSelected: store.isNavigationPresented,
+                visualScale: buttonVisualScale
+            ) {
+                send(.libraryDidTapped)
             }
             if store.isLeftHanded {
                 sentenceSettingsButton
             }
         }
+    }
+
+    private var navigationIcon: CarveIcon {
+        .library
+    }
+
+    private var navigationAccessibilityLabel: String {
+        store.isNavigationPresented ? "성경 탐색 닫기" : "성경 탐색 열기"
     }
 
     private var trailingControls: some View {

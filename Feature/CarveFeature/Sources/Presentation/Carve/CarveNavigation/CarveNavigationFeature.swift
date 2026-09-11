@@ -90,6 +90,14 @@ public struct CarveNavigationFeature {
                     guard let selectedChapter = newValue else { return .none }
                     state.$currentTitle.withLock { $0.chapter = selectedChapter }
                     state.columnVisibility = .detailOnly
+                    syncHeaderNavigationState(state: &state)
+                    // 바인딩으로 장을 선택한 경로도 본문을 새로 읽는다.
+                    return .send(.scope(.carveDetailAction(.view(.fetchSentence))))
+                }
+            }
+            .onChange(of: \.columnVisibility) { _, _ in
+                Reduce { state, _ in
+                    syncHeaderNavigationState(state: &state)
                     return .none
                 }
             }
@@ -106,6 +114,7 @@ public struct CarveNavigationFeature {
                 state.selectedChapter = chapter.chapter
                 state.$currentTitle.withLock { $0 = chapter }
                 state.columnVisibility = .detailOnly
+                syncHeaderNavigationState(state: &state)
                 return .run { send in
                     await send(.scope(.carveDetailAction(.view(.fetchSentence))))
                 }
@@ -115,6 +124,7 @@ public struct CarveNavigationFeature {
                 state.selectedChapter = verse.title.chapter
                 state.$currentTitle.withLock { $0 = verse.title }
                 state.columnVisibility = .detailOnly
+                syncHeaderNavigationState(state: &state)
                 return .merge(
                     .send(.scope(.carveDetailAction(.setScrollTarget(verse)))),
                     .run { send in
@@ -124,6 +134,9 @@ public struct CarveNavigationFeature {
                 
             case .scope(.carveDetailAction(.scope(.headerAction(.view(.titleDidTapped))))):
                 return handleTitleDidTapped(state: &state)
+
+            case .scope(.carveDetailAction(.scope(.headerAction(.view(.libraryDidTapped))))):
+                return toggleNavigation(state: &state)
                 
             case .scope(.carveDetailAction(.scope(.headerAction(.view(.moveToNext))))):
                 return handleMoveToNext(state: &state)
@@ -141,10 +154,12 @@ public struct CarveNavigationFeature {
                 
             case .view(.closeNavigationBar):
                 state.columnVisibility = .detailOnly
+                syncHeaderNavigationState(state: &state)
                 return .none
-                
+
             case .view(.navigationToDrewLog):
                 state.columnVisibility = .detailOnly
+                syncHeaderNavigationState(state: &state)
                 state.detailNavigation = .drewLog(.initialState)
                 return .none
                 
@@ -162,7 +177,26 @@ extension CarveNavigationFeature {
         state.selectedTitle = state.currentTitle.title
         state.selectedChapter = state.currentTitle.chapter
         state.columnVisibility = .all
+        syncHeaderNavigationState(state: &state)
         return .none
+    }
+
+    /// 서재 아이콘으로 탐색을 열고 닫는다. 현재가 detailOnly이면 3열을, 일부라도 열려 있으면 detailOnly를 선택한다.
+    private func toggleNavigation(state: inout State) -> Effect<Action> {
+        if state.columnVisibility == .detailOnly {
+            state.selectedTitle = state.currentTitle.title
+            state.selectedChapter = state.currentTitle.chapter
+            state.columnVisibility = .all
+        } else {
+            state.columnVisibility = .detailOnly
+        }
+        syncHeaderNavigationState(state: &state)
+        return .none
+    }
+
+    /// SplitView의 실제 표시 상태를 상세 헤더의 탐색 버튼과 동기화한다.
+    private func syncHeaderNavigationState(state: inout State) {
+        state.carveDetailState.headerState.isNavigationPresented = state.columnVisibility != .detailOnly
     }
     
     /// 다음 장으로 이동하고, 이동 후 선택된 본문을 다시 로드.
