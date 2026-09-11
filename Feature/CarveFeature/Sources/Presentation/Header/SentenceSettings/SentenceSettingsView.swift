@@ -10,82 +10,59 @@ import Domain
 import SwiftUI
 
 import ComposableArchitecture
+import UIComponents
 
 public struct SentenceSettingsView: View {
     @Bindable private var store: StoreOf<SentenceSettingsFeature>
+    @Environment(\.dismiss) private var dismiss
+
     public init(store: StoreOf<SentenceSettingsFeature>) {
         self.store = store
     }
-    
+
     public var body: some View {
-        Form {
-            Section(
-                header: Text("예시 문구").font(.headline).bold()
-            ) {
-                VerseTextView(
-                    store: self.store.scope(state: \.sampleSentence,
-                                            action: \.sampleSentence),
-                    onLayoutChange: { layout in
-                        let offsets =  VerseTextFeature.makeUnderlineOffsets(
-                            from: layout,
-                            sentenceSetting: store.sampleSentence.sentenceSetting
-                        )
-                        store.send(.sampleSentence(.setUnderlineOffsets(offsets)))
+        ScrollView {
+            VStack(spacing: 0) {
+                CarvePanelHeader("본문 설정") {
+                    Button("완료") { dismiss() }
+                        .buttonStyle(.carve(.primary))
+                }
+
+                VStack(alignment: .leading, spacing: CarveSpacing.large) {
+                    CarveSettingsSection("글꼴") {
+                        CarveSegmentedPicker(selection: $store.setting.fontFamily, items: FontCase.allCases) { font in
+                            Text(font.title)
+                                .font(CarveTypography.scripture(font.font(size: 14)))
+                        }
                     }
-                )
-                .frame(height: 300, alignment: .center)
-            }
-            
-            Section(
-                header: Text("폰트").font(.headline).bold()
-            ) {
-                SegmentedPicker(
-                    selection: $store.setting.fontFamily,
-                    items: Domain.FontCase.allCases) { font in
-                        Text(font.title)
-                            .font(Font(font.font(size: 20)))
-                    }
-            }
-            
-            Section(
-                header: Text("폰트 크기: \(Int(store.setting.fontSize))").font(.headline).bold()
-            ) {
-                CustomSlider(
-                    value: $store.setting.fontSize,
-                    minValue: 15,
-                    maxValue: 40
-                )
-                .padding(.vertical)
-            }
-            Section(
-                header: Text("줄 간격: \(Int(store.setting.lineSpace))").font(.headline).bold()
-            ) {
-                CustomSlider(
-                    value: $store.setting.lineSpace,
-                    minValue: 5,
-                    maxValue: 70
-                )
-                .padding(.vertical)
-            }
-            Section(
-                header: Text("글자 간격: \(Int(store.setting.traking))").font(.headline).bold()
-            ) {
-                CustomSlider(
-                    value: $store.setting.traking,
-                    minValue: 1,
-                    maxValue: 10
-                )
-                .padding(.vertical)
-            }
-            Section(
-                header: Text("화면 구성 및 필기 설정")
-            ) {
-                Toggle("왼손 사용자용 화면", isOn: $store.isLeftHanded)
-                    .tint(Color.teal)
-                Toggle("손가락 필사 허용", isOn: $store.allowFingerDrawing)
-                    .tint(Color.teal)
+
+                    CarveLabeledSlider("글자 크기", value: $store.setting.fontSize, in: 15...40, step: 1, valueText: "\(Int(store.setting.fontSize)) pt")
+                    CarveLabeledSlider("줄 간격", value: $store.setting.lineSpace, in: 5...70, step: 1, valueText: "\(Int(store.setting.lineSpace))")
+                    CarveLabeledSlider("자간", value: $store.setting.traking, in: 1...10, step: 1, valueText: "\(Int(store.setting.traking))")
+                }
+                .padding(CarveSpacing.large)
+
+                CarveDivider()
+
+                CarveSettingsSection("화면과 필기") {
+                    CarveSettingsRow("왼손 사용자용 화면", description: "필기 열이 왼쪽으로 가요", isOn: $store.isLeftHanded)
+                    CarveSettingsRow("손가락 필사 허용", description: "끄면 Apple Pencil로만 필사할 수 있어요", isOn: $store.allowFingerDrawing)
+                }
+                .padding(.horizontal, CarveSpacing.large)
+                .padding(.vertical, CarveSpacing.medium)
+
+                CarveDivider()
+
+                Button("본문 모양 초기화") {
+                    store.setting = .initialState
+                }
+                .buttonStyle(.carve(.primary, fillsWidth: true))
+                .disabled(store.setting == .initialState)
+                .padding(CarveSpacing.large)
             }
         }
+        .frame(idealWidth: 350)
+        .carvePresentationSurface()
     }
 }
 
