@@ -18,24 +18,21 @@ import UIComponents
 public struct CarveNavigationView: View {
     @Bindable public var store: StoreOf<CarveNavigationFeature>
     @Environment(\.scenePhase) private var scenePhase
-    /// 구약 성경의 DisclosureGroup 접힘/펼침
-    @State private var isShowOldTestment: Bool
-    /// 신약 성경의 DisclosureGroup 접힘/펼침
-    @State private var isShowNewTestment: Bool
+    @State private var searchText = ""
+    @State private var testament: Testament
     
     public init(store: StoreOf<CarveNavigationFeature>) {
         self.store = store
-        self.isShowOldTestment = store.currentTitle.title.isOldtestment
-        self.isShowNewTestment = !store.currentTitle.title.isOldtestment
+        self.testament = store.currentTitle.title.isOldtestment ? .old : .new
     }
     
     public var body: some View {
         NavigationSplitView(columnVisibility: $store.columnVisibility) {
             sideBar
-                .navigationSplitViewColumnWidth(min: 200, ideal: 300, max: 350)
+                .navigationSplitViewColumnWidth(min: 280, ideal: 300, max: 320)
         } content: {
             contentList
-                .navigationSplitViewColumnWidth(min: 150, ideal: 300, max: 350)
+                .navigationSplitViewColumnWidth(min: 280, ideal: 300, max: 320)
         } detail: {
             detailView()
         }
@@ -49,113 +46,149 @@ public struct CarveNavigationView: View {
         }
     }
     
-    /// 성경 제목(구약/신약) 사이드바
+    /// 성경 선택 열. 탐색을 열어도 detail을 대체하지 않으므로 필사 화면은 계속 유지된다.
     private var sideBar: some View {
-        List(selection: $store.selectedTitle) {
-            DisclosureGroup(
-                isExpanded: $isShowOldTestment,
-                content: {
-                    ForEach(BibleTitle.allCases[0..<39]) { title in
-                        NavigationLink(title.koreanTitle(), value: title)
-                    }
-                }, label: {
-                    Text("구약")
-                })
-            .disclosureGroupStyle(SidebarDisclosureGroupStyle())
-            
-            DisclosureGroup(
-                isExpanded: $isShowNewTestment,
-                content: {
-                    ForEach(BibleTitle.allCases[39..<66]) { title in
-                        NavigationLink(title.koreanTitle(), value: title)
-                    }
-                }, label: {
-                    Text("신약")
-                })
-            .disclosureGroupStyle(SidebarDisclosureGroupStyle())
-        }
-        .navigationTitle("성경")
-        .toolbar {
-            ToolbarItemGroup(placement: .bottomBar) {
-                HStack {
-                    Button {
-                        send(.moveToChart)
-                    } label: {
-                        Image(systemName: "chart.bar.xaxis")
-                            .font(.system(size: 22, weight: .semibold))
-                            .foregroundStyle(CarveColor.ink)
-                    }
+        VStack(spacing: CarveSpacing.small) {
+            Text("새기다")
+                .font(CarveTypography.scripture(ResourcesFontFamily.NanumMyeongjo.regular.font(size: 22)))
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-                    Button {
-                        send(.moveToSetting)
-                    } label: {
-                        Image(asset: CarveFeatureAsset.settings)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .foregroundStyle(CarveColor.ink)
-                            .frame(width: 25, height: 25)
+            TextField("성경 · 장 검색", text: $searchText)
+                .textFieldStyle(.plain)
+                .padding(.horizontal, CarveSpacing.medium)
+                .frame(height: CarveSize.minimumHitTarget)
+                .background(CarveColor.fill, in: RoundedRectangle(cornerRadius: CarveRadius.control, style: .continuous))
+
+            Picker("성경 구분", selection: $testament) {
+                Text("구약").tag(Testament.old)
+                Text("신약").tag(Testament.new)
+            }
+            .pickerStyle(.segmented)
+
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    Text("성경")
+                        .font(CarveTypography.caption)
+                        .foregroundStyle(CarveColor.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, CarveSpacing.small)
+
+                    ForEach(filteredTitles) { title in
+                        bibleTitleButton(title)
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .trailing)
             }
         }
+        .padding(.horizontal, CarveSpacing.medium)
+        .padding(.top, CarveSpacing.large)
+        .safeAreaInset(edge: .bottom) {
+            HStack(spacing: CarveSpacing.xSmall) {
+                Spacer(minLength: 0)
+                CarveIconButton(.chart, accessibilityLabel: "필사 차트") {
+                    send(.moveToChart)
+                }
+                CarveIconButton(.settings, accessibilityLabel: "앱 설정") {
+                    send(.moveToSetting)
+                }
+            }
+            .padding(.horizontal, CarveSpacing.medium)
+            .padding(.vertical, CarveSpacing.xSmall)
+            .background(CarveColor.surface)
+        }
+        .background(CarveColor.surface)
     }
     
-    /// 성경 장 목록
+    /// 선택한 성경의 장 목록. 44pt 버튼을 5열 그리드로 두어 긴 성경도 빠르게 훑는다.
     private var contentList: some View {
-        List(1...(store.currentTitle.title.lastChapter),
-             id: \.self ,
-             selection: $store.selectedChapter) { chapter in
-            NavigationLink(chapter.description, value: chapter)
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVGrid(
+                    columns: Array(repeating: GridItem(.fixed(CarveSize.minimumHitTarget), spacing: CarveSpacing.xSmall), count: 5),
+                    spacing: CarveSpacing.xSmall
+                ) {
+                    ForEach(1...store.currentTitle.title.lastChapter, id: \.self) { chapter in
+                        chapterButton(chapter)
+                            .id(chapter)
+                    }
+                }
+                .padding(CarveSpacing.large)
+            }
+            .onAppear {
+                proxy.scrollTo(store.currentTitle.chapter, anchor: .center)
+            }
+            .onChange(of: store.currentTitle) { _, title in
+                proxy.scrollTo(title.chapter, anchor: .center)
+            }
         }
-             .navigationTitle(store.currentTitle.title.koreanTitle())
+        .navigationTitle("\(store.currentTitle.title.koreanTitle()) \(store.currentTitle.title.lastChapter)장")
+        .background(CarveColor.surface)
     }
     
     /// detail화면의 content와 sheet popup 등 네비게이션 관리.
     @ViewBuilder
     private func detailView() -> some View {
-        if store.columnVisibility != .detailOnly {
-            Color(uiColor: .secondarySystemGroupedBackground)
-                .onTapGesture {
-                    send(.closeNavigationBar)
-                }
-        } else {
-            CarveDetailView(store: store.scope(state: \.carveDetailState,
-                                               action: \.scope.carveDetailAction))
-            .fullScreenCover(
-                item: $store.scope(
-                    state: \.detailNavigation?.drewLog,
-                    action: \.view.detailNavigation.drewLog)
-            ) { store in
-                DrewLogView(store: store)
-                    .toolbar(.visible, for: .navigationBar)
-            }
+        CarveDetailView(store: store.scope(state: \.carveDetailState,
+                                           action: \.scope.carveDetailAction))
+        .fullScreenCover(
+            item: $store.scope(
+                state: \.detailNavigation?.drewLog,
+                action: \.view.detailNavigation.drewLog)
+        ) { store in
+            DrewLogView(store: store)
+                .toolbar(.visible, for: .navigationBar)
         }
+    }
+
+    private var filteredTitles: [BibleTitle] {
+        let titles = testament == .old ? Array(BibleTitle.allCases[0..<39]) : Array(BibleTitle.allCases[39..<66])
+        guard !searchText.isEmpty else { return titles }
+        return titles.filter { $0.koreanTitle().localizedCaseInsensitiveContains(searchText) }
+    }
+
+    private func bibleTitleButton(_ title: BibleTitle) -> some View {
+        let isSelected = store.currentTitle.title == title
+        return Button {
+            store.selectedTitle = title
+        } label: {
+            HStack(spacing: CarveSpacing.small) {
+                Text(title.koreanTitle())
+                    .font(CarveTypography.body)
+                Spacer(minLength: 0)
+                if isSelected {
+                    Text("\(store.currentTitle.chapter)장")
+                        .font(CarveTypography.caption)
+                        .foregroundStyle(CarveColor.accent)
+                }
+            }
+            .padding(.horizontal, CarveSpacing.small)
+            .frame(height: CarveSize.minimumHitTarget)
+            .foregroundStyle(CarveColor.ink)
+            .background(isSelected ? CarveColor.selected : .clear, in: RoundedRectangle(cornerRadius: CarveRadius.control, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(isSelected ? "\(title.koreanTitle()), 현재 \(store.currentTitle.chapter)장" : title.koreanTitle())
+    }
+
+    private func chapterButton(_ chapter: Int) -> some View {
+        let isSelected = store.currentTitle.chapter == chapter
+        return Button {
+            store.selectedChapter = chapter
+        } label: {
+            Text(chapter.description)
+                .font(CarveTypography.body)
+                .frame(width: CarveSize.minimumHitTarget, height: CarveSize.minimumHitTarget)
+                .foregroundStyle(isSelected ? CarveColor.canvas : CarveColor.ink)
+                .background(isSelected ? CarveColor.accent : CarveColor.fill, in: RoundedRectangle(cornerRadius: CarveRadius.control, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(chapter)장")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 
-/// 사이드바 DisclosureGroup에 화살표 회전 애니메이션을 적용하는 커스텀 스타일
-struct SidebarDisclosureGroupStyle: DisclosureGroupStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        HStack {
-            configuration.label
-                .bold()
-            Spacer()
-            Image(systemName: "chevron.right")
-                .rotationEffect(configuration.isExpanded ? Angle(degrees: 90) : Angle(degrees: 0))
-                .foregroundStyle(CarveColor.ink)
-                .animation(.easeInOut(duration: 0/2), value: configuration.isExpanded)
-        }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            withAnimation {
-                configuration.isExpanded.toggle()
-            }
-        }
-        if configuration.isExpanded {
-            configuration.content
-        }
-    }
+private enum Testament: Hashable {
+    case old
+    case new
 }
 
 #Preview {
