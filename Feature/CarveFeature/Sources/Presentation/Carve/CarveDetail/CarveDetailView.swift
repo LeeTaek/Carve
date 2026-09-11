@@ -44,6 +44,7 @@ public struct CarveDetailView: View {
                     HeaderView(store: store.scope(state: \.headerState,
                                                   action: \.scope.headerAction))
                 }
+                .overlay(alignment: .bottom) { paletteDock }
                 .overlay(alignment: .bottom) { layoutDebugHUD }
                 .toolbar(.hidden, for: .navigationBar)
         } else {
@@ -52,6 +53,7 @@ public struct CarveDetailView: View {
                     HeaderView(store: store.scope(state: \.headerState,
                                                   action: \.scope.headerAction))
                 }
+                .overlay(alignment: .bottom) { paletteDock }
                 .overlay(alignment: .bottom) { layoutDebugHUD }
                 .toolbar(.hidden, for: .navigationBar)
         }
@@ -154,7 +156,7 @@ public struct CarveDetailView: View {
                 }
             }
     }
-    
+
     private var detailScroll: some View {
         // 폭은 ScrollView 가 아니라 바깥 컨테이너에서 읽는다.
         // 세로 ScrollView 는 내용이 제안 폭보다 넓으면 가로로 함께 넓어지므로, 행 폭이 halfWidth 의 함수인 이상
@@ -224,6 +226,7 @@ public struct CarveDetailView: View {
             ScrollView {
                 contentView
                     .padding(.top, store.headerState.headerHeight)
+                    .padding(.bottom, paletteBottomInset)
                     .offsetY { previous, current in
                         contentMinY = current
                         updateActiveCanvases()
@@ -296,6 +299,7 @@ public struct CarveDetailView: View {
             store: store.scope(state: \.chapterCanvas, action: \.scope.chapterCanvasAction),
             display: ChapterCanvasView.Display(store.chapterCanvas),
             topInset: store.headerState.headerHeight,
+            bottomInset: paletteBottomInset,
             column: AnyView(verseColumn(isCanvasActive: { _ in false })),
             onScroll: { previous, current in
                 delay {
@@ -414,6 +418,29 @@ public struct CarveDetailView: View {
     }
 }
 
+private extension CarveDetailView {
+    /// 헤더와 분리한 하단 팔레트. 접힘 버튼은 헤더가 소유한 펼침 상태만 바꾼다.
+    var paletteDock: some View {
+        PencilPalatteDockView(
+            store: store.scope(
+                state: \.headerState.palatteSetting,
+                action: \.scope.headerAction.palatteAction
+            ),
+            isExpanded: store.headerState.isPaletteExpanded,
+            isLeftHanded: store.headerState.isLeftHanded
+        ) {
+            store.send(.scope(.headerAction(.view(.expandPalette))))
+        }
+    }
+
+    /// 하단 팔레트가 마지막 절을 가리지 않도록 스크롤 콘텐츠에 같은 여백을 준다.
+    ///
+    /// ⚠️ 펼침 · 접힘에 따라 바꾸지 않는다. 펼침 상태는 스크롤 방향으로 바뀌는데, 여백이 바뀌면 끝 근처에서
+    ///    콘텐츠 높이 · 오프셋이 다시 조정되어 반대 방향 스크롤로 보고되고, 그것이 다시 펼침 상태를 뒤집는다.
+    var paletteBottomInset: CGFloat {
+        max(HeaderFeature.expandedPaletteBottomInset, HeaderFeature.collapsedPaletteBottomInset)
+    }
+}
 
 #Preview {
     @Previewable @State var store = Store(

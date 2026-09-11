@@ -89,6 +89,21 @@ struct HeaderFeatureTesting {
         #expect(state.lastHeaderOffset == -40)
     }
 
+    @Test("본문을 읽어 내려가면 팔레트를 접고 되돌리면 다시 펼친다")
+    func headerAnimationUpdatesPaletteVisibility() async {
+        var state = HeaderFeature.State.initialState
+        state.headerHeight = 118
+        state.isPaletteExpanded = true
+
+        _ = HeaderFeature().reduce(into: &state, action: .headerAnimation(-10, -20))
+
+        #expect(!state.isPaletteExpanded)
+
+        _ = HeaderFeature().reduce(into: &state, action: .headerAnimation(-20, -10))
+
+        #expect(state.isPaletteExpanded)
+    }
+
     @Test("헤더 높이를 전달받으면 상태에 그대로 반영한다")
     func setHeaderHeightStoresMeasuredHeight() async {
         var state = HeaderFeature.State.initialState
@@ -99,15 +114,15 @@ struct HeaderFeatureTesting {
         #expect(state.headerOffset == 0)
     }
 
-    @Test("연필 설정 버튼은 팔레트 표시 상태만 토글한다")
-    func pencilConfigDidTappedTogglesPalatteVisibility() async {
+    @Test("접힌 하단 팔레트 탭은 팔레트만 펼치고 헤더 상태는 바꾸지 않는다")
+    func expandPaletteDoesNotChangeHeaderLayout() async {
         var state = HeaderFeature.State.initialState
         state.headerHeight = 72
         state.headerOffset = -24
 
-        _ = HeaderFeature().reduce(into: &state, action: .view(.pencilConfigDidTapped))
+        _ = HeaderFeature().reduce(into: &state, action: .view(.expandPalette))
 
-        #expect(state.showPalatte)
+        #expect(state.isPaletteExpanded)
         #expect(state.headerHeight == 72)
         #expect(state.headerOffset == -24)
     }

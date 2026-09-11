@@ -46,6 +46,8 @@ struct ChapterCanvasView: UIViewControllerRepresentable {
     let display: Display
     /// 헤더 높이. 콘텐츠 좌표를 건드리지 않고 `contentInset.top` 으로 비운다.
     let topInset: CGFloat
+    /// 하단 팔레트가 마지막 절을 가리지 않도록 `contentInset.bottom`에 더할 높이.
+    let bottomInset: CGFloat
     let column: AnyView
     /// 스크롤 (이전, 현재) 콘텐츠 상단 y — 헤더 애니메이션용 (SwiftUI `offsetY` 와 같은 의미).
     let onScroll: (CGFloat, CGFloat) -> Void
@@ -92,6 +94,7 @@ struct ChapterCanvasView: UIViewControllerRepresentable {
             tool: Self.tool(for: pencilConfig),
             drawingPolicy: allowFingerDrawing ? .anyInput : .pencilOnly,
             topInset: topInset,
+            bottomInset: bottomInset,
             undoRequestVersion: display.undoRequestVersion,
             redoRequestVersion: display.redoRequestVersion,
             scrollRequest: display.scrollRequest,

@@ -21,29 +21,24 @@ public struct HeaderView: View {
     }
 
     public var body: some View {
-        VStack(spacing: 0) {
-            ZStack {
-                HStack(spacing: CarveSpacing.xxSmall) {
-                    leadingControls
-                    Spacer(minLength: 0)
-                    trailingControls
-                }
-
-                titleButton
+        ZStack {
+            HStack(spacing: CarveSpacing.xxSmall) {
+                leadingControls
+                Spacer(minLength: 0)
+                trailingControls
             }
-            .padding(.horizontal, CarveSpacing.large)
-            .padding(.top, controlsTopPadding)
-            .frame(height: displayedHeaderHeight, alignment: .top)
-            .background(CarveColor.canvas)
-            .clipped()
 
-            if store.showPalatte {
-                PencilPalatteView(store: store.scope(state: \.palatteSetting,
-                                                     action: \.palatteAction))
-            }
+            titleButton
         }
-        .frame(height: store.showPalatte ? nil : HeaderFeature.expandedHeight, alignment: .top)
+        .padding(.horizontal, CarveSpacing.large)
+        .padding(.top, controlsTopPadding)
+        .frame(height: displayedHeaderHeight, alignment: .top)
         .background(CarveColor.canvas.ignoresSafeArea())
+        // ⚠️ 측정 높이는 펼친 높이로 고정한다. 그리는 높이(`displayedHeaderHeight`)는 측정값(`headerHeight`)으로
+        //    진행률을 계산하므로, 그리는 높이를 재면 측정 → 진행률 → 높이가 되먹여 118 ↔ 78 을 오간다
+        //    ("Geometry action is cycling between duplicate values"). 그 값이 본문 상단 여백이라 매번 재배치된다.
+        //    빈 아래 띠는 히트 테스트되지 않아 필기 입력을 막지 않는다.
+        .frame(height: HeaderFeature.expandedHeight, alignment: .top)
         .anchorPreference(key: HeaderBoundsKey.self, value: .bounds) { $0 }
         .overlayPreferenceValue(HeaderBoundsKey.self) { value in
             if value != nil {
@@ -103,15 +98,6 @@ public struct HeaderView: View {
             }
             CarveIconButton(.next, accessibilityLabel: "다음 장", visualScale: buttonVisualScale) {
                 send(.moveToNext)
-            }
-            // 하단 접힘 팔레트 작업 전까지 기존 팔레트 접근 경로를 유지한다.
-            CarveIconButton(
-                .pen,
-                accessibilityLabel: "도구 팔레트",
-                isSelected: store.showPalatte,
-                visualScale: buttonVisualScale
-            ) {
-                send(.pencilConfigDidTapped)
             }
             if !store.isLeftHanded {
                 sentenceSettingsButton

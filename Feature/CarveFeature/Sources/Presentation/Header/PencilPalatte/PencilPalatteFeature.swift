@@ -36,6 +36,9 @@ public struct PencilPalatteFeature {
         /// 단일 Canvas 는 자기 undoManager 상태를 같은 키에 써 두는데, 팔레트가 비어 있는 `SharedUndoManager` 값(false)으로
         /// 덮으면 undo 직후 버튼이 꺼진다. 값은 `CarveDetailFeature` 가 장 진입 때 정한다.
         public var delegatesUndoToCanvas: Bool = false
+        /// 마지막으로 고른 잉크(연필 · 펜 · 형광펜). 팔레트의 펜 칸 하나가 세 잉크를 대표하므로(시안 M2),
+        /// 지우개에서 펜 칸을 누르면 이 잉크로 돌아간다.
+        public var lastInkType: PKInkingTool.InkType = .pen
 
         @Presents var navigation: Destination.State?
                 
@@ -86,6 +89,9 @@ public struct PencilPalatteFeature {
                     state.$pencilConfig.withLock { $0.lineColor = state.palatteColors[index] }
                 }
             case .view(.setPencilType(let type)):
+                if type != .monoline {
+                    state.lastInkType = type
+                }
                 withAnimation(.easeInOut(duration: 0.1)) {
                     state.$pencilConfig.withLock { $0.pencilType = type }
                 }

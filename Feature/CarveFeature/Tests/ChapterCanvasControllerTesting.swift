@@ -117,12 +117,12 @@ struct ChapterCanvasControllerTesting {
             return controller.canvas.contentFrame.height
         }
 
-        func apply(revision: Int, data: Data? = nil, topInset: CGFloat = 0, layout: ChapterLayout? = nil,
+        func apply(revision: Int, data: Data? = nil, topInset: CGFloat = 0, bottomInset: CGFloat = 24, layout: ChapterLayout? = nil,
                    scroll: ChapterCanvasFeature.State.ScrollRequest? = nil,
                    tool: PKTool = PKInkingTool(.pen), drawingPolicy: PKCanvasViewDrawingPolicy = .anyInput) {
             controller.apply(ChapterCanvasController.Configuration(
                 renderedData: data, renderedRevision: revision, isInputEnabled: true,
-                tool: tool, drawingPolicy: drawingPolicy, topInset: topInset,
+                tool: tool, drawingPolicy: drawingPolicy, topInset: topInset, bottomInset: bottomInset,
                 undoRequestVersion: 0, redoRequestVersion: 0, scrollRequest: scroll, layout: layout
             ))
         }
@@ -782,5 +782,17 @@ extension ChapterCanvasControllerTesting {
         #expect(harness.controller.columnReleaseCount == 2)
     }
 
+}
+
+private extension ChapterCanvasControllerTesting {
+    @Test("하단 팔레트 인셋은 safe area보다 크게 적용되어 마지막 절을 위한 여백이 된다")
+    func bottomPaletteInsetExpandsContentInset() {
+        let harness = Harness()
+        let canvas = harness.controller.canvas
+
+        harness.apply(revision: 1, bottomInset: 112)
+
+        #expect(canvas.contentInset.bottom >= 112)
+    }
 }
 #endif

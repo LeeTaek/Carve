@@ -76,6 +76,7 @@ private struct CarveIconButtonStyle: ButtonStyle {
     let visualScale: CGFloat
 
     @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.colorScheme) private var colorScheme
 
     func makeBody(configuration: Configuration) -> some View {
         let scale = min(1, max(0.75, visualScale))
@@ -90,7 +91,10 @@ private struct CarveIconButtonStyle: ButtonStyle {
             )
 
         let surface = Group {
-            if isHighlighted {
+            if isHighlighted, background == .plain {
+                // 표면 안 도구의 선택(시안 M2 · J1): 라이트는 밝은 바탕, 다크는 선택 배경. 아이콘은 잉크 그대로다.
+                label.background(colorScheme == .dark ? CarveColor.selected : CarveColor.fill, in: shape)
+            } else if isHighlighted {
                 label
                 .background(CarveColor.selected, in: shape)
                 .overlay {
@@ -110,6 +114,6 @@ private struct CarveIconButtonStyle: ButtonStyle {
 
     private func iconColor(isHighlighted: Bool) -> Color {
         if !isEnabled { return CarveColor.ink.opacity(0.25) }
-        return isHighlighted ? CarveColor.accent : CarveColor.ink
+        return isHighlighted && background == .floating ? CarveColor.accent : CarveColor.ink
     }
 }

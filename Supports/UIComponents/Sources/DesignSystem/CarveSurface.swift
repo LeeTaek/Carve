@@ -74,6 +74,31 @@ private func allowsGlass(reduceTransparency: Bool, contrast: ColorSchemeContrast
     !reduceTransparency && contrast != .increased
 }
 
+/// iOS 26 이상에서 안쪽 유리 표면을 한 무리로 그린다 — 가까운 표면끼리 붙었다 떨어지며 모양이 이어진다.
+/// 그 밖에는 내용을 그대로 둔다.
+public struct CarveSurfaceGroup<Content: View>: View {
+    private let spacing: CGFloat?
+    private let content: Content
+
+    /// - Parameters:
+    ///   - spacing: 이 거리 안의 유리 표면은 서로 합쳐지며 나타나고 사라진다.
+    ///   - content: 표면들.
+    public init(spacing: CGFloat? = nil, @ViewBuilder content: () -> Content) {
+        self.spacing = spacing
+        self.content = content()
+    }
+
+    public var body: some View {
+        if #available(iOS 26.0, *) {
+            GlassEffectContainer(spacing: spacing) {
+                content
+            }
+        } else {
+            content
+        }
+    }
+}
+
 private struct CarveSurfaceModifier<S: Shape>: ViewModifier {
     let style: CarveSurfaceStyle
     let shape: S

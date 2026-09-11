@@ -39,7 +39,7 @@ final class ChapterPKCanvasView: PKCanvasView {
 ///    새 획이 시작되면 직전 획의 trailing 보고를 **취소**한다. 획 도중 `editEnded` 가 나가면 `isEditing` 이 풀려 보류된 레이아웃이
 ///    획 중간에 적용된다. 미보고 변경은 다음 도구 종료 뒤에 함께 보고한다.
 /// 3. **기하:** 텍스트 컬럼 높이 = 컬럼 자신의 높이(content 높이가 아니다), 헤더는 `contentInset.top` 으로 비운다 (콘텐츠 좌표는 헤더와 무관).
-///    하단은 safe area 만큼 inset 을 더해 마지막 절이 홈 인디케이터에 가리지 않게 한다 (§5 미결 → `.never` + inset 채택).
+///    하단은 safe area와 하단 팔레트만큼 inset 을 더해 마지막 절이 가리지 않게 한다 (§5 미결 → `.never` + inset 채택).
 /// 4. **히스토리 메뉴:** 텍스트 호스트는 터치를 받지 않으므로(`isUserInteractionEnabled = false`) 행별 컨텍스트 메뉴가 닿지 않는다.
 ///    대신 캔버스 한 곳의 손가락 롱프레스 → `UIEditMenuInteraction` 메뉴 → `historyRequested(at:)` 로 알리고,
 ///    절 판정은 Feature 가 `ChapterLayout.verse(containing:)` 로 한다 (§8-7 rev.16 부록 — (3/3)).
@@ -67,6 +67,7 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate, UIE
         var tool: PKTool
         var drawingPolicy: PKCanvasViewDrawingPolicy
         var topInset: CGFloat
+        var bottomInset: CGFloat
         var undoRequestVersion: Int
         var redoRequestVersion: Int
         var scrollRequest: ChapterCanvasFeature.State.ScrollRequest?
@@ -91,6 +92,7 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate, UIE
     private var appliedRedoVersion = 0
     private var appliedScrollToken = 0
     private var appliedTopInset: CGFloat = -1
+    private var appliedBottomInset: CGFloat = -1
     /// 컬럼이 마지막으로 보고한 자기 높이. 컨트롤러는 장 전환에도 살아남으므로 새 장의 첫 프레임에는 **이전 장의 값**이 들어 있다.
     /// 그래도 안전한 이유는 컬럼이 `ChapterCanvasView.hostedColumn` 에서 `fixedSize` 로 고정돼 제안된 높이만큼 늘어나지 않기 때문이다
     /// — 늘어나면 다시 잰 높이가 이전 값과 같아져 아래 `guard` 에 걸리는 고정점이 된다 (D9).
@@ -205,6 +207,11 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate, UIE
             if wasAtTop { canvas.setContentOffset(CGPoint(x: 0, y: -configuration.topInset), animated: false) }
         }
 
+        if configuration.bottomInset != appliedBottomInset {
+            appliedBottomInset = configuration.bottomInset
+            updateContentGeometry()
+        }
+
         if configuration.renderedRevision != appliedRevision {
             let previousRevision = appliedRevision
             appliedRevision = configuration.renderedRevision
@@ -297,7 +304,12 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate, UIE
         guard width > 0 else { return }
         let inset = max(0, appliedTopInset)
         let height = max(columnHeight, view.bounds.height - inset)
-        canvas.contentInset = UIEdgeInsets(top: inset, left: 0, bottom: view.safeAreaInsets.bottom + 24, right: 0)
+        canvas.contentInset = UIEdgeInsets(
+            top: inset,
+            left: 0,
+            bottom: view.safeAreaInsets.bottom + max(24, appliedBottomInset),
+            right: 0
+        )
         // 텍스트 호스트의 frame 은 **컬럼 자신의 높이**다. content 높이(뷰포트 이상)로 늘리면 UIHostingController 가 내용을
         // 세로 중앙에 놓아, 짧은 장에서 텍스트가 레이아웃 좌표(컬럼 상단 = content 상단)보다 아래로 내려가 잉크·소유권과 어긋난다.
         canvas.contentFrame = CGRect(x: 0, y: 0, width: width, height: columnHeight > 0 ? columnHeight : height)
@@ -421,7 +433,12 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate, UIE
 
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
         // SwiftUI 경로의 offsetY 와 같은 값: 콘텐츠 상단이 뷰포트 상단에 있으면 0, 내려가면 음수.
-        let current = -(scrollView.contentOffset.y + scrollView.contentInset.top)
+        // 양 끝의 튕김(bounce)은 유효 범위로 잘라 보고하지 않는다. 끝까지 읽어 내려간 뒤 되돌아 튕기는 움직임이
+        // "되돌리는 스크롤" 로 읽히면 헤더 · 하단 팔레트가 사용자의 스크롤과 반대로 펼쳐지고 접힌다.
+        let minOffset = -scrollView.contentInset.top
+        let maxOffset = max(minOffset, scrollView.contentSize.height + scrollView.contentInset.bottom - scrollView.bounds.height)
+        let offset = min(max(scrollView.contentOffset.y, minOffset), maxOffset)
+        let current = -(offset + scrollView.contentInset.top)
         guard current != lastReportedTop else { return }
         let previous = lastReportedTop
         lastReportedTop = current

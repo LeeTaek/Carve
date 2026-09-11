@@ -18,6 +18,10 @@ public struct HeaderFeature {
     public static let expandedHeight: CGFloat = 118
     /// 스크롤 중에도 화면 상단에 남는 축소 헤더 높이(L2 · L3).
     public static let compactHeight: CGFloat = 78
+    /// 하단 펼침 팔레트가 마지막 절을 가리지 않도록 비우는 높이.
+    public static let expandedPaletteBottomInset: CGFloat = 96
+    /// 하단 접힘 팔레트와 도구 이름이 마지막 절을 가리지 않도록 비우는 높이.
+    public static let collapsedPaletteBottomInset: CGFloat = 112
 
     @ObservableState
     public struct State {
@@ -27,7 +31,8 @@ public struct HeaderFeature {
         public var lastHeaderOffset: CGFloat
         public var direction: SwipeDirection = .none
         public var shiftOffset: CGFloat
-        public var showPalatte: Bool
+        /// 하단 도구 팔레트의 펼침 상태. 접힌 상태에도 현재 도구와 실행 취소는 남는다.
+        public var isPaletteExpanded: Bool
         public var showOnlyTitle: Bool
         public var palatteSetting: PencilPalatteFeature.State = .initialState
         /// 헤더 본문 설정 버튼에 붙는 팝오버 상태.
@@ -47,7 +52,7 @@ public struct HeaderFeature {
             headerOffset: 0,
             lastHeaderOffset: 0,
             shiftOffset: 0,
-            showPalatte: false,
+            isPaletteExpanded: false,
             showOnlyTitle: false
         )
     }
@@ -61,7 +66,8 @@ public struct HeaderFeature {
         public enum View {
             case titleDidTapped
             case setHeaderHeight(CGFloat)
-            case pencilConfigDidTapped
+            /// 하단 접힘 팔레트를 탭해 도구 목록을 펼친다.
+            case expandPalette
             case sentenceSettingsDidTapped
             case moveToNext
             case moveToBefore
@@ -94,6 +100,16 @@ public struct HeaderFeature {
                     state.headerOffset = -collapseDistance
                     state.lastHeaderOffset = -collapseDistance
                 }
+
+                // 본문을 읽어 내려갈 때는 도구를 접고, 되돌릴 때는 다시 펼친다.
+                // 맨 위를 넘어 당긴 튕김(값이 양수)은 방향 전환이 아니다 — N-Canvas(SwiftUI ScrollView) 경로용.
+                // 단일 Canvas 경로는 컨트롤러가 양 끝 튕김을 잘라서 보고한다.
+                let isOverscrolledAtTop = previous > 0 || current > 0
+                if isScrollingUp, !isOverscrolledAtTop {
+                    state.isPaletteExpanded = false
+                } else if isScrollingDown, !isOverscrolledAtTop {
+                    state.isPaletteExpanded = true
+                }
                 
                 if isScrollingUp {
                     if state.direction != .up, current < 0 {
@@ -117,10 +133,8 @@ public struct HeaderFeature {
                     state.headerOffset = (offset > 0 ? 0 : offset)
                 }
 
-            case .view(.pencilConfigDidTapped):
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    state.showPalatte.toggle()
-                }
+            case .view(.expandPalette):
+                state.isPaletteExpanded = true
 
             case .view(.sentenceSettingsDidTapped):
                 state.sentenceSettings = .initialState
