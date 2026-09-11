@@ -208,7 +208,9 @@ public struct CarveDetailFeature {
                 return .send(.scope(.chapterCanvasAction(.flushPending)))
 
             case .scope(.chapterCanvasAction(.delegate(.showHistory(let verse)))):
-                state.chapterHistory = VerseDrawingHistoryFeature.State(title: state.chapterCanvas.chapter, verse: verse)
+                var history = VerseDrawingHistoryFeature.State(title: state.chapterCanvas.chapter, verse: verse)
+                history.anchorFrame = state.chapterCanvas.historyAnchorFrame
+                state.chapterHistory = history
                 return .none
 
             case .chapterHistory(.presented(.setPresentDrawing(let drawing))):

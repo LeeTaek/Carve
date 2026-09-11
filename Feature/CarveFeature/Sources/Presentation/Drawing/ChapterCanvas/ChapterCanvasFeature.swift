@@ -163,6 +163,8 @@ public struct ChapterCanvasFeature {
         @Presents var eraseAlert: AlertState<Action.EraseAlert>?
         /// 떠 있는 절 롱탭 메뉴(시안 E1). nil 이면 닫혀 있다.
         var verseMenu: ChapterCanvasVerseMenu?
+        /// 메뉴에서 기록을 고른 절의 행(창 좌표). 기록 팝오버가 그 절 아래에 붙는다(시안 E2).
+        var historyAnchorFrame: CGRect?
 
         /// 헤더 팔레트가 읽는 undo/redo 가능 여부 — `PencilPalatteFeature` 와 같은 in-memory 키를 공유한다.
         @Shared(.inMemory("canUndo")) var canUndo: Bool = false
@@ -408,32 +410,8 @@ public struct ChapterCanvasFeature {
                 state.eraseAlert = Self.confirmEraseAlert(chapter: state.chapter, verse: verse)
                 return .none
 
-            case let .verseMenuRequested(point, anchor, verseFrame):
-                // 할 수 없는 일만 남은 절이면 메뉴를 올리지 않는다 (UI-2).
-                let availability = Self.menuAvailability(at: point, state: state)
-                guard !availability.isEmpty, let verse = Self.verse(at: point, state: state) else { return .none }
-                state.verseMenu = ChapterCanvasVerseMenu(
-                    verse: verse,
-                    contentPoint: point,
-                    anchor: anchor,
-                    verseFrame: verseFrame,
-                    availability: availability
-                )
-                return .none
-
-            case .verseMenuDismissed:
-                state.verseMenu = nil
-                return .none
-
-            case .verseMenuHistoryTapped:
-                guard let menu = state.verseMenu, menu.availability.canViewHistory else { return .none }
-                state.verseMenu = nil
-                return .send(.historyRequested(at: menu.contentPoint))
-
-            case .verseMenuEraseTapped:
-                guard let menu = state.verseMenu, menu.availability.canErase else { return .none }
-                state.verseMenu = nil
-                return .send(.eraseRequested(at: menu.contentPoint))
+            case .verseMenuRequested, .verseMenuDismissed, .verseMenuHistoryTapped, .verseMenuEraseTapped:
+                return reduceVerseMenu(state: &state, action: action)
 
             case .eraseAlert(.presented(.confirm(let verse))):
                 return beginErase(state: &state, verse: verse)

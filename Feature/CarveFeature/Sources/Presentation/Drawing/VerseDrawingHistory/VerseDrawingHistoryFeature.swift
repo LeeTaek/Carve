@@ -7,6 +7,7 @@
 //
 
 import CarveToolkit
+import CoreGraphics
 import Domain
 
 import ComposableArchitecture
@@ -22,6 +23,10 @@ public struct VerseDrawingHistoryFeature {
         public var verse: Int
         /// 해당 절에 대한 필사 기록 목록
         public var drawings: [BibleDrawing] = []
+        /// 목록을 한 번이라도 받았는지. 조회 전 빈 목록을 "기록 없음" 으로 깜빡이지 않게 한다.
+        public var hasLoaded = false
+        /// 롱탭한 절 행의 창 좌표(시안 E2 — 팝오버를 그 절 아래에 붙인다). 없으면 화면 가운데에 띄운다.
+        public var anchorFrame: CGRect?
 
         public static let initialState = State(title: .init(title: .genesis, chapter: 1),
                                                verse: 1)
@@ -69,6 +74,7 @@ public struct VerseDrawingHistoryFeature {
                 // `updatePresentDrawing` 이 DB 의 **모든 행**을 다시 읽어 `isPresent` 를 옮기므로, 목록에서 뺀 빈 행의
                 // 표시도 정상적으로 내려간다.
                 state.drawings = drawings.historyRows()
+                state.hasLoaded = true
                 return .none
                 
             case .view(.selectDrawing(let drawing)):

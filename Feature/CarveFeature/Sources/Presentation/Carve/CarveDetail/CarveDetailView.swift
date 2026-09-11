@@ -48,6 +48,7 @@ public struct CarveDetailView: View {
                 .overlay(alignment: .bottom) { paletteDock }
                 .overlay(alignment: .bottom) { layoutDebugHUD }
                 .overlay { verseMenuOverlay }
+                .overlay { historyOverlay }
                 .toolbar(.hidden, for: .navigationBar)
         } else {
             detailScroll
@@ -58,6 +59,7 @@ public struct CarveDetailView: View {
                 .overlay(alignment: .bottom) { paletteDock }
                 .overlay(alignment: .bottom) { layoutDebugHUD }
                 .overlay { verseMenuOverlay }
+                .overlay { historyOverlay }
                 .toolbar(.hidden, for: .navigationBar)
         }
     }
@@ -322,10 +324,6 @@ public struct CarveDetailView: View {
             // 레이아웃이 아직 없으면 컨트롤러가 요청을 들고 있다가 layout 이 오면 수행한다.
             store.send(.scrollToTop)
         }
-        // 절 필사 기록 — N-Canvas 는 행마다 시트를 갖지만 B 구조는 캔버스 한 곳의 롱프레스가 절을 골라 여기서 연다 (§8-7).
-        .sheet(item: $store.scope(state: \.chapterHistory, action: \.chapterHistory)) { store in
-            VerseDrawingHistoryView(store: store)
-        }
         // 지우기(보관 후 초기화) 확인창과 실패 안내 (UI-2). 같은 롱프레스 메뉴에서 온다.
         .alert($store.scope(
             state: \.chapterCanvas.eraseAlert,
@@ -460,6 +458,19 @@ private extension CarveDetailView {
                 onHistory: { store.send(.scope(.chapterCanvasAction(.verseMenuHistoryTapped))) },
                 onErase: { store.send(.scope(.chapterCanvasAction(.verseMenuEraseTapped))) },
                 onDismiss: { store.send(.scope(.chapterCanvasAction(.verseMenuDismissed))) }
+            )
+        }
+    }
+
+    /// 절 필사 기록 팝오버(시안 E2). N-Canvas 는 행마다 시트를 갖지만 단일 Canvas 는 롱탭 메뉴에서 절을 골라
+    /// 여기서 연다 (§8-7). 지금 필기를 덮지 않도록 시트가 아니라 그 절 아래에 붙는다.
+    @ViewBuilder
+    var historyOverlay: some View {
+        if let historyStore = store.scope(state: \.chapterHistory, action: \.chapterHistory.presented) {
+            VerseHistoryPopover(
+                store: historyStore,
+                isLeftHanded: store.headerState.isLeftHanded,
+                onDismiss: { store.send(.chapterHistory(.dismiss)) }
             )
         }
     }

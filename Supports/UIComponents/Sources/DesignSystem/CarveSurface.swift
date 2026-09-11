@@ -19,6 +19,9 @@ public enum CarveSurfaceStyle: Sendable {
     case panel
     /// 확인 대화상자 · 알림처럼 대비가 먼저인 표면. 항상 불투명하다.
     case solid
+    /// 필기 · 도구 위에 오래 떠 있는 목록 패널 — 이전 필사 기록(시안 E2). 뒤가 비치면 썸네일을 견주기 어려워
+    /// 항상 불투명한 `surface` 다.
+    case opaquePanel
 }
 
 /// 컨트롤이 놓인 바탕. 버튼 · 세그먼트가 이 값으로 자기 바탕색을 고른다.
@@ -121,7 +124,8 @@ private struct CarveSurfaceModifier<S: Shape>: ViewModifier {
     }
 
     private var usesGlass: Bool {
-        style != .solid && allowsGlass(reduceTransparency: reduceTransparency, contrast: contrast)
+        (style == .floatingControl || style == .panel)
+            && allowsGlass(reduceTransparency: reduceTransparency, contrast: contrast)
     }
 
     /// 확인 대화상자 · 알림은 라이트에서 종이색, 다크에서 표면색으로 떠오른다(시안 F2 · G2).

@@ -8,6 +8,8 @@
 
 import CoreGraphics
 
+import ComposableArchitecture
+
 /// 절 롱탭 메뉴가 떠 있는 상태(시안 E1).
 ///
 /// 좌표는 둘이다. `contentPoint` 는 캔버스 content 좌표로 항목을 고른 뒤 기존 `historyRequested` · `eraseRequested`
@@ -41,5 +43,43 @@ extension ChapterCanvasFeature {
             width: layout.writingWidth * 2,
             height: region.writingRect.height
         )
+    }
+}
+
+extension ChapterCanvasFeature {
+    /// 절 메뉴 액션(시안 E1). 항목은 기존 `historyRequested` · `eraseRequested` 흐름으로 넘긴다.
+    func reduceVerseMenu(state: inout State, action: Action) -> Effect<Action> {
+        switch action {
+        case let .verseMenuRequested(point, anchor, verseFrame):
+            // 할 수 없는 일만 남은 절이면 메뉴를 올리지 않는다 (UI-2).
+            let availability = Self.menuAvailability(at: point, state: state)
+            guard !availability.isEmpty, let verse = Self.verse(at: point, state: state) else { return .none }
+            state.verseMenu = ChapterCanvasVerseMenu(
+                verse: verse,
+                contentPoint: point,
+                anchor: anchor,
+                verseFrame: verseFrame,
+                availability: availability
+            )
+            return .none
+
+        case .verseMenuDismissed:
+            state.verseMenu = nil
+            return .none
+
+        case .verseMenuHistoryTapped:
+            guard let menu = state.verseMenu, menu.availability.canViewHistory else { return .none }
+            state.verseMenu = nil
+            state.historyAnchorFrame = menu.verseFrame
+            return .send(.historyRequested(at: menu.contentPoint))
+
+        case .verseMenuEraseTapped:
+            guard let menu = state.verseMenu, menu.availability.canErase else { return .none }
+            state.verseMenu = nil
+            return .send(.eraseRequested(at: menu.contentPoint))
+
+        default:
+            return .none
+        }
     }
 }
