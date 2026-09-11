@@ -49,5 +49,9 @@ public enum CarveColor {
         public static let text = ResourcesAsset.Paper.text.swiftUIColor
         /// 필기 가이드 줄.
         public static let guide = ResourcesAsset.Paper.guide.swiftUIColor
+        /// 종이 위 보조 글자 — 열 라벨(「말씀」 · 「나의 필사」). 다크에서도 종이 위라 라이트 값이다(시안 J1).
+        public static let secondary = ResourcesAsset.Paper.secondary.swiftUIColor
+        /// 종이 위 강조 — 절 번호.
+        public static let accent = ResourcesAsset.Paper.accent.swiftUIColor
     }
 }

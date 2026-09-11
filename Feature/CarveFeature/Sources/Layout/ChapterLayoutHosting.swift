@@ -24,14 +24,22 @@ import Domain
 /// | `titleSpacing` | 행 안쪽 `VStack` 기본 spacing | `SentencesWithDrawingView` |
 /// | `firstVerseTopPadding` | `topDrawingInset` (1절만 25) | `SentencesWithDrawingView` |
 enum ChapterLayoutHosting {
-    /// 절 행 사이의 `VStack` spacing.
-    static let rowSpacing: CGFloat = 8
+    /// 절 행 사이의 `VStack` spacing. 위아래 행 padding(2 + 2)과 합쳐 **절 사이 30pt** 가 된다(시안 M1 · M2:
+    /// 줄 거리 48 위에 30 을 더한 78). 줄 사이 간격은 본문 블록 위아래 여백(`textVerticalPadding`)이 따로 만든다.
+    static let rowSpacing: CGFloat = 26
     /// 각 행의 본문·캔버스 HStack 상하 padding.
     static let rowVerticalPadding: CGFloat = 2
     /// 소제목과 본문 사이 간격 (행 안쪽 `VStack` spacing).
     static let titleSpacing: CGFloat = 8
     /// 장 첫 절의 상단 여백. 캔버스 **안**에 있으므로 `VerseLayoutInput.topPadding` 으로 들어간다.
-    static let firstVerseTopPadding: CGFloat = 25
+    ///
+    /// 2.0 에서는 헤더와 첫 절 사이를 열 라벨 줄(`columnHeaderHeight`)이 맡아 0 이다.
+    static let firstVerseTopPadding: CGFloat = 0
+    /// 컬럼 맨 위 열 라벨 줄(「말씀」 · 「나의 필사 · 절을 길게 눌러 더 보기」) 높이.
+    ///
+    /// 컬럼 좌표계 **안**에 있어 모든 절을 이만큼 내리므로 `metrics.topInset` 에 더한다. 글자 크기와 무관한 고정값이라야
+    /// 빌더의 예측 위치와 실측 위치가 같다(Δ 0). 시안 M2 기준 라벨 기준선이 첫 줄 기준선보다 56pt 위에 온다.
+    static let columnHeaderHeight: CGFloat = 64
 
     /// 레이아웃 좌표계의 원점이 되는 SwiftUI 좌표 공간 이름. `VStack` 자체에 붙인다.
     ///
@@ -48,13 +56,13 @@ enum ChapterLayoutHosting {
     /// 빌더에 넘길 배치 여백. 행 padding 과 stack spacing 을 `writingRect` 사이의 gap 으로 환산한 값이다.
     ///
     /// ```
-    /// topInset      = 첫 행의 상단 padding (2)
-    /// verseSpacing  = 하단 padding (2) + stack spacing (8) + 상단 padding (2) = 12
+    /// topInset      = 열 라벨 줄 (64) + 첫 행의 상단 padding (2)
+    /// verseSpacing  = 하단 padding (2) + stack spacing (26) + 상단 padding (2) = 30
     /// bottomInset   = 마지막 행의 하단 padding (2)
     /// ```
     static var metrics: ChapterLayoutMetrics {
         ChapterLayoutMetrics(
-            topInset: rowVerticalPadding,
+            topInset: columnHeaderHeight + rowVerticalPadding,
             verseSpacing: rowVerticalPadding * 2 + rowSpacing,
             bottomInset: rowVerticalPadding
         )
@@ -75,5 +83,23 @@ enum ChapterLayoutHosting {
     static func leadingInset(titleHeight: CGFloat?) -> CGFloat {
         guard let titleHeight, titleHeight > 0 else { return 0 }
         return titleHeight + titleSpacing
+    }
+
+    /// 종이 여백(시안). 원문 · 필기 반쪽의 **바깥쪽**과 두 열 사이 **가운데**에 둔다.
+    struct PageMargins: Equatable {
+        /// 화면 가장자리 쪽 여백.
+        let outer: CGFloat
+        /// 두 열 사이(반쪽의 안쪽) 여백.
+        let gutter: CGFloat
+    }
+
+    /// 컬럼 폭에 맞는 종이 여백. 가로(시안 M2 · 1180pt)는 바깥 44 · 가운데 30, 세로(시안 M1 · 820pt)는 바깥 38 · 가운데 20.
+    ///
+    /// 여백은 원문 줄바꿈 폭과 가이드 위치만 정한다 — 필기 캔버스 폭(`writingWidth`)은 반쪽 전체 그대로다.
+    /// - Parameter contentWidth: 컬럼 폭(= 반쪽 × 2).
+    static func pageMargins(contentWidth: CGFloat) -> PageMargins {
+        contentWidth >= 1000
+            ? PageMargins(outer: 44, gutter: 30)
+            : PageMargins(outer: 38, gutter: 20)
     }
 }

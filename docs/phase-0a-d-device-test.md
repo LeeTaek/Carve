@@ -1419,7 +1419,7 @@ xcrun devicectl device process launch --device "$DEV" --terminate-existing \
 | `176/176` | 실측/기대 절 수 일치 | 모자라면 아래 `missing` 줄에 절 번호가 뜸 |
 | `Δ max` | **0.00** (초록, tol 1.00pt) | 0 이 아니면 **레이아웃보다 측정 경로를 먼저 의심** (AGENTS.md — 중첩 호스팅의 `.named` → global 대체). ⚠️ **rev.6 — 이 값은 R16 계열을 잡지 못합니다.** D9-0-d 를 함께 도십시오 |
 | `guard` | **`OPEN`** (초록) | `BLOCKED` 면 Δ 안전망이 새 획 입력을 막는 중입니다 (합성·표시·저장은 계속 돕니다). Δ 가 0 인데 `BLOCKED` 면 **오탐**입니다. `guard —` 는 N-Canvas 이거나 실측 대기 (설계 §14) |
-| `columnX` | **366.70** (오른손·세로) | 다르면 화면 크기·왼손 설정을 먼저 확인 |
+| `columnX` | **`W` 와 같음** (오른손 · iPad mini 세로 372.00). 2.0 레이아웃 전에는 행 좌우 여백 때문에 366.70 | 다르면 화면 크기·왼손 설정을 먼저 확인 |
 | `missing` 줄 | **없어야 함** (있으면 노란색) | 있으면 게이트가 열리지 않은 절 |
 | `compose` | **`SYNC`** (초록) · `leg 0` | `STALE` 이면 캔버스가 **옛 레이아웃으로 합성된 채**입니다 — 본문만 재배치되고 잉크가 남습니다. 켜진 플래그가 원인을 가릅니다 (`pend` 편집 중 보류 · `rl`/`rws` 재조회 대기 · 전부 0 이면 미전달). `leg`/`mism` 은 절 번호까지 나옵니다 |
 | `PKCanvasView` 개수 | **1** | 설계 §20-8 — `com.apple.pencilkit` 의 `isGenerationToolEnabled` 가 생성 1회당 1줄. ⚠️ **실기기에서는 `simctl spawn … log stream` 을 쓸 수 없습니다** (아래 참고) |

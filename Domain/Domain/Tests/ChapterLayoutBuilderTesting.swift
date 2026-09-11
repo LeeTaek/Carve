@@ -265,17 +265,17 @@ struct ChapterLayoutBuilderTesting {
 
     @Test("signature 는 프로세스가 바뀌어도 같은 값이다 (hashValue 회귀 방지)")
     func signatureMatchesHardcodedDigestAcrossProcesses() {
-        // 이 기대값은 다른 프로세스(shasum)에서 계산한 고정값이다.
+        // 이 기대값은 다른 프로세스(shasum)에서 계산한 고정값이다. formatVersion 2 (2.0 · 줄 간격 뜻 변경).
         // Hashable.hashValue 로 회귀하면 시드가 매 실행 달라지므로 이 테스트가 반드시 깨진다.
         let setting = makeSetting()
-        let expectedCanonical = "carve.chapterLayout/1"
+        let expectedCanonical = "carve.chapterLayout/2"
             + "|font=NanumGothic"
             + "|fontSize=20.0000"
             + "|tracking=1.0000"
             + "|lineSpace=30.0000"
             + "|writingWidth=320.0000"
             + "|direction=rightHanded"
-        let expectedSignature = "cl1-32f3d51249a609f16b697c22fa5f8d7b4bb9e77ea99f490b256cac4ff0e0281f"
+        let expectedSignature = "cl2-a2f831398e9c07b6b18dbe644e54e8c6265ac2d509c35666ea9140db37b0d028"
 
         #expect(
             ChapterLayoutSignature.canonicalString(setting: setting, writingWidth: 320, isLeftHanded: false)

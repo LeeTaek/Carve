@@ -18,6 +18,8 @@ import SwiftUI
     func makeUIView(context: Context) -> UIViewType {
         let hosting = UIHostingController(rootView: content())
         let view = hosting.view!
+        // 호스팅 뷰의 기본 배경(systemBackground)이 행마다 흰 띠로 비치지 않게 한다 — 바탕은 감싸는 쪽(종이)이 칠한다.
+        view.backgroundColor = .clear
 
         let longPress = UILongPressGestureRecognizer(target: context.coordinator,
                                                      action: #selector(Coordinator.handleLongPress(_:)))

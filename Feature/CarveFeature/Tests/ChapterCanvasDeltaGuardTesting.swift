@@ -205,8 +205,8 @@ struct ChapterCanvasDeltaGuardWiringTesting {
     }
 
     /// 실측이 예측보다 절당 0.5pt 씩 크게 렌더된 상태를 만든다 (D9 R13 의 모양).
-    /// 마지막 절의 Δ 가 한 줄(30pt)을 확실히 넘도록 절 수를 넉넉히 준다.
-    private func measureWithAccumulatingDelta(_ store: StoreOf<CarveDetailFeature>, verseCount: Int = 80) {
+    /// 마지막 절의 Δ 가 한 줄(줄 거리 `linePitch`, 기본 설정에서 약 53pt)을 확실히 넘도록 절 수를 넉넉히 준다.
+    private func measureWithAccumulatingDelta(_ store: StoreOf<CarveDetailFeature>, verseCount: Int = 150) {
         store.send(.view(.layoutHostingChanged(writingWidth: 372)))
         store.send(.setSentence(sentences(count: verseCount), []))
         var batch: [SentencesWithDrawingFeature.State.ID: VerseRowGeometry] = [:]
@@ -258,7 +258,7 @@ struct ChapterCanvasDeltaGuardWiringTesting {
             // 측정 자체는 "차단해야 할 크기" 라고 판정한다 — 즉 이 테스트는 Δ 가 작아서 통과하는 것이 아니다.
             let verdict = try #require(store.chapterLayout.layoutDeltaVerdict)
             #expect(verdict.blocksInput)
-            #expect(verdict.magnitude > 30)
+            #expect(verdict.magnitude > SentenceSetting.initialState.linePitch)
 
             // effect 를 실제로 태웠는데도 N-Canvas 경로에는 아무것도 전달되지 않았다.
             #expect(store.chapterCanvas.layoutDelta == nil)

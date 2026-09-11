@@ -33,6 +33,7 @@ public struct VerseLayoutInput: Equatable, Sendable {
     /// **R13 (D9 실기기) 의 수정이다.** 측정 파이프라인은 줄 수·밑줄 위치·소제목 높이·컬럼 폭을 전부 실측하는데
     /// 행 높이만 `lineCount × lineSpace` 로 **예측**했다. 그 예측은 뷰의
     /// `lineSpacing = lineSpace − font.lineHeight` · `lineGapPadding = (lineSpace − font.lineHeight) / 2` 조합이
+    /// (2.0 부터는 `lineSpacing = lineSpace` · 위아래 `lineSpace / 2` 로 줄 거리 `linePitch` 를 만든다)
     /// 실수 연산으로 정확히 `N × lineSpace` 가 되는 것에 의존하는데, SwiftUI 가 픽셀 그리드에 스냅하면 깨진다 —
     /// 실기기(iOS 27.0 beta)에서 절당 정확히 0.5pt(= @2x 의 1픽셀)씩 어긋나 시편 119편 176절에서 87.50pt 가 누적됐다.
     /// 빌더가 SwiftUI 의 내부 반올림을 모델링하는 구조라 **OS 판올림마다 재발**한다. 그래서 실측을 쓴다.
@@ -119,6 +120,8 @@ public struct ChapterLayoutBuilder: Sendable {
     ///   - isLeftHanded: 왼손 모드 여부. signature 구성요소(layoutDirection)다.
     ///   - verses: 절 순서대로 정렬된 측정 결과. 결과 `regions`는 이 순서를 그대로 보존한다.
     ///   - metrics: 배치 여백.
+    ///   - linePitch: 줄 거리(band 폭). 앱은 `SentenceSetting.linePitch`(글꼴 줄 높이 + 줄 간격)를 넘긴다.
+    ///     `nil` 이면 `setting.lineSpace` 를 그대로 쓴다 — 빌더가 `UIFont` 메트릭을 직접 읽지 않도록 밖에서 받는다.
     /// - Returns: 계산된 장 레이아웃.
     public func build(
         chapter: BibleChapter,
@@ -126,9 +129,10 @@ public struct ChapterLayoutBuilder: Sendable {
         setting: SentenceSetting,
         isLeftHanded: Bool,
         verses: [VerseLayoutInput],
-        metrics: ChapterLayoutMetrics = .zero
+        metrics: ChapterLayoutMetrics = .zero,
+        linePitch: CGFloat? = nil
     ) -> ChapterLayout {
-        let lineSpace = max(0, setting.lineSpace)
+        let lineSpace = max(0, linePitch ?? setting.lineSpace)
         let width = max(0, writingWidth)
 
         // ── Pass 1 ──────────────────────────────────────────────────────────

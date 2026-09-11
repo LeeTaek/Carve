@@ -10,6 +10,7 @@ import CarveToolkit
 import SwiftUI
 
 import ComposableArchitecture
+import UIComponents
 
 @ViewAction(for: CarveDetailFeature.self)
 public struct CarveDetailView: View {
@@ -195,6 +196,8 @@ public struct CarveDetailView: View {
                     updateActiveCanvases()
                 }
         }
+        // 필사 화면은 종이다 — 다크에서도 밝은 값을 유지한다(결정 8-1 안 1). 폭 · 좌표에는 영향이 없다.
+        .background(CarveColor.Paper.background.ignoresSafeArea())
     }
 
     /// 뷰포트 근처(위아래 `canvasActivationMargin` 배)의 행을 캔버스 활성 집합에 더한다. 빼지는 않는다.
@@ -382,8 +385,14 @@ public struct CarveDetailView: View {
                     } action: { [id = childStore.id] frame in
                         geometryCollector.reportRowFrame(id: id, frame: frame)
                     }
-                    .padding(.horizontal, 10)
                 }
+            }
+        }
+        // 열 라벨 줄. 컬럼 좌표계 **안**의 고정 높이라 모든 절을 같은 만큼 내린다 — `ChapterLayoutHosting.metrics.topInset`.
+        .padding(.top, ChapterLayoutHosting.columnHeaderHeight)
+        .overlay(alignment: .top) {
+            if halfWidth > 0 {
+                ChapterColumnHeader(halfWidth: halfWidth, isLeftHanded: store.headerState.isLeftHanded)
             }
         }
         // 콘텐츠 폭을 컨테이너 폭에 고정한다. `VStack` 은 내용 폭을 그대로 보고하므로(`LazyVStack` 과 다름)
@@ -439,6 +448,54 @@ private extension CarveDetailView {
     ///    콘텐츠 높이 · 오프셋이 다시 조정되어 반대 방향 스크롤로 보고되고, 그것이 다시 펼침 상태를 뒤집는다.
     var paletteBottomInset: CGFloat {
         max(HeaderFeature.expandedPaletteBottomInset, HeaderFeature.collapsedPaletteBottomInset)
+    }
+}
+
+/// 열 라벨 줄(시안 M1 · M2) — 원문 반쪽에 「말씀」, 필기 반쪽에 「나의 필사 · 절을 길게 눌러 더 보기」.
+///
+/// 컬럼 좌표계 안의 고정 높이 줄이다. 글자 크기가 커져도 높이는 `ChapterLayoutHosting.columnHeaderHeight` 로 고정한다
+/// (빌더의 예측 위치와 실측이 같아야 한다).
+private struct ChapterColumnHeader: View {
+    let halfWidth: CGFloat
+    let isLeftHanded: Bool
+
+    var body: some View {
+        let margins = ChapterLayoutHosting.pageMargins(contentWidth: halfWidth * 2)
+        let scripture = columnLabel(
+            "말씀",
+            alignment: .leading,
+            leading: isLeftHanded ? margins.gutter : margins.outer,
+            trailing: isLeftHanded ? margins.outer : margins.gutter
+        )
+        let writing = columnLabel(
+            "나의 필사 · 절을 길게 눌러 더 보기",
+            alignment: isLeftHanded ? .leading : .trailing,
+            leading: isLeftHanded ? margins.outer : margins.gutter,
+            trailing: isLeftHanded ? margins.gutter : margins.outer
+        )
+        return HStack(alignment: .lastTextBaseline, spacing: 0) {
+            if isLeftHanded {
+                writing
+                scripture
+            } else {
+                scripture
+                writing
+            }
+        }
+        .font(CarveTypography.label)
+        .foregroundStyle(CarveColor.Paper.secondary)
+        .lineLimit(1)
+        .minimumScaleFactor(0.7)
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+        .padding(.bottom, 18)
+        .frame(height: ChapterLayoutHosting.columnHeaderHeight, alignment: .bottom)
+    }
+
+    private func columnLabel(_ title: String, alignment: Alignment, leading: CGFloat, trailing: CGFloat) -> some View {
+        Text(title)
+            .padding(.leading, leading)
+            .padding(.trailing, trailing)
+            .frame(width: halfWidth, alignment: alignment)
     }
 }
 

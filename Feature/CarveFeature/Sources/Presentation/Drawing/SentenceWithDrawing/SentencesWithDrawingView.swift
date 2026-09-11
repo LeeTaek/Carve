@@ -10,6 +10,7 @@ import SwiftUI
 import CarveToolkit
 
 import ComposableArchitecture
+import UIComponents
 
 @ViewAction(for: SentencesWithDrawingFeature.self)
 public struct SentencesWithDrawingView: View, Equatable {
@@ -36,6 +37,10 @@ public struct SentencesWithDrawingView: View, Equatable {
     /// 1절의 상단 여백. 캔버스 **안**의 여백이라 레이아웃에서는 `VerseLayoutInput.topPadding` 이 된다.
     private var topDrawingInset: CGFloat {
         ChapterLayoutHosting.topPadding(forVerse: store.sentence.verse)
+    }
+    /// 종이 여백(시안 M1 · M2). 행 폭(= 컬럼 폭)으로 가로 · 세로를 가른다.
+    private var margins: ChapterLayoutHosting.PageMargins {
+        ChapterLayoutHosting.pageMargins(contentWidth: halfWidth * 2)
     }
     let onUnderlineLayoutChange: (VerseRowFeature.State.ID, Text.LayoutKey.Value) -> Void
     /// 소제목 높이 실측 → 상위(`CarveDetailFeature`)로 전달. 레이아웃의 `leadingInset` 이 된다.
@@ -74,7 +79,8 @@ public struct SentencesWithDrawingView: View, Equatable {
                         onTitleHeightChange(store.id, height)
                     }
             }
-            HStack(alignment: .top) {
+            // 원문 반쪽 | 필기 반쪽이 컬럼 폭을 정확히 나눈다. 필기 반쪽 폭이 곧 `writingWidth` 다.
+            HStack(alignment: .top, spacing: 0) {
                 if store.isLeftHanded {
                     // 왼손잡이
                     canvasView
@@ -111,7 +117,10 @@ public struct SentencesWithDrawingView: View, Equatable {
                 onUnderlineLayoutChange(store.id, layout)
             }
         )
-        .frame(width: halfWidth * 0.95, alignment: .leading)
+        // 바깥쪽은 종이 여백, 필기 열 쪽은 가운데 여백. 절 번호 칸은 `VerseTextView` 안에 있다.
+        .padding(.leading, store.isLeftHanded ? margins.gutter : margins.outer)
+        .padding(.trailing, store.isLeftHanded ? margins.outer : margins.gutter)
+        .frame(width: halfWidth, alignment: .leading)
         .padding(.top, topDrawingInset)
     }
     
@@ -140,21 +149,28 @@ public struct SentencesWithDrawingView: View, Equatable {
         Text(store.sentenceState.chapterTitle ?? "")
             .font(.system(size: 22))
             .fontWeight(.heavy)
+            .foregroundStyle(CarveColor.Paper.text)
     }
     
+    /// 필기 가이드 — 본문 줄마다 한 줄(시안 M1 · M2 실선 `Paper.guide`).
+    ///
+    /// 가이드는 **장식**이다. 캔버스(필기 가능 영역 · 저장 좌표 기준)는 반쪽 전체이고, 가이드만 시안의 필기 열
+    /// (가운데 여백 ~ 바깥 여백)에 그린다. 그래서 여백을 바꿔도 기존 필기의 크기 · 위치는 변하지 않는다.
     private var underLineView: some View {
         let underlineOffsets = store.sentenceState.underlineOffsets
-        
+
         return Canvas { context, size in
             for y in underlineOffsets {
                 var path = Path()
                 path.move(to: CGPoint(x: 0, y: y + topDrawingInset))
                 path.addLine(to: CGPoint(x: size.width, y: y + topDrawingInset))
-                context.stroke(path, with: .color(.gray), style: StrokeStyle(lineWidth: 1, dash: [5]))
+                context.stroke(path, with: .color(CarveColor.Paper.guide), lineWidth: 1)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .padding(.horizontal, 20)
+        .padding(.leading, store.isLeftHanded ? margins.outer : margins.gutter)
+        .padding(.trailing, store.isLeftHanded ? margins.gutter : margins.outer)
+        .accessibilityHidden(true)
     }
     
 }

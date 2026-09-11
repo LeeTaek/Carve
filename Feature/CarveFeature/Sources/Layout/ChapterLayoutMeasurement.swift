@@ -149,7 +149,7 @@ struct ChapterLayoutMeasurement: Equatable, Sendable {
     private(set) var canvasFramesInRow: [Int: CGRect] = [:]
     /// 필사 컬럼 폭 (= 절 캔버스 폭 = `ChapterLayout.writingWidth`).
     private(set) var writingWidth: CGFloat = 0
-    /// 마지막 계산에 쓴 `SentenceSetting.lineSpace`. 안전망의 차단 임계값(한 줄)이다.
+    /// 마지막 계산에 쓴 줄 거리(`SentenceSetting.linePitch`). 안전망의 차단 임계값(한 줄)이자 빌더의 band 폭이다.
     /// 설정값이므로 장이 바뀌어도 유지된다 (`writingWidth` 와 같은 성격).
     private(set) var lineSpace: CGFloat = 0
     /// 전 절 측정으로 완성된 레이아웃. 게이트 판정은 이 값과 `expectedVerseCount` 로 한다.
@@ -390,7 +390,8 @@ struct ChapterLayoutMeasurement: Equatable, Sendable {
         now: ContinuousClock.Instant
     ) -> ChapterLayout? {
         guard let chapter, isTextComplete, writingWidth > 0 else { return nil }
-        lineSpace = max(0, setting.lineSpace)
+        // 줄 띠 폭은 뷰가 실제로 그리는 줄 거리다(글꼴 줄 높이 + 줄 간격). 빌더 · Δ 가드가 같은 값을 쓴다.
+        lineSpace = setting.linePitch
 
         let inputs = verses.map { verse -> VerseLayoutInput in
             let text = textMeasurements[verse]
@@ -411,7 +412,8 @@ struct ChapterLayoutMeasurement: Equatable, Sendable {
             setting: setting,
             isLeftHanded: isLeftHanded,
             verses: inputs,
-            metrics: metrics
+            metrics: metrics,
+            linePitch: lineSpace
         )
         layout = built
         buildCount += 1

@@ -22,7 +22,10 @@ import Dependencies
 struct ChapterLayoutMeasurementTesting {
     private let chapter = BibleChapter(title: .genesis, chapter: 1)
     private let setting = SentenceSetting.initialState   // lineSpace 30
-    private let metrics = ChapterLayoutHosting.metrics      // topInset 2 · verseSpacing 12 · bottomInset 2
+    private let metrics = ChapterLayoutHosting.metrics
+    /// 줄 띠 폭 = 글꼴 줄 높이 + 줄 간격(`SentenceSetting.linePitch`). 실측 높이가 없을 때의 예측 · Δ 임계값이 이 값이다.
+    /// 아래 `anchors` 는 **실측으로 넣는 입력값**이라 30pt 간격 그대로 둔다.
+    private var pitch: CGFloat { setting.linePitch }
     private let clock = ContinuousClock()
 
     /// 절 `verse` 가 `lineCount` 줄일 때 Reducer 가 넘기는 anchor (topPadding 포함, 30pt 간격).
@@ -167,8 +170,8 @@ struct ChapterLayoutMeasurementTesting {
 
         #expect(measurement.buildCount == 2)
         #expect(measurement.firstBuildDuration == firstDuration)
-        #expect(second?.regions[1].writingRect.height == 90)
-        #expect(second?.totalHeight == (first?.totalHeight ?? 0) + 60)
+        #expect(second?.regions[1].writingRect.height == 3 * pitch)
+        #expect(second?.totalHeight == (first?.totalHeight ?? 0) + 2 * pitch)
         // 재계산 사이에도 게이트는 닫히지 않는다 — 절 개수가 그대로이기 때문이다.
         #expect(measurement.isReady)
     }
@@ -230,9 +233,9 @@ struct ChapterLayoutMeasurementTesting {
         let layout = rebuild(&measurement)
 
         let padding = ChapterLayoutHosting.firstVerseTopPadding
-        #expect(layout?.regions[0].writingRect.height == padding + 60)
+        #expect(layout?.regions[0].writingRect.height == padding + 2 * pitch)
         #expect(layout?.regions[0].underlineAnchors == [padding + 30, padding + 60])
-        #expect(layout?.regions[1].writingRect.height == 60)
+        #expect(layout?.regions[1].writingRect.height == 2 * pitch)
         #expect(layout?.regions[1].underlineAnchors == [30, 60])
     }
 
@@ -244,8 +247,8 @@ struct ChapterLayoutMeasurementTesting {
         measurement.recordText(verse: 2, underlineAnchors: anchors(verse: 2, lineCount: 1))
         let layout = rebuild(&measurement)
 
-        // 1줄 텍스트 + 초과 band 3개 = 4 × 30.
-        #expect(layout?.regions[1].writingRect.height == 120)
+        // 1줄 텍스트 + 초과 band 3개 = 4 × 줄 거리.
+        #expect(layout?.regions[1].writingRect.height == 4 * pitch)
         #expect(layout?.regions[1].underlineAnchors == [30])
     }
 
@@ -337,7 +340,7 @@ struct ChapterLayoutMeasurementTesting {
         #expect(small.magnitude == 0.5)
         #expect(!small.exceedsTolerance)
         #expect(!small.blocksInput)
-        #expect(small.lineSpace == 30)
+        #expect(small.lineSpace == pitch)
 
         // 12pt — 허용치는 넘지만 한 줄(30pt)보다 작다. 로그는 남기되 막지 않는다.
         measurement.recordFrame(verse: 2, frame: CGRect(
@@ -384,10 +387,10 @@ struct ChapterLayoutMeasurementTesting {
 
         #expect(measurement.hasReflowSlack)
         // 행은 여유만큼 커지지 않으므로 Δ 가 의도적으로 크다.
-        measurement.recordFrame(verse: 2, frame: CGRect(x: 380, y: region.writingRect.minY, width: 300, height: 30))
+        measurement.recordFrame(verse: 2, frame: CGRect(x: 380, y: region.writingRect.minY, width: 300, height: pitch))
         let verdict = try #require(measurement.layoutDeltaVerdict)
 
-        #expect(verdict.magnitude == 90)
+        #expect(verdict.magnitude == 3 * pitch)
         #expect(verdict.exceedsTolerance)
         // 의도한 여유와 예측 결함을 구별할 수 없다 — 막지 않는다.
         #expect(!verdict.blocksInput)
@@ -647,7 +650,7 @@ struct CarveDetailLayoutMeasurementTesting {
         #expect(state.isLayoutReady)
         #expect(state.chapterLayout.buildCount == 1)
         let padding = ChapterLayoutHosting.firstVerseTopPadding
-        #expect(state.chapterLayout.layout?.regions[0].writingRect.height == padding + 60)   // 예측
+        #expect(state.chapterLayout.layout?.regions[0].writingRect.height == padding + 2 * SentenceSetting.initialState.linePitch)   // 예측
         #expect(state.chapterLayout.canvasFramesInRow.isEmpty)
 
         // 실측 높이가 뒤늦게 도착 — 예측 → 실측으로 한 번 더 지어지고, 그 사이 게이트는 닫히지 않는다.
@@ -679,7 +682,7 @@ struct CarveDetailLayoutMeasurementTesting {
             rowID(2, chapter: next): VerseRowGeometry(underlineOffsets: [30])
         ])
         let padding = ChapterLayoutHosting.firstVerseTopPadding
-        #expect(state.chapterLayout.layout?.regions[0].writingRect.height == padding + 30)
+        #expect(state.chapterLayout.layout?.regions[0].writingRect.height == padding + SentenceSetting.initialState.linePitch)
         let buildCount = state.chapterLayout.buildCount
 
         // 이전 장 행 id 로 늦게 도착한 실측 높이 — id 조회에 실패해 버려진다.
@@ -687,7 +690,7 @@ struct CarveDetailLayoutMeasurementTesting {
 
         #expect(state.chapterLayout.canvasFramesInRow.isEmpty)
         #expect(state.chapterLayout.buildCount == buildCount)
-        #expect(state.chapterLayout.layout?.regions[0].writingRect.height == padding + 30)
+        #expect(state.chapterLayout.layout?.regions[0].writingRect.height == padding + SentenceSetting.initialState.linePitch)
     }
 
     @Test("폭이 나중에 도착해도 이미 모인 실측으로 곧바로 레이아웃이 완성된다 (§6-4 도착 순서 무관)")

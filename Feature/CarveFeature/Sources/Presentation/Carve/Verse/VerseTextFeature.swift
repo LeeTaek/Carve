@@ -86,6 +86,9 @@ public struct VerseTextFeature {
         let uiFont = sentenceSetting.fontFamily.font(size: fontSize)
         let descender = uiFont.descender.magnitude
         
-        return layoutLines.map { $0.origin.y + descender }
+        // 텍스트 레이아웃 좌표는 `Text` 자신의 것이라, 블록 위 여백(`textVerticalPadding`)을 더해 행 좌표로 옮긴다.
+        // 이 값이 밑줄(가이드)과 레이아웃 anchor 가 되므로, 빼면 가이드가 본문 줄보다 여백만큼 위에 그려진다.
+        let topPadding = sentenceSetting.textVerticalPadding
+        return layoutLines.map { $0.origin.y + descender + topPadding }
     }
 }

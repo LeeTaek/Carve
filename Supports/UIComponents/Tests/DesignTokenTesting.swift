@@ -39,7 +39,9 @@ struct DesignTokenTesting {
     static let paperCases: [ColorCase] = [
         ColorCase(name: "Paper.background", color: CarveColor.Paper.background, light: "#FAF9F6", dark: "#FAF9F6"),
         ColorCase(name: "Paper.text", color: CarveColor.Paper.text, light: "#303B36", dark: "#303B36"),
-        ColorCase(name: "Paper.guide", color: CarveColor.Paper.guide, light: "#DFE2DB", dark: "#DFE2DB")
+        ColorCase(name: "Paper.guide", color: CarveColor.Paper.guide, light: "#DFE2DB", dark: "#DFE2DB"),
+        ColorCase(name: "Paper.secondary", color: CarveColor.Paper.secondary, light: "#5F6862", dark: "#5F6862"),
+        ColorCase(name: "Paper.accent", color: CarveColor.Paper.accent, light: "#476550", dark: "#476550")
     ]
 
     @Test("UI 색 토큰은 리소스 번들에서 시안의 라이트 · 다크 값으로 풀린다", arguments: themeCases)

@@ -55,6 +55,21 @@ public struct SentenceSetting: Sendable, Codable, Equatable, Hashable {
     }
 }
 
+public extension SentenceSetting {
+    /// 줄 거리(pitch) — 한 줄의 글꼴 높이 + 줄 간격. 본문 줄 · 필기 가이드 · 줄 띠(band)가 모두 이 값으로 떨어진다.
+    ///
+    /// 2.0 에서 `lineSpace` 의 뜻을 "줄 거리" 에서 "줄 사이 빈 공간" 으로 바꿨다(디자인 문서 3-2 · 시안 M1 · M2 · 큰 글꼴).
+    /// 저장값은 그대로이고, 저장된 필기는 저장 당시 밑줄을 기준으로 새 밑줄에 재배치된다(단일 Canvas 설계 §9-2).
+    var linePitch: CGFloat {
+        fontFamily.font(size: fontSize).lineHeight + max(0, lineSpace)
+    }
+
+    /// 본문 블록의 위아래 여백 — 줄 간격의 절반. 첫 줄 위와 마지막 줄 아래에도 줄 사이와 같은 간격이 생긴다.
+    var textVerticalPadding: CGFloat {
+        max(0, lineSpace) / 2
+    }
+}
+
 /// 문장 설정에서 사용할 수 있는 폰트.
 /// 실제 폰트 리소스(ResourcesFontFamily)를 매핑하여 UIKit 폰트로 변환.
 public enum FontCase: String, CaseIterable, Sendable, Codable {

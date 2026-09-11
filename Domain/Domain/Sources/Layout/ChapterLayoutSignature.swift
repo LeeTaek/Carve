@@ -19,7 +19,10 @@ import Foundation
 public enum ChapterLayoutSignature {
     /// signature 인코딩 형식 자체의 버전.
     /// 구성요소나 인코딩 규칙이 바뀌면 올린다. 값이 바뀌면 기존 metadata와 의도적으로 불일치가 난다.
-    public static let formatVersion = 1
+    ///
+    /// - 2: `lineSpace` 의 뜻이 "줄 거리" 에서 "줄 사이 빈 공간" 으로 바뀌었다(`SentenceSetting.linePitch`).
+    ///   같은 `lineSpace=30` 이라도 다른 레이아웃이므로 버전으로 구분한다.
+    public static let formatVersion = 2
 
     /// signature의 원본이 되는 canonical 문자열.
     ///
