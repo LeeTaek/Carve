@@ -11,6 +11,7 @@ import SwiftUI
 import Resources
 
 import ComposableArchitecture
+import UIComponents
 
 /// Carve 디테일 화면의 네비게이션 담당
 @ViewAction(for: CarveNavigationFeature.self)
@@ -82,7 +83,7 @@ public struct CarveNavigationView: View {
                     } label: {
                         Image(systemName: "chart.bar.xaxis")
                             .font(.system(size: 22, weight: .semibold))
-                            .foregroundStyle(.black)
+                            .foregroundStyle(CarveColor.ink)
                     }
 
                     Button {
@@ -91,7 +92,7 @@ public struct CarveNavigationView: View {
                         Image(asset: CarveFeatureAsset.settings)
                             .resizable()
                             .aspectRatio(contentMode: .fit)
-                            .foregroundStyle(.black)
+                            .foregroundStyle(CarveColor.ink)
                             .frame(width: 25, height: 25)
                     }
                 }
@@ -142,7 +143,7 @@ struct SidebarDisclosureGroupStyle: DisclosureGroupStyle {
             Spacer()
             Image(systemName: "chevron.right")
                 .rotationEffect(configuration.isExpanded ? Angle(degrees: 90) : Angle(degrees: 0))
-                .foregroundStyle(.black)
+                .foregroundStyle(CarveColor.ink)
                 .animation(.easeInOut(duration: 0/2), value: configuration.isExpanded)
         }
         .contentShape(Rectangle())

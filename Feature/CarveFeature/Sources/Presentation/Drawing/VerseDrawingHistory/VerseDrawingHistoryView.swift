@@ -12,6 +12,7 @@ import SwiftUI
 import PencilKit
 
 import ComposableArchitecture
+import UIComponents
 
 @ViewAction(for: VerseDrawingHistoryFeature.self)
 public struct VerseDrawingHistoryView: View {
@@ -29,7 +30,7 @@ public struct VerseDrawingHistoryView: View {
         VStack(alignment: .leading) {
             Text("\(store.title.title.koreanTitle()) \(store.title.chapter)장 \(store.verse)절 필사 기록")
                 .font(Font(ResourcesFontFamily.NanumGothic.bold.font(size: 25)))
-                .foregroundStyle(.black.opacity(0.7))
+                .foregroundStyle(CarveColor.ink)
                 .padding()
             
             if store.drawings.isEmpty {
@@ -37,7 +38,7 @@ public struct VerseDrawingHistoryView: View {
                     Spacer()
                     Text("필사 내역이 없습니다.")
                         .font(Font(ResourcesFontFamily.NanumGothic.bold.font(size: 20)))
-                        .foregroundStyle(.black.opacity(0.7))
+                        .foregroundStyle(CarveColor.secondary)
                     Spacer()
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -80,6 +81,8 @@ public struct VerseDrawingHistoryView: View {
                 DrawingPreview(drawing: pkDrawing)
                     .frame(width: width, height: height)
                     .padding()
+                    // 필기는 종이 위에 보여 준다 — 다크 목록 행 위에 검정 잉크가 묻히지 않게(결정 8-1 안 1).
+                    .background(CarveColor.Paper.background, in: RoundedRectangle(cornerRadius: CarveRadius.control))
             }
         } else {
             Text("불러올 수 없는 필사 데이터입니다.")

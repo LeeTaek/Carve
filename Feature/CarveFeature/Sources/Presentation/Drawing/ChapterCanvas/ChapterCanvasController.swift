@@ -40,10 +40,10 @@ final class ChapterPKCanvasView: PKCanvasView {
 ///    획 중간에 적용된다. 미보고 변경은 다음 도구 종료 뒤에 함께 보고한다.
 /// 3. **기하:** 텍스트 컬럼 높이 = 컬럼 자신의 높이(content 높이가 아니다), 헤더는 `contentInset.top` 으로 비운다 (콘텐츠 좌표는 헤더와 무관).
 ///    하단은 safe area와 하단 팔레트만큼 inset 을 더해 마지막 절이 가리지 않게 한다 (§5 미결 → `.never` + inset 채택).
-/// 4. **히스토리 메뉴:** 텍스트 호스트는 터치를 받지 않으므로(`isUserInteractionEnabled = false`) 행별 컨텍스트 메뉴가 닿지 않는다.
-///    대신 캔버스 한 곳의 손가락 롱프레스 → `UIEditMenuInteraction` 메뉴 → `historyRequested(at:)` 로 알리고,
+/// 4. **절 메뉴:** 텍스트 호스트는 터치를 받지 않으므로(`isUserInteractionEnabled = false`) 행별 컨텍스트 메뉴가 닿지 않는다.
+///    대신 캔버스 한 곳의 손가락 롱프레스 → `menuRequested` 로 알리고, 메뉴는 SwiftUI 오버레이가 그린다(시안 E1).
 ///    절 판정은 Feature 가 `ChapterLayout.verse(containing:)` 로 한다 (§8-7 rev.16 부록 — (3/3)).
-final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate, UIEditMenuInteractionDelegate {
+final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
 
     /// 컨트롤러가 밖으로 알리는 사건. Coordinator 가 Feature 액션으로 옮긴다.
     enum Event {
@@ -53,10 +53,8 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate, UIE
         case undoStateChanged(canUndo: Bool, canRedo: Bool)
         /// SwiftUI `offsetY` 와 같은 의미의 (이전, 현재) 콘텐츠 상단 y. 맨 위에서 0, 내려가면 음수.
         case scrolled(previous: CGFloat, current: CGFloat)
-        /// 롱프레스 메뉴에서 "이전 필사 내용 보기" 를 골랐다. 좌표는 캔버스 content 좌표.
-        case historyRequested(at: CGPoint)
-        /// 롱프레스 메뉴에서 "지우기" 를 골랐다 (UI-2). 좌표는 캔버스 content 좌표.
-        case eraseRequested(at: CGPoint)
+        /// 손가락 롱프레스로 절 메뉴를 요청했다(시안 E1). `point` 는 content 좌표, `anchor` · `verseFrame` 은 창 좌표다.
+        case menuRequested(at: CGPoint, anchor: CGPoint, verseFrame: CGRect)
     }
 
     /// 뷰가 매 업데이트마다 넘기는 표시 상태.
@@ -106,8 +104,6 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate, UIE
     private var cancelCheckTask: Task<Void, Never>?
     private var lastReportedTop: CGFloat = 0
     private var lastBounds: CGRect = .zero
-    /// 롱프레스 메뉴. 메뉴 항목이 눌리면 `historyMenuPoint` 를 실어 보낸다.
-    private var historyMenuInteraction: UIEditMenuInteraction?
     #if DEBUG
     /// 장 전환에서 이전 컬럼을 놓은 횟수 (R26 회귀 고정용). 메모리 해제 자체는 단위 테스트로 볼 수 없으므로
     /// **결정**을 고정한다 — `freshDisplayRebuildCount` 와 같은 관용구다.
@@ -116,11 +112,11 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate, UIE
     /// 지금 호스트에 들어 있는 컬럼의 장 (R26 — 장이 바뀔 때만 이전 컬럼을 놓는다).
     private var hostedChapter: BibleChapter?
     private let historyLongPress = UILongPressGestureRecognizer()
-    private var historyMenuPoint: CGPoint?
     /// 롱프레스 지점에서 **띄울 수 있는 메뉴 항목**을 Feature 에 묻는다 (UI-2).
     /// 컨트롤러는 절을 모른다 — 절 판정과 회차·획 유무는 `ChapterCanvasFeature.menuAvailability(at:state:)` 가 한다.
-    /// 편집 메뉴 구성은 동기 콜백이라 이 조회도 동기다.
     var menuAvailability: ((CGPoint) -> ChapterCanvasMenuAvailability)?
+    /// 롱프레스 지점 절의 행 사각형(content 좌표)을 Feature 에 묻는다 — `ChapterCanvasFeature.verseRowRect(at:state:)`.
+    var menuTargetRect: ((CGPoint) -> CGRect?)?
     #if DEBUG
     /// 표시용 획 재구성이 실제로 돈 횟수. **`renderedRevision` 교체에서만** 늘어야 한다 — 테스트의 관측점이다.
     /// Release 에는 없다 (계수기 하나뿐이며 delegate 도 폴링도 만들지 않는다).
@@ -134,6 +130,9 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate, UIE
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        // 필사 영역은 다크에서도 라이트로 고정한다(결정 8-1 안 1). PencilKit 은 외관에 따라 잉크 색을 바꿔 그리므로
+        // 캔버스와 그 안의 본문 컬럼까지 라이트 외관으로 둔다 — 저장된 색 그대로 보여야 한다.
+        overrideUserInterfaceStyle = .light
         view.backgroundColor = .clear
 
         canvas.frame = view.bounds
@@ -162,10 +161,7 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate, UIE
         host.didMove(toParent: self)
         canvas.contentHostView = host.view
 
-        // 히스토리 메뉴 — 손가락 롱프레스만 받는다. 펜슬은 필기용이라 제외 (N-Canvas 의 `touchIgnoringContextMenu(ignoringType: .pencil)` 과 같은 규칙).
-        let interaction = UIEditMenuInteraction(delegate: self)
-        canvas.addInteraction(interaction)
-        historyMenuInteraction = interaction
+        // 절 메뉴 — 손가락 롱프레스만 받는다. 펜슬은 필기용이라 제외 (N-Canvas 의 `touchIgnoringContextMenu(ignoringType: .pencil)` 과 같은 규칙).
         historyLongPress.allowedTouchTypes = [NSNumber(value: UITouch.TouchType.direct.rawValue)]
         historyLongPress.addTarget(self, action: #selector(handleHistoryLongPress(_:)))
         canvas.addGestureRecognizer(historyLongPress)
@@ -555,49 +551,23 @@ extension ChapterCanvasController {
 
 extension ChapterCanvasController {
     @objc private func handleHistoryLongPress(_ recognizer: UILongPressGestureRecognizer) {
-        guard recognizer.state == .began, let interaction = historyMenuInteraction else { return }
-        // 스크롤 뷰의 좌표 = content 좌표. 메뉴도 같은 좌표계로 띄운다.
+        guard recognizer.state == .began else { return }
+        // 스크롤 뷰의 좌표 = content 좌표.
         let point = recognizer.location(in: canvas)
-        // 아직 아무것도 쓰지 않은 절이면 띄울 항목이 없다 — 빈 메뉴 거품을 보이지 않고 조용히 넘어간다 (UI-2).
+        // 아직 아무것도 쓰지 않은 절이면 띄울 항목이 없다 — 빈 메뉴를 보이지 않고 조용히 넘어간다 (UI-2).
         if menuAvailability?(point).isEmpty == true { return }
-        historyMenuPoint = point
-        interaction.presentEditMenu(with: UIEditMenuConfiguration(identifier: nil, sourcePoint: point))
-    }
-
-    func editMenuInteraction(
-        _ interaction: UIEditMenuInteraction,
-        menuFor configuration: UIEditMenuConfiguration,
-        suggestedActions: [UIMenuElement]
-    ) -> UIMenu? {
-        // 구현이 끝난 항목만 둔다 — "이미지 저장" · "위젯에 표시" 는 아직 없으므로 넣지 않는다 (로드맵 UI-2 규칙).
-        // "지우기" 는 삭제가 아니라 **보관 후 초기화**다. 파괴적 스타일을 주지 않는 이유가 그것이다 —
-        // 확인창에서 "현재 필사는 이전 필사 기록에 남습니다" 를 알린다 (`ChapterCanvasFeature` 지우기 확장 주석).
-        //
-        // 할 수 없는 일은 아예 띄우지 않는다 (UI-2). 지난 회차가 없으면 "이전 필사 내용 보기" 를,
-        // 획이 없으면 "지우기" 를 뺀다. 둘 다 없으면 `nil` 을 돌려 메뉴를 올리지 않는다.
-        guard let point = historyMenuPoint else { return nil }
-        let availability = menuAvailability?(point) ?? ChapterCanvasMenuAvailability(canViewHistory: true, canErase: true)
-        guard !availability.isEmpty else { return nil }
-
-        var children: [UIMenuElement] = []
-        if availability.canViewHistory {
-            children.append(UIAction(title: "이전 필사 내용 보기") { [weak self] _ in
-                guard let self, let point = self.historyMenuPoint else { return }
-                self.onEvent?(.historyRequested(at: point))
-            })
-        }
-        if availability.canErase {
-            children.append(UIAction(title: "지우기") { [weak self] _ in
-                guard let self, let point = self.historyMenuPoint else { return }
-                self.onEvent?(.eraseRequested(at: point))
-            })
-        }
-        return UIMenu(children: children)
+        guard let rowRect = menuTargetRect?(point) else { return }
+        // 오버레이는 스크롤과 무관한 창 좌표로 그린다. 스크롤 위치를 아는 것은 여기뿐이라 변환도 여기서 한다.
+        onEvent?(.menuRequested(
+            at: point,
+            anchor: canvas.convert(point, to: nil),
+            verseFrame: canvas.convert(rowRect, to: nil)
+        ))
     }
 
     /// PencilKit 이 **내부 타일 뷰에 붙인 편집 메뉴**를 걷어낸다 (R25).
     ///
-    /// 롱프레스하면 우리 메뉴(`historyMenuInteraction`)가 먼저 뜨는데, 잠시 뒤 PencilKit 의 메뉴가 그 자리를
+    /// 롱프레스하면 우리 메뉴가 먼저 뜨는데, 잠시 뒤 PencilKit 의 메뉴가 그 자리를
     /// **교체**한다. 사용자는 우리 항목을 누르는 줄 알고 "전체 선택" 을 누르게 되고, 그대로 획이 선택·이동되어
     /// **필기 데이터가 바뀐다** (런북 A1 사고의 원인 — §8-7 R25).
     ///
@@ -605,13 +575,13 @@ extension ChapterCanvasController {
     ///
     /// | 뷰 | 편집 메뉴 |
     /// |---|---|
-    /// | `canvas` 자신 | 우리가 붙인 `UIEditMenuInteraction` |
+    /// | `canvas` 자신 | 우리가 붙인 `UIEditMenuInteraction` (2.0 부터는 손가락 롱프레스 인식기 — 메뉴는 SwiftUI 오버레이) |
     /// | `canvas` 의 하위 타일 뷰 | PencilKit 의 `UIEditMenuInteraction` + 브리지된 컨텍스트 메뉴 |
     ///
     /// PencilKit 의 것이 **더 위 뷰**에 있어 우리 것을 덮는다. 이 앱은 올가미 선택·붙여넣기·공간 삽입을
     /// 제공하지 않으므로(도구 팔레트에 해당 항목이 없다) 그 표면 자체를 닫는다.
     ///
-    /// - Important: `canvas` **자신의** 상호작용은 건드리지 않는다 — 우리 메뉴가 거기 있다.
+    /// - Important: `canvas` **자신의** 상호작용은 건드리지 않는다 — 우리 메뉴 진입점이 거기 있다.
     ///              하위 뷰는 PencilKit 이 레이아웃 중 다시 만들 수 있으므로 `viewDidLayoutSubviews` 에서도 부른다.
     ///              내부 클래스 이름에 기대지 않고 상호작용의 **종류**로만 판정한다.
     private func suppressPencilKitEditMenus() {

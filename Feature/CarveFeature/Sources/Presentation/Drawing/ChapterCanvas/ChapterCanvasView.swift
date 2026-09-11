@@ -61,6 +61,9 @@ struct ChapterCanvasView: UIViewControllerRepresentable {
             coordinator.handle(event)
         }
         // 메뉴 항목 가용성은 절 판정이 필요하므로 Feature 가 답한다 (UI-2). 동기 조회다.
+        controller.menuTargetRect = { [coordinator = context.coordinator] point in
+            ChapterCanvasFeature.verseRowRect(at: point, state: coordinator.store.state)
+        }
         controller.menuAvailability = { [coordinator = context.coordinator] point in
             ChapterCanvasFeature.menuAvailability(at: point, state: coordinator.store.state)
         }
@@ -161,10 +164,8 @@ struct ChapterCanvasView: UIViewControllerRepresentable {
                 store.send(.undoStateChanged(canUndo: canUndo, canRedo: canRedo))
             case .scrolled(let previous, let current):
                 onScroll(previous, current)
-            case .historyRequested(let point):
-                store.send(.historyRequested(at: point))
-            case .eraseRequested(let point):
-                store.send(.eraseRequested(at: point))
+            case let .menuRequested(point, anchor, verseFrame):
+                store.send(.verseMenuRequested(at: point, anchor: anchor, verseFrame: verseFrame))
             }
         }
     }

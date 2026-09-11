@@ -161,6 +161,8 @@ public struct ChapterCanvasFeature {
         var eraseTask: VerseEraseTask?
         /// 지우기 확인창(권·장·절 포함)과 실패 안내를 함께 쓰는 알림.
         @Presents var eraseAlert: AlertState<Action.EraseAlert>?
+        /// 떠 있는 절 롱탭 메뉴(시안 E1). nil 이면 닫혀 있다.
+        var verseMenu: ChapterCanvasVerseMenu?
 
         /// 헤더 팔레트가 읽는 undo/redo 가능 여부 — `PencilPalatteFeature` 와 같은 in-memory 키를 공유한다.
         @Shared(.inMemory("canUndo")) var canUndo: Bool = false
@@ -256,6 +258,14 @@ public struct ChapterCanvasFeature {
         case historyRequested(at: CGPoint)
         /// 롱프레스 메뉴의 "지우기" — 그 자리(content 좌표)의 절을 보관 후 초기화한다 (UI-2). 먼저 확인창을 띄운다.
         case eraseRequested(at: CGPoint)
+        /// 손가락 롱프레스 — 그 절의 메뉴를 연다(시안 E1). `anchor` · `verseFrame` 은 창 좌표다.
+        case verseMenuRequested(at: CGPoint, anchor: CGPoint, verseFrame: CGRect)
+        /// 절 메뉴를 닫는다 — 가림막을 누르거나 항목을 골랐다.
+        case verseMenuDismissed
+        /// 절 메뉴의 「이전 필사 내용 보기」.
+        case verseMenuHistoryTapped
+        /// 절 메뉴의 「지우기」.
+        case verseMenuEraseTapped
         case eraseAlert(PresentationAction<EraseAlert>)
         /// 보관+초기화 트랜잭션의 결과. 성공하면 `outcome`, 실패하면 `failure` 가 온다.
         case eraseFinished(outcome: VerseDrawingArchiveOutcome?, failure: DrawingRepositoryError?)
@@ -398,6 +408,33 @@ public struct ChapterCanvasFeature {
                 state.eraseAlert = Self.confirmEraseAlert(chapter: state.chapter, verse: verse)
                 return .none
 
+            case let .verseMenuRequested(point, anchor, verseFrame):
+                // 할 수 없는 일만 남은 절이면 메뉴를 올리지 않는다 (UI-2).
+                let availability = Self.menuAvailability(at: point, state: state)
+                guard !availability.isEmpty, let verse = Self.verse(at: point, state: state) else { return .none }
+                state.verseMenu = ChapterCanvasVerseMenu(
+                    verse: verse,
+                    contentPoint: point,
+                    anchor: anchor,
+                    verseFrame: verseFrame,
+                    availability: availability
+                )
+                return .none
+
+            case .verseMenuDismissed:
+                state.verseMenu = nil
+                return .none
+
+            case .verseMenuHistoryTapped:
+                guard let menu = state.verseMenu, menu.availability.canViewHistory else { return .none }
+                state.verseMenu = nil
+                return .send(.historyRequested(at: menu.contentPoint))
+
+            case .verseMenuEraseTapped:
+                guard let menu = state.verseMenu, menu.availability.canErase else { return .none }
+                state.verseMenu = nil
+                return .send(.eraseRequested(at: menu.contentPoint))
+
             case .eraseAlert(.presented(.confirm(let verse))):
                 return beginErase(state: &state, verse: verse)
 
@@ -456,6 +493,8 @@ extension ChapterCanvasFeature {
         // 세대를 올려 뷰가 빈 캔버스를 즉시 표시하게 한다 — 이전 장 잉크가 새 장 본문 위에 남지 않게.
         state.renderedRevision += 1
         state.renderedLayout = nil
+        // 이전 장의 절 메뉴는 좌표가 맞지 않으므로 닫는다.
+        state.verseMenu = nil
         state.ownership = nil
         state.activeRowIDs = [:]
         state.layoutMismatchVerses = []

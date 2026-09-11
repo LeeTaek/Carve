@@ -61,12 +61,18 @@ struct ChapterCanvasMenuSuppressionTesting {
         #expect(!subview.interactions.contains { $0 is UIEditMenuInteraction })
     }
 
-    @Test("우리 메뉴는 캔버스 자신에 그대로 남는다")
-    func ownEditMenuSurvivesOnCanvas() {
+    /// 2.0 부터 절 메뉴는 SwiftUI 오버레이다(시안 E1). 캔버스 자신에 남는 것은 **손가락 롱프레스 진입점**이다.
+    private func fingerLongPresses(on controller: ChapterCanvasController) -> [UILongPressGestureRecognizer] {
+        (controller.canvas.gestureRecognizers ?? [])
+            .compactMap { $0 as? UILongPressGestureRecognizer }
+            .filter { $0.allowedTouchTypes == [NSNumber(value: UITouch.TouchType.direct.rawValue)] }
+    }
+
+    @Test("우리 메뉴 진입점(손가락 롱프레스)은 캔버스 자신에 그대로 남는다")
+    func ownMenuEntrySurvivesOnCanvas() {
         let controller = makeController()
 
-        let ownMenus = controller.canvas.interactions.filter { $0 is UIEditMenuInteraction }
-        #expect(ownMenus.count == 1)
+        #expect(fingerLongPresses(on: controller).count == 1)
     }
 
     @Test("레이아웃이 다시 돌아도 하위 뷰에 메뉴가 되살아나지 않는다")
@@ -83,6 +89,6 @@ struct ChapterCanvasMenuSuppressionTesting {
                 #expect(!(interaction is UIContextMenuInteraction))
             }
         }
-        #expect(controller.canvas.interactions.filter { $0 is UIEditMenuInteraction }.count == 1)
+        #expect(fingerLongPresses(on: controller).count == 1)
     }
 }

@@ -47,6 +47,7 @@ public struct CarveDetailView: View {
                 }
                 .overlay(alignment: .bottom) { paletteDock }
                 .overlay(alignment: .bottom) { layoutDebugHUD }
+                .overlay { verseMenuOverlay }
                 .toolbar(.hidden, for: .navigationBar)
         } else {
             detailScroll
@@ -56,6 +57,7 @@ public struct CarveDetailView: View {
                 }
                 .overlay(alignment: .bottom) { paletteDock }
                 .overlay(alignment: .bottom) { layoutDebugHUD }
+                .overlay { verseMenuOverlay }
                 .toolbar(.hidden, for: .navigationBar)
         }
     }
@@ -196,8 +198,7 @@ public struct CarveDetailView: View {
                     updateActiveCanvases()
                 }
         }
-        // 필사 화면은 종이다 — 다크에서도 밝은 값을 유지한다(결정 8-1 안 1). 폭 · 좌표에는 영향이 없다.
-        .background(CarveColor.Paper.background.ignoresSafeArea())
+        .background { paperBackground }
     }
 
     /// 뷰포트 근처(위아래 `canvasActivationMargin` 배)의 행을 캔버스 활성 집합에 더한다. 빼지는 않는다.
@@ -418,16 +419,51 @@ public struct CarveDetailView: View {
         #endif
     }
     
+}
+
+private extension CarveDetailView {
     /// 헤더 스크롤 애니메이션 등 과도한 이벤트 호출을 방지하기 위한 딜레이
-    private func delay(
+    func delay(
         to delay: TimeInterval = 0.1,
         _ action: @escaping () -> Void
     ) {
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: action)
     }
-}
 
-private extension CarveDetailView {
+    /// 필사 화면 바탕 — 책상(`canvas`) 위의 종이(시안 J1).
+    ///
+    /// 라이트에서는 두 색이 같아 종이 경계가 보이지 않고, 다크에서만 어두운 책상 위 밝은 종이가 된다(결정 8-1 안 1).
+    /// 종이는 **배경 장식**이다 — 원문 · 필기 열의 x · 폭은 이 모양과 무관하다(단일 Canvas 설계 §9).
+    /// 아래쪽은 도구 팔레트 밑 안내 문구가 종이 밖(책상 위)에 오도록 비운다.
+    var paperBackground: some View {
+        ZStack {
+            CarveColor.canvas
+                .ignoresSafeArea()
+            UnevenRoundedRectangle(
+                bottomLeadingRadius: CarveRadius.card,
+                bottomTrailingRadius: CarveRadius.card,
+                style: .continuous
+            )
+            .fill(CarveColor.Paper.background)
+            .padding(.horizontal, CarveSpacing.medium)
+            .padding(.bottom, 36)
+            .ignoresSafeArea(edges: .top)
+        }
+    }
+
+    /// 절 롱탭 메뉴(시안 E1). 헤더 · 팔레트까지 가림막으로 덮도록 가장 위에 둔다.
+    @ViewBuilder
+    var verseMenuOverlay: some View {
+        if let menu = store.chapterCanvas.verseMenu {
+            VerseMenuOverlay(
+                menu: menu,
+                onHistory: { store.send(.scope(.chapterCanvasAction(.verseMenuHistoryTapped))) },
+                onErase: { store.send(.scope(.chapterCanvasAction(.verseMenuEraseTapped))) },
+                onDismiss: { store.send(.scope(.chapterCanvasAction(.verseMenuDismissed))) }
+            )
+        }
+    }
+
     /// 헤더와 분리한 하단 팔레트. 접힘 버튼은 헤더가 소유한 펼침 상태만 바꾼다.
     var paletteDock: some View {
         PencilPalatteDockView(

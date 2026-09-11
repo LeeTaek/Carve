@@ -43,6 +43,10 @@ public enum CarveIcon: CaseIterable, Sendable {
     case chevronRight
     /// 이전 필사 기록.
     case history
+    /// 이미지 저장(절 롱탭 메뉴).
+    case photo
+    /// 위젯에 표시(절 롱탭 메뉴).
+    case widget
     /// 지우기 · 삭제.
     case trash
     case help
@@ -70,6 +74,8 @@ public enum CarveIcon: CaseIterable, Sendable {
         case .chevronLeft: ResourcesAsset.LineIcon.chevronLeft
         case .chevronRight: ResourcesAsset.LineIcon.chevronRight
         case .history: ResourcesAsset.LineIcon.history
+        case .photo: ResourcesAsset.LineIcon.photo
+        case .widget: ResourcesAsset.LineIcon.widget
         case .trash: ResourcesAsset.LineIcon.trash
         case .help: ResourcesAsset.LineIcon.help
         }

@@ -35,6 +35,8 @@ public struct CanvasView: UIViewRepresentable {
             let canvas = PKCanvasView()
 
             canvas.drawingPolicy = .pencilOnly
+            // 다크에서도 잉크를 저장된 색 그대로 그린다(결정 8-1 안 1).
+            canvas.overrideUserInterfaceStyle = .light
             canvas.backgroundColor = .clear
             canvas.isOpaque = false
             canvas.translatesAutoresizingMaskIntoConstraints = false
