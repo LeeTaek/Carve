@@ -20,6 +20,10 @@ public struct AppCoordinatorFeature {
         public static var initialState = Self()
         /// 현재 루트 화면 (트리기반)
         @Presents public var root: Root.State? = .launchProgress(.initialState)
+        /// 업데이트 패치노트 표시 상태
+        @Presents public var patchnote: PatchnoteFeature.State?
+        /// 마지막으로 확인한 앱 버전. 값이 없는 기존 설치에는 패치노트를 자동 표시하지 않는다.
+        @Shared(.appStorage("lastSeenAppVersion")) public var lastSeenAppVersion: String?
         /// 루트 화면 위에 Push될 화면 Path. (스택 기반)
         public var path: StackState<Path.State> = .init()
         // analytics key
@@ -49,6 +53,7 @@ public struct AppCoordinatorFeature {
     
     public enum Action {
         case root(PresentationAction<Root.Action>)
+        case patchnote(PresentationAction<PatchnoteFeature.Action>)
         /// Path와 관련된 프레젠테이션 액션.
         case path(StackActionOf<Path>)
     }
@@ -77,7 +82,13 @@ public struct AppCoordinatorFeature {
         Reduce { state, action in
             switch action {
             case .root(.presented(.launchProgress(.syncCompleted))):
+                let currentVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+                let previousVersion = state.lastSeenAppVersion
+                state.$lastSeenAppVersion.withLock { $0 = currentVersion }
                 state.root = .carve(.initialState)
+                if let previousVersion, previousVersion != currentVersion {
+                    state.patchnote = .initialState
+                }
                 
             case .root(.presented(.carve(.view(.moveToSetting)))):
                 state.path.append(.settings(.initialState))
@@ -87,6 +98,17 @@ public struct AppCoordinatorFeature {
 
             case .path(.element(id: _, action: .settings(.view(.backToCarve)))):
                 state.path.removeLast()
+
+            case .patchnote(.presented(.delegate(.close))):
+                state.patchnote = nil
+
+            case .patchnote(.presented(.delegate(.showHelp))):
+                state.patchnote = nil
+                state.path.append(.settings(SettingsFeature.State.initialState(path: .help(.initialState))))
+
+            case .path(.element(id: _, action: .settings(.delegate(.restartFirstRunGuide)))):
+                state.path.removeLast()
+                return .send(.root(.presented(.carve(.view(.restartFirstRunGuide)))))
                 
             case let .path(.element(id: _, action: .chart(.drawingWeeklySummary(.openChapter(chapter))))):
                 state.path.removeLast()
@@ -115,6 +137,9 @@ public struct AppCoordinatorFeature {
             }
         }
         .ifLet(\.$root, action: \.root)
+        .ifLet(\.$patchnote, action: \.patchnote) {
+            PatchnoteFeature()
+        }
         .forEach(\.path, action: \.path)
     }
 }

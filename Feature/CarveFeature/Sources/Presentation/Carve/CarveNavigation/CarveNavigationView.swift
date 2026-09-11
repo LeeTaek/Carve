@@ -54,7 +54,17 @@ public struct CarveNavigationView: View {
             // 앱이 비활성/백그라운드로 가면 단일 Canvas 의 미저장분을 저장한다 (§8-5, best-effort).
             // CarveDetailView가 열림 상태와 관계없이 유지되므로, 이 뷰에서 저장을 건다.
             if phase != .active {
-                store.send(.scope(.carveDetailAction(.view(.appWillResignActive))))
+                send(.appWillResignActive)
+            }
+        }
+        .onAppear {
+            send(.presentFirstRunGuide)
+        }
+        .allowsHitTesting(store.firstRunGuide == nil)
+        .accessibilityHidden(store.firstRunGuide != nil)
+        .overlay {
+            if let guideStore = store.scope(state: \.firstRunGuide, action: \.firstRunGuide.presented) {
+                FirstRunGuideView(store: guideStore)
             }
         }
     }
@@ -187,7 +197,7 @@ public struct CarveNavigationView: View {
         return Button {
             // selectedChapter 바인딩만 바꾸면 현재 장 헤더만 갱신되고 본문 fetch가 발생하지 않는다.
             // 도메인 이동 액션으로 보내야 장 상태·detail 전환·본문 로딩이 한 흐름으로 처리된다.
-            store.send(.moveToChapter(BibleChapter(title: store.currentTitle.title, chapter: chapter)))
+            send(.chapterTapped(BibleChapter(title: store.currentTitle.title, chapter: chapter)))
         } label: {
             Text(chapter.description)
                 .font(CarveTypography.body)

@@ -73,7 +73,7 @@ public struct CarveDetailView: View {
                     verses: { store.sentenceWithDrawingState.map(\.sentence.verse) },
                     scrollTo: { verse in
                         if store.usesSingleCanvas {
-                            store.send(.scope(.chapterCanvasAction(.scrollToVerse(verse))))
+                            send(.scrollToVerse(verse))
                         } else if let row = store.sentenceWithDrawingState.first(where: { $0.sentence.verse == verse }) {
                             withAnimation(.easeInOut(duration: 0.4)) {
                                 store.proxy?.scrollTo(row.id, anchor: .bottom)
@@ -86,7 +86,7 @@ public struct CarveDetailView: View {
         if ChapterLayoutDebugScenario.isNextChapterEnabled {
             Task { @MainActor in
                 await ChapterLayoutDebugScenario.runNextChapter {
-                    store.send(.scope(.headerAction(.view(.moveToNext))))
+                    send(.moveToNext)
                 }
             }
         }
@@ -322,7 +322,7 @@ public struct CarveDetailView: View {
         .onChange(of: store.sentenceWithDrawingState) {
             // N-Canvas 의 setProxy → scrollToTop 과 같은 자리. 장 전환·딥링크(setScrollTarget)의 스크롤 요청을 여기서 낸다.
             // 레이아웃이 아직 없으면 컨트롤러가 요청을 들고 있다가 layout 이 오면 수행한다.
-            store.send(.scrollToTop)
+            send(.scrollToTop)
         }
         // 지우기(보관 후 초기화) 확인창과 실패 안내 (UI-2). 같은 롱프레스 메뉴에서 온다.
         .alert($store.scope(
@@ -455,9 +455,9 @@ private extension CarveDetailView {
         if let menu = store.chapterCanvas.verseMenu {
             VerseMenuOverlay(
                 menu: menu,
-                onHistory: { store.send(.scope(.chapterCanvasAction(.verseMenuHistoryTapped))) },
-                onErase: { store.send(.scope(.chapterCanvasAction(.verseMenuEraseTapped))) },
-                onDismiss: { store.send(.scope(.chapterCanvasAction(.verseMenuDismissed))) }
+                onHistory: { send(.verseMenuHistoryTapped) },
+                onErase: { send(.verseMenuEraseTapped) },
+                onDismiss: { send(.verseMenuDismissed) }
             )
         }
     }
@@ -470,7 +470,7 @@ private extension CarveDetailView {
             VerseHistoryPopover(
                 store: historyStore,
                 isLeftHanded: store.headerState.isLeftHanded,
-                onDismiss: { store.send(.chapterHistory(.dismiss)) }
+                onDismiss: { send(.dismissChapterHistory) }
             )
         }
     }
@@ -485,7 +485,7 @@ private extension CarveDetailView {
             isExpanded: store.headerState.isPaletteExpanded,
             isLeftHanded: store.headerState.isLeftHanded
         ) {
-            store.send(.scope(.headerAction(.view(.expandPalette))))
+            send(.expandPalette)
         }
     }
 

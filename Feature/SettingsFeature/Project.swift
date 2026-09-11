@@ -12,6 +12,7 @@ let projectName = "SettingsFeature"
 
 let dependencies: [TargetDependency] = [
     .Domain,
+    .UIComponents,
     .TCAArchitecture,
     .Resources
 ]

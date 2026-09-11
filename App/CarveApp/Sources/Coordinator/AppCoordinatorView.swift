@@ -56,5 +56,12 @@ public struct AppCoordinatorView: View {
                 DrawingChartView(store: store)
             }
         }
+        .allowsHitTesting(store.patchnote == nil)
+        .accessibilityHidden(store.patchnote != nil)
+        .overlay {
+            if let patchnoteStore = store.scope(state: \.patchnote, action: \.patchnote.presented) {
+                PatchnoteView(store: patchnoteStore)
+            }
+        }
     }
 }

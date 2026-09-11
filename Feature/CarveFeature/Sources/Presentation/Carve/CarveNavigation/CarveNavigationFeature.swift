@@ -33,14 +33,24 @@ public struct CarveNavigationFeature {
         @Presents var detailNavigation: DetailDestination.State?
         /// 앱 전역에 공유하는 현재 성경 title
         @Shared(.appStorage("title")) public var currentTitle: BibleChapter = .initialState
+        /// 최초 필사 안내 팝업 상태
+        @Presents public var firstRunGuide: FirstRunGuideFeature.State?
+        /// 최초 필사 안내를 한 번이라도 표시했는지 저장한다.
+        ///
+        /// `@Shared(.appStorage(...))`는 UserDefaults에 연결되므로 앱을 다시 실행해도 값이 유지된다.
+        /// 키 이름은 이전 구현과의 호환성을 위해 유지한다.
+        @Shared(.appStorage("hasSeenFirstRunGuide")) public var hasPresentedFirstRunGuide = false
         
-        public static let initialState = State(
-            columnVisibility: .detailOnly,
-            carveDetailState: .initialState
-        )
+        public static var initialState: Self {
+            State(
+                columnVisibility: .detailOnly,
+                carveDetailState: .initialState
+            )
+        }
     }
     public enum Action: ViewAction, CarveToolkit.ScopeAction, BindableAction {
         case binding(BindingAction<State>)
+        case firstRunGuide(PresentationAction<FirstRunGuideFeature.Action>)
         case moveToChapter(BibleChapter)
         case moveToVerse(BibleVerse)
         case view(View)
@@ -58,6 +68,14 @@ public struct CarveNavigationFeature {
             case detailNavigation(PresentationAction<DetailDestination.Action>)
             /// DrawingHistoryChart로 이동
             case navigationToDrewLog
+            /// 최초 필사 안내를 표시
+            case presentFirstRunGuide
+            /// 설정의 도움말에서 최초 필사 안내를 다시 표시
+            case restartFirstRunGuide
+            /// 앱이 비활성화되기 전 단일 Canvas의 미저장분을 저장
+            case appWillResignActive
+            /// 장 선택 버튼에서 도메인 장 이동을 요청
+            case chapterTapped(BibleChapter)
         }
     }
 
@@ -162,11 +180,35 @@ public struct CarveNavigationFeature {
                 syncHeaderNavigationState(state: &state)
                 state.detailNavigation = .drewLog(.initialState)
                 return .none
-                
+
+            case .view(.presentFirstRunGuide):
+                guard !state.hasPresentedFirstRunGuide, state.firstRunGuide == nil else { return .none }
+                state.$hasPresentedFirstRunGuide.withLock { $0 = true }
+                state.firstRunGuide = .initialState
+                return .none
+
+            case .view(.restartFirstRunGuide):
+                guard state.firstRunGuide == nil else { return .none }
+                state.firstRunGuide = .initialState
+                return .none
+
+            case .firstRunGuide(.presented(.delegate(.finished))):
+                state.firstRunGuide = nil
+                return .none
+
+            case .view(.appWillResignActive):
+                return .send(.scope(.carveDetailAction(.view(.appWillResignActive))))
+
+            case .view(.chapterTapped(let chapter)):
+                return .send(.moveToChapter(chapter))
+
             default: return .none
             }
         }
         .ifLet(\.$detailNavigation, action: \.view.detailNavigation)
+        .ifLet(\.$firstRunGuide, action: \.firstRunGuide) {
+            FirstRunGuideFeature()
+        }
     }
 }
 

@@ -37,6 +37,13 @@ public struct SettingsView: View {
                 }
         }
         .toolbar(.hidden)
+        .allowsHitTesting(store.path?.patchnote == nil)
+        .accessibilityHidden(store.path?.patchnote != nil)
+        .overlay {
+            if let patchnoteStore = store.scope(state: \.path?.patchnote, action: \.path.patchnote) {
+                PatchnoteView(store: patchnoteStore)
+            }
+        }
     }
     
     private var sideBar: some View {
@@ -46,6 +53,8 @@ public struct SettingsView: View {
                 NavigationLink("필사 캔버스", value: SettingsFeature.Path.State.canvas(.initialState))
             }
             Section("지원") {
+                NavigationLink("도움말", value: SettingsFeature.Path.State.help(.initialState))
+                NavigationLink("패치노트", value: SettingsFeature.Path.State.patchnote(.initialState))
                 NavigationLink("의견 보내기", value: SettingsFeature.Path.State.sendFeedback(.initialState))
                 NavigationLink("앱 버전", value: SettingsFeature.Path.State.appVersion(.initialState))
             }
@@ -66,6 +75,12 @@ public struct SettingsView: View {
             if let store = store.scope(state: \.path?.canvas, action: \.path.canvas) {
                 CanvasSettingsView(store: store)
             }
+        case .help:
+            if let store = store.scope(state: \.path?.help, action: \.path.help) {
+                HelpView(store: store)
+            }
+        case .patchnote:
+            Color.clear
         case .sendFeedback:
             if let store = store.scope(state: \.path?.sendFeedback, action: \.path.sendFeedback) {
                 SendFeedbackView(store: store)

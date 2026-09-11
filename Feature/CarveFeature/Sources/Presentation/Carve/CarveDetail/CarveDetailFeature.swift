@@ -113,6 +113,22 @@ public struct CarveDetailFeature {
             case layoutHostingChanged(writingWidth: CGFloat)
             /// 앱이 비활성/백그라운드로 감 — 단일 Canvas 의 미저장분을 저장한다 (§8-5, best-effort)
             case appWillResignActive
+            /// 디버그 시나리오에서 단일 Canvas의 특정 절로 스크롤
+            case scrollToVerse(Int)
+            /// 디버그 시나리오에서 다음 장으로 이동
+            case moveToNext
+            /// 장이 바뀐 뒤 본문을 최상단으로 이동
+            case scrollToTop
+            /// 절 메뉴의 이전 필사 보기
+            case verseMenuHistoryTapped
+            /// 절 메뉴의 지우기
+            case verseMenuEraseTapped
+            /// 절 메뉴 닫기
+            case verseMenuDismissed
+            /// 절 필사 기록 팝오버 닫기
+            case dismissChapterHistory
+            /// 하단 팔레트 펼치기
+            case expandPalette
         }
     }
 
@@ -206,6 +222,31 @@ public struct CarveDetailFeature {
             case .view(.appWillResignActive):
                 // flag 와 무관하게 보낸다 — 방금 flag 를 끈 뒤에도 단일 Canvas 에 미저장분이 남아 있을 수 있다. 없으면 no-op.
                 return .send(.scope(.chapterCanvasAction(.flushPending)))
+
+            case .view(.scrollToVerse(let verse)):
+                guard state.usesSingleCanvas else { return .none }
+                return .send(.scope(.chapterCanvasAction(.scrollToVerse(verse))))
+
+            case .view(.moveToNext):
+                return .send(.scope(.headerAction(.view(.moveToNext))))
+
+            case .view(.scrollToTop):
+                return .send(.scrollToTop)
+
+            case .view(.verseMenuHistoryTapped):
+                return .send(.scope(.chapterCanvasAction(.verseMenuHistoryTapped)))
+
+            case .view(.verseMenuEraseTapped):
+                return .send(.scope(.chapterCanvasAction(.verseMenuEraseTapped)))
+
+            case .view(.verseMenuDismissed):
+                return .send(.scope(.chapterCanvasAction(.verseMenuDismissed)))
+
+            case .view(.dismissChapterHistory):
+                return .send(.chapterHistory(.dismiss))
+
+            case .view(.expandPalette):
+                return .send(.scope(.headerAction(.view(.expandPalette))))
 
             case .scope(.chapterCanvasAction(.delegate(.showHistory(let verse)))):
                 var history = VerseDrawingHistoryFeature.State(title: state.chapterCanvas.chapter, verse: verse)
