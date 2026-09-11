@@ -121,14 +121,6 @@ public struct CarveNavigationView: View {
         } else {
             CarveDetailView(store: store.scope(state: \.carveDetailState,
                                                action: \.scope.carveDetailAction))
-            .sheet(
-                item: $store.scope(
-                    state: \.detailNavigation?.sentenceSettings,
-                    action: \.view.detailNavigation.sentenceSettings
-                )
-            ) { store in
-                SentenceSettingsView(store: store)
-            }
             .fullScreenCover(
                 item: $store.scope(
                     state: \.detailNavigation?.drewLog,

@@ -25,6 +25,10 @@ public struct HeaderFeature {
         public var showPalatte: Bool
         public var showOnlyTitle: Bool
         public var palatteSetting: PencilPalatteFeature.State = .initialState
+        /// 헤더 본문 설정 버튼에 붙는 팝오버 상태.
+        @Presents public var sentenceSettings: SentenceSettingsFeature.State?
+        /// 필기 열을 왼쪽에 둘지. 본문 설정 버튼과 팝오버의 위치를 정한다.
+        @Shared(.appStorage("isLeftHanded")) public var isLeftHanded: Bool = false
         /// 탭으로 헤더 숨김/보임 상태
         public var isHidden: Bool = false
         
@@ -45,6 +49,7 @@ public struct HeaderFeature {
     public enum Action: ViewAction {
         case headerAnimation(CGFloat, CGFloat)
         case palatteAction(PencilPalatteFeature.Action)
+        case sentenceSettings(PresentationAction<SentenceSettingsFeature.Action>)
         case toggleVisibility
         case view(View)
         
@@ -62,6 +67,9 @@ public struct HeaderFeature {
     public var body: some Reducer<State, Action> {
         Scope(state: \.palatteSetting, action: \.palatteAction) {
             PencilPalatteFeature()
+        }
+        .ifLet(\.$sentenceSettings, action: \.sentenceSettings) {
+            SentenceSettingsFeature()
         }
         
         Reduce { state, action in
@@ -106,6 +114,9 @@ public struct HeaderFeature {
                 withAnimation(.easeInOut(duration: 0.2)) {
                     state.showPalatte.toggle()
                 }
+
+            case .view(.sentenceSettingsDidTapped):
+                state.sentenceSettings = .initialState
                 
             case .toggleVisibility:
                 state.isHidden.toggle()
@@ -125,6 +136,13 @@ public struct HeaderFeature {
             default: break
             }
             return .none
+        }
+        .onChange(of: \.isLeftHanded) { _, _ in
+            Reduce { state, _ in
+                // 팝오버의 anchor가 필기 열 쪽으로 바뀌므로, 열린 상태에서는 닫고 새 위치에서 다시 연다.
+                state.sentenceSettings = nil
+                return .none
+            }
         }
     }
 }

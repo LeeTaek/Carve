@@ -112,4 +112,13 @@ struct HeaderFeatureTesting {
         #expect(state.headerOffset == -24)
     }
 
+    @Test("본문 설정 버튼은 헤더에 붙는 설정 팝오버 상태를 연다")
+    func sentenceSettingsDidTappedPresentsSettings() async {
+        var state = HeaderFeature.State.initialState
+
+        _ = HeaderFeature().reduce(into: &state, action: .view(.sentenceSettingsDidTapped))
+
+        #expect(state.sentenceSettings != nil)
+    }
+
 }

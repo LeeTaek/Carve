@@ -69,8 +69,6 @@ public struct CarveNavigationFeature {
     /// 상세 화면에서의 Navigation Destination
     @Reducer
     public enum DetailDestination {
-        /// 문장 폰트 등 설정 화면 시트
-        case sentenceSettings(SentenceSettingsFeature)
         /// DrawingHistoryChart로 이동
         case drewLog(DrewLogFeature)
     }
@@ -148,10 +146,6 @@ public struct CarveNavigationFeature {
             case .view(.navigationToDrewLog):
                 state.columnVisibility = .detailOnly
                 state.detailNavigation = .drewLog(.initialState)
-                return .none
-                
-            case .scope(.carveDetailAction(.scope(.headerAction(.view(.sentenceSettingsDidTapped))))):
-                state.detailNavigation = .sentenceSettings(.initialState)
                 return .none
                 
             default: return .none

@@ -6,50 +6,41 @@
 //  Copyright © 2024 leetaek. All rights reserved.
 //
 
-import SwiftUI
 import Resources
+import SwiftUI
 
 import ComposableArchitecture
+import UIComponents
 
 @ViewAction(for: HeaderFeature.self)
 public struct HeaderView: View {
-    public var store: StoreOf<HeaderFeature>
-    private let iconSize: CGFloat = 40
-    public  init(store: StoreOf<HeaderFeature>) {
+    @Bindable public var store: StoreOf<HeaderFeature>
+
+    public init(store: StoreOf<HeaderFeature>) {
         self.store = store
     }
-    
+
     public var body: some View {
-        let titleName = store.currentTitle.title.koreanTitle()
-        return VStack {
-            HStack {
-                Button(action: { send(.titleDidTapped) }) {
-                    Text("\(titleName) \(store.currentTitle.chapter)장")
-                        .font(Font(ResourcesFontFamily.NanumGothic.bold.font(size: 30)))
-                        .foregroundStyle(.black.opacity(0.7))
-                        .padding()
+        VStack(spacing: 0) {
+            ZStack {
+                HStack(spacing: CarveSpacing.xxSmall) {
+                    leadingControls
+                    Spacer(minLength: 0)
+                    trailingControls
                 }
-                Spacer()
-                if !store.showOnlyTitle {
-                    beforeButton
-                    nextButton
-                    divider
-                    pencilConfigButton
-                    sentenceSettingsButton
-                }
+
+                titleButton
             }
-            
+
             if store.showPalatte {
                 PencilPalatteView(store: store.scope(state: \.palatteSetting,
                                                      action: \.palatteAction))
             }
         }
-        .background {
-            Color.white
-                .ignoresSafeArea()
-        }
-        .padding(.top, safeArea().top)
-        .padding(.bottom, 10)
+        .padding(.horizontal, CarveSpacing.large)
+        .padding(.top, safeArea().top + CarveSpacing.small)
+        .padding(.bottom, CarveSpacing.small)
+        .background(CarveColor.canvas.ignoresSafeArea())
         .anchorPreference(key: HeaderBoundsKey.self, value: .bounds) { $0 }
         .overlayPreferenceValue(HeaderBoundsKey.self) { value in
             if value != nil {
@@ -71,56 +62,71 @@ public struct HeaderView: View {
                 : (store.headerOffset < 0 ? store.headerOffset : 0))
         .ignoresSafeArea(.all, edges: .top)
     }
-    
-    private var pencilConfigButton: some View {
-        Button {
-            send(.pencilConfigDidTapped)
-        } label: {
-            Image(asset: CarveFeatureAsset.pencilConfig)
-                .resizable()
-                .frame(width: iconSize, height: iconSize)
-                .padding(15)
+
+    private var leadingControls: some View {
+        HStack(spacing: CarveSpacing.xxSmall) {
+            CarveIconButton(.library, accessibilityLabel: "서재 열기") {
+                send(.titleDidTapped)
+            }
+            if store.isLeftHanded {
+                sentenceSettingsButton
+            }
         }
     }
-    
+
+    private var trailingControls: some View {
+        HStack(spacing: CarveSpacing.xxSmall) {
+            CarveIconButton(.previous, accessibilityLabel: "이전 장") {
+                send(.moveToBefore)
+            }
+            CarveIconButton(.next, accessibilityLabel: "다음 장") {
+                send(.moveToNext)
+            }
+            // 하단 접힘 팔레트 작업 전까지 기존 팔레트 접근 경로를 유지한다.
+            CarveIconButton(.pen, accessibilityLabel: "도구 팔레트", isSelected: store.showPalatte) {
+                send(.pencilConfigDidTapped)
+            }
+            if !store.isLeftHanded {
+                sentenceSettingsButton
+            }
+        }
+    }
+
     private var sentenceSettingsButton: some View {
-        Button {
+        CarveIconButton(
+            .textFormat,
+            accessibilityLabel: "본문 설정",
+            isSelected: store.sentenceSettings != nil
+        ) {
             send(.sentenceSettingsDidTapped)
-        } label: {
-            Image(asset: CarveFeatureAsset.sentenceConfig)
-                .resizable()
-                .frame(width: iconSize, height: iconSize)
-                .padding(15)
+        }
+        .popover(
+            item: $store.scope(state: \.sentenceSettings, action: \.sentenceSettings),
+            attachmentAnchor: .rect(.bounds),
+            arrowEdge: .top
+        ) { settingsStore in
+            SentenceSettingsView(store: settingsStore)
+                .frame(width: 350, height: 560)
         }
     }
-    
-    private var nextButton: some View {
+
+    private var titleButton: some View {
         Button {
-            send(.moveToNext)
+            send(.titleDidTapped)
         } label: {
-            Image(asset: CarveFeatureAsset.next)
-                .resizable()
-                .frame(width: iconSize, height: iconSize)
-                .padding(15)
+            VStack(spacing: 2) {
+                Text("\(store.currentTitle.title.koreanTitle()) \(store.currentTitle.chapter)장")
+                    .font(CarveTypography.scripture(ResourcesFontFamily.NanumMyeongjo.regular.font(size: 26)))
+                Text("개역한글 · \(store.currentTitle.title.isOldtestment ? "구약" : "신약") / \(store.currentTitle.title.koreanTitle())")
+                    .font(CarveTypography.caption)
+                    .foregroundStyle(CarveColor.secondary)
+            }
+            .foregroundStyle(CarveColor.ink)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, CarveSpacing.medium)
+            .contentShape(Rectangle())
         }
-    }
-    
-    private var beforeButton: some View {
-        Button {
-            send(.moveToBefore)
-        } label: {
-            Image(asset: CarveFeatureAsset.before)
-                .resizable()
-                .frame(width: iconSize, height: iconSize)
-                .padding(15)
-        }
-    }
-    
-    
-    private var divider: some View {
-        Rectangle()
-            .frame(width: 1, height: iconSize)
-            .foregroundStyle(.gray)
-            .padding(.horizontal)
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(store.currentTitle.title.koreanTitle()) \(store.currentTitle.chapter)장, 성경과 장 목록 열기")
     }
 }
