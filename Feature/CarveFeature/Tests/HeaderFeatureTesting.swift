@@ -12,9 +12,9 @@ struct HeaderFeatureTesting {
     @Test("헤더를 다시 토글해 보이면 오프셋을 0으로 되돌리고 추적 상태를 초기화한다")
     func toggleVisibilityShowsHeaderAndResetsTracking() async {
         var state = HeaderFeature.State.initialState
-        state.headerHeight = 72
-        state.headerOffset = -72
-        state.lastHeaderOffset = -72
+        state.headerHeight = 118
+        state.headerOffset = -40
+        state.lastHeaderOffset = -40
         state.direction = .down
         state.shiftOffset = 18
         state.isHidden = true
@@ -28,10 +28,10 @@ struct HeaderFeatureTesting {
         #expect(state.lastHeaderOffset == 0)
     }
 
-    @Test("헤더 토글로 숨길 때 높이만큼 올리고 추적 상태를 초기화한다")
+    @Test("헤더 토글로 숨길 때 축소 상태를 기록하고 추적 상태를 초기화한다")
     func toggleVisibilityHidesHeaderAndResetsTracking() async {
         var state = HeaderFeature.State.initialState
-        state.headerHeight = 72
+        state.headerHeight = 118
         state.headerOffset = -18
         state.lastHeaderOffset = -18
         state.direction = .up
@@ -40,28 +40,28 @@ struct HeaderFeatureTesting {
         _ = HeaderFeature().reduce(into: &state, action: .toggleVisibility)
 
         #expect(state.isHidden)
-        #expect(state.headerOffset == -72)
+        #expect(state.headerOffset == -40)
         #expect(state.direction == .none)
         #expect(state.shiftOffset == 0)
-        #expect(state.lastHeaderOffset == -72)
+        #expect(state.lastHeaderOffset == -40)
     }
 
     @Test("위로 스크롤을 계속하면 헤더 오프셋이 높이를 넘지 않게 고정된다")
     func headerAnimationClampsOffsetWhileScrollingUp() async {
         var state = HeaderFeature.State.initialState
-        state.headerHeight = 72
+        state.headerHeight = 118
         state.direction = .up
         state.shiftOffset = -12
 
         _ = HeaderFeature().reduce(into: &state, action: .headerAnimation(-12, -120))
 
-        #expect(state.headerOffset == -72)
+        #expect(state.headerOffset == -40)
     }
 
     @Test("아래로 스크롤하면 헤더 오프셋은 0을 넘지 않고 현재 위치를 기준으로 전환한다")
     func headerAnimationClampsOffsetAtZeroWhileScrollingDown() async {
         var state = HeaderFeature.State.initialState
-        state.headerHeight = 72
+        state.headerHeight = 118
         state.headerOffset = -24
         state.direction = .up
         state.shiftOffset = -12
@@ -77,8 +77,8 @@ struct HeaderFeatureTesting {
     @Test("탭으로 숨긴 뒤 아래로 스크롤하면 숨김 상태를 해제하고 아래 방향으로 전환한다")
     func headerAnimationClearsHiddenStateOnScrollDown() async {
         var state = HeaderFeature.State.initialState
-        state.headerHeight = 72
-        state.headerOffset = -72
+        state.headerHeight = 118
+        state.headerOffset = -40
         state.isHidden = true
 
         _ = HeaderFeature().reduce(into: &state, action: .headerAnimation(-10, 20))
@@ -86,7 +86,7 @@ struct HeaderFeatureTesting {
         #expect(!state.isHidden)
         #expect(state.direction == .down)
         #expect(state.shiftOffset == 20)
-        #expect(state.lastHeaderOffset == -72)
+        #expect(state.lastHeaderOffset == -40)
     }
 
     @Test("헤더 높이를 전달받으면 상태에 그대로 반영한다")

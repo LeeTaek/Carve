@@ -14,6 +14,11 @@ import ComposableArchitecture
 
 @Reducer
 public struct HeaderFeature {
+    /// 본문 시작 위치를 고정하는 펼친 헤더 높이(L1 · L3).
+    public static let expandedHeight: CGFloat = 118
+    /// 스크롤 중에도 화면 상단에 남는 축소 헤더 높이(L2 · L3).
+    public static let compactHeight: CGFloat = 78
+
     @ObservableState
     public struct State {
         @Shared(.appStorage("title")) public var currentTitle: BibleChapter = .initialState
@@ -79,26 +84,28 @@ public struct HeaderFeature {
             case .headerAnimation(let previous, let current):
                 let isScrollingDown = current > previous
                 let isScrollingUp   = current < previous
+                let collapseDistance = collapseDistance(for: state)
 
                 if isScrollingDown, state.isHidden {
-                    // 스크롤로 다시 열기 시작 → 탭으로 숨긴 상태 해제
+                    // 탭으로 숨겼던 헤더는 스크롤을 되돌릴 때 축소 상태로 다시 보인다.
                     state.isHidden = false
                     state.direction = .down
                     state.shiftOffset = current
-                    state.lastHeaderOffset = state.headerOffset
+                    state.headerOffset = -collapseDistance
+                    state.lastHeaderOffset = -collapseDistance
                 }
                 
                 if isScrollingUp {
                     if state.direction != .up, current < 0 {
                         state.shiftOffset = current - state.headerOffset
                         state.direction = .up
-                        state.lastHeaderOffset = state.headerHeight
+                        state.lastHeaderOffset = collapseDistance
                     }
 
                     let offset = current < 0 ? (current - state.shiftOffset) : 0
-                    state.headerOffset = (-offset < state.headerHeight
+                    state.headerOffset = (-offset < collapseDistance
                                           ? (offset < 0 ? offset : 0)
-                                          : -state.headerHeight)
+                                          : -collapseDistance)
                 } else if isScrollingDown {
                     if state.direction != .down {
                         state.shiftOffset = current
@@ -123,7 +130,7 @@ public struct HeaderFeature {
                 
                 withAnimation(.easeInOut(duration: 0.2)) {
                     if state.isHidden {
-                        state.headerOffset = -state.headerHeight
+                        state.headerOffset = -collapseDistance(for: state)
                     } else {
                         state.headerOffset = 0
                     }
@@ -144,5 +151,10 @@ public struct HeaderFeature {
                 return .none
             }
         }
+    }
+
+    /// 펼친 높이에서 축소 높이까지의 스크롤 이동량을 만든다. 이 값을 넘기면 헤더는 더 위로 밀리지 않는다.
+    private func collapseDistance(for state: State) -> CGFloat {
+        max(0, state.headerHeight - Self.compactHeight)
     }
 }
