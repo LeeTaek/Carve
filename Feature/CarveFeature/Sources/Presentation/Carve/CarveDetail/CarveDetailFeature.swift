@@ -99,7 +99,7 @@ public struct CarveDetailFeature {
             case switchToEraser
             /// 펜 타입을 이전으로 전환
             case switchToPreviousPenType
-            /// 한 손가락 탭 액션: 헤더 노출/숨김
+            /// 한 손가락 탭 액션: 헤더 펼침/축소
             case tapForHeaderHidden
             /// 두손가락 더블탭 액션: undo
             case twoFingerDoubleTapForUndo
@@ -279,7 +279,7 @@ public struct CarveDetailFeature {
 //                return .send(.scope(.canvasAction(.redo)))
             
             case .view(.tapForHeaderHidden):
-                return .send(.scope(.headerAction(.toggleVisibility)))
+                return .send(.scope(.headerAction(.toggleCompact)))
                 
             case .view(.twoFingerDoubleTapForUndo):
 //                return .send(.scope(.canvasAction(.undo)))

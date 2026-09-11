@@ -60,8 +60,8 @@ public struct HeaderView: View {
                     )
             }
         }
-        .offset(y: store.isHidden ? -store.headerHeight : 0)
         .animation(.easeInOut(duration: 0.16), value: store.headerOffset)
+        .animation(.easeInOut(duration: 0.16), value: store.isManuallyCollapsed)
         .ignoresSafeArea(.all, edges: .top)
     }
 
@@ -80,9 +80,14 @@ public struct HeaderView: View {
         safeArea().top + 28 - 18 * collapseProgress
     }
 
+    /// 축소 중에도 44pt 탭 영역은 유지하고, 버튼의 아이콘과 표면만 작게 보인다.
+    private var buttonVisualScale: CGFloat {
+        1 - 0.14 * collapseProgress
+    }
+
     private var leadingControls: some View {
         HStack(spacing: CarveSpacing.xxSmall) {
-            CarveIconButton(.library, accessibilityLabel: "서재 열기") {
+            CarveIconButton(.library, accessibilityLabel: "서재 열기", visualScale: buttonVisualScale) {
                 send(.titleDidTapped)
             }
             if store.isLeftHanded {
@@ -93,14 +98,19 @@ public struct HeaderView: View {
 
     private var trailingControls: some View {
         HStack(spacing: CarveSpacing.xxSmall) {
-            CarveIconButton(.previous, accessibilityLabel: "이전 장") {
+            CarveIconButton(.previous, accessibilityLabel: "이전 장", visualScale: buttonVisualScale) {
                 send(.moveToBefore)
             }
-            CarveIconButton(.next, accessibilityLabel: "다음 장") {
+            CarveIconButton(.next, accessibilityLabel: "다음 장", visualScale: buttonVisualScale) {
                 send(.moveToNext)
             }
             // 하단 접힘 팔레트 작업 전까지 기존 팔레트 접근 경로를 유지한다.
-            CarveIconButton(.pen, accessibilityLabel: "도구 팔레트", isSelected: store.showPalatte) {
+            CarveIconButton(
+                .pen,
+                accessibilityLabel: "도구 팔레트",
+                isSelected: store.showPalatte,
+                visualScale: buttonVisualScale
+            ) {
                 send(.pencilConfigDidTapped)
             }
             if !store.isLeftHanded {
@@ -113,7 +123,8 @@ public struct HeaderView: View {
         CarveIconButton(
             .textFormat,
             accessibilityLabel: "본문 설정",
-            isSelected: store.sentenceSettings != nil
+            isSelected: store.sentenceSettings != nil,
+            visualScale: buttonVisualScale
         ) {
             send(.sentenceSettingsDidTapped)
         }

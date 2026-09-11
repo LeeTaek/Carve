@@ -28,6 +28,7 @@ public struct CarveIconButton: View {
     private let accessibilityLabel: String
     private let isSelected: Bool
     private let background: Background
+    private let visualScale: CGFloat
     private let action: () -> Void
 
     /// - Parameters:
@@ -35,18 +36,21 @@ public struct CarveIconButton: View {
     ///   - accessibilityLabel: VoiceOver 이름. 아이콘만 두는 버튼이라 반드시 준다(예: 「본문 설정」).
     ///   - isSelected: 선택 · 열림 상태(예: 팝오버가 열린 본문 설정 버튼).
     ///   - background: 버튼 바탕.
+    ///   - visualScale: 아이콘과 표면의 크기. 탭 영역은 항상 44pt로 유지한다.
     ///   - action: 탭 콜백.
     public init(
         _ icon: CarveIcon,
         accessibilityLabel: String,
         isSelected: Bool = false,
         background: Background = .floating,
+        visualScale: CGFloat = 1,
         action: @escaping () -> Void
     ) {
         self.icon = icon
         self.accessibilityLabel = accessibilityLabel
         self.isSelected = isSelected
         self.background = background
+        self.visualScale = visualScale
         self.action = action
     }
 
@@ -54,7 +58,13 @@ public struct CarveIconButton: View {
         Button(action: action) {
             icon.image
         }
-        .buttonStyle(CarveIconButtonStyle(isSelected: isSelected, background: background))
+        .buttonStyle(
+            CarveIconButtonStyle(
+                isSelected: isSelected,
+                background: background,
+                visualScale: visualScale
+            )
+        )
         .accessibilityLabel(accessibilityLabel)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
@@ -63,28 +73,39 @@ public struct CarveIconButton: View {
 private struct CarveIconButtonStyle: ButtonStyle {
     let isSelected: Bool
     let background: CarveIconButton.Background
+    let visualScale: CGFloat
 
     @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
+        let scale = min(1, max(0.75, visualScale))
         let isHighlighted = isEnabled && (isSelected || configuration.isPressed)
-        let shape = RoundedRectangle(cornerRadius: CarveRadius.control, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: CarveRadius.control * scale, style: .continuous)
         let label = configuration.label
             .foregroundStyle(iconColor(isHighlighted: isHighlighted))
-            .frame(width: CarveSize.minimumHitTarget, height: CarveSize.minimumHitTarget)
-            .contentShape(shape)
+            .scaleEffect(scale)
+            .frame(
+                width: CarveSize.minimumHitTarget * scale,
+                height: CarveSize.minimumHitTarget * scale
+            )
 
-        if isHighlighted {
-            label
+        let surface = Group {
+            if isHighlighted {
+                label
                 .background(CarveColor.selected, in: shape)
                 .overlay {
                     shape.strokeBorder(CarveColor.accent.opacity(0.45), lineWidth: 1)
                 }
-        } else if background == .floating {
-            label.carveSurface(.floatingControl, in: shape)
-        } else {
-            label
+            } else if background == .floating {
+                label.carveSurface(.floatingControl, in: shape)
+            } else {
+                label
+            }
         }
+
+        surface
+            .frame(width: CarveSize.minimumHitTarget, height: CarveSize.minimumHitTarget)
+            .contentShape(Rectangle())
     }
 
     private func iconColor(isHighlighted: Bool) -> Color {

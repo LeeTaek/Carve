@@ -34,8 +34,8 @@ public struct HeaderFeature {
         @Presents public var sentenceSettings: SentenceSettingsFeature.State?
         /// 필기 열을 왼쪽에 둘지. 본문 설정 버튼과 팝오버의 위치를 정한다.
         @Shared(.appStorage("isLeftHanded")) public var isLeftHanded: Bool = false
-        /// 탭으로 헤더 숨김/보임 상태
-        public var isHidden: Bool = false
+        /// 탭으로 전환한 축소 헤더 상태. 광고 영역이 생겨도 헤더는 항상 남는다.
+        public var isManuallyCollapsed: Bool = false
         
         public enum SwipeDirection {
             case up
@@ -55,7 +55,7 @@ public struct HeaderFeature {
         case headerAnimation(CGFloat, CGFloat)
         case palatteAction(PencilPalatteFeature.Action)
         case sentenceSettings(PresentationAction<SentenceSettingsFeature.Action>)
-        case toggleVisibility
+        case toggleCompact
         case view(View)
         
         public enum View {
@@ -86,9 +86,9 @@ public struct HeaderFeature {
                 let isScrollingUp   = current < previous
                 let collapseDistance = collapseDistance(for: state)
 
-                if isScrollingDown, state.isHidden {
-                    // 탭으로 숨겼던 헤더는 스크롤을 되돌릴 때 축소 상태로 다시 보인다.
-                    state.isHidden = false
+                if isScrollingDown, state.isManuallyCollapsed {
+                    // 탭으로 축소한 헤더는 아래로 스크롤하면 다시 펼친다.
+                    state.isManuallyCollapsed = false
                     state.direction = .down
                     state.shiftOffset = current
                     state.headerOffset = -collapseDistance
@@ -125,11 +125,11 @@ public struct HeaderFeature {
             case .view(.sentenceSettingsDidTapped):
                 state.sentenceSettings = .initialState
                 
-            case .toggleVisibility:
-                state.isHidden.toggle()
+            case .toggleCompact:
+                state.isManuallyCollapsed.toggle()
                 
                 withAnimation(.easeInOut(duration: 0.2)) {
-                    if state.isHidden {
+                    if state.isManuallyCollapsed {
                         state.headerOffset = -collapseDistance(for: state)
                     } else {
                         state.headerOffset = 0

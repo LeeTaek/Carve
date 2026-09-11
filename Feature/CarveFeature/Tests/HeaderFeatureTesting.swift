@@ -9,27 +9,27 @@
 import Testing
 
 struct HeaderFeatureTesting {
-    @Test("헤더를 다시 토글해 보이면 오프셋을 0으로 되돌리고 추적 상태를 초기화한다")
-    func toggleVisibilityShowsHeaderAndResetsTracking() async {
+    @Test("축소 헤더를 다시 토글하면 펼치고 추적 상태를 초기화한다")
+    func toggleCompactExpandsHeaderAndResetsTracking() async {
         var state = HeaderFeature.State.initialState
         state.headerHeight = 118
         state.headerOffset = -40
         state.lastHeaderOffset = -40
         state.direction = .down
         state.shiftOffset = 18
-        state.isHidden = true
+        state.isManuallyCollapsed = true
 
-        _ = HeaderFeature().reduce(into: &state, action: .toggleVisibility)
+        _ = HeaderFeature().reduce(into: &state, action: .toggleCompact)
 
-        #expect(!state.isHidden)
+        #expect(!state.isManuallyCollapsed)
         #expect(state.headerOffset == 0)
         #expect(state.direction == .none)
         #expect(state.shiftOffset == 0)
         #expect(state.lastHeaderOffset == 0)
     }
 
-    @Test("헤더 토글로 숨길 때 축소 상태를 기록하고 추적 상태를 초기화한다")
-    func toggleVisibilityHidesHeaderAndResetsTracking() async {
+    @Test("헤더 토글은 화면에서 없애지 않고 축소 상태로 만들며 추적 상태를 초기화한다")
+    func toggleCompactCollapsesHeaderAndResetsTracking() async {
         var state = HeaderFeature.State.initialState
         state.headerHeight = 118
         state.headerOffset = -18
@@ -37,9 +37,9 @@ struct HeaderFeatureTesting {
         state.direction = .up
         state.shiftOffset = -24
 
-        _ = HeaderFeature().reduce(into: &state, action: .toggleVisibility)
+        _ = HeaderFeature().reduce(into: &state, action: .toggleCompact)
 
-        #expect(state.isHidden)
+        #expect(state.isManuallyCollapsed)
         #expect(state.headerOffset == -40)
         #expect(state.direction == .none)
         #expect(state.shiftOffset == 0)
@@ -74,16 +74,16 @@ struct HeaderFeatureTesting {
         #expect(state.headerOffset == -24)
     }
 
-    @Test("탭으로 숨긴 뒤 아래로 스크롤하면 숨김 상태를 해제하고 아래 방향으로 전환한다")
-    func headerAnimationClearsHiddenStateOnScrollDown() async {
+    @Test("탭으로 축소한 뒤 아래로 스크롤하면 펼침 상태로 전환한다")
+    func headerAnimationClearsManualCollapseOnScrollDown() async {
         var state = HeaderFeature.State.initialState
         state.headerHeight = 118
         state.headerOffset = -40
-        state.isHidden = true
+        state.isManuallyCollapsed = true
 
         _ = HeaderFeature().reduce(into: &state, action: .headerAnimation(-10, 20))
 
-        #expect(!state.isHidden)
+        #expect(!state.isManuallyCollapsed)
         #expect(state.direction == .down)
         #expect(state.shiftOffset == 20)
         #expect(state.lastHeaderOffset == -40)
