@@ -163,9 +163,10 @@ extension SendFeedbackFeature {
         }
     }
     
-    @Reducer(state: .hashable)
+    @Reducer
     public enum Path {
         case email(MailComposeFeature)
     }
 }
 
+extension SendFeedbackFeature.Path.State: Hashable {}

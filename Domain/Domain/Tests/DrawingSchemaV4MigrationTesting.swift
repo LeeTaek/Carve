@@ -613,8 +613,8 @@ struct LegacyPathOnV4StoreTesting {
         #expect(created.drawingVersion == 1)
     }
 
-    @Test("updateDrawing(drawing:) / updateDrawings(drawings:) 경로가 동작한다")
-    func updateDrawingByModel() async throws {
+    @Test("N-Canvas 저장 요청이 legacy 행을 rowID로 갱신한다")
+    func updateDrawingByRowRequest() async throws {
         let directory = try V4StoreHarness.makeStoreDirectory()
         defer { V4StoreHarness.removeStoreDirectory(directory) }
         let database = try Self.makeMigratedDatabase(at: directory)
@@ -624,12 +624,46 @@ struct LegacyPathOnV4StoreTesting {
         let replacement = PKDrawing().dataRepresentation()
         target.lineData = replacement
         target.updateDate = Date(timeIntervalSince1970: 1_743_000_000)
-        try await database.updateDrawings(drawings: [target])
+        try await database.updateDrawing(request: LegacyDrawingSaveRequest(
+            chapter: Self.chapter,
+            verse: 2,
+            rowID: BibleDrawingRowID(raw: target.rowKey),
+            lineData: target.lineData,
+            updateDate: target.updateDate,
+            drawingVersion: target.drawingVersion,
+            layoutMetadataData: target.layoutMetadataData
+        ))
 
         let reloaded = try await database.fetchDrawings(chapter: Self.chapter, verse: 2)
         let stored = try #require(reloaded.first)
         #expect(stored.lineData == replacement)
         #expect(stored.drawingVersion == 1)
+        #expect(stored.rowUUID == nil, "legacy 행에 UUID를 소급 발급하면 안 된다")
+    }
+
+    @Test("N-Canvas 신규 행은 선발급 rowUUID로 재시도해도 하나만 남는다")
+    func insertDrawingPreservesPreissuedRowID() async throws {
+        let directory = try V4StoreHarness.makeStoreDirectory()
+        defer { V4StoreHarness.removeStoreDirectory(directory) }
+        let database = try Self.makeMigratedDatabase(at: directory)
+        let rowID = BibleDrawingRowID.issue()
+        let request = LegacyDrawingSaveRequest(
+            chapter: Self.chapter,
+            verse: 10,
+            rowID: rowID,
+            lineData: PKDrawing().dataRepresentation(),
+            updateDate: Date(timeIntervalSince1970: 1_744_000_000),
+            drawingVersion: 1,
+            layoutMetadataData: nil
+        )
+
+        try await database.updateDrawing(request: request)
+        try await database.updateDrawing(request: request)
+
+        let rows = try await database.fetchDrawings(chapter: Self.chapter, verse: 10)
+        #expect(rows.count == 1)
+        #expect(rows.first?.rowUUID == rowID.raw)
+        #expect(rows.first?.isPresent != true, "기존 N-Canvas 삽입 의미를 유지한다")
     }
 
     @Test("updatePresentDrawing 이 대표 행을 옮긴다 — 히스토리 복원 경로 (§8-7)")

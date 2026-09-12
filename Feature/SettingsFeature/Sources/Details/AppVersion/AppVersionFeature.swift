@@ -26,7 +26,7 @@ public struct AppVersionFeature {
         case setiCloud(Bool)
     }
     
-    @Reducer(state: .equatable, .hashable)
+    @Reducer
     public enum Path {
         case lisence(LisenceFeature)
     }
@@ -45,3 +45,5 @@ public struct AppVersionFeature {
         .forEach(\.path, action: \.path)
     }
 }
+
+extension AppVersionFeature.Path.State: Hashable {}

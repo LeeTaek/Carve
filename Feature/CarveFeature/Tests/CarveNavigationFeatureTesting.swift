@@ -48,28 +48,28 @@ struct CarveNavigationFeatureTesting {
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
 
-        withDependencies {
-            $0.defaultAppStorage = defaults
-        } operation: {
-            var state = CarveNavigationFeature.State.initialState
-            let reducer = CarveNavigationFeature()
+        var state = CarveNavigationFeature.State.initialState
+        state.$hasPresentedFirstRunGuide = Shared(
+            wrappedValue: false,
+            .appStorage("hasSeenFirstRunGuide", store: defaults)
+        )
+        let reducer = CarveNavigationFeature()
 
-            _ = reducer.reduce(into: &state, action: .view(.presentFirstRunGuide))
+        _ = reducer.reduce(into: &state, action: .view(.presentFirstRunGuide))
 
-            #expect(state.firstRunGuide != nil)
-            #expect(state.hasPresentedFirstRunGuide)
-            #expect(defaults.bool(forKey: "hasSeenFirstRunGuide"))
+        #expect(state.firstRunGuide != nil)
+        #expect(state.hasPresentedFirstRunGuide)
+        #expect(defaults.bool(forKey: "hasSeenFirstRunGuide"))
 
-            state.firstRunGuide = nil
-            _ = reducer.reduce(into: &state, action: .view(.presentFirstRunGuide))
-            #expect(state.firstRunGuide == nil)
+        state.firstRunGuide = nil
+        _ = reducer.reduce(into: &state, action: .view(.presentFirstRunGuide))
+        #expect(state.firstRunGuide == nil)
 
-            // 도움말의 수동 재표시는 최초 실행 여부와 관계없이 허용한다.
-            _ = reducer.reduce(into: &state, action: .view(.restartFirstRunGuide))
-            #expect(state.firstRunGuide != nil)
+        // 도움말의 수동 재표시는 최초 실행 여부와 관계없이 허용한다.
+        _ = reducer.reduce(into: &state, action: .view(.restartFirstRunGuide))
+        #expect(state.firstRunGuide != nil)
 
-            _ = reducer.reduce(into: &state, action: .firstRunGuide(.presented(.delegate(.finished))))
-            #expect(state.firstRunGuide == nil)
-        }
+        _ = reducer.reduce(into: &state, action: .firstRunGuide(.presented(.delegate(.finished))))
+        #expect(state.firstRunGuide == nil)
     }
 }

@@ -43,8 +43,6 @@ final class GoogleNativeAdClient: NSObject, NativeAdClient, @unchecked Sendable 
         switch placement {
         case .chartCard:
             return AdMobConfig.nativeChartAdUnitId
-        default:
-            return AdMobConfig.nativeChartAdUnitId
         }
     }
 

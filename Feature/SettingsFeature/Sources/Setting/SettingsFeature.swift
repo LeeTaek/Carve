@@ -40,7 +40,7 @@ public struct SettingsFeature {
         }
     }
     
-    @Reducer(state: .hashable)
+    @Reducer
     public enum Path {
         case iCloud(CloudSettingsFeature)
         /// 필사 캔버스 — 단일 Canvas flag 토글 (설계 §13 Phase 3 (3/3)).
@@ -72,3 +72,5 @@ public struct SettingsFeature {
     }
 
 }
+
+extension SettingsFeature.Path.State: Hashable {}

@@ -1,5 +1,5 @@
 //
-//  SentenceDrewHistoryListFeature.swift
+//  VerseDrawingHistoryFeature.swift
 //  FeatureCarve
 //
 //  Created by 이택성 on 7/4/25.
@@ -113,13 +113,17 @@ extension VerseDrawingHistoryFeature {
         let title = state.title
         let verse = state.verse
         let presentID = drawing.persistentModelID
-        return .run { send in
-            await drawingContext.updatePresentDrawing(
-                chapter: title,
-                verse: verse,
-                presentID: presentID
-            )
-            await send(.setPresentDrawing(drawing))
-        }
+        // 저장이 끝난 뒤 상위에 알리는 순서는 그대로 두되,
+        // @Sendable 클로저가 모델(drawing)을 붙잡지 않도록 전달은 .send 로 분리한다.
+        return .concatenate(
+            .run { _ in
+                await drawingContext.updatePresentDrawing(
+                    chapter: title,
+                    verse: verse,
+                    presentID: presentID
+                )
+            },
+            .send(.setPresentDrawing(drawing))
+        )
     }
 }

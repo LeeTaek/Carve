@@ -29,7 +29,7 @@ public enum CarveColor {
     /// 기본 글자 · 아이콘.
     public static let ink = ResourcesAsset.Theme.ink.swiftUIColor
     /// 설명 · 보조 라벨. 다크에서는 `selected` 위에 두지 않는다(4.34:1).
-    public static let secondary = ResourcesAsset.Theme.secondary.swiftUIColor
+    public static let secondary = ResourcesAsset.Theme.textSecondary.swiftUIColor
     /// 강조 · 선택 · 링크 · 값.
     public static let accent = ResourcesAsset.Theme.accent.swiftUIColor
     /// 지우기 · 삭제. 다크에서는 `selected` 위에 두지 않는다(3.86:1).
@@ -50,7 +50,7 @@ public enum CarveColor {
         /// 필기 가이드 줄.
         public static let guide = ResourcesAsset.Paper.guide.swiftUIColor
         /// 종이 위 보조 글자 — 열 라벨(「말씀」 · 「나의 필사」). 다크에서도 종이 위라 라이트 값이다(시안 J1).
-        public static let secondary = ResourcesAsset.Paper.secondary.swiftUIColor
+        public static let secondary = ResourcesAsset.Paper.textSecondary.swiftUIColor
         /// 종이 위 강조 — 절 번호.
         public static let accent = ResourcesAsset.Paper.accent.swiftUIColor
     }

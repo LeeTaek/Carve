@@ -60,6 +60,7 @@ private final class ValueBox<Value> {
 struct ChapterCanvasControllerTesting {
 
     /// 컨트롤러와 그 이벤트 기록.
+    @MainActor
     private final class Harness {
         let controller = ChapterCanvasController()
         var events: [ChapterCanvasController.Event] = []

@@ -338,9 +338,12 @@ public struct CarveDetailFeature {
                     return .none
                 }
                 state.lastEditedVerseID = id
-                let drawing = state.sentenceWithDrawingState[index].canvasState.drawing
+                let canvasState = state.sentenceWithDrawingState[index].canvasState
+                guard let request = makeLegacyDrawingSaveRequest(from: canvasState) else {
+                    return .none
+                }
                 return .run { _ in
-                    try await persistDrawing(drawing)
+                    try await persistDrawing(request)
                 }
                 
                      
@@ -359,6 +362,23 @@ public struct CarveDetailFeature {
 
 
 extension CarveDetailFeature {
+    /// N-Canvas 상태의 SwiftData 모델에서 actor 경계를 넘길 저장 값만 추출한다.
+    /// - Parameter canvasState: 변경된 절의 Canvas 상태.
+    /// - Returns: 저장할 모델이 없으면 nil, 있으면 Sendable 행 단위 요청.
+    /// - Note: 저장 부작용은 없으며 신규 모델이 가진 선발급 `rowUUID`를 보존한다.
+    private func makeLegacyDrawingSaveRequest(from canvasState: CanvasFeature.State) -> LegacyDrawingSaveRequest? {
+        guard let drawing = canvasState.drawing else { return nil }
+        return LegacyDrawingSaveRequest(
+            chapter: canvasState.title,
+            verse: canvasState.verse,
+            rowID: BibleDrawingRowID(raw: drawing.rowKey),
+            lineData: drawing.lineData,
+            updateDate: drawing.updateDate,
+            drawingVersion: drawing.drawingVersion,
+            layoutMetadataData: drawing.layoutMetadataData
+        )
+    }
+
     /// Canvas에서 올라온 변경(획 추가 / 지우개)을 SwiftData에 반영.
     ///
     /// - Important: 획 유무를 조건으로 걸지 않는다.
@@ -366,9 +386,9 @@ extension CarveDetailFeature {
     ///   `lineData?.containsPKStroke == false`가 된다. 예전에는 이 조건을 저장의 전제로 삼아
     ///   "전부 지운 순간"의 저장이 통째로 건너뛰어졌고, 앱을 재기동하면 지웠던 획이 되살아났다.
     ///   따라서 stroke가 0개인 drawing도 그대로 저장한다.
-    func persistDrawing(_ drawing: BibleDrawing?) async throws {
-        guard let drawing else { return }
-        try await drawingContext.updateDrawing(drawing: drawing)
+    func persistDrawing(_ request: LegacyDrawingSaveRequest?) async throws {
+        guard let request else { return }
+        try await drawingContext.updateDrawing(request: request)
     }
 
     /// `SentencesWithDrawingFeature.State.id` 규칙과 동일한 스크롤용 ID를 생성.

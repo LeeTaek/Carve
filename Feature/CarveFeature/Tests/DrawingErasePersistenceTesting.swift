@@ -60,7 +60,7 @@ struct DrawingErasePersistenceTesting {
             verse: verse,
             lineData: PKDrawing(strokes: [Self.makeStroke()]).dataRepresentation()
         )
-        try await feature.persistDrawing(drawing)
+        try await feature.persistDrawing(Self.request(for: drawing, chapter: chapter, verse: verse))
         let afterDraw = try await Self.fetch(chapter: chapter, verse: verse, from: verifier)
         let afterDrawStrokes = try Self.strokeCount(of: afterDraw)
         #expect(afterDrawStrokes == 1)
@@ -68,7 +68,7 @@ struct DrawingErasePersistenceTesting {
         // when: 지우개로 전부 지운 상태(= stroke 0개인 유효한 PKDrawing)를 저장한다.
         drawing.lineData = PKDrawing().dataRepresentation()
         drawing.updateDate = Date()
-        try await feature.persistDrawing(drawing)
+        try await feature.persistDrawing(Self.request(for: drawing, chapter: chapter, verse: verse))
 
         // then: 다른 context 에서 다시 읽어도 획이 되살아나지 않는다.
         let reloaded = try await Self.fetch(chapter: chapter, verse: verse, from: verifier)
@@ -216,6 +216,19 @@ struct DrawingErasePersistenceTesting {
     private static func strokeCount(of drawings: [BibleDrawing]) throws -> Int {
         guard let main = drawings.mainDrawing() else { throw Failure.missingDrawing }
         return try strokeCount(of: main)
+    }
+
+    /// 테스트 모델에서 제품 코드와 같은 N-Canvas 저장 요청을 만든다.
+    private static func request(for drawing: BibleDrawing, chapter: BibleChapter, verse: Int) -> LegacyDrawingSaveRequest {
+        LegacyDrawingSaveRequest(
+            chapter: chapter,
+            verse: verse,
+            rowID: BibleDrawingRowID(raw: drawing.rowKey),
+            lineData: drawing.lineData,
+            updateDate: drawing.updateDate,
+            drawingVersion: drawing.drawingVersion,
+            layoutMetadataData: drawing.layoutMetadataData
+        )
     }
 
     /// 주어진 actor(= ModelContext)에서 해당 절의 필사 기록을 읽는다.

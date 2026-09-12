@@ -246,25 +246,25 @@ struct ChapterCanvasDeltaGuardWiringTesting {
         defer { defaults.removePersistentDomain(forName: suite) }
         defaults.set(false, forKey: SingleCanvasFlag.appStorageKey)
 
-        try await withDependencies {
-            $0.defaultAppStorage = defaults
-        } operation: {
-            let state = CarveDetailFeature.State(headerState: .initialState)
-            try #require(!state.usesSingleCanvas)
-            let store = makeDetailStore(state)
-            measureWithAccumulatingDelta(store)
-            try await Task.sleep(for: .milliseconds(200))
+        var state = CarveDetailFeature.State(headerState: .initialState)
+        state.$isSingleCanvasEnabled = Shared(
+            wrappedValue: false,
+            .appStorage(SingleCanvasFlag.appStorageKey, store: defaults)
+        )
+        try #require(!state.usesSingleCanvas)
+        let store = makeDetailStore(state)
+        measureWithAccumulatingDelta(store)
+        try await Task.sleep(for: .milliseconds(200))
 
-            // 측정 자체는 "차단해야 할 크기" 라고 판정한다 — 즉 이 테스트는 Δ 가 작아서 통과하는 것이 아니다.
-            let verdict = try #require(store.chapterLayout.layoutDeltaVerdict)
-            #expect(verdict.blocksInput)
-            #expect(verdict.magnitude > SentenceSetting.initialState.linePitch)
+        // 측정 자체는 "차단해야 할 크기" 라고 판정한다 — 즉 이 테스트는 Δ 가 작아서 통과하는 것이 아니다.
+        let verdict = try #require(store.chapterLayout.layoutDeltaVerdict)
+        #expect(verdict.blocksInput)
+        #expect(verdict.magnitude > SentenceSetting.initialState.linePitch)
 
-            // effect 를 실제로 태웠는데도 N-Canvas 경로에는 아무것도 전달되지 않았다.
-            #expect(store.chapterCanvas.layoutDelta == nil)
-            #expect(store.chapterCanvas.isDrawingInputEnabled == store.chapterCanvas.isInputEnabled)
-            #expect(store.isLayoutReady)
-        }
+        // effect 를 실제로 태웠는데도 N-Canvas 경로에는 아무것도 전달되지 않았다.
+        #expect(store.chapterCanvas.layoutDelta == nil)
+        #expect(store.chapterCanvas.isDrawingInputEnabled == store.chapterCanvas.isInputEnabled)
+        #expect(store.isLayoutReady)
     }
 
     @Test("단일 Canvas 경로에서는 Δ 판정이 effect 로 캔버스까지 전달돼 새 입력이 닫힌다 (§14 안전망 배선)")
@@ -274,20 +274,20 @@ struct ChapterCanvasDeltaGuardWiringTesting {
         defer { defaults.removePersistentDomain(forName: suite) }
         defaults.set(true, forKey: SingleCanvasFlag.appStorageKey)
 
-        try await withDependencies {
-            $0.defaultAppStorage = defaults
-        } operation: {
-            let state = CarveDetailFeature.State(headerState: .initialState)
-            try #require(state.usesSingleCanvas)
-            let store = makeDetailStore(state)
-            measureWithAccumulatingDelta(store)
-            try await Task.sleep(for: .milliseconds(300))
+        var state = CarveDetailFeature.State(headerState: .initialState)
+        state.$isSingleCanvasEnabled = Shared(
+            wrappedValue: true,
+            .appStorage(SingleCanvasFlag.appStorageKey, store: defaults)
+        )
+        try #require(state.usesSingleCanvas)
+        let store = makeDetailStore(state)
+        measureWithAccumulatingDelta(store)
+        try await Task.sleep(for: .milliseconds(300))
 
-            let verdict = try #require(store.chapterLayout.layoutDeltaVerdict)
-            #expect(verdict.blocksInput)
-            // `.layoutDeltaEvaluated` 를 손으로 보내지 않았다 — `forwardLayoutToSingleCanvas` 의 effect 가 옮긴 것이다.
-            #expect(store.chapterCanvas.layoutDelta == verdict)
-            #expect(!store.chapterCanvas.isDrawingInputEnabled)
-        }
+        let verdict = try #require(store.chapterLayout.layoutDeltaVerdict)
+        #expect(verdict.blocksInput)
+        // `.layoutDeltaEvaluated` 를 손으로 보내지 않았다 — `forwardLayoutToSingleCanvas` 의 effect 가 옮긴 것이다.
+        #expect(store.chapterCanvas.layoutDelta == verdict)
+        #expect(!store.chapterCanvas.isDrawingInputEnabled)
     }
 }

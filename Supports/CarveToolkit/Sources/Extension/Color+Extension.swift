@@ -21,7 +21,7 @@ public extension Color {
     enum Brand {
         public static let background = ResourcesAsset.background.swiftUIColor
         public static let cellBackground = ResourcesAsset.cellBackground.swiftUIColor
-        public static let secondary = ResourcesAsset.secondary.swiftUIColor
+        public static let secondary = ResourcesAsset.textSecondary.swiftUIColor
         public static let ink = ResourcesAsset.ink.swiftUIColor
         public static let accent = ResourcesAsset.accent.swiftUIColor
     }

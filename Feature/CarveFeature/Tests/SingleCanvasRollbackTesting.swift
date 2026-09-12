@@ -101,7 +101,7 @@ struct SingleCanvasRollbackTesting {
         let row = BibleDrawing(bibleTitle: chapter, verse: verse, lineData: PKDrawing(strokes: [Self.stroke()]).dataRepresentation())
         row.drawingVersion = 3
         row.layoutMetadataData = try CanvasTestSupport.metadata().encodedBlob()
-        try await feature.persistDrawing(row)
+        try await feature.persistDrawing(Self.request(for: row, chapter: chapter, verse: verse))
         let stored = try await Self.fetch(chapter: chapter, verse: verse, from: verifier)
         #expect(stored.first?.drawingVersion == 3)
         #expect(stored.first?.layoutMetadataData != nil)
@@ -109,7 +109,7 @@ struct SingleCanvasRollbackTesting {
         // when: N-Canvas 가 편집해 v2 로 내린다.
         var state = CanvasFeature.State(sentence: BibleVerse(title: chapter, verse: verse, sentence: "가사는 버림을 당하며"), drawing: row)
         _ = CanvasFeature().reduce(into: &state, action: .saveDrawing(PKDrawing(strokes: [Self.stroke()])))
-        try await feature.persistDrawing(row)
+        try await feature.persistDrawing(Self.request(for: row, chapter: chapter, verse: verse))
 
         // then: 다른 context 에서 읽어도 v2 이고 metadata 가 없다. 이전 구현은 lineData 만 갱신해 v3 표식이 남았다.
         let reloaded = try await Self.fetch(chapter: chapter, verse: verse, from: verifier)
@@ -129,6 +129,19 @@ struct SingleCanvasRollbackTesting {
             $0.titleName == titleName && $0.titleChapter == chapterNumber && $0.verse == verse
         }
         return try await actor.fetch(FetchDescriptor(predicate: predicate))
+    }
+
+    /// 테스트 모델에서 제품 코드와 같은 N-Canvas 저장 요청을 만든다.
+    private static func request(for drawing: BibleDrawing, chapter: BibleChapter, verse: Int) -> LegacyDrawingSaveRequest {
+        LegacyDrawingSaveRequest(
+            chapter: chapter,
+            verse: verse,
+            rowID: BibleDrawingRowID(raw: drawing.rowKey),
+            lineData: drawing.lineData,
+            updateDate: drawing.updateDate,
+            drawingVersion: drawing.drawingVersion,
+            layoutMetadataData: drawing.layoutMetadataData
+        )
     }
 
     // MARK: 디코드 불가 행

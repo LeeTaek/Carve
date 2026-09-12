@@ -37,18 +37,6 @@ public struct DrawingDatabase: Sendable {
         return storedDrawing
     }
     
-    /// 내부 helper: updateDrawing 에서만 사용되며, id 기준 단건 조회용
-    private func fetch(drawing: BibleDrawing) async throws -> BibleDrawing? {
-        let id = drawing.id
-        let predicate = #Predicate<BibleDrawing> {
-            $0.id == id
-        }
-        let descriptor = FetchDescriptor(predicate: predicate,
-                                         sortBy: [SortDescriptor(\.verse)])
-        let storedDrawing: BibleDrawing? = try await actor.fetch(descriptor).first
-        return storedDrawing
-    }
-    
     /// 해당 절의 필사 데이터를 모두 가져옴
     /// - Parameters:
     ///   - chapter: 해당 성경의 이름과 장
@@ -236,30 +224,16 @@ public struct DrawingDatabase: Sendable {
         }
     }
     
-    public func updateDrawing(drawing: BibleDrawing) async throws {
+    /// N-Canvas의 행 단위 변경을 저장한다.
+    ///
+    /// SwiftData 모델은 actor 경계를 넘기지 않고, 호출부가 미리 만든 Sendable 요청만 전달한다.
+    /// 기존 행의 `isPresent`와 `rowUUID`는 유지하며 신규 행은 선발급된 `rowID`를 그대로 사용한다(§8-7).
+    public func updateDrawing(request: LegacyDrawingSaveRequest) async throws {
         do {
-            if (try await fetch(drawing: drawing)) != nil {
-                try await actor.update(drawing.id) { (oldValue: BibleDrawing) async in
-                    oldValue.lineData = drawing.lineData
-                    oldValue.updateDate = drawing.updateDate
-                    // 좌표 형식 표식과 metadata 도 함께 옮긴다 (설계 §10-3 flag off 경로).
-                    // N-Canvas 가 첫 밑줄 원점(v3) 행을 편집하면 좌상단 원점(v2)으로 내리는데,
-                    // lineData 만 바꾸면 행은 v3 인 채 내용만 v2 가 되어 단일 Canvas 가 잘못된 위치에 놓는다.
-                    oldValue.drawingVersion = drawing.drawingVersion
-                    oldValue.layoutMetadataData = drawing.layoutMetadataData
-                }
-            } else {
-                try await actor.insert(drawing)
-            }
-            Log.debug("update drawing", drawing.id ?? "")
+            try await actor.upsertLegacyDrawing(request)
+            Log.debug("update drawing", request.rowID.raw)
         } catch {
             Log.error("failed to update drawing", error)
-        }
-    }
-    
-    public func updateDrawings(drawings: [BibleDrawing]) async throws {
-        for drawing in drawings {
-            try await updateDrawing(drawing: drawing)
         }
     }
     
@@ -296,6 +270,42 @@ public struct DrawingDatabase: Sendable {
         descriptor.fetchLimit = limit
 
         return try await actor.fetch(descriptor)
+    }
+}
+
+extension SwiftDatabaseActor {
+    /// N-Canvas 저장 요청을 행 주소로 upsert하고 한 번 저장한다.
+    /// - Parameter request: SwiftData 모델을 포함하지 않는 행 단위 저장 값.
+    public func upsertLegacyDrawing(_ request: LegacyDrawingSaveRequest) throws {
+        let rawRowID = request.rowID.raw
+        let titleName = request.chapter.title.rawValue
+        let chapterNumber = request.chapter.chapter
+        let predicate = #Predicate<BibleDrawing> {
+            $0.titleName == titleName && $0.titleChapter == chapterNumber
+                && ($0.rowUUID == rawRowID || $0.id == rawRowID)
+        }
+        var descriptor = FetchDescriptor(predicate: predicate)
+        descriptor.fetchLimit = 1
+
+        if let stored = try modelContext.fetch(descriptor).first {
+            stored.lineData = request.lineData
+            stored.updateDate = request.updateDate
+            // 좌표 형식 표식과 metadata도 함께 옮긴다(설계 §10-3 flag off 경로).
+            stored.drawingVersion = request.drawingVersion
+            stored.layoutMetadataData = request.layoutMetadataData
+        } else {
+            let stored = BibleDrawing(
+                bibleTitle: request.chapter,
+                verse: request.verse,
+                lineData: request.lineData,
+                updateDate: request.updateDate,
+                layoutMetadataData: request.layoutMetadataData,
+                rowUUID: rawRowID
+            )
+            stored.drawingVersion = request.drawingVersion
+            modelContext.insert(stored)
+        }
+        try modelContext.save()
     }
 }
 

@@ -442,11 +442,15 @@ struct ChapterLayoutBuilderHeightTesting {
         #expect(layout.regions[0].underlineAnchors == [55, 85])
 
         // 2절: leadingInset 은 writingRect **밖**의 gap 이라 cursor 만 민다.
-        #expect(layout.regions[1].writingRect.minY == 2 + 85.5 + 12 + 34)
+        // 매크로 안의 리터럴 산술식이 다른 숫자 타입으로 추론되지 않도록 CGFloat 로 고정한다.
+        let expectedSecondMinY: CGFloat = 2 + 85.5 + 12 + 34
+        #expect(layout.regions[1].writingRect.minY == expectedSecondMinY)
         // 실측 60.5 + 초과 band 2개 × 30.
-        #expect(layout.regions[1].writingRect.height == 60.5 + 60)
+        let expectedSecondHeight: CGFloat = 60.5 + 60
+        #expect(layout.regions[1].writingRect.height == expectedSecondHeight)
         #expect(layout.regions[1].underlineAnchors == [30, 60])
-        #expect(layout.totalHeight == 2 + 85.5 + 12 + 34 + 120.5 + 2)
+        let expectedTotalHeight: CGFloat = 2 + 85.5 + 12 + 34 + 120.5 + 2
+        #expect(layout.totalHeight == expectedTotalHeight)
     }
 }
 

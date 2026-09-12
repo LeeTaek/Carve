@@ -9,6 +9,7 @@
 import SwiftUI
 import CarveFeature
 import ChartFeature
+import ClientInterfaces
 import SettingsFeature
 
 import ComposableArchitecture

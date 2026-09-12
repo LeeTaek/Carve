@@ -117,8 +117,10 @@ public struct CloudSettingsFeature {
 }
 
 extension CloudSettingsFeature {
-    @Reducer(state: .hashable)
+    @Reducer
     public enum Path {
         case popup(PopupFeature)
     }
 }
+
+extension CloudSettingsFeature.Path.State: Hashable {}

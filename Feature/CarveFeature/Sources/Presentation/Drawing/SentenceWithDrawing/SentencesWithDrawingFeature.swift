@@ -82,9 +82,9 @@ public struct SentencesWithDrawingFeature {
                 state.isPresentDrewHistory = isPresent
             case .scope(.drewHistoryAction(.setPresentDrawing(let drawing))):
                 state.isPresentDrewHistory = false
-                return .run { send in
-                    await send(.scope(.canvasAction(.setDrawing(drawing))))
-                }
+                // 액션만 전달하는 자리라 .run 을 쓸 이유가 없다.
+                // @Sendable 클로저로 모델을 들고 들어가지 않게 .send 로 바꾼다.
+                return .send(.scope(.canvasAction(.setDrawing(drawing))))
             default: break
                 
             }

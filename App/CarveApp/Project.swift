@@ -60,6 +60,9 @@ let targets: [Target] = [
         entitlements: .file(path: .relativeToCurrentFile("Support/Carve.entitlements")),
         scripts: script,
         dependencies: dependencies,
+        // Asset.xcassets 에 AccentColor 색상 세트가 없어서 actool 경고가 난다. 기본 틴트를 쓴다.
+        // tuist 가 타깃 레벨에 기본값을 넣으므로 프로젝트 base 가 아니라 여기서 비워야 먹는다.
+        settings: .settings(base: ["ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME": ""]),
         launchArguments: [
             .launchArgument(name: "-FIRDebugEnabled", isEnabled: true)
         ]

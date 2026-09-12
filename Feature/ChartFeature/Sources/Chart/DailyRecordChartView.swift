@@ -66,7 +66,11 @@ struct DailyRecordChartView: View {
         let endExclusive = start.addDays(pageDays)
         let fallbackXDomain = start...endExclusive
         
-        return Chart {}
+        // 축만 그리는 차트. `Chart {}` 는 EmptyView 를 ChartContent 로 쓰는데
+        // 그 conformance 가 iOS 27+ 라 경고가 난다. 빈 컬렉션으로 마크 0개를 그린다.
+        return Chart([Int](), id: \.self) { _ in
+            RuleMark(y: .value("", 0))
+        }
             .chartXScale(domain: visible?.xDomain ?? fallbackXDomain)
             .chartYScale(domain: store.yScale)
             .chartYAxis {

@@ -30,23 +30,23 @@ public struct SentenceSettingsView: View {
 
                 VStack(alignment: .leading, spacing: CarveSpacing.large) {
                     CarveSettingsSection("글꼴") {
-                        CarveSegmentedPicker(selection: $store.setting.fontFamily, items: FontCase.allCases) { font in
+                        CarveSegmentedPicker(selection: $store.setting.fontFamily.sending(\.setFontFamily), items: FontCase.allCases) { font in
                             Text(font.title)
                                 .font(CarveTypography.scripture(font.font(size: 14)))
                         }
                     }
 
-                    CarveLabeledSlider("글자 크기", value: $store.setting.fontSize, in: 15...40, step: 1, valueText: "\(Int(store.setting.fontSize)) pt")
-                    CarveLabeledSlider("줄 간격", value: $store.setting.lineSpace, in: 5...70, step: 1, valueText: "\(Int(store.setting.lineSpace))")
-                    CarveLabeledSlider("자간", value: $store.setting.traking, in: 1...10, step: 1, valueText: "\(Int(store.setting.traking))")
+                    CarveLabeledSlider("글자 크기", value: $store.setting.fontSize.sending(\.setFontSize), in: 15...40, step: 1, valueText: "\(Int(store.setting.fontSize)) pt")
+                    CarveLabeledSlider("줄 간격", value: $store.setting.lineSpace.sending(\.setLineSpace), in: 5...70, step: 1, valueText: "\(Int(store.setting.lineSpace))")
+                    CarveLabeledSlider("자간", value: $store.setting.traking.sending(\.setTraking), in: 1...10, step: 1, valueText: "\(Int(store.setting.traking))")
                 }
                 .padding(CarveSpacing.large)
 
                 CarveDivider()
 
                 CarveSettingsSection("화면과 필기") {
-                    CarveSettingsRow("왼손 사용자용 화면", description: "필기 열이 왼쪽으로 가요", isOn: $store.isLeftHanded)
-                    CarveSettingsRow("손가락 필사 허용", description: "끄면 Apple Pencil로만 필사할 수 있어요", isOn: $store.allowFingerDrawing)
+                    CarveSettingsRow("왼손 사용자용 화면", description: "필기 열이 왼쪽으로 가요", isOn: $store.isLeftHanded.sending(\.setLeftHanded))
+                    CarveSettingsRow("손가락 필사 허용", description: "끄면 Apple Pencil로만 필사할 수 있어요", isOn: $store.allowFingerDrawing.sending(\.setAllowFingerDrawing))
                 }
                 .padding(.horizontal, CarveSpacing.large)
                 .padding(.vertical, CarveSpacing.medium)
@@ -54,7 +54,7 @@ public struct SentenceSettingsView: View {
                 CarveDivider()
 
                 Button("본문 모양 초기화") {
-                    store.setting = .initialState
+                    store.send(.resetSetting)
                 }
                 .buttonStyle(.carve(.primary, fillsWidth: true))
                 .disabled(store.setting == .initialState)
