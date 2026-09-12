@@ -43,6 +43,20 @@ struct DrawingWeeklySummaryStateTesting {
         #expect(state.weekMaxCount == 0)
     }
 
+    @Test("하루 평균은 소수점 한 자리로 표시한다")
+    func weekAverageTextUsesOneFractionDigit() {
+        let start = makeDate(year: 2026, month: 9, day: 4)
+        var state = DrawingWeeklySummaryFeature.State()
+        state.scrollPosition = start
+        state.dailyRecords = [
+            DailyRecord(date: start, count: 2),
+            DailyRecord(date: start.addingTimeInterval(86_400), count: 3),
+            DailyRecord(date: start.addingTimeInterval(86_400 * 2), count: 7)
+        ]
+
+        #expect(state.weekAverageText == "1.7")
+    }
+
     @Test("현재 주의 일별 권별 횟수를 합산해 가장 많이 필사한 권을 반환한다")
     func topChapterMergesCountsWithinVisibleWeekOnly() {
         let start = makeDate(year: 2026, month: 5, day: 18)

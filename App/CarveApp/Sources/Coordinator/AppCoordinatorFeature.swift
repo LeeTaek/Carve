@@ -100,6 +100,9 @@ public struct AppCoordinatorFeature {
             case .path(.element(id: _, action: .settings(.view(.backToCarve)))):
                 state.path.removeLast()
 
+            case .path(.element(id: _, action: .chart(.delegate(.backToWriting)))):
+                state.path.removeLast()
+
             case .patchnote(.presented(.delegate(.close))):
                 state.patchnote = nil
 

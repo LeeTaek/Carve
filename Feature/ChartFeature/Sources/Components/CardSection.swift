@@ -7,23 +7,26 @@
 //
 
 import SwiftUI
-import CarveToolkit
+import UIComponents
 
 struct CardSection<Content: View>: View {
     let title: String
     @ViewBuilder var content: () -> Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: CarveSpacing.small) {
             Text(title)
-                .font(.subheadline)
-                .foregroundStyle(Color.Brand.ink)
+                .font(CarveTypography.caption)
+                .foregroundStyle(CarveColor.secondary)
 
             content()
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .background(Color.white)
-                .sectionCardShadow()
         }
+        .padding(.horizontal, CarveSpacing.large)
+        .padding(.vertical, CarveSpacing.medium)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .carveSurface(
+            .panel,
+            in: RoundedRectangle(cornerRadius: CarveRadius.card, style: .continuous)
+        )
     }
 }

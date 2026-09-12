@@ -7,24 +7,25 @@
 //
 
 import SwiftUI
-import CarveToolkit
+import UIComponents
 
 struct TileCard<Content: View>: View {
     let title: String
     @ViewBuilder var content: () -> Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: CarveSpacing.small) {
             Text(title)
-                .font(.subheadline)
-                .foregroundStyle(Color.Brand.ink)
+                .font(CarveTypography.caption)
+                .foregroundStyle(CarveColor.secondary)
 
             content()
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .topLeading)
-        .background(Color.white)
-        .sectionCardShadow()
-        .aspectRatio(1, contentMode: .fit)
+        .padding(CarveSpacing.medium)
+        .frame(maxWidth: .infinity, minHeight: 220, alignment: .topLeading)
+        .carveSurface(
+            .panel,
+            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+        )
     }
 }

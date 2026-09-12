@@ -9,6 +9,7 @@
 import SwiftUI
 import Charts
 import CarveToolkit
+import UIComponents
 
 import ComposableArchitecture
 
@@ -16,37 +17,76 @@ import ComposableArchitecture
 struct DailyRecordChartView: View {
     @Bindable var store: StoreOf<DailyRecordChartFeature>
     private let pageDays: Int = DailyRecordChartFeature.pageDays
-    private let background = Color.Brand.background
-    private let secondary = Color.Brand.secondary
     private let visiblePageIndex = 1
     
     var body: some View {
-        if store.records.isEmpty {
-            Text("최근 한 달 동안의 필사 기록이 없어요.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, minHeight: UIScreen.main.bounds.height / 3)
-        } else {
-            GeometryReader { geo in
-                ZStack {
-                    axisChart
-                        .allowsHitTesting(false)
-                        .frame(width: geo.size.width)
-                    
-                    pager
-                        .frame(width: geo.size.width, alignment: .leading)
+        VStack(spacing: CarveSpacing.medium) {
+            weekNavigator
+
+            CardSection(title: "하루에 필사한 절") {
+                GeometryReader { geometry in
+                    ZStack {
+                        axisChart
+                            .allowsHitTesting(false)
+                            .frame(width: geometry.size.width)
+
+                        pager
+                            .frame(width: geometry.size.width, alignment: .leading)
+                    }
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .clipped()
+                    .onAppear {
+                        send(.onAppear(width: geometry.size.width))
+                    }
+                    .onChange(of: geometry.size.width) { _, newValue in
+                        send(.widthChanged(newValue))
+                    }
                 }
-                .padding(.vertical, 12)
-                .frame(width: geo.size.width, height: geo.size.height)
-                .clipped()
-                .onAppear {
-                    send(.onAppear(width: geo.size.width))
-                }
-                .onChange(of: geo.size.width) { _, newValue in
-                    send(.widthChanged(newValue))
-                }
+                .frame(height: 236)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(store.accessibilitySummary)
             }
-            .frame(height: UIScreen.main.bounds.height / 3)
+        }
+    }
+
+    private var weekNavigator: some View {
+        HStack(spacing: CarveSpacing.medium) {
+            CarveIconButton(.chevronLeft, accessibilityLabel: "이전 주") {
+                send(.previousWeekTapped)
+            }
+            .disabled(!store.canMoveToPreviousWeek)
+
+            VStack(spacing: CarveSpacing.xxSmall) {
+                Text("\(store.visibleStartDate.chartMonthDayText) – \(store.visibleEndDate.chartMonthDayText)")
+                    .font(CarveTypography.body)
+                    .foregroundStyle(CarveColor.ink)
+                    .monospacedDigit()
+
+                Text(relativeWeekText)
+                    .font(CarveTypography.caption)
+                    .foregroundStyle(CarveColor.secondary)
+            }
+            .frame(maxWidth: 280)
+            .accessibilityElement(children: .combine)
+
+            CarveIconButton(.chevronRight, accessibilityLabel: "다음 주") {
+                send(.nextWeekTapped)
+            }
+            .disabled(!store.canMoveToNextWeek)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var relativeWeekText: String {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let end = calendar.startOfDay(for: store.visibleEndDate)
+        let days = calendar.dateComponents([.day], from: end, to: today).day ?? 0
+
+        switch days {
+        case ...0: return "이번 주"
+        case 1...7: return "지난 주"
+        default: return "\(max(1, Int(round(Double(days) / 7.0))))주 전"
         }
     }
     
@@ -75,18 +115,21 @@ struct DailyRecordChartView: View {
             .chartYScale(domain: store.yScale)
             .chartYAxis {
                 AxisMarks { value in
+                    AxisGridLine(stroke: StrokeStyle(lineWidth: 1))
+                        .foregroundStyle(CarveColor.divider)
                     AxisValueLabel {
                         if let number = value.as(Double.self) {
                             Text("\(Int(number))")
-                                .foregroundStyle(Color.Brand.ink)
+                                .font(CarveTypography.caption)
+                                .foregroundStyle(CarveColor.secondary)
                         }
                     }
                 }
             }
             .chartXAxis {
                 AxisMarks(values: xAxisBoundaries(for: visible)) { _ in
-                    AxisGridLine(stroke: StrokeStyle(lineWidth: 1, dash: [5]))
-                    AxisTick()
+                    AxisGridLine().foregroundStyle(.clear)
+                    AxisTick().foregroundStyle(.clear)
                     AxisValueLabel {
                         Text(" ")
                             .font(.caption2)
@@ -107,24 +150,18 @@ struct DailyRecordChartView: View {
                     
                     ForEach(dates, id: \.self) { date in
                         if let xPosition = proxy.position(forX: date) {
-                            let x = min(max(xPosition, plotFrame.minX + 22), plotFrame.maxX - 22)
-                            let md = date.formatted(
-                                Date.FormatStyle()
-                                    .locale(Locale(identifier: "ko_KR"))
-                                    .month(.twoDigits)
-                                    .day(.twoDigits)
-                            )
-                            let wd = date.formatted(
+                            let positionX = min(max(xPosition, plotFrame.minX + 22), plotFrame.maxX - 22)
+                            let weekday = date.formatted(
                                 Date.FormatStyle()
                                     .locale(Locale(identifier: "ko_KR"))
                                     .weekday(.narrow)
                             )
                             
-                            Text("\(md) (\(wd))")
-                                .font(.caption2)
+                            Text("\(date.chartMonthDayText) \(weekday)")
+                                .font(CarveTypography.caption)
                                 .monospacedDigit()
-                                .foregroundStyle(Color.Brand.ink)
-                                .position(x: x, y: plotFrame.maxY + 12)
+                                .foregroundStyle(CarveColor.secondary)
+                                .position(x: positionX, y: plotFrame.maxY + 12)
                         }
                     }
                 }
@@ -136,12 +173,14 @@ struct DailyRecordChartView: View {
         HStack(spacing: 0) {
             pageChart(store.pages[safe: 0], allowsSelection: false)
                 .frame(width: store.pageWidth)
+                .opacity(store.canMoveToPreviousWeek ? 1 : 0)
             
             pageChart(store.pages[safe: 1], allowsSelection: true)
                 .frame(width: store.pageWidth)
             
             pageChart(store.pages[safe: 2], allowsSelection: false)
                 .frame(width: store.pageWidth)
+                .opacity(store.canMoveToNextWeek ? 1 : 0)
         }
         .offset(x: (-store.pageWidth * CGFloat(visiblePageIndex)) + store.dragX)
         .contentShape(Rectangle())
@@ -172,27 +211,21 @@ struct DailyRecordChartView: View {
                 width: .ratio(0.55)
             )
             .cornerRadius(6)
-            .foregroundStyle(
-                LinearGradient(
-                    gradient: Gradient(colors: [background, secondary]),
-                    startPoint: .bottom,
-                    endPoint: .top
-                )
-            )
-            .opacity(isSelected ? 1.0 : 0.65)
+            .foregroundStyle(CarveColor.accent)
+            .opacity(isSelected ? 1 : 0.88)
             .annotation(position: .top, alignment: .center) {
-                if isSelected {
+                if record.hasDrawing {
                     Text("\(record.count)")
-                        .font(.caption2)
-                        .foregroundStyle(.white)
-                        .padding(.vertical, 2)
-                        .padding(.horizontal, 6)
-                        .background(Color.Brand.secondary)
+                        .font(CarveTypography.caption)
+                        .foregroundStyle(CarveColor.accent)
+                        .padding(.vertical, CarveSpacing.xxSmall)
+                        .padding(.horizontal, CarveSpacing.xSmall)
+                        .background(CarveColor.selected)
                         .clipShape(Capsule())
                 } else {
                     Text("\(record.count)")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .font(CarveTypography.caption)
+                        .foregroundStyle(CarveColor.divider)
                 }
             }
         }

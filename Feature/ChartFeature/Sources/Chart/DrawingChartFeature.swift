@@ -61,11 +61,22 @@ public struct DrawingChartFeature {
         case endAppending
         case dailyRecordChart(DailyRecordChartFeature.Action)
         case drawingWeeklySummary(DrawingWeeklySummaryFeature.Action)
+        case delegate(Delegate)
         
         public enum View {
+            /// 빈 상태에서 필사 화면으로 돌아가려 할 때 발생한다.
+            case backToWriting
+            /// 차트 진입 시 데이터를 불러오기 위해 발생한다.
             case fetchData
+            /// 과거 데이터가 더 필요할 때 발생한다.
             case loadMoreBefore(Date)
+            /// 차트의 날짜 막대를 선택했을 때 발생한다.
             case tapSymbol(Date)
+        }
+
+        public enum Delegate {
+            /// 차트를 닫고 필사 화면으로 돌아가도록 부모에 알린다.
+            case backToWriting
         }
     }
     
@@ -83,6 +94,9 @@ public struct DrawingChartFeature {
             
             Reduce { state, action in
                 switch action {
+                case .view(.backToWriting):
+                    return .send(.delegate(.backToWriting))
+
                 case .view(.fetchData):
                     return handleFetchData()
                     

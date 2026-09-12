@@ -8,7 +8,6 @@
 
 import SwiftUI
 import UIComponents
-import CarveToolkit
 
 import ComposableArchitecture
 
@@ -26,15 +25,15 @@ public struct DrawingWeeklySummaryView: View {
             alignment: .leading,
             spacing: 16
         ) {
-            TileCard(title: "최근 필사 내역") {
+            TileCard(title: "한 주 동안") {
                 latestDrawingHistoryTile
             }
 
-            TileCard(title: "표시 중인 주 평균") {
+            TileCard(title: "하루 평균") {
                 weeklyAverageTile
             }
 
-            TileCard(title: "표시 중인 주 최고 장") {
+            TileCard(title: "가장 많이 쓴 장") {
                 topChapterTile
             }
 
@@ -57,7 +56,7 @@ public struct DrawingWeeklySummaryView: View {
     private var tileColumns: [GridItem] {
         [
             GridItem(
-                .adaptive(minimum: 220, maximum: 420),
+                .adaptive(minimum: 240, maximum: 420),
                 spacing: 12,
                 alignment: .topLeading
             )
@@ -66,27 +65,17 @@ public struct DrawingWeeklySummaryView: View {
 
     private var latestDrawingHistoryTile: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("한 주 동안")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
             Text("\(store.weekTotalCount)절")
-                .font(.title3)
-                .foregroundStyle(Color.Brand.ink)
+                .font(.title2)
+                .foregroundStyle(CarveColor.ink)
                 .monospacedDigit()
 
             Text("최근")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(CarveTypography.caption)
+                .foregroundStyle(CarveColor.secondary)
                 .padding(.top, 6)
 
             recentVersesList
-
-            Spacer(minLength: 0)
-
-            Text("필사하셨어요")
-                .font(.caption)
-                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
@@ -101,8 +90,9 @@ public struct DrawingWeeklySummaryView: View {
                     } label: {
                         Text("• \(item.message)")
                     }
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(CarveTypography.label)
+                    .foregroundStyle(CarveColor.ink)
+                    .buttonStyle(.plain)
                     .lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -113,26 +103,17 @@ public struct DrawingWeeklySummaryView: View {
 
     private var weeklyAverageTile: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("평균")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            Text("\(store.weekAverageCount)절/일")
-                .font(.title3)
-                .foregroundStyle(Color.Brand.ink)
+            Text("\(store.weekAverageText)절")
+                .font(.title2)
+                .foregroundStyle(CarveColor.ink)
                 .monospacedDigit()
 
-            Text("최근")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            Text("최근 장")
+                .font(CarveTypography.caption)
+                .foregroundStyle(CarveColor.secondary)
                 .padding(.top, 6)
 
             recentChaptersList
-            Spacer(minLength: 0)
-
-            Text("필사하셨어요")
-                .font(.caption)
-                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
@@ -150,8 +131,9 @@ public struct DrawingWeeklySummaryView: View {
                     } label: {
                         Text("• \(item.title.koreanTitle()) \(item.chapter)장")
                     }
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(CarveTypography.label)
+                    .foregroundStyle(CarveColor.ink)
+                    .buttonStyle(.plain)
                     .lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -162,10 +144,6 @@ public struct DrawingWeeklySummaryView: View {
 
     private var topChapterTile: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("이번 주")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
             if let topChapter = store.topChapter {
                 Button {
                     send(.topChapterTapped)
@@ -173,11 +151,11 @@ public struct DrawingWeeklySummaryView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("\(topChapter.chapter.title.koreanTitle()) \(topChapter.chapter.chapter)장")
                             .font(.title3)
-                            .foregroundStyle(Color.Brand.ink)
+                            .foregroundStyle(CarveColor.ink)
                             .lineLimit(2)
                         Text("\(topChapter.count)절")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .font(CarveTypography.label)
+                            .foregroundStyle(CarveColor.secondary)
                             .monospacedDigit()
                     }
                 }
@@ -185,14 +163,19 @@ public struct DrawingWeeklySummaryView: View {
             } else {
                 Text("기록 없음")
                     .font(.title3)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(CarveColor.secondary)
             }
 
             Spacer(minLength: 0)
 
-            Text("(절 수 기준)")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            if store.topChapter != nil {
+                Button("이어서 쓰기") {
+                    send(.topChapterTapped)
+                }
+                .font(CarveTypography.label)
+                .foregroundStyle(CarveColor.accent)
+                .buttonStyle(.plain)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }

@@ -48,6 +48,11 @@ public struct DrawingWeeklySummaryFeature {
         public var weekAverageCount: Int {
             Int(round(Double(weekTotalCount) / 7.0))
         }
+
+        /// 주간 합계를 7일로 나눈 값을 소수점 한 자리로 표시한다.
+        public var weekAverageText: String {
+            (Double(weekTotalCount) / 7.0).formatted(.number.precision(.fractionLength(1)))
+        }
         
         public var weekMaxCount: Int {
             currentWeekRecords.map(\.count).max() ?? 0
