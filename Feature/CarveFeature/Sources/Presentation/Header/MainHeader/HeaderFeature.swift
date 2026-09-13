@@ -105,16 +105,8 @@ public struct HeaderFeature {
                     state.lastHeaderOffset = -collapseDistance
                 }
 
-                // 본문을 읽어 내려갈 때는 도구를 접고, 되돌릴 때는 다시 펼친다.
-                // 맨 위를 넘어 당긴 튕김(값이 양수)은 방향 전환이 아니다 — N-Canvas(SwiftUI ScrollView) 경로용.
-                // 단일 Canvas 경로는 컨트롤러가 양 끝 튕김을 잘라서 보고한다.
                 let isOverscrolledAtTop = previous > 0 || current > 0
-                if isScrollingUp, !isOverscrolledAtTop {
-                    state.isPaletteExpanded = false
-                } else if isScrollingDown, !isOverscrolledAtTop {
-                    state.isPaletteExpanded = true
-                }
-                
+
                 if isScrollingUp {
                     if state.direction != .up, current < 0 {
                         state.shiftOffset = current - state.headerOffset
@@ -135,6 +127,13 @@ public struct HeaderFeature {
 
                     let offset = state.lastHeaderOffset + (current - state.shiftOffset)
                     state.headerOffset = (offset > 0 ? 0 : offset)
+                }
+
+                // 미세한 방향 전환에는 반응하지 않고, 헤더가 끝까지 접히거나 펼쳐졌을 때 팔레트도 함께 전환한다.
+                if isScrollingUp, !isOverscrolledAtTop, state.headerOffset <= -collapseDistance {
+                    state.isPaletteExpanded = false
+                } else if isScrollingDown, !isOverscrolledAtTop, state.headerOffset >= 0 {
+                    state.isPaletteExpanded = true
                 }
 
             case .view(.expandPalette):

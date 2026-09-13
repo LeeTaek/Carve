@@ -37,13 +37,6 @@ public struct SettingsView: View {
                 }
         }
         .toolbar(.hidden)
-        .allowsHitTesting(store.path?.patchnote == nil)
-        .accessibilityHidden(store.path?.patchnote != nil)
-        .overlay {
-            if let patchnoteStore = store.scope(state: \.path?.patchnote, action: \.path.patchnote) {
-                PatchnoteView(store: patchnoteStore)
-            }
-        }
     }
     
     private var sideBar: some View {
@@ -80,7 +73,9 @@ public struct SettingsView: View {
                 HelpView(store: store)
             }
         case .patchnote:
-            Color.clear
+            if let store = store.scope(state: \.path?.patchnote, action: \.path.patchnote) {
+                PatchnoteView(store: store, style: .detail)
+            }
         case .sendFeedback:
             if let store = store.scope(state: \.path?.sendFeedback, action: \.path.sendFeedback) {
                 SendFeedbackView(store: store)

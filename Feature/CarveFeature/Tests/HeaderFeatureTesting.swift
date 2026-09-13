@@ -89,7 +89,7 @@ struct HeaderFeatureTesting {
         #expect(state.lastHeaderOffset == -40)
     }
 
-    @Test("본문을 읽어 내려가면 팔레트를 접고 되돌리면 다시 펼친다")
+    @Test("팔레트는 헤더가 완전히 접히거나 펼쳐진 뒤에만 함께 전환한다")
     func headerAnimationUpdatesPaletteVisibility() async {
         var state = HeaderFeature.State.initialState
         state.headerHeight = 118
@@ -97,9 +97,20 @@ struct HeaderFeatureTesting {
 
         _ = HeaderFeature().reduce(into: &state, action: .headerAnimation(-10, -20))
 
+        #expect(state.isPaletteExpanded)
+
+        _ = HeaderFeature().reduce(into: &state, action: .headerAnimation(-20, -61))
+
+        #expect(state.headerOffset == -40)
         #expect(!state.isPaletteExpanded)
 
-        _ = HeaderFeature().reduce(into: &state, action: .headerAnimation(-20, -10))
+        _ = HeaderFeature().reduce(into: &state, action: .headerAnimation(-61, -60))
+
+        #expect(!state.isPaletteExpanded)
+
+        _ = HeaderFeature().reduce(into: &state, action: .headerAnimation(-60, -20))
+
+        #expect(state.headerOffset == 0)
 
         #expect(state.isPaletteExpanded)
     }

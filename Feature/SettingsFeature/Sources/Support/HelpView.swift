@@ -41,16 +41,11 @@ public struct HelpView: View {
                     body: "지정한 순간의 모습이 위젯에 남아요. 홈 화면에 위젯을 먼저 추가해 주세요."
                 )
 
-                Button {
-                    send(.restartFirstRunGuideTapped)
-                } label: {
-                    Text("처음부터 다시 보기")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.carve(.secondary))
             }
             .padding(CarveSpacing.large)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(CarveColor.canvas)
     }
 

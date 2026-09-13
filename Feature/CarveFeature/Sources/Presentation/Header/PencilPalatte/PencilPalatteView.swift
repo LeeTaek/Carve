@@ -303,19 +303,15 @@ public struct PencilPalatteDockView: View {
         GeometryReader { proxy in
             // 펼친 팔레트는 시안 폭(504)이고, 창이 그보다 좁으면 가용 폭까지만 쓰고 안에서 넘긴다.
             let expandedWidth = min(max(0, proxy.size.width - CarveSpacing.large * 2), PencilPalatteView.designWidth)
-            // iOS 26 유리에서는 가까운 유리끼리 붙었다 떨어진다 — 실행 취소가 원에서 갈라져 나오는 모양이 여기서 생긴다.
-            // 그 밖의 경로 · 투명도 줄이기에서는 불투명 표면의 폭 · 크기 변화로 같은 전환을 한다.
-            CarveSurfaceGroup(spacing: CarveSpacing.xLarge) {
-                VStack(alignment: sideAlignment, spacing: CarveSpacing.xxSmall) {
-                    HStack(spacing: isShowingExpanded ? 0 : CarveSpacing.small) {
-                        if isLeftHanded { undoButton }
-                        paletteSurface(expandedWidth: expandedWidth)
-                        if !isLeftHanded { undoButton }
-                    }
-                    caption(expandedWidth: expandedWidth)
+            VStack(alignment: sideAlignment, spacing: CarveSpacing.xxSmall) {
+                HStack(spacing: isShowingExpanded ? 0 : CarveSpacing.medium) {
+                    if isLeftHanded { undoButton }
+                    paletteSurface(expandedWidth: expandedWidth)
+                    if !isLeftHanded { undoButton }
                 }
-                .frame(maxWidth: .infinity, alignment: isShowingExpanded ? .center : Alignment(horizontal: sideAlignment, vertical: .center))
+                caption(expandedWidth: expandedWidth)
             }
+            .frame(maxWidth: .infinity, alignment: isShowingExpanded ? .center : Alignment(horizontal: sideAlignment, vertical: .center))
             .padding(.horizontal, CarveSpacing.large)
         }
         .frame(height: CarveSize.floatingToolButton + CarveSpacing.xxSmall + Self.captionHeight + CarveSpacing.small)
@@ -364,11 +360,11 @@ public struct PencilPalatteDockView: View {
         .carveSurface(.floatingControl, in: paletteShape)
     }
 
-    /// 접힘 상태의 실행 취소. 펼치면 원 옆에서 크기 0 으로 줄어들어 합쳐지고, 접으면 거기서 갈라져 나온다.
+    /// 접힘 상태의 실행 취소. 펼치면 크기 0으로 줄어들고, 접히면 현재 도구와 분리된 단일 버튼으로 나타난다.
     ///
     /// ⚠️ 펼친 동안에는 유리를 빼(`.plain`) 일반 뷰로 숨긴다. 유리 컨테이너는 유리 **안의 내용**을 따로 그려
     ///    바깥의 `opacity` · `scaleEffect` 를 따르지 않으므로, 유리를 둔 채 숨기면 캡슐 옆에 아이콘이 그대로 보였다.
-    ///    접을 때 유리가 다시 생기며 가까운 원에서 갈라져 나온다.
+    ///    접을 때 유리가 다시 생기며 독립된 버튼으로 나타난다.
     private var undoButton: some View {
         CarveIconButton(.undo, accessibilityLabel: "실행 취소", background: isShowingExpanded ? .plain : .floating) {
             store.send(.view(.undo))

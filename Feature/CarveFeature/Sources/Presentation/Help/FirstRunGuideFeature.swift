@@ -12,12 +12,17 @@ import ComposableArchitecture
 public struct FirstRunGuideFeature {
     public init() { }
 
+    static let pageCount = 4
+
     @ObservableState
     public struct State: Equatable {
         public static let initialState = Self()
+        /// 최초 안내에서 현재 표시하는 항목의 0 기반 위치다.
+        public var currentPage = 0
     }
 
-    public enum Action: ViewAction {
+    public enum Action: ViewAction, BindableAction {
+        case binding(BindingAction<State>)
         case delegate(Delegate)
         case view(View)
 
@@ -26,16 +31,27 @@ public struct FirstRunGuideFeature {
         }
 
         public enum View {
-            case startTapped
+            /// 다음 안내를 표시하거나 마지막 안내를 완료할 때 발생한다.
+            case nextTapped
+            /// 남은 안내를 건너뛰고 필사를 시작할 때 발생한다.
+            case skipTapped
         }
     }
 
     public var body: some Reducer<State, Action> {
-        Reduce { _, action in
+        BindingReducer()
+
+        Reduce { state, action in
             switch action {
-            case .view(.startTapped):
+            case .view(.nextTapped):
+                guard state.currentPage == Self.pageCount - 1 else {
+                    state.currentPage += 1
+                    return .none
+                }
                 return .send(.delegate(.finished))
-            case .delegate:
+            case .view(.skipTapped):
+                return .send(.delegate(.finished))
+            case .binding, .delegate:
                 return .none
             }
         }

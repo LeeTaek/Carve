@@ -13,6 +13,25 @@ import ComposableArchitecture
 
 @MainActor
 struct CarveNavigationFeatureTesting {
+    @Test("최초 안내는 네 항목을 순서대로 넘긴 뒤 완료한다")
+    func firstRunGuideAdvancesThroughFourPages() async {
+        let store = TestStore(initialState: FirstRunGuideFeature.State.initialState) {
+            FirstRunGuideFeature()
+        }
+
+        await store.send(.view(.nextTapped)) {
+            $0.currentPage = 1
+        }
+        await store.send(.view(.nextTapped)) {
+            $0.currentPage = 2
+        }
+        await store.send(.view(.nextTapped)) {
+            $0.currentPage = 3
+        }
+        await store.send(.view(.nextTapped))
+        await store.receive(\.delegate)
+    }
+
     @Test("서재 아이콘을 닫힌 상태에서 누르면 현재 장을 선택한 3열을 연다")
     func libraryButtonOpensAllColumns() {
         var state = CarveNavigationFeature.State.initialState
