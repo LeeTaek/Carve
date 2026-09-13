@@ -9,6 +9,7 @@
 import SwiftUI
 
 import ComposableArchitecture
+import UIComponents
 
 @ViewAction(for: CanvasSettingsFeature.self)
 public struct CanvasSettingsView: View {
@@ -19,17 +20,30 @@ public struct CanvasSettingsView: View {
     }
 
     public var body: some View {
-        List {
-            Section(
-                header: Text("단일 캔버스"),
-                footer: Text("장 전체를 캔버스 하나로 필사합니다 (실험 기능). 켜거나 끄면 현재 장을 다시 불러옵니다.\n두 방식은 같은 필사 데이터를 쓰므로 언제든 되돌릴 수 있습니다.")
-            ) {
-                Toggle(isOn: $store.isSingleCanvasEnabled.sending(\.view.setSingleCanvasEnabled)) {
-                    Text("단일 캔버스 사용")
-                }
+        ScrollView {
+            VStack(alignment: .leading, spacing: CarveSpacing.large) {
+                Text("필사 캔버스")
+                    .font(CarveTypography.sectionTitle)
+                    .foregroundStyle(CarveColor.secondary)
+
+                CarveSettingsRow(
+                    "단일 캔버스 사용",
+                    description: "장 전체를 하나의 캔버스에서 필사해요.",
+                    isOn: $store.isSingleCanvasEnabled.sending(\.view.setSingleCanvasEnabled)
+                )
+
+                CarveDivider()
+
+                Text("켜거나 끄면 현재 장을 다시 불러와요. 두 방식은 같은 필사 데이터를 사용하므로 언제든 되돌릴 수 있어요.")
+                    .font(CarveTypography.body)
+                    .foregroundStyle(CarveColor.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+            .padding(CarveSpacing.large)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
-        .navigationTitle("필사 캔버스")
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(CarveColor.surface)
         .onAppear { send(.onAppear) }
     }
 }

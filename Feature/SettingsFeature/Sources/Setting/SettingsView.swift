@@ -9,6 +9,7 @@ import SwiftUI
 import Resources
 
 import ComposableArchitecture
+import UIComponents
 
 @ViewAction(for: SettingsFeature.self)
 public struct SettingsView: View {
@@ -19,41 +20,77 @@ public struct SettingsView: View {
     }
     
     public var body: some View {
-        NavigationSplitView {
-            sideBar
-        } detail: {
-            detailView()
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button {
-                            send(.backToCarve)
-                        } label: {
-                            Image(asset: ResourcesAsset.xButton)
-                                .resizable()
-                                .frame(width: 35, height: 35)
-                                .padding()
-                        }
-                    }
+        VStack(spacing: 0) {
+            CarvePanelHeader("설정") {
+                Button("완료") {
+                    send(.backToCarve)
                 }
+                .buttonStyle(.carve(.secondary))
+            }
+
+            NavigationSplitView(columnVisibility: .constant(.all)) {
+                sideBar
+                    .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 320)
+            } detail: {
+                detailView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            }
+            .navigationSplitViewStyle(.balanced)
         }
-        .toolbar(.hidden)
+        .frame(maxWidth: 900, maxHeight: 700)
+        .carveSurface(
+            .panel,
+            in: RoundedRectangle(cornerRadius: CarveRadius.panel, style: .continuous)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: CarveRadius.panel, style: .continuous))
     }
     
     private var sideBar: some View {
         List(selection: $store.path.sending(\.push)) {
-            Section("앱 설정") {
-                NavigationLink("iCloud 설정", value: SettingsFeature.Path.State.iCloud(.initialState))
-                NavigationLink("필사 캔버스", value: SettingsFeature.Path.State.canvas(.initialState))
+            Section("필사") {
+                NavigationLink(value: SettingsFeature.Path.State.canvas(.initialState)) {
+                    sidebarRow("필사 캔버스", value: "단일")
+                }
+            }
+            Section("저장") {
+                NavigationLink(value: SettingsFeature.Path.State.iCloud(.initialState)) {
+                    sidebarRow("iCloud", value: "켬")
+                }
             }
             Section("지원") {
                 NavigationLink("도움말", value: SettingsFeature.Path.State.help(.initialState))
                 NavigationLink("패치노트", value: SettingsFeature.Path.State.patchnote(.initialState))
                 NavigationLink("의견 보내기", value: SettingsFeature.Path.State.sendFeedback(.initialState))
-                NavigationLink("앱 버전", value: SettingsFeature.Path.State.appVersion(.initialState))
+                NavigationLink(value: SettingsFeature.Path.State.appVersion(.initialState)) {
+                    sidebarRow("앱 버전", value: UIDevice.appVersion())
+                }
             }
         }
-        .navigationTitle("설정")
+        .safeAreaInset(edge: .bottom) {
+            VStack(alignment: .leading, spacing: CarveSpacing.xxSmall) {
+                CarveDivider()
+                Text("본문 글꼴·크기·줄 간격은\n필사 화면 위 「가가」에서 바꿔요.")
+                    .font(CarveTypography.caption)
+                    .foregroundStyle(CarveColor.secondary)
+                    .padding(.horizontal, CarveSpacing.small)
+            }
+            .padding(.bottom, CarveSpacing.small)
+            .background(CarveColor.surface)
+        }
+        .listStyle(.sidebar)
+        .scrollContentBackground(.hidden)
+        .background(CarveColor.surface)
         .toolbar(removing: .sidebarToggle)
+    }
+
+    private func sidebarRow(_ title: String, value: String) -> some View {
+        HStack(spacing: CarveSpacing.small) {
+            Text(title)
+            Spacer(minLength: 0)
+            Text(value)
+                .font(CarveTypography.caption)
+                .foregroundStyle(CarveColor.secondary)
+        }
     }
     
     

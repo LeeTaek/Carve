@@ -9,6 +9,7 @@
 import SwiftUI
 
 import ComposableArchitecture
+import UIComponents
 
 @ViewAction(for: CloudSettingsFeature.self)
 public struct CloudSettingView: View {
@@ -20,28 +21,58 @@ public struct CloudSettingView: View {
     
     public var body: some View {
         ZStack {
-            List {
-                Section(
-                    header: Text("iCloud"),
-                    footer: Text("필사한 정보를 개인 계정 iCloud를 통해 백업할지 결정합니다. 사용하지 않는 경우 앱 삭제와 함께 필사 내용이 삭제됩니다.\n끄기 옵션은 추후에 업데이트를 통해 제공되며, 설정앱의 iCloud 항목에서 제거할 수 있습니다.")
-                ) {
-                    Toggle(isOn: $store.iCloudIsOn.sending(\.setiCloud)) {
-                        Text("iCloud를 저장공간으로 사용")
-                    }
+            ScrollView {
+                VStack(alignment: .leading, spacing: CarveSpacing.large) {
+                    Text("iCloud")
+                        .font(CarveTypography.sectionTitle)
+                        .foregroundStyle(CarveColor.secondary)
+
+                    CarveSettingsRow(
+                        "iCloud를 저장공간으로 사용",
+                        description: "항상 켜져 있어요. 끄기는 설정 앱에서 할 수 있어요.",
+                        isOn: $store.iCloudIsOn.sending(\.setiCloud)
+                    )
                     .disabled(true)
+
+                    CarveDivider()
+
+                    VStack(alignment: .leading, spacing: CarveSpacing.xSmall) {
+                        Text("필사한 내용을 개인 iCloud 계정에 백업해요.")
+                            .foregroundStyle(CarveColor.ink)
+                        Text("쓰지 않으면 앱을 지울 때 필사도 함께 사라져요.")
+                        Text("끄기는 다음 업데이트에서 제공할 예정이에요.")
+                    }
+                    .font(CarveTypography.body)
+                    .foregroundStyle(CarveColor.secondary)
+
+                    CarveDivider()
+
+                    VStack(alignment: .leading, spacing: CarveSpacing.small) {
+                        Text("위험한 동작")
+                            .font(CarveTypography.sectionTitle)
+                            .foregroundStyle(CarveColor.secondary)
+
+                        Button {
+                            send(.databaseIsEmpty)
+                        } label: {
+                            Text("모든 필사 데이터 삭제")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.carve(.destructive, fillsWidth: true))
+                        .popover(item: $store.scope(state: \.path?.popup, action: \.path.popup)) { store in
+                            PopupView(store: store)
+                        }
+
+                        Text("모든 장의 필사 기록이 사라져요. 되돌릴 수 없어요.")
+                            .font(CarveTypography.caption)
+                            .foregroundStyle(CarveColor.secondary)
+                    }
                 }
-                
-                Button {
-                    send(.databaseIsEmpty)
-                }label: {
-                    Text("모든 필사 데이터 삭제")
-                        .foregroundStyle(.red)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                }
-                .popover(item: $store.scope(state: \.path?.popup, action: \.path.popup)) { store in
-                    PopupView(store: store)
-                }
+                .padding(CarveSpacing.large)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background(CarveColor.surface)
             
             if store.isLoading {
                 Color.black.opacity(0.2)
@@ -56,8 +87,7 @@ public struct CloudSettingView: View {
                     )
             }
         }
-        .disabled(store.isLoading) // 로딩 중에는 조작 막기
-        .navigationTitle("iCloud 설정")
+        .disabled(store.isLoading)
     }
     
         

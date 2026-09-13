@@ -10,6 +10,7 @@ import CarveFeature
 import ChartFeature
 import SettingsFeature
 import SwiftUI
+import UIComponents
 
 import ComposableArchitecture
 
@@ -50,14 +51,22 @@ public struct AppCoordinatorView: View {
         } destination: { store in
             // push destination - Stack 기반
             switch store.case {
-            case .settings(let store):
-                SettingsView(store: store)
             case .chart(let store):
                 DrawingChartView(store: store)
             }
         }
-        .allowsHitTesting(store.patchnote == nil)
-        .accessibilityHidden(store.patchnote != nil)
+        .allowsHitTesting(store.patchnote == nil && store.settings == nil)
+        .accessibilityHidden(store.patchnote != nil || store.settings != nil)
+        .overlay {
+            if let settingsStore = store.scope(state: \.settings, action: \.settings.presented) {
+                ZStack {
+                    CarveColor.scrim
+                        .ignoresSafeArea()
+                    SettingsView(store: settingsStore)
+                        .padding(60)
+                }
+            }
+        }
         .overlay {
             if let patchnoteStore = store.scope(state: \.patchnote, action: \.patchnote.presented) {
                 PatchnoteView(store: patchnoteStore)
