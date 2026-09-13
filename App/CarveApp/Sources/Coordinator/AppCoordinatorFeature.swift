@@ -23,17 +23,21 @@ public struct AppCoordinatorFeature {
         @Presents public var root: Root.State? = .launchProgress(.initialState)
         /// 업데이트 패치노트 표시 상태
         @Presents public var patchnote: PatchnoteFeature.State?
+        /// 필사 화면 위에 패널로 표시하는 앱 설정 상태.
+        @Presents public var settings: SettingsFeature.State?
         /// 마지막으로 확인한 앱 버전. 값이 없는 기존 설치에는 패치노트를 자동 표시하지 않는다.
         @Shared(.appStorage("lastSeenAppVersion")) public var lastSeenAppVersion: String?
         /// 루트 화면 위에 Push될 화면 Path. (스택 기반)
         public var path: StackState<Path.State> = .init()
         // analytics key
         public var currentScreenKey: String {
-            // Stack top이 있으면 그걸 우선(설정/차트 등)
+            if settings != nil {
+                return "Settings"
+            }
+
+            // Stack top이 있으면 그걸 우선한다.
             if let topPath = path.last {
                 switch topPath {
-                case .settings:
-                    return "Settings"
                 case .chart:
                     return "Chart"
                 }
@@ -55,6 +59,7 @@ public struct AppCoordinatorFeature {
     public enum Action {
         case root(PresentationAction<Root.Action>)
         case patchnote(PresentationAction<PatchnoteFeature.Action>)
+        case settings(PresentationAction<SettingsFeature.Action>)
         /// Path와 관련된 프레젠테이션 액션.
         case path(StackActionOf<Path>)
     }
@@ -70,8 +75,6 @@ public struct AppCoordinatorFeature {
     /// AppCoordinator가 전환할 수 있는 루트 화면들의 집합.
     @Reducer
     public enum Path {
-        /// 앱 설정 화면 흐름.
-        case settings(SettingsFeature)
         /// 필사 통계 차트 화면 흐름.
         case chart(DrawingChartFeature)
     }
@@ -92,13 +95,13 @@ public struct AppCoordinatorFeature {
                 }
                 
             case .root(.presented(.carve(.view(.moveToSetting)))):
-                state.path.append(.settings(.initialState))
+                state.settings = .initialState
                 
             case .root(.presented(.carve(.view(.moveToChart)))):
                 state.path.append(.chart(.initialState))
 
-            case .path(.element(id: _, action: .settings(.view(.backToCarve)))):
-                state.path.removeLast()
+            case .settings(.presented(.view(.backToCarve))):
+                state.settings = nil
 
             case .path(.element(id: _, action: .chart(.delegate(.backToWriting)))):
                 state.path.removeLast()
@@ -108,10 +111,10 @@ public struct AppCoordinatorFeature {
 
             case .patchnote(.presented(.delegate(.showHelp))):
                 state.patchnote = nil
-                state.path.append(.settings(SettingsFeature.State.initialState(path: .help(.initialState))))
+                state.settings = SettingsFeature.State.initialState(path: .help(.initialState))
 
-            case .path(.element(id: _, action: .settings(.delegate(.restartFirstRunGuide)))):
-                state.path.removeLast()
+            case .settings(.presented(.delegate(.restartFirstRunGuide))):
+                state.settings = nil
                 return .send(.root(.presented(.carve(.view(.restartFirstRunGuide)))))
                 
             case let .path(.element(id: _, action: .chart(.drawingWeeklySummary(.openChapter(chapter))))):
@@ -143,6 +146,9 @@ public struct AppCoordinatorFeature {
         .ifLet(\.$root, action: \.root)
         .ifLet(\.$patchnote, action: \.patchnote) {
             PatchnoteFeature()
+        }
+        .ifLet(\.$settings, action: \.settings) {
+            SettingsFeature()
         }
         .forEach(\.path, action: \.path)
     }

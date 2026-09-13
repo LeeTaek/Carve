@@ -164,6 +164,9 @@ public struct CarveNavigationFeature {
                 
             case .view(.moveToSetting):
                 Log.debug("move To settings")
+                // 설정은 필사 화면 위 오버레이로 뜬다. 탐색 열이 뒤에 열린 채 남지 않도록 detail만 남긴다.
+                state.columnVisibility = .detailOnly
+                syncHeaderNavigationState(state: &state)
                 return .none
                 
             case .view(.moveToChart):

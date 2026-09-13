@@ -38,8 +38,9 @@ public struct PatchnoteView: View {
     private var detailContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
-                CarvePanelHeader("패치노트")
-                    .padding(.horizontal, -CarveSpacing.large)
+                Text("패치노트")
+                    .font(CarveTypography.sectionTitle)
+                    .foregroundStyle(CarveColor.secondary)
 
                 VStack(alignment: .leading, spacing: CarveSpacing.xxSmall) {
                     Text("새기다 2.0")

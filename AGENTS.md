@@ -50,7 +50,7 @@ xcodebuild -version                   # Xcode 26.3 / Build 17C529 확인
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer   # 필요할 때만
 ```
 
-**tuist 는 `.mise.toml` 로 4.39.0 에 고정돼 있다.** `PATH` 기본값과 다르므로 반드시
+**tuist 는 `.mise.toml` 로 4.208.0 에 고정돼 있다.** `PATH` 기본값과 다르므로 반드시
 `mise x -- tuist ...` 로 실행한다.
 
 ## 공통 명령어

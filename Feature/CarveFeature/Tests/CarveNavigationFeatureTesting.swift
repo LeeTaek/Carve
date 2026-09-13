@@ -61,6 +61,18 @@ struct CarveNavigationFeatureTesting {
         #expect(!state.carveDetailState.headerState.isNavigationPresented)
     }
 
+    @Test("설정을 열면 탐색 열을 닫고 필사 화면만 남긴다")
+    func moveToSettingClosesNavigationColumns() {
+        var state = CarveNavigationFeature.State.initialState
+        state.columnVisibility = .all
+        state.carveDetailState.headerState.isNavigationPresented = true
+
+        _ = CarveNavigationFeature().reduce(into: &state, action: .view(.moveToSetting))
+
+        #expect(state.columnVisibility == .detailOnly)
+        #expect(!state.carveDetailState.headerState.isNavigationPresented)
+    }
+
     @Test("최초 안내는 UserDefaults에 표시 사실을 저장하고 자동으로 다시 열지 않는다")
     func firstRunGuideIsPresentedOnlyOnce() throws {
         let suite = "CarveNavigationFeatureTesting.\(UUID().uuidString)"
