@@ -4,14 +4,24 @@
 //
 //  D9-5 — 히스토리 메뉴 (설계 §20-11 · 런북 §6-9 D9-5).
 //
-//  ⚠️ **`UIEditMenuInteraction` 은 앱 밖 remote view 로 렌더된다.** 앱·springboard 어느 트리에서도
-//  라벨로 조회되지 않는 것을 확인했다(2026-09-08). 따라서 **존재는 스크린샷으로 판정**하고
-//  **조작은 좌표로** 한다. 트리를 통째로 열거하는 방식은 열거 중 트리가 바뀌어 실패한다.
+//  절 메뉴는 앱 안의 SwiftUI 오버레이(`VerseMenuOverlay`, 시안 E1)다. 항목은 버튼으로 트리에 올라오므로
+//  **식별자 `verseMenu.<항목>` 으로 조회**한다 (2026-09-14 전환).
+//  그 전의 `UIEditMenuInteraction` 메뉴는 앱 밖 remote view 라 라벨로 조회되지 않았고, `menuItems` 로 보이던 것은
+//  PencilKit 자체 메뉴였다 — 그래서 옛 `menuItems["이전 필사 내용 보기"]` 판정은 지금 메뉴를 보지 못한다.
 //
 
 import XCTest
 
 final class ChapterHistoryMenuUITests: XCTestCase {
+
+    /// 절 메뉴 항목 식별자 (`VerseMenuOverlay`).
+    private enum VerseMenuID {
+        static let history = "verseMenu.history"
+        static let image = "verseMenu.image"
+        static let widget = "verseMenu.widget"
+        static let erase = "verseMenu.erase"
+        static let all = [history, image, widget, erase]
+    }
 
     /// 필사 컬럼 안(시편 119편 1절)의 누를 지점을 **창 크기에서 계산**한다.
     ///
@@ -31,62 +41,48 @@ final class ChapterHistoryMenuUITests: XCTestCase {
         app.coordinate(withNormalizedOffset: .zero).withOffset(vector)
     }
 
-    /// D9-5-1 · D9-5-2 — 필기가 있는 절을 길게 눌러 메뉴를 띄우고, 그 메뉴를 눌러 시트를 연다.
+    /// 필기가 있는 시편 119편에서 앱을 띄운다.
+    private func launchAtInkedChapter() -> XCUIApplication {
+        launchCarve(extra: startChapterArguments(bookFile: "1-19Psalms.txt", chapter: 119))
+    }
+
+    /// D9-5-1 — 필기가 있는 절을 길게 누르면 절 메뉴가 뜬다.
+    ///
+    /// 메뉴는 보여 줄 항목이 있을 때만 뜬다(UI-2) — 쓰기만 한 절은 「지우기」 만, 지운 뒤에는 「이전 필사 내용 보기」 만.
+    /// 「이미지 저장」 은 메뉴가 열리면 늘 (비활성으로) 있으므로, 보관본 유무와 무관하게 그것으로 메뉴가 떴는지 본다.
+    /// 이 기기의 시편 119편 1절에 필기가 없으면 메뉴가 뜨지 않는 것이 정상이다.
     func testLongPressOpensHistoryMenuAndSheet() throws {
         try skipUnlessPhysicalDevice()
         XCUIDevice.shared.orientation = .portrait
-        let app = launchCarve()
+        let app = launchAtInkedChapter()
         waitForChapterReady(app)
         capture(app, "01-ready")
 
         let press = inkPoint(app)
         point(app, press).press(forDuration: 1.0)
 
-        // 메뉴 항목은 bounded 쿼리로만 조회한다 — 트리 전체 열거는 열거 중 트리가 바뀌어 실패한다.
-        let label = "이전 필사 내용 보기"
-        let target = app.menuItems[label]
-        let appeared = poll(timeout: 6) { target.exists }
+        let appeared = poll(timeout: 6) { app.buttons[VerseMenuID.image].exists }
         capture(app, "02-menu")   // ← D9-5-1 판정
 
-        let items = app.menuItems.allElementsBoundByIndex.map { "\($0.label)@\($0.frame)" }
+        let present = VerseMenuID.all.filter { app.buttons[$0].exists }
         let probe = XCTAttachment(string: """
-        window=\(app.windows.firstMatch.frame) press=\(press) appeared=\(appeared) items=\(items)
+        window=\(app.windows.firstMatch.frame) press=\(press) appeared=\(appeared) items=\(present)
         """)
         probe.name = "menu-items"
         probe.lifetime = .keepAlways
         add(probe)
 
-        // ⚠️ `exists` 는 캐시된 스냅샷에서 참이지만 `tap()` 은 라이브 해석이 필요해 실패한다
-        // ("No matches found ... IN identifiers"). remote view 라 좌표로 눌러야 한다.
-        //
-        // 열거되는 라벨은 낡은 값("전체 선택"·"빈칸 삽입")이지만 **frame 은 현재 메뉴를 가리킨다** —
-        // 실측에서 두 frame 의 합집합(x 487.5~641.5, y 326~366.5)이 화면의 알약과 일치했다.
-        // 그래서 좌표를 하드코딩하지 않고 합집합의 중심을 누른다.
-        XCTAssertTrue(appeared, "롱프레스 후 '\(label)' 메뉴 항목이 조회되지 않았다")
-        _ = target
+        XCTAssertTrue(appeared, "롱프레스 후 절 메뉴가 뜨지 않았다 — 시편 119편 1절에 필기가 있는지 확인한다")
 
-        // ⛔ **좌표 탭을 하지 않는다.** 2026-09-09 에 이 자리에서 사고가 났다 —
-        // 열거되는 menuItems 의 frame 은 앱 메뉴가 아니라 **PencilKit 자체 메뉴**("전체 선택")의 것이었고,
-        // 그 중심을 누르자 전 획이 선택된 뒤 끌려가 **시편 119편 1~4절이 실제로 수정·저장**됐다.
-        // 화면에 보이는 알약과 frame 이 우연히 겹쳐 있어 구분되지 않았다.
-        //
-        // 앱 메뉴는 remote view 라 조회로도 좌표로도 안전하게 누를 수 없다. D9-5-2(메뉴 → 시트)는
-        // **자동화 대상에서 뺀다.** 사람이 눌러 판정한다. 여기서는 D9-5-1(메뉴가 뜨는가)까지만 본다.
-        _ = target
-
-        let summary = XCTAttachment(string: """
-        sheets=\(app.sheets.allElementsBoundByIndex.count) \
-        texts=\(app.staticTexts.allElementsBoundByIndex.prefix(30).map(\.label))
-        """)
-        summary.name = "sheet-summary"
-        summary.lifetime = .keepAlways
-        add(summary)
+        // ⛔ **메뉴 항목을 누르지 않는다.** 「지우기」 는 실제 필사를 보관 후 비운다.
+        // 2026-09-09 에는 좌표 탭이 PencilKit 메뉴를 눌러 **시편 119편 1~4절이 실제로 수정·저장**됐다.
+        // D9-5-2(메뉴 → 이전 필사 시트)는 자동화 대상에서 빼고 사람이 눌러 판정한다. 여기서는 D9-5-1 까지만 본다.
     }
 
-    /// D9-5-3 — 본문(텍스트) 쪽에서 길게 눌러도 x 클램프로 같은 절이 잡히는지.
+    /// D9-5-3 — 본문(텍스트) 쪽에서 길게 눌러도 x 클램프로 같은 절이 잡히는지. 판정은 스크린샷으로 한다.
     func testLongPressOnTextSideClampsToSameVerse() throws {
         try skipUnlessPhysicalDevice()
-        let app = launchCarve()
+        let app = launchAtInkedChapter()
         waitForChapterReady(app)
 
         // 본문은 왼쪽 절반이다 (columnX 366.70 왼쪽).

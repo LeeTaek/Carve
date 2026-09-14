@@ -83,6 +83,16 @@ extension XCTestCase {
         add(tree)
     }
 
+    /// 시작할 장을 정하는 실행 인자. 앱의 `UITestLaunchChapter` 가 받는다 (Debug 전용).
+    ///
+    /// 앱은 마지막으로 연 장에서 시작하므로, 이 인자 없이 띄우면 기기에 남은 장에 따라 결과가 갈린다 (2026-09-14 로마서 1장에서 시작해 실패).
+    /// - Parameters:
+    ///   - bookFile: `BibleTitle` 의 rawValue (예: 시편 `1-19Psalms.txt`).
+    ///   - chapter: 장 번호.
+    func startChapterArguments(bookFile: String, chapter: Int) -> [String] {
+        ["-UITestChapter", "{\"title\":\"\(bookFile)\",\"chapter\":\(chapter)}"]
+    }
+
     /// 오버레이를 켠 채 앱을 띄운다.
     func launchCarve(singleCanvas: Bool = true, extra: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()

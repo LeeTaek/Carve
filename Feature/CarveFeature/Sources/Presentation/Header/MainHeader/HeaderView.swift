@@ -141,6 +141,8 @@ public struct HeaderView: View {
             CarveIconButton(.next, accessibilityLabel: "다음 장", visualScale: buttonVisualScale) {
                 send(.moveToNext)
             }
+            // 실기기 UI 테스트가 찾는 식별자. 접근성 이름(「다음 장」)이 문구 변경으로 바뀌어도 유지한다.
+            .accessibilityIdentifier("nextChapter")
             // 왼손 모드에서도 오른쪽에 고정한다. 서재 쪽에 버튼이 늘면 헤더 광고가 들어갈 자리가 사라진다.
             sentenceSettingsButton
         }

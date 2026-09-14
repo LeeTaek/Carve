@@ -95,6 +95,10 @@ mise x -- swiftlint lint --quiet --config .swiftlint.yml <파일들>
   `xcrun xctrace list devices` 로 확인한다.
 - 앱 인자를 넘길 때는 `--` 로 구분한다:
   `xcrun devicectl device process launch --device <id> <bundle> -- -MyFlag`
+- **실기기 UI 테스트는 시작 장을 인자로 정한다** — `-UITestChapter <BibleChapter JSON>`(Debug 전용, `UITestLaunchChapter`,
+  UITests 에서는 `startChapterArguments`). 앱은 마지막으로 연 장에서 시작하므로 인자 없이는 기기 상태에 따라 결과가 갈린다.
+  헤더 다음 장 버튼(`nextChapter`)과 절 메뉴 항목(`verseMenu.history` · `image` · `widget` · `erase`)은 접근성 이름이 아니라 식별자로 찾는다.
+  히스토리 메뉴 테스트는 **시편 119편 1절에 필기가 있어야** 메뉴가 뜬다. 메뉴 항목은 누르지 않는다(「지우기」 는 실제 필사를 비운다).
 - 기록 중에는 **`pgrep`/`pkill` 로 프로세스를 건드리지 않는다.** 마무리 단계에 끼어들면
   트레이스가 템플릿 메타데이터 없이 저장되어 `xctrace export` 가 실패한다.
 

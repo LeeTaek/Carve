@@ -147,6 +147,17 @@ struct VerseMenuOverlay: View {
         .buttonStyle(.plain)
         .disabled(!isEnabled)
         .accessibilityHint(isEnabled ? "" : "준비 중인 기능이에요")
+        .accessibilityIdentifier(identifier(item))
+    }
+
+    /// 실기기 UI 테스트가 항목을 찾는 식별자. 항목 문구가 바뀌어도 유지한다.
+    private func identifier(_ item: Item) -> String {
+        switch item {
+        case .history: "verseMenu.history"
+        case .image: "verseMenu.image"
+        case .widget: "verseMenu.widget"
+        case .erase: "verseMenu.erase"
+        }
     }
 
     private func icon(_ item: Item) -> CarveIcon {
