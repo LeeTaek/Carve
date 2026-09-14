@@ -29,23 +29,26 @@ struct CarveApp: App {
     private let nativeAdClient: any NativeAdClient
     /// 광고 동의(UMP) 확인과 광고 SDK 시작
     private let adConsent: AdConsentCoordinator
-    
+
     // 앱 시작 시 필요한 의존성(ContainerID, ModelContainer, Store)을 생성하는 생성자.
     init() {
+        // 환불 · 보호자 승인 같은 거래 변경을 놓치지 않도록 가장 먼저 만든다.
+        let purchaseClient = StoreKitPurchaseClient()
         let containerID = Self.makeContainerID()
         let modelContainer = Self.makeModelContainer(containerID: containerID)
         self.modelContainer = modelContainer
-        let adConsent = AdConsentCoordinator()
+        let adConsent = AdConsentCoordinator(purchases: purchaseClient)
         self.adConsent = adConsent
-        self.nativeAdClient = GoogleNativeAdClient(consent: adConsent)
+        self.nativeAdClient = GoogleNativeAdClient(consent: adConsent, purchases: purchaseClient)
         self.store = Self.makeStore(
             containerID: containerID,
             modelContainer: modelContainer,
             nativeAdClient: nativeAdClient,
-            adConsentClient: adConsent
+            adConsentClient: adConsent,
+            purchaseClient: purchaseClient
         )
     }
-    
+
     var body: some Scene {
         WindowGroup {
             #if DEBUG
@@ -75,6 +78,7 @@ struct CarveApp: App {
                 ]
             )
             // 화면이 뜬 뒤라야 동의 폼을 띄울 수 있다. 앱을 실행할 때마다 동의 정보를 갱신한다(UMP).
+            // 광고 제거를 샀으면 동의 폼도 광고 SDK 도 띄우지 않는다.
             .task {
                 await adConsent.gatherConsent()
             }
@@ -106,13 +110,15 @@ extension CarveApp {
         containerID: ContainerID,
         modelContainer: ModelContainer,
         nativeAdClient: any NativeAdClient,
-        adConsentClient: any AdConsentClient
+        adConsentClient: any AdConsentClient,
+        purchaseClient: any PurchaseClient
     ) -> StoreOf<AppCoordinatorFeature> {
         withDependencies {
             $0.containerId = containerID
             $0.modelContainer = modelContainer
             $0.nativeAdClient = nativeAdClient
             $0.adConsentClient = adConsentClient
+            $0.purchaseClient = purchaseClient
             $0.analyticsClient = FirebaseAnalyticsClient()
         } operation: {
             Store(initialState: .initialState) {

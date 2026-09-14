@@ -13,7 +13,7 @@ import ComposableArchitecture
 
 /// 네이티브 광고 한 자리의 로드 상태. 차트 · 탐색 사이드바 · 필사 헤더가 같은 규칙을 쓴다.
 ///
-/// - 실패하면 자리를 없앤다(시안 K4). 화면은 ``State/hasAd`` · ``State/occupiesSpace`` 로 표시 여부를 정한다.
+/// - 실패하거나 광고 제거를 사면 자리를 없앤다(시안 K4). 화면은 ``State/hasAd`` · ``State/occupiesSpace`` 로 표시 여부를 정한다.
 /// - 받은 광고는 ``adLifetime`` 뒤 만료된다. 계속 보이는 자리는 바로 새로 받고, 가끔 보이는 자리는 비웠다가 다음에 열 때 받는다.
 @Reducer
 public struct SponsorAdSlotFeature {
@@ -28,6 +28,8 @@ public struct SponsorAdSlotFeature {
         public let placement: NativeAdPlacement
         /// 만료되면 바로 새로 받을지. 계속 보이는 자리(헤더)는 true, 가끔 보이는 자리(사이드바 · 차트)는 false.
         public let refreshesOnExpiry: Bool
+        /// 광고 제거를 샀는지. 설정에서 사면 액션 없이도 화면에서 자리가 바로 사라진다.
+        @SharedReader(.isAdFree) public var isAdFree: Bool
         /// AdMob 로드 성공시 반환받는 토큰(뷰 캐시 조회용)
         public var token: NativeAdToken?
         /// 로딩 중인지 여부
@@ -38,10 +40,10 @@ public struct SponsorAdSlotFeature {
         public var adView: UIView?
 
         /// 그릴 광고가 있는지.
-        public var hasAd: Bool { adView != nil }
+        public var hasAd: Bool { !isAdFree && adView != nil }
 
-        /// 자리를 차지하는지. 로드 중에는 광고가 도착해도 주변이 밀리지 않게 비워 두고, 실패하면 없앤다.
-        public var occupiesSpace: Bool { isLoading || hasAd }
+        /// 자리를 차지하는지. 로드 중에는 광고가 도착해도 주변이 밀리지 않게 비워 두고, 실패하거나 광고 제거를 사면 없앤다.
+        public var occupiesSpace: Bool { !isAdFree && (isLoading || hasAd) }
 
         public init(
             placement: NativeAdPlacement,
@@ -80,6 +82,8 @@ public struct SponsorAdSlotFeature {
         Reduce { state, action in
             switch action {
             case .startLoad:
+                // 광고 제거를 샀으면 요청하지 않고, 남아 있는 광고가 있으면 정리한다.
+                guard state.isAdFree == false else { return clear(&state) }
                 // 이미 있으면 재요청 안 함
                 guard state.token == nil, state.isLoading == false else { return .none }
                 state.isLoading = true
@@ -87,6 +91,11 @@ public struct SponsorAdSlotFeature {
                 return load(placement: state.placement)
 
             case .adLoaded(let token):
+                // 받는 사이에 광고 제거를 샀으면 받은 광고를 버린다.
+                guard state.isAdFree == false else {
+                    invalidate(token)
+                    return clear(&state)
+                }
                 // 만료로 새로 받은 경우 이전 광고 뷰를 정리한다.
                 if let previous = state.token, previous != token {
                     invalidate(previous)
@@ -124,6 +133,9 @@ public struct SponsorAdSlotFeature {
 
             case .adExpired:
                 guard let expired = state.token, state.isLoading == false else { return .none }
+                if state.isAdFree {
+                    return clear(&state)
+                }
                 if state.refreshesOnExpiry {
                     // 새 광고가 올 때까지 이전 광고를 그대로 두어 자리가 깜빡이지 않게 한다.
                     state.isLoading = true
@@ -148,6 +160,18 @@ public struct SponsorAdSlotFeature {
         }
     }
 
+    /// 광고 제거를 산 뒤 남은 광고 · 로드 상태 · 만료 타이머를 정리한다.
+    private func clear(_ state: inout State) -> Effect<Action> {
+        if let token = state.token {
+            invalidate(token)
+        }
+        state.token = nil
+        state.adView = nil
+        state.isLoading = false
+        state.errorMessage = nil
+        return .cancel(id: CancelID.expiry(state.placement))
+    }
+
     private func invalidate(_ token: NativeAdToken) {
         MainActor.assumeIsolated {
             nativeAdClient.invalidate(token: token)
@@ -160,6 +184,7 @@ extension SponsorAdSlotFeature.State: Equatable {
     public static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.placement == rhs.placement
             && lhs.refreshesOnExpiry == rhs.refreshesOnExpiry
+            && lhs.isAdFree == rhs.isAdFree
             && lhs.token == rhs.token
             && lhs.isLoading == rhs.isLoading
             && lhs.errorMessage == rhs.errorMessage

@@ -16,17 +16,26 @@ import ClientInterfaces
 /// - 앱을 실행할 때마다 동의 정보를 갱신한다. EEA·영국·스위스처럼 동의가 필요한 지역에서만 폼이 뜬다.
 /// - 이전 실행에서 이미 광고를 요청할 수 있었다면 갱신을 기다리지 않고 바로 시작해 첫 광고를 늦추지 않는다.
 /// - 광고 로드는 ``canRequestAds()`` 로 동의 확인이 끝나기를 기다린다.
+/// - 광고 제거를 샀으면 동의 폼도 광고 SDK 도 띄우지 않는다.
 @MainActor
 final class AdConsentCoordinator: AdConsentClient {
+    /// 광고 제거 권한
+    private let purchases: StoreKitPurchaseClient
     private var gathering: Task<Void, Never>?
     private var isMobileAdsStarted = false
+
+    init(purchases: StoreKitPurchaseClient) {
+        self.purchases = purchases
+    }
 
     var isPrivacyOptionsRequired: Bool {
         ConsentInformation.shared.privacyOptionsRequirementStatus == .required
     }
 
     /// 동의 정보를 갱신하고 필요하면 폼을 띄운다. 여러 번 불러도 한 번만 수행한다.
+    /// 광고 제거를 샀으면 아무것도 하지 않는다 — 환불로 권한이 사라지면 그 뒤의 호출에서 수집한다.
     func gatherConsent() async {
+        guard await purchases.resolveAdFree() == false else { return }
         if gathering == nil {
             gathering = Task {
                 startMobileAdsIfAllowed()

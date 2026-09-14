@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import ClientInterfaces
 import Resources
 
 import ComposableArchitecture
@@ -14,11 +15,13 @@ import UIComponents
 @ViewAction(for: SettingsFeature.self)
 public struct SettingsView: View {
     @Bindable public var store: StoreOf<SettingsFeature>
-    
+    /// 광고 제거를 샀는지. 사이드바 행의 값만 바꾼다.
+    @SharedReader(.isAdFree) private var isAdFree: Bool
+
     public init(store: StoreOf<SettingsFeature>) {
         self.store = store
     }
-    
+
     public var body: some View {
         VStack(spacing: 0) {
             CarvePanelHeader("설정") {
@@ -44,7 +47,7 @@ public struct SettingsView: View {
         )
         .clipShape(RoundedRectangle(cornerRadius: CarveRadius.panel, style: .continuous))
     }
-    
+
     private var sideBar: some View {
         List(selection: $store.path.sending(\.push)) {
             Section("필사") {
@@ -65,9 +68,13 @@ public struct SettingsView: View {
                     sidebarRow("앱 버전", value: UIDevice.appVersion())
                 }
             }
-            if store.isPrivacyOptionsRequired {
-                // 동의가 필요한 지역에서는 광고 동의를 다시 고를 수 있는 진입점을 둬야 한다(UMP 개인정보 옵션).
-                Section("광고") {
+            Section("광고") {
+                // 구매를 권하지 않고 설정에 한 줄로만 둔다(시안 K4).
+                NavigationLink(value: SettingsFeature.Path.State.removeAds(.initialState)) {
+                    sidebarRow("광고 제거", value: isAdFree ? "구매함" : "")
+                }
+                if store.isPrivacyOptionsRequired {
+                    // 동의가 필요한 지역에서는 광고 동의를 다시 고를 수 있는 진입점을 둬야 한다(UMP 개인정보 옵션).
                     Button("광고 개인정보 옵션") {
                         send(.privacyOptionsTapped)
                     }
@@ -104,8 +111,8 @@ public struct SettingsView: View {
                 .foregroundStyle(CarveColor.secondary)
         }
     }
-    
-    
+
+
     @ViewBuilder
     private func detailView() -> some View {
         switch store.path {
@@ -132,6 +139,10 @@ public struct SettingsView: View {
         case .appVersion:
             if let store = store.scope(state: \.path?.appVersion, action: \.path.appVersion) {
                 AppVersionView(store: store)
+            }
+        case .removeAds:
+            if let store = store.scope(state: \.path?.removeAds, action: \.path.removeAds) {
+                RemoveAdsView(store: store)
             }
         default:
             EmptyView()

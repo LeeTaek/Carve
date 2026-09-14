@@ -50,10 +50,12 @@ private extension NativeAdPlacement {
 
 /// GoogleMobileAds 기반 Native 광고 로더.
 /// - `load`는 AdMob의 delegate 콜백을 async/await 형태로 바꿔 사용.
-/// - 광고 동의(UMP) 확인이 끝나고 요청이 허용된 뒤에만 로드한다.
+/// - 광고 제거를 사지 않았고, 광고 동의(UMP) 확인이 끝나 요청이 허용된 뒤에만 로드한다.
 final class GoogleNativeAdClient: NSObject, NativeAdClient, @unchecked Sendable {
     /// 광고 동의 수집과 광고 SDK 시작
     private let consent: AdConsentCoordinator
+    /// 광고 제거 권한
+    private let purchases: StoreKitPurchaseClient
     /// tokenId -> 실제로 화면에 embed할 광고 UIView 캐시
     private var viewCache: [String: UIView] = [:]
 
@@ -69,8 +71,9 @@ final class GoogleNativeAdClient: NSObject, NativeAdClient, @unchecked Sendable 
     /// 같은 위치의 요청만 한 번에 하나로 막는다.
     private var inFlightRequests: [ObjectIdentifier: InFlightRequest] = [:]
 
-    init(consent: AdConsentCoordinator) {
+    init(consent: AdConsentCoordinator, purchases: StoreKitPurchaseClient) {
         self.consent = consent
+        self.purchases = purchases
         super.init()
     }
 
@@ -93,6 +96,11 @@ final class GoogleNativeAdClient: NSObject, NativeAdClient, @unchecked Sendable 
         let resolvedAdUnitId = resolvedAdUnitId(for: placement, provided: adUnitId)
         guard resolvedAdUnitId.isEmpty == false else {
             throw .emptyAdUnitId
+        }
+
+        // 광고 제거를 샀으면 요청하지 않는다. 실행 직후에는 첫 권한 판정을 기다린다.
+        guard await purchases.resolveAdFree() == false else {
+            throw .adFree
         }
 
         // 동의 확인이 끝날 때까지 기다린다. 동의가 필요한 지역에서 동의를 받지 못했으면 요청하지 않는다.

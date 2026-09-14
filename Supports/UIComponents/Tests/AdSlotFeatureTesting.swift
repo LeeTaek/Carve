@@ -12,7 +12,7 @@ import ClientInterfaces
 import ComposableArchitecture
 @testable import UIComponents
 
-/// 광고 한 자리의 로드 · 실패 · 만료 규칙(시안 K4, AdMob 네이티브 1시간 만료).
+/// 광고 한 자리의 로드 · 실패 · 만료 · 광고 제거 규칙(시안 K4, AdMob 네이티브 1시간 만료).
 @MainActor
 struct AdSlotFeatureTesting {
     @Test("받는 동안 자리를 비워 두고, 광고가 오면 그 뷰를 든다")
@@ -148,17 +148,112 @@ struct AdSlotFeatureTesting {
         }
     }
 
+    // MARK: - 광고 제거
+
+    @Test("광고 제거를 샀으면 광고를 요청하지 않고 자리도 두지 않는다")
+    func adFreeSkipsLoad() async throws {
+        let suite = "AdSlotFeatureTesting.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        adFreeShared(in: defaults).withLock { $0 = true }
+
+        let client = StubNativeAdClient(outcomes: [])
+        let store = makeStore(placement: .headerStrip, refreshesOnExpiry: true, client: client, clock: TestClock(), appStorage: defaults)
+
+        #expect(!store.state.occupiesSpace)
+        await store.send(.startLoad)
+        #expect(client.loadCount == 0)
+        #expect(!store.state.occupiesSpace)
+    }
+
+    @Test("광고가 떠 있는 동안 광고 제거를 사면 자리가 바로 사라지고, 만료돼도 새로 받지 않고 정리한다")
+    func purchaseWhileVisibleRemovesAdWithoutRefresh() async throws {
+        let suite = "AdSlotFeatureTesting.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let isAdFree = adFreeShared(in: defaults)
+
+        let adView = UIView()
+        let client = StubNativeAdClient(outcomes: [.success(adView)])
+        let clock = TestClock()
+        let store = makeStore(placement: .headerStrip, refreshesOnExpiry: true, client: client, clock: clock, appStorage: defaults)
+
+        await store.send(.startLoad) {
+            $0.isLoading = true
+        }
+        await store.receive(\.adLoaded) {
+            $0.isLoading = false
+            $0.token = NativeAdToken(tokenId: "ad-0")
+            $0.adView = adView
+        }
+        #expect(store.state.occupiesSpace)
+
+        // 설정에서 구매가 끝나 앱의 구매 클라이언트가 권한을 썼다 — 액션 없이도 화면에서 자리가 사라진다.
+        isAdFree.withLock { $0 = true }
+        #expect(!store.state.occupiesSpace)
+        #expect(!store.state.hasAd)
+
+        // 헤더처럼 계속 보이는 자리여도 만료 때 새로 받지 않고 남은 광고를 정리한다.
+        await clock.advance(by: SponsorAdSlotFeature.adLifetime)
+        await store.receive(\.adExpired) {
+            $0.token = nil
+            $0.adView = nil
+        }
+        #expect(client.invalidatedTokenIDs == ["ad-0"])
+        #expect(client.loadCount == 1)
+    }
+
+    @Test("받는 사이에 광고 제거를 샀으면 도착한 광고를 버린다")
+    func adArrivingAfterPurchaseIsDiscarded() async throws {
+        let suite = "AdSlotFeatureTesting.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        adFreeShared(in: defaults).withLock { $0 = true }
+
+        let client = StubNativeAdClient(outcomes: [])
+        let store = makeStore(placement: .sidebarCard, isLoading: true, client: client, clock: TestClock(), appStorage: defaults)
+
+        await store.send(.adLoaded(NativeAdToken(tokenId: "late"))) {
+            $0.isLoading = false
+        }
+        #expect(client.invalidatedTokenIDs == ["late"])
+        #expect(!store.state.occupiesSpace)
+    }
+
+    /// 광고 제거 여부는 테스트마다 따로 둔다 — 기본 저장소를 함께 쓰면 다른 테스트의 광고 자리까지 사라진다.
+    private func adFreeShared(in defaults: UserDefaults) -> Shared<Bool> {
+        withDependencies {
+            $0.defaultAppStorage = defaults
+        } operation: {
+            Shared<Bool>(.isAdFree)
+        }
+    }
+
     private func makeStore(
         placement: NativeAdPlacement,
         refreshesOnExpiry: Bool = false,
+        isLoading: Bool = false,
         client: StubNativeAdClient,
-        clock: TestClock<Duration>
+        clock: TestClock<Duration>,
+        appStorage: UserDefaults? = nil
     ) -> TestStoreOf<SponsorAdSlotFeature> {
-        TestStore(initialState: SponsorAdSlotFeature.State(placement: placement, refreshesOnExpiry: refreshesOnExpiry)) {
-            SponsorAdSlotFeature()
-        } withDependencies: {
-            $0.nativeAdClient = client
-            $0.continuousClock = clock
+        withDependencies {
+            if let appStorage {
+                $0.defaultAppStorage = appStorage
+            }
+        } operation: {
+            TestStore(
+                initialState: SponsorAdSlotFeature.State(
+                    placement: placement,
+                    refreshesOnExpiry: refreshesOnExpiry,
+                    isLoading: isLoading
+                )
+            ) {
+                SponsorAdSlotFeature()
+            } withDependencies: {
+                $0.nativeAdClient = client
+                $0.continuousClock = clock
+            }
         }
     }
 }
@@ -175,7 +270,7 @@ private final class StubNativeAdClient: NativeAdClient {
 
     private var outcomes: [Outcome]
     private var views: [String: UIView] = [:]
-    private var loadCount = 0
+    private(set) var loadCount = 0
     private(set) var invalidatedTokenIDs: [String] = []
 
     init(outcomes: [Outcome]) {

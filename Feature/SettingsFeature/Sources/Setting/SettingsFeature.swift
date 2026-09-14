@@ -57,6 +57,8 @@ public struct SettingsFeature {
         case patchnote(PatchnoteFeature)
         case sendFeedback(SendFeedbackFeature)
         case appVersion(AppVersionFeature)
+        /// 광고 제거 구매 · 복원(시안 K4).
+        case removeAds(RemoveAdsFeature)
     }
     
     @Dependency(\.adConsentClient) var adConsentClient

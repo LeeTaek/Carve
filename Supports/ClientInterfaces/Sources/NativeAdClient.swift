@@ -62,6 +62,8 @@ public enum NativeAdClientError: Error, Sendable, Equatable {
     case requestAlreadyInFlight
     /// 광고 동의(UMP)가 없어 요청할 수 없음
     case consentNotObtained
+    /// 광고 제거를 구매해 요청하지 않음
+    case adFree
     case adLoaderFailed(code: Int, message: String)
 }
 
