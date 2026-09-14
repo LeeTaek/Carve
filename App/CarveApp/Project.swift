@@ -76,8 +76,26 @@ let targets: [Target] = [
 ]
 
 
+/// 시뮬레이터에서 광고 제거 구매를 시험하는 스킴. 실행(Run)만 로컬 StoreKit 설정(`Support/Carve.storekit`)을 쓴다.
+/// Xcode Cloud · 아카이브는 자동 생성되는 `CarveApp` 스킴을 그대로 쓰므로 StoreKit 설정이 섞이지 않는다.
+let storeKitScheme: Scheme = .scheme(
+    name: "\(projectName)-StoreKit",
+    buildAction: .buildAction(targets: [.target(projectName)]),
+    runAction: .runAction(
+        configuration: .debug,
+        executable: .target(projectName),
+        arguments: .arguments(launchArguments: [
+            .launchArgument(name: "-FIRDebugEnabled", isEnabled: true)
+        ]),
+        options: .options(storeKitConfigurationPath: .relativeToManifest("Support/Carve.storekit"))
+    )
+)
+
 let project = Project.makeModule(
     name: projectName,
     targets: targets,
-    settings: settings
+    schemes: [storeKitScheme],
+    settings: settings,
+    // 앱 번들에 넣지 않고 Xcode 에서 편집(가격 · 거래 관리)만 할 수 있게 네비게이터에 둔다.
+    additionalFiles: ["Support/Carve.storekit"]
 )
