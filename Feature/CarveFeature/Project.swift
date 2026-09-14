@@ -12,6 +12,7 @@ import CarveEnvironment
 let projectName = "CarveFeature"
 
 let dependencies: [TargetDependency] = [
+    .ClientInterfaces,
     .Domain,
     .UIComponents,
     .TCAArchitecture,

@@ -11,7 +11,8 @@ let dependencies: [TargetDependency] = [
     .FirebaseAnalytics,
     .FirebaseMessaging,
     .GoogleAds,
-    
+    .GoogleUMP,
+
     .TCAArchitecture
 ]
 
@@ -34,11 +35,16 @@ let settings: Settings = .settings(
     configurations: [
         .debug(name: "Debug", settings: [
             "CLOUDKIT_CONTAINER_ID": "iCloud.Carve.SwiftData.iCloud.dev",
-            "ADMOB_NATIVE_CHART_AD_UNIT_ID": "ca-app-pub-3940256099942544/3986624511"
+            // Debug 는 모든 위치에 Google 공개 테스트 네이티브 단위를 쓴다.
+            "ADMOB_NATIVE_CHART_AD_UNIT_ID": "ca-app-pub-3940256099942544/3986624511",
+            "ADMOB_NATIVE_SIDEBAR_AD_UNIT_ID": "ca-app-pub-3940256099942544/3986624511",
+            "ADMOB_NATIVE_HEADER_AD_UNIT_ID": "ca-app-pub-3940256099942544/3986624511"
         ]),
         .release(name: "Release", settings: [
             "CLOUDKIT_CONTAINER_ID": "iCloud.Carve.SwiftData.iCloud",
-            "ADMOB_NATIVE_CHART_AD_UNIT_ID": "ca-app-pub-7073697298801242/6417626074"
+            "ADMOB_NATIVE_CHART_AD_UNIT_ID": "ca-app-pub-7073697298801242/6417626074",
+            "ADMOB_NATIVE_SIDEBAR_AD_UNIT_ID": "ca-app-pub-7073697298801242/8915591660",
+            "ADMOB_NATIVE_HEADER_AD_UNIT_ID": "ca-app-pub-7073697298801242/1591248377"
         ])
     ]
 )

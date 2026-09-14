@@ -147,4 +147,19 @@ struct HeaderFeatureTesting {
         #expect(state.sentenceSettings != nil)
     }
 
+    @Test("축소 헤더는 상태바가 높아도 44pt 버튼 줄을 담도록 늘어나고, 펼친 높이는 그대로다")
+    func displayedHeightContainsControlsForTallerStatusBar() {
+        // 상태바 24pt: 시안 규격 78pt 그대로.
+        #expect(HeaderFeature.displayedHeight(collapseProgress: 1, safeAreaTop: 24) == 78)
+        #expect(HeaderFeature.controlsTopPadding(collapseProgress: 1, safeAreaTop: 24) + 44 == 78)
+
+        // 상태바 32pt(iPadOS 26 iPad mini): 버튼 줄 아래끝 32 + 10 + 44 = 86pt 까지 그린다.
+        #expect(HeaderFeature.displayedHeight(collapseProgress: 1, safeAreaTop: 32) == 86)
+        #expect(HeaderFeature.controlsTopPadding(collapseProgress: 1, safeAreaTop: 32) + 44 == 86)
+
+        // 펼친 높이는 본문 시작점이라 상태바와 무관하게 118pt 이고, 그 안에 버튼 줄이 들어간다.
+        #expect(HeaderFeature.displayedHeight(collapseProgress: 0, safeAreaTop: 32) == 118)
+        #expect(HeaderFeature.controlsTopPadding(collapseProgress: 0, safeAreaTop: 32) + 44 <= 118)
+    }
+
 }

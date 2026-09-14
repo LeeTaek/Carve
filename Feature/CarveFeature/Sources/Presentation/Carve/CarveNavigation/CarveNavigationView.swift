@@ -105,13 +105,24 @@ public struct CarveNavigationView: View {
         .padding(.horizontal, CarveSpacing.medium)
         .padding(.top, CarveSpacing.large)
         .safeAreaInset(edge: .bottom) {
-            HStack(spacing: CarveSpacing.xSmall) {
-                Spacer(minLength: 0)
-                CarveIconButton(.chart, accessibilityLabel: "필사 차트") {
-                    send(.moveToChart)
+            // 광고를 차트 · 설정 버튼과 성경 목록에서 떨어뜨린다 — 버튼 · 목록을 누르다 광고를 누르지 않게 한다(AdMob 오클릭 가이드).
+            VStack(spacing: CarveSpacing.large) {
+                if store.sidebarAdSlot.occupiesSpace {
+                    // 성경 목록 아래 네이티브 광고(시안 K3). 오버레이 열이라 필사 폭에 영향이 없다.
+                    // VoiceOver 는 목록 · 버튼 뒤에 읽는다.
+                    AdSlotView(store: store.scope(state: \.sidebarAdSlot, action: \.scope.sidebarAdSlotAction))
+                        .frame(height: NativeAdMetrics.sidebarHeight)
+                        .padding(.top, CarveSpacing.xSmall)
+                        .accessibilitySortPriority(-1)
                 }
-                CarveIconButton(.settings, accessibilityLabel: "앱 설정") {
-                    send(.moveToSetting)
+                HStack(spacing: CarveSpacing.xSmall) {
+                    Spacer(minLength: 0)
+                    CarveIconButton(.chart, accessibilityLabel: "필사 차트") {
+                        send(.moveToChart)
+                    }
+                    CarveIconButton(.settings, accessibilityLabel: "앱 설정") {
+                        send(.moveToSetting)
+                    }
                 }
             }
             .padding(.horizontal, CarveSpacing.medium)
@@ -119,6 +130,9 @@ public struct CarveNavigationView: View {
             .background(CarveColor.surface)
         }
         .background(CarveColor.surface)
+        .onAppear {
+            send(.sidebarAppeared)
+        }
     }
     
     /// 선택한 성경의 장 목록. 44pt 버튼을 5열 그리드로 두어 긴 성경도 빠르게 훑는다.

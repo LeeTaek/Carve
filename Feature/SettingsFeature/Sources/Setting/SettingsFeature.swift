@@ -7,6 +7,7 @@
 //
 
 import CarveToolkit
+import ClientInterfaces
 import Foundation
 
 import ComposableArchitecture
@@ -18,6 +19,8 @@ public struct SettingsFeature {
     public struct State {
         public static let initialState = Self()
         @Presents public var path: Path.State? = .iCloud(.initialState)
+        /// 광고 개인정보 옵션 항목을 보일지. 동의가 필요한 지역(EEA·영국·스위스 등)에서만 true.
+        public var isPrivacyOptionsRequired = false
 
         public static func initialState(path: Path.State?) -> Self {
             var state = Self()
@@ -37,6 +40,9 @@ public struct SettingsFeature {
         
         public enum View {
             case backToCarve
+            case onAppear
+            /// 광고 개인정보 옵션 폼 열기
+            case privacyOptionsTapped
         }
     }
     
@@ -53,9 +59,20 @@ public struct SettingsFeature {
         case appVersion(AppVersionFeature)
     }
     
+    @Dependency(\.adConsentClient) var adConsentClient
+
     public var body: some Reducer<State, Action> {
         Reduce { state, action in
             switch action {
+            case .view(.onAppear):
+                state.isPrivacyOptionsRequired = MainActor.assumeIsolated {
+                    adConsentClient.isPrivacyOptionsRequired
+                }
+            case .view(.privacyOptionsTapped):
+                return .run { _ in
+                    // 폼을 닫거나 띄우지 못해도 설정 화면 상태는 바뀌지 않는다.
+                    try? await adConsentClient.presentPrivacyOptions()
+                }
             case .push(let path):
                 state.path = path
             case .path(.presented(.help(.delegate(.restartFirstRunGuide)))):

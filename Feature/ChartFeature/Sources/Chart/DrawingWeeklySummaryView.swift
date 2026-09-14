@@ -20,33 +20,35 @@ public struct DrawingWeeklySummaryView: View {
     }
 
     public var body: some View {
-        LazyVGrid(
-            columns: tileColumns,
-            alignment: .leading,
-            spacing: 16
-        ) {
-            TileCard(title: "한 주 동안") {
-                latestDrawingHistoryTile
-            }
-
-            TileCard(title: "하루 평균") {
-                weeklyAverageTile
-            }
-
-            TileCard(title: "가장 많이 쓴 장") {
-                topChapterTile
-            }
-
-            if !store.adSlotState.isLoading {
-                TileCard(title: "스폰서") {
-                    sponsorAdTile
+        VStack(alignment: .leading, spacing: 16) {
+            LazyVGrid(
+                columns: tileColumns,
+                alignment: .leading,
+                spacing: 16
+            ) {
+                TileCard(title: "한 주 동안") {
+                    latestDrawingHistoryTile
                 }
-                .transition(.opacity)
+
+                TileCard(title: "하루 평균") {
+                    weeklyAverageTile
+                }
+
+                TileCard(title: "가장 많이 쓴 장") {
+                    topChapterTile
+                }
+            }
+
+            // 광고가 실제로 온 뒤에만 둔다. 로드 중 · 실패에는 빈 자리를 남기지 않는다(시안 K4).
+            // 16:9 미디어를 120pt 로 그리기에 타일 한 칸은 좁아 한 줄 전체 폭 가로형 카드로 둔다.
+            if store.adSlotState.hasAd {
+                sponsorAdCard
+                    .transition(.opacity)
             }
         }
         .animation(
             .spring(response: 0.35, dampingFraction: 0.9),
-            value: !store.adSlotState.isLoading
+            value: store.adSlotState.hasAd
         )
         .onAppear {
             send(.onAppear)
@@ -180,13 +182,20 @@ public struct DrawingWeeklySummaryView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
-    private var sponsorAdTile: some View {
+    /// 차트 스폰서 카드. 미디어가 120pt 아래로 눌리지 않도록 높이를 고정하고, 바탕은 타일과 같은 표면을 쓴다.
+    private var sponsorAdCard: some View {
         AdSlotView(
             store: store.scope(
                 state: \.adSlotState,
                 action: \.adSlot
             )
         )
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity)
+        .frame(height: NativeAdMetrics.chartHeight)
+        .carveSurface(
+            .panel,
+            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 }

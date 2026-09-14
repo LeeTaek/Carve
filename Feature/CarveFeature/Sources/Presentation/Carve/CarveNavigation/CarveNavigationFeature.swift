@@ -7,12 +7,14 @@
 //
 
 import CarveToolkit
+import ClientInterfaces
 import Domain
 import Resources
 import SwiftUI
 import SwiftData
 
 import ComposableArchitecture
+import UIComponents
 
 /// Carve 전체 네비게이션 관리 Reducer
 /// 성경 (제목/장) 선ㄴ택, Splitview, 상세화면 전환 담당
@@ -40,7 +42,9 @@ public struct CarveNavigationFeature {
         /// `@Shared(.appStorage(...))`는 UserDefaults에 연결되므로 앱을 다시 실행해도 값이 유지된다.
         /// 키 이름은 이전 구현과의 호환성을 위해 유지한다.
         @Shared(.appStorage("hasSeenFirstRunGuide")) public var hasPresentedFirstRunGuide = false
-        
+        /// 탐색 사이드바 하단 네이티브 광고(시안 K3). 사이드바를 열 때 받고, 만료되면 비웠다가 다음에 열 때 받는다.
+        public var sidebarAdSlot: SponsorAdSlotFeature.State = .init(placement: .sidebarCard)
+
         public static var initialState: Self {
             State(
                 columnVisibility: .detailOnly,
@@ -76,12 +80,15 @@ public struct CarveNavigationFeature {
             case appWillResignActive
             /// 장 선택 버튼에서 도메인 장 이동을 요청
             case chapterTapped(BibleChapter)
+            /// 사이드바가 화면에 나타남 — 하단 광고가 없거나 만료됐으면 받는다
+            case sidebarAppeared
         }
     }
 
     @CasePathable
     public enum ScopeAction {
         case carveDetailAction(CarveDetailFeature.Action)
+        case sidebarAdSlotAction(SponsorAdSlotFeature.Action)
     }
     
     /// 상세 화면에서의 Navigation Destination
@@ -123,6 +130,11 @@ public struct CarveNavigationFeature {
         Scope(state: \.carveDetailState,
               action: \.scope.carveDetailAction) {
             CarveDetailFeature()
+        }
+
+        Scope(state: \.sidebarAdSlot,
+              action: \.scope.sidebarAdSlotAction) {
+            SponsorAdSlotFeature()
         }
         
         Reduce { state, action in
@@ -204,6 +216,9 @@ public struct CarveNavigationFeature {
 
             case .view(.chapterTapped(let chapter)):
                 return .send(.moveToChapter(chapter))
+
+            case .view(.sidebarAppeared):
+                return .send(.scope(.sidebarAdSlotAction(.startLoad)))
 
             default: return .none
             }

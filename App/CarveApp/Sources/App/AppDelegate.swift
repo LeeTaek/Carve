@@ -9,7 +9,6 @@
 import UIKit
 
 import FirebaseCore
-import GoogleMobileAds
 
 class AppDelegate: NSObject, UIApplicationDelegate {
     /// MetricKit 구독은 앱이 살아 있는 동안 유지돼야 한다 (R20 — 저메모리 기기 실태 수집).
@@ -22,7 +21,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 #if DEBUG
         FirebaseConfiguration.shared.setLoggerLevel(.min)
 #endif
-        MobileAds.shared.start()
+        // 광고 SDK 는 광고 동의(UMP)를 확인한 뒤 AdConsentCoordinator 가 시작한다(ADS-1).
         // payload 는 실행 시점에 하루치가 한 번에 오므로 가장 이르게 등록한다.
         metrics.start()
 

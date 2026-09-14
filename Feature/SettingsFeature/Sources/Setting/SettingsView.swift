@@ -65,6 +65,18 @@ public struct SettingsView: View {
                     sidebarRow("앱 버전", value: UIDevice.appVersion())
                 }
             }
+            if store.isPrivacyOptionsRequired {
+                // 동의가 필요한 지역에서는 광고 동의를 다시 고를 수 있는 진입점을 둬야 한다(UMP 개인정보 옵션).
+                Section("광고") {
+                    Button("광고 개인정보 옵션") {
+                        send(.privacyOptionsTapped)
+                    }
+                    .foregroundStyle(CarveColor.ink)
+                }
+            }
+        }
+        .onAppear {
+            send(.onAppear)
         }
         .safeAreaInset(edge: .bottom) {
             VStack(alignment: .leading, spacing: CarveSpacing.xxSmall) {

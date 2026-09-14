@@ -9,9 +9,14 @@ import UIKit
 
 import ComposableArchitecture
 
-/// 네이티브 광고 표시 위치(화면/영역 단위로 분리)
+/// 네이티브 광고 표시 위치(화면/영역 단위로 분리). 위치마다 광고 단위와 레이아웃이 다르다.
 public enum NativeAdPlacement: String, Sendable, Equatable {
+    /// 차트 주간 요약의 스폰서 타일
     case chartCard
+    /// 탐색 사이드바 하단 카드(시안 K3)
+    case sidebarCard
+    /// 필사 헤더 줄(시안 K2)
+    case headerStrip
 }
 
 /// Feature가 들고 있을 핸들 key
@@ -55,6 +60,8 @@ public enum NativeAdClientError: Error, Sendable, Equatable {
     case emptyAdUnitId
     case rootViewControllerNotFound
     case requestAlreadyInFlight
+    /// 광고 동의(UMP)가 없어 요청할 수 없음
+    case consentNotObtained
     case adLoaderFailed(code: Int, message: String)
 }
 

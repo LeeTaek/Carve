@@ -27,17 +27,22 @@ struct CarveApp: App {
     let modelContainer: ModelContainer
     /// 광고용 인스턴스
     private let nativeAdClient: any NativeAdClient
+    /// 광고 동의(UMP) 확인과 광고 SDK 시작
+    private let adConsent: AdConsentCoordinator
     
     // 앱 시작 시 필요한 의존성(ContainerID, ModelContainer, Store)을 생성하는 생성자.
     init() {
         let containerID = Self.makeContainerID()
         let modelContainer = Self.makeModelContainer(containerID: containerID)
         self.modelContainer = modelContainer
-        self.nativeAdClient = GoogleNativeAdClient()
+        let adConsent = AdConsentCoordinator()
+        self.adConsent = adConsent
+        self.nativeAdClient = GoogleNativeAdClient(consent: adConsent)
         self.store = Self.makeStore(
             containerID: containerID,
             modelContainer: modelContainer,
-            nativeAdClient: nativeAdClient
+            nativeAdClient: nativeAdClient,
+            adConsentClient: adConsent
         )
     }
     
@@ -69,6 +74,10 @@ struct CarveApp: App {
                     "screen_class": .string("AppCoordinatorView")
                 ]
             )
+            // 화면이 뜬 뒤라야 동의 폼을 띄울 수 있다. 앱을 실행할 때마다 동의 정보를 갱신한다(UMP).
+            .task {
+                await adConsent.gatherConsent()
+            }
     }
 }
 
@@ -96,12 +105,14 @@ extension CarveApp {
     private static func makeStore(
         containerID: ContainerID,
         modelContainer: ModelContainer,
-        nativeAdClient: any NativeAdClient
+        nativeAdClient: any NativeAdClient,
+        adConsentClient: any AdConsentClient
     ) -> StoreOf<AppCoordinatorFeature> {
         withDependencies {
             $0.containerId = containerID
             $0.modelContainer = modelContainer
             $0.nativeAdClient = nativeAdClient
+            $0.adConsentClient = adConsentClient
             $0.analyticsClient = FirebaseAnalyticsClient()
         } operation: {
             Store(initialState: .initialState) {
