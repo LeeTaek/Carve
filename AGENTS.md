@@ -99,6 +99,8 @@ mise x -- swiftlint lint --quiet --config .swiftlint.yml <파일들>
   UITests 에서는 `startChapterArguments`). 앱은 마지막으로 연 장에서 시작하므로 인자 없이는 기기 상태에 따라 결과가 갈린다.
   헤더 다음 장 버튼(`nextChapter`)과 절 메뉴 항목(`verseMenu.history` · `image` · `widget` · `erase`)은 접근성 이름이 아니라 식별자로 찾는다.
   히스토리 메뉴 테스트는 **시편 119편 1절에 필기가 있어야** 메뉴가 뜬다. 메뉴 항목은 누르지 않는다(「지우기」 는 실제 필사를 비운다).
+  누를 좌표는 **보이는 요소 기준**으로 만든다(절 메뉴는 「1절」 번호와 필사 열 라벨, 드래그는 창 기준 `windowPoint`). 창 모드(iPadOS 창 버튼)에서는
+  앱 좌표 원점이 화면 원점이라 `app.coordinate` 에 창 크기 비율을 더한 좌표가 창 위치만큼 어긋난다 (2026-09-15 창 y=177 에서 헤더 위를 눌러 실패).
 - 기록 중에는 **`pgrep`/`pkill` 로 프로세스를 건드리지 않는다.** 마무리 단계에 끼어들면
   트레이스가 템플릿 메타데이터 없이 저장되어 `xctrace export` 가 실패한다.
 
