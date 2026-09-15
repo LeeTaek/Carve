@@ -73,6 +73,7 @@ struct ChapterReflowResult: Sendable {
 ///   → 저장 당시 metadata 의 baseUnderlineAnchors 로 band(줄) 판정
 ///   → 현재 layout 의 같은 index underline 으로 translate
 ///   → 폭이 줄었을 때만 uniform 축소 (scale = min(1, now / base))
+///   → 잉크가 현재 줄 수보다 많은 band 에 걸쳤으면 절 전체를 같은 비율로 줄여 현재 줄 묶음 안에 넣는다 (§9-3 줄 수 감소)
 /// ```
 ///
 /// 상태도 부수효과도 없다. `StrokeOwnershipResolver` 와 마찬가지로 PencilKit 을 알지만
@@ -143,7 +144,7 @@ struct LineBandReflow: Sendable {
             )
         }
 
-        let scale = Self.uniformScale(
+        let widthScale = Self.uniformScale(
             baseWidth: metadata.baseWritingWidth,
             currentWidth: region.writingRect.width
         )
@@ -157,13 +158,20 @@ struct LineBandReflow: Sendable {
             writingRect: region.writingRect
         )
 
+        // 잉크가 실제로 걸친 band 수. 줄 수가 줄었을 때 절 안에 줄여 넣을지를 정한다 (§9-3) —
+        // 저장 당시 마지막 줄들이 비어 있었다면 줄일 이유가 없다.
+        let inkBandCount = input.storedDrawing.strokes.reduce(0) { count, stroke in
+            max(count, BandPlan.band(of: bandAnchorY(of: stroke), in: baseAnchors) + 1)
+        }
         guard let plan = BandPlan(
             base: baseAnchors,
             current: currentAnchors,
-            writingRectTop: region.writingRect.minY
+            writingRectTop: region.writingRect.minY,
+            inkBandCount: inkBandCount,
+            widthScale: widthScale
         ) else {
             // ── 매핑할 줄 없음 → 설계 §9-3-1 ────────────────────────────────
-            let whole = Self.wholeVerseTransform(region: region, scale: scale)
+            let whole = Self.wholeVerseTransform(region: region, scale: widthScale)
             return ReflowedVerseDrawing(
                 verse: input.verse,
                 displayDrawing: transformed(input.storedDrawing) { _ in whole },
@@ -173,7 +181,7 @@ struct LineBandReflow: Sendable {
 
         // band 별 변환은 stroke 수와 무관하게 band 수만큼만 있으면 된다.
         let byBand = (0..<plan.base.count).map {
-            plan.transform(forBand: $0, scale: scale, left: region.writingRect.minX)
+            plan.transform(forBand: $0, left: region.writingRect.minX)
         }
         return ReflowedVerseDrawing(
             verse: input.verse,
@@ -229,6 +237,7 @@ struct LineBandReflow: Sendable {
     /// `min(1, now / base)` — **폭이 늘어나도 확대하지 않는다** (설계 §9-3).
     /// 확대하면 글씨 크기가 설정과 무관하게 변해 "내 필사가 커졌다" 로 보이기 때문이다.
     /// 세로로 균등 스케일하지 않는 이유는 설계 §9-2 의 그림 그대로다 — 폰트가 커지면 줄 수가 늘어난다.
+    /// 줄 수가 줄어 잉크가 현재 줄 묶음을 넘칠 때는 `BandPlan` 이 이 값보다 작은 비율을 고를 수 있다 (§9-3).
     /// - Parameters:
     ///   - baseWidth: 저장 시점 필사 폭.
     ///   - currentWidth: 현재 필사 폭.
@@ -318,42 +327,52 @@ extension LineBandReflow {
         let base: [CGFloat]
         /// band index 별 목표 y (캔버스 절대). `base` 와 개수가 같다.
         let target: [CGFloat]
+        /// 모든 band 에 함께 쓰는 uniform scale. 폭 비율(§9-2)이고, 잉크를 절 안에 줄여 넣을 때는 그보다 작을 수 있다(§9-3).
+        let scale: CGFloat
 
         /// 계획을 세운다. 세울 수 없으면 nil — 호출부는 그때 설계 §9-3-1 을 수행한다.
         ///
         /// nil 이 되는 경우는 셋뿐이다.
         /// 1. 저장 band 가 하나도 없다 (`base.isEmpty`) — 판정 기준이 없다.
         /// 2. 현재 밑줄이 하나도 없다 (`current.isEmpty`) — 옮겨 앉을 줄이 없다.
-        /// 3. 줄 수가 줄었는데 마지막 간격을 잴 수 없다 — 초과 band 를 한 줄에 겹쳐 쌓게 되므로
-        ///    "임의로 다른 줄에 합치지 않는다"(§9-3-1)를 지키려면 여기서 포기해야 한다.
+        /// 3. 잉크가 현재 줄 수보다 많은 band 에 걸쳤는데 줄 간격을 잴 수 없다 — 줄일 비율을 정할 수 없고, 그대로 두면
+        ///    초과 band 를 한 줄에 겹쳐 쌓게 되므로 "임의로 다른 줄에 합치지 않는다"(§9-3-1)를 지키려면 여기서 포기해야 한다.
         /// - Parameters:
         ///   - base: 첫 밑줄 기준 저장 밑줄 y.
         ///   - current: 캔버스 절대 현재 밑줄 y.
-        ///   - writingRectTop: 현재 `writingRect` 상단 y. 밑줄이 하나뿐일 때 간격 근거로 쓴다.
-        init?(base: [CGFloat], current: [CGFloat], writingRectTop: CGFloat) {
-            guard !base.isEmpty, let lastCurrent = current.last else { return nil }
+        ///   - writingRectTop: 현재 `writingRect` 상단 y. 밑줄이 하나뿐일 때 줄 간격 근거로 쓴다.
+        ///   - inkBandCount: 잉크가 걸친 band 수 (가장 아래 band index + 1).
+        ///   - widthScale: 폭 비율 (`LineBandReflow.uniformScale`).
+        init?(base: [CGFloat], current: [CGFloat], writingRectTop: CGFloat, inkBandCount: Int, widthScale: CGFloat) {
+            guard !base.isEmpty, let firstCurrent = current.first, let lastCurrent = current.last else { return nil }
+            self.base = base
 
-            if current.count >= base.count {
-                // 줄 수 증가(또는 동일) — 같은 index 밑줄로 그대로 간다.
-                // 남는 밑줄(index >= base.count)에는 아무 band 도 배정되지 않아 **빈 줄**이 된다 (설계 §9-3).
-                self.base = base
-                self.target = Array(current.prefix(base.count))
+            if inkBandCount <= current.count {
+                // 잉크가 현재 줄 안에 든다 (줄 수 증가 · 동일, 또는 저장 당시 마지막 줄들이 비어 있던 감소) — 같은 index 밑줄로 그대로 간다.
+                // 남는 밑줄에는 아무 band 도 배정되지 않아 **빈 줄**이 된다 (설계 §9-3).
+                // 잉크가 없는 band 는 마지막 밑줄을 목표로 두지만, 그 band 로 판정되는 획이 없어 쓰이지 않는다.
+                self.target = base.indices.map { current[min($0, current.count - 1)] }
+                self.scale = widthScale
                 return
             }
 
-            // 줄 수 감소 — 초과 band 는 **마지막 간격을 연장**해 배치한다 (설계 §9-3).
-            // 간격은 현재 레이아웃의 마지막 밑줄 간격이다. 밑줄이 하나뿐이면 잴 간격이 없으므로
-            // `writingRect` 상단 ~ 첫 밑줄 거리를 한 줄 높이로 본다.
-            let lastGap: CGFloat = current.count >= 2
-                ? current[current.count - 1] - current[current.count - 2]
-                : lastCurrent - writingRectTop
-            guard lastGap > 0 else { return nil }
+            // 줄 수 감소 — 잉크가 걸친 band 묶음을 **같은 비율로 줄여 현재 줄 묶음 안에** 넣는다 (설계 §9-3).
+            // 레이아웃을 늘리지 않으므로(§6-3) 절 간격은 그대로다.
+            // 밑줄이 하나뿐이면 현재 줄 간격을 잴 수 없으므로 `writingRect` 상단 ~ 첫 밑줄 거리를 한 줄 높이로 본다.
+            let inkSpan = base[inkBandCount - 1] - base[0]
+            let savedPitch = (base[base.count - 1] - base[0]) / CGFloat(base.count - 1)
+            let currentSpan = lastCurrent - firstCurrent
+            let currentPitch = current.count >= 2 ? currentSpan / CGFloat(current.count - 1) : firstCurrent - writingRectTop
+            guard savedPitch > 0, currentPitch > 0 else { return nil }
 
-            let lastIndex = current.count - 1
-            self.base = base
-            self.target = current + (current.count..<base.count).map { index in
-                lastCurrent + CGFloat(index - lastIndex) * lastGap
-            }
+            // 줄 묶음 = 첫 밑줄 한 줄 위 ~ 마지막 밑줄. 단 `writingRect` 상단을 넘지 않는다 — 실측 밑줄은 글자 기준선이라 보통 상단에서
+            // 한 줄보다 가깝고, 자르지 않으면 첫 band 가 절 위 여백으로 샌다 (2026-09-15 시뮬레이터 시편 119편: 53pt 줄에 첫 밑줄 38pt, 7pt 샘).
+            let lineTop = max(firstCurrent - currentPitch, writingRectTop)
+            let scale = min(widthScale, (lastCurrent - lineTop) / (inkSpan + savedPitch))
+            // 첫 band 는 되도록 첫 밑줄에 앉히고, 줄 묶음 위아래를 넘으면 그 안으로 옮긴다. 비율이 줄 묶음에 꽉 차면 두 경계가 같다.
+            let firstBaseline = min(max(firstCurrent, lineTop + savedPitch * scale), lastCurrent - inkSpan * scale)
+            self.target = base.map { firstBaseline + ($0 - base[0]) * scale }
+            self.scale = scale
         }
 
         /// 저장 좌표계 y 가 속한 band index.
@@ -366,7 +385,16 @@ extension LineBandReflow {
         /// - Parameter storedY: 저장 좌표계 y.
         /// - Returns: `0 ..< base.count` 범위의 band index.
         func band(of storedY: CGFloat) -> Int {
-            guard storedY.isFinite else { return 0 }
+            Self.band(of: storedY, in: base)
+        }
+
+        /// `band(of:)` 와 같은 규칙을 계획 없이 적용한다 — 계획을 세우기 전에 잉크가 걸친 band 수를 셀 때 쓴다.
+        /// - Parameters:
+        ///   - storedY: 저장 좌표계 y.
+        ///   - base: 첫 밑줄 기준 저장 밑줄 y.
+        /// - Returns: `0 ..< base.count` 범위의 band index. `base` 가 비어 있으면 0.
+        static func band(of storedY: CGFloat, in base: [CGFloat]) -> Int {
+            guard storedY.isFinite, !base.isEmpty else { return 0 }
             for (index, anchor) in base.enumerated() where storedY <= anchor { return index }
             return base.count - 1
         }
@@ -378,12 +406,12 @@ extension LineBandReflow {
         /// y' = (y − base[band]) × scale + target[band]
         /// ```
         /// 밑줄로부터의 상대 offset 에도 scale 을 곱한다 — uniform 이라야 종횡비가 유지된다(설계 §9-2).
+        /// 잉크를 절 안에 줄여 넣는 계획은 `target` 이 `base` 간격에 같은 scale 을 곱한 자리라, 모든 band 가 한 변환으로 모인다.
         /// - Parameters:
         ///   - band: band index.
-        ///   - scale: uniform scale.
         ///   - left: 현재 `writingRect.minX`.
         /// - Returns: 저장 좌표 → 캔버스 좌표 변환.
-        func transform(forBand band: Int, scale: CGFloat, left: CGFloat) -> CGAffineTransform {
+        func transform(forBand band: Int, left: CGFloat) -> CGAffineTransform {
             let index = min(max(band, 0), base.count - 1)
             return CGAffineTransform(translationX: 0, y: -base[index])
                 .concatenating(CGAffineTransform(scaleX: scale, y: scale))

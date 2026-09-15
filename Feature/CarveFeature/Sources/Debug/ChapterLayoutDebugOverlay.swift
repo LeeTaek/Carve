@@ -289,9 +289,6 @@ struct ChapterLayoutDebugHUD: View {
                     Text("입력만 차단 · 합성/저장 유지").foregroundStyle(.gray)
                     Text("v\(safetyNet.verse) Δ \(fmt(safetyNet.magnitude))")
                     Text("limit \(fmt(safetyNet.lineSpace))pt(1줄)").foregroundStyle(.gray)
-                    if measurement.hasReflowSlack {
-                        Text("slack(§6-3) — 판정 보류").foregroundStyle(.yellow)
-                    }
                 }
             } else {
                 Text("guard — (단일 Canvas 아님 또는 실측 대기)").foregroundStyle(.gray)
@@ -299,24 +296,15 @@ struct ChapterLayoutDebugHUD: View {
         }
     }
 
-    /// Pass 2 여유(§6-3)가 붙은 절과, 그 여유를 뺀 Δ. 여유가 있을 때만 보인다 (2026-09-14 실기기 시편 119편).
+    /// 저장 당시 줄 수가 지금보다 많은 절(slack)과 초과 band 수. 있을 때만 보인다 (2026-09-14 실기기 시편 119편 v1·v2·v4 +1).
     ///
-    /// 여유가 있으면 `Δ max` 는 누적 여유 band × `lineSpace` 의 계단을 설계상 보인다. 이 줄의 `Δ(-slack) max` 가 0 이면
-    /// 그 계단 말고는 측정 경로가 맞다는 뜻이다. ⚠️ 단일 Canvas 에서는 여유만큼 잉크·필기 귀속이 텍스트 행과 실제로 어긋나 있다.
+    /// 그런 절도 레이아웃과 행은 텍스트 줄 수만큼이라(설계 §6-3) `Δ max` 는 여전히 0 이어야 한다. 잉크가 초과 줄에 걸쳐 있으면
+    /// reflow 가 그 절 안에 같은 비율로 줄여 보여 준다(§9-3) — 이 줄은 그 후보를 알릴 뿐, 실제로 줄었는지는 잉크에 달렸다.
     private var slackLine: some View {
         let slacks = measurement.reflowSlacks
         return Group {
             if !slacks.isEmpty {
-                let worst = measurement.worstSlackAdjustedFrameDelta
-                let magnitude = worst?.magnitude ?? 0
-                HStack(spacing: 10) {
-                    Text("slack \(slackSummary(slacks))").foregroundStyle(.yellow)
-                    Text("Δ(-slack) max \(fmt(magnitude))")
-                        .foregroundStyle(worst == nil ? Color.gray : (magnitude <= tolerance ? Color.green : Color.red))
-                    if let worst {
-                        Text("worst v\(worst.verse)")
-                    }
-                }
+                Text("slack \(slackSummary(slacks)) · 초과 필기는 절 안 축소").foregroundStyle(.yellow)
             }
         }
     }

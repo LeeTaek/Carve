@@ -73,10 +73,10 @@ public struct DrawingLayoutMetadata: Codable, Sendable, Equatable {
     public let metadataSchemaVersion: Int
     /// 저장 시점의 필사 영역 폭. reflow 의 uniform scale 기준값이다(설계 §9-2).
     public let baseWritingWidth: CGFloat
-    /// 저장 시점의 `writingRect` 높이. §6-3 여유 높이가 포함된 값이다.
+    /// 저장 시점의 `writingRect` 높이. 2026-09-15 전에 저장된 행은 §6-3 Pass 2 여유 높이가 포함됐을 수 있다.
     ///
-    /// 현재 reflow 는 폭만으로 scale 을 정하므로(설계 §9-2) 이 값을 계산에 쓰지 않는다.
-    /// 진단·후속 정책(예: 세로 여유 검증)을 위해 함께 영속화한다.
+    /// 현재 reflow 는 이 값을 계산에 쓰지 않는다 — scale 은 폭 비율(설계 §9-2)과 밑줄 간격(§9-3 줄 수 감소)으로 정한다.
+    /// 진단·후속 정책을 위해 함께 영속화한다.
     public let baseWritingHeight: CGFloat
     /// **첫 밑줄 기준** 상대 y (첫 값은 0). 저장된 stroke 와 같은 좌표 공간이다.
     ///

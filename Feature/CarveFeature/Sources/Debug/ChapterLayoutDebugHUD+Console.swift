@@ -27,12 +27,6 @@ extension ChapterLayoutDebugHUD {
         } else {
             fields.append("deltaMax=unmeasured")
         }
-        // 여유(§6-3)를 뺀 Δ. 여유가 없으면 deltaMax 와 같다 — 저장된 필사가 있는 기기에서 측정 경로를 판정하는 값이다.
-        if let worst = measurement.worstSlackAdjustedFrameDelta {
-            fields.append("slackAdjustedDeltaMax=\(number(worst.magnitude)) worst=v\(worst.verse) top=\(number(worst.topDelta)) height=\(number(worst.heightDelta))")
-        } else {
-            fields.append("slackAdjustedDeltaMax=unmeasured")
-        }
         let deltas = measurement.frameDeltas.sorted { $0.verse < $1.verse }
         if let first = deltas.first, let last = deltas.last, deltas.count >= 2 {
             let heights = deltas.map(\.heightDelta)
