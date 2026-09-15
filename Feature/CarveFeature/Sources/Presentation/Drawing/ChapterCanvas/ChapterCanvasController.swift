@@ -148,6 +148,10 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
         overrideUserInterfaceStyle = .light
         view.backgroundColor = .clear
 
+        // ⚠️ 컨트롤러의 고정만으로는 부족하다. SwiftUI(`ChapterCanvasView`)에 담기면 컨트롤러 외관이 환경(시스템 다크 · 설정 다크)으로
+        // 덮여 캔버스가 다크가 되고, 검정 잉크가 흰색으로 반전돼 종이 위에서 보이지 않았다(2026-09-15 `CanvasLightAppearanceTesting`).
+        // 뷰에 건 고정은 덮이지 않으므로 캔버스에 직접 건다. 본문 컬럼은 캔버스 안에 있어 함께 라이트가 된다.
+        canvas.overrideUserInterfaceStyle = .light
         canvas.frame = view.bounds
         canvas.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         canvas.backgroundColor = .clear
