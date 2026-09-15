@@ -20,13 +20,14 @@ import Foundation
 /// `mainDrawing()`) · 조회(`loadDrawingSnapshots`) 는 빈 행을 그대로 봐야 한다. 빈 활성 행이 대표로 남아야
 /// 캔버스가 비어 보이고, 그 경로에서 걸러내면 과거 회차가 승격돼 **지운 획이 되살아난다** (§8-7 ★ 항목).
 ///
-/// 이 판정을 쓰는 곳은 셋이고 전부 같은 기준이어야 한다:
+/// 이 판정을 쓰는 곳은 넷이고 전부 같은 기준이어야 한다:
 ///
 /// | 부르는 곳 | 쓰임 |
 /// |---|---|
 /// | `Array<BibleDrawing>.historyRows()` | 히스토리 목록에서 빈 행을 숨긴다 |
 /// | `ChapterCanvasFeature.menuAvailability(at:state:)` | "이전 필사 내용 보기" · "지우기" 를 띄울지 |
 /// | `SwiftDatabaseActor.archiveAndResetVerseDrawing(_:chapter:now:)` | 보관본을 만들지 |
+/// | `SwiftDatabaseActor.fetchDrawingRecord(title:)` | 탐색 장 목록에서 필사한 장으로 칠하고 기본 장을 고를지 |
 public enum DrawingContentRule {
     /// `lineData` 에 획이 하나라도 있는가.
     ///

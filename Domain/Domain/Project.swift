@@ -32,8 +32,9 @@ let target: [Target] = [
     .makeTestTarget(projName: projectName, target: .debug, script: script, dependencies: [.target(name: projectName)])
 ]
 
+// 모듈 설정은 타깃에만 넘긴다. `makeModule` 에 settings 를 넘기면 프로젝트 기본값(자동 서명 · 개발 팀)이 빠져
+// Domain · DomainTest 의 서명이 지정되지 않는다 — 다른 모듈과 같은 구조를 따른다.
 let project = Project.makeModule(
     name: projectName,
-    targets: target,
-    settings: settings
+    targets: target
 )

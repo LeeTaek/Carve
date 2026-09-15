@@ -271,9 +271,44 @@ public struct DrawingDatabase: Sendable {
 
         return try await actor.fetch(descriptor)
     }
+
+    /// 성경 한 권의 장별 필사 기록을 요약한다 — 탐색 장 목록이 필사한 장을 칠하고 기본 장을 고를 때 쓴다.
+    /// - Parameter title: 대상 성경.
+    /// - Returns: 획이 남은 장과 그중 가장 최근에 필사한 장.
+    public func fetchDrawingRecord(title: BibleTitle) async throws -> BibleTitleDrawingRecord {
+        try await actor.fetchDrawingRecord(title: title)
+    }
 }
 
 extension SwiftDatabaseActor {
+    /// 성경 한 권의 행을 훑어 획이 있는 장과 가장 최근에 필사한 장을 구한다.
+    ///
+    /// SwiftData 모델은 actor 밖으로 내보내지 않고 요약 값만 돌려준다. 획 판정은 `DrawingContentRule` 을 따른다 —
+    /// 지우기로 비운 행과 지우개로 전부 지운 행은 기록이 아니고, 보관 행(`isPresent == false`)은 원래 필사 시각을 지닌 기록이다.
+    /// 판정마다 `PKDrawing` 을 디코딩하므로 `updateDate` 최신순으로 훑으며 이미 기록을 확인한 장의 행은 건너뛴다.
+    /// - Parameter title: 대상 성경.
+    /// - Returns: 필사 기록 요약.
+    public func fetchDrawingRecord(title: BibleTitle) throws -> BibleTitleDrawingRecord {
+        let titleName = title.rawValue
+        let predicate = #Predicate<BibleDrawing> { $0.titleName == titleName }
+        let descriptor = FetchDescriptor(
+            predicate: predicate,
+            sortBy: [SortDescriptor(\.updateDate, order: .reverse)]
+        )
+        var record = BibleTitleDrawingRecord()
+        for row in try modelContext.fetch(descriptor) {
+            guard let chapter = row.titleChapter,
+                  !record.drawnChapters.contains(chapter),
+                  DrawingContentRule.hasStrokes(row.lineData) else { continue }
+            record.drawnChapters.insert(chapter)
+            // 최신순으로 훑으므로 처음 확인한 장이 가장 최근에 필사한 장이다.
+            if record.latestChapter == nil {
+                record.latestChapter = chapter
+            }
+        }
+        return record
+    }
+
     /// N-Canvas 저장 요청을 행 주소로 upsert하고 한 번 저장한다.
     /// - Parameter request: SwiftData 모델을 포함하지 않는 행 단위 저장 값.
     public func upsertLegacyDrawing(_ request: LegacyDrawingSaveRequest) throws {

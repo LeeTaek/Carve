@@ -103,4 +103,53 @@ struct CarveNavigationFeatureTesting {
         _ = reducer.reduce(into: &state, action: .firstRunGuide(.presented(.delegate(.finished))))
         #expect(state.firstRunGuide == nil)
     }
+
+    @Test("성경을 고르면 현재 장은 그대로 두고, 필사 기록을 받을 때까지 장 선택을 비운다")
+    func bibleTitleTappedKeepsCurrentChapter() {
+        var state = CarveNavigationFeature.State.initialState
+        state.selectedTitle = state.currentTitle.title
+        state.selectedChapter = state.currentTitle.chapter
+        let currentTitle = state.currentTitle
+
+        _ = CarveNavigationFeature().reduce(into: &state, action: .view(.bibleTitleTapped(.songOfSongs)))
+
+        #expect(state.selectedTitle == .songOfSongs)
+        #expect(state.selectedChapter == nil)
+        #expect(state.currentTitle == currentTitle)
+    }
+
+    @Test(
+        "필사 기록을 받으면 가장 최근에 필사한 장의 다음 장을 고른다 — 마지막 장이면 그대로, 기록이 없으면 1장",
+        arguments: zip([3, 8, nil] as [Int?], [4, 8, 1])
+    )
+    func drawingRecordSelectsDefaultChapter(latestChapter: Int?, expectedChapter: Int) {
+        var state = CarveNavigationFeature.State.initialState
+        state.selectedTitle = .songOfSongs
+        let drawnChapters: Set<Int> = latestChapter.map { [1, $0] } ?? []
+
+        _ = CarveNavigationFeature().reduce(
+            into: &state,
+            action: .drawingRecordLoaded(.songOfSongs, .init(drawnChapters: drawnChapters, latestChapter: latestChapter))
+        )
+
+        #expect(state.selectedChapter == expectedChapter)
+        #expect(state.drawnChapters[.songOfSongs] == drawnChapters)
+    }
+
+    @Test("탐색을 열며 고른 현재 장이나 그사이 고른 다른 성경의 선택은 늦게 온 필사 기록이 바꾸지 않는다")
+    func drawingRecordKeepsExistingSelection() {
+        var state = CarveNavigationFeature.State.initialState
+        state.selectedTitle = .psalms
+        state.selectedChapter = 119
+        let reducer = CarveNavigationFeature()
+
+        _ = reducer.reduce(into: &state, action: .drawingRecordLoaded(.psalms, .init(drawnChapters: [119], latestChapter: 119)))
+        #expect(state.selectedChapter == 119)
+        #expect(state.drawnChapters[.psalms] == [119])
+
+        state.selectedTitle = .isaiah
+        state.selectedChapter = nil
+        _ = reducer.reduce(into: &state, action: .drawingRecordLoaded(.psalms, .init(drawnChapters: [119], latestChapter: 119)))
+        #expect(state.selectedChapter == nil)
+    }
 }

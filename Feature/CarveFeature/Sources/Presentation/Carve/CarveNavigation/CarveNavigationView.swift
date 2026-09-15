@@ -143,7 +143,7 @@ public struct CarveNavigationView: View {
                     columns: Array(repeating: GridItem(.fixed(CarveSize.minimumHitTarget), spacing: CarveSpacing.xSmall), count: 5),
                     spacing: CarveSpacing.xSmall
                 ) {
-                    ForEach(1...store.currentTitle.title.lastChapter, id: \.self) { chapter in
+                    ForEach(1...browsingTitle.lastChapter, id: \.self) { chapter in
                         chapterButton(chapter)
                             .id(chapter)
                     }
@@ -151,13 +151,18 @@ public struct CarveNavigationView: View {
                 .padding(CarveSpacing.large)
             }
             .onAppear {
-                proxy.scrollTo(store.currentTitle.chapter, anchor: .center)
+                if let chapter = store.selectedChapter {
+                    proxy.scrollTo(chapter, anchor: .center)
+                }
             }
-            .onChange(of: store.currentTitle) { _, title in
-                proxy.scrollTo(title.chapter, anchor: .center)
+            .onChange(of: store.selectedChapter) { _, chapter in
+                // 성경을 고르면 필사 기록을 받은 뒤 정해진 기본 장으로 옮긴다.
+                guard let chapter else { return }
+                proxy.scrollTo(chapter, anchor: .center)
             }
         }
-        .navigationTitle("\(store.currentTitle.title.koreanTitle()) \(store.currentTitle.title.lastChapter)장")
+        // 성경을 고른 직후 필사 기록을 읽는 동안은 선택한 장이 없어 성경 이름만 보인다.
+        .navigationTitle(store.selectedChapter.map { "\(browsingTitle.koreanTitle()) \($0)장" } ?? browsingTitle.koreanTitle())
         .background(CarveColor.surface)
     }
     
@@ -182,17 +187,23 @@ public struct CarveNavigationView: View {
         return titles.filter { $0.koreanTitle().localizedCaseInsensitiveContains(searchText) }
     }
 
+    /// 장 목록이 보여 줄 성경. 성경 열에서 고른 성경이 없으면 현재 성경이다.
+    private var browsingTitle: BibleTitle {
+        store.selectedTitle ?? store.currentTitle.title
+    }
+
     private func bibleTitleButton(_ title: BibleTitle) -> some View {
-        let isSelected = store.currentTitle.title == title
+        let isSelected = browsingTitle == title
         return Button {
-            store.selectedTitle = title
+            send(.bibleTitleTapped(title))
         } label: {
             HStack(spacing: CarveSpacing.small) {
                 Text(title.koreanTitle())
                     .font(CarveTypography.body)
                 Spacer(minLength: 0)
                 if isSelected {
-                    Text("\(store.currentTitle.chapter)장")
+                    // 선택한 성경의 마지막 장을 보여준다. 선택한 장은 장 목록에서 강조한다.
+                    Text("\(title.lastChapter)장")
                         .font(CarveTypography.caption)
                         .foregroundStyle(CarveColor.accent)
                 }
@@ -203,24 +214,31 @@ public struct CarveNavigationView: View {
             .background(isSelected ? CarveColor.selected : .clear, in: RoundedRectangle(cornerRadius: CarveRadius.control, style: .continuous))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(isSelected ? "\(title.koreanTitle()), 현재 \(store.currentTitle.chapter)장" : title.koreanTitle())
+        .accessibilityLabel(isSelected ? "\(title.koreanTitle()), 총 \(title.lastChapter)장" : title.koreanTitle())
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private func chapterButton(_ chapter: Int) -> some View {
-        let isSelected = store.currentTitle.chapter == chapter
+        let isSelected = store.selectedChapter == chapter
+        let isDrawn = store.drawnChapters[browsingTitle]?.contains(chapter) == true
+        // 필사 기록이 있는 장은 선택 배경에 강조 글자로 칠한다. 선택한 장(강조 배경)과 구분되고,
+        // accent 글자 / selected 배경 대비가 라이트 5.32:1 · 다크 4.58:1 이다(ui-design-direction 3-1).
+        let foreground = isSelected ? CarveColor.canvas : (isDrawn ? CarveColor.accent : CarveColor.ink)
+        let background = isSelected ? CarveColor.accent : (isDrawn ? CarveColor.selected : CarveColor.fill)
         return Button {
-            // selectedChapter 바인딩만 바꾸면 현재 장 헤더만 갱신되고 본문 fetch가 발생하지 않는다.
-            // 도메인 이동 액션으로 보내야 장 상태·detail 전환·본문 로딩이 한 흐름으로 처리된다.
-            send(.chapterTapped(BibleChapter(title: store.currentTitle.title, chapter: chapter)))
+            // selectedChapter 는 목록의 강조만 나타낸다. 도메인 이동 액션으로 보내야
+            // 장 상태·detail 전환·본문 로딩이 한 흐름으로 처리된다.
+            send(.chapterTapped(BibleChapter(title: browsingTitle, chapter: chapter)))
         } label: {
             Text(chapter.description)
                 .font(CarveTypography.body)
                 .frame(width: CarveSize.minimumHitTarget, height: CarveSize.minimumHitTarget)
-                .foregroundStyle(isSelected ? CarveColor.canvas : CarveColor.ink)
-                .background(isSelected ? CarveColor.accent : CarveColor.fill, in: RoundedRectangle(cornerRadius: CarveRadius.control, style: .continuous))
+                .foregroundStyle(foreground)
+                .background(background, in: RoundedRectangle(cornerRadius: CarveRadius.control, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(chapter)장")
+        .accessibilityValue(isDrawn ? "필사 기록 있음" : "")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
