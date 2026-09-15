@@ -188,7 +188,7 @@ CarveFeature
 /// 절 하나의 캔버스 좌표 정보 (Domain)
 struct VerseCanvasRegion: Equatable, Sendable {
     let verse: Int
-    /// §6-3 Pass 2 의 여유 높이를 포함한다. 밑줄이 그려지는 구간은 텍스트 줄 수만큼.
+    /// 텍스트 줄 수(실측 높이)만큼. 저장된 필사가 더 많은 줄에 걸쳐 있어도 늘지 않는다 (§6-3).
     let writingRect: CGRect
     /// 획 소유권을 판정하는 영역 (인접 절과의 midpoint로 분할)
     let captureRect: CGRect
@@ -266,8 +266,8 @@ Verse 3 writingRect
 
 첫 절 위쪽과 마지막 절 아래쪽은 캔버스 끝까지 확장합니다.
 
-**여유 높이는 `writingRect` 안에 둡니다.** §6-3 Pass 2 의 `extraHeight` 를 절 사이 gap 으로 두면 midpoint 분할로 그 절반이 다음 절 소유가 됩니다.
-초과 band 는 그 절의 것이므로 `writingRect` 하단에 포함하고, `underlineAnchors` 는 텍스트 줄 수만큼만 만듭니다 ([ChapterLayoutBuilder.swift](../Domain/Domain/Sources/Layout/ChapterLayoutBuilder.swift)).
+**절 영역은 텍스트 줄 수만큼입니다.** 저장 당시 줄이 더 많던 필사도 `writingRect` 를 늘리지 않고, reflow 가 그 절의 줄 묶음 안에 줄여 넣습니다(§9-3). 그래서 초과 줄의 필기가 절 사이 gap 이나 다음 절로 밀려나 midpoint 분할에서 다른 절 소유가 되지 않습니다. `underlineAnchors` 는 텍스트 줄 수만큼만 만듭니다 ([ChapterLayoutBuilder.swift](../Domain/Domain/Sources/Layout/ChapterLayoutBuilder.swift)).
+(2026-09-15 전에는 §6-3 Pass 2 의 `extraHeight` 를 `writingRect` 하단에 포함했습니다.)
 
 #### 캔버스 좌표 — `columnOrigin` (U5 확정)
 
@@ -336,18 +336,17 @@ layout.regions.count == sentences.count && layout.totalHeight > 0 && layout.writ
 
 > ⚠️ **새 실패 모드.** 어떤 절의 `Text.LayoutKey` 가 끝내 도착하지 않으면 게이트가 열리지 않아 **그 장 전체가 필기 불가**입니다 (옛 코드에서는 "그 절의 밑줄만 없음"). HUD 의 `missing` 줄로 관찰합니다. 실기기·저사양 기기 확인은 남아 있습니다.
 
-### 6-3. 2-pass 높이 계산
+### 6-3. 높이 계산 — 텍스트만 (Pass 2 제거)
 
-**줄 수가 줄어드는** 리플로우(폭 증가 / 폰트 감소 / 자간 감소)에서는 저장된 필사가 텍스트보다 많은 줄을 요구할 수 있습니다.
+**줄 수가 줄어드는** 리플로우(폭 증가 / 폰트 감소 / 자간 감소)에서는 저장된 필사가 텍스트보다 많은 줄에 걸쳐 있을 수 있습니다 (저장 band 수 `N_saved` > 현재 밑줄 수 `N_now`).
+그래도 **절 높이는 텍스트(실측 높이)만으로** 정합니다. 초과 줄에 걸친 필기는 reflow 가 그 절의 줄 묶음 안에 같은 비율로 줄여 넣습니다 (§9-3 "줄 수 감소").
 
-```
-Pass 1  텍스트 기준 각 절의 밑줄 개수 / 높이 측정
-Pass 2  절의 저장 band 수(N_saved)와 현재 밑줄 수(N_now)를 비교
-        N_saved > N_now 이면  extraHeight = (N_saved - N_now) × lineSpace
-        effectiveHeight = 텍스트 높이 + extraHeight → 레이아웃 재계산
-```
+원래는 Pass 2 가 `extraHeight = (N_saved − N_now) × lineSpace` 를 더해 공간을 확보했습니다. 2026-09-15 에 없앴습니다.
 
-Pass 2 는 **band 개수만** 사용하므로 좌표 계산이 필요 없고, reflow 결과에 레이아웃이 의존하는 순환이 생기지 않습니다.
+1. **레이아웃만 늘고 행은 그대로였습니다.** 여유 절 이후의 잉크 · 필기 귀속이 텍스트 행과 계단으로 어긋났습니다 (2026-09-14 실기기 시편 119편 v1·v2·v4 +1 → HUD Δ 195.63, 가로 586.90).
+2. **행까지 늘리면 절 간격이 들쭉날쭉합니다.** 행 아래를 비워 맞추는 안은 Δ 를 0 으로 만들었지만(시뮬레이터 확인) 저장 필사가 있는 절만 넓게 벌어졌습니다. 절 간격은 일정해야 합니다.
+
+레이아웃이 저장 필사에 의존하지 않으므로 "reflow 결과 → 레이아웃 → reflow" 순환도 원천적으로 없습니다. `N_saved`(`DrawingLayoutMetadata.savedBandCount`)는 HUD 의 `slack` 진단에만 씁니다.
 
 ### 6-4. 로드 순서와 합성 게이트
 
@@ -588,6 +587,7 @@ editEnded(snapshot(generation))
 저장 stroke → 저장 당시 metadata 의 baseUnderlineAnchors 로 band(줄) 판정
            → 현재 layout 의 같은 index underline 으로 translate
            → 폭이 줄었을 때만 uniform 축소 (scale = min(1, now / base))
+           → 잉크가 현재 줄 수보다 많은 band 에 걸치면 절 전체를 같은 비율로 줄여 현재 줄 묶음 안에 넣는다 (§9-3 줄 수 감소)
 ```
 
 **왜 균등 세로 스케일이 아닌가** — 폰트를 키우면 같은 폭에서 줄 수가 늘어납니다. 세로로 늘리면 글씨가 밑줄과 어긋나고, 줄 단위로 재앵커하면 글씨 크기가 유지된 채 각 줄이 밑줄에 정렬됩니다.
@@ -602,7 +602,7 @@ reflow 는 `StrokeIdentityKey` 를 깨뜨리지 않습니다 — `PKDrawing.tran
 | writing width 감소 | 종횡비 유지 uniform 축소 |
 | writing width 증가 | **확대하지 않음.** 원래 크기 유지 |
 | 줄 수 증가 | 남는 밑줄은 빈 줄 |
-| 줄 수 감소 | 초과 band 는 마지막 간격 연장 + §6-3 effectiveHeight 로 공간 확보 (§9-3-1 4번) |
+| 줄 수 감소 | 잉크가 현재 줄 수 안에 들면 같은 index 밑줄로 옮긴다(크기 불변). 넘치면 **절 전체를 같은 비율로 줄여 현재 줄 묶음 안에** 넣는다 — 비율은 `현재 줄 묶음 높이 / 잉크가 걸친 저장 band 묶음 높이` 와 폭 비율 중 작은 쪽이고, 줄 묶음은 첫 밑줄 한 줄 위(`writingRect` 상단을 넘지 않음) ~ 마지막 밑줄이다. 첫 band 는 되도록 첫 밑줄에 앉히고, 줄 묶음을 넘으면 그 안으로 옮긴다. 레이아웃 높이는 늘리지 않는다 (§6-3) |
 | 줄바꿈만 달라짐 | `textLineRanges` 겹침으로 이동 — **미구현.** 현재 줄의 문자 범위 실측(`Text.Layout.Run.characterIndices`, iOS 17.0+ — S2 확인)이 파이프라인에 없다. 자리(`Input.currentTextLineRanges`)만 있고 읽지 않는다. 임의 구현하면 §9-3-1 로 가야 할 절이 조용히 잘못된 줄에 앉는다 |
 | 매핑할 줄 없음 | **첫 밑줄 기준으로 통째 보존** + `layoutMismatch` 기록 (§9-3-1) |
 | metadata 없음 (legacy) | 무변환 (§10-2). 코덱이 현재 `writingRect` 원점에 배치 |
@@ -621,10 +621,10 @@ reflow 는 `StrokeIdentityKey` 를 깨뜨리지 않습니다 — `PKDrawing.tran
 
 | # | 확정 |
 |---|---|
-| "매핑할 줄 없음" 의 조건 | ① 저장 band 0개 ② 현재 밑줄 0개 ③ 줄 수가 줄었는데 마지막 간격 ≤ 0. ③ 을 진행하면 초과 band 가 같은 y 에 겹쳐 쌓여 위 1번을 위반한다 |
+| "매핑할 줄 없음" 의 조건 | ① 저장 band 0개 ② 현재 밑줄 0개 ③ 잉크가 현재 줄 수보다 많은 band 에 걸쳤는데 줄 간격 ≤ 0 (줄일 비율을 정할 수 없음). ③ 을 진행하면 초과 band 가 같은 y 에 겹쳐 쌓여 위 1번을 위반한다 |
 | uniform 축소 적용 여부 | 적용한다 — 절 안의 상대 배치를 바꾸지 않고, 없으면 잉크가 좁아진 컬럼 밖으로 샌다 |
 | legacy 무변환의 출력 좌표계 | `legacyPassthrough` — 좌표를 전혀 건드리지 않는다. 배치는 코덱의 런타임 legacy 판별(§10-2 3번)이 담당 |
-| "마지막 간격" 이 밑줄 1개일 때 | `writingRect` 상단 ~ 첫 밑줄 거리를 한 줄 높이로 본다 (새 상수 없음). 0 이하면 ③ |
+| 현재 밑줄이 1개일 때의 줄 간격 | `writingRect` 상단 ~ 첫 밑줄 거리를 한 줄 높이로 본다 (새 상수 없음). 0 이하면 ③ |
 
 ### 9-3-2. 밑줄 offset 정밀화 (미적용)
 
@@ -905,7 +905,7 @@ columnHeight 가 장 전환에 초기화되지 않음 (컨트롤러는 장을 �
 
 **순서·복구** — 6 edit 1 저장 지연 중 edit 2 가 먼저 끝나도 최종 DB 가 edit 2 · 6-1 저장 중 도착한 최신 mutation 을 성공 콜백이 지우지 않음 · 6-2 조회/레이아웃 도착 순서 무관 · 6-3 이전 장 조회 결과 미적용 · 7 장 전환 직전 pending edit 유실 없음 · 8 저장 실패 후 다음 edit 성공 시 함께 반영
 
-**레이아웃·복원** — 9 라운드트립 구조 보존 · 10 layout 미완성 시 입력·저장 금지 · 11 layout 변경 중 필기는 pencil-up 뒤 reflow · 12 줄 수 감소 시 높이 증가 · 13 legacy 무변환 · 14 reflow 후 undo 초기화 · 15 signature 영속
+**레이아웃·복원** — 9 라운드트립 구조 보존 · 10 layout 미완성 시 입력·저장 금지 · 11 layout 변경 중 필기는 pencil-up 뒤 reflow · 12 줄 수 감소 시 절 안 균등 축소 (높이 불변) · 13 legacy 무변환 · 14 reflow 후 undo 초기화 · 15 signature 영속
 
 **롤백** — 16 V4 저장소 + flag off 에서 N-Canvas 정상 · 17 undo/redo 후 재실행 유지
 
@@ -913,11 +913,11 @@ columnHeight 가 장 전환에 초기화되지 않음 (컨트롤러는 장을 �
 
 | 파일 | 건수 | 고정하는 것 |
 |---|---:|---|
-| `ChapterLayoutBuilderTesting` · `ChapterLayoutBuilderInsetTesting` · `ChapterLayoutPointQueryTesting` (Domain) | 20+ | 2-pass (12) · signature canonical (15) · `leadingInset` / `topPadding` · `verse(containing:)` |
+| `ChapterLayoutBuilderTesting` · `ChapterLayoutBuilderInsetTesting` · `ChapterLayoutPointQueryTesting` (Domain) | 20+ | signature canonical (15) · `leadingInset` / `topPadding` · `verse(containing:)` |
 | `DrawingLayoutMetadataTesting` · `DrawingSchemaV4MigrationTesting` · `DrawingDatabaseTesting` (Domain) | 30+ | metadata 라운드트립 · V3→V4 마이그레이션 11건 · §10-3 등가 9건 |
 | `DrawingRepositoryTesting` (Domain, 13) | 13 | `create` upsert · legacy 주소지정과 승격 · `clear` 행 유지 (5) · 롤백 (3) · `rowNotFound` · 대표 행 규칙 (5-4) |
 | `StrokeOwnershipResolverTesting` (§7-1 · §7-3) | 20 | 첫 control point · U1 · 지우개 조각 승계 · 규칙 3 결정성 · **새 획은 겹쳐도 시작 절 (rev.19)** · 4 부분 |
-| `LineBandReflowTesting` · `LegacyCoordinateTesting` · `PencilKitDataModelTesting` · `TextLayoutKeyProbeTesting` | 30+ | §9-2 · §9-3-1 · legacy fixture · S1 · S2 |
+| `LineBandReflowTesting` · `LegacyCoordinateTesting` · `PencilKitDataModelTesting` · `TextLayoutKeyProbeTesting` | 30+ | §9-2 · 줄 수 감소 절 안 축소 (12) · §9-3-1 · legacy fixture · S1 · S2 |
 | `ChapterLayoutMeasurementTesting` · `CarveDetailLayoutMeasurementTesting` | 21 | 게이트 · 도착 순서 무관 (6-2) · 이전 장 폐기 (6-3) · 수집기 |
 | `DrawingCodecTesting` | 11 | legacy 무변환 (13) · v3 reflow · 라운드트립 무 mutation (9) · 경계 획 `create` (1) · `clear` (2) · mask dirty (5-6) · 클램프 (U8) |
 | `ChapterCanvasFeatureTesting` (18) · `ChapterCanvasHistoryTesting` (2) | 20 | 6-2 · 10 · 6-3 · 5-7 · 6-1 · 8 · 11 · 5-2 · 5-3 · 7 · 세대 · 물러난 세션 · 재합성 출구 · `coalesce` · 히스토리 절 판정 |
@@ -973,7 +973,7 @@ columnHeight 가 장 전환에 초기화되지 않음 (컨트롤러는 장을 �
 
 - 게이트는 `ChapterCanvasFeature.State.isDrawingInputEnabled` **하나**이고 `ChapterCanvasView.Display` 를 거쳐 `drawingGestureRecognizer.isEnabled` 로 간다. 합성·표시·저장·flush·복원은 `isComposed` / `isReloading` / `isFullyPersisted` 만 보므로 무엇이 어긋나든 계속 돈다. **`isReady` 는 건드리지 않는다.**
 - **단일 Canvas 전용.** N-Canvas 는 잉크가 절-로컬이라 레이아웃 Δ 가 귀속을 틀지 않는다 — 거기서 막으면 무해한 조건으로 필기를 못 하게 만드는 회귀다. `CarveDetailFeature.forwardLayoutToSingleCanvas` 의 `usesSingleCanvas` 가드가 그 경계다.
-- Pass 2 여유 높이(§6-3)가 붙은 절이 있으면 **판정을 보류한다** (`hasReflowSlack`). 그 여유는 `writingRect` 를 의도적으로 부풀린 값이라 "의도한 여유" 와 "예측 결함" 을 Δ 로 구별할 수 없고, 구별할 수 없을 때는 막지 않는다.
+- 저장 당시 줄 수가 더 많은 절(slack)이 있어도 **판정을 보류하지 않는다** (2026-09-15). 레이아웃이 저장 필사에 의존하지 않으므로(§6-3) Δ 는 언제나 행과 레이아웃의 어긋남이다. 그 전에는 Pass 2 가 `writingRect` 만 부풀려 Δ 가 의도적으로 컸고 `hasReflowSlack` 이면 보류했는데, 그동안 여유 절 이후의 필기 귀속이 틀어져 있었다 (실기기 시편 119편 Δ 195.63).
 - **장 전환 시 리셋한다** — 이전 장의 Δ 로 새 장의 입력을 막지 않는다 (위 이월 상태 감사와 같은 계열).
 - HUD 에 `guard OPEN / BLOCKED` 로 보인다.
 
@@ -1473,7 +1473,7 @@ Phase 3 이후 처음으로 **제품 코드의 단일 Canvas 경로를 실기기
 
 #### 부작용 3건 — 반드시 알고 읽어야 합니다
 
-1. **`frameDeltas.heightDelta` 가 구조적으로 0 이 됩니다.** (Pass 2 여유가 붙은 절만 예외이며, 그때는 정확히 `−extraBands × lineSpace`.) 높이 Δ 는 더 이상 독립 검증이 아니라 자기 자신을 검증합니다. 남는 독립 검증은 **`topDelta`** 이고, 그것이 `metrics`(`topInset`/`verseSpacing`/`bottomInset`)와 `leadingInset` 의 적재를 계속 검증합니다.
+1. **`frameDeltas.heightDelta` 가 구조적으로 0 이 됩니다.** (Pass 2 여유가 붙은 절만 예외였고 그때는 정확히 `−extraBands × lineSpace` 였습니다 — 2026-09-15 §6-3 Pass 2 제거로 예외도 없어졌습니다.) 높이 Δ 는 더 이상 독립 검증이 아니라 자기 자신을 검증합니다. 남는 독립 검증은 **`topDelta`** 이고, 그것이 `metrics`(`topInset`/`verseSpacing`/`bottomInset`)와 `leadingInset` 의 적재를 계속 검증합니다.
 2. ⚠️ **Δ 가 R16 계열을 더 이상 검출하지 못합니다.** 호스트 제안이 행을 늘려도 레이아웃이 그 렌더를 따라가 예측 == 실측이 되기 때문입니다. **이번 세션에서 실증됐습니다** — `.fixedSize` 가 빠진 실기기 빌드가 장 전환 Δ 를 0.00 으로 표시했습니다. 자동 검출은 `ChapterCanvasControllerTesting.hostedColumnKeepsIdealHeightAndStaysAtTop` 하나뿐이고, 실기기에서는 HUD 의 `H`(totalHeight)를 **새 진입값과 비교**해야 합니다 (런북 §6-9).
 3. **장 진입이 예측 → 실측 2회 빌드**가 됩니다. 편집 중 도착한 레이아웃은 §8-1 의 `pendingLayout` 이 흡수해 pencil-up 뒤에 적용됩니다. 절 수가 많은 장의 진입 비용은 D9-8 에서 확인 대상입니다.
 

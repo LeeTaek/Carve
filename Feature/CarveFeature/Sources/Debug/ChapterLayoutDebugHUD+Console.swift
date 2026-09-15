@@ -10,6 +10,7 @@ extension ChapterLayoutDebugHUD {
         let duration = measurement.firstBuildDuration.map {
             Double($0.components.seconds) * 1000 + Double($0.components.attoseconds) / 1e15
         }
+        let slackBands = measurement.reflowSlacks.map { "v\($0.verse):+\($0.extraBands)" }.joined(separator: ",")
         var fields = [
             "chapter=\(chapter)",
             "mode=\(compose == nil ? "N-Canvas" : "SingleCanvas")",
@@ -19,7 +20,7 @@ extension ChapterLayoutDebugHUD {
             "W=\(number(measurement.writingWidth)) H=\(number(measurement.layout?.totalHeight ?? 0))",
             "columnOrigin=\(String(describing: measurement.columnOrigin)) frames=\(measurement.measuredFrames.count)",
             "sig=\(measurement.layout?.signature ?? "—") missing=\(measurement.missingVerses)",
-            "tol=\(number(LayoutDeltaVerdict.tolerance)) slack=\(measurement.hasReflowSlack)"
+            "tol=\(number(LayoutDeltaVerdict.tolerance)) slack=\(measurement.hasReflowSlack) slackBands=[\(slackBands)]"
         ]
         if let worst = measurement.worstFrameDelta {
             fields.append("deltaMax=\(number(worst.magnitude)) worst=v\(worst.verse) top=\(number(worst.topDelta)) height=\(number(worst.heightDelta))")

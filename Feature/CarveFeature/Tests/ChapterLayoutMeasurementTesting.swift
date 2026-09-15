@@ -239,16 +239,16 @@ struct ChapterLayoutMeasurementTesting {
         #expect(layout?.regions[1].underlineAnchors == [30, 60])
     }
 
-    @Test("저장 band 수는 Pass 2 여유 높이로 반영된다")
-    func savedBandCountGrowsVerse() {
+    @Test("저장 band 수가 현재 줄 수보다 많아도 절 높이는 텍스트 줄 수로만 정해진다 — 초과 필기는 reflow 가 절 안에 줄여 넣는다 (§6-3 · §9-3)")
+    func savedBandCountDoesNotGrowVerse() {
         var measurement = begun(verses: [1, 2], savedBandCounts: [2: 4])
         measurement.setWritingWidth(300)
         measurement.recordText(verse: 1, underlineAnchors: anchors(verse: 1, lineCount: 1))
         measurement.recordText(verse: 2, underlineAnchors: anchors(verse: 2, lineCount: 1))
         let layout = rebuild(&measurement)
 
-        // 1줄 텍스트 + 초과 band 3개 = 4 × 줄 거리.
-        #expect(layout?.regions[1].writingRect.height == 4 * pitch)
+        // 1줄 텍스트 = 1 × 줄 거리. 2026-09-15 전에는 초과 band 3개만큼(4 × 줄 거리) 늘어 행과 어긋났다.
+        #expect(layout?.regions[1].writingRect.height == pitch)
         #expect(layout?.regions[1].underlineAnchors == [30])
     }
 
@@ -375,9 +375,9 @@ struct ChapterLayoutMeasurementTesting {
         #expect(measurement.isReady)
     }
 
-    @Test("Pass 2 여유 높이가 있는 장에서는 Δ 로 판정할 수 없어 차단하지 않는다")
-    func verdictDoesNotBlockWhenPassTwoSlackIsPresent() throws {
-        // 2절의 저장 band 4개 > 현재 1줄 → writingRect 가 의도적으로 90pt 부풀려진다.
+    @Test("저장 줄 수 초과(slack) 절이 있어도 판정을 보류하지 않는다 — 레이아웃이 늘지 않으므로 한 줄을 넘는 어긋남은 막는다")
+    func verdictDoesNotSkipChaptersWithSlack() throws {
+        // 2절의 저장 band 4개 > 현재 1줄. 2026-09-15 전에는 writingRect 가 90pt 부풀려져 이 경우 판정을 보류했다.
         var measurement = begun(verses: [1, 2], savedBandCounts: [2: 4])
         measurement.setWritingWidth(300)
         measurement.recordText(verse: 1, underlineAnchors: anchors(verse: 1, lineCount: 1))
@@ -386,14 +386,14 @@ struct ChapterLayoutMeasurementTesting {
         let region = try #require(layout.region(verse: 2))
 
         #expect(measurement.hasReflowSlack)
-        // 행은 여유만큼 커지지 않으므로 Δ 가 의도적으로 크다.
-        measurement.recordFrame(verse: 2, frame: CGRect(x: 380, y: region.writingRect.minY, width: 300, height: pitch))
+        #expect(region.writingRect.height == pitch)
+        // 실기기 시편 119편의 모양 — 행이 레이아웃보다 3줄 아래에 있다.
+        measurement.recordFrame(verse: 2, frame: CGRect(x: 380, y: region.writingRect.minY + 3 * pitch, width: 300, height: pitch))
         let verdict = try #require(measurement.layoutDeltaVerdict)
 
-        #expect(verdict.magnitude == 3 * pitch)
+        #expect(abs(verdict.magnitude - 3 * pitch) < 0.001)
         #expect(verdict.exceedsTolerance)
-        // 의도한 여유와 예측 결함을 구별할 수 없다 — 막지 않는다.
-        #expect(!verdict.blocksInput)
+        #expect(verdict.blocksInput)
     }
 }
 

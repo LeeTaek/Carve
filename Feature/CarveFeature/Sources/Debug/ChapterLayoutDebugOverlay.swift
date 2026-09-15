@@ -183,6 +183,7 @@ struct ChapterLayoutDebugHUD: View {
             deltaLine
             profileLine
             guardLine
+            slackLine
             composeLine
             editLine
             if !measurement.missingVerses.isEmpty {
@@ -288,14 +289,31 @@ struct ChapterLayoutDebugHUD: View {
                     Text("입력만 차단 · 합성/저장 유지").foregroundStyle(.gray)
                     Text("v\(safetyNet.verse) Δ \(fmt(safetyNet.magnitude))")
                     Text("limit \(fmt(safetyNet.lineSpace))pt(1줄)").foregroundStyle(.gray)
-                    if measurement.hasReflowSlack {
-                        Text("slack(§6-3) — 판정 보류").foregroundStyle(.yellow)
-                    }
                 }
             } else {
                 Text("guard — (단일 Canvas 아님 또는 실측 대기)").foregroundStyle(.gray)
             }
         }
+    }
+
+    /// 저장 당시 줄 수가 지금보다 많은 절(slack)과 초과 band 수. 있을 때만 보인다 (2026-09-14 실기기 시편 119편 v1·v2·v4 +1).
+    ///
+    /// 그런 절도 레이아웃과 행은 텍스트 줄 수만큼이라(설계 §6-3) `Δ max` 는 여전히 0 이어야 한다. 잉크가 초과 줄에 걸쳐 있으면
+    /// reflow 가 그 절 안에 같은 비율로 줄여 보여 준다(§9-3) — 이 줄은 그 후보를 알릴 뿐, 실제로 줄었는지는 잉크에 달렸다.
+    private var slackLine: some View {
+        let slacks = measurement.reflowSlacks
+        return Group {
+            if !slacks.isEmpty {
+                Text("slack \(slackSummary(slacks)) · 초과 필기는 절 안 축소").foregroundStyle(.yellow)
+            }
+        }
+    }
+
+    /// `v1+1·v2+1·v4+1 = 3줄` 처럼 절별 초과 band 와 합계를 보여준다. 많으면 앞의 6개만.
+    private func slackSummary(_ slacks: [ChapterLayoutMeasurement.ReflowSlack]) -> String {
+        let shown = slacks.prefix(6).map { "v\($0.verse)+\($0.extraBands)" }.joined(separator: "·")
+        let total = slacks.reduce(0) { $0 + $1.extraBands }
+        return slacks.count > 6 ? "\(shown)… (\(slacks.count)절) = \(total)줄" : "\(shown) = \(total)줄"
     }
 
     /// 측정 레이아웃이 캔버스까지 갔는지 (E-4 진단).

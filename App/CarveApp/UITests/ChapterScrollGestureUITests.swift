@@ -53,11 +53,8 @@ final class ChapterScrollGestureUITests: XCTestCase {
         capture(app, "d97-01-before-fling")
 
         // 본문 왼쪽 절반에서 스와이프한다 — 잉크 컬럼을 건드리지 않기 위함이다.
-        let frame = app.windows.firstMatch.frame
-        let top = app.coordinate(withNormalizedOffset: .zero)
-            .withOffset(CGVector(dx: frame.width * 0.25, dy: frame.height * 0.30))
-        let bottom = app.coordinate(withNormalizedOffset: .zero)
-            .withOffset(CGVector(dx: frame.width * 0.25, dy: frame.height * 0.80))
+        let top = windowPoint(app, dx: 0.25, dy: 0.30)
+        let bottom = windowPoint(app, dx: 0.25, dy: 0.80)
 
         for _ in 0..<4 { bottom.press(forDuration: 0.01, thenDragTo: top) }   // 아래로 빠르게
         usleep(1_500_000)
@@ -89,11 +86,8 @@ final class ChapterScrollGestureUITests: XCTestCase {
         XCTAssertTrue(move(app, toChapter: "시편 122장"), "테스트 장에 도달하지 못했다")
         waitForChapterReady(app)
 
-        let frame = app.windows.firstMatch.frame
-        let top = app.coordinate(withNormalizedOffset: .zero)
-            .withOffset(CGVector(dx: frame.width * 0.25, dy: frame.height * 0.30))
-        let bottom = app.coordinate(withNormalizedOffset: .zero)
-            .withOffset(CGVector(dx: frame.width * 0.25, dy: frame.height * 0.80))
+        let top = windowPoint(app, dx: 0.25, dy: 0.30)
+        let bottom = windowPoint(app, dx: 0.25, dy: 0.80)
 
         // 헤더가 접히도록 아래로 스크롤한 뒤, 애니메이션이 도는 동안 곧바로 반대로 스크롤한다.
         bottom.press(forDuration: 0.01, thenDragTo: top)

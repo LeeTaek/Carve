@@ -39,7 +39,6 @@ enum ReflowTestSupport {
     /// "절 원점" 과 "첫 밑줄" 을 혼동한 구현이 드러난다.
     static func singleVerse(
         textLineCount: Int,
-        savedBandCount: Int? = nil,
         measuredAnchors: [CGFloat]? = nil,
         writingWidth: CGFloat = 320,
         lineSpace: CGFloat = 30,
@@ -54,7 +53,6 @@ enum ReflowTestSupport {
                 VerseLayoutInput(
                     verse: 1,
                     textLineCount: textLineCount,
-                    savedBandCount: savedBandCount,
                     measuredUnderlineAnchors: measuredAnchors
                 )
             ],
@@ -235,10 +233,10 @@ struct LineBandReflowTesting {
         #expect(ReflowTestSupport.canvasBounds(result.displayDrawing).maxY < canvasAnchors[2])
     }
 
-    @Test("줄 수가 줄면 초과 band 는 마지막 간격 연장으로 놓이고 §6-3 여유 안에 들어간다")
-    func overflowBandsExtendTheLastGapWithinReservedHeight() {
-        // §6-3 Pass 2 — 저장 band 3 / 현재 텍스트 2줄 → writingRect 에 한 줄치 여유가 확보된다.
-        let (_, region) = ReflowTestSupport.singleVerse(textLineCount: 2, savedBandCount: 3)
+    @Test("줄 수가 줄어 잉크가 현재 줄보다 많은 band 에 걸치면 절 전체를 같은 비율로 줄여 현재 줄 안에 넣는다 — 레이아웃은 늘지 않는다")
+    func overflowInkShrinksUniformlyIntoCurrentLines() {
+        // 저장 3줄 → 현재 2줄. writingRect 는 2줄 그대로다 (§6-3 — 절 간격이 일정해야 한다).
+        let (_, region) = ReflowTestSupport.singleVerse(textLineCount: 2)
         let stored = ReflowTestSupport.threeBandDrawing()
 
         let result = reflow.reflow(
@@ -250,18 +248,93 @@ struct LineBandReflowTesting {
             writingRectRelative: region.underlineAnchors,
             writingRect: region.writingRect
         )
-        let lastGap = canvasAnchors[1] - canvasAnchors[0]
-        let virtualThirdAnchor = canvasAnchors[1] + lastGap
-
+        // 줄 묶음 높이 비율 = (30 + 30) / (60 + 30). 모든 획에 같은 변환이라 절 안의 상대 배치와 종횡비가 그대로다.
+        let scale: CGFloat = 2.0 / 3.0
+        let before = ReflowTestSupport.canvasBounds(stored)
+        let after = ReflowTestSupport.canvasBounds(result.displayDrawing)
         #expect(result.outcome == .reflowed)
-        #expect(region.underlineAnchors.count == 2)
-        #expect(region.writingRect.height == 90)      // 2줄 × 30 + 여유 30
-
-        // band 2 획은 "마지막 간격을 한 번 더 연장한" 가상 밑줄 기준으로 놓인다.
+        #expect(region.writingRect.height == 60)
+        #expect(abs(after.width - before.width * scale) < 0.001)
+        #expect(abs(after.height - before.height * scale) < 0.001)
+        // 마지막 band 는 마지막 밑줄에 앉는다 — 획 2 는 저장 밑줄 60 보다 20pt 위에서 시작했다.
         let anchors = ReflowTestSupport.canvasAnchors(result.displayDrawing)
-        #expect(abs(anchors[2].y - (virtualThirdAnchor - 20)) < 0.001)
-        // 확보된 여유 안에 들어간다 — writingRect 밖으로 새지 않는다.
-        #expect(ReflowTestSupport.canvasBounds(result.displayDrawing).maxY <= region.writingRect.maxY)
+        #expect(abs(anchors[2].y - (canvasAnchors[1] - 20 * scale)) < 0.001)
+        // 필사 영역 밖(절 사이 · 다음 절)으로 새지 않는다.
+        #expect(after.minY >= region.writingRect.minY)
+        #expect(after.maxY <= region.writingRect.maxY)
+    }
+
+    @Test("첫 밑줄이 writingRect 상단에서 한 줄보다 가까워도 줄여 넣은 잉크는 writingRect 위로 새지 않는다")
+    func shrunkInkStaysBelowWritingRectTopWhenFirstUnderlineIsClose() {
+        // 앱의 실측 밑줄은 글자 기준선이라 상단에서 한 줄(30)보다 가깝다 — 시뮬레이터 시편 119편에서 첫 band 가 절 위로 샜던 모양.
+        let (_, region) = ReflowTestSupport.singleVerse(textLineCount: 2, measuredAnchors: [20, 50])
+        let stored = ReflowTestSupport.threeBandDrawing()
+
+        let result = reflow.reflow(
+            LineBandReflow.Input(verse: 1, storedDrawing: stored, metadata: ReflowTestSupport.threeBandMetadata()),
+            into: region
+        )
+
+        // 줄 묶음 = writingRect 상단 ~ 마지막 밑줄(50) → 비율 50 / (60 + 30).
+        let before = ReflowTestSupport.canvasBounds(stored)
+        let after = ReflowTestSupport.canvasBounds(result.displayDrawing)
+        #expect(result.outcome == .reflowed)
+        #expect(abs(after.height - before.height * 50 / 90) < 0.001)
+        #expect(after.minY >= region.writingRect.minY)
+        #expect(after.maxY <= region.writingRect.minY + 50)
+    }
+
+    @Test("저장 당시 줄이 더 많아도 잉크가 현재 줄 수 안에 들면 줄이지 않고 같은 index 밑줄로 옮긴다")
+    func inkWithinCurrentLinesIsNotShrunk() {
+        let (_, region) = ReflowTestSupport.singleVerse(textLineCount: 2)
+        // 저장 3줄 중 앞 두 줄에만 썼다.
+        let stored = PKDrawing(strokes: Array(ReflowTestSupport.threeBandDrawing().strokes.prefix(2)))
+
+        let result = reflow.reflow(
+            LineBandReflow.Input(verse: 1, storedDrawing: stored, metadata: ReflowTestSupport.threeBandMetadata()),
+            into: region
+        )
+
+        // 첫 밑줄로의 평행이동만 남는다 — 크기 불변.
+        let expected = ReflowTestSupport.translated(ReflowTestSupport.canvasPoints(stored), by: region.storageOrigin)
+        #expect(result.outcome == .reflowed)
+        #expect(ReflowTestSupport.maxDeviation(ReflowTestSupport.canvasPoints(result.displayDrawing), expected) < 0.001)
+    }
+
+    @Test("현재 밑줄이 하나뿐이면 writingRect 상단 ~ 첫 밑줄을 한 줄로 보고 모든 band 를 그 줄 안에 넣는다")
+    func overflowInkFitsIntoSingleCurrentLine() {
+        let (_, region) = ReflowTestSupport.singleVerse(textLineCount: 1)
+        let stored = ReflowTestSupport.threeBandDrawing()
+
+        let result = reflow.reflow(
+            LineBandReflow.Input(verse: 1, storedDrawing: stored, metadata: ReflowTestSupport.threeBandMetadata()),
+            into: region
+        )
+
+        // 줄 묶음 높이 비율 = 30 / (60 + 30).
+        let before = ReflowTestSupport.canvasBounds(stored)
+        let after = ReflowTestSupport.canvasBounds(result.displayDrawing)
+        #expect(result.outcome == .reflowed)
+        #expect(abs(after.height - before.height / 3) < 0.001)
+        #expect(after.minY >= region.writingRect.minY)
+        #expect(after.maxY <= region.writingRect.maxY)
+    }
+
+    @Test("폭 비율이 줄 묶음 비율보다 작으면 폭 비율로 줄이고, 그것으로 줄 안에 들면 첫 band 를 첫 밑줄에 둔다")
+    func widthScaleWinsWhenSmallerThanLineFit() {
+        // 폭 0.5 < 줄 묶음 2/3. 0.5 로 줄인 3줄(45pt)은 이미 2줄 묶음(60pt) 안에 든다.
+        let (_, region) = ReflowTestSupport.singleVerse(textLineCount: 2, writingWidth: 160)
+        let stored = ReflowTestSupport.threeBandDrawing()
+
+        let result = reflow.reflow(
+            LineBandReflow.Input(verse: 1, storedDrawing: stored, metadata: ReflowTestSupport.threeBandMetadata()),
+            into: region
+        )
+
+        let origin = region.storageOrigin
+        let expected = ReflowTestSupport.canvasPoints(stored).map { CGPoint(x: $0.x * 0.5 + origin.x, y: $0.y * 0.5 + origin.y) }
+        #expect(result.outcome == .reflowed)
+        #expect(ReflowTestSupport.maxDeviation(ReflowTestSupport.canvasPoints(result.displayDrawing), expected) < 0.001)
     }
 
     // MARK: - §9-3 legacy
@@ -341,7 +414,7 @@ struct LineBandReflowMismatchTesting {
     @Test("현재 밑줄이 하나도 없으면 첫 밑줄 기준으로 통째 보존하고 mismatch 로 표시한다")
     func mismatchWhenCurrentLayoutHasNoUnderline() {
         // 텍스트 줄이 0인데 저장 band 는 3 — 옮겨 앉을 밑줄이 없다.
-        let (_, region) = ReflowTestSupport.singleVerse(textLineCount: 0, savedBandCount: 3)
+        let (_, region) = ReflowTestSupport.singleVerse(textLineCount: 0)
         let stored = ReflowTestSupport.threeBandDrawing()
 
         let result = reflow.reflow(
@@ -378,12 +451,11 @@ struct LineBandReflowMismatchTesting {
         #expect(metadata.savedBandCount == 0)
     }
 
-    @Test("줄 수가 줄었는데 마지막 간격을 잴 수 없으면 한 줄에 겹쳐 쌓지 않고 mismatch 로 처리한다")
-    func mismatchWhenLastGapCannotBeMeasured() {
-        // 밑줄이 하나뿐이고 그 밑줄이 writingRect 상단과 같은 자리 → 연장할 간격이 0이다.
+    @Test("잉크가 현재 줄보다 많은 band 에 걸쳤는데 줄 간격을 잴 수 없으면 한 줄에 겹쳐 쌓지 않고 mismatch 로 처리한다")
+    func mismatchWhenLinePitchCannotBeMeasured() {
+        // 밑줄이 하나뿐이고 그 밑줄이 writingRect 상단과 같은 자리 → 한 줄 높이가 0이라 줄일 비율을 정할 수 없다.
         let (_, region) = ReflowTestSupport.singleVerse(
             textLineCount: 1,
-            savedBandCount: 3,
             measuredAnchors: [0]
         )
 
@@ -402,7 +474,7 @@ struct LineBandReflowMismatchTesting {
 
     @Test("mismatch 여도 좁아진 폭에 맞춰 축소는 적용된다")
     func mismatchStillAppliesWidthScale() {
-        let (_, region) = ReflowTestSupport.singleVerse(textLineCount: 0, savedBandCount: 3, writingWidth: 160)
+        let (_, region) = ReflowTestSupport.singleVerse(textLineCount: 0, writingWidth: 160)
         let stored = ReflowTestSupport.threeBandDrawing()
 
         let result = reflow.reflow(
@@ -506,7 +578,7 @@ struct LineBandReflowMismatchTesting {
             isLeftHanded: false,
             verses: [
                 VerseLayoutInput(verse: 1, textLineCount: 3),
-                VerseLayoutInput(verse: 2, textLineCount: 0, savedBandCount: 3)
+                VerseLayoutInput(verse: 2, textLineCount: 0)
             ]
         )
         let inputs = [
@@ -669,23 +741,24 @@ struct LineBandReflowFixtureTesting {
         }
     }
 
-    @Test("실사용 필사도 줄 수가 줄면 확보된 여유 안에 들어간다 (§6-3)")
-    func realHandwritingFitsReservedHeightWhenLineCountShrinks() throws {
+    @Test("실사용 필사도 줄 수가 줄면 종횡비를 유지한 채 줄어 현재 줄 안에 들어간다 (§9-3)")
+    func realHandwritingShrinksIntoCurrentLinesWhenLineCountShrinks() throws {
         let stored = try storedDrawing(LegacyDrawingFixture.multiLine)
-        // 저장 5줄 → 현재 3줄. §6-3 Pass 2 가 두 줄치 여유를 writingRect 에 확보한다.
-        let (_, region) = ReflowTestSupport.singleVerse(
-            textLineCount: 3,
-            savedBandCount: 5,
-            lineSpace: Self.lineSpace
-        )
+        // 저장 5줄 → 현재 3줄. 레이아웃은 늘지 않는다 (§6-3).
+        let (_, region) = ReflowTestSupport.singleVerse(textLineCount: 3, lineSpace: Self.lineSpace)
 
         let result = reflow.reflow(
             LineBandReflow.Input(verse: 1, storedDrawing: stored, metadata: metadata()),
             into: region
         )
 
+        let before = ReflowTestSupport.canvasBounds(stored)
+        let after = ReflowTestSupport.canvasBounds(result.displayDrawing)
         #expect(result.outcome == .reflowed)
-        #expect(region.writingRect.height == Self.lineSpace * 5)
-        #expect(ReflowTestSupport.canvasBounds(result.displayDrawing).maxY <= region.writingRect.maxY)
+        #expect(region.writingRect.height == Self.lineSpace * 3)
+        #expect(after.height < before.height)
+        #expect(abs(after.width / after.height - before.width / before.height) < 0.001)
+        #expect(after.minY >= region.writingRect.minY)
+        #expect(after.maxY <= region.writingRect.maxY)
     }
 }

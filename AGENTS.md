@@ -99,6 +99,8 @@ mise x -- swiftlint lint --quiet --config .swiftlint.yml <파일들>
   UITests 에서는 `startChapterArguments`). 앱은 마지막으로 연 장에서 시작하므로 인자 없이는 기기 상태에 따라 결과가 갈린다.
   헤더 다음 장 버튼(`nextChapter`)과 절 메뉴 항목(`verseMenu.history` · `image` · `widget` · `erase`)은 접근성 이름이 아니라 식별자로 찾는다.
   히스토리 메뉴 테스트는 **시편 119편 1절에 필기가 있어야** 메뉴가 뜬다. 메뉴 항목은 누르지 않는다(「지우기」 는 실제 필사를 비운다).
+  누를 좌표는 **보이는 요소 기준**으로 만든다(절 메뉴는 「1절」 번호와 필사 열 라벨, 드래그는 창 기준 `windowPoint`). 창 모드(iPadOS 창 버튼)에서는
+  앱 좌표 원점이 화면 원점이라 `app.coordinate` 에 창 크기 비율을 더한 좌표가 창 위치만큼 어긋난다 (2026-09-15 창 y=177 에서 헤더 위를 눌러 실패).
 - 기록 중에는 **`pgrep`/`pkill` 로 프로세스를 건드리지 않는다.** 마무리 단계에 끼어들면
   트레이스가 템플릿 메타데이터 없이 저장되어 `xctrace export` 가 실패한다.
 
@@ -130,6 +132,9 @@ mise x -- swiftlint lint --quiet --config .swiftlint.yml <파일들>
   그 계열은 `H`(totalHeight)를 새 진입값과 비교해 본다 (런북 §6-9 D9-0-d).
   행 안의 `onGeometryChange` 는 중첩 `UIHostingController`(`touchIgnoringContextMenu`) 때문에 바깥 `.named` 공간을 보지 못하고 **조용히 global 을 쓴다** —
   그래서 행 frame 은 바깥 트리에서 재고 행 안 영역과 합친다(설계 §6-1 rev.16). Δ 가 0 이 아니면 레이아웃보다 측정 경로를 먼저 의심한다.
+  ⚠️ **저장 당시 줄 수가 지금보다 많은 필사 절(slack)이 있어도 `Δ max 0.00` 이 기대값이다.** 레이아웃과 행은 텍스트 줄 수만큼만 차지하고,
+  잉크가 초과 줄에 걸쳐 있으면 reflow 가 그 절 안에 같은 비율로 줄여 보여 준다(설계 §6-3 · §9-3). HUD 의 `slack v1+1·… = N줄 · 초과 필기는 절 안 축소` 는 그 후보 절이다.
+  2026-09-14 실기기 시편 119편 `Δ max 195.63`(v1·v2·v4 +1) · 가로 586.90 은 레이아웃만 초과 줄만큼 늘리던 §6-3 Pass 2 의 결함이었다 (2026-09-15 제거).
 
 ## 변경 정책
 - 변경은 최소 범위로 유지한다.
