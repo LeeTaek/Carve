@@ -26,6 +26,11 @@ public struct SentenceSetting: Sendable, Codable, Equatable, Hashable {
     /// 한 화면(혹은 한 절)을 구성할 때 사용할 줄 수(line count).
     public var lineCount: Int
     
+    /// 본문 설정을 저장하는 `UserDefaults` 키.
+    ///
+    /// 화면들이 `@Shared(.appStorage(...))` 로 읽고 쓰고, 실행 때 iCloud 백업을 되살리는 `SentenceSettingCloudBackup` 도 같은 키에 쓴다.
+    public static let appStorageKey = "sentenceSetting"
+
     /// 처음 실행한 사용자의 본문 설정이자 「본문 모양 초기화」 값.
     ///
     /// `@Shared(.appStorage("sentenceSetting"))`(`CodableAppStorageKey`)가 첫 로드 때 이 값을 저장하므로,

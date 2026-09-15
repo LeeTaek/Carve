@@ -29,6 +29,8 @@ struct CarveApp: App {
     private let nativeAdClient: any NativeAdClient
     /// 광고 동의(UMP) 확인과 광고 SDK 시작
     private let adConsent: AdConsentCoordinator
+    /// 본문 모양(글꼴 · 글자 크기 · 줄 간격 · 자간) iCloud 백업. 실행 뒤에 늦게 내려오는 백업도 받도록 앱이 붙잡아 둔다.
+    private let sentenceSettingBackup: SentenceSettingCloudBackup
 
     // 앱 시작 시 필요한 의존성(ContainerID, ModelContainer, Store)을 생성하는 생성자.
     init() {
@@ -36,6 +38,11 @@ struct CarveApp: App {
         let purchaseClient = StoreKitPurchaseClient()
         // 기존 사용자도 단일 Canvas 기본값(on)을 따르게 한다. flag 를 읽는 Store 생성보다 앞서야 하고, 설치당 한 번만 지운다.
         SingleCanvasFlag.resetStoredValueOnce(in: .standard)
+        // 앱을 다시 깐 기기에 iCloud 에 백업한 본문 모양을 되살린다. 본문 설정은 처음 읽을 때 기본값이 저장돼
+        // 그 뒤로는 새 설치인지 가릴 수 없으므로, 본문 설정을 읽는 Store 생성보다 앞서야 한다.
+        let sentenceSettingBackup = SentenceSettingCloudBackup()
+        sentenceSettingBackup.start()
+        self.sentenceSettingBackup = sentenceSettingBackup
         #if DEBUG
         // 실기기 UI 테스트가 정한 장(`-UITestChapter`)에서 시작한다. 헤더 · 탐색 상태가 시작 장을 읽는 Store 생성보다 앞서야 한다.
         UITestLaunchChapter.apply()
@@ -51,7 +58,8 @@ struct CarveApp: App {
             modelContainer: modelContainer,
             nativeAdClient: nativeAdClient,
             adConsentClient: adConsent,
-            purchaseClient: purchaseClient
+            purchaseClient: purchaseClient,
+            sentenceSettingBackup: sentenceSettingBackup
         )
     }
 
@@ -117,7 +125,8 @@ extension CarveApp {
         modelContainer: ModelContainer,
         nativeAdClient: any NativeAdClient,
         adConsentClient: any AdConsentClient,
-        purchaseClient: any PurchaseClient
+        purchaseClient: any PurchaseClient,
+        sentenceSettingBackup: any SentenceSettingBackupClient
     ) -> StoreOf<AppCoordinatorFeature> {
         withDependencies {
             $0.containerId = containerID
@@ -125,6 +134,7 @@ extension CarveApp {
             $0.nativeAdClient = nativeAdClient
             $0.adConsentClient = adConsentClient
             $0.purchaseClient = purchaseClient
+            $0.sentenceSettingBackup = sentenceSettingBackup
             $0.analyticsClient = FirebaseAnalyticsClient()
         } operation: {
             Store(initialState: .initialState) {

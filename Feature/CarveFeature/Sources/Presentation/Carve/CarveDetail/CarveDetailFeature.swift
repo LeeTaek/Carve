@@ -72,7 +72,7 @@ public struct CarveDetailFeature {
         }
         
         /// 성경 문장 출력시 자간 폰트 등 설정
-        @Shared(.appStorage("sentenceSetting")) public var sentenceSetting: SentenceSetting = .initialState
+        @Shared(.appStorage(SentenceSetting.appStorageKey)) public var sentenceSetting: SentenceSetting = .initialState
         /// 왼손잡이용 레이아웃 여부
         @Shared(.appStorage("isLeftHanded")) public var isLeftHanded: Bool = false
         
