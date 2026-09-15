@@ -61,7 +61,7 @@ extension ChapterCanvasFeature {
         return ChapterCanvasMenuAvailability(
             canFavorite: true,
             canViewHistory: canViewHistory,
-            canErase: currentInk(verse: verse, representative: representative, state: state) != nil
+            canErase: currentInkSnapshot(verse: verse, representative: representative, state: state) != nil
         )
     }
 
@@ -72,30 +72,45 @@ extension ChapterCanvasFeature {
     ///   - verse: 절 번호.
     ///   - state: Feature 상태.
     static func currentInk(verse: Int, state: State) -> Data? {
+        currentInkSnapshot(verse: verse, state: state)?.lineData
+    }
+
+    /// 그 절의 지금 필기를 담은 **행** — `currentInk` 와 같은 판정이다. 획이 없으면 nil.
+    ///
+    /// 절 이미지(시안 G1)는 좌표 형식(`drawingVersion` · metadata)까지 알아야 필기를 현재 밑줄에 맞춰 그릴 수 있어 행을 쓴다.
+    /// 대기 중인 편집은 저장소에 기록될 모습 그대로 만든다 — 편집은 늘 현재 레이아웃 기준 v3 로 저장된다(`DrawingCodec.mutations`).
+    /// - Parameters:
+    ///   - verse: 절 번호.
+    ///   - state: Feature 상태.
+    static func currentInkSnapshot(verse: Int, state: State) -> VerseDrawingSnapshot? {
         guard let loaded = state.loadedDrawings else { return nil }
         let representative = loaded.filter { $0.verse == verse }.representative()
-        return currentInk(verse: verse, representative: representative, state: state)
+        return currentInkSnapshot(verse: verse, representative: representative, state: state)
     }
 
     /// 빈 판정은 목록(`historyRows()`) · 저장소(`archiveAndResetVerseDrawing`)와 같은 `DrawingContentRule` 을 쓴다.
     /// 지우개로 전부 지운 절은 `lineData` 가 남아 있어도 stroke 가 0개라, 길이만 보면 틀린다.
-    private static func currentInk(
+    private static func currentInkSnapshot(
         verse: Int,
         representative: VerseDrawingSnapshot?,
         state: State
-    ) -> Data? {
-        let data: Data?
+    ) -> VerseDrawingSnapshot? {
+        let snapshot: VerseDrawingSnapshot?
         if let rowID = state.activeRowIDs[verse],
            let pending = state.pendingMutations[rowID] {
             switch pending.mutation {
             case .clear:
-                data = nil
-            case .replace(_, _, let pendingData, _), .create(_, _, let pendingData, _):
-                data = pendingData
+                snapshot = nil
+            case let .replace(_, pendingRowID, pendingData, metadata), let .create(_, pendingRowID, pendingData, metadata):
+                snapshot = VerseDrawingSnapshot(
+                    verse: verse, rowID: pendingRowID, isPresent: true, updateDate: nil,
+                    lineData: pendingData, drawingVersion: 3, metadata: metadata
+                )
             }
         } else {
-            data = representative?.lineData
+            snapshot = representative
         }
-        return DrawingContentRule.hasStrokes(data) ? data : nil
+        guard let snapshot, DrawingContentRule.hasStrokes(snapshot.lineData) else { return nil }
+        return snapshot
     }
 }
