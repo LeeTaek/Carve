@@ -20,6 +20,19 @@ final class ChapterPKCanvasView: PKCanvasView {
     weak var contentHostView: UIView?
     var contentFrame: CGRect = .zero
 
+    /// 본문 컬럼을 접근성 트리에 넣는다.
+    ///
+    /// PencilKit 은 캔버스의 접근성 요소를 **획으로만** 채운다(iPadOS 27 실측: 획마다 「연필, 검은색」). 그래서 캔버스의 하위 뷰인
+    /// 본문 컬럼이 트리에서 빠져 VoiceOver 가 본문을 읽지 못하고, 실기기 UI 테스트는 절 번호 라벨(「1절」)을 찾지 못했다 (2026-09-15).
+    /// 컬럼을 앞에 두고 PencilKit 이 내준 요소를 그대로 잇는다.
+    override var accessibilityElements: [Any]? {
+        get {
+            guard let host = contentHostView else { return super.accessibilityElements }
+            return [host] + (super.accessibilityElements ?? [])
+        }
+        set { super.accessibilityElements = newValue }
+    }
+
     override func layoutSubviews() {
         super.layoutSubviews()
         guard let host = contentHostView else { return }

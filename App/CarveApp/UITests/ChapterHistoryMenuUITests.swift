@@ -30,6 +30,7 @@ final class ChapterHistoryMenuUITests: XCTestCase {
     /// - 2026-09-15: 창 크기 비율로 바꿨더니, 창 모드(창 y=177)에서 앱 좌표 원점이 화면 원점이라 헤더 위 여백을 눌렀다.
     private enum Anchor {
         /// 1절 번호 (`VerseTextView` 의 접근성 라벨). 1절 첫 줄 높이에 있다.
+        /// 단일 Canvas 에서는 본문 컬럼이 캔버스 안이라 `ChapterPKCanvasView.accessibilityElements` 가 노출해야 트리에 올라온다.
         static let firstVerseNumber = "1절"
         /// 필사 반쪽의 열 라벨 (`ChapterColumnHeader`). 왼손 설정에서도 필사 반쪽 안에 있다.
         static let writingColumn = "나의 필사 · 절을 길게 눌러 더 보기"
