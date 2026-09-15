@@ -24,9 +24,9 @@ struct ChapterCanvasVerseMenuTesting {
     private static let pointInVerse = CGPoint(x: 10, y: 15)
     private static let verseFrame = CGRect(x: 0, y: 200, width: 800, height: 60)
 
-    private static func inkData() -> Data {
+    private static func inkData(x: CGFloat = 5) -> Data {
         let path = PKStrokePath(
-            controlPoints: [PKStrokePoint(location: CGPoint(x: 5, y: 5), timeOffset: 0,
+            controlPoints: [PKStrokePoint(location: CGPoint(x: x, y: 5), timeOffset: 0,
                                           size: CGSize(width: 2, height: 2), opacity: 1,
                                           force: 1, azimuth: 0, altitude: 0)],
             creationDate: Date(timeIntervalSince1970: 0)
@@ -46,8 +46,8 @@ struct ChapterCanvasVerseMenuTesting {
         return state
     }
 
-    @Test("아무것도 할 수 없는 절은 메뉴를 열지 않는다 (UI-2)")
-    func untouchedVerseOpensNoMenu() async {
+    @Test("필기가 없는 절도 메뉴가 열린다 — 즐겨찾기만 할 수 있다 (시안 N1)")
+    func untouchedVerseOpensMenuWithFavoriteOnly() async {
         var state = await composedState(withInk: false)
 
         _ = ChapterCanvasFeature().reduce(
@@ -55,7 +55,8 @@ struct ChapterCanvasVerseMenuTesting {
             action: .verseMenuRequested(at: Self.pointInVerse, anchor: .zero, verseFrame: Self.verseFrame)
         )
 
-        #expect(state.verseMenu == nil)
+        #expect(state.verseMenu?.verse == 1)
+        #expect(state.verseMenu?.availability == ChapterCanvasMenuAvailability(canFavorite: true, canViewHistory: false, canErase: false))
     }
 
     @Test("획이 있는 절은 메뉴가 열리고, 「지우기」 를 고르면 메뉴가 닫히며 지우기 확인으로 이어진다")
@@ -90,5 +91,58 @@ struct ChapterCanvasVerseMenuTesting {
 
         #expect(state.verseMenu == nil)
         #expect(state.eraseAlert == nil)
+    }
+
+    // MARK: 즐겨찾기 (시안 N1)
+
+    @Test("「즐겨찾기」 를 고르면 메뉴가 닫히고, 그 절의 지금 필기를 담아 부모에 넘긴다")
+    func favoriteItemClosesMenuAndDelegatesCurrentInk() async throws {
+        let initialState = await composedState(withInk: true)
+        let ink = try #require(initialState.loadedDrawings?.first?.lineData)
+        let store = TestStore(initialState: initialState) {
+            ChapterCanvasFeature()
+        }
+        store.exhaustivity = .off
+
+        await store.send(.verseMenuRequested(at: Self.pointInVerse, anchor: CGPoint(x: 120, y: 230), verseFrame: Self.verseFrame))
+        #expect(store.state.verseMenu?.availability.canFavorite == true)
+
+        await store.send(.verseMenuFavoriteTapped)
+        await store.receive(.delegate(.favoriteToggled(verse: 1, ink: ink)))
+        #expect(store.state.verseMenu == nil)
+        #expect(store.state.eraseAlert == nil)
+    }
+
+    @Test("필기가 없는 절의 즐겨찾기는 필기 없이 넘긴다")
+    func favoriteWithoutInkDelegatesNil() async {
+        let initialState = await composedState(withInk: false)
+        let store = TestStore(initialState: initialState) {
+            ChapterCanvasFeature()
+        }
+        store.exhaustivity = .off
+
+        await store.send(.verseMenuRequested(at: Self.pointInVerse, anchor: .zero, verseFrame: Self.verseFrame))
+        await store.send(.verseMenuFavoriteTapped)
+        await store.receive(.delegate(.favoriteToggled(verse: 1, ink: nil)))
+    }
+
+    @Test("보존할 필기는 저장 대기 중인 편집이 이긴다 — 저장분만 보면 방금 쓴 획이 빠진다")
+    func favoriteInkPrefersPendingEdit() async {
+        var state = await composedState(withInk: true)
+        let pending = Self.inkData(x: 40)
+        state.pendingMutations[CanvasTestSupport.rowA] = PendingDrawingMutation(
+            revision: 1,
+            chapter: CanvasTestSupport.chapter,
+            mutation: .replace(verse: 1, rowID: CanvasTestSupport.rowA, data: pending, metadata: CanvasTestSupport.metadata())
+        )
+        #expect(ChapterCanvasFeature.currentInk(verse: 1, state: state) == pending)
+
+        // 대기 중인 명령이 비우기면 저장분이 남아 있어도 보존할 필기가 없다.
+        state.pendingMutations[CanvasTestSupport.rowA] = PendingDrawingMutation(
+            revision: 2,
+            chapter: CanvasTestSupport.chapter,
+            mutation: .clear(verse: 1, rowID: CanvasTestSupport.rowA)
+        )
+        #expect(ChapterCanvasFeature.currentInk(verse: 1, state: state) == nil)
     }
 }

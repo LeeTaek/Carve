@@ -1,12 +1,13 @@
 //
 //  ChapterCanvasMenuAvailability.swift
-//  FeatureCarve
+//  CarveFeature
 //
 //  Copyright © 2026 leetaek. All rights reserved.
 //
 
 import CoreGraphics
 import Domain
+import Foundation
 
 /// 롱프레스 지점의 절에서 **어떤 메뉴 항목을 띄울 수 있는지** (UI-2).
 ///
@@ -14,16 +15,21 @@ import Domain
 /// "이전 필사 내용 보기" 가 보이면 사용자는 눌러 보고서야 빈 결과를 만난다. 런북 D9-5-4 · 5-5 가
 /// "회차가 쌓이지 않는 설계라 판정 불가" 로 남은 것도 같은 자리다 — 목록에 현재 필사 하나만 있는데
 /// 이름은 "이전 필사" 였다.
+///
+/// 「즐겨찾기」(시안 N1)는 절만 찾으면 **언제나** 할 수 있다 — 필기 없는 말씀도 즐겨찾기한다. 그래서 2026-09-15 부터
+/// 합성된 장의 절이면 메뉴가 늘 열리고, 「이전 필사 내용 보기」 · 「지우기」 만 조건에 따라 빠진다.
 struct ChapterCanvasMenuAvailability: Equatable {
+    /// 절을 찾았다 — 즐겨찾기에 추가하거나 해제할 수 있다.
+    let canFavorite: Bool
     /// **내용이 있는**, 대표가 아닌 행이 하나 이상 있다 — 즉 목록에 실제로 그려질 지난 회차가 있다.
     let canViewHistory: Bool
     /// 대표 행의 현재 내용에 획이 있다. 저장분과 **대기 중인 편집**을 함께 본다.
     let canErase: Bool
 
-    /// 띄울 항목이 하나도 없다. 이때는 메뉴 자체를 올리지 않는다.
-    var isEmpty: Bool { !canViewHistory && !canErase }
+    /// 띄울 항목이 하나도 없다 — 절을 찾지 못한 자리다. 이때는 메뉴 자체를 올리지 않는다.
+    var isEmpty: Bool { !canFavorite && !canViewHistory && !canErase }
 
-    static let none = ChapterCanvasMenuAvailability(canViewHistory: false, canErase: false)
+    static let none = ChapterCanvasMenuAvailability(canFavorite: false, canViewHistory: false, canErase: false)
 }
 
 extension ChapterCanvasFeature {
@@ -53,29 +59,43 @@ extension ChapterCanvasFeature {
         }
 
         return ChapterCanvasMenuAvailability(
+            canFavorite: true,
             canViewHistory: canViewHistory,
-            canErase: hasStrokes(verse: verse, representative: representative, state: state)
+            canErase: currentInk(verse: verse, representative: representative, state: state) != nil
         )
     }
 
-    /// 그 절의 현재 내용에 획이 있는가 — 대기 중인 편집이 있으면 그쪽이 이긴다.
+    /// 그 절의 지금 필기 — 대기 중인 편집이 있으면 그쪽이 이긴다. 획이 없으면 nil.
     ///
+    /// 「지우기」 가용성과 「즐겨찾기에 추가」 가 보존하는 필기가 같은 판정을 쓴다 — 방금 쓴 획이 저장 전이어도 포함된다.
+    /// - Parameters:
+    ///   - verse: 절 번호.
+    ///   - state: Feature 상태.
+    static func currentInk(verse: Int, state: State) -> Data? {
+        guard let loaded = state.loadedDrawings else { return nil }
+        let representative = loaded.filter { $0.verse == verse }.representative()
+        return currentInk(verse: verse, representative: representative, state: state)
+    }
+
     /// 빈 판정은 목록(`historyRows()`) · 저장소(`archiveAndResetVerseDrawing`)와 같은 `DrawingContentRule` 을 쓴다.
     /// 지우개로 전부 지운 절은 `lineData` 가 남아 있어도 stroke 가 0개라, 길이만 보면 틀린다.
-    private static func hasStrokes(
+    private static func currentInk(
         verse: Int,
         representative: VerseDrawingSnapshot?,
         state: State
-    ) -> Bool {
+    ) -> Data? {
+        let data: Data?
         if let rowID = state.activeRowIDs[verse],
            let pending = state.pendingMutations[rowID] {
             switch pending.mutation {
             case .clear:
-                return false
-            case .replace(_, _, let data, _), .create(_, _, let data, _):
-                return DrawingContentRule.hasStrokes(data)
+                data = nil
+            case .replace(_, _, let pendingData, _), .create(_, _, let pendingData, _):
+                data = pendingData
             }
+        } else {
+            data = representative?.lineData
         }
-        return DrawingContentRule.hasStrokes(representative?.lineData)
+        return DrawingContentRule.hasStrokes(data) ? data : nil
     }
 }

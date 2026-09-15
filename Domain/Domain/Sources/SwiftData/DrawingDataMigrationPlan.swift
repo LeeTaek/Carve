@@ -19,13 +19,14 @@ enum MigrationPlanV1Only: SchemaMigrationPlan {
 }
 
 
-/// BibleDrawing 관련 SwiftData Schema(V1~V4) 마이그레이션 플랜
+/// BibleDrawing 관련 SwiftData Schema(V1~V5) 마이그레이션 플랜
 /// V1 -> V2: DrawingVO -> BibleDrawing 모델명 및 속성 변경 (Custom)
 /// V2 -> V3: BiblePageDrawing 추가(lightWeight)
 /// V3 -> V4: optional 필드 2개 추가(lightWeight). **데이터 변환 없음** — 설계 §10-2
+/// V4 -> V5: FavoriteVerse 엔티티 추가(lightWeight). 필사 행은 그대로
 enum DrawingDataMigrationPlan: SchemaMigrationPlan {
     static var schemas: [VersionedSchema.Type] {
-        [DrawingSchemaV1.self, DrawingSchemaV2.self, DrawingSchemaV3.self, DrawingSchemaV4.self]
+        [DrawingSchemaV1.self, DrawingSchemaV2.self, DrawingSchemaV3.self, DrawingSchemaV4.self, DrawingSchemaV5.self]
     }
 
     private static var updatedDrawings: [DrawingSchemaV2.BibleDrawing] = []
@@ -103,12 +104,21 @@ enum DrawingDataMigrationPlan: SchemaMigrationPlan {
         toVersion: DrawingSchemaV4.self
     )
 
-    /// 정의된 순서대로 마이그레이션 실행 (V1 -> V2, V2 -> V3, V3 -> V4)
+    /// 즐겨찾기(`FavoriteVerse`) 엔티티만 추가한다. `BibleDrawing` · `BiblePageDrawing` 은 V4 클래스를 그대로 쓴다.
+    ///
+    /// - Important: forward-only 다. 이 단계를 거친 store 는 V4 빌드로 열 수 없다.
+    static let migrationV4toV5 = MigrationStage.lightweight(
+        fromVersion: DrawingSchemaV4.self,
+        toVersion: DrawingSchemaV5.self
+    )
+
+    /// 정의된 순서대로 마이그레이션 실행 (V1 -> V2, V2 -> V3, V3 -> V4, V4 -> V5)
     static var stages: [MigrationStage] {
         [
             migrationV1toV2,
             migrationV2toV3,
-            migrationV3toV4
+            migrationV3toV4,
+            migrationV4toV5
         ]
     }
 }

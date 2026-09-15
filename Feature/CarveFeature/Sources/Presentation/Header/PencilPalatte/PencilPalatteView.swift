@@ -285,6 +285,8 @@ public struct PencilPalatteDockView: View {
 
     /// 접힌 도구 원 아래 「펜 · 0.5 mm」 줄 높이.
     private static let captionHeight: CGFloat = 16
+    /// 도크 전체 높이 — 맨 위 도구 줄(64) · 도구 이름 줄 · 아래 여백. 도크 곁에 뜨는 안내(즐겨찾기 결과)가 이 값으로 자리를 잡는다.
+    static let height: CGFloat = CarveSize.floatingToolButton + CarveSpacing.xxSmall + captionHeight + CarveSpacing.small
 
     public init(
         store: StoreOf<PencilPalatteFeature>,
@@ -314,7 +316,7 @@ public struct PencilPalatteDockView: View {
             .frame(maxWidth: .infinity, alignment: isShowingExpanded ? .center : Alignment(horizontal: sideAlignment, vertical: .center))
             .padding(.horizontal, CarveSpacing.large)
         }
-        .frame(height: CarveSize.floatingToolButton + CarveSpacing.xxSmall + Self.captionHeight + CarveSpacing.small)
+        .frame(height: Self.height)
         .onChange(of: isExpanded) { _, newValue in
             withAnimation(transitionAnimation) {
                 isShowingExpanded = newValue

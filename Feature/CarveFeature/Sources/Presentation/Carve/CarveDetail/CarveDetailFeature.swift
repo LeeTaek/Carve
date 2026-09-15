@@ -52,6 +52,17 @@ public struct CarveDetailFeature {
         /// 단일 Canvas 의 절 필사 기록 시트 (§8-7 히스토리 UI, B 구조). 롱프레스 → `ChapterCanvasFeature.Delegate.showHistory` 로 연다.
         @Presents var chapterHistory: VerseDrawingHistoryFeature.State?
 
+        // MARK: 즐겨찾기 (시안 N1 · N2 — `CarveDetailFeature+Favorite.swift`)
+
+        /// 지금 장에서 즐겨찾기한 절. 절 메뉴의 항목 문구와 절 번호 아래 별 표시가 읽는다.
+        var favoriteVerses: Set<Int> = []
+        /// `favoriteVerses` 가 가리키는 장. 장이 바뀐 뒤 늦게 도착한 조회 · 저장 결과를 버리는 기준이다.
+        var favoriteChapter: BibleChapter?
+        /// 이 화면에서 즐겨찾기를 바꾼 횟수. 바꾸기 전에 시작한 조회가 방금 바꾼 표시를 덮지 않게 한다.
+        var favoriteEditCount = 0
+        /// 필사 화면 아래 즐겨찾기 결과 안내.
+        var favoriteNotice: FavoriteNotice?
+
         /// flag 또는 Debug 실행 인자로 단일 Canvas 를 쓸지.
         public var usesSingleCanvas: Bool {
             #if DEBUG
@@ -72,6 +83,9 @@ public struct CarveDetailFeature {
     @Dependency(\.drawingData) var drawingContext
     @Dependency(\.bibleTextClient) var bibleTextClient
     @Dependency(\.undoManager) var undoManager
+    @Dependency(\.favoriteVerseRepository) var favoriteRepository
+    @Dependency(\.date) var date
+    @Dependency(\.continuousClock) var clock
     
     public enum Action: ViewAction, CarveToolkit.ScopeAction {
         /// 화면 최상단으로 스크롤
@@ -80,6 +94,14 @@ public struct CarveDetailFeature {
         case setScrollTarget(BibleVerse)
         /// 단일 Canvas 의 절 필사 기록 시트.
         case chapterHistory(PresentationAction<VerseDrawingHistoryFeature.Action>)
+        /// 장의 즐겨찾기를 읽었다. `editCount` 는 조회를 시작할 때의 `favoriteEditCount` 다.
+        case favoritesLoaded(chapter: BibleChapter, editCount: Int, verses: Set<Int>)
+        /// 즐겨찾기 추가 · 해제의 저장이 끝났다.
+        case favoriteChangeFinished(FavoriteChange, failed: Bool)
+        /// 다른 화면(즐겨찾기 목록)에서 즐겨찾기가 바뀌었다 — 지금 장의 표시를 다시 읽는다.
+        case reloadFavorites
+        /// 즐겨찾기 결과 안내를 내린다.
+        case favoriteNoticeExpired
         
         case view(View)
         case scope(ScopeAction)
@@ -120,6 +142,10 @@ public struct CarveDetailFeature {
             case moveToNext
             /// 장이 바뀐 뒤 본문을 최상단으로 이동
             case scrollToTop
+            /// 절 메뉴의 즐겨찾기 추가 · 해제
+            case verseMenuFavoriteTapped
+            /// 즐겨찾기 저장 실패 안내의 다시 시도
+            case favoriteRetryTapped
             /// 절 메뉴의 이전 필사 보기
             case verseMenuHistoryTapped
             /// 절 메뉴의 지우기
@@ -146,6 +172,10 @@ public struct CarveDetailFeature {
     enum CancelID: Hashable {
         /// 성경 불러올떄
         case fetchBible(title: BibleChapter)
+        /// 장의 즐겨찾기 조회
+        case loadFavorites
+        /// 즐겨찾기 결과 안내의 자동 닫힘
+        case favoriteNotice
     }
     
     
@@ -197,13 +227,21 @@ public struct CarveDetailFeature {
                 // 단일 Canvas 면 팔레트의 undo/redo 는 캔버스가 처리한다 — 팔레트가 SharedUndoManager 값으로 공유 canUndo 를 덮지 않게.
                 state.headerState.palatteSetting.delegatesUndoToCanvas = state.usesSingleCanvas
                 state.chapterHistory = nil
+                let chapter = sentences.first?.title ?? state.headerState.currentTitle
+                // 절 번호 아래 즐겨찾기 표시는 두 경로(단일 Canvas · N-Canvas)가 같은 본문 컬럼에 그리므로 경로와 무관하게 읽는다.
+                let favorites = loadFavorites(state: &state, chapter: chapter)
                 guard state.usesSingleCanvas else {
                     // flag 를 끄고 돌아온 장 — 단일 Canvas 에 남은 미저장분은 여기서 마저 저장한다 (§8-5).
-                    return state.chapterCanvas.isFullyPersisted ? .none : .send(.scope(.chapterCanvasAction(.flushPending)))
+                    return .merge(
+                        favorites,
+                        state.chapterCanvas.isFullyPersisted ? .none : .send(.scope(.chapterCanvasAction(.flushPending)))
+                    )
                 }
                 // 단일 Canvas: 본문이 확정된 시점에 조회를 시작한다 (§6-4). 레이아웃은 실측이 끝나면 따로 들어간다.
-                let chapter = sentences.first?.title ?? state.headerState.currentTitle
-                return .send(.scope(.chapterCanvasAction(.load(chapter: chapter, expectedVerseCount: sentences.count))))
+                return .merge(
+                    favorites,
+                    .send(.scope(.chapterCanvasAction(.load(chapter: chapter, expectedVerseCount: sentences.count))))
+                )
                 
             case .setScrollTarget(let verse):
                 state.scrollTargetID = makeSentenceID(for: verse)
@@ -233,6 +271,15 @@ public struct CarveDetailFeature {
 
             case .view(.scrollToTop):
                 return .send(.scrollToTop)
+
+            case .view(.verseMenuFavoriteTapped):
+                return .send(.scope(.chapterCanvasAction(.verseMenuFavoriteTapped)))
+
+            case .scope(.chapterCanvasAction(.delegate(.favoriteToggled(let verse, let ink)))):
+                return toggleFavorite(state: &state, verse: verse, ink: ink)
+
+            case .favoritesLoaded, .favoriteChangeFinished, .reloadFavorites, .favoriteNoticeExpired, .view(.favoriteRetryTapped):
+                return reduceFavorite(state: &state, action: action)
 
             case .view(.verseMenuHistoryTapped):
                 return .send(.scope(.chapterCanvasAction(.verseMenuHistoryTapped)))

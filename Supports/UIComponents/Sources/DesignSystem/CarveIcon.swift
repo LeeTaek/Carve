@@ -14,6 +14,7 @@ import Resources
 ///
 /// Feature 는 에셋 이름이나 번들 위치를 몰라도 된다. 경로는 `docs/design/assets/figma/*.svg` 프레임에서 옮겼다.
 /// ``textFormat`` 만 선이 아니라 「가가」 글자를 윤곽선으로 고정한 것이다 — 글꼴에 따라 모양이 바뀌지 않게.
+/// ``starFill`` 은 ``star`` 와 같은 경로를 채운 것이다(시안 N2 · N4).
 public enum CarveIcon: CaseIterable, Sendable {
     // 헤더
     /// 서재 — 성경 목록을 여는 사이드바 토글.
@@ -51,6 +52,12 @@ public enum CarveIcon: CaseIterable, Sendable {
     case trash
     case help
 
+    // 즐겨찾기(시안 N)
+    /// 빈 별 — 사이드바 즐겨찾기 버튼 · 절 메뉴 「즐겨찾기에 추가」 · 빈 목록.
+    case star
+    /// 채운 별 — 절 번호 아래 즐겨찾기 표시 · 절 메뉴 「즐겨찾기 해제」 · 목록 제목과 해제 버튼.
+    case starFill
+
     /// 템플릿으로 그리는 아이콘. 크기는 원본 24pt 다.
     public var image: Image {
         Image(asset: asset).renderingMode(.template)
@@ -78,6 +85,8 @@ public enum CarveIcon: CaseIterable, Sendable {
         case .widget: ResourcesAsset.LineIcon.widget
         case .trash: ResourcesAsset.LineIcon.trash
         case .help: ResourcesAsset.LineIcon.help
+        case .star: ResourcesAsset.LineIcon.star
+        case .starFill: ResourcesAsset.LineIcon.starFill
         }
     }
 }

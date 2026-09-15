@@ -10,7 +10,7 @@ import CoreGraphics
 
 import ComposableArchitecture
 
-/// 절 롱탭 메뉴가 떠 있는 상태(시안 E1).
+/// 절 롱탭 메뉴가 떠 있는 상태(시안 E1 · N1).
 ///
 /// 좌표는 둘이다. `contentPoint` 는 캔버스 content 좌표로 항목을 고른 뒤 기존 `historyRequested` · `eraseRequested`
 /// 로 그대로 넘긴다. `anchor` · `verseFrame` 은 **창(window) 좌표**라 오버레이가 스크롤 위치와 무관하게 그린다 —
@@ -47,11 +47,12 @@ extension ChapterCanvasFeature {
 }
 
 extension ChapterCanvasFeature {
-    /// 절 메뉴 액션(시안 E1). 항목은 기존 `historyRequested` · `eraseRequested` 흐름으로 넘긴다.
+    /// 절 메뉴 액션(시안 E1 · N1). 기록 · 지우기는 기존 `historyRequested` · `eraseRequested` 흐름으로 넘기고,
+    /// 즐겨찾기는 이 Feature 가 모르는 저장소의 일이라 부모(`CarveDetailFeature`)에 맡긴다.
     func reduceVerseMenu(state: inout State, action: Action) -> Effect<Action> {
         switch action {
         case let .verseMenuRequested(point, anchor, verseFrame):
-            // 할 수 없는 일만 남은 절이면 메뉴를 올리지 않는다 (UI-2).
+            // 절을 찾지 못한 자리면 메뉴를 올리지 않는다 (UI-2). 절을 찾았으면 적어도 즐겨찾기는 할 수 있다.
             let availability = Self.menuAvailability(at: point, state: state)
             guard !availability.isEmpty, let verse = Self.verse(at: point, state: state) else { return .none }
             state.verseMenu = ChapterCanvasVerseMenu(
@@ -66,6 +67,13 @@ extension ChapterCanvasFeature {
         case .verseMenuDismissed:
             state.verseMenu = nil
             return .none
+
+        case .verseMenuFavoriteTapped:
+            guard let menu = state.verseMenu, menu.availability.canFavorite else { return .none }
+            state.verseMenu = nil
+            // 추가할 때 보존할 필기는 지금 보이는 필기다 — 저장 대기 중인 획까지. 해제일 때 부모는 이 값을 쓰지 않는다.
+            let ink = Self.currentInk(verse: menu.verse, state: state)
+            return .send(.delegate(.favoriteToggled(verse: menu.verse, ink: ink)))
 
         case .verseMenuHistoryTapped:
             guard let menu = state.verseMenu, menu.availability.canViewHistory else { return .none }

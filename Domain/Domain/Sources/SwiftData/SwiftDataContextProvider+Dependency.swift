@@ -29,7 +29,8 @@ extension ModelContainer: @retroactive DependencyKey {
             let url = URL.applicationSupportDirectory.appending(path: containerId.localDBPath)
             let schema = Schema([
                 BibleDrawing.self,
-                BiblePageDrawing.self
+                BiblePageDrawing.self,
+                FavoriteVerse.self
             ])
             let config = ModelConfiguration(
                 url: url,
@@ -76,7 +77,8 @@ extension ModelContainer: @retroactive DependencyKey {
             return try ModelContainer(
                 for: Schema([
                     BibleDrawing.self,
-                    BiblePageDrawing.self
+                    BiblePageDrawing.self,
+                    FavoriteVerse.self
                 ]),
                 configurations: config)
         } catch {
@@ -90,7 +92,8 @@ extension ModelContainer: @retroactive DependencyKey {
             let config = ModelConfiguration(isStoredInMemoryOnly: true)
             let schema = Schema([
                 BibleDrawing.self,
-                BiblePageDrawing.self
+                BiblePageDrawing.self,
+                FavoriteVerse.self
             ])
             return try ModelContainer(for: schema, configurations: config)
         } catch {

@@ -567,7 +567,8 @@ extension ChapterCanvasController {
         guard recognizer.state == .began else { return }
         // 스크롤 뷰의 좌표 = content 좌표.
         let point = recognizer.location(in: canvas)
-        // 아직 아무것도 쓰지 않은 절이면 띄울 항목이 없다 — 빈 메뉴를 보이지 않고 조용히 넘어간다 (UI-2).
+        // 절을 찾지 못한 자리(합성 전 등)면 띄울 항목이 없다 — 빈 메뉴를 보이지 않고 조용히 넘어간다 (UI-2).
+        // 절을 찾았으면 필기가 없어도 「즐겨찾기」 가 있어 메뉴가 뜬다 (시안 N1).
         if menuAvailability?(point).isEmpty == true { return }
         guard let rowRect = menuTargetRect?(point) else { return }
         // 오버레이는 스크롤과 무관한 창 좌표로 그린다. 스크롤 위치를 아는 것은 여기뿐이라 변환도 여기서 한다.

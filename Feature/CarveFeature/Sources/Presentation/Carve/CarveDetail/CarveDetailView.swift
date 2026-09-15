@@ -29,6 +29,7 @@ public struct CarveDetailView: View {
     /// CPU ≈14 s · footprint ≈550 MB (시뮬레이터 Debug) 가 들어 설계 §18-5 의 (B)표 기준을 한 자릿수 이상 넘는다.
     /// 텍스트 행(측정에 필요한 것)은 즉시 만들고, 비싼 캔버스만 뷰포트 근처에서 만든다.
     @State private var activeCanvasIDs: Set<SentencesWithDrawingFeature.State.ID> = []
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// 캔버스를 미리 만들어 둘 범위 — 뷰포트 위아래로 이 배수만큼.
     private static let canvasActivationMargin: CGFloat = 1.5
@@ -47,6 +48,7 @@ public struct CarveDetailView: View {
                 }
                 .overlay(alignment: .bottom) { paletteDock }
                 .overlay(alignment: .bottom) { layoutDebugHUD }
+                .overlay(alignment: .bottom) { favoriteNoticeOverlay }
                 .overlay { verseMenuOverlay }
                 .overlay { historyOverlay }
                 .toolbar(.hidden, for: .navigationBar)
@@ -58,6 +60,7 @@ public struct CarveDetailView: View {
                 }
                 .overlay(alignment: .bottom) { paletteDock }
                 .overlay(alignment: .bottom) { layoutDebugHUD }
+                .overlay(alignment: .bottom) { favoriteNoticeOverlay }
                 .overlay { verseMenuOverlay }
                 .overlay { historyOverlay }
                 .toolbar(.hidden, for: .navigationBar)
@@ -358,6 +361,7 @@ public struct CarveDetailView: View {
                         halfWidth: $halfWidth,
                         isLayoutReady: store.isLayoutReady,
                         isCanvasActive: isCanvasActive(childStore.id),
+                        isFavorite: store.favoriteVerses.contains(childStore.sentence.verse),
                         onUnderlineLayoutChange: { id, layout in
                             // 실측 콜백은 행마다 따로 오지만 액션은 수집기가 한 틱에 하나로 모은다.
                             geometryCollector.reportUnderlineOffsets(
@@ -455,11 +459,38 @@ private extension CarveDetailView {
         if let menu = store.chapterCanvas.verseMenu {
             VerseMenuOverlay(
                 menu: menu,
+                isFavorite: store.favoriteVerses.contains(menu.verse),
+                onFavorite: { send(.verseMenuFavoriteTapped) },
                 onHistory: { send(.verseMenuHistoryTapped) },
                 onErase: { send(.verseMenuEraseTapped) },
                 onDismiss: { send(.verseMenuDismissed) }
             )
         }
+    }
+
+    /// 즐겨찾기 결과 안내(시안 N2). 접힌 도구 팔레트와 같은 줄의 반대쪽 — 도구는 필기하는 손에서 먼 쪽이다(문서 4-1).
+    /// 펼친 팔레트는 가운데를 차지하므로 그 위로 올린다. 절 메뉴 가림막보다 아래 층이다.
+    var favoriteNoticeOverlay: some View {
+        ZStack {
+            if let notice = store.favoriteNotice {
+                FavoriteNoticeView(notice: notice) {
+                    send(.favoriteRetryTapped)
+                }
+                .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: store.headerState.isLeftHanded ? .leading : .trailing)
+        .padding(.horizontal, CarveSpacing.large)
+        .padding(.bottom, favoriteNoticeBottomInset)
+        .animation(reduceMotion ? .easeOut(duration: 0.12) : .snappy(duration: 0.25), value: store.favoriteNotice)
+    }
+
+    /// 안내 줄의 아래 여백. 접힌 팔레트면 도구 원(도크 맨 위 64pt)과 세로 가운데를 맞추고, 펼친 팔레트면 도크 위로 올린다.
+    var favoriteNoticeBottomInset: CGFloat {
+        if store.headerState.isPaletteExpanded {
+            return PencilPalatteDockView.height + CarveSpacing.xSmall
+        }
+        return PencilPalatteDockView.height - CarveSize.floatingToolButton / 2 - FavoriteNoticeView.height / 2
     }
 
     /// 절 필사 기록 팝오버(시안 E2). N-Canvas 는 행마다 시트를 갖지만 단일 Canvas 는 롱탭 메뉴에서 절을 골라
