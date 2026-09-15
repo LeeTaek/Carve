@@ -135,6 +135,7 @@ extension CarveApp {
             $0.adConsentClient = adConsentClient
             $0.purchaseClient = purchaseClient
             $0.sentenceSettingBackup = sentenceSettingBackup
+            $0.photoLibraryClient = PhotoKitLibraryClient()
             $0.analyticsClient = FirebaseAnalyticsClient()
         } operation: {
             Store(initialState: .initialState) {

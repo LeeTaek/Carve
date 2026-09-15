@@ -7,6 +7,7 @@
 //
 
 import CarveToolkit
+import ClientInterfaces
 import Domain
 import SwiftUI
 import PencilKit
@@ -63,6 +64,15 @@ public struct CarveDetailFeature {
         /// 필사 화면 아래 즐겨찾기 결과 안내.
         var favoriteNotice: FavoriteNotice?
 
+        // MARK: 이미지 저장 (시안 G1 · G2 — `CarveDetailFeature+VerseImage.swift`)
+
+        /// 필사 화면 아래 이미지 저장 결과 안내. 즐겨찾기 안내와 같은 자리라 둘 중 하나만 보인다.
+        var imageSaveNotice: ImageSaveNotice?
+        /// 이미지를 그려 사진에 넣는 중. 같은 요청이 겹치지 않게 한다.
+        var isSavingVerseImage = false
+        /// 사진 추가 권한이 꺼져 있다는 확인창(시안 G2).
+        @Presents var photoPermissionAlert: AlertState<Action.PhotoPermissionAlert>?
+
         /// flag 또는 Debug 실행 인자로 단일 Canvas 를 쓸지.
         public var usesSingleCanvas: Bool {
             #if DEBUG
@@ -86,6 +96,9 @@ public struct CarveDetailFeature {
     @Dependency(\.favoriteVerseRepository) var favoriteRepository
     @Dependency(\.date) var date
     @Dependency(\.continuousClock) var clock
+    @Dependency(\.verseImageRenderer) var verseImageRenderer
+    @Dependency(\.photoLibraryClient) var photoLibraryClient
+    @Dependency(\.openURL) var openURL
     
     public enum Action: ViewAction, CarveToolkit.ScopeAction {
         /// 화면 최상단으로 스크롤
@@ -102,9 +115,21 @@ public struct CarveDetailFeature {
         case reloadFavorites
         /// 즐겨찾기 결과 안내를 내린다.
         case favoriteNoticeExpired
+        /// 절 이미지를 사진 보관함에 넣는 일이 끝났다.
+        case verseImageSaveFinished(VerseImageContent, VerseImageSaveResult)
+        /// 이미지 저장 결과 안내를 내린다.
+        case imageSaveNoticeExpired
+        /// 사진 추가 권한 확인창.
+        case photoPermissionAlert(PresentationAction<PhotoPermissionAlert>)
         
         case view(View)
         case scope(ScopeAction)
+
+        /// 사진 추가 권한 확인창의 버튼.
+        public enum PhotoPermissionAlert: Equatable, Sendable {
+            /// 「설정 열기」 — 이 앱의 설정 화면을 연다.
+            case openSettings
+        }
         
         @CasePathable
         public enum View {
@@ -148,6 +173,10 @@ public struct CarveDetailFeature {
             case favoriteRetryTapped
             /// 절 메뉴의 이전 필사 보기
             case verseMenuHistoryTapped
+            /// 절 메뉴의 이미지 저장
+            case verseMenuImageTapped
+            /// 이미지 저장 실패 안내의 다시 시도
+            case imageSaveRetryTapped
             /// 절 메뉴의 지우기
             case verseMenuEraseTapped
             /// 절 메뉴 닫기
@@ -176,6 +205,8 @@ public struct CarveDetailFeature {
         case loadFavorites
         /// 즐겨찾기 결과 안내의 자동 닫힘
         case favoriteNotice
+        /// 이미지 저장 결과 안내의 자동 닫힘
+        case imageSaveNotice
     }
     
     
@@ -283,6 +314,15 @@ public struct CarveDetailFeature {
 
             case .view(.verseMenuHistoryTapped):
                 return .send(.scope(.chapterCanvasAction(.verseMenuHistoryTapped)))
+
+            case .view(.verseMenuImageTapped):
+                return .send(.scope(.chapterCanvasAction(.verseMenuImageTapped)))
+
+            case .scope(.chapterCanvasAction(.delegate(.imageSaveRequested(let handwriting)))):
+                return saveVerseImage(state: &state, handwriting: handwriting)
+
+            case .verseImageSaveFinished, .imageSaveNoticeExpired, .photoPermissionAlert, .view(.imageSaveRetryTapped):
+                return reduceVerseImage(state: &state, action: action)
 
             case .view(.verseMenuEraseTapped):
                 return .send(.scope(.chapterCanvasAction(.verseMenuEraseTapped)))
@@ -405,6 +445,7 @@ public struct CarveDetailFeature {
         .ifLet(\.$chapterHistory, action: \.chapterHistory) {
             VerseDrawingHistoryFeature()
         }
+        .ifLet(\.$photoPermissionAlert, action: \.photoPermissionAlert)
     }
 }
 

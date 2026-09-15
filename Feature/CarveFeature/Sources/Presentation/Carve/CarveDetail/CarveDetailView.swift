@@ -462,13 +462,14 @@ private extension CarveDetailView {
                 isFavorite: store.favoriteVerses.contains(menu.verse),
                 onFavorite: { send(.verseMenuFavoriteTapped) },
                 onHistory: { send(.verseMenuHistoryTapped) },
+                onImage: { send(.verseMenuImageTapped) },
                 onErase: { send(.verseMenuEraseTapped) },
                 onDismiss: { send(.verseMenuDismissed) }
             )
         }
     }
 
-    /// 즐겨찾기 결과 안내(시안 N2). 접힌 도구 팔레트와 같은 줄의 반대쪽 — 도구는 필기하는 손에서 먼 쪽이다(문서 4-1).
+    /// 즐겨찾기 · 이미지 저장 결과 안내(시안 N2 · G2). 접힌 도구 팔레트와 같은 줄의 반대쪽 — 도구는 필기하는 손에서 먼 쪽이다(문서 4-1).
     /// 펼친 팔레트는 가운데를 차지하므로 그 위로 올린다. 절 메뉴 가림막보다 아래 층이다.
     var favoriteNoticeOverlay: some View {
         ZStack {
@@ -477,12 +478,21 @@ private extension CarveDetailView {
                     send(.favoriteRetryTapped)
                 }
                 .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+            } else if let notice = store.imageSaveNotice {
+                // 안내 자리는 하나라 즐겨찾기 안내와 번갈아 쓴다 — 새 안내가 뜨면 Feature 가 다른 쪽을 내린다.
+                VerseImageNoticeView(notice: notice) {
+                    send(.imageSaveRetryTapped)
+                }
+                .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
             }
         }
         .frame(maxWidth: .infinity, alignment: store.headerState.isLeftHanded ? .leading : .trailing)
         .padding(.horizontal, CarveSpacing.large)
         .padding(.bottom, favoriteNoticeBottomInset)
         .animation(reduceMotion ? .easeOut(duration: 0.12) : .snappy(duration: 0.25), value: store.favoriteNotice)
+        .animation(reduceMotion ? .easeOut(duration: 0.12) : .snappy(duration: 0.25), value: store.imageSaveNotice)
+        // 사진 추가 권한이 꺼져 있으면 어디서 켜는지 알린다(시안 G2). 결과 안내와 같은 자리에서 띄운다.
+        .alert($store.scope(state: \.photoPermissionAlert, action: \.photoPermissionAlert))
     }
 
     /// 안내 줄의 아래 여백. 접힌 팔레트면 도구 원(도크 맨 위 64pt)과 세로 가운데를 맞추고, 펼친 팔레트면 도크 위로 올린다.

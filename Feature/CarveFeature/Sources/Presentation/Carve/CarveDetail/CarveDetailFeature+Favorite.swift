@@ -157,11 +157,16 @@ extension CarveDetailFeature {
     }
 
     private func showFavoriteNotice(state: inout State, _ notice: FavoriteNotice, duration: Duration) -> Effect<Action> {
+        // 안내 자리는 하나다 — 이미지 저장 안내가 떠 있으면 내린다.
+        state.imageSaveNotice = nil
         state.favoriteNotice = notice
-        return .run { [clock] send in
-            try await clock.sleep(for: duration)
-            await send(.favoriteNoticeExpired)
-        }
-        .cancellable(id: CancelID.favoriteNotice, cancelInFlight: true)
+        return .merge(
+            .cancel(id: CancelID.imageSaveNotice),
+            .run { [clock] send in
+                try await clock.sleep(for: duration)
+                await send(.favoriteNoticeExpired)
+            }
+            .cancellable(id: CancelID.favoriteNotice, cancelInFlight: true)
+        )
     }
 }

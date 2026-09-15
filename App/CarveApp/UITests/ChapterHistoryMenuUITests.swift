@@ -77,7 +77,7 @@ final class ChapterHistoryMenuUITests: XCTestCase {
     /// D9-5-1 — 필기가 있는 절을 길게 누르면 절 메뉴가 뜬다.
     ///
     /// 조건부 항목(UI-2) — 쓰기만 한 절은 「지우기」 가, 지운 뒤에는 「이전 필사 내용 보기」 가 더해진다.
-    /// 「이미지 저장」 은 메뉴가 열리면 늘 (비활성으로) 있으므로, 보관본 유무와 무관하게 그것으로 메뉴가 떴는지 본다.
+    /// 「이미지 저장」 은 메뉴가 열리면 늘 있으므로, 보관본 유무와 무관하게 그것으로 메뉴가 떴는지 본다.
     /// 2026-09-15 부터 「즐겨찾기」 가 늘 있어 필기가 없는 절에서도 메뉴가 뜬다 — 판정이 필기 유무로 갈리지 않는다.
     func testLongPressOpensHistoryMenuAndSheet() throws {
         try skipUnlessPhysicalDevice()
