@@ -129,6 +129,13 @@ struct ChapterLayoutMeasurement: Equatable, Sendable {
         var magnitude: CGFloat { max(abs(topDelta), abs(heightDelta)) }
     }
 
+    /// Pass 2 여유 band(설계 §6-3)가 붙은 절 하나.
+    struct ReflowSlack: Equatable, Sendable {
+        let verse: Int
+        /// 저장 band 수 − 현재 텍스트 줄 수. 항상 1 이상이다.
+        let extraBands: Int
+    }
+
     /// 측정 대상 장. `begin` 전에는 nil.
     private(set) var chapter: BibleChapter?
     /// 본문 fetch 로 확정된 절 개수 (설계 §6-4 의 `expectedVerseCount`). 게이트의 기준값이다.
@@ -215,10 +222,50 @@ struct ChapterLayoutMeasurement: Equatable, Sendable {
     /// 행은 그만큼 커지지 않는다. 즉 Δ 가 의도적으로 커지며, 그 상태의 Δ 로는 "의도한 여유" 와 "예측 결함" 을
     /// 구별할 수 없다. 안전망은 구별할 수 없을 때 **막지 않는다** — 무해한 조건으로 필기를 막는 쪽이 더 나쁜 회귀다.
     var hasReflowSlack: Bool {
-        verses.contains { verse in
-            guard let saved = savedBandCounts[verse] else { return false }
-            return saved > (textMeasurements[verse]?.lineCount ?? 0)
+        !reflowSlacks.isEmpty
+    }
+
+    /// Pass 2 여유 band 가 붙은 절과 그 수. 본문 순서이며 여유가 없으면 빈 배열이다.
+    ///
+    /// 빌더와 같은 규칙(`저장 band 수 − 텍스트 줄 수`, 텍스트 실측이 없으면 0줄)으로 센다. 여기 나온 수만큼
+    /// 그 절의 `writingRect` 가 늘고 뒤 절이 밀린다 — 디버그 HUD 가 어느 절이 몇 줄 늘었는지 보이는 데 쓴다.
+    var reflowSlacks: [ReflowSlack] {
+        verses.compactMap { verse in
+            guard let saved = savedBandCounts[verse] else { return nil }
+            let extraBands = saved - (textMeasurements[verse]?.lineCount ?? 0)
+            return extraBands > 0 ? ReflowSlack(verse: verse, extraBands: extraBands) : nil
         }
+    }
+
+    /// `frameDeltas` 에서 Pass 2 여유 높이를 뺀 절별 차이 — **진단 전용**.
+    ///
+    /// 여유 band 는 그 절의 `writingRect` 를 늘리고 뒤 절을 전부 밀지만 행은 커지지 않는다. 그래서 여유가 있는 장의
+    /// `frameDeltas` 는 누적 여유 band × `lineSpace` 만큼 계단처럼 어긋나고, 측정 경로의 결함이 있어도 그 계단에 묻힌다.
+    /// 이 값은 절마다 자기 여유(높이)와 앞 절들의 여유(상단)를 되돌려 **여유 밖의 차이만** 남긴다.
+    /// 저장된 필사가 있는 기기에서도 측정 경로를 0 으로 판정하려고 쓴다 (2026-09-14 실기기 시편 119편).
+    ///
+    /// > ⚠️ **안전망(`layoutDeltaVerdict`)에 넣지 않는다.** 단일 Canvas 의 잉크 합성·필기 귀속은 여유가 붙은 레이아웃을
+    /// > 따르므로, 이 값이 0 이어도 텍스트 행과 잉크가 맞는다는 뜻이 아니다.
+    var slackAdjustedFrameDeltas: [FrameDelta] {
+        guard let layout else { return [] }
+        let extraBands = Dictionary(reflowSlacks.map { ($0.verse, $0.extraBands) }, uniquingKeysWith: { first, _ in first })
+        var bandsAbove = 0
+        return layout.regions.compactMap { region in
+            let ownBands = extraBands[region.verse] ?? 0
+            let precedingBands = bandsAbove
+            bandsAbove += ownBands
+            guard let frame = measuredFrames[region.verse] else { return nil }
+            return FrameDelta(
+                verse: region.verse,
+                topDelta: frame.minY - (region.writingRect.minY - CGFloat(precedingBands) * lineSpace),
+                heightDelta: frame.height - (region.writingRect.height - CGFloat(ownBands) * lineSpace)
+            )
+        }
+    }
+
+    /// 여유를 뺀 차이가 가장 큰 절. 실측이 없으면 nil.
+    var worstSlackAdjustedFrameDelta: FrameDelta? {
+        slackAdjustedFrameDeltas.max { $0.magnitude < $1.magnitude }
     }
 
     /// 안전망 판정 (`LayoutDeltaVerdict`). 실측 frame 이 없으면 nil — 판정할 근거가 없다는 뜻이다.

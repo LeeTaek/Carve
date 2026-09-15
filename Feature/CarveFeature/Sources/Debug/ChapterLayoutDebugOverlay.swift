@@ -183,6 +183,7 @@ struct ChapterLayoutDebugHUD: View {
             deltaLine
             profileLine
             guardLine
+            slackLine
             composeLine
             editLine
             if !measurement.missingVerses.isEmpty {
@@ -296,6 +297,35 @@ struct ChapterLayoutDebugHUD: View {
                 Text("guard — (단일 Canvas 아님 또는 실측 대기)").foregroundStyle(.gray)
             }
         }
+    }
+
+    /// Pass 2 여유(§6-3)가 붙은 절과, 그 여유를 뺀 Δ. 여유가 있을 때만 보인다 (2026-09-14 실기기 시편 119편).
+    ///
+    /// 여유가 있으면 `Δ max` 는 누적 여유 band × `lineSpace` 의 계단을 설계상 보인다. 이 줄의 `Δ(-slack) max` 가 0 이면
+    /// 그 계단 말고는 측정 경로가 맞다는 뜻이다. ⚠️ 단일 Canvas 에서는 여유만큼 잉크·필기 귀속이 텍스트 행과 실제로 어긋나 있다.
+    private var slackLine: some View {
+        let slacks = measurement.reflowSlacks
+        return Group {
+            if !slacks.isEmpty {
+                let worst = measurement.worstSlackAdjustedFrameDelta
+                let magnitude = worst?.magnitude ?? 0
+                HStack(spacing: 10) {
+                    Text("slack \(slackSummary(slacks))").foregroundStyle(.yellow)
+                    Text("Δ(-slack) max \(fmt(magnitude))")
+                        .foregroundStyle(worst == nil ? Color.gray : (magnitude <= tolerance ? Color.green : Color.red))
+                    if let worst {
+                        Text("worst v\(worst.verse)")
+                    }
+                }
+            }
+        }
+    }
+
+    /// `v1+1·v2+1·v4+1 = 3줄` 처럼 절별 초과 band 와 합계를 보여준다. 많으면 앞의 6개만.
+    private func slackSummary(_ slacks: [ChapterLayoutMeasurement.ReflowSlack]) -> String {
+        let shown = slacks.prefix(6).map { "v\($0.verse)+\($0.extraBands)" }.joined(separator: "·")
+        let total = slacks.reduce(0) { $0 + $1.extraBands }
+        return slacks.count > 6 ? "\(shown)… (\(slacks.count)절) = \(total)줄" : "\(shown) = \(total)줄"
     }
 
     /// 측정 레이아웃이 캔버스까지 갔는지 (E-4 진단).

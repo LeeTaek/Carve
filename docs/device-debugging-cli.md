@@ -91,9 +91,9 @@ Debug 빌드에서 `-ChapterLayoutOverlay`를 켜면 화면 HUD와 함께 `Chapt
 rg 'ChapterHUD ' "$CARVE_DEVICE_LOGS/baseline.log"
 ```
 
-각 줄에는 장·Canvas 모드, gate·실측 개수·build·최초 빌드 시간, 폭·전체 높이·컬럼 원점·서명, 미측정 절, 최대 Δ·최악 절·높이 범위·누적 기울기·대표 절 Δ, guard·slack, compose·revision·합성 전후 원점·편집/재조회/보류 상태, mismatch/legacy/디코드 실패 절, legacy 잉크 bounds와 마지막 dirty bounds를 남긴다. 서명과 절 목록은 HUD처럼 줄이지 않고 기록한다. 아직 측정되지 않은 Δ는 `unmeasured`로 구분한다.
+각 줄에는 장·Canvas 모드, gate·실측 개수·build·최초 빌드 시간, 폭·전체 높이·컬럼 원점·서명, 미측정 절, 최대 Δ·최악 절·높이 범위·누적 기울기·대표 절 Δ, 여유(slack)를 뺀 최대 Δ(`slackAdjustedDeltaMax`), guard·slack·여유 절별 초과 band(`slackBands`), compose·revision·합성 전후 원점·편집/재조회/보류 상태, mismatch/legacy/디코드 실패 절, legacy 잉크 bounds와 마지막 dirty bounds를 남긴다. 서명과 절 목록은 HUD처럼 줄이지 않고 기록한다. 아직 측정되지 않은 Δ는 `unmeasured`로 구분한다.
 
-HUD와 같은 입력에서 만들어진 상태 로그다. `compose=SYNC`와 `deltaMax=0.00`은 실제 픽셀 표시의 정상화를 보증하지 않는다. 렌더링 결함 조사에서는 `CanvasDisplay` 로그와 회전 전후 캡처를 함께 사용한다. 로그 수집을 위해 `--terminate-existing`으로 재실행할 때에는 진행 중인 필기를 먼저 마친다.
+HUD와 같은 입력에서 만들어진 상태 로그다. `compose=SYNC`와 `deltaMax=0.00`은 실제 픽셀 표시의 정상화를 보증하지 않는다. `slack=true`이면 `deltaMax`는 저장 당시 줄 수가 더 많은 절(설계 §6-3 여유)만큼의 계단을 설계상 보이므로, 측정 경로는 `slackAdjustedDeltaMax=0.00`으로 판정한다. 렌더링 결함 조사에서는 `CanvasDisplay` 로그와 회전 전후 캡처를 함께 사용한다. 로그 수집을 위해 `--terminate-existing`으로 재실행할 때에는 진행 중인 필기를 먼저 마친다.
 
 ### 메모리 여유 읽기 (`-CanvasMemoryProbe`)
 

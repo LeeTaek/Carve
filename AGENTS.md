@@ -130,6 +130,10 @@ mise x -- swiftlint lint --quiet --config .swiftlint.yml <파일들>
   그 계열은 `H`(totalHeight)를 새 진입값과 비교해 본다 (런북 §6-9 D9-0-d).
   행 안의 `onGeometryChange` 는 중첩 `UIHostingController`(`touchIgnoringContextMenu`) 때문에 바깥 `.named` 공간을 보지 못하고 **조용히 global 을 쓴다** —
   그래서 행 frame 은 바깥 트리에서 재고 행 안 영역과 합친다(설계 §6-1 rev.16). Δ 가 0 이 아니면 레이아웃보다 측정 경로를 먼저 의심한다.
+  ⚠️ **`Δ max 0.00` 은 저장 당시 줄 수가 지금보다 많은 필사 절(§6-3 Pass 2 여유, slack)이 없을 때의 기대값이다.** 그런 절이 있으면 HUD 에
+  `slack v1+1·… = N줄` 줄이 뜨고, 행은 여유만큼 커지지 않으므로 `Δ max` 가 누적 여유 band × linePitch 의 계단을 설계상 보인다.
+  그때 측정 경로는 같은 줄의 `Δ(-slack) max 0.00`(콘솔 `slackAdjustedDeltaMax`)으로 판정한다. 단, 단일 Canvas 는 여유 절 이후의
+  잉크·필기 귀속이 텍스트 행과 실제로 어긋나 있다 (2026-09-14 실기기 시편 119편: v1·v2·v4 +1, `Δ max 195.63`).
 
 ## 변경 정책
 - 변경은 최소 범위로 유지한다.

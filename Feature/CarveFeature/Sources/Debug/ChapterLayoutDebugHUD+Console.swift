@@ -10,6 +10,7 @@ extension ChapterLayoutDebugHUD {
         let duration = measurement.firstBuildDuration.map {
             Double($0.components.seconds) * 1000 + Double($0.components.attoseconds) / 1e15
         }
+        let slackBands = measurement.reflowSlacks.map { "v\($0.verse):+\($0.extraBands)" }.joined(separator: ",")
         var fields = [
             "chapter=\(chapter)",
             "mode=\(compose == nil ? "N-Canvas" : "SingleCanvas")",
@@ -19,12 +20,18 @@ extension ChapterLayoutDebugHUD {
             "W=\(number(measurement.writingWidth)) H=\(number(measurement.layout?.totalHeight ?? 0))",
             "columnOrigin=\(String(describing: measurement.columnOrigin)) frames=\(measurement.measuredFrames.count)",
             "sig=\(measurement.layout?.signature ?? "—") missing=\(measurement.missingVerses)",
-            "tol=\(number(LayoutDeltaVerdict.tolerance)) slack=\(measurement.hasReflowSlack)"
+            "tol=\(number(LayoutDeltaVerdict.tolerance)) slack=\(measurement.hasReflowSlack) slackBands=[\(slackBands)]"
         ]
         if let worst = measurement.worstFrameDelta {
             fields.append("deltaMax=\(number(worst.magnitude)) worst=v\(worst.verse) top=\(number(worst.topDelta)) height=\(number(worst.heightDelta))")
         } else {
             fields.append("deltaMax=unmeasured")
+        }
+        // 여유(§6-3)를 뺀 Δ. 여유가 없으면 deltaMax 와 같다 — 저장된 필사가 있는 기기에서 측정 경로를 판정하는 값이다.
+        if let worst = measurement.worstSlackAdjustedFrameDelta {
+            fields.append("slackAdjustedDeltaMax=\(number(worst.magnitude)) worst=v\(worst.verse) top=\(number(worst.topDelta)) height=\(number(worst.heightDelta))")
+        } else {
+            fields.append("slackAdjustedDeltaMax=unmeasured")
         }
         let deltas = measurement.frameDeltas.sorted { $0.verse < $1.verse }
         if let first = deltas.first, let last = deltas.last, deltas.count >= 2 {
