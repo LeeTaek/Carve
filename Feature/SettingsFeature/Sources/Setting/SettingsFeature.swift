@@ -51,6 +51,8 @@ public struct SettingsFeature {
         case iCloud(CloudSettingsFeature)
         /// 필사 캔버스 — 단일 Canvas flag 토글 (설계 §13 Phase 3 (3/3)).
         case canvas(CanvasSettingsFeature)
+        /// 화면 모드 — 시스템 설정 · 라이트 · 다크.
+        case appearance(AppearanceSettingsFeature)
         /// 필사 사용법과 첫 안내 다시 보기.
         case help(HelpFeature)
         /// 앱 업데이트 변경 사항.

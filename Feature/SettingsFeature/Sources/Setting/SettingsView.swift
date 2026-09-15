@@ -17,6 +17,8 @@ public struct SettingsView: View {
     @Bindable public var store: StoreOf<SettingsFeature>
     /// 광고 제거를 샀는지. 사이드바 행의 값만 바꾼다.
     @SharedReader(.isAdFree) private var isAdFree: Bool
+    /// 고른 화면 모드. 사이드바 행의 값만 바꾼다.
+    @SharedReader(.appearanceMode) private var appearanceMode: AppearanceMode
 
     public init(store: StoreOf<SettingsFeature>) {
         self.store = store
@@ -53,6 +55,11 @@ public struct SettingsView: View {
             Section("필사") {
                 NavigationLink(value: SettingsFeature.Path.State.canvas(.initialState)) {
                     sidebarRow("필사 캔버스", value: "단일")
+                }
+            }
+            Section("화면") {
+                NavigationLink(value: SettingsFeature.Path.State.appearance(.initialState)) {
+                    sidebarRow("화면 모드", value: appearanceMode.title)
                 }
             }
             Section("저장") {
@@ -123,6 +130,10 @@ public struct SettingsView: View {
         case .canvas:
             if let store = store.scope(state: \.path?.canvas, action: \.path.canvas) {
                 CanvasSettingsView(store: store)
+            }
+        case .appearance:
+            if let store = store.scope(state: \.path?.appearance, action: \.path.appearance) {
+                AppearanceSettingsView(store: store)
             }
         case .help:
             if let store = store.scope(state: \.path?.help, action: \.path.help) {
