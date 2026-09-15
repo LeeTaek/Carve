@@ -33,7 +33,7 @@ public struct VerseTextFeature {
         public var preferenceVersion: UUID = .init()
         
         /// 문장 폰트 등 설정
-        @Shared(.appStorage("sentenceSetting")) public var sentenceSetting: SentenceSetting = .initialState
+        @Shared(.appStorage(SentenceSetting.appStorageKey)) public var sentenceSetting: SentenceSetting = .initialState
         
         public init(
             chapterTitle: String?,

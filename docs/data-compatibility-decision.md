@@ -18,6 +18,7 @@ R27 · R28 · 번역본 귀속은 **"필사 한 행을 무엇으로 식별하고
 |---|---|
 | V3 | `id` · `titleName` · `titleChapter` · `verse` · `creationDate` · `updateDate` · `translation` · `drawingVersion` · `isPresent` · `lineData` |
 | V4 | 위 전부 **+ `layoutMetadataData` + `rowUUID`** |
+| V5 | V4 와 같다(무변경). 새 엔티티 `FavoriteVerse` 만 추가 — 즐겨찾기, 2026-09-15 ([로드맵](./release-2.0.0-roadmap.md) §4) |
 
 `translation` 과 `drawingVersion` 은 **V3 부터 이미 있다**. V4 의 신규 필드는 `layoutMetadataData` · `rowUUID` 둘뿐이다 ([DrawingSchemaV4.swift](../Domain/Domain/Sources/SwiftData/Model/DrawingSchemaV4.swift) · [DrawingSchemaV3.swift](../Domain/Domain/Sources/SwiftData/Model/DrawingSchemaV3.swift)).
 

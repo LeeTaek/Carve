@@ -61,6 +61,8 @@ public struct CarveNavigationFeature {
         case moveToVerse(BibleVerse)
         /// 장 목록에 쓸 성경 한 권의 필사 기록을 받음
         case drawingRecordLoaded(BibleTitle, BibleTitleDrawingRecord)
+        /// 다른 화면(즐겨찾기 목록)에서 즐겨찾기가 바뀌었다 — 필사 화면의 별 표시를 다시 읽는다
+        case refreshFavorites
         case view(View)
         case scope(ScopeAction)
         
@@ -70,6 +72,8 @@ public struct CarveNavigationFeature {
             case moveToSetting
             /// 차트 화면으로 이동
             case moveToChart
+            /// 즐겨찾기 목록으로 이동 — 화면 전환은 `AppCoordinatorFeature` 가 한다
+            case moveToFavorites
             /// NavigationSplitView를 닫고 DetailOnly로 변경
             case closeNavigationBar
             /// detail Content 안에서 네비게이션 래핑
@@ -174,6 +178,13 @@ public struct CarveNavigationFeature {
             case .view(.moveToChart):
                 Log.debug("move To chart")
                 return .none
+
+            case .view(.moveToFavorites):
+                Log.debug("move To favorites")
+                return .none
+
+            case .refreshFavorites:
+                return .send(.scope(.carveDetailAction(.reloadFavorites)))
                 
             case .view(.closeNavigationBar):
                 state.columnVisibility = .detailOnly

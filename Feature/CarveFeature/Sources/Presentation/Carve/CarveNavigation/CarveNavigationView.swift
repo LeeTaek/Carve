@@ -117,6 +117,10 @@ public struct CarveNavigationView: View {
                 }
                 HStack(spacing: CarveSpacing.xSmall) {
                     Spacer(minLength: 0)
+                    // 차트 바로 왼쪽(시안 N3). 목록은 차트와 같이 앱 스택에 올린다.
+                    CarveIconButton(.star, accessibilityLabel: "즐겨찾기") {
+                        send(.moveToFavorites)
+                    }
                     CarveIconButton(.chart, accessibilityLabel: "필사 차트") {
                         send(.moveToChart)
                     }

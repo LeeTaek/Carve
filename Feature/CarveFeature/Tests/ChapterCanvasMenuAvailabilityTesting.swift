@@ -5,7 +5,7 @@
 //  UI-2 — 롱탭 메뉴는 **할 수 있는 것만** 띄운다.
 //  · "이전 필사 내용 보기" 는 대표가 아닌 행이 있을 때만
 //  · "지우기" 는 그 절에 획이 있을 때만 (저장 대기 중인 획 포함)
-//  · 둘 다 없으면 메뉴 자체를 올리지 않는다
+//  · "즐겨찾기" 는 절을 찾으면 늘 띄운다 (시안 N1) — 메뉴가 안 뜨는 것은 절을 찾지 못한 자리뿐이다
 //
 
 import CoreGraphics
@@ -60,13 +60,14 @@ struct ChapterCanvasMenuAvailabilityTesting {
         return state
     }
 
-    @Test("획도 지난 회차도 없으면 띄울 항목이 없다 — 메뉴를 올리지 않는다")
-    func nothingToOfferOnUntouchedVerse() async {
+    @Test("획도 지난 회차도 없는 절 — 즐겨찾기만 띄운다. 필기 없는 말씀도 즐겨찾기한다 (시안 N1)")
+    func untouchedVerseOffersFavoriteOnly() async {
         let state = await composedState(rows: [])
 
         let availability = ChapterCanvasFeature.menuAvailability(at: Self.pointInVerse, state: state)
 
-        #expect(availability.isEmpty)
+        #expect(!availability.isEmpty)
+        #expect(availability.canFavorite)
         #expect(!availability.canViewHistory)
         #expect(!availability.canErase)
     }
@@ -144,6 +145,7 @@ struct ChapterCanvasMenuAvailabilityTesting {
         let availability = ChapterCanvasFeature.menuAvailability(at: Self.pointInVerse, state: store.state)
 
         #expect(availability.isEmpty)
+        #expect(!availability.canFavorite)
     }
 
     @Test("비대표 행이 있어도 **내용이 없으면** 이전 필사를 띄우지 않는다 — 목록의 필터와 같은 기준")

@@ -264,6 +264,8 @@ public struct ChapterCanvasFeature {
         case verseMenuRequested(at: CGPoint, anchor: CGPoint, verseFrame: CGRect)
         /// 절 메뉴를 닫는다 — 가림막을 누르거나 항목을 골랐다.
         case verseMenuDismissed
+        /// 절 메뉴의 「즐겨찾기에 추가」 · 「즐겨찾기 해제」(시안 N1).
+        case verseMenuFavoriteTapped
         /// 절 메뉴의 「이전 필사 내용 보기」.
         case verseMenuHistoryTapped
         /// 절 메뉴의 「지우기」.
@@ -285,6 +287,8 @@ public struct ChapterCanvasFeature {
         public enum Delegate: Equatable, Sendable {
             /// 이 절의 필사 기록 시트를 열어 달라.
             case showHistory(verse: Int)
+            /// 이 절의 즐겨찾기를 켜거나 꺼 달라(시안 N1). `ink` 는 지금 보이는 필기 — 추가할 때 그대로 보존한다. 획이 없으면 nil.
+            case favoriteToggled(verse: Int, ink: Data?)
         }
     }
 
@@ -410,7 +414,7 @@ public struct ChapterCanvasFeature {
                 state.eraseAlert = Self.confirmEraseAlert(chapter: state.chapter, verse: verse)
                 return .none
 
-            case .verseMenuRequested, .verseMenuDismissed, .verseMenuHistoryTapped, .verseMenuEraseTapped:
+            case .verseMenuRequested, .verseMenuDismissed, .verseMenuFavoriteTapped, .verseMenuHistoryTapped, .verseMenuEraseTapped:
                 return reduceVerseMenu(state: &state, action: action)
 
             case .eraseAlert(.presented(.confirm(let verse))):

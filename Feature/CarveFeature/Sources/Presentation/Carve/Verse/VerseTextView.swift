@@ -27,15 +27,19 @@ public struct VerseTextView: View {
     ///         이렇게 레이아웃 이벤트만 상위로 올려 처리함으로써 ForEachReducer의
     ///         missing element warning을 회피한다.
     let onLayoutChange: (Text.LayoutKey.Value) -> Void
+    /// 즐겨찾기한 절인가 — 절 번호 아래에 작은 채운 별을 둔다(시안 N2).
+    let isFavorite: Bool
 
     /// 절 번호 칸 폭(시안: 번호 x 44 → 본문 x 78).
     static let verseNumberGutter: CGFloat = 34
 
     public init(
         store: StoreOf<VerseTextFeature>,
+        isFavorite: Bool = false,
         onLayoutChange: @escaping (Text.LayoutKey.Value) -> Void
     ) {
         self.store = store
+        self.isFavorite = isFavorite
         self.onLayoutChange = onLayoutChange
     }
 
@@ -53,7 +57,28 @@ public struct VerseTextView: View {
             .foregroundStyle(CarveColor.Paper.accent)
             .frame(width: Self.verseNumberGutter, alignment: .leading)
             .offset(y: -fontSize * 0.9)
+            // `offset` 뒤에 붙여 올린 번호가 아니라 **첫 줄 기준선**에 맞춘다. overlay 라 행 높이 · 밑줄 실측에 영향이 없다.
+            .overlay(alignment: Alignment(horizontal: .leading, vertical: .firstTextBaseline)) {
+                if isFavorite {
+                    favoriteMark(fontSize: fontSize)
+                }
+            }
+            // 실기기 UI 테스트가 「1절」 이라는 이름으로 번호를 찾는다 — 즐겨찾기는 이름이 아니라 값으로 알린다.
             .accessibilityLabel("\(verse)절")
+            .accessibilityValue(isFavorite ? "즐겨찾기" : "")
+    }
+
+    /// 즐겨찾기 표시 — 절 번호 칸 안, 첫 줄 기준선 아래(시안 N2: 20pt 본문에서 기준선 13pt 아래 · 16pt 별).
+    private func favoriteMark(fontSize: CGFloat) -> some View {
+        let size = max(12, fontSize * 0.78)
+        return CarveIcon.starFill.image
+            .resizable()
+            .frame(width: size, height: size)
+            .foregroundStyle(CarveColor.Paper.accent)
+            .alignmentGuide(.firstTextBaseline) { dimensions in
+                dimensions[.top] - fontSize * 0.65
+            }
+            .accessibilityHidden(true)
     }
 
     /// 각 절의 내용 문장

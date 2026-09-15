@@ -16,11 +16,12 @@ final class ChapterHistoryMenuUITests: XCTestCase {
 
     /// 절 메뉴 항목 식별자 (`VerseMenuOverlay`).
     private enum VerseMenuID {
+        static let favorite = "verseMenu.favorite"
         static let history = "verseMenu.history"
         static let image = "verseMenu.image"
         static let widget = "verseMenu.widget"
         static let erase = "verseMenu.erase"
-        static let all = [history, image, widget, erase]
+        static let all = [favorite, history, image, widget, erase]
     }
 
     /// 누를 지점의 기준이 되는 화면 요소 (접근성 라벨).
@@ -75,9 +76,9 @@ final class ChapterHistoryMenuUITests: XCTestCase {
 
     /// D9-5-1 — 필기가 있는 절을 길게 누르면 절 메뉴가 뜬다.
     ///
-    /// 메뉴는 보여 줄 항목이 있을 때만 뜬다(UI-2) — 쓰기만 한 절은 「지우기」 만, 지운 뒤에는 「이전 필사 내용 보기」 만.
+    /// 조건부 항목(UI-2) — 쓰기만 한 절은 「지우기」 가, 지운 뒤에는 「이전 필사 내용 보기」 가 더해진다.
     /// 「이미지 저장」 은 메뉴가 열리면 늘 (비활성으로) 있으므로, 보관본 유무와 무관하게 그것으로 메뉴가 떴는지 본다.
-    /// 이 기기의 시편 119편 1절에 필기가 없으면 메뉴가 뜨지 않는 것이 정상이다.
+    /// 2026-09-15 부터 「즐겨찾기」 가 늘 있어 필기가 없는 절에서도 메뉴가 뜬다 — 판정이 필기 유무로 갈리지 않는다.
     func testLongPressOpensHistoryMenuAndSheet() throws {
         try skipUnlessPhysicalDevice()
         XCUIDevice.shared.orientation = .portrait
@@ -101,7 +102,7 @@ final class ChapterHistoryMenuUITests: XCTestCase {
         probe.lifetime = .keepAlways
         add(probe)
 
-        XCTAssertTrue(appeared, "롱프레스 후 절 메뉴가 뜨지 않았다 — 시편 119편 1절에 필기가 있는지 확인한다")
+        XCTAssertTrue(appeared, "롱프레스 후 절 메뉴가 뜨지 않았다 — 누른 지점이 1절 필사 열인지 확인한다")
 
         // ⛔ **메뉴 항목을 누르지 않는다.** 「지우기」 는 실제 필사를 보관 후 비운다.
         // 2026-09-09 에는 좌표 탭이 PencilKit 메뉴를 눌러 **시편 119편 1~4절이 실제로 수정·저장**됐다.

@@ -40,6 +40,8 @@ public struct AppCoordinatorFeature {
                 switch topPath {
                 case .chart:
                     return "Chart"
+                case .favorites:
+                    return "Favorites"
                 }
             }
 
@@ -77,6 +79,8 @@ public struct AppCoordinatorFeature {
     public enum Path {
         /// 필사 통계 차트 화면 흐름.
         case chart(DrawingChartFeature)
+        /// 즐겨찾기 목록 화면 흐름(시안 N4 · N5).
+        case favorites(FavoriteListFeature)
     }
     
     public var body: some Reducer<State, Action> {
@@ -100,11 +104,26 @@ public struct AppCoordinatorFeature {
             case .root(.presented(.carve(.view(.moveToChart)))):
                 state.path.append(.chart(.initialState))
 
+            case .root(.presented(.carve(.view(.moveToFavorites)))):
+                state.path.append(.favorites(.initialState))
+
             case .settings(.presented(.view(.backToCarve))):
                 state.settings = nil
 
-            case .path(.element(id: _, action: .chart(.delegate(.backToWriting)))):
+            case .path(.element(id: _, action: .chart(.delegate(.backToWriting)))),
+                 .path(.element(id: _, action: .favorites(.delegate(.backToWriting)))):
                 state.path.removeLast()
+                // 차트 「필사하러 가기」 · 즐겨찾기 「말씀 보러 가기」 는 필사 화면으로 가는 버튼이다 —
+                // 탐색 열(사이드바 · 장 목록)을 닫고 필사 화면만 남긴다.
+                return .send(.root(.presented(.carve(.view(.closeNavigationBar)))))
+
+            case let .path(.element(id: _, action: .favorites(.delegate(.openVerse(verse))))):
+                state.path.removeLast()
+                return .send(.root(.presented(.carve(.moveToVerse(verse)))))
+
+            case .path(.element(id: _, action: .favorites(.delegate(.favoritesChanged)))):
+                // 목록이 떠 있는 동안 뒤의 필사 화면 표시를 맞춰 둔다 — 시스템 뒤로 가기로 닫혀도 따로 알릴 필요가 없다.
+                return .send(.root(.presented(.carve(.refreshFavorites))))
 
             case .patchnote(.presented(.delegate(.close))):
                 state.patchnote = nil
