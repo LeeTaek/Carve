@@ -30,8 +30,6 @@ public struct CarveDetailView: View {
     /// 텍스트 행(측정에 필요한 것)은 즉시 만들고, 비싼 캔버스만 뷰포트 근처에서 만든다.
     @State private var activeCanvasIDs: Set<SentencesWithDrawingFeature.State.ID> = []
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    /// 다크에서만 종이 아래 책상을 캔버스 위에 한 번 더 칠한다(`deskCover`).
-    @Environment(\.colorScheme) private var colorScheme
 
     /// 캔버스를 미리 만들어 둘 범위 — 뷰포트 위아래로 이 배수만큼.
     private static let canvasActivationMargin: CGFloat = 1.5
@@ -206,7 +204,7 @@ public struct CarveDetailView: View {
                 }
         }
         .background { paperBackground }
-        .overlay { deskCover }
+        .overlay { DeskCover() }
     }
 
     /// 뷰포트 근처(위아래 `canvasActivationMargin` 배)의 행을 캔버스 활성 집합에 더한다. 빼지는 않는다.
@@ -443,7 +441,7 @@ private extension CarveDetailView {
         ZStack {
             CarveColor.canvas
                 .ignoresSafeArea()
-            placedOnPaper(PaperShape().fill(CarveColor.Paper.background))
+            Self.placedOnPaper(PaperShape().fill(CarveColor.Paper.background))
         }
     }
 
@@ -452,17 +450,21 @@ private extension CarveDetailView {
     /// 캔버스는 화면 아래 끝까지 스크롤되므로 종이 아래 여백에도 밑줄 · 필기가 지나가고, 다크에서는 그것이 어두운 책상 위에 비친다.
     /// 라이트에서는 책상과 종이가 같은 색이라 지금처럼 비치게 둔다. 양옆 여백은 칠하지 않는다 — 캔버스 스크롤 막대가 지나가는 자리다.
     /// 터치는 막지 않는다. 스크롤 · 필기는 그대로 캔버스로 간다.
-    @ViewBuilder
-    var deskCover: some View {
-        if colorScheme == .dark {
-            placedOnPaper(PaperBottomDesk().fill(CarveColor.canvas))
-                .allowsHitTesting(false)
+    /// 외관은 이 뷰가 스스로 읽는다 — `CarveDetailView` 본문을 타입 본문 길이 제한(300줄) 안에 둔다.
+    struct DeskCover: View {
+        @Environment(\.colorScheme) private var colorScheme
+
+        var body: some View {
+            if colorScheme == .dark {
+                CarveDetailView.placedOnPaper(PaperBottomDesk().fill(CarveColor.canvas))
+                    .allowsHitTesting(false)
+            }
         }
     }
 
     /// 종이 자리 — 양옆에 여백을 두고 위로는 화면 끝까지 닿는다. 바탕과 가림막이 같은 자리를 써야 경계가 맞는다.
     /// 아래쪽은 도구 팔레트 밑 안내 문구가 종이 밖(책상 위)에 오도록 비운다.
-    func placedOnPaper(_ content: some View) -> some View {
+    static func placedOnPaper(_ content: some View) -> some View {
         content
             .padding(.horizontal, CarveSpacing.medium)
             .padding(.bottom, 36)
