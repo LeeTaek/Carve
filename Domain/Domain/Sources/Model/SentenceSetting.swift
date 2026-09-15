@@ -26,13 +26,17 @@ public struct SentenceSetting: Sendable, Codable, Equatable, Hashable {
     /// 한 화면(혹은 한 절)을 구성할 때 사용할 줄 수(line count).
     public var lineCount: Int
     
+    /// 처음 실행한 사용자의 본문 설정이자 「본문 모양 초기화」 값.
+    ///
+    /// `@Shared(.appStorage("sentenceSetting"))`(`CodableAppStorageKey`)가 첫 로드 때 이 값을 저장하므로,
+    /// 값을 바꿔도 이미 앱을 실행한 사용자의 설정은 바뀌지 않는다.
     public static let initialState = SentenceSetting(
         lineSpace: 30,
         fontSize: 20,
         traking: 1,
         baseLineHeight: 20,
         textHeight: .zero,
-        fontFamily: .gothic,
+        fontFamily: .myeongjo,
         lineCount: 3
     )
     
@@ -73,10 +77,11 @@ public extension SentenceSetting {
 /// 문장 설정에서 사용할 수 있는 폰트.
 /// 실제 폰트 리소스(ResourcesFontFamily)를 매핑하여 UIKit 폰트로 변환.
 public enum FontCase: String, CaseIterable, Sendable, Codable {
-    /// 나눔고딕.
-    case gothic = "NanumGothic"
+    // 선언 순서가 `allCases` 순서라 본문 설정의 글꼴 선택지도 이 순서로 보인다. 저장값은 rawValue 라 순서와 무관하다.
     /// 나눔명조.
     case myeongjo = "NanumMyeongjo"
+    /// 나눔고딕.
+    case gothic = "NanumGothic"
     /// 나눔꽃내음.
     case flower = "NanumFlowerScent"
         

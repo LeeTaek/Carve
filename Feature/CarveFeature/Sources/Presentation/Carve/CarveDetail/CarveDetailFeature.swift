@@ -40,7 +40,8 @@ public struct CarveDetailFeature {
 
         // MARK: Phase 3 — feature flag 뒤 단일 Canvas (설계 §13 Phase 3)
 
-        /// 단일 Canvas 경로 사용 여부. 기본 off — flag off 가 §10-3 의 유일한 롤백 수단이다.
+        /// 단일 Canvas 경로 사용 여부. 기본 on(`SingleCanvasFlag.defaultValue`) — flag off 가 §10-3 의 유일한 롤백 수단이다.
+        /// 앱 시작 때 `SingleCanvasFlag.resetStoredValueOnce(in:)` 가 기존 저장값을 설치당 한 번 지워 기존 사용자도 기본값을 따른다.
         /// 설정 > 필사 캔버스 의 토글(`CanvasSettingsFeature`)이 같은 키에 쓴다. Debug 실행 인자 `-SingleCanvas` 도 같은 효과다.
         @Shared(.appStorage(SingleCanvasFlag.appStorageKey))
         public var isSingleCanvasEnabled: Bool = SingleCanvasFlag.defaultValue

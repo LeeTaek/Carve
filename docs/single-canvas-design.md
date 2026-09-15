@@ -1,6 +1,6 @@
 # CarveFeature 단일 Canvas 전환 설계
 
-> **상태 (rev.34 · 2026-09-09):** Phase 0A~3 구현 및 `develop` 병합 완료. 단일 Canvas 기본값은 **on** (`SingleCanvasFlag.defaultValue = true`)이며 사용자의 명시적 off 는 유지합니다.
+> **상태 (rev.34 · 2026-09-09):** Phase 0A~3 구현 및 `develop` 병합 완료. 단일 Canvas 기본값은 **on** (`SingleCanvasFlag.defaultValue = true`)입니다. 2026-09-15 부터 앱을 켤 때 기존 저장값을 설치당 한 번 지워 기존 사용자도 기본값을 따르게 하고(`SingleCanvasFlag.resetStoredValueOnce(in:)`), 그 뒤에 끈 값은 유지합니다.
 > **2.0.0 작업 순서와 출시 범위는 [로드맵](./release-2.0.0-roadmap.md)을 기준으로 합니다.** Phase 4(구 구조 제거)는 출시 후 안정화 과제입니다.
 > D9 의 실제 통과·미수행 범위는 [런북 §6-9 · §8-7](./phase-0a-d-device-test.md)에 남깁니다. 미보유 구기기·120Hz 검증을 출시 선행 조건으로 두지 않습니다.
 >
@@ -703,7 +703,7 @@ flag off 경로가 단일 Canvas 의 행을 읽는 규칙 (rev.17):
 | legacy (nil/1) · v2 | 무변환 | 형식 표식 불변 |
 | **v3** (첫 밑줄 원점) | `CanvasFeature.State.firstUnderlineY`(실측 첫 밑줄)만큼 내려 표시 (`displayTransform`) | 자기 형식인 **v2** 로 내리고 metadata 를 지운다. `DrawingDatabase.updateDrawing` 이 `drawingVersion` · `layoutMetadataData` 를 함께 옮긴다. 단일 Canvas 가 다음 편집 때 다시 v3 로 올린다 |
 
-설정 > 필사 캔버스 토글(`CanvasSettingsFeature`)이 `SingleCanvasFlag.appStorageKey` 에 쓰고, `CarveDetailView` 는 `usesSingleCanvas` 변화에 현재 장을 다시 불러옵니다. Debug 실행 인자 `-SingleCanvas` 는 같은 효과입니다.
+설정 > 필사 캔버스 토글(`CanvasSettingsFeature`)이 `SingleCanvasFlag.appStorageKey` 에 쓰고, `CarveDetailView` 는 `usesSingleCanvas` 변화에 현재 장을 다시 불러옵니다. Debug 실행 인자 `-SingleCanvas` 는 같은 효과입니다. 앱은 시작할 때 이 키의 기존 저장값을 설치당 한 번 지워 기존 사용자도 기본값(on)을 따르게 합니다(`SingleCanvasFlag.resetStoredValueOnce(in:)`, 2026-09-15). 그 뒤 토글로 끈 값은 유지되므로 flag off 롤백 수단은 그대로입니다.
 
 ### 10-4. BiblePageDrawing
 

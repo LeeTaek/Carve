@@ -34,6 +34,8 @@ struct CarveApp: App {
     init() {
         // 환불 · 보호자 승인 같은 거래 변경을 놓치지 않도록 가장 먼저 만든다.
         let purchaseClient = StoreKitPurchaseClient()
+        // 기존 사용자도 단일 Canvas 기본값(on)을 따르게 한다. flag 를 읽는 Store 생성보다 앞서야 하고, 설치당 한 번만 지운다.
+        SingleCanvasFlag.resetStoredValueOnce(in: .standard)
         #if DEBUG
         // 실기기 UI 테스트가 정한 장(`-UITestChapter`)에서 시작한다. 헤더 · 탐색 상태가 시작 장을 읽는 Store 생성보다 앞서야 한다.
         UITestLaunchChapter.apply()
