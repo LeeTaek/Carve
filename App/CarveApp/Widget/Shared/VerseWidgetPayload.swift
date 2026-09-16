@@ -6,7 +6,7 @@
 //  Copyright © 2026 leetaek. All rights reserved.
 //
 //  앱과 위젯이 **함께 컴파일하는 유일한 파일**이다. 위젯은 Domain · SwiftData · CloudKit · TCA 를 링크하지 않고
-//  App Group 컨테이너에 놓인 「지정 당시 사본」(작은 JSON 1 개 + 필기 PNG 1 장)만 읽는다 (WIDGET-0 §2).
+//  App Group 컨테이너에 놓인 「지정 당시 사본」(작은 JSON 1 개 + 말씀마다 필기 PNG 1 장)만 읽는다 (WIDGET-0 §2).
 //
 
 import Foundation
@@ -16,10 +16,12 @@ import OSLog
 public enum VerseWidgetSharing {
     /// 앱 · 위젯 entitlement 양쪽에 있어야 한다.
     public static let appGroupID = "group.kr.co.carve.leetaek"
-    /// 위젯이 읽는 말씀 정보.
-    public static let payloadFileName = "widget-verse.json"
-    /// 위젯이 읽는 필기 그림(PNG, 배경 없음). 필기 없는 말씀이면 없다.
-    public static let handwritingFileName = "widget-verse-handwriting.png"
+    /// 위젯이 읽는 말씀 목록.
+    public static let payloadFileName = "widget-verses.json"
+    /// 필기 그림 파일 이름의 앞머리 — 남은 그림을 찾아 지울 때 쓴다.
+    public static let handwritingPrefix = "widget-ink-"
+    /// 말씀 하나만 담던 시절(2026-09-16 첫 구현)의 파일. 새로 쓸 때 지운다.
+    static let legacyFileNames = ["widget-verse.json", "widget-verse-handwriting.png"]
     /// 위젯을 눌렀을 때 앱을 여는 URL 스킴.
     public static let deepLinkScheme = "carve"
     /// 위젯 하나뿐이라 kind 도 하나다.
@@ -47,7 +49,7 @@ public struct VerseWidgetPayload: Codable, Equatable, Sendable {
     public var translationDisplayName: String
     /// 지정 당시의 본문. 필기가 없는 말씀은 위젯이 이 글을 보여 준다.
     public var sentence: String
-    /// 지정한 시각. 설정 화면이 「언제 지정했는지」 를 보여 줄 때 쓴다.
+    /// 위젯에 담은 시각.
     public var designatedAt: Date
 
     public init(
@@ -80,6 +82,16 @@ public struct VerseWidgetPayload: Codable, Equatable, Sendable {
         "\(bookDisplayName) \(chapter):\(verse)"
     }
 
+    /// 이 말씀의 필기 그림 파일 이름.
+    ///
+    /// 절마다 따로 두어 한 말씀을 빼도 다른 말씀의 그림이 다치지 않는다.
+    /// 파일 이름에 쓸 수 없는 글자가 섞이지 않도록 ASCII 낱자와 숫자만 남긴다.
+    public var handwritingFileName: String {
+        let raw = "\(titleRawValue)-\(chapter)-\(verse)-\(translation)"
+        let safe = String(raw.map { $0.isASCII && ($0.isLetter || $0.isNumber) ? $0 : "_" })
+        return "\(VerseWidgetSharing.handwritingPrefix)\(safe).png"
+    }
+
     /// 위젯을 눌렀을 때 앱이 받는 URL.
     public var deepLinkURL: URL? {
         var components = URLComponents()
@@ -109,42 +121,63 @@ public struct VerseWidgetContent: Equatable, Sendable {
 
 /// App Group 컨테이너 읽기 · 쓰기. 앱이 쓰고 위젯이 읽는다.
 public enum VerseWidgetStore {
-    /// 표시할 말씀을 지정한다. 필기가 없으면 `handwriting` 을 nil 로 넘긴다.
-    public static func write(payload: VerseWidgetPayload, handwriting: Data?) throws {
+    /// 위젯이 돌릴 말씀을 이 목록으로 맞춘다.
+    /// - Parameters:
+    ///   - payloads: 담을 말씀들. 순서가 곧 담은 순서다.
+    ///   - handwriting: 새로 그린 필기(`handwritingFileName` → PNG). 여기에 없는 말씀은 이미 저장된 그림을 그대로 둔다.
+    public static func write(_ payloads: [VerseWidgetPayload], handwriting: [String: Data] = [:]) throws {
         guard let root = VerseWidgetSharing.containerURL else { throw VerseWidgetStoreError.containerUnavailable }
+        for (fileName, data) in handwriting {
+            try data.write(to: root.appendingPathComponent(fileName), options: .atomic)
+        }
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
-        try encoder.encode(payload).write(to: root.appendingPathComponent(VerseWidgetSharing.payloadFileName), options: .atomic)
-        let handwritingURL = root.appendingPathComponent(VerseWidgetSharing.handwritingFileName)
-        if let handwriting {
-            try handwriting.write(to: handwritingURL, options: .atomic)
-        } else {
-            // 이전 말씀의 필기가 남아 새 말씀에 붙지 않게 한다.
-            try? FileManager.default.removeItem(at: handwritingURL)
-        }
+        try encoder.encode(payloads).write(to: root.appendingPathComponent(VerseWidgetSharing.payloadFileName), options: .atomic)
+        removeUnusedFiles(in: root, keeping: Set(payloads.map(\.handwritingFileName)))
     }
 
-    /// 지금 지정된 말씀. 없으면 nil.
-    public static func read() -> VerseWidgetContent? {
+    /// 지금 담긴 말씀들. 그림은 읽지 않는다 — 위젯은 보여 줄 말씀의 그림만 따로 읽는다.
+    public static func readPayloads() -> [VerseWidgetPayload] {
         guard let root = VerseWidgetSharing.containerURL else {
             VerseWidgetSharing.logger.notice("App Group 컨테이너를 얻지 못했다")
-            return nil
+            return []
         }
         guard let json = try? Data(contentsOf: root.appendingPathComponent(VerseWidgetSharing.payloadFileName)) else {
-            return nil
+            return []
         }
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        guard let payload = try? decoder.decode(VerseWidgetPayload.self, from: json) else { return nil }
-        let handwriting = try? Data(contentsOf: root.appendingPathComponent(VerseWidgetSharing.handwritingFileName))
-        return VerseWidgetContent(payload: payload, handwriting: handwriting)
+        return (try? decoder.decode([VerseWidgetPayload].self, from: json)) ?? []
     }
 
-    /// 표시를 해제한다. 지정된 말씀이 없어도 오류가 아니다.
+    /// 그 말씀의 필기 그림. 필기 없이 담은 말씀이면 nil.
+    public static func handwriting(for payload: VerseWidgetPayload) -> Data? {
+        guard let root = VerseWidgetSharing.containerURL else { return nil }
+        return try? Data(contentsOf: root.appendingPathComponent(payload.handwritingFileName))
+    }
+
+    /// 담긴 말씀과 그림을 함께 읽는다.
+    public static func read() -> [VerseWidgetContent] {
+        readPayloads().map { VerseWidgetContent(payload: $0, handwriting: handwriting(for: $0)) }
+    }
+
+    /// 전부 뺀다. 담긴 말씀이 없어도 오류가 아니다.
     public static func clear() throws {
         guard let root = VerseWidgetSharing.containerURL else { throw VerseWidgetStoreError.containerUnavailable }
         try? FileManager.default.removeItem(at: root.appendingPathComponent(VerseWidgetSharing.payloadFileName))
-        try? FileManager.default.removeItem(at: root.appendingPathComponent(VerseWidgetSharing.handwritingFileName))
+        removeUnusedFiles(in: root, keeping: [])
+    }
+
+    /// 목록에서 빠진 말씀의 그림과 예전 구현이 남긴 파일을 지운다.
+    private static func removeUnusedFiles(in root: URL, keeping keep: Set<String>) {
+        let manager = FileManager.default
+        for name in VerseWidgetSharing.legacyFileNames {
+            try? manager.removeItem(at: root.appendingPathComponent(name))
+        }
+        let names = (try? manager.contentsOfDirectory(atPath: root.path)) ?? []
+        for name in names where name.hasPrefix(VerseWidgetSharing.handwritingPrefix) && !keep.contains(name) {
+            try? manager.removeItem(at: root.appendingPathComponent(name))
+        }
     }
 }
 

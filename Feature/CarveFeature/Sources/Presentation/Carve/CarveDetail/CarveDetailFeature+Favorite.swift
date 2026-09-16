@@ -70,13 +70,13 @@ extension CarveDetailFeature {
                 return showFavoriteNotice(state: &state, .failed(change), duration: Self.favoriteFailureNoticeDuration)
             }
             guard change.isAdding else {
-                // 해제한 말씀이 위젯에 표시 중이었다면 위젯에서도 내린다(시안 N9 와 같은 규칙).
+                // 해제한 말씀이 위젯에 담겨 있었다면 위젯에서도 뺀다(시안 N9 와 같은 규칙).
                 return .run { [widgetVerseClient] _ in
-                    guard await widgetVerseClient.selection()?.key == change.key else { return }
+                    guard await widgetVerseClient.selection().contains(change.key) else { return }
                     do {
-                        try await widgetVerseClient.clear()
+                        try await widgetVerseClient.remove(change.key)
                     } catch {
-                        Log.error("위젯 표시 해제 실패", error)
+                        Log.error("위젯에서 빼지 못했다", error)
                     }
                 }
             }

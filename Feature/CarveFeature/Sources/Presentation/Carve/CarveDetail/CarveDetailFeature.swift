@@ -73,12 +73,12 @@ public struct CarveDetailFeature {
         /// 사진 추가 권한이 꺼져 있다는 확인창(시안 G2).
         @Presents var photoPermissionAlert: AlertState<Action.PhotoPermissionAlert>?
 
-        // MARK: 위젯에 표시 (시안 N6 — `CarveDetailFeature+Widget.swift`)
+        // MARK: 위젯에 추가 (시안 N6 — `CarveDetailFeature+Widget.swift`)
 
-        /// 필사 화면 아래 위젯 표시 결과 안내. 다른 안내와 같은 자리를 나눠 쓴다.
+        /// 필사 화면 아래 위젯 결과 안내. 다른 안내와 같은 자리를 나눠 쓴다.
         var widgetNotice: WidgetNotice?
-        /// 보관하고 위젯에 지정하는 중. 같은 요청이 겹치지 않게 한다.
-        var isDisplayingOnWidget = false
+        /// 보관하고 위젯에 담는 중. 같은 요청이 겹치지 않게 한다.
+        var isAddingToWidget = false
 
         /// flag 또는 Debug 실행 인자로 단일 Canvas 를 쓸지.
         public var usesSingleCanvas: Bool {
@@ -130,7 +130,7 @@ public struct CarveDetailFeature {
         /// 사진 추가 권한 확인창.
         case photoPermissionAlert(PresentationAction<PhotoPermissionAlert>)
         /// 위젯 표시 지정이 끝났다. `addedToFavorites` 면 즐겨찾기에도 새로 담았다.
-        case widgetDisplayFinished(WidgetDisplayRequest, addedToFavorites: Bool, failed: Bool)
+        case widgetAddFinished(WidgetDisplayRequest, WidgetAddOutcome)
         /// 위젯 표시 안내를 내린다.
         case widgetNoticeExpired
         
@@ -346,9 +346,9 @@ public struct CarveDetailFeature {
                 return .send(.scope(.chapterCanvasAction(.verseMenuWidgetTapped)))
 
             case let .scope(.chapterCanvasAction(.delegate(.widgetRequested(verse, ink)))):
-                return displayVerseOnWidget(state: &state, verse: verse, ink: ink)
+                return addVerseToWidget(state: &state, verse: verse, ink: ink)
 
-            case .widgetDisplayFinished, .widgetNoticeExpired, .view(.widgetRetryTapped):
+            case .widgetAddFinished, .widgetNoticeExpired, .view(.widgetRetryTapped):
                 return reduceWidget(state: &state, action: action)
 
             case .view(.verseMenuEraseTapped):

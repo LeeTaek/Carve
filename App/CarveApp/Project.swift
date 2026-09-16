@@ -65,7 +65,12 @@ let targets: [Target] = [
     .makeWidgetExtensionTarget(
         name: "CarveWidget",
         displayName: "새기다",
-        sources: ["Widget/Sources/**", "Widget/Shared/**"],
+        sources: [
+            "Widget/Sources/**",
+            "Widget/Shared/**",
+            // 도는 순서 규칙은 Domain 이 갖고 Domain 테스트가 지킨다. 위젯은 링크하지 않고 소스로 함께 컴파일한다.
+            "../../Domain/Domain/Sources/Widget/WidgetVerseRotation.swift"
+        ],
         entitlements: .file(path: .relativeToCurrentFile("Support/CarveWidget.entitlements"))
     ),
     .makeAppTarget(

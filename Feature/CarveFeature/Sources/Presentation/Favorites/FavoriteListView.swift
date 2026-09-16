@@ -49,7 +49,7 @@ public struct FavoriteListView: View {
         }
         .animation(reduceMotion ? nil : .snappy(duration: 0.25), value: store.notice)
         .animation(reduceMotion ? nil : .snappy(duration: 0.25), value: store.favorites)
-        // 위젯에 표시 중인 말씀을 해제하기 전 확인(시안 N9).
+        // 위젯에 담긴 말씀을 해제하기 전 확인(시안 N9).
         .alert($store.scope(state: \.removeConfirm, action: \.removeConfirm))
         .task {
             send(.task)
@@ -105,7 +105,7 @@ public struct FavoriteListView: View {
                 ForEach(store.favorites) { favorite in
                     FavoriteVerseCard(
                         favorite: favorite,
-                        isOnWidget: store.widgetKey == favorite.key,
+                        isOnWidget: store.widgetKeys.contains(favorite.key),
                         onUnfavorite: { send(.unfavoriteTapped(favorite.key)) },
                         onWidget: { send(.widgetTapped(favorite.key)) },
                         onOpen: { send(.openVerseTapped(favorite.key)) }
@@ -159,7 +159,10 @@ public struct FavoriteListView: View {
                     CarveStatusMessage(.failure, message: Self.message(for: notice)) {
                         send(.noticeActionTapped)
                     }
-                case .widgetDisplayed, .widgetCleared:
+                case .widgetLimitReached:
+                    // 다시 눌러도 같은 결과다 — 버튼 없이 알리기만 한다.
+                    CarveStatusMessage(.failure, message: Self.message(for: notice))
+                case .widgetAdded, .widgetRemoved:
                     // 되돌릴 것이 없다 — 버튼 없이 알리기만 한다.
                     CarveStatusMessage(.success, message: Self.message(for: notice))
                 }
@@ -178,9 +181,10 @@ public struct FavoriteListView: View {
         case .removed: "즐겨찾기에서 해제했어요"
         case .removeFailed: "즐겨찾기를 해제하지 못했어요"
         case .restoreFailed: "즐겨찾기를 되돌리지 못했어요"
-        case .widgetDisplayed: "위젯에 표시했어요"
-        case .widgetCleared: "위젯 표시를 해제했어요"
-        case .widgetFailed: "위젯 표시를 바꾸지 못했어요"
+        case .widgetAdded: "위젯에 담았어요"
+        case .widgetRemoved: "위젯에서 뺐어요"
+        case .widgetLimitReached: "위젯에는 \(WidgetVerseLimit.maximum)개까지 담을 수 있어요"
+        case .widgetFailed: "위젯을 바꾸지 못했어요"
         }
     }
 
@@ -205,7 +209,7 @@ public struct FavoriteListView: View {
 /// 즐겨찾기 카드(시안 N4) — 권 · 장 · 절과 번역본, 추가할 때의 본문과 필기, 추가 날짜.
 private struct FavoriteVerseCard: View {
     let favorite: FavoriteVerseSnapshot
-    /// 지금 위젯에 표시 중인 말씀인가(시안 N4 배지).
+    /// 지금 위젯에 담긴 말씀인가(시안 N4 배지).
     let isOnWidget: Bool
     let onUnfavorite: () -> Void
     let onWidget: () -> Void
@@ -290,14 +294,14 @@ private struct FavoriteVerseCard: View {
         .carveSurface(.panel, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
-    /// 「위젯에 표시 중」 배지(시안 N4 · N6).
+    /// 「위젯에 담김」 배지(시안 N4 · N6).
     private var widgetBadge: some View {
         HStack(spacing: CarveSpacing.xxSmall) {
             CarveIcon.widget.image
                 .resizable()
                 .frame(width: 14, height: 14)
                 .accessibilityHidden(true)
-            Text("위젯에 표시 중")
+            Text("위젯에 담김")
                 .font(CarveTypography.label)
         }
         .foregroundStyle(CarveColor.accent)
@@ -307,12 +311,12 @@ private struct FavoriteVerseCard: View {
         .accessibilityElement(children: .combine)
     }
 
-    /// 카드 더보기(시안 N6) — 위젯 표시와 즐겨찾기 해제.
+    /// 카드 더보기(시안 N6) — 위젯에 담기와 즐겨찾기 해제.
     private var moreMenu: some View {
         Menu {
             Button(action: onWidget) {
                 Label {
-                    Text(isOnWidget ? "위젯 표시 해제" : "위젯에 표시")
+                    Text(isOnWidget ? "위젯에서 빼기" : "위젯에 추가")
                 } icon: {
                     CarveIcon.widget.image
                 }
@@ -333,7 +337,7 @@ private struct FavoriteVerseCard: View {
         .padding(.top, -CarveSpacing.xSmall)
         .padding(.trailing, -CarveSpacing.small)
         .accessibilityLabel("더보기")
-        .accessibilityHint(isOnWidget ? "위젯 표시 해제 · 즐겨찾기 해제" : "위젯에 표시 · 즐겨찾기 해제")
+        .accessibilityHint(isOnWidget ? "위젯에서 빼기 · 즐겨찾기 해제" : "위젯에 추가 · 즐겨찾기 해제")
     }
 
     private var sentence: some View {

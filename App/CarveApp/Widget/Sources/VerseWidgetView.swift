@@ -14,7 +14,6 @@ import WidgetKit
 /// 필기가 없는 말씀은 본문을 대신 보여 준다. 지정된 말씀이 없으면 고르는 방법을 안내한다.
 /// 누르면 그 절의 필사 화면으로 들어간다.
 struct VerseWidgetView: View {
-    @Environment(\.widgetFamily) private var family
     let entry: VerseWidgetEntry
 
     var body: some View {
@@ -46,9 +45,9 @@ struct VerseWidgetView: View {
             } else {
                 // 필기 없이 말씀만 즐겨찾기한 경우.
                 Text(payload.sentence)
-                    .font(.system(size: family == .systemSmall ? 13 : 15))
+                    .font(.system(size: 15))
                     .foregroundStyle(VerseWidgetPalette.ink)
-                    .lineLimit(family == .systemSmall ? 4 : 3)
+                    .lineLimit(3)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
 
@@ -63,12 +62,12 @@ struct VerseWidgetView: View {
     private var empty: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("표시할 말씀을 골라 주세요")
-                .font(.system(size: family == .systemSmall ? 14 : 16, weight: .semibold))
+                .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(VerseWidgetPalette.ink)
             Text("새기다 앱의 즐겨찾기에서 고를 수 있어요.")
                 .font(.caption2)
                 .foregroundStyle(VerseWidgetPalette.secondary)
-                .lineLimit(family == .systemSmall ? 3 : 2)
+                .lineLimit(2)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)

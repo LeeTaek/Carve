@@ -8,9 +8,10 @@
 
 import SwiftUI
 
+import Domain
 import UIComponents
 
-/// 필사 화면의 위젯 표시 결과 안내(시안 N6).
+/// 필사 화면의 위젯 담기 결과 안내(시안 N6).
 ///
 /// 즐겨찾기에 없던 절은 보관까지 했다는 것을 함께 알린다. 실패는 사라지는 안내만 두지 않고 「다시 시도」 를 함께 둔다.
 struct WidgetNoticeView: View {
@@ -27,8 +28,10 @@ struct WidgetNoticeView: View {
     @ViewBuilder
     private var content: some View {
         switch notice {
-        case .displayed:
+        case .added, .alreadyAdded:
             CarveStatusMessage(.success, message: message)
+        case .limitReached:
+            CarveStatusMessage(.failure, message: message)
         case .failed:
             CarveStatusMessage(.failure, message: message, onRetry: onRetry)
         }
@@ -36,10 +39,14 @@ struct WidgetNoticeView: View {
 
     private var message: String {
         switch notice {
-        case .displayed(let addedToFavorites):
-            addedToFavorites ? "즐겨찾기에 추가하고 위젯에 표시했어요" : "위젯에 표시했어요"
+        case .added(let addedToFavorites):
+            addedToFavorites ? "즐겨찾기에 추가하고 위젯에 담았어요" : "위젯에 담았어요"
+        case .alreadyAdded:
+            "이미 위젯에 담긴 말씀이에요"
+        case .limitReached:
+            "위젯에는 \(WidgetVerseLimit.maximum)개까지 담을 수 있어요"
         case .failed:
-            "위젯에 표시하지 못했어요"
+            "위젯에 담지 못했어요"
         }
     }
 }

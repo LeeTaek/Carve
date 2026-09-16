@@ -185,7 +185,7 @@ struct VerseMenuOverlay: View {
         case .favorite: Text(isFavorite ? "즐겨찾기 해제" : "즐겨찾기에 추가")
         case .history: Text("이전 필사 내용 보기")
         case .image: Text("이미지 저장")
-        case .widget: Text("위젯에 표시")
+        case .widget: Text("위젯에 추가")
         case .erase: Text("지우기")
         }
     }
