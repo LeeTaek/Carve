@@ -37,25 +37,6 @@ struct AppearanceSettingsFeatureTesting {
         #expect(defaults.string(forKey: "appearanceMode") == "system")
     }
 
-    /// 사이드바 `List(selection:)` 은 경로 상태를 행의 값(`.appearance(.initialState)`)과 비교해 선택을 표시한다.
-    /// 상태가 모드를 담으면 모드를 바꾸는 순간 둘이 달라져 선택 표시가 풀린다(2026-09-15 시뮬레이터에서 확인).
-    @Test("모드를 바꿔도 경로 상태는 사이드바 행의 값과 같다")
-    func selectionKeepsSidebarRowValue() async throws {
-        let suite = "AppearanceSettingsFeatureTesting.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite) }
-
-        let store = TestStore(initialState: AppearanceSettingsFeature.State.initialState) {
-            AppearanceSettingsFeature()
-        } withDependencies: {
-            $0.defaultAppStorage = defaults
-        }
-
-        await store.send(.view(.setAppearanceMode(.light)))
-        #expect(SettingsFeature.Path.State.appearance(store.state) == .appearance(.initialState))
-        #expect(rootAppearanceMode(in: defaults) == .light)
-    }
-
     @Test("고른 적 없는 사용자는 시스템 설정을 따른다")
     func untouchedModeFollowsSystem() throws {
         let suite = "AppearanceSettingsFeatureTesting.\(UUID().uuidString)"

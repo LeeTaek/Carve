@@ -13,8 +13,8 @@ import ComposableArchitecture
 /// 화면 모드 설정 — 시스템 설정 · 라이트 · 다크.
 ///
 /// 값은 `@Shared(.appearanceMode)` 에 있다. 앱 루트 화면(`AppCoordinatorView`)이 같은 키를 읽으므로 여기서 쓰면 곧바로 반영된다.
-/// ⚠️ 고른 값은 상태에 두지 않고 화면이 같은 키를 읽어 보여 준다. 상태가 모드에 따라 달라지면 `SettingsFeature.Path.State` 가
-/// 사이드바 행의 값(`.appearance(.initialState)`)과 같지 않게 되어 행 선택 표시가 풀린다. `Shared` 는 `Hashable` 도 아니다.
+/// 고른 값은 상태에 두지 않고 화면이 같은 키를 읽어 보여 준다. `SettingsFeature.Path` 가 `Hashable` 상태를 요구하고
+/// `Shared` 는 `Hashable` 이 아니기 때문이다.
 @Reducer
 public struct AppearanceSettingsFeature {
     public init() { }
