@@ -20,15 +20,20 @@ public struct CloudSettingsFeature {
     public struct State: Hashable {
         public static let initialState = Self()
         @Presents public var path: Path.State?
-        public var iCloudIsOn: Bool = true
+        /// iCloud 계정을 쓸 수 있는지. **조회 전에는 `checking`** 이며, 확인하지 않은 상태를
+        /// "연결됨" 으로 보여 주지 않는다. 이전 구현은 조작 불가능한 토글을 켜진 채로 두어
+        /// 계정이 없는 기기에서도 동기화되는 것처럼 보였다.
+        public var availability: CloudAccountAvailability = .checking
         public var isLoading: Bool = false
     }
     @Dependency(\.createSwiftDataActor) private var database
+    @Dependency(\.cloudAccountStatus) private var accountStatus
     @Dependency(\.widgetVerseClient) private var widgetVerseClient
 
     public enum Action: ViewAction {
         case path(PresentationAction<Path.Action>)
-        case setiCloud(Bool)
+        /// 계정 조회 결과가 도착했다.
+        case accountChecked(CloudAccountAvailability)
         case removeAlliCloudData
         /// 삭제가 끝났다 — 열려 있는 장에 알린다.
         case drawingDataCleared
@@ -48,13 +53,20 @@ public struct CloudSettingsFeature {
         
         public enum View {
             case databaseIsEmpty
+            /// 화면이 나타났다. 계정 상태를 **그때 조회한다** — 미리 켜 두지 않는다.
+            case onAppear
         }
     }
     public var body: some Reducer<State, Action> {
         Reduce { state, action in
             switch action {
-            case .setiCloud(let ison):
-                state.iCloudIsOn = ison
+            case .view(.onAppear):
+                state.availability = .checking
+                return .run { send in
+                    await send(.accountChecked(await accountStatus.availability()))
+                }
+            case .accountChecked(let availability):
+                state.availability = availability
             case .view(.databaseIsEmpty):
                 return .run { [widgetVerseClient] send in
                     // 「필사 데이터」 에는 즐겨찾기에 복사해 둔 필기와 위젯에 담은 말씀도 포함된다 — 셋을 함께 본다.

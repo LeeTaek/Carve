@@ -19,6 +19,47 @@ public struct CloudSettingView: View {
         self.store = store
     }
     
+    /// 계정 상태 한 줄에 쓸 문구. 아직 확인 중이면 본문이 없다.
+    private struct AccountStatusCopy {
+        let title: String
+        let detail: String
+        /// 확인 중에는 흐리게 — 아직 결론이 아니라는 뜻이다.
+        var isPending: Bool { detail.isEmpty }
+    }
+
+    private var accountStatusCopy: AccountStatusCopy {
+        switch store.availability {
+        case .checking:
+            AccountStatusCopy(title: "iCloud 상태를 확인하는 중이에요", detail: "")
+        case .available:
+            AccountStatusCopy(title: "iCloud 계정에 연결돼 있어요", detail: "필사가 같은 계정의 다른 기기로 전해져요.")
+        case .noAccount:
+            AccountStatusCopy(title: "iCloud에 로그인돼 있지 않아요", detail: "지금은 이 기기에만 저장돼요.")
+        case .restricted:
+            AccountStatusCopy(title: "iCloud 사용이 제한돼 있어요", detail: "기기 설정에서 허용해야 동기화할 수 있어요.")
+        case .unknown:
+            // 확인 실패와 "계정 없음" 을 같은 문구로 쓰지 않는다.
+            AccountStatusCopy(title: "iCloud 상태를 확인하지 못했어요", detail: "계정이 없다는 뜻은 아니에요. 잠시 뒤 다시 열어 보세요.")
+        }
+    }
+
+    /// 지금 확인된 계정 상태 한 줄. **확인 전에는 연결됐다고 쓰지 않는다.**
+    @ViewBuilder
+    private var accountStatusRow: some View {
+        let copy = accountStatusCopy
+        VStack(alignment: .leading, spacing: CarveSpacing.xSmall) {
+            Text(copy.title)
+                .font(CarveTypography.body)
+                .foregroundStyle(copy.isPending ? CarveColor.secondary : CarveColor.ink)
+            if !copy.detail.isEmpty {
+                Text(copy.detail)
+                    .font(CarveTypography.caption)
+                    .foregroundStyle(CarveColor.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     public var body: some View {
         ZStack {
             ScrollView {
@@ -27,20 +68,17 @@ public struct CloudSettingView: View {
                         .font(CarveTypography.sectionTitle)
                         .foregroundStyle(CarveColor.secondary)
 
-                    CarveSettingsRow(
-                        "iCloud를 저장공간으로 사용",
-                        description: "항상 켜져 있어요. 끄기는 설정 앱에서 할 수 있어요.",
-                        isOn: $store.iCloudIsOn.sending(\.setiCloud)
-                    )
-                    .disabled(true)
+                    // 조작할 수 없는 토글을 켜 둔 채로 보여 주지 않는다. 지금 확인된 계정 상태를 그대로 적는다.
+                    accountStatusRow
 
                     CarveDivider()
 
                     VStack(alignment: .leading, spacing: CarveSpacing.xSmall) {
-                        Text("필사한 내용을 개인 iCloud 계정에 백업해요.")
+                        Text("필사한 내용을 iCloud로 기기 사이에 동기화해요.")
                             .foregroundStyle(CarveColor.ink)
-                        Text("쓰지 않으면 앱을 지울 때 필사도 함께 사라져요.")
-                        Text("끄기는 다음 업데이트에서 제공할 예정이에요.")
+                        // 동기화를 백업이라고 부르지 않는다 — 지운 것도 함께 전해진다.
+                        Text("백업과는 달라요. 한 기기에서 지우면 다른 기기에서도 사라져요.")
+                        Text("iCloud 사용 여부는 기기의 설정 앱에서 바꿀 수 있어요.")
                     }
                     .font(CarveTypography.body)
                     .foregroundStyle(CarveColor.secondary)
@@ -85,6 +123,7 @@ public struct CloudSettingView: View {
             }
         }
         .disabled(store.isLoading)
+        .onAppear { send(.onAppear) }
         // 시안 F2 는 확인 대화상자를 화면 가운데에 띄우고 뒤를 가린다. 팝오버는 버튼에 붙어 한쪽으로 뜨므로
         // 전체를 덮는 표현으로 바꾼다 — 바탕은 `PopupView` 가 직접 그린다.
         .fullScreenCover(item: $store.scope(state: \.path?.popup, action: \.path.popup)) { store in
