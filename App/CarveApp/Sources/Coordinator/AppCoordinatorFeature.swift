@@ -6,6 +6,7 @@
 //  Copyright © 2024 leetaek. All rights reserved.
 //
 
+import Domain
 import SwiftUI
 import CarveFeature
 import ChartFeature
@@ -29,6 +30,8 @@ public struct AppCoordinatorFeature {
         @Shared(.appStorage("lastSeenAppVersion")) public var lastSeenAppVersion: String?
         /// 루트 화면 위에 Push될 화면 Path. (스택 기반)
         public var path: StackState<Path.State> = .init()
+        /// 위젯을 눌러 앱이 시작됐을 때 필사 화면이 준비되면 이동할 절.
+        var pendingWidgetVerse: BibleVerse?
         // analytics key
         public var currentScreenKey: String {
             if settings != nil {
@@ -64,6 +67,8 @@ public struct AppCoordinatorFeature {
         case settings(PresentationAction<SettingsFeature.Action>)
         /// Path와 관련된 프레젠테이션 액션.
         case path(StackActionOf<Path>)
+        /// 위젯 등 외부에서 앱을 열었다.
+        case openedURL(URL)
     }
     
     @Reducer
@@ -83,6 +88,13 @@ public struct AppCoordinatorFeature {
         case favorites(FavoriteListFeature)
     }
     
+    /// 위젯이 넘긴 URL 의 절. 앱이 아는 권이 아니면 nil.
+    static func verse(from url: URL) -> BibleVerse? {
+        guard let link = VerseWidgetDeepLink.parse(url),
+              let title = BibleTitle(rawValue: link.titleRawValue) else { return nil }
+        return BibleVerse(title: BibleChapter(title: title, chapter: link.chapter), verse: link.verse, sentence: "")
+    }
+
     public var body: some Reducer<State, Action> {
         /// 자식 Feature에서 올라오는 액션을 기반으로 루트 화면 전환을 수행하는 Reducer.
         /// - Note: LaunchProgress의 `.syncCompleted`, Carve의 `.moveToSetting,
@@ -97,7 +109,24 @@ public struct AppCoordinatorFeature {
                 if let previousVersion, previousVersion != currentVersion {
                     state.patchnote = .initialState
                 }
+                // 위젯을 눌러 시작했다면 필사 화면이 준비된 지금 그 절로 간다.
+                if let verse = state.pendingWidgetVerse {
+                    state.pendingWidgetVerse = nil
+                    return .send(.root(.presented(.carve(.moveToVerse(verse)))))
+                }
                 
+            case .openedURL(let url):
+                guard let verse = Self.verse(from: url) else { break }
+                // 위젯에서 들어왔다 — 설정 · 다른 화면을 닫고 그 절을 연다.
+                state.settings = nil
+                state.path.removeAll()
+                guard case .some(.carve) = state.root else {
+                    // 아직 준비 화면이다. 필사 화면이 뜨면 그때 이동한다.
+                    state.pendingWidgetVerse = verse
+                    break
+                }
+                return .send(.root(.presented(.carve(.moveToVerse(verse)))))
+
             case .root(.presented(.carve(.view(.moveToSetting)))):
                 state.settings = .initialState
                 

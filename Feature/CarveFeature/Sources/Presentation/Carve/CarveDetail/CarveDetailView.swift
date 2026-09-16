@@ -463,6 +463,7 @@ private extension CarveDetailView {
                 onFavorite: { send(.verseMenuFavoriteTapped) },
                 onHistory: { send(.verseMenuHistoryTapped) },
                 onImage: { send(.verseMenuImageTapped) },
+                onWidget: { send(.verseMenuWidgetTapped) },
                 onErase: { send(.verseMenuEraseTapped) },
                 onDismiss: { send(.verseMenuDismissed) }
             )
@@ -484,6 +485,11 @@ private extension CarveDetailView {
                     send(.imageSaveRetryTapped)
                 }
                 .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+            } else if let notice = store.widgetNotice {
+                WidgetNoticeView(notice: notice) {
+                    send(.widgetRetryTapped)
+                }
+                .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
             }
         }
         .frame(maxWidth: .infinity, alignment: store.headerState.isLeftHanded ? .leading : .trailing)
@@ -491,6 +497,7 @@ private extension CarveDetailView {
         .padding(.bottom, favoriteNoticeBottomInset)
         .animation(reduceMotion ? .easeOut(duration: 0.12) : .snappy(duration: 0.25), value: store.favoriteNotice)
         .animation(reduceMotion ? .easeOut(duration: 0.12) : .snappy(duration: 0.25), value: store.imageSaveNotice)
+        .animation(reduceMotion ? .easeOut(duration: 0.12) : .snappy(duration: 0.25), value: store.widgetNotice)
         // 사진 추가 권한이 꺼져 있으면 어디서 켜는지 알린다(시안 G2). 결과 안내와 같은 자리에서 띄운다.
         .alert($store.scope(state: \.photoPermissionAlert, action: \.photoPermissionAlert))
     }

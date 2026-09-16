@@ -18,7 +18,7 @@ import UIComponents
 /// 항목은 할 수 있을 때만 둔다(UI-2) — 「이전 필사 내용 보기」 는 지난 회차가 있을 때, 「지우기」 는 획이 있을 때.
 /// 「즐겨찾기에 추가」 는 늘 첫 항목이고, 이미 즐겨찾기한 절이면 채운 별과 「즐겨찾기 해제」 로 바뀐다(시안 N1).
 /// 「이미지 저장」 은 절만 찾으면 늘 할 수 있다 — 필기가 없으면 본문만 담는다(시안 G1, 2026-09-15 결정).
-/// 「위젯에 표시」 는 기능이 붙기 전까지 **비활성**으로 보인다.
+/// 「위젯에 표시」 도 늘 할 수 있다 — 즐겨찾기에 없는 절은 지금 모습을 즐겨찾기에 보관하고 위젯 대상으로 삼는다(시안 N6, 2026-09-16 결정).
 struct VerseMenuOverlay: View {
     let menu: ChapterCanvasVerseMenu
     /// 롱탭한 절이 이미 즐겨찾기에 있는가.
@@ -26,6 +26,7 @@ struct VerseMenuOverlay: View {
     let onFavorite: () -> Void
     let onHistory: () -> Void
     let onImage: () -> Void
+    let onWidget: () -> Void
     let onErase: () -> Void
     let onDismiss: () -> Void
 
@@ -131,33 +132,30 @@ struct VerseMenuOverlay: View {
     }
 
     private func row(_ item: Item) -> some View {
-        let isEnabled = item != .widget
         let color = item == .erase ? CarveColor.danger : CarveColor.ink
         return Button {
             switch item {
             case .favorite: onFavorite()
             case .history: onHistory()
             case .image: onImage()
+            case .widget: onWidget()
             case .erase: onErase()
-            case .widget: break
             }
         } label: {
             HStack(spacing: CarveSpacing.medium) {
                 icon(item).image
-                    // 즐겨찾기 별만 강조색이다(시안 N1). 비활성 항목은 흐린 잉크를 그대로 따른다.
-                    .foregroundStyle(item == .favorite ? CarveColor.accent : (isEnabled ? color : CarveColor.ink.opacity(0.35)))
+                    // 즐겨찾기 별만 강조색이다(시안 N1).
+                    .foregroundStyle(item == .favorite ? CarveColor.accent : color)
                 title(item)
                     .font(CarveTypography.body)
                 Spacer(minLength: 0)
             }
-            .foregroundStyle(isEnabled ? color : CarveColor.ink.opacity(0.35))
+            .foregroundStyle(color)
             .padding(.horizontal, CarveSpacing.medium + CarveSpacing.xxSmall)
             .frame(minHeight: Self.rowHeight)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .disabled(!isEnabled)
-        .accessibilityHint(isEnabled ? "" : "준비 중인 기능이에요")
         .accessibilityIdentifier(identifier(item))
     }
 

@@ -121,11 +121,13 @@ extension CarveDetailFeature {
     }
 
     private func showImageSaveNotice(state: inout State, _ notice: ImageSaveNotice, duration: Duration) -> Effect<Action> {
-        // 안내 자리는 하나다 — 즐겨찾기 안내가 떠 있으면 내린다.
+        // 안내 자리는 하나다 — 다른 안내가 떠 있으면 내린다.
         state.favoriteNotice = nil
+        state.widgetNotice = nil
         state.imageSaveNotice = notice
         return .merge(
             .cancel(id: CancelID.favoriteNotice),
+            .cancel(id: CancelID.widgetNotice),
             .run { [clock] send in
                 try await clock.sleep(for: duration)
                 await send(.imageSaveNoticeExpired)

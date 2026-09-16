@@ -69,7 +69,17 @@ extension CarveDetailFeature {
                 setFavoriteMark(state: &state, key: change.key, isFavorite: !change.isAdding)
                 return showFavoriteNotice(state: &state, .failed(change), duration: Self.favoriteFailureNoticeDuration)
             }
-            guard change.isAdding else { return .none }
+            guard change.isAdding else {
+                // 해제한 말씀이 위젯에 표시 중이었다면 위젯에서도 내린다(시안 N9 와 같은 규칙).
+                return .run { [widgetVerseClient] _ in
+                    guard await widgetVerseClient.selection()?.key == change.key else { return }
+                    do {
+                        try await widgetVerseClient.clear()
+                    } catch {
+                        Log.error("위젯 표시 해제 실패", error)
+                    }
+                }
+            }
             return showFavoriteNotice(state: &state, .added, duration: Self.favoriteAddedNoticeDuration)
 
         case .favoriteNoticeExpired:
@@ -157,11 +167,13 @@ extension CarveDetailFeature {
     }
 
     private func showFavoriteNotice(state: inout State, _ notice: FavoriteNotice, duration: Duration) -> Effect<Action> {
-        // 안내 자리는 하나다 — 이미지 저장 안내가 떠 있으면 내린다.
+        // 안내 자리는 하나다 — 다른 안내가 떠 있으면 내린다.
         state.imageSaveNotice = nil
+        state.widgetNotice = nil
         state.favoriteNotice = notice
         return .merge(
             .cancel(id: CancelID.imageSaveNotice),
+            .cancel(id: CancelID.widgetNotice),
             .run { [clock] send in
                 try await clock.sleep(for: duration)
                 await send(.favoriteNoticeExpired)

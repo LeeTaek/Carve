@@ -54,6 +54,7 @@ public struct SettingsView: View {
                 NavigationLink(value: SettingsFeature.Path.State.canvas(.initialState)) {
                     sidebarRow("필사 캔버스", value: "단일")
                 }
+                NavigationLink("위젯", value: SettingsFeature.Path.State.widget(.initialState))
             }
             Section("저장") {
                 NavigationLink(value: SettingsFeature.Path.State.iCloud(.initialState)) {
@@ -123,6 +124,10 @@ public struct SettingsView: View {
         case .canvas:
             if let store = store.scope(state: \.path?.canvas, action: \.path.canvas) {
                 CanvasSettingsView(store: store)
+            }
+        case .widget:
+            if let store = store.scope(state: \.path?.widget, action: \.path.widget) {
+                WidgetSettingsView(store: store)
             }
         case .help:
             if let store = store.scope(state: \.path?.help, action: \.path.help) {

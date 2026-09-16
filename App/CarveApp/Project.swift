@@ -61,11 +61,20 @@ let targets: [Target] = [
         sources: ["UITests/**"],
         dependencies: [.target(name: projectName)]
     ),
+    // 위젯(시안 N6~N9). 앱이 이 타깃에 의존해야 Tuist 가 PlugIns 에 임베드한다 (WIDGET-0 §1).
+    .makeWidgetExtensionTarget(
+        name: "CarveWidget",
+        displayName: "새기다",
+        sources: ["Widget/Sources/**", "Widget/Shared/**"],
+        entitlements: .file(path: .relativeToCurrentFile("Support/CarveWidget.entitlements"))
+    ),
     .makeAppTarget(
         name: projectName,
+        // 위젯과 함께 컴파일하는 공유 페이로드. 위젯은 Domain · SwiftData 를 링크하지 않는다.
+        sources: ["Sources/**", "Widget/Shared/**"],
         entitlements: .file(path: .relativeToCurrentFile("Support/Carve.entitlements")),
         scripts: script,
-        dependencies: dependencies,
+        dependencies: dependencies + [.target(name: "CarveWidget")],
         // Asset.xcassets 에 AccentColor 색상 세트가 없어서 actool 경고가 난다. 기본 틴트를 쓴다.
         // tuist 가 타깃 레벨에 기본값을 넣으므로 프로젝트 base 가 아니라 여기서 비워야 먹는다.
         settings: .settings(base: ["ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME": ""]),

@@ -95,6 +95,13 @@ extension ChapterCanvasFeature {
                 inkData: ink
             ))))
 
+        case .verseMenuWidgetTapped:
+            guard let menu = state.verseMenu, menu.availability.canFavorite else { return .none }
+            state.verseMenu = nil
+            // 즐겨찾기에 없는 절이면 부모가 지금 필기 그대로 보관한 뒤 위젯 대상으로 삼는다(시안 N6).
+            let widgetInk = Self.currentInk(verse: menu.verse, state: state)
+            return .send(.delegate(.widgetRequested(verse: menu.verse, ink: widgetInk)))
+
         case .verseMenuEraseTapped:
             guard let menu = state.verseMenu, menu.availability.canErase else { return .none }
             state.verseMenu = nil

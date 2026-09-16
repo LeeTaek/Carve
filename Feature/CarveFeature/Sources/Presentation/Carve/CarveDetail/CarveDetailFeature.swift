@@ -73,6 +73,13 @@ public struct CarveDetailFeature {
         /// 사진 추가 권한이 꺼져 있다는 확인창(시안 G2).
         @Presents var photoPermissionAlert: AlertState<Action.PhotoPermissionAlert>?
 
+        // MARK: 위젯에 표시 (시안 N6 — `CarveDetailFeature+Widget.swift`)
+
+        /// 필사 화면 아래 위젯 표시 결과 안내. 다른 안내와 같은 자리를 나눠 쓴다.
+        var widgetNotice: WidgetNotice?
+        /// 보관하고 위젯에 지정하는 중. 같은 요청이 겹치지 않게 한다.
+        var isDisplayingOnWidget = false
+
         /// flag 또는 Debug 실행 인자로 단일 Canvas 를 쓸지.
         public var usesSingleCanvas: Bool {
             #if DEBUG
@@ -99,6 +106,7 @@ public struct CarveDetailFeature {
     @Dependency(\.verseImageRenderer) var verseImageRenderer
     @Dependency(\.photoLibraryClient) var photoLibraryClient
     @Dependency(\.openURL) var openURL
+    @Dependency(\.widgetVerseClient) var widgetVerseClient
     
     public enum Action: ViewAction, CarveToolkit.ScopeAction {
         /// 화면 최상단으로 스크롤
@@ -121,6 +129,10 @@ public struct CarveDetailFeature {
         case imageSaveNoticeExpired
         /// 사진 추가 권한 확인창.
         case photoPermissionAlert(PresentationAction<PhotoPermissionAlert>)
+        /// 위젯 표시 지정이 끝났다. `addedToFavorites` 면 즐겨찾기에도 새로 담았다.
+        case widgetDisplayFinished(WidgetDisplayRequest, addedToFavorites: Bool, failed: Bool)
+        /// 위젯 표시 안내를 내린다.
+        case widgetNoticeExpired
         
         case view(View)
         case scope(ScopeAction)
@@ -177,6 +189,10 @@ public struct CarveDetailFeature {
             case verseMenuImageTapped
             /// 이미지 저장 실패 안내의 다시 시도
             case imageSaveRetryTapped
+            /// 절 메뉴의 위젯에 표시
+            case verseMenuWidgetTapped
+            /// 위젯 표시 실패 안내의 다시 시도
+            case widgetRetryTapped
             /// 절 메뉴의 지우기
             case verseMenuEraseTapped
             /// 절 메뉴 닫기
@@ -207,6 +223,8 @@ public struct CarveDetailFeature {
         case favoriteNotice
         /// 이미지 저장 결과 안내의 자동 닫힘
         case imageSaveNotice
+        /// 위젯 표시 안내의 자동 닫힘
+        case widgetNotice
     }
     
     
@@ -323,6 +341,15 @@ public struct CarveDetailFeature {
 
             case .verseImageSaveFinished, .imageSaveNoticeExpired, .photoPermissionAlert, .view(.imageSaveRetryTapped):
                 return reduceVerseImage(state: &state, action: action)
+
+            case .view(.verseMenuWidgetTapped):
+                return .send(.scope(.chapterCanvasAction(.verseMenuWidgetTapped)))
+
+            case let .scope(.chapterCanvasAction(.delegate(.widgetRequested(verse, ink)))):
+                return displayVerseOnWidget(state: &state, verse: verse, ink: ink)
+
+            case .widgetDisplayFinished, .widgetNoticeExpired, .view(.widgetRetryTapped):
+                return reduceWidget(state: &state, action: action)
 
             case .view(.verseMenuEraseTapped):
                 return .send(.scope(.chapterCanvasAction(.verseMenuEraseTapped)))

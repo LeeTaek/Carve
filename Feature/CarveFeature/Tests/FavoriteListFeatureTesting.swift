@@ -56,6 +56,8 @@ struct FavoriteListFeatureTesting {
         let store = makeStore(spy: spy)
 
         await store.send(.view(.task))
+        // 배지를 정하는 조회가 먼저 온다(위젯에 표시 중인 말씀 없음).
+        await store.receive(\.widgetSelectionLoaded)
         await store.receive(\.favoritesLoaded) {
             $0.favorites = [Self.newer, Self.older]
             $0.hasLoaded = true
@@ -71,6 +73,7 @@ struct FavoriteListFeatureTesting {
         let store = makeStore(spy: spy)
 
         await store.send(.view(.task))
+        await store.receive(\.widgetSelectionLoaded)
         await store.receive(\.favoritesLoaded) {
             $0.hasLoaded = true
             $0.loadFailed = true

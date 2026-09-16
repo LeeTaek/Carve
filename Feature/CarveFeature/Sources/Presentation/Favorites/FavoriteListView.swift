@@ -49,6 +49,8 @@ public struct FavoriteListView: View {
         }
         .animation(reduceMotion ? nil : .snappy(duration: 0.25), value: store.notice)
         .animation(reduceMotion ? nil : .snappy(duration: 0.25), value: store.favorites)
+        // 위젯에 표시 중인 말씀을 해제하기 전 확인(시안 N9).
+        .alert($store.scope(state: \.removeConfirm, action: \.removeConfirm))
         .task {
             send(.task)
         }
@@ -103,7 +105,9 @@ public struct FavoriteListView: View {
                 ForEach(store.favorites) { favorite in
                     FavoriteVerseCard(
                         favorite: favorite,
+                        isOnWidget: store.widgetKey == favorite.key,
                         onUnfavorite: { send(.unfavoriteTapped(favorite.key)) },
+                        onWidget: { send(.widgetTapped(favorite.key)) },
                         onOpen: { send(.openVerseTapped(favorite.key)) }
                     )
                     .transition(.opacity)
@@ -151,10 +155,13 @@ public struct FavoriteListView: View {
                     CarveStatusMessage(.success, message: Self.message(for: notice), retryTitle: "실행 취소") {
                         send(.noticeActionTapped)
                     }
-                case .removeFailed, .restoreFailed:
+                case .removeFailed, .restoreFailed, .widgetFailed:
                     CarveStatusMessage(.failure, message: Self.message(for: notice)) {
                         send(.noticeActionTapped)
                     }
+                case .widgetDisplayed, .widgetCleared:
+                    // 되돌릴 것이 없다 — 버튼 없이 알리기만 한다.
+                    CarveStatusMessage(.success, message: Self.message(for: notice))
                 }
             }
             .padding(.horizontal, CarveSpacing.large)
@@ -171,6 +178,9 @@ public struct FavoriteListView: View {
         case .removed: "즐겨찾기에서 해제했어요"
         case .removeFailed: "즐겨찾기를 해제하지 못했어요"
         case .restoreFailed: "즐겨찾기를 되돌리지 못했어요"
+        case .widgetDisplayed: "위젯에 표시했어요"
+        case .widgetCleared: "위젯 표시를 해제했어요"
+        case .widgetFailed: "위젯 표시를 바꾸지 못했어요"
         }
     }
 
@@ -195,7 +205,10 @@ public struct FavoriteListView: View {
 /// 즐겨찾기 카드(시안 N4) — 권 · 장 · 절과 번역본, 추가할 때의 본문과 필기, 추가 날짜.
 private struct FavoriteVerseCard: View {
     let favorite: FavoriteVerseSnapshot
+    /// 지금 위젯에 표시 중인 말씀인가(시안 N4 배지).
+    let isOnWidget: Bool
     let onUnfavorite: () -> Void
+    let onWidget: () -> Void
     let onOpen: () -> Void
 
     var body: some View {
@@ -214,6 +227,10 @@ private struct FavoriteVerseCard: View {
 
                 Spacer(minLength: 0)
 
+                if isOnWidget {
+                    widgetBadge
+                }
+
                 // 채운 별이 곧 44pt 해제 버튼이다(시안 N4). 터치 영역 여백만큼 카드 모서리 쪽으로 붙인다.
                 Button(action: onUnfavorite) {
                     CarveIcon.starFill.image
@@ -223,8 +240,9 @@ private struct FavoriteVerseCard: View {
                 }
                 .buttonStyle(.plain)
                 .padding(.top, -CarveSpacing.xSmall)
-                .padding(.trailing, -CarveSpacing.small)
                 .accessibilityLabel("즐겨찾기 해제")
+
+                moreMenu
             }
 
             // 가로가 넉넉하면 본문 | 필기 두 열(시안), 좁은 창에서는 위아래로 둔다.
@@ -270,6 +288,52 @@ private struct FavoriteVerseCard: View {
         .padding(.horizontal, CarveSpacing.large)
         .padding(.vertical, CarveSpacing.medium)
         .carveSurface(.panel, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    /// 「위젯에 표시 중」 배지(시안 N4 · N6).
+    private var widgetBadge: some View {
+        HStack(spacing: CarveSpacing.xxSmall) {
+            CarveIcon.widget.image
+                .resizable()
+                .frame(width: 14, height: 14)
+                .accessibilityHidden(true)
+            Text("위젯에 표시 중")
+                .font(CarveTypography.label)
+        }
+        .foregroundStyle(CarveColor.accent)
+        .padding(.horizontal, CarveSpacing.small)
+        .padding(.vertical, CarveSpacing.xxSmall)
+        .background(CarveColor.selected, in: Capsule())
+        .accessibilityElement(children: .combine)
+    }
+
+    /// 카드 더보기(시안 N6) — 위젯 표시와 즐겨찾기 해제.
+    private var moreMenu: some View {
+        Menu {
+            Button(action: onWidget) {
+                Label {
+                    Text(isOnWidget ? "위젯 표시 해제" : "위젯에 표시")
+                } icon: {
+                    CarveIcon.widget.image
+                }
+            }
+            Button(role: .destructive, action: onUnfavorite) {
+                Label {
+                    Text("즐겨찾기 해제")
+                } icon: {
+                    CarveIcon.starFill.image
+                }
+            }
+        } label: {
+            CarveIcon.more.image
+                .foregroundStyle(CarveColor.secondary)
+                .frame(width: CarveSize.minimumHitTarget, height: CarveSize.minimumHitTarget)
+                .contentShape(Rectangle())
+        }
+        .padding(.top, -CarveSpacing.xSmall)
+        .padding(.trailing, -CarveSpacing.small)
+        .accessibilityLabel("더보기")
+        .accessibilityHint(isOnWidget ? "위젯 표시 해제 · 즐겨찾기 해제" : "위젯에 표시 · 즐겨찾기 해제")
     }
 
     private var sentence: some View {
