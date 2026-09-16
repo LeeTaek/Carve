@@ -146,6 +146,8 @@ public struct ChapterCanvasFeature {
         // §8-3 저장 대기열
         var pendingMutations: [BibleDrawingRowID: PendingDrawingMutation] = [:]
         var saveStatus: SaveStatus = .idle
+        /// 성공 없이 이어진 저장 실패 횟수. 재시도가 `.saving` 을 거치므로 `saveStatus` 만으로는 누적되지 않아 따로 센다.
+        var consecutiveSaveFailures = 0
         /// 지금 저장 중인 batch 의 rowID → revision. 성공 시 같은 revision 인 항목만 제거한다 (§8-3 5번).
         var inFlightBatch: [BibleDrawingRowID: Int] = [:]
         /// 지금 저장 중인 batch 의 내용과 장. 성공하면 `loadedDrawings` 에 겹쳐 DB 내용을 따라가게 한다.

@@ -26,6 +26,7 @@ extension ChapterCanvasFeature {
         state.editQueue = []
         state.isPreparingEdit = false
         state.saveStatus = .idle
+        state.consecutiveSaveFailures = 0
         state.retiredSession = nil
         // 활성 행도 사라졌다 — 다음 편집은 새 행(create)으로 가야 한다.
         state.activeRowIDs = [:]

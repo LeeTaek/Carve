@@ -691,8 +691,10 @@ struct ChapterCanvasGenerationTesting {
         }
         #expect(!store.state.isInputEnabled)
         await store.receive(\.saveFinished) {
-            // retryCount 는 `.saving` 을 거치며 1 로 돌아온다 (기존 동작 — 재시도 횟수는 로그용이다).
-            $0.saveStatus = .failed(revision: 1, retryCount: 1)
+            // 성공 없이 두 번째 실패다. 재시도가 `.saving` 을 거쳐도 누적된다 — 화면이 반복 실패를 구분하는 근거다.
+            // (이전에는 늘 1 로 돌아와 "로그용" 으로만 쓰였다.)
+            $0.saveStatus = .failed(revision: 1, retryCount: 2)
+            $0.consecutiveSaveFailures = 2
             // 이전 구현은 여기서 isReloading 이 영원히 true — 입력이 잠긴 채 재시도할 편집도 생기지 않았다.
             $0.isReloading = false
             $0.renderedRevision = 3

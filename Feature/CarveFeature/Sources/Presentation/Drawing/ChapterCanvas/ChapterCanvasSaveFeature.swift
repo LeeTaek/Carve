@@ -96,9 +96,10 @@ extension ChapterCanvasFeature {
         state.inFlightChapter = nil
 
         if let failure {
-            let retryCount: Int
-            if case .failed(_, let previous) = state.saveStatus { retryCount = previous + 1 } else { retryCount = 1 }
-            state.saveStatus = .failed(revision: revision, retryCount: retryCount)
+            // 이전 구현은 직전 상태가 `.failed` 일 때만 +1 했다. 재시도는 항상 `.saving` 을 거치므로 값이 **늘 1** 이었다 —
+            // 로그용일 때는 무해했지만 화면이 반복 실패를 구분하려면 실제로 누적돼야 한다.
+            state.consecutiveSaveFailures += 1
+            state.saveStatus = .failed(revision: revision, retryCount: state.consecutiveSaveFailures)
             Log.error("단일 Canvas 저장 실패 — 큐 보존, 다음 편집/flush 에서 재시도", "\(failure)", "revision=\(revision)")
             if state.reloadWhenSettled {
                 // 재합성이 저장 완료를 기다리는 중이다. 입력을 잠근 채 두면 재시도할 편집 자체가 생기지 않는다 —
@@ -123,6 +124,7 @@ extension ChapterCanvasFeature {
             state.loadedDrawings = overlay(loaded, with: mutations)
         }
         state.persistedRevision = max(state.persistedRevision, revision)
+        state.consecutiveSaveFailures = 0
         state.saveStatus = .idle
         return startSaveIfPossible(state: &state, allowRetry: false)
     }
