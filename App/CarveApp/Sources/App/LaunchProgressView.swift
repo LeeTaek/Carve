@@ -33,7 +33,7 @@ struct LaunchProgressView: View {
                             x: geometry.size.width / 2,
                             y: (geometry.size.height) / 2 * 0.8
                         )
-                    if !(store.syncState == .failed || store.syncState == .syncCompleted) {
+                    if store.syncState.isInProgress {
                         ProgressView()
                             .tint(.gray)
                             .frame(width: 150)
@@ -66,17 +66,35 @@ struct LaunchProgressView: View {
             statusText("데이터 동기화 중...")
         case .migration:
             statusText("데이터 마이그레이션 중...\n조금만 기다려주세요.")
-        case .failed:
-            Text("❗️iCloud에서 데이터를 가져오는데 실패했습니다.\n네트워크를 확인해주세요.")
-                .font(.subheadline)
-                .foregroundColor(.red)
-                .multilineTextAlignment(.center)
+        case .stillWaiting:
+            // 실패가 아니다. 관찰은 계속되고 원격 필사가 나중에 도착할 수 있다 (정책 §3-2).
+            statusText("기존 필사를 확인하는 데 시간이 걸리고 있어요.\n먼저 시작해도 나중에 나타날 수 있어요.")
+        case .failed(let reason):
+            failureText(reason)
         case .syncCompleted:
             statusText("데이터 동기화 완료")
         default: EmptyView()
         }
     }
     
+    /// 확인된 오류의 안내. **원인과 무관한 문구를 쓰지 않는다** — 계정 문제에 "네트워크를 확인" 이라고
+    /// 말하면 사용자가 고칠 수 없는 곳을 보게 된다.
+    @ViewBuilder
+    private func failureText(_ reason: CloudSyncFailure) -> some View {
+        let message = switch reason {
+        case .accountUnavailable:
+            "iCloud 계정을 확인해 주세요.\n지금은 이 기기에만 저장돼요."
+        case .importFailed:
+            "iCloud에서 필사를 가져오다 문제가 생겼어요.\n지금은 이 기기에만 저장돼요."
+        case .unknown:
+            "iCloud 연결을 확인하지 못했어요.\n지금은 이 기기에만 저장돼요."
+        }
+        Text(message)
+            .font(.subheadline)
+            .foregroundColor(.red)
+            .multilineTextAlignment(.center)
+    }
+
     /// 공통 상태 메시지 스타일(폰트/색상/정렬)을 적용하는 헬퍼 뷰.
     @ViewBuilder
     private func statusText(_ message: String) -> some View {

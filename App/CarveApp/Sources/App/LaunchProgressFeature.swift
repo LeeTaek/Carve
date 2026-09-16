@@ -65,18 +65,15 @@ public struct LaunchProgressFeature {
             case .updateSyncState(let syncState):
                 state.syncState = syncState
                 switch syncState {
-                case .failed:
+                case .failed, .stillWaiting, .syncCompleted:
+                    // 셋 다 "이 화면을 떠난다" 는 같지만 **안내 문구가 다르다**.
+                    // 특히 `stillWaiting` 은 실패가 아니라 기다리는 중이며, 원격 필사가 나중에 도착할 수 있다.
                     return .run { send in
                         try? await Task.sleep(nanoseconds: 1_500_000_000)
                         await send(.syncCompleted)
                     }
                 case .migrationCompleted:
                     return .send(.view(.setMigratioinAlert(true)))
-                case .syncCompleted:
-                    return .run { send in
-                        try? await Task.sleep(nanoseconds: 1_500_000_000)
-                        await send(.syncCompleted)
-                    }
                 default: break
                 }
             case .view(.setMigratioinAlert(let isShow)):
