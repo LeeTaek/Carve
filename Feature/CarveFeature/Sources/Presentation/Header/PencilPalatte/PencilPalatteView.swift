@@ -16,7 +16,8 @@ import UIComponents
 /// 펼친 도구 팔레트의 한 줄(시안 M2 · J1). 504 × 64 안에 펜 · 지우개 · 올가미 | 굵기 | 색 셋 | 실행 취소 · 다시 실행.
 ///
 /// 펜 칸 하나가 연필 · 펜 · 형광펜을 대표한다 — 길게 누르면 잉크를 고르고, 지우개에서 누르면 마지막 잉크로 돌아간다.
-/// 올가미는 캔버스에 연결하기 전까지 비활성이다. 표면(유리)은 `PencilPalatteDockView` 가 깐다.
+/// 올가미는 선택한 필기를 옮기는 도구다 — 잉크 종류가 아니라 `isLassoSelected` 가 펜 · 지우개보다 우선한다 (올가미 설계 §4-1).
+/// 표면(유리)은 `PencilPalatteDockView` 가 깐다.
 @ViewAction(for: PencilPalatteFeature.self)
 public struct PencilPalatteView: View {
     @Bindable public var store: StoreOf<PencilPalatteFeature>
@@ -66,7 +67,12 @@ public struct PencilPalatteView: View {
     // MARK: - 도구
 
     private var isErasing: Bool {
-        store.pencilConfig.pencilType == .monoline
+        !store.isLassoSelected && store.pencilConfig.pencilType == .monoline
+    }
+
+    /// 잉크로 쓰는 중인가 — 펜 칸의 선택 표시.
+    private var isInking: Bool {
+        !store.isLassoSelected && store.pencilConfig.pencilType != .monoline
     }
 
     /// 펜 칸이 가리키는 잉크. 지우개를 쓰는 중이면 마지막으로 고른 잉크다.
@@ -76,7 +82,7 @@ public struct PencilPalatteView: View {
 
     private var toolButtons: some View {
         HStack(spacing: CarveSpacing.xxSmall) {
-            CarveIconButton(.pen, accessibilityLabel: inkName(activeInk), isSelected: !isErasing, background: .plain) {
+            CarveIconButton(.pen, accessibilityLabel: inkName(activeInk), isSelected: isInking, background: .plain) {
                 send(.setPencilType(activeInk))
             }
             .contextMenu {
@@ -98,8 +104,11 @@ public struct PencilPalatteView: View {
                 send(.setPencilType(.monoline))
             }
 
-            CarveIconButton(.lasso, accessibilityLabel: "올가미", background: .plain) {}
-                .disabled(true)
+            CarveIconButton(.lasso, accessibilityLabel: "올가미", isSelected: store.isLassoSelected, background: .plain) {
+                send(.selectLasso)
+            }
+            .disabled(!store.isLassoAvailable)
+            .accessibilityHint("필기를 묶어 옮깁니다")
         }
     }
 
@@ -419,15 +428,17 @@ public struct PencilPalatteDockView: View {
     }
 
     private var compactToolIcon: CarveIcon {
-        store.pencilConfig.pencilType == .monoline ? .eraser : .pen
+        if store.isLassoSelected { return .lasso }
+        return store.pencilConfig.pencilType == .monoline ? .eraser : .pen
     }
 
     private var compactToolName: String {
+        if store.isLassoSelected { return "올가미" }
         switch store.pencilConfig.pencilType {
-        case .monoline: "지우개"
-        case .pencil: "연필"
-        case .marker: "형광펜"
-        default: "펜"
+        case .monoline: return "지우개"
+        case .pencil: return "연필"
+        case .marker: return "형광펜"
+        default: return "펜"
         }
     }
 }

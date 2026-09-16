@@ -39,6 +39,15 @@ public struct PencilPalatteFeature {
         /// 마지막으로 고른 잉크(연필 · 펜 · 형광펜). 팔레트의 펜 칸 하나가 세 잉크를 대표하므로(시안 M2),
         /// 지우개에서 펜 칸을 누르면 이 잉크로 돌아간다.
         public var lastInkType: PKInkingTool.InkType = .pen
+        /// 올가미 도구를 쓰는 중인가. `pencilConfig.pencilType` 의 `.monoline`(지우개) sentinel 보다 **우선**한다 (올가미 설계 §4-1).
+        ///
+        /// 앱 실행 동안만 유지한다(`.inMemory`) — 올가미인 채로 앱을 닫으면 다음 실행에서 펜슬을 대도 글씨가 써지지 않아
+        /// 사용자에게는 고장으로 읽힌다. 지우개와 달리 화면에 남는 흔적도 없다.
+        @Shared(.inMemory("isLassoSelected")) public var isLassoSelected: Bool = false
+        /// 올가미를 쓸 수 있는가. **단일 Canvas 경로에서만 true** 다 (올가미 설계 §4-8) —
+        /// N-Canvas 롤백 경로(`CanvasView`)는 절마다 캔버스가 따로라 장 단위 선택·이동이 성립하지 않는다.
+        /// 값은 `delegatesUndoToCanvas` 와 같은 자리에서 `CarveDetailFeature` 가 정한다.
+        public var isLassoAvailable: Bool = false
 
         @Presents var navigation: Destination.State?
                 
@@ -61,6 +70,7 @@ public struct PencilPalatteFeature {
             case setPopoverPoint(CGPoint)
             case setLineWidth(Int)
             case setPencilType(PKInkingTool.InkType)
+            case selectLasso
             case undo
             case redo
             case popoverColor(Int)
@@ -92,9 +102,14 @@ public struct PencilPalatteFeature {
                 if type != .monoline {
                     state.lastInkType = type
                 }
+                // 펜 · 지우개를 고르면 올가미에서 빠져나온다. `pencilType` 은 그대로 두므로 마지막 잉크가 유지된다.
+                state.$isLassoSelected.withLock { $0 = false }
                 withAnimation(.easeInOut(duration: 0.1)) {
                     state.$pencilConfig.withLock { $0.pencilType = type }
                 }
+            case .view(.selectLasso):
+                guard state.isLassoAvailable else { return .none }
+                state.$isLassoSelected.withLock { $0 = true }
             case .view(.setLineWidth(let index)):
                 state.$selectedWidthIndex.withLock { $0 = index }
                 state.$pencilConfig.withLock { $0.lineWidth = state.lineWidths[index] }
