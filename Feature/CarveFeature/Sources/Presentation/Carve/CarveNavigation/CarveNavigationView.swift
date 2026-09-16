@@ -20,6 +20,8 @@ public struct CarveNavigationView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var searchText = ""
     @State private var testament: Testament
+    /// 구약 · 신약이 각자 기억하는 목록의 첫 행. 두 구분의 스크롤을 분리한다.
+    @State private var listAnchors: [Testament: BibleTitle] = [:]
     
     public init(store: StoreOf<CarveNavigationFeature>) {
         self.store = store
@@ -100,7 +102,12 @@ public struct CarveNavigationView: View {
                         bibleTitleButton(title)
                     }
                 }
+                .scrollTargetLayout()
             }
+            // 구약 · 신약이 한 ScrollView 를 같이 쓰면 스크롤 위치가 그대로 남아 신약이 구약에서 보던 자리에서 시작한다.
+            // 구분마다 목록을 새로 두고(`id`), 그 구분이 기억한 첫 행으로 돌아간다.
+            .scrollPosition(id: scrollAnchor)
+            .id(testament)
         }
         .padding(.horizontal, CarveSpacing.medium)
         .padding(.top, CarveSpacing.large)
@@ -183,6 +190,18 @@ public struct CarveNavigationView: View {
             DrewLogView(store: store)
                 .toolbar(.visible, for: .navigationBar)
         }
+    }
+
+    /// 지금 보고 있는 구분의 스크롤 위치. 구분을 바꾸면 그 구분이 기억한 자리로 돌아간다.
+    private var scrollAnchor: Binding<BibleTitle?> {
+        Binding(
+            get: { listAnchors[testament] },
+            set: { newValue in
+                // 목록이 바뀌는 순간 오는 nil 로 기억을 지우지 않는다.
+                guard let newValue else { return }
+                listAnchors[testament] = newValue
+            }
+        )
     }
 
     private var filteredTitles: [BibleTitle] {
