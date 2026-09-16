@@ -35,10 +35,77 @@ public struct CloudSyncEvent: Equatable, Sendable {
 public enum CloudSyncFailure: Equatable, Sendable {
     /// iCloud 계정이 없거나 제한됐다. 네트워크 문제가 아니다.
     case accountUnavailable
-    /// import 가 **오류로** 끝났다.
+    /// import 가 **오류로** 끝났다. 원격 변경을 받지 못했다는 뜻이다.
     case importFailed
+    /// export 가 **오류로** 끝났다. 내 변경이 서버에 올라가지 못했다는 뜻이다.
+    case exportFailed
     /// 그 밖. 원인을 특정하지 못했다.
     case unknown
+}
+
+/// 앱이 도는 동안 계속 갱신되는 동기화 활동.
+///
+/// `CloudSyncState` 와 **다른 축**이다. 그쪽은 시작 화면이 초기 import 를 기다린 결과이고,
+/// 이 값은 그 뒤로도 이어지는 실제 주고받음이다. 시작 화면이 끝났다고 동기화가 끝난 것이 아니므로
+/// 설정 화면은 이 값을 본다 (정책 §4-1).
+public struct CloudSyncActivity: Equatable, Sendable {
+    /// 지금 진행 중인 작업이 있는가.
+    ///
+    /// - Note: 이벤트가 시작·종료 짝을 이룬다는 보장이 없어 **마지막 이벤트 기준**으로만 판단한다.
+    ///         "확실히 돌고 있다" 가 아니라 "마지막으로 본 이벤트가 진행 중이었다" 로 읽어야 한다.
+    public var isRunning: Bool
+    /// 마지막으로 import 가 성공한 시각. 없으면 이 실행에서 한 번도 받아 본 적이 없다.
+    public var lastImportSuccess: Date?
+    /// 마지막으로 export 가 성공한 시각. 없으면 이 실행에서 한 번도 올려 본 적이 없다.
+    public var lastExportSuccess: Date?
+    /// 마지막으로 확인된 오류. 같은 종류가 성공하면 지운다.
+    public var lastFailure: CloudSyncFailure?
+
+    public init(
+        isRunning: Bool = false,
+        lastImportSuccess: Date? = nil,
+        lastExportSuccess: Date? = nil,
+        lastFailure: CloudSyncFailure? = nil
+    ) {
+        self.isRunning = isRunning
+        self.lastImportSuccess = lastImportSuccess
+        self.lastExportSuccess = lastExportSuccess
+        self.lastFailure = lastFailure
+    }
+
+    /// 이벤트 하나를 반영한 새 값. 순수 함수라 테스트로 고정한다.
+    ///
+    /// - Parameters:
+    ///   - event: 방금 도착한 이벤트.
+    ///   - date: 그 이벤트가 끝난 것으로 볼 시각.
+    public func applying(_ event: CloudSyncEvent, at date: Date) -> CloudSyncActivity {
+        var next = self
+        guard event.ended else {
+            // 시작 이벤트다. 성공·실패 기록은 건드리지 않는다.
+            next.isRunning = true
+            return next
+        }
+        next.isRunning = false
+
+        switch (event.kind, event.succeeded) {
+        case (.cloudImport, true):
+            next.lastImportSuccess = date
+            if next.lastFailure == .importFailed { next.lastFailure = nil }
+        case (.cloudImport, false):
+            next.lastFailure = .importFailed
+        case (.cloudExport, true):
+            next.lastExportSuccess = date
+            if next.lastFailure == .exportFailed { next.lastFailure = nil }
+        case (.cloudExport, false):
+            next.lastFailure = .exportFailed
+        case (.setup, true):
+            break
+        case (.setup, false):
+            // setup 실패는 원인을 특정할 수 없다. 계정 문제일 수도, 권한일 수도 있다.
+            next.lastFailure = .unknown
+        }
+        return next
+    }
 }
 
 /// 이벤트를 상태로 옮기는 규칙. 순수 함수라 테스트로 고정한다.

@@ -86,6 +86,9 @@ struct LaunchProgressView: View {
             "iCloud 계정을 확인해 주세요.\n지금은 이 기기에만 저장돼요."
         case .importFailed:
             "iCloud에서 필사를 가져오다 문제가 생겼어요.\n지금은 이 기기에만 저장돼요."
+        case .exportFailed:
+            // 받지 못한 것과 올리지 못한 것은 다르다. 후자는 기기에는 남아 있다.
+            "필사를 iCloud에 올리지 못했어요.\n이 기기에는 저장돼 있어요."
         case .unknown:
             "iCloud 연결을 확인하지 못했어요.\n지금은 이 기기에만 저장돼요."
         }

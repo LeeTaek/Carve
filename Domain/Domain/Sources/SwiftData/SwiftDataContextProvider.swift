@@ -31,7 +31,14 @@ public class ContainerID {
 /// SwiftData와 NSPersistentCloudKitContainer 이벤트를 관찰하여 동기화 진행 상태를 표현.
 public final class PersistentCloudKitContainer: ObservableObject {
     /// 현재 CloudKit 동기화 상태. LaunchProgressFeature에서 구독하여 사용.
+    ///
+    /// **초기 import 를 기다린 결과**다. 시작 화면이 끝나면 더 바뀌지 않을 수 있으므로,
+    /// 그 뒤의 주고받음은 ``activity`` 로 본다.
     @Published public var syncState: CloudSyncState = .idle
+    /// 앱이 도는 동안 이어지는 동기화 활동 (정책 §4-1).
+    @Published public var activity = CloudSyncActivity()
+    /// 이벤트 관찰 Task. 앱 수명 동안 유지한다. `nil` 이면 아직 시작하지 않았다.
+    private var observationTask: Task<Void, Never>?
     /// 현재 동기화 기준이 되는 성경 제목/장 정보.
     private var currentTitle: BibleChapter
     /// 의존성으로 주입된 ContainerID를 기반으로 생성되는 CloudKit Private 데이터베이스.
@@ -87,17 +94,22 @@ public final class PersistentCloudKitContainer: ObservableObject {
     /// CloudKit 동기화 상태를 확인하고, 계정 상태/네트워크 등을 검사한 뒤 동기화를 시작.
     /// - 동기화 모드에 따라 타임아웃(deadline)을 다르게 적용.
     public func observeCloudKitSyncProgress() async {
+        // ★ 계정을 조회하기 **전에** 구독을 시작한다. 이전 구현은 계정 조회가 끝난 뒤에야
+        //   구독을 열어, 그 사이에 도착한 이벤트를 놓쳤다.
+        startObserving()
         self.syncState = (syncState == .migration) ? .migration : .syncing
         let deadline: Double = syncState == .migration ? 120 : 20
         do {
             // 계정 조회도 같은 제한 안에서 한다. 이전 구현은 이 호출이 제한 밖이라
             // 계정 조회가 오래 걸리면 기다린 시간이 집계되지 않았다.
             try await Task.withTimeout(seconds: deadline) { [weak self] in
-                let cloudKitAccountStatus = try await CKContainer.default().accountStatus()
+                @Dependency(\.containerId) var containerId
+                let container = containerId.id.isEmpty ? CKContainer.default() : CKContainer(identifier: containerId.id)
+                let cloudKitAccountStatus = try await container.accountStatus()
                 guard cloudKitAccountStatus == .available else {
                     throw CloudkitError.accountError
                 }
-                try await self?.isSyncFromCloudKit()
+                await self?.waitForInitialConclusion()
             }
         } catch let error as CloudkitError {
             await MainActor.run { self.syncState = Self.state(for: error) }
@@ -124,29 +136,54 @@ public final class PersistentCloudKitContainer: ObservableObject {
     }
     
     
-    /// `eventChangedNotification` 을 구독해 초기 import 가 **성공으로** 끝나는지 본다.
+    /// `eventChangedNotification` 관찰을 **앱 수명 동안** 시작한다. 여러 번 불러도 한 번만 시작한다.
     ///
-    /// - Important: 끝난 것과 성공한 것은 다르다. 이전 구현은 `endDate != nil` 과 `type == .import` 만 보고
-    ///              완료로 판정해서 **오류로 끝난 import 도 "동기화 완료" 로 표시**했다. 판정은
-    ///              `CloudSyncStateRule` 이 하고 여기서는 이벤트를 값으로 바꿔 넘기기만 한다.
-    /// - Throws: import 가 오류로 끝나면 `CloudkitError.syncingFail`. 제한 시간 초과는 호출부가 다룬다.
-    private func isSyncFromCloudKit() async throws {
-        let cloudkitNotification = NotificationCenter.default.notifications(named: NSPersistentCloudKitContainer.eventChangedNotification)
-
-        for await notification in cloudkitNotification {
-            guard let cloudEvent = notification.userInfo?[NSPersistentCloudKitContainer.eventNotificationUserInfoKey]
-                as? NSPersistentCloudKitContainer.Event else { continue }
-            Log.debug("cloudEvent", cloudEvent.debugDescription)
-
-            let event = Self.syncEvent(from: cloudEvent)
-            guard CloudSyncStateRule.concludesWaiting(event) else { continue }
-
-            if CloudSyncStateRule.isImportFailure(event) {
-                throw CloudkitError.syncingFail
+    /// - Important: 이전 구현은 초기 import 하나를 확인하면 관찰을 끝냈다. 그래서 시작 화면이 지난 뒤의
+    ///              동기화 상태를 앱이 전혀 알지 못했다. 이제는 관찰을 끊지 않고 ``activity`` 를 계속 갱신한다.
+    public func startObserving() {
+        guard observationTask == nil else { return }
+        observationTask = Task { [weak self] in
+            let notifications = NotificationCenter.default.notifications(named: NSPersistentCloudKitContainer.eventChangedNotification)
+            for await notification in notifications {
+                guard let self else { return }
+                guard let cloudEvent = notification.userInfo?[NSPersistentCloudKitContainer.eventNotificationUserInfoKey]
+                    as? NSPersistentCloudKitContainer.Event else { continue }
+                Log.debug("cloudEvent", cloudEvent.debugDescription)
+                let event = Self.syncEvent(from: cloudEvent)
+                await MainActor.run {
+                    self.activity = self.activity.applying(event, at: Date())
+                    self.applyToInitialWait(event)
+                }
             }
-            await MainActor.run {
-                self.syncState = (self.syncState == .migration) ? .migrationCompleted : .syncCompleted
-            }
+        }
+    }
+
+    deinit {
+        observationTask?.cancel()
+    }
+
+    /// 관찰을 멈춘다. 앱이 살아 있는 동안은 부를 일이 없고, 테스트·해제 때만 쓴다.
+    public func stopObserving() {
+        observationTask?.cancel()
+        observationTask = nil
+    }
+
+    /// 시작 화면이 기다리는 `syncState` 에 이벤트를 반영한다.
+    ///
+    /// 이미 결론이 난 뒤에도 늦게 도착한 import 는 반영한다 — `stillWaiting` 으로 먼저 진입한 사용자에게
+    /// 원격 필사가 나중에 도착할 수 있기 때문이다 (정책 §3-1).
+    private func applyToInitialWait(_ event: CloudSyncEvent) {
+        guard syncState.isInProgress else { return }
+        if CloudSyncStateRule.isAwaitedImportSuccess(event) {
+            syncState = (syncState == .migration) ? .migrationCompleted : .syncCompleted
+        } else if CloudSyncStateRule.isImportFailure(event) {
+            syncState = .failed(.importFailed)
+        }
+    }
+
+    /// 초기 대기가 끝날 때까지 기다린다. 판정은 관찰 Task 가 하고 여기서는 결론만 본다.
+    private func waitForInitialConclusion() async {
+        for await state in $syncState.values where !state.isInProgress {
             return
         }
     }
