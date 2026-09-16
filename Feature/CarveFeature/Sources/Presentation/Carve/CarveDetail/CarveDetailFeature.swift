@@ -257,6 +257,12 @@ public struct CarveDetailFeature {
                 beginLayoutMeasurement(state: &state, sentences: sentences)
                 // 단일 Canvas 면 팔레트의 undo/redo 는 캔버스가 처리한다 — 팔레트가 SharedUndoManager 값으로 공유 canUndo 를 덮지 않게.
                 state.headerState.palatteSetting.delegatesUndoToCanvas = state.usesSingleCanvas
+                // 올가미도 단일 Canvas 전용이다 (올가미 설계 §4-8). flag 를 끄고 돌아온 장에서는 선택까지 내린다 —
+                // 버튼만 잠그면 이전에 고른 올가미가 남아 N-Canvas 에서 필기가 되지 않는 것처럼 보인다.
+                state.headerState.palatteSetting.isLassoAvailable = state.usesSingleCanvas
+                if !state.usesSingleCanvas {
+                    state.headerState.palatteSetting.$isLassoSelected.withLock { $0 = false }
+                }
                 state.chapterHistory = nil
                 let chapter = sentences.first?.title ?? state.headerState.currentTitle
                 // 절 번호 아래 즐겨찾기 표시는 두 경로(단일 Canvas · N-Canvas)가 같은 본문 컬럼에 그리므로 경로와 무관하게 읽는다.

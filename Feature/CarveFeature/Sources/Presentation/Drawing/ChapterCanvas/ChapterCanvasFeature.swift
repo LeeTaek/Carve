@@ -29,7 +29,7 @@ public struct CanvasEditSnapshot: Equatable, Sendable {
     let generation: Int
 }
 
-public enum EditReason: Equatable, Sendable { case ink, erase, undo, redo }
+public enum EditReason: Equatable, Sendable { case ink, erase, lasso, undo, redo }
 
 /// 저장 중 도착한 최신 편집을 보호하기 위해 revision 과 장을 함께 보관한다 (§8-3).
 struct PendingDrawingMutation: Equatable, Sendable {
