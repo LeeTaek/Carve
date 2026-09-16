@@ -21,7 +21,6 @@ import UIComponents
 @ViewAction(for: PencilPalatteFeature.self)
 public struct PencilPalatteView: View {
     @Bindable public var store: StoreOf<PencilPalatteFeature>
-    @State private var isShowingWidthPicker = false
 
     /// 시안 M2 의 팔레트 크기.
     static let designWidth: CGFloat = 504
@@ -126,10 +125,14 @@ public struct PencilPalatteView: View {
         String(format: "%.1f mm", lineWidth / 4)
     }
 
-    /// 현재 굵기 글자(시안 「0.5 mm」). 탭하면 굵기 세 단계 중에서 고른다.
+    /// 현재 굵기 글자(시안 「0.5 mm」). 탭하면 시안 P2 「펜 굵기」 팝오버를 연다.
+    ///
+    /// 예전에는 여기서 굵기 칸 목록을 먼저 띄우고 「조절」 을 눌러야 값 편집으로 갔다. 팝오버 두 개가
+    /// 겹치지 않도록 0.35초를 기다려 여는 임시 처리까지 있었는데, P2 가 고르기와 조절을 한 화면에 담아
+    /// 그 단계를 없앴다 (디자인 문서 5장 — 「팝오버는 한 번에 하나만 연다」).
     private var lineWidthButton: some View {
         Button {
-            isShowingWidthPicker = true
+            send(.popoverLineWidth(store.editingWidthIndex))
         } label: {
             Text(millimeters(store.pencilConfig.lineWidth))
                 .font(CarveTypography.body)
@@ -142,79 +145,13 @@ public struct PencilPalatteView: View {
         .buttonStyle(.plain)
         .accessibilityLabel("펜 굵기 \(millimeters(store.pencilConfig.lineWidth))")
         .accessibilityHint("탭하면 굵기를 고릅니다")
-        .popover(isPresented: $isShowingWidthPicker, arrowEdge: .bottom) {
-            lineWidthPicker
+        .popover(
+            item: $store.scope(state: \.navigation?.lineWidthPalatte,
+                               action: \.navigation.lineWidthPalatte),
+            arrowEdge: .bottom
+        ) { store in
+            LineWidthPalatteView(store: store)
         }
-        // 굵기 값 편집은 기존 팝오버를 쓴다. 위의 선택 팝오버와 한 뷰에 겹치지 않게 배경에 단다.
-        .background {
-            Color.clear
-                .popover(
-                    item: $store.scope(state: \.navigation?.lineWidthPalatte,
-                                       action: \.navigation.lineWidthPalatte),
-                    arrowEdge: .bottom
-                ) { store in
-                    LineWidthPalatteView(store: store)
-                }
-        }
-    }
-
-    private var lineWidthPicker: some View {
-        VStack(spacing: 0) {
-            ForEach(Array(store.lineWidths.enumerated()), id: \.offset) { index, width in
-                lineWidthRow(index: index, width: width)
-                if index < store.lineWidths.count - 1 {
-                    CarveDivider()
-                }
-            }
-        }
-        .padding(.vertical, CarveSpacing.xSmall)
-        .frame(width: 260)
-        .carvePresentationSurface()
-        .presentationCompactAdaptation(.popover)
-    }
-
-    private func lineWidthRow(index: Int, width: CGFloat) -> some View {
-        let isSelected = index == store.selectedWidthIndex
-        return HStack(spacing: CarveSpacing.small) {
-            Button {
-                send(.setLineWidth(index))
-                isShowingWidthPicker = false
-            } label: {
-                HStack(spacing: CarveSpacing.small) {
-                    Capsule()
-                        .fill(CarveColor.ink)
-                        .frame(width: 36, height: max(1, width))
-                    Text(millimeters(width))
-                        .font(CarveTypography.body)
-                        .monospacedDigit()
-                        .foregroundStyle(CarveColor.ink)
-                    Spacer(minLength: 0)
-                    if isSelected {
-                        CarveIcon.checkmark.image
-                            .foregroundStyle(CarveColor.accent)
-                    }
-                }
-                .frame(minHeight: CarveSize.minimumHitTarget)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("굵기 \(millimeters(width))")
-            .accessibilityAddTraits(isSelected ? .isSelected : [])
-
-            Button("조절") {
-                isShowingWidthPicker = false
-                // 선택 팝오버가 닫힌 뒤에 편집 팝오버를 연다 — 팝오버 두 개가 동시에 뜨지 않게.
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                    send(.popoverLineWidth(index))
-                }
-            }
-            .font(CarveTypography.label)
-            .foregroundStyle(CarveColor.accent)
-            .buttonStyle(.plain)
-            .frame(minHeight: CarveSize.minimumHitTarget)
-            .accessibilityLabel("\(millimeters(width)) 굵기 조절")
-        }
-        .padding(.horizontal, CarveSpacing.medium)
     }
 
     // MARK: - 색

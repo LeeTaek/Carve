@@ -250,6 +250,8 @@ public struct ChapterCanvasFeature {
         case saveFinished(revision: Int, failure: DrawingRepositoryError?)
         /// 장 전환 · 백그라운드 진입 시 대기열 저장 (§8-5). 실패했던 저장의 재시도이기도 하다.
         case flushPending
+        /// 밖에서 필사 데이터가 전부 지워졌다 (설정 → 「모든 필사 데이터 삭제」).
+        case drawingDataCleared
         /// 히스토리에서 다른 회차를 선택해 `isPresent` 가 바뀐 뒤. mutation 을 만들지 않고 다시 합성한다 (§8-7).
         case verseRowRestored(verse: Int, rowID: BibleDrawingRowID)
         case undoStateChanged(canUndo: Bool, canRedo: Bool)
@@ -383,6 +385,9 @@ public struct ChapterCanvasFeature {
 
             case .flushPending:
                 return startSaveIfPossible(state: &state, allowRetry: true)
+
+            case .drawingDataCleared:
+                return clearAfterExternalDelete(state: &state)
 
             case .verseRowRestored:
                 // isPresent 이전은 호출부(히스토리 시트)가 이미 DB 에 반영했다. 여기서는 mutation 없이 다시 합성만 한다.

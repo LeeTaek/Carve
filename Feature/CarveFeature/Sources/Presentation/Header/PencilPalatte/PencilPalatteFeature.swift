@@ -49,6 +49,13 @@ public struct PencilPalatteFeature {
         /// 값은 `delegatesUndoToCanvas` 와 같은 자리에서 `CarveDetailFeature` 가 정한다.
         public var isLassoAvailable: Bool = false
 
+        /// 굵기 팝오버를 열 칸. 팔레트 글자가 보여 주는 **펜의 현재 굵기**와 같은 칸을 먼저 찾고,
+        /// 없으면 선택 칸으로 간다 — 글자는 `pencilConfig` 를, 선택 표시는 `selectedWidthIndex` 를 읽어
+        /// 둘이 어긋난 채로 열리면 사용자는 방금 본 값과 다른 칸을 만지게 된다.
+        public var editingWidthIndex: Int {
+            lineWidths.firstIndex(of: pencilConfig.lineWidth) ?? selectedWidthIndex
+        }
+
         @Presents var navigation: Destination.State?
                 
         public static var initialState = State()
@@ -116,12 +123,17 @@ public struct PencilPalatteFeature {
             case .view(.setPopoverPoint(let point)):
                 state.popoverPoint = point
             case .view(.popoverColor(let index)):
+                // 칸 번호는 저장된 사용자 값에서 온다 — 배열보다 크면 열지 않는다.
+                guard index < state.palatteColors.count else { return .none }
                 state.navigation = .colorPalatte(.init(index: index, color: state.palatteColors[index]))
             case .view(.popoverLineWidth(let index)):
+                guard index < state.lineWidths.count else { return .none }
                 state.navigation = .lineWidthPalatte(.init(lineWidth: state.lineWidths[index], index: index))
             case .navigation(.dismiss):
-                state.$pencilConfig.withLock { $0.lineColor = state.palatteColors[state.selectedColorIndex] }
-                state.$pencilConfig.withLock { $0.lineWidth = state.lineWidths[state.selectedWidthIndex] }
+                // 닫을 때 다시 맞추지 않는다. 색 · 굵기 팝오버(시안 P1 · P2)가 고르는 즉시 `pencilConfig` 까지 쓰므로,
+                // 여기서 선택 칸 값으로 덮으면 **사용자가 방금 조절한 값이 닫는 순간 되돌아간다**
+                // (펜 1.0 mm 인 채로 팝오버를 열었다 닫으면 선택 칸의 0.5 mm 로 바뀌던 동작).
+                break
             case .view(.undo):
                 // 단일 Canvas 경로에서는 부모(CarveDetailFeature)가 이 액션을 캔버스의 undoTapped 로 옮긴다.
                 guard !state.delegatesUndoToCanvas else { return .none }
