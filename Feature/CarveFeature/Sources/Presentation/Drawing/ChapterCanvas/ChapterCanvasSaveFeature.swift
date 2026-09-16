@@ -45,7 +45,9 @@ extension ChapterCanvasFeature.State {
         if case .failed(_, let count) = saveStatus { return .failed(retryCount: count) }
         if case .saving = saveStatus { return .saving }
         if hasUnsavedChanges { return .pending }
-        return editRevision > 0 ? .saved : .none
+        // 마지막으로 전부 지운 뒤에 쓴 것이 있을 때만. 이전 구현은 `editRevision > 0` 만 봐서
+        // 필사를 전부 지운 직후에도 "이 기기에 저장됨" 이 떴다.
+        return editRevision > editRevisionAtClear ? .saved : .none
     }
 
     /// 아직 저장하지 않은 변경이 있는가. **장과 무관하다** — 장을 바꿔도 남은 이전 장의 미저장분을 포함한다.

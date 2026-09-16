@@ -384,4 +384,30 @@ struct LocalSaveIndicatorTesting {
         await store.receive(\.saveFinished)
         #expect(store.state.localSaveIndicator == .saved)
     }
+
+    @Test("필사 데이터를 전부 지우면 '저장됨' 을 내리고, 그 뒤 새로 쓰면 다시 보인다")
+    func externalClearWithdrawsSavedUntilNextEdit() async {
+        let results = LockIsolated([createResult("a"), createResult("b")])
+        let store = CanvasTestSupport.makeStore(spy: RepositorySpy(), results: results)
+        await CanvasTestSupport.compose(store)
+        await store.send(.editBegan)
+        await store.send(.editEnded(CanvasTestSupport.edit("a")))
+        await store.receive(\.mutationsPrepared)
+        await store.receive(\.saveFinished)
+        #expect(store.state.localSaveIndicator == .saved)
+
+        // 설정에서 전부 지웠다. 저장된 필사가 없는데 "저장됨" 이라고 말하면 안 된다.
+        await store.send(.drawingDataCleared)
+        #expect(store.state.localSaveIndicator == .none)
+        await store.receive(\.drawingsLoaded)
+        #expect(store.state.localSaveIndicator == .none)
+
+        // 지운 뒤에 새로 쓴 것은 다시 "저장됨" 이다.
+        let generation = store.state.renderedRevision
+        await store.send(.editBegan)
+        await store.send(.editEnded(CanvasTestSupport.edit("b", generation: generation)))
+        await store.receive(\.mutationsPrepared)
+        await store.receive(\.saveFinished)
+        #expect(store.state.localSaveIndicator == .saved)
+    }
 }

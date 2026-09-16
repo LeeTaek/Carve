@@ -130,6 +130,8 @@ public struct ChapterCanvasFeature {
         // §8-1 편집 계약
         var editRevision = 0
         var persistedRevision = 0
+        /// 필사 데이터가 밖에서 전부 지워진 시점의 `editRevision`. 그 뒤에 쓴 것이 없으면 "저장됨" 이라고 말하지 않는다.
+        var editRevisionAtClear = 0
         var isEditing = false
         /// 편집 중 도착한 변경. pencil-up 뒤에 한 번에 적용한다 — 획 도중 재합성하면 획이 사라진다.
         var pendingLayout: ChapterLayout?

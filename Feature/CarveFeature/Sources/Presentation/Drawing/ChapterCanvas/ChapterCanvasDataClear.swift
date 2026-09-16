@@ -27,6 +27,9 @@ extension ChapterCanvasFeature {
         state.isPreparingEdit = false
         state.saveStatus = .idle
         state.consecutiveSaveFailures = 0
+        // `editRevision` 자체는 되돌리지 않는다 — 늦게 도착하는 편집의 revision 비교가 이 값을 기준으로 한다.
+        // 대신 지금을 기록해, 그 뒤에 새로 쓴 것이 있을 때만 "이 기기에 저장됨" 을 보인다.
+        state.editRevisionAtClear = state.editRevision
         state.retiredSession = nil
         // 활성 행도 사라졌다 — 다음 편집은 새 행(create)으로 가야 한다.
         state.activeRowIDs = [:]
