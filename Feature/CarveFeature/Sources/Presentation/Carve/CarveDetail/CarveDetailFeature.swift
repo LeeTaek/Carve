@@ -92,6 +92,10 @@ public struct CarveDetailFeature {
         @Shared(.appStorage(SentenceSetting.appStorageKey)) public var sentenceSetting: SentenceSetting = .initialState
         /// 왼손잡이용 레이아웃 여부
         @Shared(.appStorage("isLeftHanded")) public var isLeftHanded: Bool = false
+        /// 설정의 「모든 필사 데이터 삭제」가 올리는 세대. 설정과 이 화면은 서로를 모르므로 공유 값으로 잇는다.
+        @Shared(.inMemory(DrawingDataRevision.key)) public var drawingDataRevision: Int = 0
+        /// 이 화면이 마지막으로 반영한 세대. 뷰가 트리에서 빠졌다 돌아와도 놓치지 않도록 **값으로** 비교한다.
+        public var seenDrawingDataRevision: Int = 0
         
         public static let initialState = State(
             headerState: .initialState
@@ -147,6 +151,8 @@ public struct CarveDetailFeature {
         public enum View {
             /// 성경 구절 fetch
             case fetchSentence
+            /// 밖에서 필사 데이터가 지워졌는지 확인한다 (공유 세대 비교).
+            case drawingDataRevisionChanged
             #if DEBUG
             /// HUD가 나타나거나 표시할 진단 값이 바뀌었을 때 콘솔에 기록한다.
             case debugHUDSnapshotChanged(String)
@@ -249,6 +255,20 @@ public struct CarveDetailFeature {
             case .view(.headerAnimation(let previous, let current)):
                 return .send(.scope(.headerAction(.headerAnimation(previous, current))))
                 
+            case .view(.drawingDataRevisionChanged):
+                guard state.seenDrawingDataRevision != state.drawingDataRevision else { return .none }
+                state.seenDrawingDataRevision = state.drawingDataRevision
+                // 즐겨찾기 표시도 함께 지워졌다.
+                var effects: [Effect<Action>] = [.send(.reloadFavorites)]
+                if state.usesSingleCanvas {
+                    // 미저장분까지 버리고 DB 에서 다시 합성한다 — 레이아웃은 그대로라 다시 재지 않는다.
+                    effects.append(.send(.scope(.chapterCanvasAction(.drawingDataCleared))))
+                } else {
+                    // N-Canvas 롤백 경로는 절마다 drawing 을 들고 있어 장을 다시 읽는다.
+                    effects.append(.send(.view(.fetchSentence)))
+                }
+                return .merge(effects)
+
             case .view(.fetchSentence):
                 let oldChapter = state.headerState.currentTitle
                                 

@@ -59,9 +59,6 @@ public struct CloudSettingView: View {
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.carve(.destructive, fillsWidth: true))
-                        .popover(item: $store.scope(state: \.path?.popup, action: \.path.popup)) { store in
-                            PopupView(store: store)
-                        }
 
                         Text("모든 장의 필사 기록이 사라져요. 되돌릴 수 없어요.")
                             .font(CarveTypography.caption)
@@ -88,6 +85,12 @@ public struct CloudSettingView: View {
             }
         }
         .disabled(store.isLoading)
+        // 시안 F2 는 확인 대화상자를 화면 가운데에 띄우고 뒤를 가린다. 팝오버는 버튼에 붙어 한쪽으로 뜨므로
+        // 전체를 덮는 표현으로 바꾼다 — 바탕은 `PopupView` 가 직접 그린다.
+        .fullScreenCover(item: $store.scope(state: \.path?.popup, action: \.path.popup)) { store in
+            PopupView(store: store)
+                .presentationBackground(.clear)
+        }
     }
     
         
