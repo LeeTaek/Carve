@@ -35,6 +35,7 @@ public struct CloudSettingsFeature {
     /// 화면이 떠 있는 동안만 활동을 구독한다.
     private enum CancelID { case activity }
     @Dependency(\.widgetVerseClient) private var widgetVerseClient
+    @Dependency(\.drawingDataEraser) private var drawingDataEraser
 
     public enum Action: ViewAction {
         case path(PresentationAction<Path.Action>)
@@ -130,21 +131,41 @@ public struct CloudSettingsFeature {
                     confirmAction: action
                 ))
             case .removeAlliCloudData:
-                return .run { [widgetVerseClient] send in
+                return .run { [widgetVerseClient, drawingDataEraser] send in
                     await send(.setLoading(true))
-                    // 필사 행 · 구 구조 잔존 행 · 즐겨찾기(필기 복사본) · 위젯(App Group 의 필기 PNG)까지 지운다.
-                    try await database.deleteAll(BibleDrawing.self)
-                    try await database.deleteAll(BiblePageDrawing.self)
-                    try await database.deleteAll(FavoriteVerse.self)
-                    // 위젯은 별도 저장소라 실패해도 DB 삭제를 되돌릴 수 없다. 남으면 홈 화면에만 옛 말씀이 남는다.
-                    do {
-                        try await widgetVerseClient.clear()
-                    } catch {
-                        Log.error("전체 삭제 — 위젯 내용을 비우지 못했다", "\(error)")
+                    // 필사 행 · 구 구조 잔존 행 · 즐겨찾기(필기 복사본)를 지운다. 필사 행이 가장 먼저다.
+                    let outcome = await drawingDataEraser.eraseAll()
+
+                    if outcome.drawingsCleared {
+                        // 위젯은 별도 저장소라 실패해도 DB 삭제를 되돌릴 수 없다. 남으면 홈 화면에만 옛 말씀이 남는다.
+                        do {
+                            try await widgetVerseClient.clear()
+                        } catch {
+                            Log.error("전체 삭제 — 위젯 내용을 비우지 못했다", "\(error)")
+                        }
+                        // 뒤따른 삭제가 실패했더라도 필사 행은 사라졌다. 열린 장이 옛 잉크를 버리지 않으면
+                        // 다음 저장이 방금 지운 필사를 되살린다 — 이전 구현은 실패하면 이 신호를 보내지 않았다.
+                        await send(.drawingDataCleared)
                     }
-                    await send(.drawingDataCleared)
+                    // 필사 행조차 지우지 못했다면 신호를 보내지 않는다. 아무것도 지워지지 않았는데 미저장분만 버리면 유실이다.
+
+                    // 결과와 무관하게 잠금을 푼다. 이전 구현은 삭제가 실패하면 여기에 오지 못해 화면이 멈췄다.
                     await send(.setLoading(false))
 
+                    guard outcome == .completed else {
+                        // 「다시 시도」 는 같은 삭제를 다시 부른다. 삭제는 멱등이라 이미 지운 것을 다시 지워도 안전하다.
+                        await send(.presentPopover(
+                            title: "필사 데이터를 모두 지우지 못했어요",
+                            body: outcome.drawingsCleared
+                                ? "필기는 지웠지만 즐겨찾기가 남았을 수 있어요."
+                                : "아직 아무것도 지우지 않았어요.",
+                            confirmTitle: "다시 시도",
+                            cancelTitle: "닫기",
+                            role: .destructive,
+                            action: .deleteAllData
+                        ))
+                        return
+                    }
                     await send(.presentPopover(
                         body: "모든 필사 데이터를 지웠어요.",
                         confirmTitle: "확인",
@@ -157,18 +178,13 @@ public struct CloudSettingsFeature {
                 // 상태에 두지 않는 이유는 `State` 가 `Hashable` 이기 때문이다 — `@Shared` 는 그 합성을 깬다.
                 DrawingDataRevision.bump()
             case .path(.presented(.popup(.view(.confirm)))):
-                let shouldDeleteAllData = state.path?.popup?.confirmAction == .deleteAllData
-                return .run { send in
-                    guard let databaseIsEmpty = try? await database.databaseIsEmpty(BibleDrawing.self) else {
-                        return
-                    }
-                    
-                    if shouldDeleteAllData && !databaseIsEmpty {
-                        await send(.removeAlliCloudData)
-                    } else {
-                        await send(.popupDismiss)
-                    }
+                guard state.path?.popup?.confirmAction == .deleteAllData else {
+                    return .send(.popupDismiss)
                 }
+                // 지울 것이 있는지는 확인 팝업을 띄울 때 이미 봤다. 이전 구현은 여기서 **필사 행만** 다시 확인해서,
+                // 즐겨찾기만 남은 경우와 부분 삭제 뒤 「다시 시도」 가 아무것도 지우지 않고 닫혔다.
+                // 삭제는 멱등이므로 다시 확인하지 않는다.
+                return .send(.removeAlliCloudData)
             case .path(.presented(.popup(.view(.cancel)))):
                 state.path = nil
             case .popupDismiss:
