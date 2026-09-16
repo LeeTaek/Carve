@@ -13,9 +13,48 @@ import Foundation
 
 import ComposableArchitecture
 
-// MARK: - 저장 (§8-3 · §8-4)
+// MARK: - 저장 상태 표시 (로드맵 SAVE-1)
+
+/// 필사가 **이 기기에** 저장됐는지. iCloud 로 전해졌는지와는 무관하다.
+///
+/// | 상태 | 표시 |
+/// |---|---|
+/// | `pending` | 저장 대기 중 |
+/// | `saving` | 저장 중… |
+/// | `saved` | 이 기기에 저장됨 |
+/// | `failed` | 지속 안내 + 「다시 시도」 (`SaveFailureNoticeView`) |
+enum LocalSaveIndicator: Equatable, Sendable {
+    /// 아직 쓴 것이 없다. 표시하지 않는다 — 저장할 것이 없었는데 "저장됨" 이라고 말하지 않는다.
+    case none
+    /// 아직 저장하지 않은 변경이 있다.
+    case pending
+    /// 저장 처리 중이다.
+    case saving
+    /// 지금까지의 변경이 이 기기에 저장됐다.
+    case saved
+    /// 저장에 실패했다. 성공 없이 이어진 실패 횟수를 함께 든다.
+    case failed(retryCount: Int)
+}
 
 extension ChapterCanvasFeature.State {
+    /// 지금 보여 줄 로컬 저장 상태.
+    ///
+    /// **실패가 가장 먼저다.** 실패한 채로 새 획을 그어도 미저장분이 남아 있으므로 실패 안내를 내리지 않는다 —
+    /// 새 편집이 저장을 다시 시작하면 그때 `saving` 으로 바뀐다.
+    var localSaveIndicator: LocalSaveIndicator {
+        if case .failed(_, let count) = saveStatus { return .failed(retryCount: count) }
+        if case .saving = saveStatus { return .saving }
+        if hasUnsavedChanges { return .pending }
+        return editRevision > 0 ? .saved : .none
+    }
+
+    /// 아직 저장하지 않은 변경이 있는가. **장과 무관하다** — 장을 바꿔도 남은 이전 장의 미저장분을 포함한다.
+    ///
+    /// 획을 긋는 중(`isEditing`)도 포함한다. 그 획은 아직 보고되지도 않았으므로 저장됐다고 말할 수 없다.
+    var hasUnsavedChanges: Bool {
+        isEditing || isPreparingEdit || !editQueue.isEmpty || !pendingMutations.isEmpty
+    }
+
     /// 저장에 실패해 **사용자에게 알려야 하는** 상태면 지금까지의 재시도 횟수. 아니면 nil.
     ///
     /// 실패해도 큐는 보존되고 다음 편집·flush 에서 자동으로 다시 시도한다(§8-4). 그래도 알리는 이유는

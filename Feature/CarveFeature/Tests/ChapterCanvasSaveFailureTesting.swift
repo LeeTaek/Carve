@@ -284,3 +284,104 @@ struct ChapterCanvasSaveFailureTesting {
         #expect(store.state.saveRetryCount == 1)
     }
 }
+
+// MARK: - 저장 상태 표시 판정
+
+/// 로컬 저장 상태 표시(로드맵 SAVE-1)의 판정 규칙. 표시 방식과 분리해 흐름으로 고정한다.
+@Suite("저장 상태 표시 판정")
+@MainActor
+struct LocalSaveIndicatorTesting {
+    private let rowInA = BibleDrawingRowID(raw: "row-in-chapter-a")
+    private let diskError = DrawingRepositoryError.persistenceFailed("디스크 오류")
+
+    nonisolated private func createResult(_ tag: String) -> DrawingEditResult {
+        DrawingEditResult(
+            ownership: OwnershipSnapshot(map: [:], layoutSignature: CanvasTestSupport.layout.signature),
+            mutations: [.create(verse: 2, rowID: BibleDrawingRowID(raw: "row-in-chapter-a"), data: Data("create-\(tag)".utf8), metadata: CanvasTestSupport.metadata())],
+            issuedRowIDs: [2: BibleDrawingRowID(raw: "row-in-chapter-a")]
+        )
+    }
+
+    @Test("아직 아무것도 쓰지 않았으면 표시하지 않는다 — 저장할 것이 없었는데 저장됐다고 말하지 않는다")
+    func nothingWrittenShowsNothing() async {
+        let store = CanvasTestSupport.makeStore(spy: RepositorySpy())
+        await CanvasTestSupport.compose(store)
+
+        #expect(store.state.localSaveIndicator == .none)
+    }
+
+    @Test("획을 긋는 중 → 대기 중 → 저장 중 → 이 기기에 저장됨 순서로 간다")
+    func progressesThroughEachState() async {
+        let spy = RepositorySpy()
+        let store = CanvasTestSupport.makeStore(spy: spy, results: LockIsolated([createResult("a")]))
+        await CanvasTestSupport.compose(store)
+
+        await store.send(.editBegan)
+        // 펜이 닿아 있다. 이 획은 아직 보고되지도 않았다.
+        #expect(store.state.localSaveIndicator == .pending)
+
+        spy.holdNextApply()
+        await store.send(.editEnded(CanvasTestSupport.edit("a")))
+        // 코덱이 저장 명령을 만드는 중이다.
+        #expect(store.state.localSaveIndicator == .pending)
+
+        await store.receive(\.mutationsPrepared)
+        #expect(store.state.localSaveIndicator == .saving)
+
+        spy.releaseApply()
+        await store.receive(\.saveFinished)
+        #expect(store.state.localSaveIndicator == .saved)
+    }
+
+    @Test("변경 없이 도구를 뗀 것은 저장 상태를 바꾸지 않는다")
+    func cancelledEditLeavesSavedAlone() async {
+        let store = CanvasTestSupport.makeStore(spy: RepositorySpy(), results: LockIsolated([createResult("a")]))
+        await CanvasTestSupport.compose(store)
+        await store.send(.editBegan)
+        await store.send(.editEnded(CanvasTestSupport.edit("a")))
+        await store.receive(\.mutationsPrepared)
+        await store.receive(\.saveFinished)
+        #expect(store.state.localSaveIndicator == .saved)
+
+        await store.send(.editBegan)
+        #expect(store.state.localSaveIndicator == .pending)
+        await store.send(.editCancelled)
+        #expect(store.state.localSaveIndicator == .saved)
+    }
+
+    @Test("실패는 가장 먼저 보인다 — 실패한 채로 새 획을 긋고 있어도 실패 안내를 내리지 않는다")
+    func failureOutranksEditing() async {
+        let spy = RepositorySpy()
+        spy.applyFailures.setValue([diskError])
+        let store = CanvasTestSupport.makeStore(spy: spy, results: LockIsolated([createResult("a")]))
+        await CanvasTestSupport.compose(store)
+        await store.send(.editBegan)
+        await store.send(.editEnded(CanvasTestSupport.edit("a")))
+        await store.receive(\.mutationsPrepared)
+        await store.receive(\.saveFinished)
+        #expect(store.state.localSaveIndicator == .failed(retryCount: 1))
+
+        await store.send(.editBegan)
+        #expect(store.state.localSaveIndicator == .failed(retryCount: 1))
+    }
+
+    @Test("장을 바꿔도 이전 장의 저장이 도는 중이면 저장 중이다 — 새 장에 쓴 것이 없어도 조용해지지 않는다")
+    func previousChapterPendingKeepsIndicatorPending() async {
+        let spy = RepositorySpy()
+        spy.holdNextApply()
+        let store = CanvasTestSupport.makeStore(spy: spy, results: LockIsolated([createResult("a")]))
+        await CanvasTestSupport.compose(store)
+        await store.send(.editBegan)
+        await store.send(.editEnded(CanvasTestSupport.edit("a")))
+        await store.receive(\.mutationsPrepared)
+        #expect(store.state.localSaveIndicator == .saving)
+
+        await store.send(.load(chapter: BibleChapter(title: .jonah, chapter: 3), expectedVerseCount: 3))
+        // 도는 저장이 있어 새 장에서도 "저장 중" 이다 — 장이 바뀌었다고 조용해지지 않는다.
+        #expect(store.state.localSaveIndicator == .saving)
+
+        spy.releaseApply()
+        await store.receive(\.saveFinished)
+        #expect(store.state.localSaveIndicator == .saved)
+    }
+}

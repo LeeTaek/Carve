@@ -500,17 +500,37 @@ private extension CarveDetailView {
                     send(.widgetRetryTapped)
                 }
                 .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+            } else if let text = localSaveText {
+                // 다른 안내가 없을 때만, 조용한 한 줄로. 캡슐 안내처럼 끼어들지 않는다.
+                Text(text)
+                    .font(CarveTypography.caption)
+                    .foregroundStyle(CarveColor.secondary)
+                    .lineLimit(1)
+                    .accessibilityLabel(text)
+                    .transition(.opacity)
             }
         }
         .frame(maxWidth: .infinity, alignment: store.headerState.isLeftHanded ? .leading : .trailing)
         .padding(.horizontal, CarveSpacing.large)
         .padding(.bottom, favoriteNoticeBottomInset)
         .animation(reduceMotion ? .easeOut(duration: 0.12) : .snappy(duration: 0.25), value: store.chapterCanvas.saveRetryCount)
+        .animation(.easeOut(duration: 0.2), value: localSaveText)
         .animation(reduceMotion ? .easeOut(duration: 0.12) : .snappy(duration: 0.25), value: store.favoriteNotice)
         .animation(reduceMotion ? .easeOut(duration: 0.12) : .snappy(duration: 0.25), value: store.imageSaveNotice)
         .animation(reduceMotion ? .easeOut(duration: 0.12) : .snappy(duration: 0.25), value: store.widgetNotice)
         // 사진 추가 권한이 꺼져 있으면 어디서 켜는지 알린다(시안 G2). 결과 안내와 같은 자리에서 띄운다.
         .alert($store.scope(state: \.photoPermissionAlert, action: \.photoPermissionAlert))
+    }
+
+    /// 로컬 저장 상태 한 줄(로드맵 SAVE-1). **이 기기**에 관한 것이며 iCloud 전송은 말하지 않는다.
+    /// 실패는 위에서 지속 안내로 따로 그리므로 여기서는 다루지 않는다.
+    var localSaveText: String? {
+        switch store.chapterCanvas.localSaveIndicator {
+        case .none, .failed: nil
+        case .pending: "저장 대기 중"
+        case .saving: "저장 중…"
+        case .saved: "이 기기에 저장됨"
+        }
     }
 
     /// 안내 줄의 아래 여백. 접힌 팔레트면 도구 원(도크 맨 위 64pt)과 세로 가운데를 맞추고, 펼친 팔레트면 도크 위로 올린다.
