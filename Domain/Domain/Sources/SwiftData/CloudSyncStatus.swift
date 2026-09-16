@@ -32,7 +32,7 @@ public struct CloudSyncEvent: Equatable, Sendable {
 }
 
 /// 동기화가 왜 멈췄는지. `failed` 하나로 뭉치면 화면이 원인과 무관한 안내를 하게 된다.
-public enum CloudSyncFailure: Equatable, Sendable {
+public enum CloudSyncFailure: Hashable, Sendable {
     /// iCloud 계정이 없거나 제한됐다. 네트워크 문제가 아니다.
     case accountUnavailable
     /// import 가 **오류로** 끝났다. 원격 변경을 받지 못했다는 뜻이다.
@@ -48,7 +48,7 @@ public enum CloudSyncFailure: Equatable, Sendable {
 /// `CloudSyncState` 와 **다른 축**이다. 그쪽은 시작 화면이 초기 import 를 기다린 결과이고,
 /// 이 값은 그 뒤로도 이어지는 실제 주고받음이다. 시작 화면이 끝났다고 동기화가 끝난 것이 아니므로
 /// 설정 화면은 이 값을 본다 (정책 §4-1).
-public struct CloudSyncActivity: Equatable, Sendable {
+public struct CloudSyncActivity: Hashable, Sendable {
     /// 지금 진행 중인 작업이 있는가.
     ///
     /// - Note: 이벤트가 시작·종료 짝을 이룬다는 보장이 없어 **마지막 이벤트 기준**으로만 판단한다.
@@ -71,6 +71,26 @@ public struct CloudSyncActivity: Equatable, Sendable {
         self.lastImportSuccess = lastImportSuccess
         self.lastExportSuccess = lastExportSuccess
         self.lastFailure = lastFailure
+    }
+
+    /// 화면에 한 줄로 보여 줄 요약.
+    public enum Summary: Hashable, Sendable {
+        /// 이번 실행에서 아직 주고받은 기록이 없다. **동기화되지 않았다는 뜻이 아니다.**
+        case noRecord
+        /// 지금 주고받는 중이다.
+        case running
+        /// 마지막으로 확인된 오류가 남아 있다.
+        case failed(CloudSyncFailure)
+        /// 성공 기록만 있다. 받은 적 · 올린 적이 없으면 nil.
+        case succeeded(lastImport: Date?, lastExport: Date?)
+    }
+
+    /// 지금 보여 줄 요약. **실패가 가장 먼저다** — 다른 종류가 성공했어도 남은 실패는 해결되지 않았다.
+    public var summary: Summary {
+        if let lastFailure { return .failed(lastFailure) }
+        if isRunning { return .running }
+        if lastImportSuccess == nil && lastExportSuccess == nil { return .noRecord }
+        return .succeeded(lastImport: lastImportSuccess, lastExport: lastExportSuccess)
     }
 
     /// 이벤트 하나를 반영한 새 값. 순수 함수라 테스트로 고정한다.

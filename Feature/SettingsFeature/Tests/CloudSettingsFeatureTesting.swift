@@ -65,4 +65,30 @@ struct CloudSettingsFeatureTesting {
         #expect(!CloudAccountAvailability.unknown.canSync)
         #expect(CloudAccountAvailability.available.canSync)
     }
+
+    // MARK: 동기화 활동
+
+    @Test("화면이 열리면 동기화 활동을 구독해 바뀔 때마다 반영한다")
+    func onAppearStreamsSyncActivity() async {
+        let first = CloudSyncActivity(isRunning: true)
+        let second = CloudSyncActivity(lastImportSuccess: Date(timeIntervalSince1970: 1_000))
+        let store = await TestStore(initialState: CloudSettingsFeature.State.initialState) {
+            CloudSettingsFeature()
+        } withDependencies: {
+            $0.cloudAccountStatus = StubCloudAccountStatusClient(.available)
+            $0.cloudSyncActivity = StubCloudSyncActivityClient([first, second])
+        }
+        store.exhaustivity = .off
+
+        await store.send(.view(.onAppear))
+        await store.receive(\.activityChanged) { $0.activity = first }
+        await store.receive(\.activityChanged) { $0.activity = second }
+
+        #expect(store.state.activity.summary == .succeeded(lastImport: Date(timeIntervalSince1970: 1_000), lastExport: nil))
+    }
+
+    @Test("이번 실행에서 아직 아무 일도 없었다면 기록 없음으로 둔다")
+    func startsWithNoRecord() {
+        #expect(CloudSettingsFeature.State.initialState.activity.summary == .noRecord)
+    }
 }

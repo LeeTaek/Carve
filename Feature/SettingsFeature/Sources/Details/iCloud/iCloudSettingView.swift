@@ -6,6 +6,7 @@
 //  Copyright © 2024 leetaek. All rights reserved.
 //
 
+import Domain
 import SwiftUI
 
 import ComposableArchitecture
@@ -60,6 +61,45 @@ public struct CloudSettingView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    /// 이번 실행의 동기화 활동 한 줄. **이번 실행**에 한정된 기록임을 문구에 드러낸다.
+    @ViewBuilder
+    private var syncActivityRow: some View {
+        VStack(alignment: .leading, spacing: CarveSpacing.xSmall) {
+            switch store.activity.summary {
+            case .noRecord:
+                activityLine("이번 실행에서는 아직 주고받은 기록이 없어요", emphasized: false)
+            case .running:
+                activityLine("동기화하는 중이에요", emphasized: false)
+            case .failed(let failure):
+                activityLine(failureText(failure), emphasized: true)
+            case .succeeded(let lastImport, let lastExport):
+                if let lastImport {
+                    activityLine("마지막으로 받음 · \(lastImport.formatted(.relative(presentation: .named)))", emphasized: false)
+                }
+                if let lastExport {
+                    activityLine("마지막으로 올림 · \(lastExport.formatted(.relative(presentation: .named)))", emphasized: false)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func activityLine(_ text: String, emphasized: Bool) -> some View {
+        Text(text)
+            .font(CarveTypography.caption)
+            .foregroundStyle(emphasized ? CarveColor.ink : CarveColor.secondary)
+    }
+
+    /// 받지 못한 것과 올리지 못한 것은 사용자에게 뜻이 다르다.
+    private func failureText(_ failure: CloudSyncFailure) -> String {
+        switch failure {
+        case .accountUnavailable: "iCloud 계정을 확인해 주세요"
+        case .importFailed: "iCloud에서 필사를 받아오지 못했어요"
+        case .exportFailed: "필사를 iCloud에 올리지 못했어요 · 이 기기에는 저장돼 있어요"
+        case .unknown: "동기화 중 문제가 생겼어요"
+        }
+    }
+
     public var body: some View {
         ZStack {
             ScrollView {
@@ -70,6 +110,11 @@ public struct CloudSettingView: View {
 
                     // 조작할 수 없는 토글을 켜 둔 채로 보여 주지 않는다. 지금 확인된 계정 상태를 그대로 적는다.
                     accountStatusRow
+
+                    // 계정을 쓸 수 있을 때만 — 계정이 없으면 주고받을 수 없으므로 활동을 말할 것이 없다.
+                    if store.availability.canSync {
+                        syncActivityRow
+                    }
 
                     CarveDivider()
 
@@ -124,6 +169,7 @@ public struct CloudSettingView: View {
         }
         .disabled(store.isLoading)
         .onAppear { send(.onAppear) }
+        .onDisappear { send(.onDisappear) }
         // 시안 F2 는 확인 대화상자를 화면 가운데에 띄우고 뒤를 가린다. 팝오버는 버튼에 붙어 한쪽으로 뜨므로
         // 전체를 덮는 표현으로 바꾼다 — 바탕은 `PopupView` 가 직접 그린다.
         .fullScreenCover(item: $store.scope(state: \.path?.popup, action: \.path.popup)) { store in

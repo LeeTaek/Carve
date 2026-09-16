@@ -98,4 +98,31 @@ struct CloudSyncActivityTesting {
         #expect(activity.lastFailure == nil)
         #expect(!activity.isRunning)
     }
+
+    // MARK: 화면 요약
+
+    @Test("기록이 없으면 '아직 주고받은 기록 없음' 이다 — 동기화되지 않았다는 뜻이 아니다")
+    func emptyActivitySummarizesAsNoRecord() {
+        #expect(CloudSyncActivity().summary == .noRecord)
+    }
+
+    @Test("진행 중이면 진행 중으로 요약한다")
+    func runningSummarizesAsRunning() {
+        #expect(CloudSyncActivity(isRunning: true, lastImportSuccess: now).summary == .running)
+    }
+
+    /// 다른 종류의 성공이 있어도, 진행 중이어도 남은 실패는 해결되지 않았다.
+    @Test("실패가 가장 먼저다 — 성공 기록이 있거나 진행 중이어도 실패로 요약한다")
+    func failureOutranksEverything() {
+        let activity = CloudSyncActivity(isRunning: true, lastImportSuccess: now, lastFailure: .exportFailed)
+
+        #expect(activity.summary == .failed(.exportFailed))
+    }
+
+    @Test("성공 기록만 있으면 받은 시각과 올린 시각을 각각 든다 — 없는 쪽은 nil")
+    func successCarriesEachTimestamp() {
+        #expect(CloudSyncActivity(lastImportSuccess: now).summary == .succeeded(lastImport: now, lastExport: nil))
+        #expect(CloudSyncActivity(lastImportSuccess: now, lastExportSuccess: later).summary
+                == .succeeded(lastImport: now, lastExport: later))
+    }
 }

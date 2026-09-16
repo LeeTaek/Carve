@@ -24,16 +24,24 @@ public struct CloudSettingsFeature {
         /// "연결됨" 으로 보여 주지 않는다. 이전 구현은 조작 불가능한 토글을 켜진 채로 두어
         /// 계정이 없는 기기에서도 동기화되는 것처럼 보였다.
         public var availability: CloudAccountAvailability = .checking
+        /// 이번 실행에서의 동기화 활동. **앱을 방금 켰다면 비어 있으며, 그것이 동기화되지 않았다는 뜻은 아니다.**
+        public var activity = CloudSyncActivity()
         public var isLoading: Bool = false
     }
     @Dependency(\.createSwiftDataActor) private var database
     @Dependency(\.cloudAccountStatus) private var accountStatus
+    @Dependency(\.cloudSyncActivity) private var syncActivity
+
+    /// 화면이 떠 있는 동안만 활동을 구독한다.
+    private enum CancelID { case activity }
     @Dependency(\.widgetVerseClient) private var widgetVerseClient
 
     public enum Action: ViewAction {
         case path(PresentationAction<Path.Action>)
         /// 계정 조회 결과가 도착했다.
         case accountChecked(CloudAccountAvailability)
+        /// 동기화 활동이 바뀌었다.
+        case activityChanged(CloudSyncActivity)
         case removeAlliCloudData
         /// 삭제가 끝났다 — 열려 있는 장에 알린다.
         case drawingDataCleared
@@ -55,6 +63,8 @@ public struct CloudSettingsFeature {
             case databaseIsEmpty
             /// 화면이 나타났다. 계정 상태를 **그때 조회한다** — 미리 켜 두지 않는다.
             case onAppear
+            /// 화면이 사라졌다. 활동 구독을 멈춘다.
+            case onDisappear
         }
     }
     public var body: some Reducer<State, Action> {
@@ -62,11 +72,23 @@ public struct CloudSettingsFeature {
             switch action {
             case .view(.onAppear):
                 state.availability = .checking
-                return .run { send in
-                    await send(.accountChecked(await accountStatus.availability()))
-                }
+                return .merge(
+                    .run { send in
+                        await send(.accountChecked(await accountStatus.availability()))
+                    },
+                    .run { send in
+                        for await activity in syncActivity.activities() {
+                            await send(.activityChanged(activity))
+                        }
+                    }
+                    .cancellable(id: CancelID.activity, cancelInFlight: true)
+                )
+            case .view(.onDisappear):
+                return .cancel(id: CancelID.activity)
             case .accountChecked(let availability):
                 state.availability = availability
+            case .activityChanged(let activity):
+                state.activity = activity
             case .view(.databaseIsEmpty):
                 return .run { [widgetVerseClient] send in
                     // 「필사 데이터」 에는 즐겨찾기에 복사해 둔 필기와 위젯에 담은 말씀도 포함된다 — 셋을 함께 본다.
