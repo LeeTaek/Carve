@@ -270,6 +270,8 @@ public struct ChapterCanvasFeature {
         case verseMenuHistoryTapped
         /// 절 메뉴의 「이미지 저장」(시안 G1).
         case verseMenuImageTapped
+        /// 절 메뉴의 「위젯에 표시」(시안 N6).
+        case verseMenuWidgetTapped
         /// 절 메뉴의 「지우기」.
         case verseMenuEraseTapped
         case eraseAlert(PresentationAction<EraseAlert>)
@@ -293,6 +295,8 @@ public struct ChapterCanvasFeature {
             case favoriteToggled(verse: Int, ink: Data?)
             /// 이 절을 이미지로 사진에 저장해 달라(시안 G1). 필기 칸은 캔버스에 보이는 그대로다.
             case imageSaveRequested(VerseImageHandwriting)
+            /// 이 절을 위젯에 표시해 달라(시안 N6). `ink` 는 지금 보이는 필기 — 즐겨찾기에 없던 절이면 이대로 보관한다.
+            case widgetRequested(verse: Int, ink: Data?)
         }
     }
 
@@ -419,7 +423,7 @@ public struct ChapterCanvasFeature {
                 return .none
 
             case .verseMenuRequested, .verseMenuDismissed, .verseMenuFavoriteTapped, .verseMenuHistoryTapped, .verseMenuImageTapped,
-                 .verseMenuEraseTapped:
+                 .verseMenuWidgetTapped, .verseMenuEraseTapped:
                 return reduceVerseMenu(state: &state, action: action)
 
             case .eraseAlert(.presented(.confirm(let verse))):

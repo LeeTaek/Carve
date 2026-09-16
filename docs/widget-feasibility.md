@@ -181,7 +181,7 @@ CarveApp[34696] [kr.co.carve.leetaek:WidgetSpike] WIDGET-0 openURL:
 | W1 | **실기기 동작** | 실기기 접근 없음. 시뮬레이터에서만 확인했다 | 없음. 기기 확보 시 mini·Air 에서 위젯 추가·표시·탭을 확인한다 |
 | W2 | **자동 서명이 App Group 을 실제로 처리하는가** | 확인하려면 기기/아카이브 빌드가 필요하고, 그러면 Xcode 가 **개발자 포털에 App Group ID 를 등록하고 App ID 능력을 바꾸며 위젯용 App ID·프로파일을 새로 만든다.** 사용자 계정 설정 변경이라 수행하지 않았다 | 로컬 프로파일을 확인한 결과 `H4MSW7FUBB.kr.co.carve.leetaek` 프로파일에 **`application-groups` 가 없다**. 즉 WIDGET 에서 **① App Group ID 등록 ② 앱 App ID 에 App Groups 능력 추가 ③ `kr.co.carve.leetaek.Widget` App ID·프로파일 생성**이 필요하다. 사용자가 명시적으로 승인한 뒤 진행한다 |
 | W3 | **시뮬레이터 엔타이틀먼트가 실기기와 같은가** | 시뮬레이터 빌드는 앱·위젯 모두 ad-hoc 서명(`TeamIdentifier=not set`)이라 프로파일 검증을 거치지 않는다 | W2 와 함께 확인 |
-| W4 | **systemSmall 이외 패밀리의 이미지 면적 상한** | systemSmall 만 홈 화면에 올려 봤다 | WIDGET 에서 실제 쓰는 패밀리로 재측정. 갤러리에는 4 종(small·medium·large·extraLarge)이 노출됐다 |
+| W4 | **systemSmall 이외 패밀리의 이미지 면적 상한** | systemSmall 만 홈 화면에 올려 봤다 | WIDGET 에서 실제 쓰는 패밀리로 재측정. 갤러리에는 4 종(small·medium·large·extraLarge)이 노출됐다. **2026-09-16: 본 구현은 `systemMedium` 하나만 낸다 — 이 패밀리에서 재측정이 남았다** |
 | W5 | **긴 절·회전·저메모리에서의 위젯 동작** | 더미 이미지 한 장만 썼다 | IMAGE-CORE 완료 후 |
 | W6 | **App Store 제출 시 버전 불일치 거부 여부** | 제출하지 않았다 | §5-2 |
 | W7 | **위젯 탭 후 진행 중 편집 유실 여부** | 실제 이동 배선이 없어 판정 불가 | WIDGET 에서 확인 (로드맵 §4) |
@@ -216,6 +216,8 @@ CarveApp[34696] [kr.co.carve.leetaek:WidgetSpike] WIDGET-0 openURL:
 ---
 
 ## 8. WIDGET 본 구현에 넘기는 결정 사항
+
+> **2026-09-16 WIDGET 구현에서 정했다.** D-W1(다크) 은 종이 유지 — 배경을 종이색으로 명시하고 뷰에 라이트 `colorScheme` 을 넣는다. D-W2(이미지 규격) 는 사진용 원본을 주지 않고 **필기 PNG 를 420 × 260pt 안으로** 줄여 담는다(여러 말씀을 돌리면 한 타임라인이 그림을 여러 장 들고 있어 2026-09-16 에 560 × 360 에서 낮췄다). 나머지 결정(선택 범위 · 패밀리 · 진입점)은 [로드맵](./release-2.0.0-roadmap.md) §4 「필사 위젯」 에 있다.
 
 | # | 결정할 것 | 이 문서가 제공하는 근거 |
 |---|---|---|

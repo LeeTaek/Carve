@@ -50,6 +50,8 @@ public enum CarveIcon: CaseIterable, Sendable {
     case widget
     /// 지우기 · 삭제.
     case trash
+    /// 더보기(···) — 즐겨찾기 카드의 메뉴 버튼(시안 N6).
+    case more
     case help
 
     // 즐겨찾기(시안 N)
@@ -84,6 +86,7 @@ public enum CarveIcon: CaseIterable, Sendable {
         case .photo: ResourcesAsset.LineIcon.photo
         case .widget: ResourcesAsset.LineIcon.widget
         case .trash: ResourcesAsset.LineIcon.trash
+        case .more: ResourcesAsset.LineIcon.more
         case .help: ResourcesAsset.LineIcon.help
         case .star: ResourcesAsset.LineIcon.star
         case .starFill: ResourcesAsset.LineIcon.starFill

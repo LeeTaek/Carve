@@ -51,6 +51,8 @@ public struct SettingsFeature {
         case iCloud(CloudSettingsFeature)
         /// 필사 캔버스 — 단일 Canvas flag 토글 (설계 §13 Phase 3 (3/3)).
         case canvas(CanvasSettingsFeature)
+        /// 위젯에 표시할 말씀(시안 N7 · N8).
+        case widget(WidgetSettingsFeature)
         /// 필사 사용법과 첫 안내 다시 보기.
         case help(HelpFeature)
         /// 앱 업데이트 변경 사항.
