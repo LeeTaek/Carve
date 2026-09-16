@@ -15,6 +15,17 @@ import ComposableArchitecture
 
 // MARK: - 저장 (§8-3 · §8-4)
 
+extension ChapterCanvasFeature.State {
+    /// 저장에 실패해 **사용자에게 알려야 하는** 상태면 지금까지의 재시도 횟수. 아니면 nil.
+    ///
+    /// 실패해도 큐는 보존되고 다음 편집·flush 에서 자동으로 다시 시도한다(§8-4). 그래도 알리는 이유는
+    /// 그 재시도가 언제 일어날지 사용자가 알 수 없고, **그 사이에 앱을 닫으면 미저장분이 사라지기** 때문이다.
+    var saveRetryCount: Int? {
+        guard case .failed(_, let count) = saveStatus else { return nil }
+        return count
+    }
+}
+
 extension ChapterCanvasFeature {
     /// 같은 rowID 의 pending 항목 위에 새 명령을 겹칠 때의 규칙.
     ///

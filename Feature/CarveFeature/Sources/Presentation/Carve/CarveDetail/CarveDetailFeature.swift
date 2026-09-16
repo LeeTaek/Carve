@@ -199,6 +199,8 @@ public struct CarveDetailFeature {
             case verseMenuWidgetTapped
             /// 위젯 표시 실패 안내의 다시 시도
             case widgetRetryTapped
+            /// 저장 실패 안내의 다시 시도. 큐는 이미 보존돼 있으므로 flush 를 앞당기는 것이다.
+            case saveRetryTapped
             /// 절 메뉴의 지우기
             case verseMenuEraseTapped
             /// 절 메뉴 닫기
@@ -335,6 +337,10 @@ public struct CarveDetailFeature {
 
             case .view(.appWillResignActive):
                 // flag 와 무관하게 보낸다 — 방금 flag 를 끈 뒤에도 단일 Canvas 에 미저장분이 남아 있을 수 있다. 없으면 no-op.
+                return .send(.scope(.chapterCanvasAction(.flushPending)))
+
+            case .view(.saveRetryTapped):
+                // `flushPending` 이 곧 실패한 저장의 재시도다 (§8-5). 사용자가 기다리지 않고 지금 시도하게 한다.
                 return .send(.scope(.chapterCanvasAction(.flushPending)))
 
             case .view(.scrollToVerse(let verse)):

@@ -477,7 +477,14 @@ private extension CarveDetailView {
     /// 펼친 팔레트는 가운데를 차지하므로 그 위로 올린다. 절 메뉴 가림막보다 아래 층이다.
     var favoriteNoticeOverlay: some View {
         ZStack {
-            if let notice = store.favoriteNotice {
+            // 저장 실패가 **가장 먼저**다. 다른 안내는 일이 끝났다는 소식이지만 이것은 아직 끝나지 않았다는 뜻이고,
+            // 이대로 앱을 닫으면 미저장분이 사라진다.
+            if let retryCount = store.chapterCanvas.saveRetryCount {
+                SaveFailureNoticeView(retryCount: retryCount) {
+                    send(.saveRetryTapped)
+                }
+                .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+            } else if let notice = store.favoriteNotice {
                 FavoriteNoticeView(notice: notice) {
                     send(.favoriteRetryTapped)
                 }
@@ -498,6 +505,7 @@ private extension CarveDetailView {
         .frame(maxWidth: .infinity, alignment: store.headerState.isLeftHanded ? .leading : .trailing)
         .padding(.horizontal, CarveSpacing.large)
         .padding(.bottom, favoriteNoticeBottomInset)
+        .animation(reduceMotion ? .easeOut(duration: 0.12) : .snappy(duration: 0.25), value: store.chapterCanvas.saveRetryCount)
         .animation(reduceMotion ? .easeOut(duration: 0.12) : .snappy(duration: 0.25), value: store.favoriteNotice)
         .animation(reduceMotion ? .easeOut(duration: 0.12) : .snappy(duration: 0.25), value: store.imageSaveNotice)
         .animation(reduceMotion ? .easeOut(duration: 0.12) : .snappy(duration: 0.25), value: store.widgetNotice)
