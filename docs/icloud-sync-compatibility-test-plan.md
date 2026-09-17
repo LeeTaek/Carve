@@ -35,7 +35,7 @@
 | 항목 | 왜 필요한가 | 현재 |
 |---|---|---|
 | 테스트 전용 iCloud 계정 | 실사용 계정의 private DB 에 시험 레코드를 남기지 않기 위해 | ❌ 미확보 |
-| 폐기 가능한 CloudKit 컨테이너 | 시험이 끝나면 통째로 버릴 수 있어야 한다. 배포한 레코드 타입은 Production 에서 지울 수 없다 | ❌ 미확보 |
+| 폐기 가능한 CloudKit 컨테이너 | 시험이 끝나면 통째로 버릴 수 있어야 한다. 배포한 레코드 타입은 Production 에서 지울 수 없다 | ⚠️ **2026-09-17 사용자 결정** — dev 컨테이너(`iCloud.Carve.SwiftData.iCloud.dev`, Debug 빌드 · `Carve.dev.sqlite`)는 지우거나 고쳐도 된다. 연결된 iPad 한 대로 쓴다. 단 **같은 계정의 private DB 라 계정 격리는 아니고**, 두 번째 클라이언트도 아직 없다 |
 | 환경·zone 확인 | 컨테이너 ID 뿐 아니라 Development/Production 환경과 zone 까지 맞는지 | ❌ 미확인 |
 
 ⚠️ **로컬 파일이 갈린 것과 서버가 격리된 것은 다르다.** Debug 빌드가 `Carve.dev.sqlite` 를 쓴다고 해서 CloudKit 까지 안전한 것이 아니다. dev 컨테이너(`iCloud.Carve.SwiftData.iCloud.dev`)도 **같은 iCloud 계정의 private DB** 이고 개발 중 쌓인 데이터가 이미 있다. 파일명만 보고 "격리됐다" 고 판단하지 않는다.
@@ -264,7 +264,7 @@ OLD·CURRENT·NEW 커밋 / 테스트 변경 diff:
 제한과 다음 조치:
 ```
 
-## 5-1. 수행 기록 (2026-09-16)
+## 5-1. 수행 기록 (2026-09-16 · 17)
 
 ### PRE-0 — OLD 빌드 재현 (§2-1 선행)
 
@@ -366,6 +366,36 @@ OLD·CURRENT·NEW 커밋 / 테스트 변경 diff: OLD 49f2dc27 (MIG-L0 과 같�
 제한과 다음 조치: iCloud 미로그인 상태였다. **V1 스키마가 된 store 가 CloudKit 에 붙으면 무슨 일이
   일어나는지는 확인하지 못했다** — 서버에는 `CD_BibleDrawing` 이 있는데 클라이언트는 `CD_DrawingVO` 를
   기대하는 상태다. 단계 A 에서 반드시 관측한다.
+```
+
+### DEV-ICLOUD-1 — 실제 계정 · dev 컨테이너 한 대 관측 (계획 케이스 아님)
+
+```text
+케이스 ID / 수행일: DEV-ICLOUD-1 / 2026-09-17
+OLD·CURRENT·NEW 커밋 / 테스트 변경 diff: CURRENT 4854e609(develop, Debug)
+  / 기기 전용 임시 UI 테스트 1개로 조작 · 캡처(확인 뒤 삭제, 커밋 안 함)
+기기 A·B OS / 빌드 도구 / 환경 별칭: iPad mini (A17 Pro) · iPadOS 27.2 · USB / Xcode 26.3 · tuist 4.208.0
+  / 실사용 iCloud 계정 · iCloud.Carve.SwiftData.iCloud.dev · Carve.dev.sqlite (§2-1 사용자 결정: dev 는 지워도 된다)
+초기 표본·행/버전 수 / 원본 해시: dev 저장소의 기존 개발 데이터 — 삭제 전 행 수는 기록하지 않았다.
+  위젯 App Group 파일 2개는 빌드 구성으로 갈리지 않아 시험 전 백업 → 시험 뒤 복원, sha1 일치
+오프라인·재연결 순서 / 실제 조작: 실행 → 설정 → iCloud → 「모든 필사 데이터 삭제」 → 「모두 지우기」 → 확인 → 완료
+  → 앱 종료 → 재실행. 첫 시도는 기기의 UI 자동화가 꺼져 러너가 시작하지 못했다(사용자가 켬).
+  손가락 필기는 실행 인자로 켜지지 않아 넣지 못했다
+로컬 저장 성공 / export·import 결과 / 실제 수신 확인:
+  · 시작 화면 4.3s "데이터 동기화 중..." → 4.7s "데이터 동기화 완료" — import 성공 이벤트로 결론. 재실행 때도 2.5s 에 완료
+  · 설정 → iCloud "iCloud 계정에 연결돼 있어요" · "마지막으로 받음 · 10초 전" · "마지막으로 올림 · 10초 전"
+  · 삭제 직후 "동기화하는 중이에요" → 약 10초 뒤 "마지막으로 올림 · 지금" — 삭제가 export 됐다
+전후 원본·메타데이터·계보 비교 / 화면 확인:
+  · 결과 팝업 "모든 필사 데이터를 지웠어요." — 위젯 비우기까지 끝났다
+  · 재실행(실제 import) 뒤 기기의 dev 저장소를 복사해 셈: BibleDrawing 0 · FavoriteVerse 0 · BiblePageDrawing 0.
+    되살아난 행이 없다. 사본은 확인 뒤 지웠다
+  · 운영 Carve.sqlite 수정 시각 9/16 그대로 — 열지 않았다
+크래시·오류 / 로그·스크린샷 경로: 없음. 캡처는 xcresult 첨부로 판독한 뒤 지웠다(저장소 밖)
+관찰 시간 / 종료 코드 / 미수행 단계: 약 2.5분 / TEST SUCCEEDED / 필기 입력 · 저장 중 삭제 경쟁 · 삭제 실패 · 다른 기기 반영
+판정: 통과 — 관측한 범위(한 기기 · 성공 경로)에 한한다
+제한과 다음 조치: 경쟁 · 실패 경로와 두 번째 클라이언트는 보지 못했다. 앱 Log.debug 와 CoreData CloudKit 디버그 로그는
+  devicectl --console 로 나오지 않아(OS_ACTIVITY_DT_MODE 를 줘도) 이벤트 종류는 화면 문구로만 판정했다.
+  설정 사이드바의 iCloud 행 값이 계정 상태와 무관하게 "켬" 으로 고정된 것을 발견했다(미수정).
 ```
 
 ### 이 수행에서 새로 확인한 사실
