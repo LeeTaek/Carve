@@ -51,6 +51,7 @@ final class ChapterPKCanvasView: PKCanvasView {
 ///    `canvasViewDidEndUsingTool` 을 저장 지점으로 쓰지 않는다 — PencilKit 이 획을 반영하기 전에 호출된다 (§7-5 실측).
 ///    새 획이 시작되면 직전 획의 trailing 보고를 **취소**한다. 획 도중 `editEnded` 가 나가면 `isEditing` 이 풀려 보류된 레이아웃이
 ///    획 중간에 적용된다. 미보고 변경은 다음 도구 종료 뒤에 함께 보고한다.
+///    도구 사용 없이 내용이 바뀌는 올가미 이동 · 팔레트 Undo/Redo 는 그 변경 시점에 `editBegan` 을 따로 낸다.
 /// 3. **기하:** 텍스트 컬럼 높이 = 컬럼 자신의 높이(content 높이가 아니다), 헤더는 `contentInset.top` 으로 비운다 (콘텐츠 좌표는 헤더와 무관).
 ///    하단은 safe area와 하단 팔레트만큼 inset 을 더해 마지막 절이 가리지 않게 한다 (§5 미결 → `.never` + inset 채택).
 /// 4. **절 메뉴:** 텍스트 호스트는 터치를 받지 않으므로(`isUserInteractionEnabled = false`) 행별 컨텍스트 메뉴가 닿지 않는다.
@@ -367,35 +368,6 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
         return min(max(target, minOffset), maxOffset)
     }
 
-    // MARK: undo / redo
-
-    private func performHistory(_ reason: EditReason) {
-        guard let undoManager = canvas.undoManager else { return }
-        isPerformingHistory = reason
-        defer { isPerformingHistory = nil }
-        switch reason {
-        case .undo where undoManager.canUndo: undoManager.undo()
-        case .redo where undoManager.canRedo: undoManager.redo()
-        default: break
-        }
-    }
-
-    /// undo/redo 가능 여부를 알린다.
-    /// - Parameter deferred: 뷰 갱신(`updateUIViewController`) 안에서 부를 때 `true`. 값은 지금 읽고 보고만 다음 턴에 한다.
-    private func reportUndoState(deferred: Bool = false) {
-        let event = Event.undoStateChanged(
-            canUndo: canvas.undoManager?.canUndo ?? false,
-            canRedo: canvas.undoManager?.canRedo ?? false
-        )
-        guard deferred else {
-            onEvent?(event)
-            return
-        }
-        Task { @MainActor [weak self] in
-            self?.onEvent?(event)
-        }
-    }
-
     // MARK: PKCanvasViewDelegate — 편집 계약 (§8-1)
 
     func canvasViewDidBeginUsingTool(_ canvasView: PKCanvasView) {
@@ -466,6 +438,48 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
         let previous = lastReportedTop
         lastReportedTop = current
         onEvent?(.scrolled(previous: previous, current: current))
+    }
+}
+
+// MARK: - undo / redo
+
+/// 본문에 두면 `type_body_length`(300)를 넘는다. 같은 파일의 확장이라 `private` 상태를 그대로 쓴다.
+extension ChapterCanvasController {
+    private func performHistory(_ reason: EditReason) {
+        guard let undoManager = canvas.undoManager else { return }
+        // 획 도중이거나 미보고 변경이 있으면 편집 구간은 이미 열려 있다.
+        let opensEdit = !isUsingTool && !hasUnreportedChange
+        isPerformingHistory = reason
+        defer { isPerformingHistory = nil }
+        switch reason {
+        case .undo where undoManager.canUndo: undoManager.undo()
+        case .redo where undoManager.canRedo: undoManager.redo()
+        default: return
+        }
+        // ★ Undo/Redo 는 도구 사용 없이 drawing 을 바꾼다. 편집 구간을 열지 않으면 trailing 보고(0.3초) 전까지 Feature 가
+        //   미저장 변경이 없다고 보고 "이 기기에 저장됨" 을 유지한다 (리뷰 P2-6). 변경 알림은 undo 안에서 동기로 오므로
+        //   실제로 바뀐 때만 연다 — 시뮬레이터에서 손가락으로 그은 실제 획의 Undo · Redo 로 확인했다(2026-09-17).
+        //   뷰 갱신(`apply`) 안이라 다음 턴에 보낸다 — trailing `editEnded` 보다 먼저 도착한다.
+        guard opensEdit, hasUnreportedChange else { return }
+        Task { @MainActor [weak self] in
+            self?.onEvent?(.editBegan)
+        }
+    }
+
+    /// undo/redo 가능 여부를 알린다.
+    /// - Parameter deferred: 뷰 갱신(`updateUIViewController`) 안에서 부를 때 `true`. 값은 지금 읽고 보고만 다음 턴에 한다.
+    private func reportUndoState(deferred: Bool = false) {
+        let event = Event.undoStateChanged(
+            canUndo: canvas.undoManager?.canUndo ?? false,
+            canRedo: canvas.undoManager?.canRedo ?? false
+        )
+        guard deferred else {
+            onEvent?(event)
+            return
+        }
+        Task { @MainActor [weak self] in
+            self?.onEvent?(event)
+        }
     }
 }
 
