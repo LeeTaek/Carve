@@ -46,7 +46,7 @@ struct ChapterCanvasSaveFailureTesting {
                 revision: 1, chapter: CanvasTestSupport.chapter,
                 mutation: CanvasTestSupport.createResult("1").mutations[0]
             )]
-            $0.saveStatus = .saving(revision: 1)
+            $0.saveStatus = .saving(revision: 1, requestID: UUID(1))
             $0.inFlightBatch = [self.newRow: 1]
             $0.inFlightMutations = CanvasTestSupport.createResult("1").mutations
             $0.inFlightChapter = CanvasTestSupport.chapter
@@ -66,7 +66,7 @@ struct ChapterCanvasSaveFailureTesting {
 
         // 재시도. flush 가 곧 재시도 경로다 (§8-5).
         await store.send(.flushPending) {
-            $0.saveStatus = .saving(revision: 1)
+            $0.saveStatus = .saving(revision: 1, requestID: UUID(2))
             $0.inFlightBatch = [self.newRow: 1]
             $0.inFlightMutations = CanvasTestSupport.createResult("1").mutations
             $0.inFlightChapter = CanvasTestSupport.chapter
@@ -104,7 +104,7 @@ struct ChapterCanvasSaveFailureTesting {
         state.saveStatus = .idle
         #expect(state.saveRetryCount == nil)
 
-        state.saveStatus = .saving(revision: 3)
+        state.saveStatus = .saving(revision: 3, requestID: UUID(1))
         #expect(state.saveRetryCount == nil)
 
         state.saveStatus = .failed(revision: 3, retryCount: 1)
@@ -194,7 +194,7 @@ struct ChapterCanvasSaveFailureTesting {
         await store.send(.editBegan)
         await store.send(.editEnded(CanvasTestSupport.edit("a")))
         await store.receive(\.mutationsPrepared)
-        #expect(store.state.saveStatus == .saving(revision: 1))
+        #expect(store.state.saveStatus == .saving(revision: 1, requestID: UUID(1)))
 
         // 저장이 붙잡힌 채로 장을 바꾼다. 도는 저장이 있으므로 장 전환의 flush 는 새 저장을 시작하지 않는다.
         await store.send(.load(chapter: chapterB, expectedVerseCount: 3))

@@ -114,21 +114,29 @@ extension ChapterCanvasFeature {
         state.inFlightBatch = batch.mapValues(\.revision)
         state.inFlightMutations = mutations
         state.inFlightChapter = chapter
-        state.saveStatus = .saving(revision: revision)
+        let requestID = uuid()
+        state.saveStatus = .saving(revision: revision, requestID: requestID)
 
         return .run { [repository] send in
             do {
                 try await repository.apply(mutations, chapter: chapter)
-                await send(.saveFinished(revision: revision, failure: nil))
+                await send(.saveFinished(requestID: requestID, revision: revision, failure: nil))
             } catch let error as DrawingRepositoryError {
-                await send(.saveFinished(revision: revision, failure: error))
+                await send(.saveFinished(requestID: requestID, revision: revision, failure: error))
             } catch {
-                await send(.saveFinished(revision: revision, failure: .persistenceFailed("\(error)")))
+                await send(.saveFinished(requestID: requestID, revision: revision, failure: .persistenceFailed("\(error)")))
             }
         }
     }
 
-    func finishSave(state: inout State, revision: Int, failure: DrawingRepositoryError?) -> Effect<Action> {
+    func finishSave(state: inout State, requestID: UUID, revision: Int, failure: DrawingRepositoryError?) -> Effect<Action> {
+        // ★ 지금 도는 저장의 응답인가. 이전 구현은 이것을 보지 않고 **현재의** 진행 중 기록을 가져가 처리해서,
+        //   전체 삭제로 상태를 비운 뒤 시작한 새 저장이 있을 때 삭제 전 저장의 늦은 응답이 그 새 필사를 큐에서 지웠다.
+        //   진행 중 기록은 이 저장의 것이 아니므로 건드리지 않는다.
+        guard case .saving(_, let current) = state.saveStatus, current == requestID else {
+            Log.error("단일 Canvas — 지금 도는 저장이 아닌 완료 응답을 버린다", "revision=\(revision)", "failure=\(String(describing: failure))")
+            return .none
+        }
         let batch = state.inFlightBatch
         let mutations = state.inFlightMutations
         let chapter = state.inFlightChapter

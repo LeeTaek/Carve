@@ -41,7 +41,7 @@ struct PendingDrawingMutation: Equatable, Sendable {
 
 enum SaveStatus: Equatable, Sendable {
     case idle
-    case saving(revision: Int)
+    case saving(revision: Int, requestID: UUID)
     case failed(revision: Int, retryCount: Int)
 }
 
@@ -251,7 +251,7 @@ public struct ChapterCanvasFeature {
         /// 도구는 댔지만 drawing 이 바뀌지 않은 경우 (탭 등). 보류된 변경을 적용한다.
         case editCancelled
         case mutationsPrepared(revision: Int, DrawingEditResult)
-        case saveFinished(revision: Int, failure: DrawingRepositoryError?)
+        case saveFinished(requestID: UUID, revision: Int, failure: DrawingRepositoryError?)
         /// 장 전환 · 백그라운드 진입 시 대기열 저장 (§8-5). 실패했던 저장의 재시도이기도 하다.
         case flushPending
         /// 밖에서 필사 데이터가 전부 지워졌다 (설정 → 「모든 필사 데이터 삭제」).
@@ -384,8 +384,8 @@ public struct ChapterCanvasFeature {
             case .mutationsPrepared(let revision, let result):
                 return finishEdit(state: &state, revision: revision, result: result)
 
-            case .saveFinished(let revision, let failure):
-                return finishSave(state: &state, revision: revision, failure: failure)
+            case .saveFinished(let requestID, let revision, let failure):
+                return finishSave(state: &state, requestID: requestID, revision: revision, failure: failure)
 
             case .flushPending:
                 return startSaveIfPossible(state: &state, allowRetry: true)

@@ -366,7 +366,7 @@ struct ChapterCanvasEditTesting {
             $0.baselineData = CanvasTestSupport.edit("1").drawingData
             $0.activeRowIDs[2] = self.newRow
             $0.pendingMutations = [self.newRow: PendingDrawingMutation(revision: 1, chapter: CanvasTestSupport.chapter, mutation: self.createResult("1").mutations[0])]
-            $0.saveStatus = .saving(revision: 1)
+            $0.saveStatus = .saving(revision: 1, requestID: UUID(1))
             $0.inFlightBatch = [self.newRow: 1]
             $0.inFlightMutations = self.createResult("1").mutations
             $0.inFlightChapter = CanvasTestSupport.chapter
@@ -396,7 +396,7 @@ struct ChapterCanvasEditTesting {
         spy.holdNextApply()
         await store.send(.editEnded(CanvasTestSupport.edit("1")))
         await store.receive(\.mutationsPrepared)
-        #expect(store.state.saveStatus == .saving(revision: 1))
+        #expect(store.state.saveStatus == .saving(revision: 1, requestID: UUID(1)))
 
         // 첫 저장이 붙잡힌 동안 두 번째 편집이 들어온다.
         await store.send(.editEnded(CanvasTestSupport.edit("2")))
@@ -404,13 +404,13 @@ struct ChapterCanvasEditTesting {
         let merged = store.state.pendingMutations[newRow]
         #expect(merged?.revision == 2)
         #expect(merged?.mutation == .create(verse: 2, rowID: newRow, data: Data("replace-2".utf8), metadata: CanvasTestSupport.metadata()))
-        #expect(store.state.saveStatus == .saving(revision: 1))
+        #expect(store.state.saveStatus == .saving(revision: 1, requestID: UUID(1)))
 
         spy.releaseApply()
         await store.receive(\.saveFinished) {
             // revision 1 로 저장된 항목만 제거되는데, 큐의 항목은 revision 2 라 남는다.
             $0.persistedRevision = 1
-            $0.saveStatus = .saving(revision: 2)
+            $0.saveStatus = .saving(revision: 2, requestID: UUID(2))
             $0.inFlightBatch = [self.newRow: 2]
         }
         await store.receive(\.saveFinished) {
@@ -457,7 +457,7 @@ struct ChapterCanvasEditTesting {
         #expect(!store.state.isFullyPersisted)
 
         await store.send(.flushPending) {
-            $0.saveStatus = .saving(revision: 1)
+            $0.saveStatus = .saving(revision: 1, requestID: UUID(2))
             $0.inFlightBatch = [self.newRow: 1]
         }
         await store.receive(\.saveFinished) {
@@ -583,7 +583,7 @@ struct ChapterCanvasEditTesting {
             $0.chapter = next
             $0.renderedData = nil
             // 장 전환은 flush 지점이다 — 이전 장의 batch 가 곧바로 다시 나간다.
-            $0.saveStatus = .saving(revision: 1)
+            $0.saveStatus = .saving(revision: 1, requestID: UUID(3))
             $0.inFlightBatch = [self.newRow: 1]
         }
         await store.receive(\.saveFinished) {
@@ -633,7 +633,7 @@ struct ChapterCanvasGenerationTesting {
             $0.pendingMutations = [self.newRow: PendingDrawingMutation(
                 revision: 1, chapter: CanvasTestSupport.chapter, mutation: CanvasTestSupport.createResult("late").mutations[0]
             )]
-            $0.saveStatus = .saving(revision: 1)
+            $0.saveStatus = .saving(revision: 1, requestID: UUID(2))
         }
         await store.receive(\.saveFinished) {
             $0.pendingMutations = [:]
@@ -687,7 +687,7 @@ struct ChapterCanvasGenerationTesting {
             $0.layout = CanvasTestSupport.otherLayout
             $0.reloadWhenSettled = true
             $0.isReloading = true
-            $0.saveStatus = .saving(revision: 1)
+            $0.saveStatus = .saving(revision: 1, requestID: UUID(2))
         }
         #expect(!store.state.isInputEnabled)
         await store.receive(\.saveFinished) {
@@ -710,7 +710,7 @@ struct ChapterCanvasGenerationTesting {
         #expect(spy.loadedChapters.value.count == 1)
 
         // 저장이 성공하면 미뤄 둔 DB 재조회가 이어진다.
-        await store.send(.flushPending) { $0.saveStatus = .saving(revision: 1) }
+        await store.send(.flushPending) { $0.saveStatus = .saving(revision: 1, requestID: UUID(3)) }
         await store.receive(\.saveFinished) {
             $0.pendingMutations = [:]
             $0.saveStatus = .idle
