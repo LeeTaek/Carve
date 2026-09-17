@@ -37,10 +37,14 @@ public final class PersistentCloudKitContainer: ObservableObject {
     @Published public var syncState: CloudSyncState = .idle
     /// 앱이 도는 동안 이어지는 동기화 활동 (정책 §4-1).
     @Published public var activity = CloudSyncActivity()
-    /// 이벤트 관찰 Task. 앱 수명 동안 유지한다. `nil` 이면 아직 시작하지 않았다.
-    private var observationTask: Task<Void, Never>?
+    /// 알림 구독. 앱 수명 동안 유지한다. `nil` 이면 아직 시작하지 않았다. **MainActor 에서만** 바꾼다.
+    private var observation: Observation?
+    /// 초기 대기를 이미 시작했는가. 두 번째 호출이 결론을 되돌리지 않게 한다. **MainActor 에서만** 바꾼다.
+    private var initialWaitStarted = false
     /// 초기 import 를 기다리는 한도(초). 테스트가 줄인다.
     var initialWaitLimit = InitialWaitLimit()
+    /// 관찰할 알림. 테스트가 바꾼다 — `NSPersistentCloudKitContainer.Event` 는 테스트에서 만들 수 없다.
+    var eventSource = EventSource()
     /// 현재 동기화 기준이 되는 성경 제목/장 정보.
     private var currentTitle: BibleChapter
     /// 의존성으로 주입된 ContainerID를 기반으로 생성되는 CloudKit Private 데이터베이스.
@@ -93,19 +97,32 @@ public final class PersistentCloudKitContainer: ObservableObject {
         }
     }
     
+    /// 관찰할 알림과, 그 알림에서 판정에 쓸 이벤트를 꺼내는 방법.
+    struct EventSource: Sendable {
+        var center: NotificationCenter = .default
+        var name: Notification.Name = NSPersistentCloudKitContainer.eventChangedNotification
+        var event: @Sendable (Notification) -> CloudSyncEvent? = { PersistentCloudKitContainer.cloudKitEvent(from: $0) }
+    }
+
     /// 초기 import 를 기다리는 한도. 마이그레이션은 오래 걸리므로 따로 둔다.
     struct InitialWaitLimit {
         var normal: Double = 20
         var migration: Double = 120
     }
 
-    /// 계정을 확인하고, 초기 import 의 결론이나 제한 시간까지 기다린다.
+    /// 알림 구독 한 벌 — 끊을 때 셋을 함께 정리한다.
+    private struct Observation {
+        let center: NotificationCenter
+        let token: any NSObjectProtocol
+        let continuation: AsyncStream<CloudSyncEvent>.Continuation
+        let task: Task<Void, Never>
+    }
+
+    /// 계정을 확인하고, 초기 import 의 결론이나 제한 시간까지 기다린다. **한 번만** 기다린다.
     public func observeCloudKitSyncProgress() async {
         // ★ 계정을 조회하기 **전에** 구독을 시작한다. 이전 구현은 계정 조회가 끝난 뒤에야
         //   구독을 열어, 그 사이에 도착한 이벤트를 놓쳤다.
-        startObserving()
-        self.syncState = (syncState == .migration) ? .migration : .syncing
-        let deadline = syncState == .migration ? initialWaitLimit.migration : initialWaitLimit.normal
+        guard let deadline = await beginInitialWait() else { return }
         // 설정 화면과 같은 조회를 쓴다 — 조회 실패를 "계정 없음" 으로 단정하지 않는 규칙이 한곳에 있다.
         @Dependency(\.cloudAccountStatus) var accountStatus
         do {
@@ -125,7 +142,31 @@ public final class PersistentCloudKitContainer: ObservableObject {
                 await self?.waitForInitialConclusion()
             }
         } catch {
-            await MainActor.run { self.concludeInitialWait(after: error) }
+            await concludeInitialWait(after: error)
+        }
+    }
+
+    /// 관찰을 설치하고 초기 대기 상태를 정한다 — **이벤트 반영(`receive`)과 같은 MainActor 에서, 한 번에.**
+    ///
+    /// 이전 구현은 이벤트 반영은 MainActor 에서, 상태 초기화(`.syncing`)는 그 밖에서 했다. 그래서 구독이 먼저 받은
+    /// 결론을 초기화가 지우고, 오지 않을 결론을 기다리다 "시간이 걸리고 있어요" 로 끝날 수 있었다.
+    /// - Returns: 기다릴 한도(초). 이미 대기를 시작했거나 결론이 나 있으면 nil — 결론을 되돌리지 않는다.
+    @MainActor
+    private func beginInitialWait() -> Double? {
+        startObserving()
+        guard !initialWaitStarted else { return nil }
+        initialWaitStarted = true
+        switch syncState {
+        case .idle:
+            syncState = .syncing
+            return initialWaitLimit.normal
+        case .migration:
+            return initialWaitLimit.migration
+        case .syncing, .stillWaiting:
+            return initialWaitLimit.normal
+        case .syncCompleted, .migrationCompleted, .failed:
+            Log.debug("초기 대기 — 대기를 시작하기 전에 결론이 났다", "\(syncState)")
+            return nil
         }
     }
 
@@ -172,32 +213,46 @@ public final class PersistentCloudKitContainer: ObservableObject {
         }
     }
 
-    /// `eventChangedNotification` 관찰을 **앱 수명 동안** 시작한다. 여러 번 불러도 한 번만 시작한다.
+    /// CloudKit 이벤트 관찰을 **앱 수명 동안** 시작한다. 여러 번 불러도 한 번만 시작한다.
     ///
     /// - Important: 이전 구현은 초기 import 하나를 확인하면 관찰을 끝냈다. 그래서 시작 화면이 지난 뒤의
     ///              동기화 상태를 앱이 전혀 알지 못했다. 이제는 관찰을 끊지 않고 ``activity`` 를 계속 갱신한다.
+    /// - Important: **돌아올 때 구독은 이미 걸려 있다.** 이전 구현은 Task 안에서 알림 시퀀스를 만들어, 그 Task 가
+    ///              돌기 전에 게시된 이벤트를 놓쳤다. 구독은 여기서 동기로 걸고, 도착한 이벤트는 순서대로 쌓아 두었다가
+    ///              MainActor 에서 반영한다 — 알림을 보낸 스레드에서 MainActor 를 기다리지 않는다.
+    @MainActor
     public func startObserving() {
-        guard observationTask == nil else { return }
-        observationTask = Task { [weak self] in
-            let notifications = NotificationCenter.default.notifications(named: NSPersistentCloudKitContainer.eventChangedNotification)
-            for await notification in notifications {
+        guard observation == nil else { return }
+        let source = eventSource
+        let (events, continuation) = AsyncStream<CloudSyncEvent>.makeStream()
+        let token = source.center.addObserver(forName: source.name, object: nil, queue: nil) { notification in
+            guard let event = source.event(notification) else { return }
+            continuation.yield(event)
+        }
+        let task = Task { @MainActor [weak self] in
+            for await event in events {
                 guard let self else { return }
-                guard let cloudEvent = notification.userInfo?[NSPersistentCloudKitContainer.eventNotificationUserInfoKey]
-                    as? NSPersistentCloudKitContainer.Event else { continue }
-                Log.debug("cloudEvent", cloudEvent.debugDescription)
-                await self.receive(Self.syncEvent(from: cloudEvent))
+                self.receive(event)
             }
         }
+        observation = Observation(center: source.center, token: token, continuation: continuation, task: task)
     }
 
     deinit {
-        observationTask?.cancel()
+        guard let observation else { return }
+        observation.center.removeObserver(observation.token)
+        observation.continuation.finish()
+        observation.task.cancel()
     }
 
     /// 관찰을 멈춘다. 앱이 살아 있는 동안은 부를 일이 없고, 테스트·해제 때만 쓴다.
+    @MainActor
     public func stopObserving() {
-        observationTask?.cancel()
-        observationTask = nil
+        guard let observation else { return }
+        observation.center.removeObserver(observation.token)
+        observation.continuation.finish()
+        observation.task.cancel()
+        self.observation = nil
     }
 
     /// 이벤트 하나를 반영한다. 관찰 Task 가 부른다 — `NSPersistentCloudKitContainer.Event` 는 테스트에서 만들 수 없어
@@ -228,8 +283,11 @@ public final class PersistentCloudKitContainer: ObservableObject {
         }
     }
 
-    /// CloudKit 이벤트를 판정에 필요한 값만 남긴 `CloudSyncEvent` 로 바꾼다.
-    private static func syncEvent(from event: NSPersistentCloudKitContainer.Event) -> CloudSyncEvent {
+    /// CloudKit 알림에서 판정에 필요한 값만 남긴 `CloudSyncEvent` 를 꺼낸다.
+    static func cloudKitEvent(from notification: Notification) -> CloudSyncEvent? {
+        guard let event = notification.userInfo?[NSPersistentCloudKitContainer.eventNotificationUserInfoKey]
+            as? NSPersistentCloudKitContainer.Event else { return nil }
+        Log.debug("cloudEvent", event.debugDescription)
         let kind: CloudSyncEvent.Kind = switch event.type {
         case .setup: .setup
         case .import: .cloudImport
