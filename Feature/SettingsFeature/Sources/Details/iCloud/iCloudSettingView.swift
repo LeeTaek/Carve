@@ -94,6 +94,7 @@ public struct CloudSettingView: View {
     private func failureText(_ failure: CloudSyncFailure) -> String {
         switch failure {
         case .accountUnavailable: "iCloud 계정을 확인해 주세요"
+        case .accountCheckFailed: "iCloud 계정 상태를 확인하지 못했어요"
         case .importFailed: "iCloud에서 필사를 받아오지 못했어요"
         case .exportFailed: "필사를 iCloud에 올리지 못했어요 · 이 기기에는 저장돼 있어요"
         case .unknown: "동기화 중 문제가 생겼어요"

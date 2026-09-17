@@ -39,6 +39,8 @@ public final class PersistentCloudKitContainer: ObservableObject {
     @Published public var activity = CloudSyncActivity()
     /// 이벤트 관찰 Task. 앱 수명 동안 유지한다. `nil` 이면 아직 시작하지 않았다.
     private var observationTask: Task<Void, Never>?
+    /// 초기 import 를 기다리는 한도(초). 테스트가 줄인다.
+    var initialWaitLimit = InitialWaitLimit()
     /// 현재 동기화 기준이 되는 성경 제목/장 정보.
     private var currentTitle: BibleChapter
     /// 의존성으로 주입된 ContainerID를 기반으로 생성되는 CloudKit Private 데이터베이스.
@@ -91,51 +93,85 @@ public final class PersistentCloudKitContainer: ObservableObject {
         }
     }
     
-    /// CloudKit 동기화 상태를 확인하고, 계정 상태/네트워크 등을 검사한 뒤 동기화를 시작.
-    /// - 동기화 모드에 따라 타임아웃(deadline)을 다르게 적용.
+    /// 초기 import 를 기다리는 한도. 마이그레이션은 오래 걸리므로 따로 둔다.
+    struct InitialWaitLimit {
+        var normal: Double = 20
+        var migration: Double = 120
+    }
+
+    /// 계정을 확인하고, 초기 import 의 결론이나 제한 시간까지 기다린다.
     public func observeCloudKitSyncProgress() async {
         // ★ 계정을 조회하기 **전에** 구독을 시작한다. 이전 구현은 계정 조회가 끝난 뒤에야
         //   구독을 열어, 그 사이에 도착한 이벤트를 놓쳤다.
         startObserving()
         self.syncState = (syncState == .migration) ? .migration : .syncing
-        let deadline: Double = syncState == .migration ? 120 : 20
+        let deadline = syncState == .migration ? initialWaitLimit.migration : initialWaitLimit.normal
+        // 설정 화면과 같은 조회를 쓴다 — 조회 실패를 "계정 없음" 으로 단정하지 않는 규칙이 한곳에 있다.
+        @Dependency(\.cloudAccountStatus) var accountStatus
         do {
             // 계정 조회도 같은 제한 안에서 한다. 이전 구현은 이 호출이 제한 밖이라
             // 계정 조회가 오래 걸리면 기다린 시간이 집계되지 않았다.
             try await Task.withTimeout(seconds: deadline) { [weak self] in
-                @Dependency(\.containerId) var containerId
-                let container = containerId.id.isEmpty ? CKContainer.default() : CKContainer(identifier: containerId.id)
-                let cloudKitAccountStatus = try await container.accountStatus()
-                guard cloudKitAccountStatus == .available else {
-                    throw CloudkitError.accountError
+                switch await accountStatus.availability() {
+                case .available:
+                    break
+                case .noAccount, .restricted:
+                    throw InitialWaitError.accountUnavailable
+                case .unknown, .checking:
+                    throw InitialWaitError.accountCheckFailed
                 }
+                // 조회하는 사이 대기가 취소됐으면 여기서 멈춘다 — 결론을 기다리지 않는다.
+                try Task.checkCancellation()
                 await self?.waitForInitialConclusion()
             }
-        } catch let error as CloudkitError {
-            await MainActor.run { self.syncState = Self.state(for: error) }
         } catch {
-            // 제한 시간이 지난 것은 **실패가 아니다.** 관찰을 끊지 않고 안내만 바꾼다.
-            Log.debug("CloudKit 초기 import 가 제한 시간 안에 끝나지 않았다", error.localizedDescription)
-            await MainActor.run { self.syncState = .stillWaiting }
+            await MainActor.run { self.concludeInitialWait(after: error) }
         }
     }
 
-    /// 확인된 오류를 상태로 옮긴다. 원인을 잃지 않아야 화면이 맞는 안내를 한다.
-    private static func state(for error: CloudkitError) -> CloudSyncState {
+    /// 초기 대기가 결론 없이 끝난 이유를 상태로 옮긴다 (정책 §3). **이미 결론이 났으면 덮지 않는다.**
+    ///
+    /// 관찰이 import 결과를 먼저 반영했는데 계정 조회 결과가 뒤늦게 오면, 이전 구현은 그 결론을 지웠다.
+    @MainActor
+    private func concludeInitialWait(after error: Error) {
+        guard let outcome = Self.initialWaitOutcome(after: error) else { return }
+        guard syncState.isInProgress else {
+            Log.debug("초기 대기 — 이미 결론이 났다. 늦게 온 결과로 덮지 않는다", "\(syncState)", "\(error)")
+            return
+        }
+        syncState = outcome
+    }
+
+    /// 초기 대기를 끝낸 오류의 뜻. 순수 함수다.
+    ///
+    /// | 이유 | 상태 |
+    /// |---|---|
+    /// | 제한 시간 (`TaskTimeoutError`) | `stillWaiting` — **실패가 아니다.** 관찰은 이어진다 |
+    /// | 계정 없음 · 제한 | `failed(.accountUnavailable)` |
+    /// | 계정 확인 실패 | `failed(.accountCheckFailed)` — 계정이 없다는 뜻이 아니다 |
+    /// | 취소 | nil — 바꾸지 않는다. 기다리던 화면이 사라졌다 |
+    /// | 그 밖 | `failed(.unknown)` — 확인하지 못한 오류를 "시간이 걸린다" 로 말하지 않는다 |
+    ///
+    /// 이전 구현은 계정 조회가 던진 오류와 취소까지 하나의 `catch` 에서 `stillWaiting` 으로 보냈다.
+    static func initialWaitOutcome(after error: Error) -> CloudSyncState? {
         switch error {
-        case .accountError:
-            Log.error("iCloud 계정을 쓸 수 없다", "\(error)")
+        case is TaskTimeoutError:
+            Log.debug("CloudKit 초기 import 가 제한 시간 안에 끝나지 않았다", "\(error)")
+            return .stillWaiting
+        case is CancellationError:
+            return nil
+        case InitialWaitError.accountUnavailable:
+            Log.error("iCloud 계정을 쓸 수 없다")
             return .failed(.accountUnavailable)
-        case .syncingFail:
-            Log.error("CloudKit import 가 오류로 끝났다", "\(error)")
-            return .failed(.importFailed)
-        case .initFail, .timeout:
-            Log.error("CloudKit 초기화 실패", "\(error)")
+        case InitialWaitError.accountCheckFailed:
+            Log.error("iCloud 계정 상태를 확인하지 못했다")
+            return .failed(.accountCheckFailed)
+        default:
+            Log.error("CloudKit 초기 대기가 알 수 없는 오류로 끝났다", "\(error)")
             return .failed(.unknown)
         }
     }
-    
-    
+
     /// `eventChangedNotification` 관찰을 **앱 수명 동안** 시작한다. 여러 번 불러도 한 번만 시작한다.
     ///
     /// - Important: 이전 구현은 초기 import 하나를 확인하면 관찰을 끝냈다. 그래서 시작 화면이 지난 뒤의
@@ -149,11 +185,7 @@ public final class PersistentCloudKitContainer: ObservableObject {
                 guard let cloudEvent = notification.userInfo?[NSPersistentCloudKitContainer.eventNotificationUserInfoKey]
                     as? NSPersistentCloudKitContainer.Event else { continue }
                 Log.debug("cloudEvent", cloudEvent.debugDescription)
-                let event = Self.syncEvent(from: cloudEvent)
-                await MainActor.run {
-                    self.activity = self.activity.applying(event, at: Date())
-                    self.applyToInitialWait(event)
-                }
+                await self.receive(Self.syncEvent(from: cloudEvent))
             }
         }
     }
@@ -166,6 +198,14 @@ public final class PersistentCloudKitContainer: ObservableObject {
     public func stopObserving() {
         observationTask?.cancel()
         observationTask = nil
+    }
+
+    /// 이벤트 하나를 반영한다. 관찰 Task 가 부른다 — `NSPersistentCloudKitContainer.Event` 는 테스트에서 만들 수 없어
+    /// 테스트는 판정에 쓰는 값(`CloudSyncEvent`)으로 여기를 직접 부른다.
+    @MainActor
+    func receive(_ event: CloudSyncEvent) {
+        activity = activity.applying(event, at: Date())
+        applyToInitialWait(event)
     }
 
     /// 시작 화면이 기다리는 `syncState` 에 이벤트를 반영한다.
@@ -199,15 +239,11 @@ public final class PersistentCloudKitContainer: ObservableObject {
         return CloudSyncEvent(kind: kind, ended: event.endDate != nil, succeeded: event.succeeded)
     }
         
-    /// CloudKit 초기화 및 동기화 과정에서 발생할 수 있는 에러.
-    private enum CloudkitError: Error {
-        /// 컨테이너 초기화에 실패.
-        case initFail
-        /// 지정된 대기 시간 내에 동기화 완료 이벤트를 받지 못한 경우.
-        case timeout
-        /// 동기화 처리 중 알 수 없는 오류가 발생한 경우.
-        case syncingFail
-        /// iCloud 계정 상태가 유효하지 않은 경우. (비로그인, 제한 등)
-        case accountError
+    /// 초기 대기를 멈추게 한 계정 문제. 제한 시간 · 취소와 구분하려고 따로 던진다.
+    private enum InitialWaitError: Error {
+        /// iCloud 에 로그인돼 있지 않거나 제한됐다.
+        case accountUnavailable
+        /// 계정 상태를 확인하지 못했다(조회 오류 · 일시적 불가). **없다는 뜻이 아니다.**
+        case accountCheckFailed
     }
 }

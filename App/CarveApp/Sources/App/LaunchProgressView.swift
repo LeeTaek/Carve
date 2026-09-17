@@ -84,6 +84,9 @@ struct LaunchProgressView: View {
         let message = switch reason {
         case .accountUnavailable:
             "iCloud 계정을 확인해 주세요.\n지금은 이 기기에만 저장돼요."
+        case .accountCheckFailed:
+            // 계정이 없다고 단정하지 않는다. 동기화가 되는지도 모르므로 "이 기기에만" 이라고 하지 않는다.
+            "iCloud 계정 상태를 확인하지 못했어요.\n필사는 이 기기에 저장돼요."
         case .importFailed:
             "iCloud에서 필사를 가져오다 문제가 생겼어요.\n지금은 이 기기에만 저장돼요."
         case .exportFailed:

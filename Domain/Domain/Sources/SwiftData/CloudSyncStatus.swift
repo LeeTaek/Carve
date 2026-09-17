@@ -35,6 +35,8 @@ public struct CloudSyncEvent: Equatable, Sendable {
 public enum CloudSyncFailure: Hashable, Sendable {
     /// iCloud 계정이 없거나 제한됐다. 네트워크 문제가 아니다.
     case accountUnavailable
+    /// iCloud 계정 상태를 **확인하지 못했다**(조회 오류 · 일시적 불가). 계정이 없다는 뜻이 아니다.
+    case accountCheckFailed
     /// import 가 **오류로** 끝났다. 원격 변경을 받지 못했다는 뜻이다.
     case importFailed
     /// export 가 **오류로** 끝났다. 내 변경이 서버에 올라가지 못했다는 뜻이다.
