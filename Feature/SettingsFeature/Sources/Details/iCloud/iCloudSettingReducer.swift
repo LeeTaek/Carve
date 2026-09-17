@@ -150,7 +150,8 @@ public struct CloudSettingsFeature {
                         // 다음 저장이 방금 지운 필사를 되살린다.
                         await send(.drawingDataCleared)
                     }
-                    // 필사 행조차 지우지 못했다면 신호를 보내지 않는다. 아무것도 지워지지 않았는데 미저장분만 버리면 유실이다.
+                    // 필사 행 삭제가 실패했다면 신호를 보내지 않는다. 지워졌는지 확인하지 못했을 때 미저장분을 버리면,
+                    // 실제로 지워지지 않았을 경우 사용자가 쓴 필사를 잃는다(`DrawingEraseOutcome.failed`).
 
                     // 결과와 무관하게 잠금을 푼다. 이전 구현은 삭제가 실패하면 여기에 오지 못해 화면이 멈췄다.
                     await send(.setLoading(false))
@@ -201,9 +202,12 @@ public struct CloudSettingsFeature {
 }
 
 extension CloudSettingsFeature {
-    /// 전체 삭제가 끝나지 못했을 때 **무엇이 남았는지** 말한다. 남은 것을 뭉뚱그리지 않는다.
+    /// 전체 삭제가 끝나지 못했을 때 **확인된 범위만** 말한다. 남은 것을 뭉뚱그리지도, 확인하지 못한 것을 단정하지도 않는다.
+    ///
+    /// 필사 행 삭제가 실패하면(`.failed`) 일부가 지워졌는지 증명하지 못한다(`DrawingEraseOutcome.failed`). 미저장분을
+    /// 지키기로 한 판단과 "아무것도 지우지 않았다" 는 보장은 별개라, 이전 문구("아직 아무것도 지우지 않았어요")를 쓰지 않는다.
     static func eraseFailureBody(outcome: DrawingEraseOutcome, widgetCleared: Bool) -> String {
-        guard outcome.drawingsCleared else { return "아직 아무것도 지우지 않았어요." }
+        guard outcome.drawingsCleared else { return "삭제를 완료하지 못했어요. 다시 시도해 주세요." }
         switch (outcome, widgetCleared) {
         case (.partiallyFailed, false):
             return "필기는 지웠지만 즐겨찾기와 위젯에 담은 말씀이 남았을 수 있어요."

@@ -87,7 +87,7 @@ struct CloudSettingsEraseTesting {
         ))
     }
 
-    @Test("필사 행조차 못 지웠으면 열린 장에 알리지 않는다 — 미저장분을 버리면 유실이다. 잠금은 풀고 다시 시도를 둔다")
+    @Test("필사 행 삭제가 실패하면 열린 장에 알리지 않고, 지웠다고도 지우지 않았다고도 단정하지 않는다. 잠금은 풀고 다시 시도를 둔다")
     func nothingErasedKeepsPendingAndUnlocks() async {
         let eraser = EraserStub([.failed])
         let widget = WidgetClearSpy()
@@ -98,10 +98,11 @@ struct CloudSettingsEraseTesting {
         // ★ `drawingDataCleared` 가 끼어들면 이 순서가 어긋나 실패한다.
         await store.receive(\.setLoading) { $0.isLoading = false }
         await store.receive(\.presentPopover) {
-            $0.path = self.retryPopup(body: "아직 아무것도 지우지 않았어요.")
+            // 일부가 지워졌는지 증명하지 못하므로 "아무것도 지우지 않았다" 고 단정하지 않는다.
+            $0.path = self.retryPopup(body: "삭제를 완료하지 못했어요. 다시 시도해 주세요.")
         }
 
-        // 아무것도 지우지 않았으므로 위젯의 말씀도 그대로 둔다.
+        // 필사 행을 지웠다고 확인하지 못했으므로 위젯의 말씀도 그대로 둔다 — 미저장분을 지키는 것과 같은 판단이다.
         #expect(widget.clearCount.value == 0)
     }
 
