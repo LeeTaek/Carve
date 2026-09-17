@@ -37,6 +37,29 @@ private final class HeldAccountStatus: CloudAccountStatusClient, @unchecked Send
     }
 }
 
+/// 조회하는 도중 기다리던 쪽을 취소하고 `.unknown` 을 돌려준다.
+///
+/// 실제 구현(`CloudKitAccountStatusClient`)은 조회가 던진 오류를 전부 `.unknown` 으로 바꾸므로, 조회 중에 취소되면
+/// 취소 오류도 `.unknown` 으로 돌아올 수 있다. 그 결과를 "계정 확인 실패" 로 읽으면 안 된다.
+private final class CancellingAccountStatus: CloudAccountStatusClient, @unchecked Sendable {
+    private let lock = NSLock()
+    private var target: Task<Void, Never>?
+
+    func cancelDuringCheck(_ task: Task<Void, Never>) {
+        lock.lock()
+        target = task
+        lock.unlock()
+    }
+
+    func availability() async -> CloudAccountAvailability {
+        lock.lock()
+        let task = target
+        lock.unlock()
+        task?.cancel()
+        return .unknown
+    }
+}
+
 @Suite("시작 화면 초기 대기 — 끝난 이유를 가른다")
 @MainActor
 struct CloudInitialWaitTesting {
@@ -106,6 +129,21 @@ struct CloudInitialWaitTesting {
 
         // ★ 이전 구현은 취소도 "시간이 걸리고 있어요" 로 바꿨다.
         #expect(container.syncState == .syncing)
+    }
+
+    /// 취소와 시간 초과 작업의 오류 중 무엇이 먼저 전달되는지는 실행마다 다를 수 있어 여러 번 본다.
+    @Test("계정 조회 도중 취소돼 조회가 .unknown 으로 끝나도 상태를 바꾸지 않는다 — 확인 실패로 보이지 않는다")
+    func cancellationDuringAccountCheckIsNotCheckFailure() async {
+        for _ in 0..<10 {
+            let container = makeContainer(limit: 30)
+            let account = CancellingAccountStatus()
+            // 대기는 MainActor 를 거쳐 시작하므로, 이 줄이 조회보다 먼저 실행된다.
+            let waiting = Task { await observe(container, account: account) }
+            account.cancelDuringCheck(waiting)
+            await waiting.value
+
+            #expect(container.syncState == .syncing)
+        }
     }
 
     @Test("관찰이 먼저 결론을 냈으면 늦게 끝난 계정 조회가 그 결론을 덮지 않는다")

@@ -129,7 +129,11 @@ public final class PersistentCloudKitContainer: ObservableObject {
             // 계정 조회도 같은 제한 안에서 한다. 이전 구현은 이 호출이 제한 밖이라
             // 계정 조회가 오래 걸리면 기다린 시간이 집계되지 않았다.
             try await Task.withTimeout(seconds: deadline) { [weak self] in
-                switch await accountStatus.availability() {
+                let availability = await accountStatus.availability()
+                // ★ 결과를 보기 **전에** 취소를 확인한다. 조회 구현은 취소를 포함한 모든 오류를 `.unknown` 으로 바꾸므로,
+                //   먼저 분기하면 조회 도중의 취소를 "계정 상태를 확인하지 못했다" 로 읽는다(시험에서 10번 중 10번).
+                try Task.checkCancellation()
+                switch availability {
                 case .available:
                     break
                 case .noAccount, .restricted:
@@ -137,11 +141,12 @@ public final class PersistentCloudKitContainer: ObservableObject {
                 case .unknown, .checking:
                     throw InitialWaitError.accountCheckFailed
                 }
-                // 조회하는 사이 대기가 취소됐으면 여기서 멈춘다 — 결론을 기다리지 않는다.
-                try Task.checkCancellation()
                 await self?.waitForInitialConclusion()
             }
         } catch {
+            // 기다리던 호출이 취소됐으면 어떤 오류로 끝났든 상태를 바꾸지 않는다. 취소는 시간 초과 작업에도 함께 전해지고,
+            // 어느 쪽 오류가 먼저 올라올지는 정해져 있지 않다.
+            guard !Task.isCancelled else { return }
             await concludeInitialWait(after: error)
         }
     }
