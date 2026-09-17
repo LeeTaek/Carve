@@ -29,8 +29,12 @@ final class RepositorySpy: DrawingRepository, @unchecked Sendable {
     let loadFailures = LockIsolated<[String]>([])
     struct LoadBoom: Error, CustomStringConvertible { let description: String }
     var snapshots: @Sendable (BibleChapter) -> [VerseDrawingSnapshot] = { _ in [] }
+    /// 지금 저장소 세대. 전체 삭제를 흉내 내려면 올린다 — 조회는 이 값을 돌려주고, 다른 세대의 저장은 거절한다.
+    let generation = LockIsolated(DrawingStoreGeneration(raw: 0))
+    /// 도착한 저장의 세대. 거절된 저장도 남는다 — `applied` 는 **실제로 쓴** 저장만 남긴다.
+    let appliedGenerations = LockIsolated<[DrawingStoreGeneration]>([])
 
-    func load(chapter: BibleChapter) async throws -> [VerseDrawingSnapshot] {
+    func load(chapter: BibleChapter) async throws -> DrawingChapterLoad {
         if let (stream, continuation) = makeLoadGateIfNeeded() {
             loadGate.setValue(continuation)
             for await _ in stream { break }
@@ -39,7 +43,7 @@ final class RepositorySpy: DrawingRepository, @unchecked Sendable {
         if let message = loadFailures.withValue({ $0.isEmpty ? nil : $0.removeFirst() }) {
             throw LoadBoom(description: message)
         }
-        return snapshots(chapter)
+        return DrawingChapterLoad(snapshots: snapshots(chapter), generation: generation.value)
     }
 
     /// 다음 `load` 를 `releaseLoad()` 까지 붙잡는다 — 늦게 도착하는 조회 결과를 재현하기 위함.
@@ -54,10 +58,15 @@ final class RepositorySpy: DrawingRepository, @unchecked Sendable {
         return AsyncStream<Void>.makeStream()
     }
 
-    func apply(_ mutations: [VerseDrawingMutation], chapter: BibleChapter) async throws {
+    func apply(_ mutations: [VerseDrawingMutation], chapter: BibleChapter, generation: DrawingStoreGeneration) async throws {
         if let (stream, continuation) = makeGateIfNeeded() {
             applyGate.setValue(continuation)
             for await _ in stream { break }
+        }
+        // 게이트 **뒤에서** 대조한다 — 저장소도 요청이 아니라 실행 시점의 세대로 판정한다.
+        appliedGenerations.withValue { $0.append(generation) }
+        guard generation == self.generation.value else {
+            throw DrawingRepositoryError.staleStoreGeneration
         }
         applied.withValue { $0.append((chapter, mutations)) }
         if let failure = applyFailures.withValue({ $0.isEmpty ? nil : $0.removeFirst() }) {

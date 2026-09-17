@@ -88,6 +88,41 @@ extension ChapterCanvasFeature {
         }
     }
 
+    /// 저장 명령을 스냅샷 위에 겹친다 — 저장소의 `create`(upsert) · `replace` · `clear`(행 유지, 없으면 빈 행) 와 같은 의미다.
+    func overlay(_ snapshots: [VerseDrawingSnapshot], with mutations: [VerseDrawingMutation]) -> [VerseDrawingSnapshot] {
+        guard !mutations.isEmpty else { return snapshots }
+        let now = date.now
+        var result = snapshots
+        var indexByRow: [BibleDrawingRowID: Int] = [:]
+        for (index, snapshot) in result.enumerated() { indexByRow[snapshot.rowID] = index }
+
+        func upsert(_ snapshot: VerseDrawingSnapshot) {
+            if let index = indexByRow[snapshot.rowID] {
+                result[index] = snapshot
+            } else {
+                indexByRow[snapshot.rowID] = result.count
+                result.append(snapshot)
+            }
+        }
+
+        for mutation in mutations {
+            let existing = indexByRow[mutation.rowID].map { result[$0] }
+            switch mutation {
+            case .create(let verse, let rowID, let data, let metadata), .replace(let verse, let rowID, let data, let metadata):
+                upsert(VerseDrawingSnapshot(
+                    verse: verse, rowID: rowID, isPresent: existing?.isPresent ?? true, updateDate: now,
+                    lineData: data, drawingVersion: 3, metadata: metadata
+                ))
+            case .clear(let verse, let rowID):
+                upsert(VerseDrawingSnapshot(
+                    verse: verse, rowID: rowID, isPresent: existing?.isPresent ?? true, updateDate: now,
+                    lineData: nil, drawingVersion: existing?.drawingVersion ?? 3, metadata: existing?.metadata
+                ))
+            }
+        }
+        return result.sorted { lhs, rhs in lhs.verse != rhs.verse ? lhs.verse < rhs.verse : lhs.rowID < rhs.rowID }
+    }
+
     /// 저장은 동시에 하나만. `allowRetry` 면 실패 상태에서도 다시 시도한다.
     func startSaveIfPossible(state: inout State, allowRetry: Bool) -> Effect<Action> {
         switch state.saveStatus {
@@ -100,6 +135,11 @@ extension ChapterCanvasFeature {
         }
         guard !state.pendingMutations.isEmpty else {
             return settleIfNeeded(state: &state)
+        }
+        guard let generation = state.storeGeneration else {
+            // 미저장분은 조회한 내용 위에서만 생기므로 여기 오지 않는다. 기준 없이 보내면 저장소가 대조할 수 없어 보내지 않는다.
+            Log.error("단일 Canvas — 기준 세대 없이 미저장분이 있다. 저장하지 않고 남긴다", "count=\(state.pendingMutations.count)")
+            return .none
         }
 
         // 한 batch 는 한 장이다. 이전 장의 미저장분이 남아 있으면 그것부터 보낸다.
@@ -119,7 +159,7 @@ extension ChapterCanvasFeature {
 
         return .run { [repository] send in
             do {
-                try await repository.apply(mutations, chapter: chapter)
+                try await repository.apply(mutations, chapter: chapter, generation: generation)
                 await send(.saveFinished(requestID: requestID, revision: revision, failure: nil))
             } catch let error as DrawingRepositoryError {
                 await send(.saveFinished(requestID: requestID, revision: revision, failure: error))
@@ -136,6 +176,13 @@ extension ChapterCanvasFeature {
         guard case .saving(_, let current) = state.saveStatus, current == requestID else {
             Log.error("단일 Canvas — 지금 도는 저장이 아닌 완료 응답을 버린다", "revision=\(revision)", "failure=\(String(describing: failure))")
             return .none
+        }
+        if failure == .staleStoreGeneration {
+            // 저장소가 아무것도 쓰지 않고 거절했다 — 이 화면이 기준으로 삼은 조회 뒤에 필사 데이터가 전부 지워졌다.
+            // 실패로 알리고 다시 시도하면 매번 같은 이유로 거절된다. 설정의 삭제 알림(`drawingDataCleared`)이 오기 전이라도
+            // 같은 정리를 한다. 알림이 뒤따라 와도 결과가 같다 — 설정이 떠 있는 동안에는 새 편집이 생기지 않는다.
+            Log.error("단일 Canvas — 저장이 세대에 걸려 거절됐다. 미저장분을 버리고 다시 읽는다", "revision=\(revision)")
+            return clearAfterExternalDelete(state: &state)
         }
         let batch = state.inFlightBatch
         let mutations = state.inFlightMutations

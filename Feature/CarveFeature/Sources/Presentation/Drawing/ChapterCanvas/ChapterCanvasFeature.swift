@@ -99,6 +99,10 @@ public struct ChapterCanvasFeature {
         var layout: ChapterLayout?
         /// 마지막으로 알고 있는 이 장의 DB 내용. 성공한 저장을 겹쳐 두므로 재조회 없이도 현재 내용의 근거가 된다.
         var loadedDrawings: [VerseDrawingSnapshot]?
+        /// 지금 들고 있는 모든 것(합성한 잉크 · 미저장분 · 물러난 장의 편집)이 기준으로 삼은 저장소 세대. 저장은 이 세대로 보낸다.
+        /// 첫 조회에서 정하고, 전부 지워진 뒤의 정리(`clearAfterExternalDelete`)가 내려놓으면 다음 조회에서 다시 정한다.
+        /// 그 밖의 조회는 덮어쓰지 않는다 — 장 전환은 이전 장 미저장분을 들고 가고, 다른 세대가 오면 정리로 이어진다(`finishLoad`).
+        var storeGeneration: DrawingStoreGeneration?
         var loadRequestID: UUID?
         var loadFailure: DrawingLoadFailure?
         /// 캔버스 content 좌표 = layout 좌표 + columnOrigin (§5). 값은 호스팅이 준다.
@@ -240,7 +244,7 @@ public struct ChapterCanvasFeature {
     public enum Action: Equatable {
         /// 장 진입. 이전 장의 미저장분은 버리지 않고 자기 장으로 저장된다.
         case load(chapter: BibleChapter, expectedVerseCount: Int)
-        case drawingsLoaded(requestID: UUID, Result<[VerseDrawingSnapshot], DrawingLoadFailure>)
+        case drawingsLoaded(requestID: UUID, Result<DrawingChapterLoad, DrawingLoadFailure>)
         case layoutCompleted(ChapterLayout)
         case columnOriginChanged(CGPoint)
         /// 예측 좌표와 실제 렌더의 Δ 안전망 판정이 갱신됐다 (§14 — D9 R13). 새 입력만 좌우한다.
@@ -526,8 +530,8 @@ extension ChapterCanvasFeature {
         let chapter = state.chapter
         return .run { [repository] send in
             do {
-                let snapshots = try await repository.load(chapter: chapter)
-                await send(.drawingsLoaded(requestID: requestID, .success(snapshots)))
+                let loaded = try await repository.load(chapter: chapter)
+                await send(.drawingsLoaded(requestID: requestID, .success(loaded)))
             } catch {
                 await send(.drawingsLoaded(requestID: requestID, .failure(DrawingLoadFailure(message: "\(error)"))))
             }
@@ -537,13 +541,21 @@ extension ChapterCanvasFeature {
     private func finishLoad(
         state: inout State,
         requestID: UUID,
-        result: Result<[VerseDrawingSnapshot], DrawingLoadFailure>
+        result: Result<DrawingChapterLoad, DrawingLoadFailure>
     ) -> Effect<Action> {
         // 이전 장(또는 이전 요청)의 결과는 폐기한다 (§6-4).
         guard requestID == state.loadRequestID else { return .none }
         switch result {
-        case .success(let snapshots):
-            state.loadedDrawings = snapshots
+        case .success(let loaded):
+            if let base = state.storeGeneration, base != loaded.generation {
+                // ★ 이 화면이 삭제 소식을 받기 전에 필사 데이터가 전부 지워졌다. 들고 있는 잉크 · 미저장분의 기준이 사라졌으므로
+                //   이 결과로 합성하지 않고 삭제 뒤처리부터 한다 — 그러지 않으면 지운 데이터 기준의 편집이 새 세대로 저장된다.
+                Log.error("단일 Canvas — 조회 사이에 필사 데이터가 전부 지워졌다. 미저장분을 버리고 다시 읽는다",
+                          "기준 세대=\(base.raw)", "조회 세대=\(loaded.generation.raw)")
+                return clearAfterExternalDelete(state: &state)
+            }
+            state.storeGeneration = loaded.generation
+            state.loadedDrawings = loaded.snapshots
             state.loadFailure = nil
             if state.isReloading, !state.isFullyPersisted {
                 // 재조회 결과가 아직 저장 중인 편집보다 앞선다. 저장이 정리되면 다시 읽는다 — 지금 합성하면 그 편집이 화면에서 빠진다.
@@ -654,41 +666,6 @@ extension ChapterCanvasFeature {
                       "\(state.chapter.title.rawValue).\(state.chapter.chapter)",
                       "verses=\(composed.undecodableVerses.sorted())")
         }
-    }
-
-    /// 저장 명령을 스냅샷 위에 겹친다 — 저장소의 `create`(upsert) · `replace` · `clear`(행 유지, 없으면 빈 행) 와 같은 의미다.
-    func overlay(_ snapshots: [VerseDrawingSnapshot], with mutations: [VerseDrawingMutation]) -> [VerseDrawingSnapshot] {
-        guard !mutations.isEmpty else { return snapshots }
-        let now = date.now
-        var result = snapshots
-        var indexByRow: [BibleDrawingRowID: Int] = [:]
-        for (index, snapshot) in result.enumerated() { indexByRow[snapshot.rowID] = index }
-
-        func upsert(_ snapshot: VerseDrawingSnapshot) {
-            if let index = indexByRow[snapshot.rowID] {
-                result[index] = snapshot
-            } else {
-                indexByRow[snapshot.rowID] = result.count
-                result.append(snapshot)
-            }
-        }
-
-        for mutation in mutations {
-            let existing = indexByRow[mutation.rowID].map { result[$0] }
-            switch mutation {
-            case .create(let verse, let rowID, let data, let metadata), .replace(let verse, let rowID, let data, let metadata):
-                upsert(VerseDrawingSnapshot(
-                    verse: verse, rowID: rowID, isPresent: existing?.isPresent ?? true, updateDate: now,
-                    lineData: data, drawingVersion: 3, metadata: metadata
-                ))
-            case .clear(let verse, let rowID):
-                upsert(VerseDrawingSnapshot(
-                    verse: verse, rowID: rowID, isPresent: existing?.isPresent ?? true, updateDate: now,
-                    lineData: nil, drawingVersion: existing?.drawingVersion ?? 3, metadata: existing?.metadata
-                ))
-            }
-        }
-        return result.sorted { lhs, rhs in lhs.verse != rhs.verse ? lhs.verse < rhs.verse : lhs.rowID < rhs.rowID }
     }
 
     /// 미저장분이 전부 저장된 뒤 DB 에서 다시 합성한다. 저장할 것이 없으면 즉시 다시 읽는다.

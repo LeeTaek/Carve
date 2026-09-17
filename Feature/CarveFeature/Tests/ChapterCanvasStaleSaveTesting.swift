@@ -22,9 +22,11 @@ private final class OrderedApplySpy: DrawingRepository, @unchecked Sendable {
     private let nextIndex = LockIsolated(0)
     let applied = LockIsolated<[[VerseDrawingMutation]]>([])
 
-    func load(chapter: BibleChapter) async throws -> [VerseDrawingSnapshot] { [] }
+    func load(chapter: BibleChapter) async throws -> DrawingChapterLoad {
+        DrawingChapterLoad(snapshots: [], generation: DrawingStoreGeneration(raw: 0))
+    }
 
-    func apply(_ mutations: [VerseDrawingMutation], chapter: BibleChapter) async throws {
+    func apply(_ mutations: [VerseDrawingMutation], chapter: BibleChapter, generation: DrawingStoreGeneration) async throws {
         let index = nextIndex.withValue { value -> Int in
             defer { value += 1 }
             return value

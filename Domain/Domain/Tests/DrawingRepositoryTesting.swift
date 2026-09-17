@@ -22,11 +22,22 @@ struct RepositoryHarness {
 
     init() throws {
         let container = try ModelContainer(
-            for: Schema([BibleDrawing.self, BiblePageDrawing.self]),
+            for: Schema([BibleDrawing.self, BiblePageDrawing.self, FavoriteVerse.self]),
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
         actor = SwiftDatabaseActor(modelContainer: container)
         repository = SwiftDataDrawingRepository(actor: actor)
+    }
+
+    /// 지금 세대로 저장한다 — 전체 삭제와의 경쟁을 다루지 않는 테스트용. 경쟁은 `DrawingStoreGenerationTesting` 이 본다.
+    func apply(_ mutations: [VerseDrawingMutation], chapter: BibleChapter) async throws {
+        let generation = try await repository.load(chapter: chapter).generation
+        try await repository.apply(mutations, chapter: chapter, generation: generation)
+    }
+
+    /// 장의 스냅샷만 읽는다.
+    func load(chapter: BibleChapter) async throws -> [VerseDrawingSnapshot] {
+        try await repository.load(chapter: chapter).snapshots
     }
 
     func metadata(verse: Int, anchors: [CGFloat] = [0, 30]) -> DrawingLayoutMetadata {
@@ -73,7 +84,7 @@ struct DrawingRepositoryTesting {
         let rowID = BibleDrawingRowID.issue()
         let metadata = harness.metadata(verse: 4)
 
-        try await harness.repository.apply(
+        try await harness.apply(
             [.create(verse: 4, rowID: rowID, data: Data([9, 9]), metadata: metadata)],
             chapter: harness.chapter
         )
@@ -86,7 +97,7 @@ struct DrawingRepositoryTesting {
         #expect(rows.first?.lineData == Data([9, 9]))
         #expect(DrawingLayoutMetadata.decode(blob: rows.first?.layoutMetadataData) == metadata)
 
-        let loaded = try await harness.repository.load(chapter: harness.chapter)
+        let loaded = try await harness.load(chapter: harness.chapter)
         #expect(loaded.count == 1)
         #expect(loaded.first?.rowID == rowID)
         #expect(loaded.first?.hasVersionedLayout == true)
@@ -100,7 +111,7 @@ struct DrawingRepositoryTesting {
         let rowID = BibleDrawingRowID(raw: key)
         let metadata = harness.metadata(verse: 2)
 
-        try await harness.repository.apply(
+        try await harness.apply(
             [.replace(verse: 2, rowID: rowID, data: Data([7]), metadata: metadata)],
             chapter: harness.chapter
         )
@@ -112,7 +123,7 @@ struct DrawingRepositoryTesting {
         #expect(rows.first?.drawingVersion == 3)
         #expect(rows.first?.updateDate ?? .distantPast > Date(timeIntervalSince1970: 1_000))
 
-        let loaded = try await harness.repository.load(chapter: harness.chapter)
+        let loaded = try await harness.load(chapter: harness.chapter)
         #expect(loaded.first?.rowID == rowID)
     }
 
@@ -122,9 +133,9 @@ struct DrawingRepositoryTesting {
         let older = try await harness.seedLegacyRow(verse: 5, updateDate: Date(timeIntervalSince1970: 100), lineData: Data([1]))
         let newer = try await harness.seedLegacyRow(verse: 5, updateDate: Date(timeIntervalSince1970: 200), isPresent: true, lineData: Data([2]))
 
-        try await harness.repository.apply([.clear(verse: 5, rowID: BibleDrawingRowID(raw: newer))], chapter: harness.chapter)
+        try await harness.apply([.clear(verse: 5, rowID: BibleDrawingRowID(raw: newer))], chapter: harness.chapter)
 
-        let loaded = try await harness.repository.load(chapter: harness.chapter)
+        let loaded = try await harness.load(chapter: harness.chapter)
         #expect(loaded.count == 2)
         let cleared = try #require(loaded.first { $0.rowID.raw == newer })
         #expect(cleared.lineData == nil)
@@ -141,7 +152,7 @@ struct DrawingRepositoryTesting {
         let missing = BibleDrawingRowID(raw: "no-such-row")
 
         await #expect(throws: DrawingRepositoryError.rowNotFound(missing)) {
-            try await harness.repository.apply(
+            try await harness.apply(
                 [
                     .replace(verse: 1, rowID: BibleDrawingRowID(raw: existing), data: Data([42]), metadata: harness.metadata(verse: 1)),
                     .create(verse: 2, rowID: BibleDrawingRowID.issue(), data: Data([2]), metadata: harness.metadata(verse: 2)),
@@ -152,7 +163,7 @@ struct DrawingRepositoryTesting {
         }
 
         // 첫 replace 와 create 도 적용되지 않았다.
-        let loaded = try await harness.repository.load(chapter: harness.chapter)
+        let loaded = try await harness.load(chapter: harness.chapter)
         #expect(loaded.count == 1)
         #expect(loaded.first?.lineData == Data([1]))
         #expect(loaded.first?.drawingVersion == 1)
@@ -163,11 +174,11 @@ struct DrawingRepositoryTesting {
     func createIsUpsertByRowID() async throws {
         let harness = try RepositoryHarness()
         let rowID = BibleDrawingRowID.issue()
-        try await harness.repository.apply(
+        try await harness.apply(
             [.create(verse: 1, rowID: rowID, data: Data([1]), metadata: harness.metadata(verse: 1))],
             chapter: harness.chapter
         )
-        try await harness.repository.apply(
+        try await harness.apply(
             [.create(verse: 1, rowID: rowID, data: Data([2]), metadata: harness.metadata(verse: 1, anchors: [0, 30, 60]))],
             chapter: harness.chapter
         )
@@ -183,7 +194,7 @@ struct DrawingRepositoryTesting {
         let harness = try RepositoryHarness()
         let rowID = BibleDrawingRowID.issue()
 
-        try await harness.repository.apply([.clear(verse: 6, rowID: rowID)], chapter: harness.chapter)
+        try await harness.apply([.clear(verse: 6, rowID: rowID)], chapter: harness.chapter)
 
         let rows = try await harness.rows(verse: 6)
         #expect(rows.count == 1)
@@ -199,7 +210,7 @@ struct DrawingRepositoryTesting {
         let missing = BibleDrawingRowID.issue()
 
         await #expect(throws: DrawingRepositoryError.rowNotFound(missing)) {
-            try await harness.repository.apply(
+            try await harness.apply(
                 [.replace(verse: 1, rowID: missing, data: Data([1]), metadata: harness.metadata(verse: 1))],
                 chapter: harness.chapter
             )
@@ -217,16 +228,16 @@ struct DrawingRepositoryTesting {
 
         // replace 는 엄격하다 — 다른 장의 행은 보이지 않으므로 rowNotFound.
         await #expect(throws: DrawingRepositoryError.rowNotFound(sharedID)) {
-            try await harness.repository.apply(
+            try await harness.apply(
                 [.replace(verse: 1, rowID: sharedID, data: Data([1]), metadata: harness.metadata(verse: 1))],
                 chapter: harness.chapter
             )
         }
         // clear 는 이 장에 빈 행을 만들 뿐, 다른 장의 행을 비우지 않는다.
-        try await harness.repository.apply([.clear(verse: 1, rowID: sharedID)], chapter: harness.chapter)
+        try await harness.apply([.clear(verse: 1, rowID: sharedID)], chapter: harness.chapter)
 
-        #expect(try await harness.repository.load(chapter: other).first?.lineData == Data([5]))
-        let mine = try await harness.repository.load(chapter: harness.chapter)
+        #expect(try await harness.load(chapter: other).first?.lineData == Data([5]))
+        let mine = try await harness.load(chapter: harness.chapter)
         #expect(mine.count == 1)
         #expect(mine.first?.lineData == nil)
         #expect(mine.first?.rowID == sharedID)
@@ -235,7 +246,7 @@ struct DrawingRepositoryTesting {
     @Test("load 는 절 → 행 키 순으로 정렬돼 삽입 순서와 무관하다")
     func loadIsSortedDeterministically() async throws {
         let harness = try RepositoryHarness()
-        try await harness.repository.apply(
+        try await harness.apply(
             [
                 .create(verse: 3, rowID: BibleDrawingRowID(raw: "b"), data: Data([3]), metadata: harness.metadata(verse: 3)),
                 .create(verse: 1, rowID: BibleDrawingRowID(raw: "z"), data: Data([1]), metadata: harness.metadata(verse: 1)),
@@ -244,7 +255,7 @@ struct DrawingRepositoryTesting {
             chapter: harness.chapter
         )
 
-        let loaded = try await harness.repository.load(chapter: harness.chapter)
+        let loaded = try await harness.load(chapter: harness.chapter)
         #expect(loaded.map { "\($0.verse)/\($0.rowID.raw)" } == ["1/z", "3/a", "3/b"])
     }
 }
@@ -351,7 +362,7 @@ struct DrawingArchiveAndResetTesting {
         _ harness: RepositoryHarness, verse: Int, data: Data
     ) async throws -> BibleDrawingRowID {
         let rowID = BibleDrawingRowID.issue()
-        try await harness.repository.apply(
+        try await harness.apply(
             [.create(verse: verse, rowID: rowID, data: data, metadata: harness.metadata(verse: verse))],
             chapter: harness.chapter
         )
@@ -421,7 +432,7 @@ struct DrawingArchiveAndResetTesting {
 
         // ① `clear` 로 비워진 행.
         let cleared = try await seedActiveRow(harness, verse: 7, data: Self.inkData())
-        try await harness.repository.apply([.clear(verse: 7, rowID: cleared)], chapter: harness.chapter)
+        try await harness.apply([.clear(verse: 7, rowID: cleared)], chapter: harness.chapter)
         let clearedOutcome = try await harness.repository.archiveAndReset(
             VerseDrawingArchiveCommand(verse: 7, activeRowID: cleared, archiveRowID: BibleDrawingRowID.issue()),
             chapter: harness.chapter

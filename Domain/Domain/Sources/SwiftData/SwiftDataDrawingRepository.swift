@@ -29,12 +29,12 @@ public struct SwiftDataDrawingRepository: DrawingRepository {
         }
     }
 
-    public func load(chapter: BibleChapter) async throws -> [VerseDrawingSnapshot] {
-        try await actor.loadDrawingSnapshots(chapter: chapter)
+    public func load(chapter: BibleChapter) async throws -> DrawingChapterLoad {
+        try await actor.loadChapterDrawings(chapter: chapter)
     }
 
-    public func apply(_ mutations: [VerseDrawingMutation], chapter: BibleChapter) async throws {
-        try await actor.applyDrawingMutations(mutations, chapter: chapter, now: Date())
+    public func apply(_ mutations: [VerseDrawingMutation], chapter: BibleChapter, generation: DrawingStoreGeneration) async throws {
+        try await actor.applyDrawingMutations(mutations, chapter: chapter, generation: generation, now: Date())
     }
 
     public func archiveAndReset(
@@ -79,6 +79,26 @@ extension SwiftDatabaseActor {
             }
     }
 
+    /// 장의 스냅샷과 지금 저장소 세대를 **한 actor 구간에서** 읽는다 (`DrawingChapterLoad`).
+    public func loadChapterDrawings(chapter: BibleChapter) throws -> DrawingChapterLoad {
+        DrawingChapterLoad(
+            snapshots: try loadDrawingSnapshots(chapter: chapter),
+            generation: DrawingStoreGeneration(raw: drawingStoreGeneration)
+        )
+    }
+
+    /// 필사 행을 전부 지우고 저장소 세대를 올린다 — **한 actor 구간** (설정 → 「모든 필사 데이터 삭제」).
+    ///
+    /// 둘 사이에 저장이 끼어들면 삭제 전 조회를 기준으로 만든 명령이 새 세대로 통과한다. 그래서 따로 부르지 않는다.
+    ///
+    /// **지우지 못하면(throw) 세대를 올리지 않는다.** 세대가 오르면 열린 장이 미저장분을 버리므로, 무엇이 지워졌는지
+    /// 모를 때는 미저장분을 지키는 쪽을 택한다. 그래도 일부가 지워졌다면 사용자는 실패 안내에서 다시 시도한다.
+    /// 배치 삭제는 `save()` 를 기다리지 않고 저장소에 바로 반영된다 (`DrawingStoreGenerationTesting` 이 고정한다).
+    public func eraseAllDrawingRows() throws {
+        try modelContext.delete(model: BibleDrawing.self)
+        drawingStoreGeneration += 1
+    }
+
     /// 저장 명령들을 **한 트랜잭션**으로 적용한다 (P8).
     ///
     /// | 명령 | 하는 일 |
@@ -91,15 +111,24 @@ extension SwiftDatabaseActor {
     ///   **빈 행을 만든다** — 앞선 `create` 가 저장됐든 아니든 결과가 같아야 하기 때문 |
     ///
     /// 하나라도 실패하면 `rollback()` 으로 이 트랜잭션의 변경을 전부 버리고 던진다.
+    ///
+    /// **세대가 다르면 아무것도 하지 않고 던진다** (`staleStoreGeneration`). 대조는 쓰기보다 먼저, 같은 actor 구간에서 한다 —
+    /// 요청은 삭제 전에 왔어도 실행이 삭제 뒤라면 여기서 걸린다.
     /// - Parameters:
     ///   - mutations: 저장 명령.
     ///   - chapter: 대상 장.
+    ///   - generation: 명령이 기준으로 삼은 조회의 세대.
     ///   - now: `updateDate` 에 기록할 시각.
     public func applyDrawingMutations(
         _ mutations: [VerseDrawingMutation],
         chapter: BibleChapter,
+        generation: DrawingStoreGeneration,
         now: Date
     ) throws {
+        guard generation.raw == drawingStoreGeneration else {
+            Log.error("필사 저장 거절 — 조회 뒤 필사 데이터가 전부 지워졌다", "명령 세대=\(generation.raw)", "지금 세대=\(drawingStoreGeneration)")
+            throw DrawingRepositoryError.staleStoreGeneration
+        }
         do {
             for mutation in mutations {
                 switch mutation {
