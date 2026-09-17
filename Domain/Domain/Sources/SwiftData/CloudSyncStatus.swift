@@ -41,6 +41,8 @@ public enum CloudSyncFailure: Hashable, Sendable {
     case importFailed
     /// export 가 **오류로** 끝났다. 내 변경이 서버에 올라가지 못했다는 뜻이다.
     case exportFailed
+    /// 동기화 준비(setup)가 오류로 끝났다. 받기 · 올리기가 모두 멈췄을 수 있다.
+    case setupFailed
     /// 그 밖. 원인을 특정하지 못했다.
     case unknown
 }
@@ -60,36 +62,48 @@ public struct CloudSyncActivity: Hashable, Sendable {
     public var lastImportSuccess: Date?
     /// 마지막으로 export 가 성공한 시각. 없으면 이 실행에서 한 번도 올려 본 적이 없다.
     public var lastExportSuccess: Date?
-    /// 마지막으로 확인된 오류. 같은 종류가 성공하면 지운다.
-    public var lastFailure: CloudSyncFailure?
+    /// 아직 해결되지 않은 실패. **종류마다 따로** 들고, 같은 종류가 성공해야 풀린다.
+    ///
+    /// 이전 구현은 마지막 실패 하나만 들어서 "export 실패 → import 실패 → import 성공" 이면 export 실패가 사라졌다 —
+    /// 내 변경은 여전히 올라가지 못했는데 성공 기록만 보였다. setup 실패는 setup 이 성공해도 풀리지 않았다.
+    public var unresolvedFailures: Set<CloudSyncFailure>
 
     public init(
         isRunning: Bool = false,
         lastImportSuccess: Date? = nil,
         lastExportSuccess: Date? = nil,
-        lastFailure: CloudSyncFailure? = nil
+        unresolvedFailures: Set<CloudSyncFailure> = []
     ) {
         self.isRunning = isRunning
         self.lastImportSuccess = lastImportSuccess
         self.lastExportSuccess = lastExportSuccess
-        self.lastFailure = lastFailure
+        self.unresolvedFailures = unresolvedFailures
     }
 
-    /// 화면에 한 줄로 보여 줄 요약.
+    /// 화면에 보여 줄 요약.
     public enum Summary: Hashable, Sendable {
         /// 이번 실행에서 아직 주고받은 기록이 없다. **동기화되지 않았다는 뜻이 아니다.**
         case noRecord
         /// 지금 주고받는 중이다.
         case running
-        /// 마지막으로 확인된 오류가 남아 있다.
-        case failed(CloudSyncFailure)
+        /// 해결되지 않은 실패가 남아 있다. **전부** 든다 — 하나만 보이면 나머지가 해결된 것처럼 읽힌다.
+        /// 순서는 `displayOrder` 다.
+        case failed([CloudSyncFailure])
         /// 성공 기록만 있다. 받은 적 · 올린 적이 없으면 nil.
         case succeeded(lastImport: Date?, lastExport: Date?)
     }
 
+    /// 실패를 보여 줄 순서. 범위가 넓은 것부터 — setup 실패는 받기 · 올리기를 모두 막고,
+    /// 올리지 못한 것은 이 기기에만 있는 필사라 받지 못한 것보다 앞에 둔다.
+    public static let displayOrder: [CloudSyncFailure] = [
+        .setupFailed, .exportFailed, .importFailed, .accountUnavailable, .accountCheckFailed, .unknown
+    ]
+
     /// 지금 보여 줄 요약. **실패가 가장 먼저다** — 다른 종류가 성공했어도 남은 실패는 해결되지 않았다.
     public var summary: Summary {
-        if let lastFailure { return .failed(lastFailure) }
+        if !unresolvedFailures.isEmpty {
+            return .failed(Self.displayOrder.filter(unresolvedFailures.contains))
+        }
         if isRunning { return .running }
         if lastImportSuccess == nil && lastExportSuccess == nil { return .noRecord }
         return .succeeded(lastImport: lastImportSuccess, lastExport: lastExportSuccess)
@@ -109,22 +123,23 @@ public struct CloudSyncActivity: Hashable, Sendable {
         }
         next.isRunning = false
 
+        // 같은 종류의 성공만 그 실패를 푼다. 다른 종류의 성공은 남은 실패와 무관하다.
         switch (event.kind, event.succeeded) {
         case (.cloudImport, true):
             next.lastImportSuccess = date
-            if next.lastFailure == .importFailed { next.lastFailure = nil }
+            next.unresolvedFailures.remove(.importFailed)
         case (.cloudImport, false):
-            next.lastFailure = .importFailed
+            next.unresolvedFailures.insert(.importFailed)
         case (.cloudExport, true):
             next.lastExportSuccess = date
-            if next.lastFailure == .exportFailed { next.lastFailure = nil }
+            next.unresolvedFailures.remove(.exportFailed)
         case (.cloudExport, false):
-            next.lastFailure = .exportFailed
+            next.unresolvedFailures.insert(.exportFailed)
         case (.setup, true):
-            break
+            next.unresolvedFailures.remove(.setupFailed)
         case (.setup, false):
-            // setup 실패는 원인을 특정할 수 없다. 계정 문제일 수도, 권한일 수도 있다.
-            next.lastFailure = .unknown
+            // 원인(계정 · 권한 · 스키마)은 이벤트만으로 특정할 수 없다.
+            next.unresolvedFailures.insert(.setupFailed)
         }
         return next
     }

@@ -92,6 +92,9 @@ struct LaunchProgressView: View {
         case .exportFailed:
             // 받지 못한 것과 올리지 못한 것은 다르다. 후자는 기기에는 남아 있다.
             "필사를 iCloud에 올리지 못했어요.\n이 기기에는 저장돼 있어요."
+        case .setupFailed:
+            // 시작 화면은 setup 이벤트로 결론을 내지 않는다. 종류가 늘어 문구만 둔다.
+            "iCloud 동기화를 준비하지 못했어요.\n필사는 이 기기에 저장돼요."
         case .unknown:
             "iCloud 연결을 확인하지 못했어요.\n지금은 이 기기에만 저장돼요."
         }

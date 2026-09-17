@@ -70,8 +70,11 @@ public struct CloudSettingView: View {
                 activityLine("이번 실행에서는 아직 주고받은 기록이 없어요", emphasized: false)
             case .running:
                 activityLine("동기화하는 중이에요", emphasized: false)
-            case .failed(let failure):
-                activityLine(failureText(failure), emphasized: true)
+            case .failed(let failures):
+                // 해결되지 않은 실패를 모두 보인다 — 하나만 보이면 나머지가 해결된 것처럼 읽힌다.
+                ForEach(failures, id: \.self) { failure in
+                    activityLine(failureText(failure), emphasized: true)
+                }
             case .succeeded(let lastImport, let lastExport):
                 if let lastImport {
                     activityLine("마지막으로 받음 · \(lastImport.formatted(.relative(presentation: .named)))", emphasized: false)
@@ -97,6 +100,7 @@ public struct CloudSettingView: View {
         case .accountCheckFailed: "iCloud 계정 상태를 확인하지 못했어요"
         case .importFailed: "iCloud에서 필사를 받아오지 못했어요"
         case .exportFailed: "필사를 iCloud에 올리지 못했어요 · 이 기기에는 저장돼 있어요"
+        case .setupFailed: "iCloud 동기화를 준비하지 못했어요"
         case .unknown: "동기화 중 문제가 생겼어요"
         }
     }
