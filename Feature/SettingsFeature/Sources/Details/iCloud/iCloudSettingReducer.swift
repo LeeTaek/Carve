@@ -136,15 +136,18 @@ public struct CloudSettingsFeature {
                     // 필사 행 · 구 구조 잔존 행 · 즐겨찾기(필기 복사본)를 지운다. 필사 행이 가장 먼저다.
                     let outcome = await drawingDataEraser.eraseAll()
 
+                    var widgetCleared = false
                     if outcome.drawingsCleared {
-                        // 위젯은 별도 저장소라 실패해도 DB 삭제를 되돌릴 수 없다. 남으면 홈 화면에만 옛 말씀이 남는다.
+                        // 위젯은 별도 저장소라 실패해도 DB 삭제를 되돌릴 수 없다. 남으면 홈 화면에 옛 말씀이 남는다.
                         do {
                             try await widgetVerseClient.clear()
+                            widgetCleared = true
                         } catch {
+                            // 로그만 남기고 완료로 보지 않는다 — 이전 구현은 여기서 "모든 필사 데이터를 지웠어요" 를 띄웠다.
                             Log.error("전체 삭제 — 위젯 내용을 비우지 못했다", "\(error)")
                         }
                         // 뒤따른 삭제가 실패했더라도 필사 행은 사라졌다. 열린 장이 옛 잉크를 버리지 않으면
-                        // 다음 저장이 방금 지운 필사를 되살린다 — 이전 구현은 실패하면 이 신호를 보내지 않았다.
+                        // 다음 저장이 방금 지운 필사를 되살린다.
                         await send(.drawingDataCleared)
                     }
                     // 필사 행조차 지우지 못했다면 신호를 보내지 않는다. 아무것도 지워지지 않았는데 미저장분만 버리면 유실이다.
@@ -152,13 +155,11 @@ public struct CloudSettingsFeature {
                     // 결과와 무관하게 잠금을 푼다. 이전 구현은 삭제가 실패하면 여기에 오지 못해 화면이 멈췄다.
                     await send(.setLoading(false))
 
-                    guard outcome == .completed else {
-                        // 「다시 시도」 는 같은 삭제를 다시 부른다. 삭제는 멱등이라 이미 지운 것을 다시 지워도 안전하다.
+                    guard outcome == .completed, widgetCleared else {
+                        // 「다시 시도」 는 같은 삭제를 다시 부른다. DB 삭제와 위젯 비우기 모두 멱등이다.
                         await send(.presentPopover(
                             title: "필사 데이터를 모두 지우지 못했어요",
-                            body: outcome.drawingsCleared
-                                ? "필기는 지웠지만 즐겨찾기가 남았을 수 있어요."
-                                : "아직 아무것도 지우지 않았어요.",
+                            body: Self.eraseFailureBody(outcome: outcome, widgetCleared: widgetCleared),
                             confirmTitle: "다시 시도",
                             cancelTitle: "닫기",
                             role: .destructive,
@@ -200,6 +201,19 @@ public struct CloudSettingsFeature {
 }
 
 extension CloudSettingsFeature {
+    /// 전체 삭제가 끝나지 못했을 때 **무엇이 남았는지** 말한다. 남은 것을 뭉뚱그리지 않는다.
+    static func eraseFailureBody(outcome: DrawingEraseOutcome, widgetCleared: Bool) -> String {
+        guard outcome.drawingsCleared else { return "아직 아무것도 지우지 않았어요." }
+        switch (outcome, widgetCleared) {
+        case (.partiallyFailed, false):
+            return "필기는 지웠지만 즐겨찾기와 위젯에 담은 말씀이 남았을 수 있어요."
+        case (.partiallyFailed, true):
+            return "필기는 지웠지만 즐겨찾기가 남았을 수 있어요."
+        default:
+            return "필기와 즐겨찾기는 지웠지만 위젯에 담은 말씀이 남았을 수 있어요."
+        }
+    }
+
     @Reducer
     public enum Path {
         case popup(PopupFeature)

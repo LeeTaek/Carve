@@ -28,15 +28,32 @@ private final class EraserStub: DrawingDataEraser, @unchecked Sendable {
     }
 }
 
-/// 위젯을 비웠는지만 센다.
+/// 위젯을 비운 횟수를 세고, 정해 둔 횟수만큼 실패한다.
+///
+/// 이전 스파이는 항상 성공해서 "위젯 삭제가 실패해도 완료를 띄우는" 결함을 잡지 못했다.
 private final class WidgetClearSpy: WidgetVerseClient, @unchecked Sendable {
+    struct ClearFailed: Error {}
     let clearCount = LockIsolated(0)
+    /// 앞에서부터 이만큼 실패한다.
+    let failuresRemaining: LockIsolated<Int>
+
+    init(failing failures: Int = 0) {
+        failuresRemaining = LockIsolated(failures)
+    }
 
     func selection() async -> [FavoriteVerseKey] { [] }
     func select(_ favorites: [FavoriteVerseSnapshot]) async throws {}
     func add(_ favorite: FavoriteVerseSnapshot) async throws {}
     func remove(_ key: FavoriteVerseKey) async throws {}
-    func clear() async throws { clearCount.withValue { $0 += 1 } }
+    func clear() async throws {
+        clearCount.withValue { $0 += 1 }
+        let shouldFail = failuresRemaining.withValue { remaining -> Bool in
+            guard remaining > 0 else { return false }
+            remaining -= 1
+            return true
+        }
+        if shouldFail { throw ClearFailed() }
+    }
 }
 
 /// 이전 구현은 삭제 중 하나라도 throw 하면
@@ -155,5 +172,56 @@ struct CloudSettingsEraseTesting {
         #expect(eraser.calls.value == 2)
         #expect(store.state.path?.popup?.body == "모든 필사 데이터를 지웠어요.")
         #expect(!store.state.isLoading)
+    }
+
+    // MARK: 위젯 삭제 실패
+
+    @Test("DB 는 전부 지웠어도 위젯을 못 비우면 완료가 아니다 — 알리고 다시 시도를 둔다")
+    func widgetClearFailureIsNotCompletion() async {
+        let eraser = EraserStub([.completed])
+        let widget = WidgetClearSpy(failing: 1)
+        let store = makeStore(eraser, widget: widget)
+
+        await store.send(.removeAlliCloudData)
+        await store.receive(\.setLoading) { $0.isLoading = true }
+        // 필사 행은 지워졌으므로 열린 장에는 알린다.
+        await store.receive(\.drawingDataCleared)
+        await store.receive(\.setLoading) { $0.isLoading = false }
+        await store.receive(\.presentPopover) {
+            $0.path = self.retryPopup(body: "필기와 즐겨찾기는 지웠지만 위젯에 담은 말씀이 남았을 수 있어요.")
+        }
+        #expect(widget.clearCount.value == 1)
+    }
+
+    @Test("필사 행만 지우고 위젯도 못 비우면 남은 것을 둘 다 말한다")
+    func partialEraseAndWidgetFailureNamesBoth() async {
+        let eraser = EraserStub([.partiallyFailed])
+        let store = makeStore(eraser, widget: WidgetClearSpy(failing: 1))
+        store.exhaustivity = .off
+
+        await store.send(.removeAlliCloudData)
+        await store.receive(\.presentPopover)
+
+        #expect(store.state.path?.popup?.body == "필기는 지웠지만 즐겨찾기와 위젯에 담은 말씀이 남았을 수 있어요.")
+        #expect(store.state.path?.popup?.confirmAction == .deleteAllData)
+    }
+
+    @Test("위젯 삭제 실패 뒤 「다시 시도」 가 성공하면 완료를 알린다")
+    func retryAfterWidgetFailureCompletes() async {
+        let eraser = EraserStub([.completed, .completed])
+        let widget = WidgetClearSpy(failing: 1)
+        let store = makeStore(eraser, widget: widget)
+        store.exhaustivity = .off
+
+        await store.send(.removeAlliCloudData)
+        await store.receive(\.presentPopover)
+        #expect(store.state.path?.popup?.confirmAction == .deleteAllData)
+
+        await store.send(.path(.presented(.popup(.view(.confirm)))))
+        await store.receive(\.removeAlliCloudData)
+        await store.receive(\.presentPopover)
+
+        #expect(widget.clearCount.value == 2)
+        #expect(store.state.path?.popup?.body == "모든 필사 데이터를 지웠어요.")
     }
 }
