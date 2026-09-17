@@ -137,7 +137,8 @@ extension ChapterCanvasFeature {
             return settleIfNeeded(state: &state)
         }
         guard let generation = state.storeGeneration else {
-            // 미저장분은 조회한 내용 위에서만 생기므로 여기 오지 않는다. 기준 없이 보내면 저장소가 대조할 수 없어 보내지 않는다.
+            // 오지 않는 자리다 — 합성은 세대가 있을 때만 하고(`composeIfReady`) 미저장분은 합성한 내용 위에서만 생긴다.
+            // 기준 없이 보내면 저장소가 대조할 수 없어 보내지 않는다.
             Log.error("단일 Canvas — 기준 세대 없이 미저장분이 있다. 저장하지 않고 남긴다", "count=\(state.pendingMutations.count)")
             return .none
         }

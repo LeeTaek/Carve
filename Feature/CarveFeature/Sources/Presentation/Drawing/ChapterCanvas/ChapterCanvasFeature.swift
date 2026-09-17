@@ -200,6 +200,9 @@ public struct ChapterCanvasFeature {
         }
 
         var isComposed: Bool { renderedData != nil }
+        /// 조회에 실패해 **합성하지 못한** 장의 실패. 화면이 안내와 「다시 시도」(`retryLoad`)를 띄운다.
+        /// 합성된 장의 재조회 실패는 마지막으로 알던 내용으로 이미 복구했으므로 들지 않는다.
+        var blockingLoadFailure: DrawingLoadFailure? { isComposed ? nil : loadFailure }
         /// §6-2 입력 게이트 — 합성이 끝났고, 다시 합성하지도 지우지도 않는 중일 때만 입력을 받는다.
         var isInputEnabled: Bool { isComposed && !isReloading && !isErasing }
         /// 지우기가 실제로 도는 중인가. `.failed` 는 **포함하지 않는다** — 실패하면 잠금을 풀고 필기를 그대로 쓰게 둔다.
@@ -245,6 +248,8 @@ public struct ChapterCanvasFeature {
         /// 장 진입. 이전 장의 미저장분은 버리지 않고 자기 장으로 저장된다.
         case load(chapter: BibleChapter, expectedVerseCount: Int)
         case drawingsLoaded(requestID: UUID, Result<DrawingChapterLoad, DrawingLoadFailure>)
+        /// 조회에 실패해 합성하지 못한 장을 다시 읽는다 — 첫 조회 실패, 전부 지운 뒤의 재조회 실패.
+        case retryLoad
         case layoutCompleted(ChapterLayout)
         case columnOriginChanged(CGPoint)
         /// 예측 좌표와 실제 렌더의 Δ 안전망 판정이 갱신됐다 (§14 — D9 R13). 새 입력만 좌우한다.
@@ -323,6 +328,11 @@ public struct ChapterCanvasFeature {
 
             case .drawingsLoaded(let requestID, let result):
                 return finishLoad(state: &state, requestID: requestID, result: result)
+
+            case .retryLoad:
+                guard state.blockingLoadFailure != nil else { return .none }
+                state.loadFailure = nil
+                return requestLoad(state: &state)
 
             case .layoutCompleted(let layout):
                 if state.isEditing {
@@ -564,8 +574,9 @@ extension ChapterCanvasFeature {
             }
         case .failure(let failure):
             state.loadFailure = failure
-            guard state.isReloading, state.loadedDrawings != nil else {
-                // 첫 조회 실패를 빈 장으로 취급하면 기존 행 위에 새 행이 생긴다. 게이트를 닫아 둔다.
+            guard state.isReloading, state.loadedDrawings != nil, state.storeGeneration != nil else {
+                // 기준(내용과 세대)이 없다 — 첫 조회 실패이거나 전부 지운 뒤의 재조회 실패다. 빈 장으로 합성하면 기존 행 위에
+                // 새 행이 생기고, 세대 없이 연 입력의 필기는 저장되지 않는다. 게이트를 닫아 두고 `retryLoad` 를 기다린다.
                 return .none
             }
             // 재조회 실패 — 입력을 영원히 잠그는 대신 마지막으로 알고 있는 내용으로 다시 합성한다 (성공한 저장은 이미 겹쳐져 있다).
@@ -634,8 +645,10 @@ extension ChapterCanvasFeature {
     /// 합성 입력은 `DB 내용 ⊕ 이 장의 미저장분` 이다. 저장이 실패한 채 장을 떠났다 돌아와도, 재합성 중 저장이 실패해도
     /// 미저장 잉크가 화면에서 사라지지 않는다. 미저장 행이 대표 행이 되므로 `activeRowIDs` 도 그 행을 가리킨다.
     private func composeIfReady(state: inout State) {
+        // 저장소 세대 없이 합성하지 않는다 — 합성이 입력을 열고, 그 입력의 필기는 세대가 있어야 저장된다.
         guard let layout = state.layout,
               let loaded = state.loadedDrawings,
+              state.storeGeneration != nil,
               let expected = state.expectedVerseCount,
               layout.satisfiesCompositionGate(expectedVerseCount: expected) else { return }
 

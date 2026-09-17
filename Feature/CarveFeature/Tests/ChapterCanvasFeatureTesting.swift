@@ -317,6 +317,7 @@ struct ChapterCanvasComposeTesting {
         }
         await store.send(.layoutCompleted(CanvasTestSupport.layout))
         #expect(!store.state.isInputEnabled)
+        #expect(store.state.blockingLoadFailure != nil)
     }
 
     @Test("장 진입은 세대를 올리고 스크롤 토큰은 장이 바뀌어도 이어진다 — 뷰의 잔존 토큰과 겹치지 않게")
@@ -755,6 +756,8 @@ struct ChapterCanvasGenerationTesting {
             $0.renderedLayout = CanvasTestSupport.otherLayout
         }
         #expect(store.state.isInputEnabled)
+        // 복구했으므로 쓸 수 없다는 안내를 띄우지 않는다.
+        #expect(store.state.blockingLoadFailure == nil)
         #expect(store.state.loadedDrawings == [CanvasTestSupport.snapshot(verse: 1, rowID: CanvasTestSupport.rowA)])
         #expect(composeInputs.value.last == [CanvasTestSupport.snapshot(verse: 1, rowID: CanvasTestSupport.rowA)])
     }

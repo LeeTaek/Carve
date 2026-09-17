@@ -484,6 +484,12 @@ private extension CarveDetailView {
                     send(.saveRetryTapped)
                 }
                 .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+            } else if store.chapterCanvas.blockingLoadFailure != nil {
+                // 불러오지 못한 장은 쓸 수 없게 닫혀 있다. 저장 실패 다음으로 — 그쪽은 이미 쓴 필사가 위험하다.
+                LoadFailureNoticeView {
+                    send(.loadRetryTapped)
+                }
+                .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
             } else if let notice = store.favoriteNotice {
                 FavoriteNoticeView(notice: notice) {
                     send(.favoriteRetryTapped)
@@ -514,6 +520,7 @@ private extension CarveDetailView {
         .padding(.horizontal, CarveSpacing.large)
         .padding(.bottom, favoriteNoticeBottomInset)
         .animation(reduceMotion ? .easeOut(duration: 0.12) : .snappy(duration: 0.25), value: store.chapterCanvas.saveRetryCount)
+        .animation(reduceMotion ? .easeOut(duration: 0.12) : .snappy(duration: 0.25), value: store.chapterCanvas.blockingLoadFailure)
         .animation(.easeOut(duration: 0.2), value: localSaveText)
         .animation(reduceMotion ? .easeOut(duration: 0.12) : .snappy(duration: 0.25), value: store.favoriteNotice)
         .animation(reduceMotion ? .easeOut(duration: 0.12) : .snappy(duration: 0.25), value: store.imageSaveNotice)

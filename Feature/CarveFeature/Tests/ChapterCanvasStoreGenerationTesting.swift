@@ -140,3 +140,93 @@ struct ChapterCanvasStoreGenerationTesting {
         #expect(store.state.pendingMutations.isEmpty)
     }
 }
+
+// MARK: - 조회 실패 — 기준 없이 입력을 열지 않는다
+
+@Suite("조회 실패 — 기준(내용과 세대) 없이 입력을 열지 않는다")
+@MainActor
+struct ChapterCanvasLoadFailureTesting {
+    private let after = DrawingStoreGeneration(raw: 1)
+
+    private func settle(_ store: TestStoreOf<ChapterCanvasFeature>) async {
+        await store.finish()
+        await store.skipReceivedActions(strict: false)
+    }
+
+    /// ★ 리뷰가 짚은 순서. 이전 구현은 전부 지운 뒤 내용을 `[]` 로 두어, 다시 읽기가 실패하면 빈 내용으로 합성해 입력을 열었다.
+    /// 그 뒤의 필기는 세대가 없어 저장을 시작하지 못하고, 실패 안내도 없이 큐에 쌓였으며 `flushPending` 으로도 풀리지 않았다.
+    @Test("전부 지운 뒤 다시 읽기가 실패하면 입력을 닫아 두고, 다시 읽기에 성공한 뒤의 새 필기는 새 세대로 저장된다")
+    func reloadFailureAfterEraseKeepsInputClosedUntilRetry() async {
+        let spy = RepositorySpy()
+        spy.snapshots = { _ in [CanvasTestSupport.snapshot(verse: 1, rowID: CanvasTestSupport.rowA)] }
+        let store = CanvasTestSupport.makeStore(spy: spy, results: LockIsolated([CanvasTestSupport.createResult("after")]))
+        await CanvasTestSupport.compose(store)
+
+        // 설정에서 전부 지웠고, 이어진 다시 읽기가 실패한다.
+        spy.eraseWithoutNotice()
+        spy.loadFailures.setValue(["디스크 오류"])
+        await store.send(.drawingDataCleared)
+        await store.receive(\.drawingsLoaded)
+
+        #expect(!store.state.isInputEnabled)
+        #expect(store.state.renderedData == nil, "지운 잉크가 화면에 남지 않는다")
+        #expect(store.state.storeGeneration == nil)
+        #expect(store.state.blockingLoadFailure != nil, "화면이 안내와 「다시 시도」 를 띄운다")
+        #expect(store.state.localSaveIndicator == .none)
+
+        // 닫히기 전 캔버스의 늦은 보고가 와도 계산할 기준이 없어 버린다 — 저장될 곳 없는 미저장분을 만들지 않는다.
+        await store.send(.editEnded(CanvasTestSupport.edit("stray", generation: store.state.renderedRevision)))
+        await settle(store)
+        await store.send(.flushPending)
+        await settle(store)
+        #expect(store.state.pendingMutations.isEmpty)
+        #expect(spy.appliedGenerations.value.isEmpty)
+
+        // 다시 읽기에 성공하면 새 세대로 합성하고 입력을 연다.
+        await store.send(.retryLoad)
+        await store.receive(\.drawingsLoaded)
+        #expect(store.state.isInputEnabled)
+        #expect(store.state.storeGeneration == after)
+        #expect(store.state.blockingLoadFailure == nil)
+
+        // 그 뒤의 새 필기는 새 세대로 저장된다.
+        await store.send(.editBegan)
+        await store.send(.editEnded(CanvasTestSupport.edit("after", generation: store.state.renderedRevision)))
+        await store.receive(\.mutationsPrepared)
+        await store.receive(\.saveFinished)
+        #expect(spy.appliedGenerations.value == [after])
+        #expect(spy.applied.value.count == 1)
+        #expect(store.state.pendingMutations.isEmpty)
+        #expect(store.state.localSaveIndicator == .saved)
+    }
+
+    @Test("첫 조회가 실패한 장은 입력을 닫아 두고 안내하며, 다시 읽기에 성공하면 연다 — 이전에는 다시 읽을 길이 없었다")
+    func firstLoadFailureOffersRetry() async {
+        let spy = RepositorySpy()
+        spy.loadFailures.setValue(["디스크 오류"])
+        let store = CanvasTestSupport.makeStore(spy: spy)
+        await store.send(.load(chapter: CanvasTestSupport.chapter, expectedVerseCount: 3))
+        await store.receive(\.drawingsLoaded)
+        await store.send(.layoutCompleted(CanvasTestSupport.layout))
+        #expect(!store.state.isInputEnabled)
+        #expect(store.state.blockingLoadFailure != nil)
+
+        await store.send(.retryLoad)
+        await store.receive(\.drawingsLoaded)
+
+        #expect(store.state.isInputEnabled)
+        #expect(store.state.blockingLoadFailure == nil)
+        #expect(spy.loadedChapters.value == [CanvasTestSupport.chapter, CanvasTestSupport.chapter])
+    }
+
+    @Test("합성된 장에서는 다시 읽기 요청을 무시한다 — 재조회 실패는 마지막으로 알던 내용으로 이미 복구했다")
+    func retryIsIgnoredWhenComposed() async {
+        let spy = RepositorySpy()
+        let store = CanvasTestSupport.makeStore(spy: spy)
+        await CanvasTestSupport.compose(store)
+
+        await store.send(.retryLoad)
+
+        #expect(spy.loadedChapters.value == [CanvasTestSupport.chapter])
+    }
+}
