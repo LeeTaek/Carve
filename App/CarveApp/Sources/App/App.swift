@@ -31,6 +31,8 @@ struct CarveApp: App {
     private let adConsent: AdConsentCoordinator
     /// 본문 모양(글꼴 · 글자 크기 · 줄 간격 · 자간) iCloud 백업. 실행 뒤에 늦게 내려오는 백업도 받도록 앱이 붙잡아 둔다.
     private let sentenceSettingBackup: SentenceSettingCloudBackup
+    /// 편집이 기대는 계정 · K 환경(정책 §12-6 구현 순서 ①). 계정 변경 알림을 앱 수명 동안 받는다.
+    private let drawingEditEnvironment: LiveDrawingEditEnvironment
 
     // 앱 시작 시 필요한 의존성(ContainerID, ModelContainer, Store)을 생성하는 생성자.
     init() {
@@ -49,6 +51,13 @@ struct CarveApp: App {
         #endif
         let containerID = Self.makeContainerID()
         let modelContainer = Self.makeModelContainer(containerID: containerID)
+        // 저장소를 연 뒤에 계정을 확인한다. 조회는 네트워크를 기다릴 수 있어 시작을 막지 않는다 — 확인 전에는 서버 작업만 잠긴다.
+        let drawingEditEnvironment = LiveDrawingEditEnvironment(
+            identity: CloudKitAccountIdentityClient(containerID: containerID.id),
+            containerID: containerID.id,
+            stateStore: FileEraseStateStore(area: .live(localDBPath: containerID.localDBPath))
+        )
+        self.drawingEditEnvironment = drawingEditEnvironment
         self.modelContainer = modelContainer
         let adConsent = AdConsentCoordinator(purchases: purchaseClient)
         self.adConsent = adConsent
@@ -59,8 +68,10 @@ struct CarveApp: App {
             nativeAdClient: nativeAdClient,
             adConsentClient: adConsent,
             purchaseClient: purchaseClient,
-            sentenceSettingBackup: sentenceSettingBackup
+            sentenceSettingBackup: sentenceSettingBackup,
+            drawingEditEnvironment: drawingEditEnvironment
         )
+        Task { await drawingEditEnvironment.start() }
     }
 
     var body: some Scene {
@@ -130,7 +141,8 @@ extension CarveApp {
         nativeAdClient: any NativeAdClient,
         adConsentClient: any AdConsentClient,
         purchaseClient: any PurchaseClient,
-        sentenceSettingBackup: any SentenceSettingBackupClient
+        sentenceSettingBackup: any SentenceSettingBackupClient,
+        drawingEditEnvironment: any DrawingEditEnvironmentClient
     ) -> StoreOf<AppCoordinatorFeature> {
         withDependencies {
             $0.containerId = containerID
@@ -139,6 +151,7 @@ extension CarveApp {
             $0.adConsentClient = adConsentClient
             $0.purchaseClient = purchaseClient
             $0.sentenceSettingBackup = sentenceSettingBackup
+            $0.drawingEditEnvironment = drawingEditEnvironment
             $0.photoLibraryClient = PhotoKitLibraryClient()
             $0.widgetVerseClient = AppGroupWidgetVerseClient()
             $0.analyticsClient = FirebaseAnalyticsClient()
