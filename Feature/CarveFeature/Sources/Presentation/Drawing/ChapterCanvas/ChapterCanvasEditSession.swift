@@ -202,15 +202,37 @@ extension ChapterCanvasFeature {
         return scheduleSessionSettle(id: ending.id)
     }
 
-    /// 조회 결과가 지금 세션에 쓸 수 있는가 — 결과에 붙은 환경(조회할 때의 것)과 세션 환경을 비교한다(7차 리뷰).
+    /// 두 환경이 **같은 근거**인가 — 계정 상태 · K · 저장소 소유 근거. 확인 세대(표)는 보지 않는다: 같은 계정의 재확인은 근거를 바꾸지
+    /// 않는다. 반대로 세대가 같거나 더 새롭다는 것도 근거가 같다는 뜻이 아니다 — 세대는 소유도 K 의 동등성도 나타내지 않는다(8차 리뷰).
+    static func hasSameBasis(_ lhs: DrawingEditEnvironment, _ rhs: DrawingEditEnvironment) -> Bool {
+        lhs.accountState == rhs.accountState && lhs.knowledge == rhs.knowledge && lhs.storeOwnership == rhs.storeOwnership
+    }
+
+    /// 조회 결과가 세션과 **다른 근거**로 읽혔다. **한 세션은 한 근거로 읽은 내용만 든다** — 다른 근거의 결과를 지금 세션에 섞지 않는다.
     ///
-    /// 세션이 결과보다 **나중 세대의 다른 근거**(계정 상태 · K)로 바뀌었으면 옛 근거로 읽은 결과다 — 버리고 다시 읽는다. 같은 근거의
-    /// 표만 바뀐 것(같은 계정 재확인)이거나, 세션이 새 환경을 받아들이지 않은 채(보존만 · 확인 대기) 둔 것이면 쓴다 — 그런 세션은
-    /// 귀속하지 않는다.
-    static func isLoadResultUsable(loadedUnder result: DrawingEditEnvironment, session: DrawingEditEnvironment) -> Bool {
-        let sameBasis = result.accountState == session.accountState && result.knowledge == session.knowledge
-            && result.storeOwnership == session.storeOwnership
-        return sameBasis || result.generation >= session.generation
+    /// - 지킬 편집이 없으면 결과의 근거로 새 세션을 연다. 결과는 그 근거로 읽은 것이므로 그대로 쓴다(nil 을 돌려 합성을 잇는다).
+    /// - 지킬 편집이 있으면 결과를 버리고 지금 세션을 닫는다. 그 편집은 **지금 세션의 출처를 단 채** 보존하고(격리본 — ② 에서는 초안),
+    ///   새 근거로 다시 읽는다.
+    /// - Returns: 합성을 이어도 되면 nil, 아니면 결과를 버린 뒤의 효과.
+    func resolveLoadBasisMismatch(state: inout State, loadedUnder environment: DrawingEditEnvironment) -> Effect<Action>? {
+        if var ending = state.sessionEnd {
+            // 이미 닫는 중이다 — 닫은 뒤 다시 읽는다. 결과는 버린다.
+            ending.next = environment
+            state.sessionEnd = ending
+            return .none
+        }
+        let validity = Self.sessionValidity(session: state.editEnvironment, latest: environment)
+        guard Self.hasUnsavedWork(state), validity != .valid else {
+            Log.info("편집 세션 — 조회 결과의 근거로 세션을 새로 연다", "\(validity)")
+            state.editEnvironment = environment
+            return nil
+        }
+        Log.info("편집 세션 — 다른 근거로 읽은 조회 결과를 버리고, 지금 세션의 편집을 보존한 뒤 다시 연다", "\(validity)")
+        let ending = EditSessionEnd(
+            id: uuid().uuidString, reason: validity, environment: state.editEnvironment, next: environment, phase: .settling
+        )
+        state.sessionEnd = ending
+        return scheduleSessionSettle(id: ending.id)
     }
 
     static func quarantineItem(_ pending: PendingDrawingMutation) -> DrawingQuarantineItem {

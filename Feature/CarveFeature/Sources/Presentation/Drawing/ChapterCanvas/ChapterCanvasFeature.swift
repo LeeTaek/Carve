@@ -600,10 +600,10 @@ extension ChapterCanvasFeature {
     ) -> Effect<Action> {
         // 이전 장(또는 이전 요청)의 결과는 폐기한다 (§6-4).
         guard requestID == state.loadRequestID else { return .none }
-        // 옛 계정 · K 근거로 읽은 결과를 새 세션 아래 합성하지 않는다 — 버리고 지금 근거로 다시 읽는다 (§12-6 구현 순서 ①).
-        guard Self.isLoadResultUsable(loadedUnder: environment, session: state.editEnvironment) else {
-            Log.info("단일 Canvas — 옛 편집 환경으로 읽은 조회 결과를 버리고 다시 읽는다")
-            return requestLoad(state: &state)
+        // 한 세션은 한 근거(계정 상태 · K · 소유 근거)로 읽은 내용만 든다 — 다른 근거의 결과를 지금 세션에 섞지 않는다 (§12-6 구현 순서 ①).
+        if !Self.hasSameBasis(environment, state.editEnvironment),
+           let effect = resolveLoadBasisMismatch(state: &state, loadedUnder: environment) {
+            return effect
         }
         switch result {
         case .success(let loaded):
