@@ -58,6 +58,11 @@ struct CarveApp: App {
             stateStore: FileEraseStateStore(area: .live(localDBPath: containerID.localDBPath))
         )
         self.drawingEditEnvironment = drawingEditEnvironment
+        // 무효가 된 편집 세션의 미저장분을 남기는 곳. 보존 영역 안이라 이 기기의 전체 삭제가 함께 지운다.
+        let drawingQuarantine = FileDrawingQuarantine(
+            store: FileRecoveryCopyStore(root: PreservationArea.live(localDBPath: containerID.localDBPath).recoveryCopiesDirectory),
+            deviceID: (try? InstallationID.load(at: InstallationID.liveURL)) ?? "installation-unreadable"
+        )
         self.modelContainer = modelContainer
         let adConsent = AdConsentCoordinator(purchases: purchaseClient)
         self.adConsent = adConsent
@@ -69,7 +74,8 @@ struct CarveApp: App {
             adConsentClient: adConsent,
             purchaseClient: purchaseClient,
             sentenceSettingBackup: sentenceSettingBackup,
-            drawingEditEnvironment: drawingEditEnvironment
+            drawingEditEnvironment: drawingEditEnvironment,
+            drawingQuarantine: drawingQuarantine
         )
         Task { await drawingEditEnvironment.start() }
     }
@@ -142,7 +148,8 @@ extension CarveApp {
         adConsentClient: any AdConsentClient,
         purchaseClient: any PurchaseClient,
         sentenceSettingBackup: any SentenceSettingBackupClient,
-        drawingEditEnvironment: any DrawingEditEnvironmentClient
+        drawingEditEnvironment: any DrawingEditEnvironmentClient,
+        drawingQuarantine: any DrawingQuarantineClient
     ) -> StoreOf<AppCoordinatorFeature> {
         withDependencies {
             $0.containerId = containerID
@@ -152,6 +159,7 @@ extension CarveApp {
             $0.purchaseClient = purchaseClient
             $0.sentenceSettingBackup = sentenceSettingBackup
             $0.drawingEditEnvironment = drawingEditEnvironment
+            $0.drawingQuarantine = drawingQuarantine
             $0.photoLibraryClient = PhotoKitLibraryClient()
             $0.widgetVerseClient = AppGroupWidgetVerseClient()
             $0.analyticsClient = FirebaseAnalyticsClient()

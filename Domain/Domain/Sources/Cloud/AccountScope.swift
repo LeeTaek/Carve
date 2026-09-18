@@ -46,6 +46,11 @@ public struct AccountScope: Hashable, Codable, Sendable {
 public struct AccountServerWorkToken: Codable, Equatable, Sendable {
     public let scope: AccountScope
     public let generation: UInt64
+
+    public init(scope: AccountScope, generation: UInt64) {
+        self.scope = scope
+        self.generation = generation
+    }
 }
 
 /// 이번 실행에서 계정 범위를 얼마나 확신하는지.

@@ -125,6 +125,8 @@ extension ChapterCanvasFeature {
 
     /// 저장은 동시에 하나만. `allowRetry` 면 실패 상태에서도 다시 시도한다.
     func startSaveIfPossible(state: inout State, allowRetry: Bool) -> Effect<Action> {
+        // 무효가 된 세션을 닫는 중이다 — 바뀐 계정 · 기준점 아래로 이전 세션의 편집을 저장하지 않는다(§12-6 구현 순서 ①).
+        guard state.sessionEnd == nil else { return .none }
         switch state.saveStatus {
         case .saving:
             return .none
@@ -192,6 +194,14 @@ extension ChapterCanvasFeature {
         state.inFlightMutations = []
         state.inFlightChapter = nil
 
+        if let failure, state.pendingMutations.isEmpty, state.sessionEnd == nil {
+            // 실패한 저장의 내용은 이미 격리했다 — 편집 세션을 닫으며 미저장분을 격리본으로 옮겼다(§12-6 구현 순서 ①).
+            // 다시 시도할 것이 없으므로 실패로 남기지 않는다. 남기면 예약된 재합성이 저장 성공을 기다리며 멈춰 입력이 잠긴다.
+            Log.info("단일 Canvas — 실패한 저장의 내용은 이미 격리했다. 다시 시도하지 않는다", "\(failure)", "revision=\(revision)")
+            state.consecutiveSaveFailures = 0
+            state.saveStatus = .idle
+            return settleIfNeeded(state: &state)
+        }
         if let failure {
             // 이전 구현은 직전 상태가 `.failed` 일 때만 +1 했다. 재시도는 항상 `.saving` 을 거치므로 값이 **늘 1** 이었다 —
             // 로그용일 때는 무해했지만 화면이 반복 실패를 구분하려면 실제로 누적돼야 한다.

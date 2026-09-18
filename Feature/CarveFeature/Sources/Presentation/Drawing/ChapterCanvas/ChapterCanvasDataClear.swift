@@ -24,6 +24,11 @@ extension ChapterCanvasFeature {
     /// 기준과 다른 세대의 조회 결과. 뒤의 둘은 알림보다 먼저 올 수 있고, 알림이 뒤따라 와도 같은 정리를 한 번 더 할 뿐이다.
     /// 이미 요청돼 도는 저장은 멈출 수 없다 — 그 저장이 삭제 뒤에 실행되면 저장소가 세대로 거절한다 (`DrawingStoreGeneration`).
     func clearAfterExternalDelete(state: inout State) -> Effect<Action> {
+        // 사용자가 요청한 전체 삭제다 — 닫던 세션의 미저장분도 격리하지 않고 버린다. 다시 불러올 때는 최신 환경을 쓴다.
+        if let ending = state.sessionEnd {
+            state.editEnvironment = ending.next
+            state.sessionEnd = nil
+        }
         state.pendingMutations = [:]
         state.inFlightBatch = [:]
         state.inFlightMutations = []

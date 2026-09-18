@@ -163,6 +163,13 @@ public struct ChapterCanvasFeature {
         var reloadWhenSettled = false
         var isReloading = false
 
+        // §12-6 구현 순서 ① — 편집 세션의 계정 · K 근거
+
+        /// 이 세션(불러온 뒤의 편집 전체)이 기댄 편집 환경. 불러올 때 정하고, 바뀌면 세션을 닫고 다시 불러오며 새로 정한다.
+        var editEnvironment: DrawingEditEnvironment = .unknown
+        /// 무효가 된 세션을 닫는 중 — 입력 · 저장을 막고 미저장분을 격리한 뒤 다시 연다.
+        var sessionEnd: EditSessionEnd?
+
         // UI-2 지우기 (보관 후 초기화)
 
         /// 진행 중이거나 실패한 지우기 작업. 진행 중에는 입력·중복 지우기·재합성을 막는다.
@@ -204,7 +211,7 @@ public struct ChapterCanvasFeature {
         /// 합성된 장의 재조회 실패는 마지막으로 알던 내용으로 이미 복구했으므로 들지 않는다.
         var blockingLoadFailure: DrawingLoadFailure? { isComposed ? nil : loadFailure }
         /// §6-2 입력 게이트 — 합성이 끝났고, 다시 합성하지도 지우지도 않는 중일 때만 입력을 받는다.
-        var isInputEnabled: Bool { isComposed && !isReloading && !isErasing }
+        var isInputEnabled: Bool { isComposed && !isReloading && !isErasing && sessionEnd == nil }
         /// 지우기가 실제로 도는 중인가. `.failed` 는 **포함하지 않는다** — 실패하면 잠금을 풀고 필기를 그대로 쓰게 둔다.
         var isErasing: Bool {
             switch eraseTask?.phase {
@@ -265,6 +272,12 @@ public struct ChapterCanvasFeature {
         case flushPending
         /// 밖에서 필사 데이터가 전부 지워졌다 (설정 → 「모든 필사 데이터 삭제」).
         case drawingDataCleared
+        /// 편집 환경(계정 · K)이 바뀌었을 수 있다 (§12-6 구현 순서 ①).
+        case editEnvironmentChanged(DrawingEditEnvironment)
+        /// 무효가 된 세션의 편집이 멎었는지 잴 때가 됐다.
+        case sessionEndSettled
+        /// 무효가 된 세션의 미저장분을 격리한 결과.
+        case sessionQuarantineFinished(failure: String?)
         /// 히스토리에서 다른 회차를 선택해 `isPresent` 가 바뀐 뒤. mutation 을 만들지 않고 다시 합성한다 (§8-7).
         case verseRowRestored(verse: Int, rowID: BibleDrawingRowID)
         case undoStateChanged(canUndo: Bool, canRedo: Bool)
@@ -319,6 +332,9 @@ public struct ChapterCanvasFeature {
     @Dependency(\.drawingRepository) var repository
     @Dependency(\.uuid) var uuid
     @Dependency(\.date) var date
+    @Dependency(\.drawingEditEnvironment) var editEnvironment
+    @Dependency(\.drawingQuarantine) var quarantine
+    @Dependency(\.continuousClock) var clock
 
     public var body: some Reducer<State, Action> {
         Reduce { state, action in
@@ -402,10 +418,23 @@ public struct ChapterCanvasFeature {
                 return finishSave(state: &state, requestID: requestID, revision: revision, failure: failure)
 
             case .flushPending:
+                if state.sessionEnd != nil {
+                    // 무효가 된 세션을 닫는 중에는 저장하지 않는다. 격리가 실패했다면 이것이 「다시 시도」다.
+                    return retrySessionEnd(state: &state)
+                }
                 return startSaveIfPossible(state: &state, allowRetry: true)
 
             case .drawingDataCleared:
                 return clearAfterExternalDelete(state: &state)
+
+            case .editEnvironmentChanged(let latest):
+                return editEnvironmentChanged(state: &state, latest: latest)
+
+            case .sessionEndSettled:
+                return sessionEndSettled(state: &state)
+
+            case .sessionQuarantineFinished(let failure):
+                return sessionQuarantineFinished(state: &state, failure: failure)
 
             case .verseRowRestored:
                 // isPresent 이전은 호출부(히스토리 시트)가 이미 DB 에 반영했다. 여기서는 mutation 없이 다시 합성만 한다.
@@ -530,7 +559,8 @@ extension ChapterCanvasFeature {
         // 장 전환은 flush 지점이다 (§8-5). 실패해 남아 있던 이전 장 batch 를 여기서 다시 시도한다.
         return .merge(
             requestLoad(state: &state),
-            startSaveIfPossible(state: &state, allowRetry: true)
+            startSaveIfPossible(state: &state, allowRetry: true),
+            observeEditEnvironment()
         )
     }
 
@@ -538,7 +568,13 @@ extension ChapterCanvasFeature {
         let requestID = uuid()
         state.loadRequestID = requestID
         let chapter = state.chapter
-        return .run { [repository] send in
+        let knownEnvironment = state.editEnvironment
+        return .run { [repository, editEnvironment] send in
+            // 불러오는 내용이 기댈 환경을 먼저 확인한다. 바뀐 경우에만 알린다 — 세션 판정은 리듀서가 한다.
+            let environment = await editEnvironment.current()
+            if environment != knownEnvironment {
+                await send(.editEnvironmentChanged(environment))
+            }
             do {
                 let loaded = try await repository.load(chapter: chapter)
                 await send(.drawingsLoaded(requestID: requestID, .success(loaded)))
