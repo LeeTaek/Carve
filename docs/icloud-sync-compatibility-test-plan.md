@@ -702,6 +702,26 @@ OLD·CURRENT·NEW 커밋 / 테스트 변경 diff: 수정 전 = develop 2c124cb3(
 
 출시 전에 MIG-F1 로 더 볼 것(리뷰): 실제 1.0.x · 동기화 이력이 있는 저장소 **사본**에서 판별 · 이관 · 필사 보존 / iCloud 로그인 상태에서 마이그레이션 성공 · 실패 · 시간 초과와 늦은 이벤트에도 진입 차단 / 보호 데이터 접근 실패 뒤 잠금 해제 · 재실행 복구와 실제 열기 실패에서 원본 보존 / 정상 V5 업데이트 뒤 새 필사 저장 · 재실행 조회, 최종 후보 모델의 V3 · V5 → V6 이관.
 
+### RAW-E1 — 원시 사본과 V6 마이그레이션의 실제 앱 경로 (2026-09-18)
+
+```text
+케이스 ID / 수행일: RAW-E1 / 2026-09-18
+커밋: develop bbae71ef + 작업 트리(원시 사본 · 스키마 V6 · 삭제 판정 상태 저장소, 미커밋)
+기기 / 빌드 / 환경: 전용 임시 시뮬레이터 Carve-RAW-tmp(iPad Pro 11-inch M5, iOS 26.2 — 앱이 iPad 전용이라 iPhone 은 설치 거부)
+  / Debug / iCloud 미로그인 · Carve.dev.sqlite
+초기 표본: Carve-Migration-Test 의 V5 dev 저장소 사본 — 필사 행 1, 즐겨찾기 테이블 있음, 외부 저장 0,
+  sqlite 77,824 B(sha256 f30f4e5554e93dd5…) · 미반영 WAL 1,149,512 B(5a6fefd8d55b5992…)
+실제 조작: 설치 → 첫 실행 전에 저장소 파일을 컨테이너에 넣음 → 실행 → 파일 · 화면 확인 → 기기 삭제
+결과:
+  ① Preservation/Carve.dev.sqlite/raw/<id>/ 에 sqlite · -wal · -shm · manifest.json 이 생겼다. 사본의 sqlite · -wal
+     해시가 넣은 원본과 같다 — 마이그레이션 전 원본이다. 사본을 복제해 열면 V5 테이블만 있고 필사 행 1(같은 rowUUID)
+  ② 본 저장소는 V6 로 올라갔다 — ZVERSEDRAWINGVERSION · ZDRAWINGERASEEPOCH 테이블, ZFAVORITEVERSE.ZKNOWNERASEEPOCHS
+     열이 생겼고 필사 행 1 이 그대로다
+  ③ 시작 화면에서 막히지 않고 창세기 1장 필사 화면에 들어가 1절의 기존 필기를 보였다
+판정: 통과(관측 범위, 1회). 외부 저장 파일이 있는 저장소 · 1.3.0(V3) 저장소의 실제 앱 경로는 단위 시험으로만 확인했다
+  (RawStoreSnapshotTesting · DrawingSchemaV4MigrationTesting). 공간 부족 막힘 화면은 실기기에서 아직 보지 않았다
+```
+
 ### 이 수행에서 새로 확인한 사실
 
 | # | 사실 | 근거 | 영향 |

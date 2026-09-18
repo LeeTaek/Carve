@@ -90,7 +90,7 @@ public enum RecoveryCopyStoreError: Error, Equatable {
 /// 비동기화 영역에 두는 파일 기반 복구 사본 저장소 (정책 §12-6 C11).
 ///
 /// 규칙 세 가지를 코드로 고정한다.
-/// 1. **blob 을 먼저, 항목을 나중에** 쓴다 — 중간에 끊겨도 내용 없는 항목이 남지 않는다.
+/// 1. **blob 을 먼저, 항목을 나중에** 쓴다 — 중간에 끊겨도 내용 없는 항목이 남지 않는다. 둘 다 장치까지 내려 쓴다(`DurableFile`).
 /// 2. **저장은 아무것도 지우지 않는다.** 공간이 부족하면 실패로 두고, 기존 사본을 치워 자리를 만들지 않는다.
 /// 3. 삭제는 명시적인 `remove` 뿐이고, blob 은 **참조가 모두 사라졌을 때만** 지운다.
 public struct FileRecoveryCopyStore: RecoveryCopyWriting {
@@ -108,11 +108,11 @@ public struct FileRecoveryCopyStore: RecoveryCopyWriting {
 
         let blobURL = blobURL(entry.accountScope, fingerprint: entry.contentFingerprint)
         if !fileManager.fileExists(atPath: blobURL.path) {
-            try blob.write(to: blobURL, options: .atomic)
+            try DurableFile.write(blob, to: blobURL)
         }
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
-        try encoder.encode(entry).write(to: entryURL(entry.accountScope, entryID: entry.entryID), options: .atomic)
+        try DurableFile.write(try encoder.encode(entry), to: entryURL(entry.accountScope, entryID: entry.entryID))
     }
 
     /// 한 계정 범위의 사본 목록. 다른 계정 범위는 읽지 않는다.

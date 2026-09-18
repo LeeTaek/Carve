@@ -23,7 +23,7 @@ public enum EraseJobStage: Int, Comparable, Codable, CaseIterable, Sendable {
 }
 
 /// 비동기화 영역에 남기는 삭제 작업 기록. 단계 완료 표시는 **실제 작업을 끝낸 뒤에** 적는다.
-public struct EraseJobRecord: Equatable, Sendable {
+public struct EraseJobRecord: Codable, Equatable, Sendable {
     public var jobID: String
     /// 시작할 때 미리 정한다 — 재시도해도 기준점이 늘지 않는다.
     public var epochID: String

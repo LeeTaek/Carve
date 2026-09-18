@@ -17,7 +17,7 @@ import Foundation
 /// 두 집합 모두 **추가만 한다.** 참조로만 아는 기준점도 숨김 판정에는 쓰지만, 원본을 없애는 일
 /// (서버 정리 · 로컬 보존 기록 삭제)에는 `received` 만 쓴다 — 잘못된 참조 하나로 계정 데이터가
 /// 지워지는 것을 막는 안전장치다.
-public struct EraseEpochKnowledge: Equatable, Sendable {
+public struct EraseEpochKnowledge: Codable, Equatable, Sendable {
     public private(set) var received: Set<String>
     public private(set) var referencedOnly: Set<String>
 
