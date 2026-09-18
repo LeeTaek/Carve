@@ -33,7 +33,7 @@ public enum LocalStoreFailure: Hashable, Sendable {
 /// 갈아치워졌고, 필사가 사라진 채 앱이 평소처럼 열렸다(테스트 계획 §5-1 DOWN-L2 · F7).
 ///
 /// - Important: 가리기 전에 **앱 스키마로 여는 첫 시도는 이미 했다.** 그 시도가 실패했을 때 파일을 전혀 바꾸지 않았다는 보장은 없다 —
-///              V6 · 손상 표본에서 바이트가 그대로인 것을 확인했을 뿐이다. 여기서 보장하는 것은 "모르는 저장소에 V1 폴백을 하지 않는다" 까지다.
+///              더 새 스키마(시험 당시 이름 V6, 지금 V7) · 손상 표본에서 바이트가 그대로인 것을 확인했을 뿐이다. 여기서 보장하는 것은 "모르는 저장소에 V1 폴백을 하지 않는다" 까지다.
 enum LocalStoreLoader {
     /// 준비 결과.
     enum Outcome {
@@ -68,9 +68,9 @@ enum LocalStoreLoader {
         case block(LocalStoreFailure)
     }
 
-    /// 앱이 여는 스키마. `ModelContainer.liveValue` 가 쓰던 표현 그대로다.
+    /// 앱이 여는 스키마 — 현재 스키마 버전의 모델 전체(`AppStoreSchema`).
     private static var appSchema: Schema {
-        Schema([BibleDrawing.self, BiblePageDrawing.self, FavoriteVerse.self])
+        AppStoreSchema.schema
     }
 
     /// 앱 스키마 + 마이그레이션 플랜으로 연다. 실패하면 저장소를 가린 뒤 확인된 1.0.x 저장소만 V1 전용 컨테이너로 연다.

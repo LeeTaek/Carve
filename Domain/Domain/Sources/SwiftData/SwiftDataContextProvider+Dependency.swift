@@ -53,13 +53,7 @@ extension ModelContainer: @retroactive DependencyKey {
     public static var previewValue: ModelContainer {
         do {
             let config = ModelConfiguration(isStoredInMemoryOnly: true)
-            return try ModelContainer(
-                for: Schema([
-                    BibleDrawing.self,
-                    BiblePageDrawing.self,
-                    FavoriteVerse.self
-                ]),
-                configurations: config)
+            return try ModelContainer(for: AppStoreSchema.schema, configurations: config)
         } catch {
             fatalError("Failed to create preview ModelContainer")
         }
@@ -69,12 +63,7 @@ extension ModelContainer: @retroactive DependencyKey {
     public static var testValue: ModelContainer {
         do {
             let config = ModelConfiguration(isStoredInMemoryOnly: true)
-            let schema = Schema([
-                BibleDrawing.self,
-                BiblePageDrawing.self,
-                FavoriteVerse.self
-            ])
-            return try ModelContainer(for: schema, configurations: config)
+            return try ModelContainer(for: AppStoreSchema.schema, configurations: config)
         } catch {
             fatalError("Failed to create test ModelContainer")
         }

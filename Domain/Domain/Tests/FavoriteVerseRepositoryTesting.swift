@@ -18,7 +18,7 @@ struct FavoriteRepositoryHarness {
 
     init() throws {
         let container = try ModelContainer(
-            for: Schema([BibleDrawing.self, BiblePageDrawing.self, FavoriteVerse.self]),
+            for: AppStoreSchema.schema,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
         actor = SwiftDatabaseActor(modelContainer: container)

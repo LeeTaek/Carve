@@ -31,7 +31,7 @@ struct RawStoreSnapshotTesting {
     /// 앱 스키마로 필사 행을 남긴다. `largeInk` 면 외부 저장으로 빠질 만큼 큰 획을 하나 더 넣는다.
     private func seedStore(at url: URL, largeInk: Bool = false) throws {
         let container = try ModelContainer(
-            for: Schema([BibleDrawing.self, BiblePageDrawing.self, FavoriteVerse.self]),
+            for: AppStoreSchema.schema,
             migrationPlan: DrawingDataMigrationPlan.self,
             configurations: ModelConfiguration(url: url, cloudKitDatabase: .none)
         )
@@ -57,7 +57,7 @@ struct RawStoreSnapshotTesting {
     private func drawingsInSnapshot(_ snapshot: URL, scratch: URL) throws -> [String: Data] {
         try FileManager.default.copyItem(at: snapshot, to: scratch)
         let container = try ModelContainer(
-            for: Schema([BibleDrawing.self, BiblePageDrawing.self, FavoriteVerse.self]),
+            for: AppStoreSchema.schema,
             migrationPlan: DrawingDataMigrationPlan.self,
             configurations: ModelConfiguration(url: scratch.appendingPathComponent("Carve.sqlite"), cloudKitDatabase: .none)
         )

@@ -65,10 +65,10 @@ struct LegacyStoreMigrationTesting {
         try context.save()
     }
 
-    /// 앱과 같은 방식으로 연다 — 현재 스키마(V5) + 전체 마이그레이션 플랜. CloudKit 만 뺀다.
+    /// 앱과 같은 방식으로 연다 — 현재 스키마(`AppStoreSchema`) + 전체 마이그레이션 플랜. CloudKit 만 뺀다.
     private static func openWithAppSchema(at directory: URL) throws -> ModelContainer {
         try ModelContainer(
-            for: Schema(DrawingSchemaV5.models),
+            for: AppStoreSchema.schema,
             migrationPlan: DrawingDataMigrationPlan.self,
             configurations: ModelConfiguration(url: storeURL(in: directory))
         )

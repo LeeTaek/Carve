@@ -26,7 +26,7 @@ enum MigrationPlanV1Only: SchemaMigrationPlan {
 /// V4 -> V5: FavoriteVerse 엔티티 추가(lightWeight). 필사 행은 그대로
 enum DrawingDataMigrationPlan: SchemaMigrationPlan {
     static var schemas: [VersionedSchema.Type] {
-        [DrawingSchemaV1.self, DrawingSchemaV2.self, DrawingSchemaV3.self, DrawingSchemaV4.self, DrawingSchemaV5.self]
+        [DrawingSchemaV1.self, DrawingSchemaV2.self, DrawingSchemaV3.self, DrawingSchemaV4.self, DrawingSchemaV5.self, DrawingSchemaV6.self]
     }
 
     private static var updatedDrawings: [DrawingSchemaV2.BibleDrawing] = []
@@ -112,13 +112,23 @@ enum DrawingDataMigrationPlan: SchemaMigrationPlan {
         toVersion: DrawingSchemaV5.self
     )
 
-    /// 정의된 순서대로 마이그레이션 실행 (V1 -> V2, V2 -> V3, V3 -> V4, V4 -> V5)
+    /// 절 필기 버전(`VerseDrawingVersion`) · 삭제 기준점(`DrawingEraseEpoch`) 엔티티를 더하고, 즐겨찾기에 optional 필드
+    /// (`knownEraseEpochs`) 하나를 더한다. 필사 행은 V4 클래스를 그대로 쓴다.
+    ///
+    /// - Important: forward-only 다. 이 단계를 거친 store 는 V5 빌드로 열 수 없다.
+    static let migrationV5toV6 = MigrationStage.lightweight(
+        fromVersion: DrawingSchemaV5.self,
+        toVersion: DrawingSchemaV6.self
+    )
+
+    /// 정의된 순서대로 마이그레이션 실행 (V1 -> V2, V2 -> V3, V3 -> V4, V4 -> V5, V5 -> V6)
     static var stages: [MigrationStage] {
         [
             migrationV1toV2,
             migrationV2toV3,
             migrationV3toV4,
-            migrationV4toV5
+            migrationV4toV5,
+            migrationV5toV6
         ]
     }
 }

@@ -54,7 +54,7 @@ struct DrawingSchemaV5MigrationTesting {
         try await repository.save(favorite)
     }
 
-    @Test("V5 는 5.0.0 이고 V4 의 두 모델 클래스를 그대로 싣고 즐겨찾기만 더한다 — 플랜의 마지막 스키마다")
+    @Test("V5 는 5.0.0 이고 V4 의 두 모델 클래스를 그대로 싣고 즐겨찾기만 더한다 — 플랜의 다섯 번째 스키마다")
     func versionModelsAndPlanPosition() {
         #expect(DrawingSchemaV5.versionIdentifier == Schema.Version(5, 0, 0))
         let models = DrawingSchemaV5.models.map { ObjectIdentifier($0) }
@@ -63,8 +63,8 @@ struct DrawingSchemaV5MigrationTesting {
             ObjectIdentifier(DrawingSchemaV4.BiblePageDrawing.self),
             ObjectIdentifier(DrawingSchemaV5.FavoriteVerse.self)
         ])
-        #expect(DrawingDataMigrationPlan.schemas.last?.versionIdentifier == Schema.Version(5, 0, 0))
-        #expect(FavoriteVerse.self == DrawingSchemaV5.FavoriteVerse.self)
+        // V5 는 다섯 번째 스키마다. 현재 별칭은 2026-09-18 부터 V6 를 가리킨다(`DrawingSchemaV6MigrationTesting`).
+        #expect(DrawingDataMigrationPlan.schemas[4].versionIdentifier == Schema.Version(5, 0, 0))
     }
 
     @Test("V4 store 를 앱 스키마로 다시 열면 필사 행은 그대로이고 즐겨찾기를 저장할 수 있다")

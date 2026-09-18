@@ -141,7 +141,7 @@ extension SwiftDatabaseActor {
 
 // MARK: - 행 → 도메인 값
 
-extension DrawingSchemaV5.FavoriteVerse {
+extension FavoriteVerse {
     /// 권 · 장 · 절을 해석할 수 없는 행(알 수 없는 권 이름 등)은 nil — 목록에 올리지 않는다.
     var snapshot: FavoriteVerseSnapshot? {
         guard let titleName, let title = BibleTitle(rawValue: titleName),

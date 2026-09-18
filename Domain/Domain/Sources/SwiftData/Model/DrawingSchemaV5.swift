@@ -76,7 +76,4 @@ public enum DrawingSchemaV5: VersionedSchema {
     }
 }
 
-// MARK: - 현재 스키마 별칭
-
-/// 앱 코드가 쓰는 **현재 스키마**의 즐겨찾기 모델.
-public typealias FavoriteVerse = DrawingSchemaV5.FavoriteVerse
+// 현재 스키마 별칭(`FavoriteVerse`)은 V6 로 옮겼다 — `DrawingSchemaV6.swift`.
