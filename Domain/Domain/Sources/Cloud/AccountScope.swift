@@ -43,7 +43,7 @@ public struct AccountScope: Hashable, Codable, Sendable {
 ///
 /// 확인 세대를 함께 든다. 작업은 서버 단계마다 `AccountScopeProvider.isCurrent(_:)` 로 표가 아직 유효한지 다시 확인한다 —
 /// 그 사이 계정 변경 알림이나 재확인이 있었으면 멈춘다.
-public struct AccountServerWorkToken: Equatable, Sendable {
+public struct AccountServerWorkToken: Codable, Equatable, Sendable {
     public let scope: AccountScope
     public let generation: UInt64
 }
