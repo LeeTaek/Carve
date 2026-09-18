@@ -104,6 +104,9 @@ public enum VerseEditPreserveOnlyReason: Equatable, Sendable {
     case accountUnverifiedAtStart
     /// 기준점 집합(K)을 읽지 못했다 — 시작할 때든 지금이든. 삭제 사실을 모른 채 판정하지 않는다.
     case knowledgeUnreadable
+    /// 확인된 계정에서 시작했지만, 불러온 데이터가 그 계정의 것이라는 근거가 없다. 계정 확인과 저장소 내용의 소유는 별개다 —
+    /// 확인이 끝나도 저장소에는 이전 계정의 필사가 남아 있을 수 있다(7차 리뷰).
+    case dataOwnershipUnverified
 }
 
 /// 편집 문맥이 아직 유효한가. **편집 보존과 계정 귀속은 따로다** — `.preserveOnly` 는 보존은 이어 가되 귀속 · 확정은 하지 않는다.
@@ -128,7 +131,8 @@ public enum VerseEditContextValidity: Equatable, Sendable {
 /// - **문맥은 계정 범위가 실제로 바뀔 때 끝난다.** 확인 세대가 바뀐 것만(같은 계정으로 다시 확인)으로는 끝나지 않는다 — 계정 변경
 ///   알림은 같은 계정에서도 온다. 재확인하는 동안은 기다리고, 같은 계정으로 확인되면 새 표를 든다(`VerseEditContext.refreshed(with:)`).
 ///   확정 자체는 그때의 표가 유효한지(`isCurrent`)를 따로 확인한다.
-/// - **확인 전에 시작한 문맥은 불러온 데이터의 소유 근거가 있을 때만 귀속한다.** 마지막 확인 계정과 같다는 것은 근거가 아니다(6차 리뷰).
+/// - **불러온 데이터의 소유 근거가 있을 때만 귀속한다.** 확인 전에 시작한 문맥이든 확인된 계정에서 시작한 문맥이든 같다 —
+///   마지막 확인 계정과 같다는 것도(6차 리뷰), 계정 확인이 끝났다는 것도(7차 리뷰) 저장소 내용의 소유 근거가 아니다.
 public enum VerseEditContextRule {
     /// - Parameters:
     ///   - context: 판정할 문맥.
@@ -146,6 +150,12 @@ public enum VerseEditContextRule {
         switch (context.account, accountState) {
         case (.confirmed(let token), .confirmed(let scope)):
             guard token.scope == scope else { return .accountChanged }
+            // 계정이 같아도 불러온 데이터가 이 계정의 것이라는 근거가 있어야 귀속한다.
+            if let loadedDataOwner {
+                guard loadedDataOwner == scope else { return .accountChanged }
+            } else {
+                preserveOnly = .dataOwnershipUnverified
+            }
         case (.confirmed, .unconfirmed), (.localOnly, .unconfirmed):
             // 계정이 바뀌었는지 아직 모른다.
             awaiting = true

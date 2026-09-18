@@ -254,7 +254,8 @@ public struct ChapterCanvasFeature {
     public enum Action: Equatable {
         /// 장 진입. 이전 장의 미저장분은 버리지 않고 자기 장으로 저장된다.
         case load(chapter: BibleChapter, expectedVerseCount: Int)
-        case drawingsLoaded(requestID: UUID, Result<DrawingChapterLoad, DrawingLoadFailure>)
+        /// 조회 결과. `environment` 는 **조회할 때의** 편집 환경이다 — 결과가 어느 계정 · K 근거로 읽은 것인지 함께 든다.
+        case drawingsLoaded(requestID: UUID, environment: DrawingEditEnvironment, Result<DrawingChapterLoad, DrawingLoadFailure>)
         /// 조회에 실패해 합성하지 못한 장을 다시 읽는다 — 첫 조회 실패, 전부 지운 뒤의 재조회 실패.
         case retryLoad
         case layoutCompleted(ChapterLayout)
@@ -274,10 +275,10 @@ public struct ChapterCanvasFeature {
         case drawingDataCleared
         /// 편집 환경(계정 · K)이 바뀌었을 수 있다 (§12-6 구현 순서 ①).
         case editEnvironmentChanged(DrawingEditEnvironment)
-        /// 무효가 된 세션의 편집이 멎었는지 잴 때가 됐다.
-        case sessionEndSettled
-        /// 무효가 된 세션의 미저장분을 격리한 결과.
-        case sessionQuarantineFinished(failure: String?)
+        /// 무효가 된 세션의 편집이 멎었는지 잴 때가 됐다. `id` 는 닫는 세션이다.
+        case sessionEndSettled(id: String)
+        /// 무효가 된 세션의 미저장분을 격리한 결과. `id` 는 닫는 세션(격리 batch)이다.
+        case sessionQuarantineFinished(id: String, failure: String?)
         /// 히스토리에서 다른 회차를 선택해 `isPresent` 가 바뀐 뒤. mutation 을 만들지 않고 다시 합성한다 (§8-7).
         case verseRowRestored(verse: Int, rowID: BibleDrawingRowID)
         case undoStateChanged(canUndo: Bool, canRedo: Bool)
@@ -342,8 +343,8 @@ public struct ChapterCanvasFeature {
             case .load(let chapter, let expectedVerseCount):
                 return beginLoad(state: &state, chapter: chapter, expectedVerseCount: expectedVerseCount)
 
-            case .drawingsLoaded(let requestID, let result):
-                return finishLoad(state: &state, requestID: requestID, result: result)
+            case .drawingsLoaded(let requestID, let environment, let result):
+                return finishLoad(state: &state, requestID: requestID, environment: environment, result: result)
 
             case .retryLoad:
                 guard state.blockingLoadFailure != nil else { return .none }
@@ -430,11 +431,11 @@ public struct ChapterCanvasFeature {
             case .editEnvironmentChanged(let latest):
                 return editEnvironmentChanged(state: &state, latest: latest)
 
-            case .sessionEndSettled:
-                return sessionEndSettled(state: &state)
+            case .sessionEndSettled(let id):
+                return sessionEndSettled(state: &state, id: id)
 
-            case .sessionQuarantineFinished(let failure):
-                return sessionQuarantineFinished(state: &state, failure: failure)
+            case .sessionQuarantineFinished(let id, let failure):
+                return sessionQuarantineFinished(state: &state, id: id, failure: failure)
 
             case .verseRowRestored:
                 // isPresent 이전은 호출부(히스토리 시트)가 이미 DB 에 반영했다. 여기서는 mutation 없이 다시 합성만 한다.
@@ -584,9 +585,9 @@ extension ChapterCanvasFeature {
                 if after != environment {
                     await send(.editEnvironmentChanged(after))
                 }
-                await send(.drawingsLoaded(requestID: requestID, .success(loaded)))
+                await send(.drawingsLoaded(requestID: requestID, environment: environment, .success(loaded)))
             } catch {
-                await send(.drawingsLoaded(requestID: requestID, .failure(DrawingLoadFailure(message: "\(error)"))))
+                await send(.drawingsLoaded(requestID: requestID, environment: environment, .failure(DrawingLoadFailure(message: "\(error)"))))
             }
         }
     }
@@ -594,10 +595,16 @@ extension ChapterCanvasFeature {
     private func finishLoad(
         state: inout State,
         requestID: UUID,
+        environment: DrawingEditEnvironment,
         result: Result<DrawingChapterLoad, DrawingLoadFailure>
     ) -> Effect<Action> {
         // 이전 장(또는 이전 요청)의 결과는 폐기한다 (§6-4).
         guard requestID == state.loadRequestID else { return .none }
+        // 옛 계정 · K 근거로 읽은 결과를 새 세션 아래 합성하지 않는다 — 버리고 지금 근거로 다시 읽는다 (§12-6 구현 순서 ①).
+        guard Self.isLoadResultUsable(loadedUnder: environment, session: state.editEnvironment) else {
+            Log.info("단일 Canvas — 옛 편집 환경으로 읽은 조회 결과를 버리고 다시 읽는다")
+            return requestLoad(state: &state)
+        }
         switch result {
         case .success(let loaded):
             if let base = state.storeGeneration, base != loaded.generation {

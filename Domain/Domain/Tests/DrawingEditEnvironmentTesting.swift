@@ -178,6 +178,39 @@ struct DrawingEditEnvironmentTesting {
         }
     }
 
+    /// 확인하지 못한 채 보존만 하다가 영구히 머물지 않아야 한다(7차 리뷰).
+    @Test("앱이 다시 활성화되면 확인하지 못한 계정을 다시 확인하고 알린다")
+    func reactivationReevaluates() async throws {
+        try await withStateStore { store in
+            let center = NotificationCenter()
+            let environment = LiveDrawingEditEnvironment(
+                identity: SequencedIdentityClient([.unavailable, .identified(userRecordName: "_a")]),
+                containerID: container, stateStore: store, notificationCenter: center
+            )
+            await environment.start()
+            #expect(await environment.current().serverWork == nil)
+            var changes = environment.changes().makeAsyncIterator()
+
+            center.post(name: LiveDrawingEditEnvironment.didBecomeActiveNotification, object: nil)
+            _ = await changes.next()
+
+            #expect(await environment.current().accountState == .confirmed(scope("_a")))
+        }
+    }
+
+    @Test("저장소 소유 근거는 검증된 방법이 정해질 때까지 비어 있다 — 모든 세션이 보존만 한다")
+    func storeOwnershipIsNotClaimedYet() async throws {
+        try await withStateStore { store in
+            let environment = LiveDrawingEditEnvironment(
+                identity: SequencedIdentityClient([.identified(userRecordName: "_a")]),
+                containerID: container, stateStore: store, notificationCenter: NotificationCenter()
+            )
+            await environment.start()
+
+            #expect(await environment.current().storeOwnership == nil)
+        }
+    }
+
     @Test("주입하지 않은 기본값은 확인 전 환경이다 — 서버 작업을 하지 않는다")
     func unconfiguredDefaultDoesNoServerWork() async {
         let current = await StubDrawingEditEnvironment(.unknown).current()

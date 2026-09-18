@@ -55,8 +55,19 @@ final class RecordingQuarantine: DrawingQuarantineClient, @unchecked Sendable {
 
     let calls = LockIsolated<[Call]>([])
     let failures = LockIsolated(0)
+    private let holdNext = LockIsolated(false)
+    private let gate = LockIsolated<AsyncStream<Void>.Continuation?>(nil)
+
+    /// 다음 격리를 `release()` 까지 붙잡는다 — 격리가 도는 동안 도착하는 늦은 응답을 재현하기 위함.
+    func holdNextCall() { holdNext.setValue(true) }
+    func release() { gate.withValue { $0?.yield(); $0?.finish(); $0 = nil } }
 
     func quarantine(_ items: [DrawingQuarantineItem], environment: DrawingEditEnvironment, batchID: String) async throws {
+        if holdNext.withValue({ value -> Bool in defer { value = false }; return value }) {
+            let (stream, continuation) = AsyncStream<Void>.makeStream()
+            gate.setValue(continuation)
+            for await _ in stream { break }
+        }
         let shouldFail = failures.withValue { remaining -> Bool in
             guard remaining > 0 else { return false }
             remaining -= 1
@@ -77,11 +88,18 @@ struct ChapterCanvasEditSessionTesting {
     private let accountA = AccountScope(key: "acct-a")
     private let accountB = AccountScope(key: "acct-b")
 
-    private func confirmed(_ scope: AccountScope, _ generation: UInt64, knowledge: EraseEpochKnowledge? = EraseEpochKnowledge()) -> DrawingEditEnvironment {
+    /// 확인된 계정 환경. 기본은 저장소 소유 근거가 그 계정인 경우다 — 근거가 없는 경우는 `owned: false` 로 따로 본다.
+    private func confirmed(
+        _ scope: AccountScope,
+        _ generation: UInt64,
+        knowledge: EraseEpochKnowledge? = EraseEpochKnowledge(),
+        owned: Bool = true
+    ) -> DrawingEditEnvironment {
         DrawingEditEnvironment(
             accountState: .confirmed(scope),
             serverWork: AccountServerWorkToken(scope: scope, generation: generation),
-            knowledge: knowledge
+            knowledge: knowledge,
+            storeOwnership: owned ? scope : nil
         )
     }
 
@@ -433,6 +451,70 @@ struct ChapterCanvasEditSessionTesting {
         await store.receive(\.drawingsLoaded)
 
         #expect(store.state.editEnvironment == confirmed(accountA, 2, knowledge: learned))
+        await end(store, environment)
+    }
+
+    // MARK: - 소유 근거
+
+    /// 계정 확인이 끝나도 저장소에는 이전 계정의 필사가 남아 있을 수 있다(7차 리뷰). 근거 없이 귀속하지 않는다.
+    @Test("확인된 계정에서 시작해도 저장소 소유 근거가 없으면 새 표를 들지 않고 보존만 한다")
+    func confirmedSessionWithoutOwnershipIsPreserveOnly() async {
+        let spy = RepositorySpy()
+        let unowned = confirmed(accountA, 1, owned: false)
+        let environment = ControlledEditEnvironment(unowned)
+        let quarantine = RecordingQuarantine()
+        let store = makeStore(spy: spy, results: [CanvasTestSupport.createResult("a")], environment: environment, quarantine: quarantine)
+        await composeAndSubscribe(store, environment)
+        await holdOneEdit(store, spy)
+
+        environment.change(to: confirmed(accountA, 2, owned: false))
+        await store.receive(\.editEnvironmentChanged)
+
+        #expect(store.state.editEnvironment == unowned)
+        #expect(store.state.sessionEnd == nil)
+        #expect(quarantine.calls.value.isEmpty)
+        spy.releaseApply()
+        await store.receive(\.saveFinished)
+        await end(store, environment)
+    }
+
+    // MARK: - 늦은 격리 응답
+
+    /// 전체 삭제로 정리된 뒤 새로 닫는 세션이 생겼을 때, 앞 세션 격리의 늦은 성공 응답이 새 세션의 미저장분을 치우면 안 된다(7차 리뷰 3).
+    @Test("다른 세션의 격리 응답은 지금 닫는 세션의 미저장분을 건드리지 않는다")
+    func staleQuarantineCompletionIsIgnored() async {
+        let spy = RepositorySpy()
+        spy.applyFailures.setValue([.persistenceFailed("disk")])
+        let environment = ControlledEditEnvironment(confirmed(accountA, 1))
+        let quarantine = RecordingQuarantine()
+        quarantine.holdNextCall()
+        let store = makeStore(spy: spy, results: [CanvasTestSupport.createResult("a")], environment: environment, quarantine: quarantine)
+        await composeAndSubscribe(store, environment)
+        await store.send(.editBegan)
+        await store.send(.editEnded(CanvasTestSupport.edit("a")))
+        await store.receive(\.mutationsPrepared)
+        await store.receive(\.saveFinished)
+
+        environment.change(to: confirmed(accountB, 2))
+        await store.receive(\.editEnvironmentChanged)
+        await store.receive(\.sessionEndSettled)
+        guard case .quarantining = store.state.sessionEnd?.phase else {
+            Issue.record("격리가 시작되지 않았다: \(String(describing: store.state.sessionEnd))")
+            return
+        }
+
+        await store.send(.sessionQuarantineFinished(id: "앞서 정리된 세션", failure: nil))
+        #expect(!store.state.pendingMutations.isEmpty)
+        guard case .quarantining = store.state.sessionEnd?.phase else {
+            Issue.record("늦은 응답이 지금 격리를 끝냈다: \(String(describing: store.state.sessionEnd))")
+            return
+        }
+
+        quarantine.release()
+        await store.receive(\.sessionQuarantineFinished)
+        await store.receive(\.drawingsLoaded)
+        #expect(store.state.pendingMutations.isEmpty)
+        #expect(quarantine.calls.value.count == 1)
         await end(store, environment)
     }
 

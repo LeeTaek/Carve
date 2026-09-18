@@ -57,12 +57,15 @@ extension ChapterCanvasFeature {
 
     /// 세션의 근거가 최신 환경에서도 유효한가. 절 문맥과 같은 규칙(`VerseEditContextRule`)을 세션 전체에 적용한다.
     ///
-    /// 불러온 데이터의 소유 근거(`loadedDataOwner`)는 아직 줄 곳이 없다 — 확인 전에 시작한 세션은 보존만 한다(ACC-1 에서 근거를 정한다).
+    /// 불러온 데이터의 소유 근거는 **세션을 연 환경의 것**(`session.storeOwnership`)을 쓴다 — 근거는 불러온 내용에 대한 것이다.
+    /// 지금은 근거를 줄 곳이 없어 모든 세션이 보존만 한다(ACC-1 에서 근거를 정한다).
     static func sessionValidity(session: DrawingEditEnvironment, latest: DrawingEditEnvironment) -> VerseEditContextValidity {
         let probe = VerseEditContext(
             contextID: "session", verse: 0, base: .empty, knownEpochs: session.knowledge?.all, account: session.accountBasis
         )
-        return VerseEditContextRule.validity(of: probe, accountState: latest.accountState, deviceKnowledge: latest.knowledge)
+        return VerseEditContextRule.validity(
+            of: probe, accountState: latest.accountState, deviceKnowledge: latest.knowledge, loadedDataOwner: session.storeOwnership
+        )
     }
 
     /// 지킬 편집이 있는가 — 미저장분 · 도는 편집 · 그리는 중인 획.
@@ -104,10 +107,11 @@ extension ChapterCanvasFeature {
             return restartSession(state: &state, with: latest)
         }
         Log.info("편집 세션 — 계정 · 삭제 근거가 바뀌었다. 입력 · 저장을 막고 미저장분을 격리한 뒤 다시 연다", "\(validity)")
-        state.sessionEnd = EditSessionEnd(
+        let ending = EditSessionEnd(
             id: uuid().uuidString, reason: validity, environment: state.editEnvironment, next: latest, phase: .settling
         )
-        return scheduleSessionSettle()
+        state.sessionEnd = ending
+        return scheduleSessionSettle(id: ending.id)
     }
 
     /// 새 환경으로 세션을 시작한다. 합성된 장이면 다시 읽고, 합성 전이면 도는 조회를 새 요청으로 바꿔 **옛 환경의 결과를 버린다**
@@ -121,19 +125,20 @@ extension ChapterCanvasFeature {
         return requestLoad(state: &state)
     }
 
-    func scheduleSessionSettle() -> Effect<Action> {
+    func scheduleSessionSettle(id: String) -> Effect<Action> {
         .run { [clock] send in
             try await clock.sleep(for: Self.sessionSettleDelay)
-            await send(.sessionEndSettled)
+            await send(.sessionEndSettled(id: id))
         }
         .cancellable(id: CanvasEditSessionCancelID.settle, cancelInFlight: true)
     }
 
     /// 편집이 멎었으면 미저장분을 격리한다. 아직 흐르고 있으면 한 번 더 기다린다.
-    func sessionEndSettled(state: inout State) -> Effect<Action> {
-        guard var ending = state.sessionEnd, ending.phase == .settling else { return .none }
+    /// **지금 닫는 세션의 알림만** 받는다 — 앞서 정리된 세션의 늦은 알림이 새로 닫는 세션을 서둘러 격리하게 하지 않는다.
+    func sessionEndSettled(state: inout State, id: String) -> Effect<Action> {
+        guard var ending = state.sessionEnd, ending.id == id, ending.phase == .settling else { return .none }
         guard state.editQueue.isEmpty, !state.isPreparingEdit, !state.isEditing else {
-            return scheduleSessionSettle()
+            return scheduleSessionSettle(id: ending.id)
         }
         let pending = state.pendingMutations
         guard !pending.isEmpty else { return finishSessionEnd(state: &state) }
@@ -147,15 +152,17 @@ extension ChapterCanvasFeature {
         return .run { [quarantine] send in
             do {
                 try await quarantine.quarantine(items, environment: environment, batchID: batchID)
-                await send(.sessionQuarantineFinished(failure: nil))
+                await send(.sessionQuarantineFinished(id: batchID, failure: nil))
             } catch {
-                await send(.sessionQuarantineFinished(failure: "\(error)"))
+                await send(.sessionQuarantineFinished(id: batchID, failure: "\(error)"))
             }
         }
     }
 
-    func sessionQuarantineFinished(state: inout State, failure: String?) -> Effect<Action> {
-        guard var ending = state.sessionEnd, case .quarantining(let captured) = ending.phase else { return .none }
+    /// 격리 결과. **지금 닫는 세션의 격리 결과만** 받는다 — 전체 삭제로 정리된 뒤 새로 닫는 세션이 생겼을 때, 앞 세션 격리의 늦은
+    /// 성공 응답이 새 세션의 미저장분을 격리된 것으로 치우면 안 된다(7차 리뷰 3).
+    func sessionQuarantineFinished(state: inout State, id: String, failure: String?) -> Effect<Action> {
+        guard var ending = state.sessionEnd, ending.id == id, case .quarantining(let captured) = ending.phase else { return .none }
         if let failure {
             Log.error("편집 세션 — 미저장분을 격리하지 못했다. 입력 · 저장을 막은 채 다시 시도를 기다린다", failure)
             ending.phase = .failed(message: failure)
@@ -169,7 +176,7 @@ extension ChapterCanvasFeature {
         guard state.pendingMutations.isEmpty, state.editQueue.isEmpty, !state.isPreparingEdit else {
             ending.phase = .settling
             state.sessionEnd = ending
-            return scheduleSessionSettle()
+            return scheduleSessionSettle(id: ending.id)
         }
         return finishSessionEnd(state: &state)
     }
@@ -192,7 +199,18 @@ extension ChapterCanvasFeature {
         guard var ending = state.sessionEnd, case .failed = ending.phase else { return .none }
         ending.phase = .settling
         state.sessionEnd = ending
-        return scheduleSessionSettle()
+        return scheduleSessionSettle(id: ending.id)
+    }
+
+    /// 조회 결과가 지금 세션에 쓸 수 있는가 — 결과에 붙은 환경(조회할 때의 것)과 세션 환경을 비교한다(7차 리뷰).
+    ///
+    /// 세션이 결과보다 **나중 세대의 다른 근거**(계정 상태 · K)로 바뀌었으면 옛 근거로 읽은 결과다 — 버리고 다시 읽는다. 같은 근거의
+    /// 표만 바뀐 것(같은 계정 재확인)이거나, 세션이 새 환경을 받아들이지 않은 채(보존만 · 확인 대기) 둔 것이면 쓴다 — 그런 세션은
+    /// 귀속하지 않는다.
+    static func isLoadResultUsable(loadedUnder result: DrawingEditEnvironment, session: DrawingEditEnvironment) -> Bool {
+        let sameBasis = result.accountState == session.accountState && result.knowledge == session.knowledge
+            && result.storeOwnership == session.storeOwnership
+        return sameBasis || result.generation >= session.generation
     }
 
     static func quarantineItem(_ pending: PendingDrawingMutation) -> DrawingQuarantineItem {

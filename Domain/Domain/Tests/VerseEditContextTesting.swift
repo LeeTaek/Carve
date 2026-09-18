@@ -66,12 +66,29 @@ struct VerseEditContextTesting {
         let edit = context(account: .confirmed(token(accountA, generation: 1)))
         let empty = EraseEpochKnowledge()
 
-        #expect(VerseEditContextRule.validity(of: edit, accountState: .confirmed(accountA), deviceKnowledge: empty) == .valid)
+        #expect(VerseEditContextRule.validity(of: edit, accountState: .confirmed(accountA), deviceKnowledge: empty, loadedDataOwner: accountA)
+            == .valid)
         #expect(VerseEditContextRule.validity(of: edit, accountState: .confirmed(accountB), deviceKnowledge: empty) == .accountChanged)
         // 재확인하는 동안은 계정이 바뀌었는지 모른다 — 끝내지 않고 기다린다(확정은 표가 무효라 어차피 막힌다).
         #expect(VerseEditContextRule.validity(of: edit, accountState: .unconfirmed(lastConfirmed: accountA), deviceKnowledge: empty)
             == .awaitingAccountConfirmation)
         #expect(VerseEditContextRule.validity(of: edit, accountState: .noAccount, deviceKnowledge: empty) == .accountChanged)
+    }
+
+    /// 계정 확인이 끝나도 저장소에는 이전 계정의 필사가 남아 있을 수 있다(7차 리뷰). 다시 읽어도 소유는 달라지지 않는다.
+    @Test("확인된 계정에서 시작한 문맥도 불러온 데이터의 소유 근거가 있어야 귀속하고, 다른 계정의 것이면 끝난다")
+    func confirmedContextNeedsOwnershipEvidence() {
+        let edit = context(account: .confirmed(token(accountA)))
+        let empty = EraseEpochKnowledge()
+
+        #expect(VerseEditContextRule.validity(of: edit, accountState: .confirmed(accountA), deviceKnowledge: empty)
+            == .preserveOnly(.dataOwnershipUnverified))
+        #expect(VerseEditContextRule.validity(of: edit, accountState: .confirmed(accountA), deviceKnowledge: empty, loadedDataOwner: accountB)
+            == .accountChanged)
+        // 삭제를 알게 된 것은 근거 여부와 관계없이 먼저 끝낸다.
+        var learned = EraseEpochKnowledge()
+        learned.receive("E1")
+        #expect(VerseEditContextRule.validity(of: edit, accountState: .confirmed(accountA), deviceKnowledge: learned) == .eraseLearned)
     }
 
     @Test("편집 도중 모르던 삭제를 알게 되면 문맥이 끝난다")
@@ -83,7 +100,7 @@ struct VerseEditContextTesting {
                                               accountState: .confirmed(accountA), deviceKnowledge: learned) == .eraseLearned)
         // 그 삭제를 알고 시작한 문맥은 유효하다.
         #expect(VerseEditContextRule.validity(of: context(known: ["E1"], account: .confirmed(token(accountA))),
-                                              accountState: .confirmed(accountA), deviceKnowledge: learned) == .valid)
+                                              accountState: .confirmed(accountA), deviceKnowledge: learned, loadedDataOwner: accountA) == .valid)
     }
 
     @Test("같은 계정으로 다시 확인되면 기준 · K · 확정 이력은 그대로 두고 새 표를 든다")
@@ -136,13 +153,14 @@ struct VerseEditContextTesting {
         var learned = EraseEpochKnowledge()
         learned.receive("E1")
 
-        #expect(VerseEditContextRule.validity(of: edit, accountState: .confirmed(accountA), deviceKnowledge: nil)
+        // 소유 근거는 있는 경우로 두고 K 사유만 본다 — 둘 다 없으면 소유 사유가 먼저 나온다.
+        #expect(VerseEditContextRule.validity(of: edit, accountState: .confirmed(accountA), deviceKnowledge: nil, loadedDataOwner: accountA)
             == .preserveOnly(.knowledgeUnreadable))
         let startedBlind = context(known: nil, account: .confirmed(token(accountA)))
-        #expect(VerseEditContextRule.validity(of: startedBlind, accountState: .confirmed(accountA), deviceKnowledge: EraseEpochKnowledge())
-            == .valid)
-        #expect(VerseEditContextRule.validity(of: startedBlind, accountState: .confirmed(accountA), deviceKnowledge: learned)
-            == .preserveOnly(.knowledgeUnreadable))
+        #expect(VerseEditContextRule.validity(of: startedBlind, accountState: .confirmed(accountA), deviceKnowledge: EraseEpochKnowledge(),
+                                              loadedDataOwner: accountA) == .valid)
+        #expect(VerseEditContextRule.validity(of: startedBlind, accountState: .confirmed(accountA), deviceKnowledge: learned,
+                                              loadedDataOwner: accountA) == .preserveOnly(.knowledgeUnreadable))
     }
 
     /// 로그인 안 함 ↔ 계정 사이는 자동으로 잇지 않는다. 가져오기는 사용자가 명시적으로 하는 별도 작업이다.

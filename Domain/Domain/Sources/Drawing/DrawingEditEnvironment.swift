@@ -26,17 +26,25 @@ public struct DrawingEditEnvironment: Equatable, Sendable {
     public var knowledge: EraseEpochKnowledge?
     /// 이 환경을 읽은 계정 확인 세대. 같은 세대 안에서 읽은 상태 · 표 · K 만 한 환경으로 묶는다.
     public var generation: UInt64
+    /// 로컬 저장소의 내용이 어느 계정의 것인지에 대한 **근거**. 확인된 계정과 저장소 내용의 소유자는 별개다 — 계정 확인이 끝나도
+    /// 저장소에는 이전 계정의 필사가 남아 있을 수 있다(7차 리뷰). 근거가 이 계정과 같을 때만 편집을 귀속한다.
+    ///
+    /// 지금은 근거를 줄 곳이 없어 늘 nil 이다 — 모든 세션이 보존만 한다. 어디서 얻을지는 ACC-1 에서 검증한 뒤 정한다(후보:
+    /// CloudKit 미러링이 저장소에 적는 계정 식별, 저장소 소유 표식 레코드). **검증 전에는 소유 증명으로 채택하지 않는다.**
+    public var storeOwnership: AccountScope?
 
     public init(
         accountState: AccountScopeState,
         serverWork: AccountServerWorkToken?,
         knowledge: EraseEpochKnowledge?,
-        generation: UInt64 = 0
+        generation: UInt64 = 0,
+        storeOwnership: AccountScope? = nil
     ) {
         self.accountState = accountState
         self.serverWork = serverWork
         self.knowledge = knowledge
         self.generation = generation
+        self.storeOwnership = storeOwnership
     }
 
     /// 이 환경에서 절 편집을 시작할 때의 계정 근거.
@@ -101,7 +109,12 @@ public final class LiveDrawingEditEnvironment: DrawingEditEnvironmentClient, @un
 
     deinit {
         if let observation { notificationCenter.removeObserver(observation) }
+        if let activationObservation { notificationCenter.removeObserver(activationObservation) }
     }
+
+    /// 앱이 다시 활성화됐다는 알림 이름(`UIApplication.didBecomeActiveNotification`). Domain 이 UIKit 을 들이지 않게 이름으로 받는다.
+    static let didBecomeActiveNotification = Notification.Name("UIApplicationDidBecomeActiveNotification")
+    private var activationObservation: (any NSObjectProtocol)?
 
     /// 계정 변경 알림을 구독하고 계정을 확인한다. 앱이 시작할 때 한 번 부른다.
     public func start() async {
@@ -111,9 +124,23 @@ public final class LiveDrawingEditEnvironment: DrawingEditEnvironmentClient, @un
             observation = notificationCenter.addObserver(forName: .CKAccountChanged, object: nil, queue: nil) { [weak self] _ in
                 self?.accountChangeNotified()
             }
+            // 확인하지 못한 채 머물지 않게, 앱이 다시 활성화되면 다시 확인한다(7차 리뷰).
+            activationObservation = notificationCenter.addObserver(forName: Self.didBecomeActiveNotification, object: nil, queue: nil) {
+                [weak self] _ in
+                guard let self else { return }
+                Task { await self.reevaluate() }
+            }
         }
         lock.unlock()
         await provider.refresh()
+        notifySubscribers()
+    }
+
+    /// 확인하지 못한 상태면 다시 확인하고, 어느 쪽이든 구독자에게 다시 판정하게 알린다.
+    func reevaluate() async {
+        if case .unconfirmed = await provider.state {
+            await provider.refresh()
+        }
         notifySubscribers()
     }
 
@@ -186,9 +213,12 @@ public final class LiveDrawingEditEnvironment: DrawingEditEnvironmentClient, @un
         }
     }
 
+    /// 표가 아직 유효한가. 기다리는 사이 알림이 들어왔을 수 있어 **돌려주기 직전에 다시 본다.** 돌려준 뒤의 변경까지 막는 것은
+    /// 저장 진입 경계의 몫이다 — 저장소 쓰기가 같은 직렬화 경계 안에서 표를 다시 확인한다(③).
     public func isCurrent(_ token: AccountServerWorkToken) async -> Bool {
         guard !hasUnappliedNotification else { return false }
-        return await provider.isCurrent(token)
+        let current = await provider.isCurrent(token)
+        return current && !hasUnappliedNotification
     }
 
     public func changes() -> AsyncStream<Void> {
