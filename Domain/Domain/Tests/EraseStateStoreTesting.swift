@@ -67,6 +67,26 @@ struct EraseStateStoreTesting {
         }
     }
 
+    /// 인스턴스마다 따로인 잠금으로는 두 인스턴스의 읽기-합치기-쓰기가 겹쳐 한쪽이 쓴 기준점을 잃을 수 있었다.
+    @Test("여러 인스턴스가 동시에 써도 기준점을 잃지 않는다")
+    func concurrentWritersKeepEveryEpoch() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("erase-state-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let area = EraseStateArea(root: root, storeFileName: "Carve.sqlite")
+        let writers = [FileEraseStateStore(area: area), FileEraseStateStore(area: area)]
+        let scope = accountA
+
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            for index in 0..<60 {
+                let writer = writers[index % 2]
+                group.addTask { try writer.recordReceived("E\(index)", knownAtCreation: [], for: scope) }
+            }
+            try await group.waitForAll()
+        }
+
+        #expect(try FileEraseStateStore(area: area).knowledge(for: accountA).received.count == 60)
+    }
+
     @Test("계정 범위마다 따로 두고 섞지 않는다")
     func keepsAccountsApart() throws {
         try withArea { area, _ in

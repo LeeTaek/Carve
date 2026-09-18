@@ -36,14 +36,13 @@ public struct EraseStateArea: Equatable, Sendable {
 
 /// `K(기기)` 와 삭제 작업 기록의 파일 저장소 (정책 §12-6 C11).
 ///
-/// - `K(기기)` 는 **추가만 한다.** 쓰기는 늘 디스크의 값과 합친 뒤에 한다 — 오래된 값을 들고 있던 쪽이 써도 줄지 않는다.
+/// - `K(기기)` 는 **추가만 한다.** 읽기-합치기-쓰기를 저장소 파일 잠금(`flock`) 안에서 한다 — 인스턴스 · 프로세스가 달라도
+///   같은 잠금을 쓰므로, 오래된 값을 들고 있던 쪽이 써도 다른 쪽이 쓴 기준점이 사라지지 않는다.
 /// - 판정 · 정리보다 **먼저** 기록하고, 기록한 값(합친 결과)을 돌려준다. 호출부는 그 값으로 판정한다.
 /// - 계정 범위마다 따로 둔다. 다른 범위의 값은 읽지도 섞지도 않는다.
 public final class FileEraseStateStore: @unchecked Sendable {
     private let area: EraseStateArea
     private let fileManager: FileManager
-    /// 같은 프로세스 안의 읽기-합치기-쓰기를 한 줄로 세운다.
-    private let lock = NSLock()
 
     private static let knowledgeFile = "erase-knowledge.json"
     private static let jobFile = "erase-job.json"
@@ -56,10 +55,9 @@ public final class FileEraseStateStore: @unchecked Sendable {
 
     // MARK: - K(기기)
 
+    /// 읽기는 잠그지 않는다 — 쓰기가 늘 파일을 통째로 바꿔 넣으므로(`DurableFile`) 반쯤 쓴 값을 읽을 일이 없다.
     public func knowledge(for scope: AccountScope) throws -> EraseEpochKnowledge {
-        lock.lock()
-        defer { lock.unlock() }
-        return try loadKnowledge(scope)
+        try loadKnowledge(scope)
     }
 
     /// 기준점 레코드를 받았다.
@@ -75,14 +73,12 @@ public final class FileEraseStateStore: @unchecked Sendable {
     }
 
     private func update(_ scope: AccountScope, _ change: (inout EraseEpochKnowledge) -> Void) throws -> EraseEpochKnowledge {
-        lock.lock()
-        defer { lock.unlock() }
-        var knowledge = try loadKnowledge(scope)
-        change(&knowledge)
-        // 다른 인스턴스가 그 사이 더 쓴 값이 있어도 줄지 않게, 쓰기 직전에 한 번 더 합친다.
-        let merged = knowledge.merging(try loadKnowledge(scope))
-        try write(merged, to: url(scope, Self.knowledgeFile))
-        return merged
+        try exclusively {
+            var knowledge = try loadKnowledge(scope)
+            change(&knowledge)
+            try write(knowledge, to: url(scope, Self.knowledgeFile))
+            return knowledge
+        }
     }
 
     private func loadKnowledge(_ scope: AccountScope) throws -> EraseEpochKnowledge {
@@ -91,17 +87,14 @@ public final class FileEraseStateStore: @unchecked Sendable {
 
     // MARK: - 마지막으로 확인한 계정 범위
 
+    /// 다음 실행에서 계정을 확인하기 전에 쓸 범위(`AccountScopeState.unconfirmed`).
     /// **참고 정보일 뿐이다** — 저장소 내용의 소유를 정하는 근거로 쓰지 않는다(`AccountScopeState.unconfirmed`).
     public func lastConfirmedScope() throws -> AccountScope? {
-        lock.lock()
-        defer { lock.unlock() }
-        return try read(AccountScope.self, from: lastConfirmedScopeURL)
+        try read(AccountScope.self, from: lastConfirmedScopeURL)
     }
 
     public func rememberConfirmedScope(_ scope: AccountScope) throws {
-        lock.lock()
-        defer { lock.unlock() }
-        try write(scope, to: lastConfirmedScopeURL)
+        try exclusively { try write(scope, to: lastConfirmedScopeURL) }
     }
 
     private var lastConfirmedScopeURL: URL {
@@ -111,33 +104,27 @@ public final class FileEraseStateStore: @unchecked Sendable {
     // MARK: - 삭제 작업 기록
 
     public func job(for scope: AccountScope) throws -> EraseJobRecord? {
-        lock.lock()
-        defer { lock.unlock() }
-        return try read(EraseJobRecord.self, from: url(scope, Self.jobFile))
+        try read(EraseJobRecord.self, from: url(scope, Self.jobFile))
     }
 
     /// 작업 기록을 쓴다. 단계 완료 표시는 **실제 작업을 끝낸 뒤에** 이 함수로 적는다.
     public func save(_ job: EraseJobRecord) throws {
-        lock.lock()
-        defer { lock.unlock() }
-        try write(job, to: url(AccountScope(key: job.accountScope), Self.jobFile))
+        try exclusively { try write(job, to: url(AccountScope(key: job.accountScope), Self.jobFile)) }
     }
 
     /// 작업 기록을 지운다. **확실히 실패한 작업(`EraseEpochWriteDecision.discardJob`)에만** 쓴다.
     /// 끝난 작업은 지우지 않고 완료로 남긴다.
     public func discardJob(for scope: AccountScope) throws {
-        lock.lock()
-        defer { lock.unlock() }
-        let url = url(scope, Self.jobFile)
-        if fileManager.fileExists(atPath: url.path) {
-            try fileManager.removeItem(at: url)
+        try exclusively {
+            let url = url(scope, Self.jobFile)
+            if fileManager.fileExists(atPath: url.path) {
+                try fileManager.removeItem(at: url)
+            }
         }
     }
 
     /// 끝나지 않은 작업 — 모든 계정 범위에서 찾는다. 이어 할지는 `EraseJobRule.resume` 이 현재 계정으로 정한다.
     public func unfinishedJobs() throws -> [EraseJobRecord] {
-        lock.lock()
-        defer { lock.unlock() }
         let storeDirectory = area.root.appendingPathComponent(area.storeFileName, isDirectory: true)
         guard fileManager.fileExists(atPath: storeDirectory.path) else { return [] }
         return try fileManager.contentsOfDirectory(at: storeDirectory, includingPropertiesForKeys: [.isDirectoryKey])
@@ -149,6 +136,21 @@ public final class FileEraseStateStore: @unchecked Sendable {
     }
 
     // MARK: - 파일
+
+    /// 저장소마다 하나인 잠금 파일(`.lock`)로 읽기-합치기-쓰기를 한 줄로 세운다.
+    ///
+    /// `flock` 은 파일을 연 곳(open)마다 따로 걸리므로 같은 프로세스의 다른 인스턴스 · 다른 스레드 사이에서도 서로 막는다.
+    /// 이전의 인스턴스별 `NSLock` 은 두 인스턴스가 같은 파일을 읽고 각자 합쳐 쓰면 한쪽 기준점을 잃을 수 있었다(2026-09-18 리뷰).
+    private func exclusively<Value>(_ body: () throws -> Value) throws -> Value {
+        let directory = area.root.appendingPathComponent(area.storeFileName, isDirectory: true)
+        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        let descriptor = open(directory.appendingPathComponent(".lock").path, O_CREAT | O_RDWR, 0o644)
+        guard descriptor >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+        defer { close(descriptor) }
+        guard flock(descriptor, LOCK_EX) == 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+        defer { flock(descriptor, LOCK_UN) }
+        return try body()
+    }
 
     private func url(_ scope: AccountScope, _ name: String) -> URL {
         area.scopeDirectory(scope.key).appendingPathComponent(name)
