@@ -33,6 +33,8 @@ public struct PreservationArea: Equatable, Sendable {
     var rawSnapshotsDirectory: URL { storeDirectory.appendingPathComponent("raw", isDirectory: true) }
     /// 복구 사본 · 격리본(`FileRecoveryCopyStore`)의 위치. 보존 영역 안에 있으므로 이 기기의 전체 삭제가 함께 지운다.
     public var recoveryCopiesDirectory: URL { storeDirectory.appendingPathComponent("recovery", isDirectory: true) }
+    /// 초안(`VerseDraft`)의 위치. 보존 영역 안에 있으므로 이 기기의 전체 삭제가 함께 지운다.
+    public var draftsDirectory: URL { storeDirectory.appendingPathComponent("drafts", isDirectory: true) }
     var notNeededMarker: URL { storeDirectory.appendingPathComponent("raw-not-needed.json") }
 
     /// 이 저장소의 보존 영역을 모두 지운다. **사용자가 이 기기에서 전체 삭제를 요청했을 때만** 부른다(§12-6 C11 단계 ④).

@@ -238,7 +238,8 @@ struct RawStoreSnapshotTesting {
             _ = RawStoreSnapshot.takeIfNeeded(storeURL: url, area: area)
             try #require(snapshotFolders(in: area).count == 1)
             let harness = try RepositoryHarness()
-            let eraser = SwiftDataDrawingDataEraser(actor: harness.actor, preservationArea: { area })
+            let writer = LocalPreservationWriter(area: area, eraseState: EraseStateArea(root: directory.appendingPathComponent("EraseState", isDirectory: true), storeFileName: "Carve.sqlite"))
+            let eraser = SwiftDataDrawingDataEraser(actor: harness.actor, localPreservation: { writer })
 
             #expect(await eraser.eraseAll() == .completed)
             #expect(!FileManager.default.fileExists(atPath: area.storeDirectory.path))
@@ -254,7 +255,8 @@ struct RawStoreSnapshotTesting {
             try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: area.root.path)
             defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: area.root.path) }
             let harness = try RepositoryHarness()
-            let eraser = SwiftDataDrawingDataEraser(actor: harness.actor, preservationArea: { area })
+            let writer = LocalPreservationWriter(area: area, eraseState: EraseStateArea(root: directory.appendingPathComponent("EraseState", isDirectory: true), storeFileName: "Carve.sqlite"))
+            let eraser = SwiftDataDrawingDataEraser(actor: harness.actor, localPreservation: { writer })
 
             #expect(await eraser.eraseAll() == .partiallyFailed)
         }

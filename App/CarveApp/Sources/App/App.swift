@@ -51,16 +51,22 @@ struct CarveApp: App {
         #endif
         let containerID = Self.makeContainerID()
         let modelContainer = Self.makeModelContainer(containerID: containerID)
+        // 초안 · 격리 쓰기와 전체 삭제의 직렬화 경계. 보존 영역 안에 쓰므로 이 기기의 전체 삭제가 함께 지운다(정책 §12-6 구현 순서 ②).
+        let localPreservation = LocalPreservationWriter(
+            area: .live(localDBPath: containerID.localDBPath),
+            eraseState: .live(localDBPath: containerID.localDBPath)
+        )
         // 저장소를 연 뒤에 계정을 확인한다. 조회는 네트워크를 기다릴 수 있어 시작을 막지 않는다 — 확인 전에는 서버 작업만 잠긴다.
         let drawingEditEnvironment = LiveDrawingEditEnvironment(
             identity: CloudKitAccountIdentityClient(containerID: containerID.id),
             containerID: containerID.id,
-            stateStore: FileEraseStateStore(area: .live(localDBPath: containerID.localDBPath))
+            stateStore: FileEraseStateStore(area: .live(localDBPath: containerID.localDBPath)),
+            localPreservation: localPreservation
         )
         self.drawingEditEnvironment = drawingEditEnvironment
-        // 무효가 된 편집 세션의 미저장분을 남기는 곳. 보존 영역 안이라 이 기기의 전체 삭제가 함께 지운다.
-        let drawingQuarantine = FileDrawingQuarantine(
-            store: FileRecoveryCopyStore(root: PreservationArea.live(localDBPath: containerID.localDBPath).recoveryCopiesDirectory),
+        // 무효가 된 편집 세션의 미저장분을 남기는 곳. 직렬화 경계를 거쳐, 전체 삭제 뒤의 늦은 격리는 거절된다.
+        let drawingQuarantine = WriterDrawingQuarantine(
+            writer: localPreservation,
             deviceID: (try? InstallationID.load(at: InstallationID.liveURL)) ?? "installation-unreadable"
         )
         self.modelContainer = modelContainer
@@ -75,7 +81,8 @@ struct CarveApp: App {
             purchaseClient: purchaseClient,
             sentenceSettingBackup: sentenceSettingBackup,
             drawingEditEnvironment: drawingEditEnvironment,
-            drawingQuarantine: drawingQuarantine
+            drawingQuarantine: drawingQuarantine,
+            localPreservation: localPreservation
         )
         Task { await drawingEditEnvironment.start() }
     }
@@ -149,7 +156,8 @@ extension CarveApp {
         purchaseClient: any PurchaseClient,
         sentenceSettingBackup: any SentenceSettingBackupClient,
         drawingEditEnvironment: any DrawingEditEnvironmentClient,
-        drawingQuarantine: any DrawingQuarantineClient
+        drawingQuarantine: any DrawingQuarantineClient,
+        localPreservation: LocalPreservationWriter
     ) -> StoreOf<AppCoordinatorFeature> {
         withDependencies {
             $0.containerId = containerID
@@ -160,6 +168,7 @@ extension CarveApp {
             $0.sentenceSettingBackup = sentenceSettingBackup
             $0.drawingEditEnvironment = drawingEditEnvironment
             $0.drawingQuarantine = drawingQuarantine
+            $0.localPreservationWriter = localPreservation
             $0.photoLibraryClient = PhotoKitLibraryClient()
             $0.widgetVerseClient = AppGroupWidgetVerseClient()
             $0.analyticsClient = FirebaseAnalyticsClient()

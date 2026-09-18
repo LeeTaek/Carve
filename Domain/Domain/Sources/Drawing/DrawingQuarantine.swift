@@ -60,6 +60,18 @@ public struct FileDrawingQuarantine: DrawingQuarantineClient {
     }
 
     public func quarantine(_ items: [DrawingQuarantineItem], environment: DrawingEditEnvironment, batchID: String) async throws {
+        try Self.write(items, environment: environment, batchID: batchID, deviceID: deviceID, store: store, now: now())
+    }
+
+    /// 격리본을 복구 사본 저장소에 쓴다. 동기 함수다 — 직렬화 경계(`LocalPreservationWriter`)가 세대 검사와 같은 구간에서 부른다.
+    static func write(
+        _ items: [DrawingQuarantineItem],
+        environment: DrawingEditEnvironment,
+        batchID: String,
+        deviceID: String,
+        store: FileRecoveryCopyStore,
+        now: Date
+    ) throws {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         for item in items {
@@ -78,7 +90,7 @@ public struct FileDrawingQuarantine: DrawingQuarantineClient {
                 drawingVersion: item.drawingVersion,
                 // 세션의 K 를 읽지 못했으면 빈 집합으로 적는다. 격리본은 판정에 쓰지 않고, 사용자가 되살릴 때 그 시점 K 로 새 버전을 만든다.
                 knownEpochs: environment.knowledge?.all ?? [],
-                createdAt: now(),
+                createdAt: now,
                 deviceID: deviceID
             )
             try store.save(entry, blob: try encoder.encode(content))
@@ -96,6 +108,24 @@ public struct FileDrawingQuarantine: DrawingQuarantineClient {
     /// 절 키. 지금의 저장 경로는 번역본을 기록하지 않아(`BibleDrawing.translation` 기본값) 개역개정(NKRV)으로 적는다.
     public static func verseKey(chapter: BibleChapter, verse: Int) -> String {
         "\(Translation.NKRV.rawValue)/\(chapter.title.rawValue)/\(chapter.chapter)/\(verse)"
+    }
+}
+
+/// 직렬화 경계를 거쳐 격리하는 구현 — 앱이 쓴다. 세션이 기댄 삭제 세대 뒤에 전체 삭제가 있었으면 쓰지 않고 실패로 알린다.
+public struct WriterDrawingQuarantine: DrawingQuarantineClient {
+    public struct RejectedByErase: Error, Equatable {}
+
+    private let writer: LocalPreservationWriter
+    private let deviceID: String
+
+    public init(writer: LocalPreservationWriter, deviceID: String) {
+        self.writer = writer
+        self.deviceID = deviceID
+    }
+
+    public func quarantine(_ items: [DrawingQuarantineItem], environment: DrawingEditEnvironment, batchID: String) async throws {
+        let outcome = try await writer.quarantine(items, environment: environment, batchID: batchID, deviceID: deviceID)
+        if case .rejectedByErase = outcome { throw RejectedByErase() }
     }
 }
 

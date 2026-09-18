@@ -32,19 +32,23 @@ public struct DrawingEditEnvironment: Equatable, Sendable {
     /// 지금은 근거를 줄 곳이 없어 늘 nil 이다 — 모든 세션이 보존만 한다. 어디서 얻을지는 ACC-1 에서 검증한 뒤 정한다(후보:
     /// CloudKit 미러링이 저장소에 적는 계정 식별, 저장소 소유 표식 레코드). **검증 전에는 소유 증명으로 채택하지 않는다.**
     public var storeOwnership: AccountScope?
+    /// 이 기기의 로컬 삭제 세대(`LocalPreservationWriter`). 초안 · 격리 쓰기는 이 값을 들고 가고, 그 뒤 전체 삭제가 있었으면 거절된다.
+    public var eraseGeneration: UInt64
 
     public init(
         accountState: AccountScopeState,
         serverWork: AccountServerWorkToken?,
         knowledge: EraseEpochKnowledge?,
         generation: UInt64 = 0,
-        storeOwnership: AccountScope? = nil
+        storeOwnership: AccountScope? = nil,
+        eraseGeneration: UInt64 = 0
     ) {
         self.accountState = accountState
         self.serverWork = serverWork
         self.knowledge = knowledge
         self.generation = generation
         self.storeOwnership = storeOwnership
+        self.eraseGeneration = eraseGeneration
     }
 
     /// 이 환경에서 절 편집을 시작할 때의 계정 근거.
@@ -86,6 +90,7 @@ public protocol DrawingEditEnvironmentClient: Sendable {
 public final class LiveDrawingEditEnvironment: DrawingEditEnvironmentClient, @unchecked Sendable {
     private let provider: AccountScopeProvider
     private let stateStore: FileEraseStateStore
+    private let localPreservation: LocalPreservationWriter?
     private let notificationCenter: NotificationCenter
     private let lock = NSLock()
     private var subscribers: [UUID: AsyncStream<Void>.Continuation] = [:]
@@ -100,10 +105,12 @@ public final class LiveDrawingEditEnvironment: DrawingEditEnvironmentClient, @un
         identity: any CloudAccountIdentityClient,
         containerID: String,
         stateStore: FileEraseStateStore,
+        localPreservation: LocalPreservationWriter? = nil,
         notificationCenter: NotificationCenter = .default
     ) {
         self.provider = AccountScopeProvider(identity: identity, containerID: containerID, stateStore: stateStore)
         self.stateStore = stateStore
+        self.localPreservation = localPreservation
         self.notificationCenter = notificationCenter
     }
 
@@ -178,11 +185,14 @@ public final class LiveDrawingEditEnvironment: DrawingEditEnvironmentClient, @un
         for _ in 0..<Self.maxSnapshotAttempts {
             guard !hasUnappliedNotification else { break }
             let snapshot = await provider.snapshot()
+            let eraseGeneration = await localPreservation?.currentGeneration() ?? 0
             let knowledge = readKnowledge(for: snapshot.state)
-            // K 를 읽는 사이 계정이 바뀌지 않았어야 한 환경이다.
-            if await provider.isGeneration(snapshot.generation), !hasUnappliedNotification {
+            // K 를 읽는 사이 계정 · 로컬 삭제 세대가 바뀌지 않았어야 한 환경이다.
+            let sameErase = (await localPreservation?.currentGeneration() ?? 0) == eraseGeneration
+            if await provider.isGeneration(snapshot.generation), sameErase, !hasUnappliedNotification {
                 return DrawingEditEnvironment(
-                    accountState: snapshot.state, serverWork: snapshot.token, knowledge: knowledge, generation: snapshot.generation
+                    accountState: snapshot.state, serverWork: snapshot.token, knowledge: knowledge, generation: snapshot.generation,
+                    eraseGeneration: eraseGeneration
                 )
             }
         }
@@ -192,7 +202,8 @@ public final class LiveDrawingEditEnvironment: DrawingEditEnvironmentClient, @un
             accountState: .unconfirmed(lastConfirmed: snapshot.state.lastConfirmedHint),
             serverWork: nil,
             knowledge: nil,
-            generation: snapshot.generation
+            generation: snapshot.generation,
+            eraseGeneration: await localPreservation?.currentGeneration() ?? 0
         )
     }
 

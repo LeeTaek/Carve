@@ -45,18 +45,19 @@ public protocol DrawingDataEraser: Sendable {
 /// 필사 행 삭제는 저장소 세대도 함께 올린다 (`eraseAllDrawingRows`). 삭제 전에 요청된 저장이 뒤늦게 실행돼도
 /// 행을 되살리지 못하게 하기 위함이다 (`DrawingStoreGeneration`).
 ///
-/// 마지막으로 이 기기의 **보존 영역**(원시 사본, 정책 §12-6 C3 ①)을 지운다. 사용자가 이 기기에서 전체 삭제를 요청했으므로
-/// 숨은 사본을 남기지 않는다(§12-6 C11 단계 ④). 2.0.0 이 보존 영역을 지우는 경로는 이것뿐이다.
+/// 마지막으로 이 기기의 **보존 영역**(원시 사본 · 복구 사본 · 격리본 · 초안)을 지운다. 사용자가 이 기기에서 전체 삭제를 요청했으므로
+/// 숨은 사본을 남기지 않는다(§12-6 C11 단계 ④). 2.0.0 이 보존 영역을 지우는 경로는 이것뿐이다. 초안 · 격리 쓰기와 **같은 직렬화 경계**
+/// (`LocalPreservationWriter`)를 거친다 — 로컬 삭제 세대를 먼저 올리므로, 삭제 뒤에 도착한 늦은 쓰기는 거절된다.
 public struct SwiftDataDrawingDataEraser: DrawingDataEraser {
     private let actor: SwiftDatabaseActor?
-    private let preservationArea: @Sendable () -> PreservationArea?
+    private let localPreservation: @Sendable () -> LocalPreservationWriter?
 
     /// - Parameters:
     ///   - actor: 사용할 actor. 생략하면 삭제할 때의 의존성 actor — 저장소(`SwiftDataDrawingRepository`)와 같은 actor 여야 세대가 맞는다.
-    ///   - preservationArea: 함께 지울 보존 영역. 삭제할 때 정한다 — 앱은 그때의 저장소 경로를 따른다. 생략하면 지우지 않는다.
-    public init(actor: SwiftDatabaseActor? = nil, preservationArea: @escaping @Sendable () -> PreservationArea? = { nil }) {
+    ///   - localPreservation: 함께 지울 보존 영역의 직렬화 경계. 삭제할 때 정한다. 생략하면 지우지 않는다.
+    public init(actor: SwiftDatabaseActor? = nil, localPreservation: @escaping @Sendable () -> LocalPreservationWriter? = { nil }) {
         self.actor = actor
-        self.preservationArea = preservationArea
+        self.localPreservation = localPreservation
     }
 
     public func eraseAll() async -> DrawingEraseOutcome {
@@ -76,7 +77,7 @@ public struct SwiftDataDrawingDataEraser: DrawingDataEraser {
             return .partiallyFailed
         }
         do {
-            try preservationArea()?.removeAll()
+            try await localPreservation()?.eraseAllLocal()
             return .completed
         } catch {
             Log.error("전체 삭제 — 필사 행은 지웠지만 보존 영역을 지우지 못했다", "\(error)")
@@ -84,15 +85,15 @@ public struct SwiftDataDrawingDataEraser: DrawingDataEraser {
         }
     }
 
-    /// 앱이 쓰는 보존 영역. 삭제할 때의 저장소 경로(`containerId`)를 따른다.
-    static func liveArea() -> PreservationArea? {
-        @Dependency(\.containerId) var containerId
-        return .live(localDBPath: containerId.localDBPath)
+    /// 앱이 쓰는 직렬화 경계. 앱이 주입한 것을 삭제할 때 읽는다.
+    static func liveWriter() -> LocalPreservationWriter? {
+        @Dependency(\.localPreservationWriter) var writer
+        return writer
     }
 }
 
 private enum DrawingDataEraserKey: DependencyKey {
-    static let liveValue: any DrawingDataEraser = SwiftDataDrawingDataEraser(preservationArea: { SwiftDataDrawingDataEraser.liveArea() })
+    static let liveValue: any DrawingDataEraser = SwiftDataDrawingDataEraser(localPreservation: { SwiftDataDrawingDataEraser.liveWriter() })
     static let testValue: any DrawingDataEraser = SwiftDataDrawingDataEraser()
 }
 
