@@ -71,6 +71,9 @@ struct CloudSyncStateRuleTesting {
         #expect(!State.syncCompleted.isInProgress)
         #expect(!State.migrationCompleted.isInProgress)
         #expect(!State.failed(.accountUnavailable).isInProgress)
+        // 마이그레이션 모드의 끝과 저장소를 쓸 수 없는 상태는 결론이다 — 더 기다릴 것이 없다(MIG-F1).
+        #expect(!State.migrationEndedWithoutImport(nil).isInProgress)
+        #expect(!State.storeUnavailable(.unreadable).isInProgress)
     }
 
     @Test("실패는 원인을 잃지 않는다 — 원인이 다르면 다른 상태다")

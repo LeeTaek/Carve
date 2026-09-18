@@ -1,0 +1,178 @@
+//
+//  LocalStoreLoader.swift
+//  Domain
+//
+//  로컬 저장소 준비 — 앱 스키마로 열지 못한 저장소를 **V1 폴백 전에** 메타데이터로 가려, 확인된 1.0.x 저장소만 V1 폴백에 태운다
+//  (정책 §3 표 4행 · 테스트 계획 MIG-F1).
+//
+
+import CarveToolkit
+import CoreData
+import Foundation
+import SwiftData
+
+/// 로컬 저장소를 쓸 수 없는 이유. 오프라인 · iCloud 계정 문제와 **다른 축**이다 (정책 §3 표 4행).
+public enum LocalStoreFailure: Hashable, Sendable {
+    /// 이 앱이 아는 스키마(V1~V5)도, 확인된 1.0.x 모양도 아니다. 더 새 버전의 앱이 만들었을 수도,
+    /// 출시 전에 정의가 바뀐 스키마(예: 버전을 올리지 않고 고친 V5)일 수도 있다 — **업데이트가 늘 해결책은 아니다.**
+    case unknownVersion
+    /// 열거나 옮기지 못했다 — 아는 스키마인데 마이그레이션이 실패했거나, 파일이 없는데 만들지 못했거나,
+    /// 1.0.x 저장소를 V1 로 옮기지 못했다.
+    case openFailed
+    /// 저장소 정보를 읽지 못했다 — 손상됐거나 지금 접근할 수 없다.
+    case unreadable
+}
+
+/// 앱 스키마로 로컬 저장소를 연다. 열지 못하면 **V1 폴백을 하기 전에** 어떤 저장소인지 가린다.
+///
+/// 이전 구현(`ModelContainer.liveValue`)은 `loadIssueModelContainer` 를 전부 "버전 없는 1.0.x 저장소" 로 보고
+/// V1 스키마로 **같은 파일을** 다시 열었다. 더 새 스키마의 저장소에서도 그 폴백이 성공해 파일이 `DrawingVO` 스키마로
+/// 갈아치워졌고, 필사가 사라진 채 앱이 평소처럼 열렸다(테스트 계획 §5-1 DOWN-L2 · F7).
+///
+/// - Important: 가리기 전에 **앱 스키마로 여는 첫 시도는 이미 했다.** 그 시도가 실패했을 때 파일을 전혀 바꾸지 않았다는 보장은 없다 —
+///              V6 · 손상 표본에서 바이트가 그대로인 것을 확인했을 뿐이다. 여기서 보장하는 것은 "모르는 저장소에 V1 폴백을 하지 않는다" 까지다.
+enum LocalStoreLoader {
+    /// 준비 결과.
+    enum Outcome {
+        /// 앱 스키마로 열었다.
+        case ready(ModelContainer)
+        /// 확인된 1.0.x 저장소를 V1 전용 컨테이너로 열었다(V1 로 옮겼다).
+        /// **이번 실행에서는 필사를 저장할 수 없다** — 재실행하면 앱 스키마로 이어서 옮겨진다.
+        case legacyMigration(ModelContainer)
+        /// 쓸 수 없다. V1 폴백은 하지 않았다.
+        case unavailable(LocalStoreFailure)
+    }
+
+    /// 앱 스키마로 열지 못한 저장소 파일이 무엇인지.
+    enum StoreKind: Equatable {
+        /// 파일이 없다.
+        case missing
+        /// 메타데이터를 읽지 못했다.
+        case unreadable
+        /// 아는 스키마 하나와 모델 해시가 정확히 맞는다 — 알고 있는 버전인데도 열지 못했다.
+        case known(Schema.Version)
+        /// 확인된 1.0.x 모양(`UnversionedDrawingStore`) 하나와 모델 해시가 정확히 맞는다.
+        case unversionedLegacy
+        /// 그 밖 — 아는 스키마도 확인된 1.0.x 모양도 아니다. 엔티티가 `DrawingVO` 하나뿐이어도 여기다.
+        case unknown
+    }
+
+    /// 열지 못한 저장소를 어떻게 다룰지.
+    enum Plan: Equatable {
+        /// V1 전용 컨테이너로 다시 연다(기존 1.0.x 이관 경로).
+        case fallbackToV1
+        /// V1 폴백 없이 막는다.
+        case block(LocalStoreFailure)
+    }
+
+    /// 앱이 여는 스키마. `ModelContainer.liveValue` 가 쓰던 표현 그대로다.
+    private static var appSchema: Schema {
+        Schema([BibleDrawing.self, BiblePageDrawing.self, FavoriteVerse.self])
+    }
+
+    /// 앱 스키마 + 마이그레이션 플랜으로 연다. 실패하면 저장소를 가린 뒤 확인된 1.0.x 저장소만 V1 전용 컨테이너로 연다.
+    /// - Parameters:
+    ///   - url: 저장소 파일.
+    ///   - cloudKitDatabase: 앱은 `.private(컨테이너 ID)` 를 쓴다. 테스트는 `.none` 을 넘긴다 — 시뮬레이터 테스트에는 entitlement 가 없다.
+    static func load(at url: URL, cloudKitDatabase: ModelConfiguration.CloudKitDatabase) -> Outcome {
+        let loadError: Error
+        do {
+            return .ready(try ModelContainer(
+                for: appSchema,
+                migrationPlan: DrawingDataMigrationPlan.self,
+                configurations: ModelConfiguration(url: url, cloudKitDatabase: cloudKitDatabase)
+            ))
+        } catch {
+            loadError = error
+        }
+
+        let kind = storeKind(at: url)
+        let isLoadIssue = (loadError as? SwiftDataError) == .loadIssueModelContainer
+        Log.error("로컬 저장소를 앱 스키마로 열지 못했다", "\(kind)", "\(loadError)")
+        switch plan(for: kind, isLoadIssue: isLoadIssue) {
+        case .fallbackToV1:
+            do {
+                return .legacyMigration(try ModelContainer(
+                    for: Schema([DrawingVO.self]),
+                    migrationPlan: MigrationPlanV1Only.self,
+                    configurations: ModelConfiguration(url: url, cloudKitDatabase: cloudKitDatabase)
+                ))
+            } catch {
+                Log.error("버전 없는 저장소를 V1 로 옮기지 못했다", "\(error)")
+                return .unavailable(.openFailed)
+            }
+        case .block(let failure):
+            return .unavailable(failure)
+        }
+    }
+
+    /// 열지 못한 저장소를 어떻게 다룰지. 순수 함수라 테스트로 고정한다.
+    ///
+    /// | 저장소 | 처리 |
+    /// |---|---|
+    /// | 확인된 1.0.x 모양 (`loadIssueModelContainer` 일 때만) | V1 폴백 — 이전 구현의 조건을 좁힌 것이다 |
+    /// | 아는 버전 · 파일 없음 | 막기(`openFailed`) |
+    /// | 모르는 모델 | 막기(`unknownVersion`) — **V1 폴백이 필사를 지우던 경우다** |
+    /// | 메타데이터를 읽지 못함 | 막기(`unreadable`) |
+    static func plan(for kind: StoreKind, isLoadIssue: Bool) -> Plan {
+        switch kind {
+        case .unversionedLegacy: isLoadIssue ? .fallbackToV1 : .block(.openFailed)
+        case .known, .missing: .block(.openFailed)
+        case .unknown: .block(.unknownVersion)
+        case .unreadable: .block(.unreadable)
+        }
+    }
+
+    /// 메타데이터만 읽어 저장소를 가린다. 이 함수는 저장소를 열지 않는다 — 열면 마이그레이션이 파일을 바꿀 수 있다.
+    ///
+    /// 모델 해시(`NSStoreModelVersionHashes`)에는 앱 엔티티만 담긴다. persistent history(`ACHANGE` …)와 CloudKit 미러링
+    /// (`ANSCK…`) 엔티티는 들어가지 않는 것을 테스트 저장소와 시뮬레이터 앱 저장소(iCloud 미로그인)에서 확인했다(테스트 계획 §5-1 MIG-F1).
+    /// - Parameters:
+    ///   - url: 저장소 파일.
+    ///   - knownSchemas: 앱이 아는 스키마.
+    ///   - unversionedModels: V1 폴백을 허용할 1.0.x 모양. **해시가 정확히 맞아야 한다** — 엔티티 이름만 같은 저장소는 막는다.
+    static func storeKind(
+        at url: URL,
+        knownSchemas: [any VersionedSchema.Type] = DrawingDataMigrationPlan.schemas,
+        unversionedModels: [[any PersistentModel.Type]] = UnversionedDrawingStore.modelSets
+    ) -> StoreKind {
+        guard FileManager.default.fileExists(atPath: url.path) else { return .missing }
+        let metadata: [String: Any]
+        do {
+            metadata = try NSPersistentStoreCoordinator.metadataForPersistentStore(type: .sqlite, at: url)
+        } catch {
+            Log.error("로컬 저장소 메타데이터를 읽지 못했다", "\(error)")
+            return .unreadable
+        }
+        guard metadata[NSStoreModelVersionHashesKey] is [String: Data] else { return .unreadable }
+
+        if let schema = knownSchemas.first(where: { matches($0.models, metadata: metadata) }) {
+            return .known(schema.versionIdentifier)
+        }
+        return unversionedModels.contains { matches($0, metadata: metadata) } ? .unversionedLegacy : .unknown
+    }
+
+    /// 모델 전체의 엔티티 해시가 저장소 메타데이터와 정확히 맞는가.
+    private static func matches(_ models: [any PersistentModel.Type], metadata: [String: Any]) -> Bool {
+        NSManagedObjectModel.makeManagedObjectModel(for: models)?
+            .isConfiguration(withName: nil, compatibleWithStoreMetadata: metadata) == true
+    }
+
+    /// 저장소를 쓸 수 없을 때 앱이 붙잡을 빈 컨테이너.
+    ///
+    /// 편집 화면에 들어가지 않으므로 쓰일 일이 없다. 그래도 **메모리에만 있고 CloudKit 에 붙지 않는다** — 잘못 쓰이더라도
+    /// 저장소 파일 · 서버를 건드리지 않는다. 기본값(`.automatic`)은 앱의 CloudKit · App Group 설정을 따라가므로 둘 다 끈다.
+    /// 저장 자체는 거절하지 않으므로 진입을 막는 쪽(`LaunchRoute` · 코디네이터의 진입 직전 확인)이 경계다.
+    /// - Note: 저장까지 거절하려고 `allowsSave: false` 를 줬더니 만들어지지 않았다 — 메모리 저장소는 `/dev/null` 의 SQLite 라
+    ///         읽기 전용으로 열 수 없다(2026-09-17, NSCocoaErrorDomain 257).
+    static func makeUnavailableStandIn() throws -> ModelContainer {
+        try ModelContainer(
+            for: appSchema,
+            configurations: ModelConfiguration(
+                isStoredInMemoryOnly: true,
+                groupContainer: .none,
+                cloudKitDatabase: .none
+            )
+        )
+    }
+}

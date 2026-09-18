@@ -6,7 +6,11 @@
 //
 //  V4 에 엔티티를 끼워 넣지 않고 V5 로 올린 것이 이 파일의 전제다. 이미 V4 로 열린 store(2.0.0 개발 · 검증 빌드)는
 //  같은 버전 번호의 **다른** 모델을 찾지 못해 `Cannot use staged migration with an unknown model version`(134504)으로
-//  열리지 않았다 — 앱에서는 V1 폴백을 거쳐 `fatalError` 다 (2026-09-15 SwiftData 단독 실험). 출시본(V3) store 는 두 방식 모두 열렸다.
+//  열리지 않았다(2026-09-15 SwiftData 단독 실험). 출시본(V3) store 는 두 방식 모두 열렸다.
+//  ⚠️ 2026-09-17 정정 — 그 실험이 확인한 것은 134504 까지다. 앱에서 V1 폴백을 거쳐 `fatalError` 로 끝난다는 것은 관측이 아니었다.
+//  실제로는 **V1 폴백이 성공한다** — 2026-09-15 실기기(dev 저장소)에서 V4 빌드가 「데이터 마이그레이션이 완료」 알림까지 갔고,
+//  DOWN-L2(2026-09-16)와 MIG-F1(2026-09-17)에서는 저장소가 `DrawingVO` 스키마로 바뀌고 필사가 사라진 것을 확인했다.
+//  2.0.0 부터는 모르는 스키마 저장소를 폴백하지 않고 막는다(`LocalStoreLoadFailureTesting`).
 //
 //  Copyright © 2026 leetaek. All rights reserved.
 //
