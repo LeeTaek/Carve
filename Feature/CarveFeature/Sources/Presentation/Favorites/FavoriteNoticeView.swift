@@ -8,6 +8,7 @@
 
 import SwiftUI
 
+import Domain
 import UIComponents
 
 /// 필사 화면의 즐겨찾기 결과 안내(시안 N2).
@@ -47,6 +48,8 @@ struct FavoriteNoticeView: View {
             .accessibilityElement(children: .combine)
         case .failed:
             CarveStatusMessage(.failure, message: message, onRetry: onRetry)
+        case .blocked:
+            CarveStatusMessage(.failure, message: message)
         }
     }
 
@@ -56,6 +59,20 @@ struct FavoriteNoticeView: View {
             "즐겨찾기에 추가했어요"
         case .failed(let change):
             change.isAdding ? "즐겨찾기에 추가하지 못했어요" : "즐겨찾기를 해제하지 못했어요"
+        case let .blocked(change, block):
+            (change.isAdding ? "즐겨찾기에 추가하지 않았어요. " : "즐겨찾기를 해제하지 않았어요. ") + block.reasonText
+        }
+    }
+}
+
+extension SyncedWriteBlock {
+    /// 동기화 저장소에 쓰지 않고 막은 사유 — 안내 문구의 뒷문장(정책 §12-6 결정 1).
+    var reasonText: String {
+        switch self {
+        case .signedOut: "iCloud 에 로그인하지 않았어요"
+        case .accountUnconfirmed: "iCloud 계정을 확인하는 중이에요"
+        case .ownershipUnverified: "이 기기의 필사가 지금 계정의 것인지 아직 확인하지 못했어요"
+        case .knowledgeUnreadable: "삭제 기록을 읽지 못했어요"
         }
     }
 }

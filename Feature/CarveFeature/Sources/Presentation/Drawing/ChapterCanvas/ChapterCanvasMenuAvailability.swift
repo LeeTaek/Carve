@@ -33,6 +33,18 @@ struct ChapterCanvasMenuAvailability: Equatable {
 }
 
 extension ChapterCanvasFeature {
+    /// content 좌표가 가리키는 절. 표시 중인 레이아웃(합성 시점 값)으로 찾고, 텍스트 쪽(컬럼 왼쪽)을 눌러도
+    /// 같은 행이 되도록 x 만 컬럼 안으로 당긴다 (§20-11). 합성 전이거나 세로로 벗어나면 nil.
+    static func verse(at point: CGPoint, state: State) -> Int? {
+        guard state.isInputEnabled, let layout = state.renderedLayout else { return nil }
+        let origin = state.renderedColumnOrigin
+        let layoutPoint = CGPoint(
+            x: min(max(point.x - origin.x, 0), layout.writingWidth),
+            y: point.y - origin.y
+        )
+        return layout.verse(containing: layoutPoint)
+    }
+
     /// content 좌표가 가리키는 절의 메뉴 가용성.
     ///
     /// 편집 메뉴 구성은 **동기 콜백**(`UIEditMenuInteractionDelegate`)이라 DB 를 다녀올 수 없다. 다행히
@@ -58,9 +70,10 @@ extension ChapterCanvasFeature {
             $0.rowID != representative?.rowID && DrawingContentRule.hasStrokes($0.lineData)
         }
 
-        // 지우기(보관 후 초기화)와 기록 복원은 저장소 행을 바꾼다. 귀속할 근거가 없는 세션은 저장소에 쓰지 않으므로 띄우지 않는다 —
-        // 초안에만 있는 필기를 두고 저장소 행만 바꾸면 다시 읽을 때 초안이 되살아나 지운 절이 돌아온다(§12-6 구현 순서 ②, ③ 에서 버전으로 되살린다).
-        let writesStore = state.persistsToStore
+        // 지우기(보관 후 초기화)와 기록 복원은 저장소 행을 바꾼다. 귀속할 근거가 없는 세션, 보이기만 하는 초안을 이은 절은 저장소에 쓰지 않으므로
+        // 띄우지 않는다 — 초안에만 있는 필기를 두고 저장소 행만 바꾸면 다시 읽을 때 초안이 되살아나 지운 절이 돌아온다(§12-6 구현 순서 ②,
+        // ③ 에서 버전으로 되살린다). 폐기 가능한 데이터로 시험하는 중간 빌드에서만 받아들이는 공백이다 — 출시 전에 되살리거나 사유를 보인다.
+        let writesStore = state.writesStore(verse: verse)
         return ChapterCanvasMenuAvailability(
             canFavorite: true,
             canViewHistory: writesStore && canViewHistory,

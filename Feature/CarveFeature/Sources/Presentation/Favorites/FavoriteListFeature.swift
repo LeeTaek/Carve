@@ -59,6 +59,16 @@ public struct FavoriteListFeature {
         case widgetLimitReached
         /// 위젯에 담긴 말씀을 바꾸지 못했다. 「다시 시도」 는 같은 변경을 다시 보낸다.
         case widgetFailed(WidgetChange)
+        /// 해제 · 되돌리기를 동기화 저장소에 쓰지 않고 막았다 — 사유를 보인다(정책 §12-6 결정 1). 목록은 그대로다.
+        case blocked(SyncedWriteBlock)
+    }
+
+    /// 동기화 저장소에 쓰지 않고 막은 목록 변경. 먼저 바꿔 둔 목록 · 배지를 되돌린다.
+    public enum BlockedWrite: Equatable, Sendable {
+        /// 해제. `fromWidget` 이면 위젯에서도 빼려던 것이다.
+        case remove(FavoriteVerseSnapshot, fromWidget: Bool)
+        /// 실행 취소(다시 저장).
+        case restore(FavoriteVerseSnapshot)
     }
 
     /// 위젯에 담긴 말씀의 변경 하나. 실패하면 이 값 그대로 다시 시도한다.
@@ -77,6 +87,8 @@ public struct FavoriteListFeature {
         case removeFinished(FavoriteVerseSnapshot, failed: Bool)
         /// 실행 취소(다시 저장)가 끝났다.
         case restoreFinished(FavoriteVerseSnapshot, failed: Bool)
+        /// 해제 · 되돌리기를 동기화 저장소에 쓰지 않고 막았다 — 소유가 확인되지 않았다(정책 §12-6 결정 1).
+        case writeBlocked(BlockedWrite, SyncedWriteBlock)
         /// 안내를 내린다.
         case noticeExpired
         /// 지금 위젯에 담긴 말씀들을 읽었다.
@@ -137,6 +149,7 @@ public struct FavoriteListFeature {
     @Dependency(\.favoriteVerseRepository) var repository
     @Dependency(\.widgetVerseClient) var widgetVerseClient
     @Dependency(\.continuousClock) var clock
+    @Dependency(\.drawingEditEnvironment) var drawingEditEnvironment
 
     public var body: some Reducer<State, Action> {
         Reduce { state, action in
@@ -191,7 +204,7 @@ public struct FavoriteListFeature {
                 guard let favorite = state.favorites.remove(id: key) else { return .none }
                 // 해제하면 위젯에서도 뺀다. 다른 말씀을 자동으로 채우지는 않는다(2026-09-16 디자인 결정).
                 state.widgetKeys.remove(key)
-                return .merge(remove(favorite, state: &state), removeFromWidget(key))
+                return remove(favorite, fromWidget: true, state: &state)
 
             case .view(.widgetTapped(let key)):
                 guard !state.isChangingWidget else { return .none }
@@ -231,6 +244,17 @@ public struct FavoriteListFeature {
                 state.favorites.remove(id: favorite.key)
                 return showNotice(.restoreFailed(favorite), duration: Self.failureNoticeDuration, state: &state)
 
+            case let .writeBlocked(write, block):
+                // 먼저 바꿔 둔 목록 · 배지를 되돌리고 막은 사유를 보인다.
+                switch write {
+                case let .remove(favorite, fromWidget):
+                    insert(favorite, into: &state)
+                    if fromWidget { state.widgetKeys.insert(favorite.key) }
+                case .restore(let favorite):
+                    state.favorites.remove(id: favorite.key)
+                }
+                return showNotice(.blocked(block), duration: Self.failureNoticeDuration, state: &state)
+
             case .view(.noticeActionTapped):
                 let notice = state.notice
                 state.notice = nil
@@ -243,7 +267,7 @@ public struct FavoriteListFeature {
                     return remove(favorite, state: &state)
                 case .widgetFailed(let change):
                     return .merge(.cancel(id: CancelID.notice), applyWidgetChange(change, state: &state))
-                case .widgetAdded, .widgetRemoved, .widgetLimitReached, nil:
+                case .widgetAdded, .widgetRemoved, .widgetLimitReached, .blocked, nil:
                     return .none
                 }
 
@@ -271,12 +295,24 @@ public struct FavoriteListFeature {
 }
 
 extension FavoriteListFeature {
-    /// 저장소에서 지우고 실행 취소 안내를 띄운다. 목록에서는 이미 뺀 뒤다.
-    private func remove(_ favorite: FavoriteVerseSnapshot, state: inout State) -> Effect<Action> {
+    /// 저장소에서 지우고 실행 취소 안내를 띄운다. 목록에서는 이미 뺀 뒤다. `fromWidget` 이면 위젯에서도 뺀다 — 실패해도 목록 동작은 막지 않는다.
+    /// 즐겨찾기는 동기화 저장소다 — 쓰기 직전에 소유가 확인됐는지 다시 보고, 막히면 위젯도 건드리지 않는다(정책 §12-6 결정 1, ACC-1 F30).
+    private func remove(_ favorite: FavoriteVerseSnapshot, fromWidget: Bool = false, state: inout State) -> Effect<Action> {
         let notice = showNotice(.removed(favorite), duration: Self.removedNoticeDuration, state: &state)
         return .merge(
             notice,
-            .run { [repository] send in
+            .run { [repository, widgetVerseClient, drawingEditEnvironment] send in
+                if let block = SyncedWriteBlock.check(await drawingEditEnvironment.current()) {
+                    await send(.writeBlocked(.remove(favorite, fromWidget: fromWidget), block))
+                    return
+                }
+                if fromWidget {
+                    do {
+                        try await widgetVerseClient.remove(favorite.key)
+                    } catch {
+                        Log.error("위젯에서 빼지 못했다", error)
+                    }
+                }
                 do {
                     try await repository.remove(favorite.key)
                     await send(.removeFinished(favorite, failed: false))
@@ -288,9 +324,13 @@ extension FavoriteListFeature {
         )
     }
 
-    /// 해제한 항목을 추가 시각 그대로 다시 저장한다. 목록에는 이미 되돌려 둔 뒤다.
+    /// 해제한 항목을 추가 시각 그대로 다시 저장한다. 목록에는 이미 되돌려 둔 뒤다. 소유가 확인되지 않았으면 쓰지 않는다(정책 §12-6 결정 1).
     private func restore(_ favorite: FavoriteVerseSnapshot) -> Effect<Action> {
-        .run { [repository] send in
+        .run { [repository, drawingEditEnvironment] send in
+            if let block = SyncedWriteBlock.check(await drawingEditEnvironment.current()) {
+                await send(.writeBlocked(.restore(favorite), block))
+                return
+            }
             do {
                 try await repository.save(favorite)
                 await send(.restoreFinished(favorite, failed: false))
@@ -331,17 +371,6 @@ extension FavoriteListFeature {
                 }
             }
         )
-    }
-
-    /// 즐겨찾기를 해제할 때 위젯에서도 뺀다. 실패해도 목록 동작은 막지 않는다.
-    private func removeFromWidget(_ key: FavoriteVerseKey) -> Effect<Action> {
-        .run { [widgetVerseClient] _ in
-            do {
-                try await widgetVerseClient.remove(key)
-            } catch {
-                Log.error("위젯에서 빼지 못했다", error)
-            }
-        }
     }
 
     /// 위젯에 담긴 말씀을 해제하기 전 확인(시안 N9).

@@ -79,6 +79,8 @@ public struct CarveDetailFeature {
         var widgetNotice: WidgetNotice?
         /// 보관하고 위젯에 담는 중. 같은 요청이 겹치지 않게 한다.
         var isAddingToWidget = false
+        /// N-Canvas 가 동기화 저장소에 쓰지 못하는 사유(정책 §12-6 결정 1). 있으면 N-Canvas 입력을 닫고 사유를 보인다. 확인 전에는 막아 둔다.
+        var nCanvasWriteBlock: SyncedWriteBlock? = .accountUnconfirmed
 
         /// flag 또는 Debug 실행 인자로 단일 Canvas 를 쓸지.
         public var usesSingleCanvas: Bool {
@@ -111,6 +113,7 @@ public struct CarveDetailFeature {
     @Dependency(\.photoLibraryClient) var photoLibraryClient
     @Dependency(\.openURL) var openURL
     @Dependency(\.widgetVerseClient) var widgetVerseClient
+    @Dependency(\.drawingEditEnvironment) var drawingEditEnvironment
     
     public enum Action: ViewAction, CarveToolkit.ScopeAction {
         /// 화면 최상단으로 스크롤
@@ -123,6 +126,10 @@ public struct CarveDetailFeature {
         case favoritesLoaded(chapter: BibleChapter, editCount: Int, verses: Set<Int>)
         /// 즐겨찾기 추가 · 해제의 저장이 끝났다.
         case favoriteChangeFinished(FavoriteChange, failed: Bool)
+        /// 즐겨찾기 추가 · 해제를 동기화 저장소에 쓰지 않고 막았다 — 소유가 확인되지 않았다(정책 §12-6 결정 1).
+        case favoriteChangeBlocked(FavoriteChange, SyncedWriteBlock)
+        /// N-Canvas 가 동기화 저장소에 쓸 수 있는지가 바뀌었다(정책 §12-6 결정 1).
+        case syncedWriteGateChanged(SyncedWriteBlock?)
         /// 다른 화면(즐겨찾기 목록)에서 즐겨찾기가 바뀌었다 — 지금 장의 표시를 다시 읽는다.
         case reloadFavorites
         /// 즐겨찾기 결과 안내를 내린다.
@@ -214,30 +221,6 @@ public struct CarveDetailFeature {
         }
     }
 
-    @CasePathable
-    public enum ScopeAction {
-        case sentenceWithDrawingAction(IdentifiedActionOf<SentencesWithDrawingFeature>)
-        case headerAction(HeaderFeature.Action)
-        /// Phase 3 — 단일 Canvas
-        case chapterCanvasAction(ChapterCanvasFeature.Action)
-//        case canvasAction(CombinedCanvasFeature.Action)
-    }
-    
-    /// 비동기 작업 취소용 작업
-    enum CancelID: Hashable {
-        /// 성경 불러올떄
-        case fetchBible(title: BibleChapter)
-        /// 장의 즐겨찾기 조회
-        case loadFavorites
-        /// 즐겨찾기 결과 안내의 자동 닫힘
-        case favoriteNotice
-        /// 이미지 저장 결과 안내의 자동 닫힘
-        case imageSaveNotice
-        /// 위젯 표시 안내의 자동 닫힘
-        case widgetNotice
-    }
-    
-    
     public var body: some Reducer<State, Action> {
         Scope(state: \.headerState,
               action: \.scope.headerAction) {
@@ -313,7 +296,8 @@ public struct CarveDetailFeature {
                     // flag 를 끄고 돌아온 장 — 단일 Canvas 에 남은 미저장분은 여기서 마저 저장한다 (§8-5).
                     return .merge(
                         favorites,
-                        state.chapterCanvas.isFullyPersisted ? .none : .send(.scope(.chapterCanvasAction(.flushPending)))
+                        state.chapterCanvas.isFullyPersisted ? .none : .send(.scope(.chapterCanvasAction(.flushPending))),
+                        observeSyncedWriteGate()
                     )
                 }
                 // 단일 Canvas: 본문이 확정된 시점에 조회를 시작한다 (§6-4). 레이아웃은 실측이 끝나면 따로 들어간다.
@@ -364,8 +348,12 @@ public struct CarveDetailFeature {
             case .scope(.chapterCanvasAction(.delegate(.favoriteToggled(let verse, let ink)))):
                 return toggleFavorite(state: &state, verse: verse, ink: ink)
 
-            case .favoritesLoaded, .favoriteChangeFinished, .reloadFavorites, .favoriteNoticeExpired, .view(.favoriteRetryTapped):
+            case .favoritesLoaded, .favoriteChangeFinished, .favoriteChangeBlocked, .reloadFavorites, .favoriteNoticeExpired, .view(.favoriteRetryTapped):
                 return reduceFavorite(state: &state, action: action)
+
+            case .syncedWriteGateChanged(let block):
+                state.nCanvasWriteBlock = block
+                return .none
 
             case .view(.verseMenuHistoryTapped):
                 return .send(.scope(.chapterCanvasAction(.verseMenuHistoryTapped)))
@@ -515,6 +503,33 @@ public struct CarveDetailFeature {
 
 
 extension CarveDetailFeature {
+    @CasePathable
+    public enum ScopeAction {
+        case sentenceWithDrawingAction(IdentifiedActionOf<SentencesWithDrawingFeature>)
+        case headerAction(HeaderFeature.Action)
+        /// Phase 3 — 단일 Canvas
+        case chapterCanvasAction(ChapterCanvasFeature.Action)
+//        case canvasAction(CombinedCanvasFeature.Action)
+    }
+
+    /// 비동기 작업 취소용 작업
+    enum CancelID: Hashable {
+        /// 성경 불러올떄
+        case fetchBible(title: BibleChapter)
+        /// 장의 즐겨찾기 조회
+        case loadFavorites
+        /// 즐겨찾기 결과 안내의 자동 닫힘
+        case favoriteNotice
+        /// 이미지 저장 결과 안내의 자동 닫힘
+        case imageSaveNotice
+        /// 위젯 표시 안내의 자동 닫힘
+        case widgetNotice
+        /// N-Canvas 의 동기화 쓰기 가능 여부 구독
+        case syncedWriteGate
+    }
+}
+
+extension CarveDetailFeature {
     /// N-Canvas 상태의 SwiftData 모델에서 actor 경계를 넘길 저장 값만 추출한다.
     /// - Parameter canvasState: 변경된 절의 Canvas 상태.
     /// - Returns: 저장할 모델이 없으면 nil, 있으면 Sendable 행 단위 요청.
@@ -541,7 +556,23 @@ extension CarveDetailFeature {
     ///   따라서 stroke가 0개인 drawing도 그대로 저장한다.
     func persistDrawing(_ request: LegacyDrawingSaveRequest?) async throws {
         guard let request else { return }
+        // N-Canvas 는 초안 없이 동기화 저장소에 바로 쓴다 — 소유가 확인되지 않았으면 쓰지 않는다(정책 §12-6 결정 1, ACC-1 F30). 입력도 막혀 있다.
+        if let block = SyncedWriteBlock.check(await drawingEditEnvironment.current()) {
+            Log.error("N-Canvas — 동기화 저장소에 쓰지 않고 막았다", "\(block)")
+            return
+        }
         try await drawingContext.updateDrawing(request: request)
+    }
+
+    /// N-Canvas 가 동기화 저장소에 쓸 수 있는지를 따라간다 — 막히면 입력을 닫고 사유를 보인다(정책 §12-6 결정 1).
+    func observeSyncedWriteGate() -> Effect<Action> {
+        .run { [drawingEditEnvironment] send in
+            await send(.syncedWriteGateChanged(SyncedWriteBlock.check(await drawingEditEnvironment.current())))
+            for await _ in drawingEditEnvironment.changes() {
+                await send(.syncedWriteGateChanged(SyncedWriteBlock.check(await drawingEditEnvironment.current())))
+            }
+        }
+        .cancellable(id: CancelID.syncedWriteGate, cancelInFlight: true)
     }
 
     /// `SentencesWithDrawingFeature.State.id` 규칙과 동일한 스크롤용 ID를 생성.

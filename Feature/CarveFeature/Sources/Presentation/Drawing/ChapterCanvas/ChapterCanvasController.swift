@@ -71,6 +71,10 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
         case menuRequested(at: CGPoint, anchor: CGPoint, verseFrame: CGRect)
         /// 인계를 마쳤다 — 이 토큰을 요청받기 전까지의 편집은 모두 보고했다(정책 §12-6 구현 순서 ②).
         case handoffCompleted(token: Int)
+        /// 캔버스가 화면에 붙었다 · 떨어졌다(미보고 편집 · 받아 둔 인계를 먼저 보고한 뒤) · 새 세대를 표시했다(이전 세대의 마지막 획을 먼저 보고한 뒤).
+        case attached(UUID)
+        case detached(UUID)
+        case displayed(UUID, revision: Int)
     }
 
     /// 뷰가 매 업데이트마다 넘기는 표시 상태.
@@ -107,9 +111,14 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
     var memoryProbe: ChapterCanvasMemoryProbe?
     #endif
     private var appliedUndoVersion = 0
+    /// 이 캔버스를 Feature 가 가리키는 이름 — 붙고 떨어지는 것을 알린다(`Event.attached` · `.detached`).
+    let instanceID = UUID()
+    /// 첫 표시 상태를 받았는가. 새 캔버스는 그때의 인계 토큰을 받아 두기만 한다.
+    private var hasAppliedConfiguration = false
     private var appliedHandoffToken = 0
     /// 요청받았지만 아직 마치지 못한 인계. 획을 긋는 중이면 그 획이 반영된 뒤에 마친다.
     private var pendingHandoffToken: Int?
+    /// 획이 끝나 반영을 기다린 뒤 인계를 마치는 작업(`scheduleHandoffCompletion`).
     private var handoffTask: Task<Void, Never>?
     private var appliedRedoVersion = 0
     private var appliedScrollToken = 0
@@ -216,11 +225,17 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
     }
 
     func apply(_ configuration: Configuration) {
-        // 인계 요청은 입력을 막기 **전에** 받는다 — 세션을 닫으며 입력을 막으면 긋던 획이 끝나는데, 그보다 먼저 요청을 받아 두어야
-        // 그 획이 반영될 때까지 기다린 뒤 마친다(`canvasViewDidEndUsingTool`).
-        if configuration.handoffToken != appliedHandoffToken {
+        if !hasAppliedConfiguration {
+            // 새 캔버스는 보고할 편집이 없다 — 지금 토큰은 받아 두기만 한다(빈 응답이 다른 캔버스의 편집 구간을 닫지 않게).
+            hasAppliedConfiguration = true
             appliedHandoffToken = configuration.handoffToken
-            requestHandoff(configuration.handoffToken)
+        }
+        // 인계 요청은 입력을 막기 **전에** 받는다 — 세션을 닫으며 입력을 막으면 긋던 획이 끝나는데, 그보다 먼저 요청을 받아 두어야
+        // 그 획이 반영될 때까지 기다린 뒤 마친다(`canvasViewDidEndUsingTool`). 마치는 것은 이 갱신의 Undo/Redo 를 수행한 뒤다.
+        let handoffRequested = configuration.handoffToken != appliedHandoffToken
+        if handoffRequested {
+            appliedHandoffToken = configuration.handoffToken
+            registerHandoff(configuration.handoffToken)
         }
         canvas.drawingGestureRecognizer.isEnabled = configuration.isInputEnabled
         probeLasso(tool: configuration.tool)
@@ -256,6 +271,7 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
             appliedRedoVersion = configuration.redoRequestVersion
             performHistory(.redo)
         }
+        if handoffRequested { completeHandoffIfIdle() }
 
         if let request = configuration.scrollRequest, request.token != appliedScrollToken, let layout = configuration.layout {
             appliedScrollToken = request.token
@@ -276,7 +292,7 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
 
     private func applyDrawing(_ data: Data?, replacingGeneration previousGeneration: Int) {
         // 내용을 바꾸기 전에, 아직 보고하지 않은 편집을 이전 세대 번호로 보고한다 (장 전환 직전의 마지막 획, §8-5).
-        flushUnreportedEdit(generation: previousGeneration)
+        flushUnreportedEdit(generation: previousGeneration, displaying: appliedRevision)
 
         let drawing: PKDrawing
         if let data, !data.isEmpty, let decoded = try? PKDrawing(data: data) {
@@ -304,18 +320,6 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
         // 뷰 갱신 도중에 관찰 상태를 바꾸면 같은 턴에 예약된 갱신이 함께 무너져 **다음 세대의 `apply` 가 오지 않을 수** 있다
         // (D9 — 회전 뒤 화면이 이전 합성에 머무는 증상). 바로 위 `flushUnreportedEdit` 이 이미 같은 이유로 미룬다.
         reportUndoState(deferred: true)
-    }
-
-    /// 미보고 변경을 지금 캔버스 내용으로 보고한다. 이벤트는 다음 턴에 보낸다 — 뷰 갱신(`updateUIViewController`) 도중에
-    /// 액션을 보내지 않기 위함이며, 세대 번호를 들고 가므로 늦게 도착해도 Feature 가 자기 세대의 문맥으로 계산한다.
-    private func flushUnreportedEdit(generation: Int) {
-        trailingEditTask?.cancel()
-        guard hasUnreportedChange else { return }
-        hasUnreportedChange = false
-        let snapshot = makeSnapshot(generation: generation)
-        Task { @MainActor [weak self] in
-            self?.onEvent?(.editEnded(snapshot))
-        }
     }
 
     private func makeSnapshot(generation: Int) -> CanvasEditSnapshot {
@@ -388,9 +392,12 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
         probeLasso("didBeginUsingTool")
         isUsingTool = true
         // 직전 획의 trailing 보고가 이 획 도중에 나가면 isEditing 이 풀려 보류된 레이아웃이 획 중간에 적용된다.
-        // 취소하고, 미보고 변경(hasUnreportedChange)은 이 도구 사용이 끝난 뒤 함께 보고한다.
+        // 취소하고, 미보고 변경(hasUnreportedChange)은 이 도구 사용이 끝난 뒤 함께 보고한다. 인계를 마치려고 기다리던 것도 같다 —
+        // 이 획이 끝나면 `canvasViewDidEndUsingTool` 이 다시 예약한다.
         trailingEditTask?.cancel()
         cancelCheckTask?.cancel()
+        handoffTask?.cancel()
+        handoffTask = nil
         onEvent?(.editBegan)
     }
 
@@ -400,12 +407,7 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
         cancelCheckTask?.cancel()
         if pendingHandoffToken != nil {
             // 인계를 기다리는 중에 획이 끝났다. PencilKit 은 이 알림 뒤에 획을 반영하므로(§7-5) 반영될 시간을 두고 마친다.
-            handoffTask?.cancel()
-            handoffTask = Task { @MainActor [weak self] in
-                try? await Task.sleep(for: .seconds(self?.editSettleInterval ?? 0.3))
-                guard let self, !Task.isCancelled else { return }
-                self.completeHandoff()
-            }
+            scheduleHandoffCompletion()
             return
         }
         if hasUnreportedChange {
@@ -699,31 +701,99 @@ extension ChapterCanvasController {
 // MARK: - 인계 (정책 §12-6 구현 순서 ②)
 
 extension ChapterCanvasController {
-    /// Feature 가 편집 세션을 닫거나 앱이 비활성화될 때 — 아직 보고하지 않은 편집을 **지금** 보고하고 끝났다고 알린다.
-    /// 시간을 재서 멎었다고 짐작하지 않는다(0.5초 대기는 완료 증명이 아니다). 획을 긋는 중이면 그 획이 끝난 뒤에 마친다.
-    fileprivate func requestHandoff(_ token: Int) {
+    /// 세션을 닫거나 비활성화될 때의 인계 요청을 받아 둔다 — 마치는 것은 같은 갱신의 Undo/Redo 뒤(`completeHandoffIfIdle`)나 획이 끝난 뒤다.
+    /// **다시 요청받았는데 그리기 인식기가 멎어 있으면** 도구 종료 알림을 놓친 것이다 — 끝난 것으로 두고 획이 반영될 시간을 둔 뒤 마친다.
+    /// 긴 획이면 인식기가 움직이는 중이라 계속 기다린다(Feature 는 캔버스가 있는 동안 닫지 않고 다시 요청한다).
+    fileprivate func registerHandoff(_ token: Int) {
+        let isRepeat = pendingHandoffToken != nil
         pendingHandoffToken = token
-        guard !isUsingTool else { return }
+        guard isRepeat, isUsingTool, handoffTask == nil, !isDrawingGestureActive else { return }
+        isUsingTool = false
+        scheduleHandoffCompletion()
+    }
+
+    /// 받아 둔 인계를 지금 마칠 수 있으면 마친다 — 획을 긋는 중이거나 획의 반영을 기다리는 중이면 그쪽이 마친다.
+    fileprivate func completeHandoffIfIdle() {
+        guard pendingHandoffToken != nil, !isUsingTool, handoffTask == nil else { return }
         completeHandoff()
+    }
+
+    /// 획이 끝났다 — PencilKit 이 그 획을 반영할 시간(`editSettleInterval`)을 두고 인계를 마친다.
+    func scheduleHandoffCompletion() {
+        handoffTask?.cancel()
+        handoffTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(self?.editSettleInterval ?? 0.3))
+            guard let self, !Task.isCancelled else { return }
+            self.completeHandoff()
+        }
+    }
+
+    /// 획을 긋는 중인가 — 그리기 인식기가 움직이고 있다(`runDisplayExperiment` 와 같은 판정).
+    private var isDrawingGestureActive: Bool {
+        [.began, .changed].contains(canvas.drawingGestureRecognizer.state)
     }
 
     fileprivate func completeHandoff() {
         guard let token = pendingHandoffToken else { return }
         pendingHandoffToken = nil
         handoffTask?.cancel()
+        handoffTask = nil
         trailingEditTask?.cancel()
         cancelCheckTask?.cancel()
         let snapshot = hasUnreportedChange ? makeSnapshot(generation: appliedRevision) : nil
         hasUnreportedChange = false
-        // 다음 턴에 한 Task 로 차례로 보낸다 — 뷰 갱신 도중에 액션을 보내지 않고, 편집이 인계 완료보다 먼저 도착한다.
-        // 보고할 변경이 없으면 열려 있을 수 있는 편집 구간을 닫는다(변경 없는 도구 사용의 취소 알림을 기다리지 않는다).
-        Task { @MainActor [weak self] in
-            if let snapshot {
-                self?.onEvent?(.editEnded(snapshot))
-            } else {
-                self?.onEvent?(.editCancelled)
-            }
-            self?.onEvent?(.handoffCompleted(token: token))
+        // 다음 턴에 한 Task 로 차례로 보낸다(편집이 인계 완료보다 먼저). 보고할 변경이 없으면 열려 있을 수 있는 편집 구간을 닫는다.
+        // 이벤트 통로를 붙잡아 둔다 — 그 사이 캔버스가 사라져도 보고를 잃지 않는다.
+        let onEvent = onEvent
+        Task { @MainActor in
+            onEvent?(snapshot.map { Event.editEnded($0) } ?? Event.editCancelled)
+            onEvent?(.handoffCompleted(token: token))
+        }
+    }
+
+    /// 미보고 변경을 지금 캔버스 내용(이전 세대)으로 보고하고 새 세대를 표시했다고 알린다 — 한 Task 에서 차례로 보내 이전 세대의 마지막 획이 먼저
+    /// 도착한다(Feature 는 붙은 캔버스가 모두 더 새 세대를 표시한 뒤에야 닫은 세션의 문맥을 놓는다). 뷰 갱신 도중에 액션을 보내지 않게 다음 턴에
+    /// 보내고, 캔버스가 먼저 사라져도 잃지 않게 이벤트 통로를 붙잡는다.
+    fileprivate func flushUnreportedEdit(generation: Int, displaying revision: Int) {
+        trailingEditTask?.cancel()
+        let snapshot = hasUnreportedChange ? makeSnapshot(generation: generation) : nil
+        hasUnreportedChange = false
+        let onEvent = onEvent
+        let id = instanceID
+        Task { @MainActor in
+            if let snapshot { onEvent?(.editEnded(snapshot)) }
+            onEvent?(.displayed(id, revision: revision))
+        }
+    }
+
+    /// 캔버스가 붙었다고 알린다(`makeUIViewController`). 뷰 갱신 도중에 액션을 보내지 않게 다음 턴에 보낸다.
+    func announceAttached() {
+        let onEvent = onEvent
+        let id = instanceID
+        Task { @MainActor in
+            onEvent?(.attached(id))
+        }
+    }
+
+    /// 캔버스가 화면에서 빠진다(`dismantleUIViewController`) — 미보고 편집 · 받아 둔 인계부터 보고하고 떨어졌다고 알린다. Feature 는 캔버스가
+    /// 없으면 인계를 기다리지 않으므로 이것이 이 캔버스의 마지막 보고다. 컨트롤러가 곧 사라지므로 이벤트 통로를 붙잡아 다음 턴에 보낸다.
+    func detach() {
+        trailingEditTask?.cancel()
+        cancelCheckTask?.cancel()
+        handoffTask?.cancel()
+        handoffTask = nil
+        let snapshot = hasUnreportedChange ? makeSnapshot(generation: appliedRevision) : nil
+        hasUnreportedChange = false
+        isUsingTool = false
+        let token = pendingHandoffToken
+        pendingHandoffToken = nil
+        let onEvent = onEvent
+        let id = instanceID
+        Task { @MainActor in
+            // 보고할 변경이 없으면 열려 있을 수 있는 편집 구간을 닫는다 — 캔버스가 없으면 그 구간을 닫을 곳이 없다.
+            onEvent?(snapshot.map { Event.editEnded($0) } ?? Event.editCancelled)
+            if let token { onEvent?(.handoffCompleted(token: token)) }
+            onEvent?(.detached(id))
         }
     }
 }

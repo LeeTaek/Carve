@@ -159,7 +159,7 @@ public struct FavoriteListView: View {
                     CarveStatusMessage(.failure, message: Self.message(for: notice)) {
                         send(.noticeActionTapped)
                     }
-                case .widgetLimitReached:
+                case .widgetLimitReached, .blocked:
                     // 다시 눌러도 같은 결과다 — 버튼 없이 알리기만 한다.
                     CarveStatusMessage(.failure, message: Self.message(for: notice))
                 case .widgetAdded, .widgetRemoved:
@@ -185,6 +185,7 @@ public struct FavoriteListView: View {
         case .widgetRemoved: "위젯에서 뺐어요"
         case .widgetLimitReached: "위젯에는 \(WidgetVerseLimit.maximum)개까지 담을 수 있어요"
         case .widgetFailed: "위젯을 바꾸지 못했어요"
+        case .blocked(let block): "즐겨찾기를 바꾸지 않았어요. " + block.reasonText
         }
     }
 

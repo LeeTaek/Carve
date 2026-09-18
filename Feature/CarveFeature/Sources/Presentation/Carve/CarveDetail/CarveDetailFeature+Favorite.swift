@@ -24,6 +24,8 @@ extension CarveDetailFeature {
         case added
         /// 저장하지 못했다. 「다시 시도」 는 같은 변경을 다시 보낸다.
         case failed(FavoriteChange)
+        /// 동기화 저장소에 쓰지 않고 막았다 — 사유를 보인다. 다시 시도해도 같은 사유로 막히므로 버튼을 두지 않는다.
+        case blocked(FavoriteChange, SyncedWriteBlock)
     }
 
     /// 즐겨찾기 한 번의 변경. 실패하면 이 값 그대로 다시 시도한다.
@@ -82,6 +84,11 @@ extension CarveDetailFeature {
             }
             return showFavoriteNotice(state: &state, .added, duration: Self.favoriteAddedNoticeDuration)
 
+        case let .favoriteChangeBlocked(change, block):
+            // 먼저 바꿔 둔 표시를 되돌리고 막은 사유를 보인다.
+            setFavoriteMark(state: &state, key: change.key, isFavorite: !change.isAdding)
+            return showFavoriteNotice(state: &state, .blocked(change, block), duration: Self.favoriteFailureNoticeDuration)
+
         case .favoriteNoticeExpired:
             state.favoriteNotice = nil
             return .none
@@ -139,7 +146,12 @@ extension CarveDetailFeature {
         state.favoriteNotice = nil
         return .merge(
             .cancel(id: CancelID.favoriteNotice),
-            .run { [favoriteRepository] send in
+            .run { [favoriteRepository, drawingEditEnvironment] send in
+                // 즐겨찾기는 동기화 저장소에 바로 쓴다 — 쓰기 직전에 소유가 확인됐는지 다시 본다(정책 §12-6 결정 1, ACC-1 F30).
+                if let block = SyncedWriteBlock.check(await drawingEditEnvironment.current()) {
+                    await send(.favoriteChangeBlocked(change, block))
+                    return
+                }
                 do {
                     switch change {
                     case .add(let favorite):

@@ -32,7 +32,9 @@ extension DraftTestSamples {
         baseFingerprint: String? = nil,
         lineData: Data? = nil,
         drawingVersion: Int? = 3,
-        withMetadata: Bool = true
+        withMetadata: Bool = true,
+        account: VerseEditAccountBasis? = nil,
+        storeOwnership: AccountScope? = nil
     ) -> VerseDraft {
         let base = baseFingerprint ?? storedVerseOneFingerprint
         let metadata = withMetadata ? try? CanvasTestSupport.metadata().encodedBlob() : nil
@@ -45,9 +47,9 @@ extension DraftTestSamples {
             layoutMetadataData: metadata,
             base: .legacy(rowID: CanvasTestSupport.rowA, contentFingerprint: base),
             baseFingerprint: base,
-            account: .confirmed(AccountServerWorkToken(scope: accountA, generation: 0)),
+            account: account ?? .confirmed(AccountServerWorkToken(scope: accountA, generation: 0)),
             knownEpochs: [],
-            storeOwnership: nil,
+            storeOwnership: storeOwnership,
             eraseGeneration: 0,
             savedAt: Date(timeIntervalSince1970: 500)
         )
@@ -148,7 +150,7 @@ struct ChapterCanvasDraftTesting: DraftTestSamples {
         await composeAndSubscribe(store, environment)
 
         #expect(store.state.loadedDrawings?.first { $0.verse == 1 }?.lineData == Data("earlier".utf8))
-        #expect(store.state.drafts.adopted[DraftVerse(chapter: CanvasTestSupport.chapter, verse: 1)] == earlier.key)
+        #expect(store.state.drafts.adopted[DraftVerse(chapter: CanvasTestSupport.chapter, verse: 1)] == earlier.ref)
 
         await draw(store)
         await store.receive(\.draftsSaved)
@@ -158,6 +160,8 @@ struct ChapterCanvasDraftTesting: DraftTestSamples {
         #expect(remaining.first?.lineData == Data("continued".utf8))
         // 이어 쓴 초안은 앞선 초안의 기준(저장소 1절)을 든다 — 사이에 들어온 내용이 있었는지 나중에 가린다.
         #expect(remaining.first?.baseFingerprint == storedVerseOneFingerprint)
+        // 보존만 하던 초안이다 — 이어 쓴 초안은 그 출처를 그대로 잇고, 그래서 원 초안을 대신한다.
+        #expect(remaining.first?.provenance == earlier.provenance)
         #expect(drafts.removed.value == [earlier.key])
         #expect(store.state.drafts.adopted.isEmpty)
         await end(store, environment)
@@ -179,8 +183,9 @@ struct ChapterCanvasDraftTesting: DraftTestSamples {
         #expect(drafts.stored(in: accountA) == [earlier])
     }
 
-    @Test("내용이 이미 저장소에 있는 앞선 세션의 초안은 불러올 때 정리한다")
-    func settledDraftIsRemovedOnLoad() async throws {
+    /// 로컬 저장은 보존이 아니다 — 전송 전에 계정이 바뀌면 미러링이 그 행을 지우고 되살리지 않는다(ACC-1 F29). 그때 이 초안이 유일한 사본이다.
+    @Test("내용이 이미 저장소에 있는 앞선 세션의 초안은 겹치지 않되, 불러온 뒤에도 지우지 않는다")
+    func settledDraftIsKeptOnLoad() async throws {
         let spy = spyWithVerseOne()
         let environment = ControlledEditEnvironment(confirmed(accountA, 1, owned: false))
         let drafts = RecordingDraftStore()
@@ -188,10 +193,12 @@ struct ChapterCanvasDraftTesting: DraftTestSamples {
         drafts.seed(settled)
         let store = makeStore(spy: spy, results: [], environment: environment, drafts: drafts)
         await composeAndSubscribe(store, environment)
-        await end(store, environment)
 
-        #expect(drafts.stored(in: accountA).isEmpty)
-        #expect(drafts.removed.value == [settled.key])
+        #expect(store.state.drafts.adopted.isEmpty)
+        #expect(store.state.loadedDrawings?.first { $0.verse == 1 }?.lineData == Data([1]))
+        await end(store, environment)
+        #expect(drafts.stored(in: accountA) == [settled])
+        #expect(drafts.removed.value.isEmpty)
     }
 
     @Test("초안 저장소가 없으면 보존만 하는 세션의 편집을 실패로 알리고 큐에 남긴다")
@@ -253,6 +260,8 @@ struct ChapterCanvasDraftTesting: DraftTestSamples {
         #expect(!hidden.canErase)
         #expect(!hidden.canViewHistory)
 
+        // 소유가 확인된 유효 세션이면 띄운다.
+        state.editEnvironment = confirmed(accountA, 1)
         state.sessionValidity = .valid
         let shown = ChapterCanvasFeature.menuAvailability(at: point, state: state)
         #expect(shown.canErase)
@@ -274,12 +283,13 @@ struct ChapterCanvasDraftTesting: DraftTestSamples {
 /// 이 파일이 막는 것:
 /// - 계정을 확인하는 동안 저장소에 쓰는 것, 또는 그 사이 편집을 저장소에 영영 쓰지 않는 것
 /// - 확인이 오래 걸리는 동안 회전 · 복원 재합성이 입력을 잠근 채 멈추는 것
-/// - 저장소 저장까지 마친 초안이 쌓이는 것
+/// - 저장소 저장(로컬 확정)만으로 마지막 로컬 사본인 초안을 지우는 것(ACC-1 F29)
 @Suite("절 초안 — 유효 세션 · 확인 대기")
 @MainActor
 struct ChapterCanvasDraftValiditySessionTesting: DraftTestSamples {
-    @Test("유효한 세션은 초안을 남기고 저장소에도 쓴 뒤, 저장을 마친 초안을 지운다")
-    func validSessionDraftsThenStoresThenReleases() async {
+    /// 저장소 저장은 로컬 확정일 뿐이다. 전송 전에 계정이 바뀌면 그 행은 지워지고 되살아나지 않는다(ACC-1 F29) — 초안이 마지막 로컬 사본이다.
+    @Test("유효한 세션은 초안을 남기고 저장소에도 쓰며, 저장소 저장을 마쳐도 초안을 지우지 않는다")
+    func validSessionKeepsDraftAfterStoreSave() async {
         let spy = RepositorySpy()
         let environment = ControlledEditEnvironment(confirmed(accountA, 1))
         let drafts = RecordingDraftStore()
@@ -293,8 +303,11 @@ struct ChapterCanvasDraftValiditySessionTesting: DraftTestSamples {
 
         #expect(spy.applied.value.count == 1)
         #expect(drafts.saves.value.count == 1)
-        #expect(drafts.stored(in: accountA).isEmpty)
+        #expect(drafts.stored(in: accountA).map(\.lineData) == [Data("create-a".utf8)])
+        #expect(drafts.removed.value.isEmpty)
         #expect(store.state.pendingMutations.isEmpty)
+        // 역할은 끝났다 — 다시 읽을 때 겹치지 않는다.
+        #expect(store.state.drafts.storedRevisions[CanvasTestSupport.newRow] == 1)
     }
 
     @Test("확인 대기 중에는 초안만 남기고 미저장분을 붙잡아 두었다가, 같은 계정으로 확인되면 저장소에 쓴다")
@@ -322,7 +335,8 @@ struct ChapterCanvasDraftValiditySessionTesting: DraftTestSamples {
 
         #expect(spy.applied.value.count == 1)
         #expect(store.state.pendingMutations.isEmpty)
-        #expect(drafts.stored(in: accountA).isEmpty)
+        // 저장소에 쓴 뒤에도 초안은 남는다(ACC-1 F29).
+        #expect(drafts.stored(in: accountA).count == 1)
     }
 
     /// 확인하는 동안 읽은 결과는 어느 계정의 것인지 모른다 — 섞지 않되, 세션을 닫아 방금 쓴 초안을 다른 묶음으로 가리지도 않는다.

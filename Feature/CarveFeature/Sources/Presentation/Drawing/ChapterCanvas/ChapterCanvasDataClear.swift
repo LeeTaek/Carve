@@ -29,8 +29,10 @@ extension ChapterCanvasFeature {
             state.editEnvironment = ending.next
             state.sessionEnd = nil
         }
-        // 전체 삭제는 이 기기의 초안도 지웠다(`LocalPreservationWriter.eraseAllLocal`). 새 세션으로 다시 연다.
+        // 전체 삭제는 이 기기의 초안도 지웠다(`LocalPreservationWriter.eraseAllLocal`). 새 세션으로 다시 연다. 닫은 세션의 늦은 편집도 삭제 전
+        // 내용 위의 것이라 버린다.
         resetDraftSession(state: &state)
+        state.closedDrafts = ClosedDraftSessions()
         state.reloadAfterAccountCheck = false
         state.pendingMutations = [:]
         state.inFlightBatch = [:]

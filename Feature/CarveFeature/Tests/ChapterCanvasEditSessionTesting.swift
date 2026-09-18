@@ -45,8 +45,10 @@ final class ControlledEditEnvironment: DrawingEditEnvironmentClient, @unchecked 
 
 /// 초안 저장 대역 — 실제 저장소(`LocalPreservationWriter`)처럼 더 새 revision 을 지키고, 이어받은 다른 세션의 초안을 지운다.
 /// `failures` 만큼 먼저 실패하고(공간 부족 등), `rejectNext` 면 전체 삭제 세대로 거절하며, `holdNextSave()` 면 `release()` 까지 붙잡는다.
+/// `readFailures` 만큼 장 단위 읽기를 실패한다(삭제 세대를 읽지 못함 등).
 final class RecordingDraftStore: VerseDraftStore, @unchecked Sendable {
     struct Full: Error {}
+    struct Unreadable: Error {}
 
     private struct Entry: Equatable {
         let scope: AccountScope
@@ -59,6 +61,7 @@ final class RecordingDraftStore: VerseDraftStore, @unchecked Sendable {
     /// 지운 초안 — 이어받아 지운 것과 저장을 마쳐 지운 것.
     let removed = LockIsolated<[VerseDraftKey]>([])
     let failures = LockIsolated(0)
+    let readFailures = LockIsolated(0)
     let rejectNext = LockIsolated(false)
     private let holdNext = LockIsolated(false)
     private let gate = LockIsolated<AsyncStream<Void>.Continuation?>(nil)
@@ -79,7 +82,7 @@ final class RecordingDraftStore: VerseDraftStore, @unchecked Sendable {
             .sorted { ($0.key.verse, $0.key.sessionID) < ($1.key.verse, $1.key.sessionID) }
     }
 
-    func saveDraft(_ draft: VerseDraft, superseding: [VerseDraftKey]) async throws -> LocalPreservationWriter.WriteOutcome {
+    func saveDraft(_ draft: VerseDraft, superseding: [VerseDraftRef]) async throws -> LocalPreservationWriter.WriteOutcome {
         if holdNext.withValue({ value -> Bool in defer { value = false }; return value }) {
             let (stream, continuation) = AsyncStream<Void>.makeStream()
             gate.setValue(continuation)
@@ -100,19 +103,52 @@ final class RecordingDraftStore: VerseDraftStore, @unchecked Sendable {
             let id = Self.id(scope, draft.key)
             if let existing = entries[id], existing.draft.revision > draft.revision { return [] }
             entries[id] = Entry(scope: scope, draft: draft)
-            return superseding.filter { key in
-                key.sessionID != draft.key.sessionID && entries.removeValue(forKey: Self.id(scope, key)) != nil
-            }
+            return superseding.filter { ref in
+                // 그 revision 일 때만 대신한다 — 더 새 revision 이 쓰였으면 남긴다.
+                let oldID = Self.id(scope, ref.key)
+                guard ref.key.sessionID != draft.key.sessionID, entries[oldID]?.draft.revision == ref.revision else { return false }
+                entries[oldID] = nil
+                return true
+            }.map(\.key)
         }
         removed.withValue { $0.append(contentsOf: removedKeys) }
         return .written
     }
 
     func drafts(in scope: AccountScope, chapter: BibleChapter, translation: Translation) async throws -> [VerseDraft] {
-        stored(in: scope).filter {
+        let shouldFail = readFailures.withValue { remaining -> Bool in
+            guard remaining > 0 else { return false }
+            remaining -= 1
+            return true
+        }
+        if shouldFail { throw Unreadable() }
+        return stored(in: scope).filter {
             $0.key.title == chapter.title.rawValue && $0.key.chapter == chapter.chapter && $0.key.translation == translation.rawValue
         }
     }
+
+    /// 이만큼 "들어감" 표식 쓰기를 실패한다 — 저장소 저장 뒤 표식을 남기기 전에 끝난 것과 같다.
+    let markFailures = LockIsolated(0)
+
+    func markDraftStored(_ key: VerseDraftKey, scope: AccountScope, throughRevision revision: Int) async throws {
+        let shouldFail = markFailures.withValue { remaining -> Bool in
+            guard remaining > 0 else { return false }
+            remaining -= 1
+            return true
+        }
+        if shouldFail { throw Full() }
+        entries.withValue { entries in
+            let id = Self.id(scope, key)
+            guard let entry = entries[id], entry.draft.revision <= revision else { return }
+            var draft = entry.draft
+            draft.storeState = .stored
+            entries[id] = Entry(scope: scope, draft: draft)
+        }
+    }
+
+    /// 로컬 삭제 세대 — 시험 환경의 기본값(0)과 같다.
+    let generation = LockIsolated<UInt64?>(0)
+    func currentGeneration() async -> UInt64? { generation.value }
 
     func removeDraft(_ key: VerseDraftKey, scope: AccountScope, ifRevision revision: Int) async throws {
         let didRemove = entries.withValue { entries -> Bool in
@@ -197,6 +233,12 @@ extension EditSessionTestHelpers {
         await store.receive(\.mutationsPrepared)
     }
 
+    /// 화면에 캔버스가 있다 — 세션을 닫을 때 인계 응답을 기다린다. 뷰처럼 지금 세대를 표시했다고도 알린다.
+    func attachCanvas(_ store: TestStoreOf<ChapterCanvasFeature>, id: UUID = UUID(700)) async {
+        await store.send(.canvasAttached(id: id))
+        await store.send(.canvasDisplayed(id: id, revision: store.state.renderedRevision))
+    }
+
     func end(_ store: TestStoreOf<ChapterCanvasFeature>, _ environment: ControlledEditEnvironment) async {
         environment.finish()
         await store.finish()
@@ -225,10 +267,10 @@ struct ChapterCanvasEditSessionTesting: EditSessionTestHelpers {
 
         environment.change(to: confirmed(accountB, 2))
         await store.receive(\.editEnvironmentChanged)
-        // 닫는 동안은 새 획을 받지 않는다 — 바뀐 근거 아래서 새 편집이 시작되지 않는다.
+        // 캔버스가 없으면 인계를 기다리지 않고 곧바로 닫는다. 다시 읽기가 끝날 때까지 새 획을 받지 않는다 — 바뀐 근거 아래서 새 편집이
+        // 시작되지 않는다.
+        #expect(store.state.sessionEnd == nil)
         #expect(!store.state.isInputEnabled)
-        #expect(store.state.sessionEnd?.environment == confirmed(accountA, 1))
-        await store.receive(\.sessionHandoffTimedOut)
 
         // 초안은 무효가 된 세션(계정 A)의 묶음에 그 세션의 근거를 들고 남았다. 새 계정 묶음에는 없다.
         let preserved = drafts.stored(in: accountA)
@@ -263,8 +305,7 @@ struct ChapterCanvasEditSessionTesting: EditSessionTestHelpers {
 
         environment.change(to: confirmed(accountA, 1, knowledge: learned))
         await store.receive(\.editEnvironmentChanged)
-        #expect(store.state.sessionEnd?.reason == .eraseLearned)
-        await store.receive(\.sessionHandoffTimedOut)
+        #expect(store.state.sessionEnd == nil)
 
         #expect(drafts.stored(in: accountA).first?.knownEpochs == [])
         #expect(store.state.editEnvironment.knowledge?.all == ["E1"])
@@ -275,8 +316,8 @@ struct ChapterCanvasEditSessionTesting: EditSessionTestHelpers {
 
     // MARK: - 늦게 온 편집
 
-    /// 뷰의 인계 응답이 없을 때(화면 없음)도 시한 안에 도착한 늦은 편집은 무효가 된 세션의 것이므로 그 세션의 초안에 넣어야 한다.
-    @Test("인계 시한 전에 늦게 온 편집도 닫는 세션의 초안에 넣고, 저장소에는 쓰지 않는다")
+    /// 캔버스가 있으면 응답이 늦어도 닫지 않는다 — 그 사이 도착한 늦은 편집은 무효가 된 세션의 것이므로 그 세션의 초안에 넣는다.
+    @Test("인계를 기다리는 동안 늦게 온 편집도 닫는 세션의 초안에 넣고, 저장소에는 쓰지 않는다 — 시한이 지나도 닫지 않고 다시 요청한다")
     func lateEditJoinsClosingSessionDraft() async {
         let spy = RepositorySpy()
         let environment = ControlledEditEnvironment(confirmed(accountA, 1))
@@ -287,6 +328,7 @@ struct ChapterCanvasEditSessionTesting: EditSessionTestHelpers {
             environment: environment, drafts: drafts, clock: clock
         )
         await composeAndSubscribe(store, environment)
+        await attachCanvas(store)
         await holdOneEdit(store, spy)
         await store.receive(\.draftsSaved)
 
@@ -298,6 +340,11 @@ struct ChapterCanvasEditSessionTesting: EditSessionTestHelpers {
         await store.receive(\.draftsSaved)
         await clock.advance(by: ChapterCanvasFeature.sessionHandoffTimeout)
         await store.receive(\.sessionHandoffTimedOut)
+        // 캔버스가 있다 — 응답이 늦을 뿐이다. 닫지 않고 새 토큰으로 다시 요청한다.
+        let token = store.state.handoffToken
+        #expect(store.state.sessionEnd?.phase == .handingOff(token: token))
+        await store.send(.editHandoffCompleted(token: token))
+        #expect(store.state.sessionEnd == nil)
 
         // 같은 절의 완전한 획 집합이므로 최신(b)이 계정 A 의 초안으로 남는다.
         #expect(drafts.stored(in: accountA).map(\.lineData) == [Data("create-b".utf8)])
@@ -321,6 +368,7 @@ struct ChapterCanvasEditSessionTesting: EditSessionTestHelpers {
             environment: environment, drafts: drafts, clock: clock
         )
         await composeAndSubscribe(store, environment)
+        await attachCanvas(store)
         await holdOneEdit(store, spy)
         await store.receive(\.draftsSaved)
 
@@ -359,6 +407,7 @@ struct ChapterCanvasEditSessionTesting: EditSessionTestHelpers {
         let clock = TestClock()
         let store = makeStore(spy: spy, results: [CanvasTestSupport.createResult("a")], environment: environment, drafts: drafts, clock: clock)
         await composeAndSubscribe(store, environment)
+        await attachCanvas(store)
         await holdOneEdit(store, spy)
         await store.receive(\.draftsSaved)
 
@@ -402,13 +451,13 @@ struct ChapterCanvasEditSessionTesting: EditSessionTestHelpers {
         let drafts = RecordingDraftStore()
         let store = makeStore(spy: spy, results: [CanvasTestSupport.createResult("a")], environment: environment, drafts: drafts)
         await composeAndSubscribe(store, environment)
-        // 저장소 저장도 초안도 아직 끝나지 않은 미저장분.
+        // 초안이 아직 끝나지 않은 미저장분 — 저장소 저장은 초안이 남은 뒤에만 시작하므로 아직 시작하지도 않았다.
         drafts.holdNextSave()
         await holdOneEdit(store, spy)
+        #expect(spy.appliedGenerations.value.isEmpty)
 
         environment.change(to: confirmed(accountB, 2))
         await store.receive(\.editEnvironmentChanged)
-        await store.receive(\.sessionHandoffTimedOut)
         #expect(store.state.sessionEnd?.phase == .preserving)
         // 쓰던 초안이 공간 부족으로 실패한다.
         drafts.failures.setValue(1)
@@ -427,20 +476,19 @@ struct ChapterCanvasEditSessionTesting: EditSessionTestHelpers {
         #expect(store.state.sessionEnd == nil)
         #expect(drafts.stored(in: accountA).map(\.lineData) == [Data("create-a".utf8)])
 
-        spy.releaseApply()
-        await store.receive(\.saveFinished)
         await store.receive(\.drawingsLoaded)
         #expect(store.state.saveStatus == .idle)
         #expect(store.state.isInputEnabled)
-        // 붙잡혀 있던 저장 한 번뿐이다 — 바뀐 계정 아래로 다시 저장하지 않았다.
-        #expect(spy.applied.value.count == 1)
+        // 초안이 되지 않은 편집은 저장소에 가지 않았고, 바뀐 계정 아래로도 저장하지 않았다.
+        #expect(spy.appliedGenerations.value.isEmpty)
+        spy.releaseApply()
         await end(store, environment)
     }
 
     // MARK: - 끊지 않는 경우
 
     /// 계정 변경 알림은 같은 계정에서도 온다.
-    @Test("같은 계정으로 다시 확인되면 세션을 이어 가고 새 표를 들며, 저장을 마친 초안은 지운다")
+    @Test("같은 계정으로 다시 확인되면 세션을 이어 가고 새 표를 들며, 저장을 마친 초안도 지우지 않는다")
     func sameAccountReconfirmationContinues() async {
         let spy = RepositorySpy()
         let environment = ControlledEditEnvironment(confirmed(accountA, 1))
@@ -459,8 +507,9 @@ struct ChapterCanvasEditSessionTesting: EditSessionTestHelpers {
         await store.receive(\.saveFinished)
         #expect(store.state.pendingMutations.isEmpty)
         await end(store, environment)
-        // 저장소 저장까지 마쳤으므로 초안은 완료로 지웠다(정책 §12-3).
-        #expect(drafts.stored(in: accountA).isEmpty)
+        // 저장소 저장은 로컬 확정일 뿐이다 — 전송 전에 계정이 바뀌면 그 행은 지워진다(ACC-1 F29). 초안은 ③ 의 확정이 정리한다.
+        #expect(drafts.stored(in: accountA).count == 1)
+        #expect(drafts.removed.value.isEmpty)
     }
 
     @Test("계정을 확인하는 중에는 세션을 끝내지 않고 근거도 바꾸지 않으며, 저장소 저장을 멈춘다")
@@ -471,6 +520,8 @@ struct ChapterCanvasEditSessionTesting: EditSessionTestHelpers {
         let store = makeStore(spy: spy, results: [CanvasTestSupport.createResult("a")], environment: environment, drafts: drafts)
         await composeAndSubscribe(store, environment)
         await holdOneEdit(store, spy)
+        // 초안이 남은 뒤에 저장소 저장이 시작된다(붙잡힘).
+        await store.receive(\.draftsSaved)
 
         environment.change(to: DrawingEditEnvironment(accountState: .unconfirmed(lastConfirmed: accountA), serverWork: nil,
                                                       knowledge: EraseEpochKnowledge()))
@@ -519,7 +570,6 @@ struct ChapterCanvasEditSessionTesting: EditSessionTestHelpers {
         await holdOneEdit(store, spy)
         environment.change(to: confirmed(accountB, 2))
         await store.receive(\.editEnvironmentChanged)
-        await store.receive(\.sessionHandoffTimedOut)
         #expect(store.state.sessionEnd?.phase == .preserving)
 
         await store.send(.drawingDataCleared)

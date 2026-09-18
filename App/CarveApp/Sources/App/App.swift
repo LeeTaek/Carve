@@ -61,7 +61,8 @@ struct CarveApp: App {
             identity: CloudKitAccountIdentityClient(containerID: containerID.id),
             containerID: containerID.id,
             stateStore: FileEraseStateStore(area: .live(localDBPath: containerID.localDBPath)),
-            localPreservation: localPreservation
+            localPreservation: localPreservation,
+            injectsOwnership: Self.injectsStoreOwnership(containerID: containerID)
         )
         self.drawingEditEnvironment = drawingEditEnvironment
         self.modelContainer = modelContainer
@@ -125,6 +126,17 @@ struct CarveApp: App {
 // MARK: - helpers
 extension CarveApp {
     /// Info.plist에 정의된 CLOUDKIT_CONTAINER_ID를 읽어와 `ContainerID`로 래핑.
+    /// ACC-1 2차 전용 소유 주입(DEBUG · 시뮬레이터 · dev 컨테이너 · 실행 인자). 켜지면 소유 증명이 아니라는 것을 로그로 남긴다.
+    private static func injectsStoreOwnership(containerID: ContainerID) -> Bool {
+        #if DEBUG
+        guard StoreOwnershipInjection.isEnabled(containerID: containerID) else { return false }
+        print("⚠️ 소유 주입(DEBUG · 시뮬레이터 · dev 컨테이너) — 소유 증명이 아니다. ACC-1 2차 시험 전용이며 결과는 주입 없는 시험과 따로 기록한다")
+        return true
+        #else
+        return false
+        #endif
+    }
+
     private static func makeContainerID() -> ContainerID {
         let id = Bundle.main.object(forInfoDictionaryKey: "CLOUDKIT_CONTAINER_ID") as? String ?? ""
         return ContainerID(id: id)

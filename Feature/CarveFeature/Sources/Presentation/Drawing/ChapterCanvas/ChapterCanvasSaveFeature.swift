@@ -55,30 +55,25 @@ extension ChapterCanvasFeature.State {
 
     /// 아직 저장하지 않은 변경이 있는가. **장과 무관하다** — 장을 바꿔도 남은 이전 장의 미저장분을 포함한다.
     ///
-    /// 획을 긋는 중(`isEditing`)도 포함한다. 그 획은 아직 보고되지도 않았으므로 저장됐다고 말할 수 없다.
+    /// 획을 긋는 중(`isEditing`)도 포함한다. 그 획은 아직 보고되지도 않았으므로 저장됐다고 말할 수 없다. 닫은 세션의 늦은 편집도
+    /// 초안이 될 때까지 포함한다.
     var hasUnsavedChanges: Bool {
-        isEditing || isPreparingEdit || !editQueue.isEmpty || hasUnsavedPending
+        isEditing || isPreparingEdit || !editQueue.isEmpty || hasUnsavedPending || !closedDrafts.pending.isEmpty
     }
 
-    /// 아직 이 기기에 남지 않은 미저장분이 있는가. 저장소에 쓰는 세션은 저장소 저장까지, 쓰지 않는 세션은 초안까지 본다 —
-    /// 확인 대기 중에는 초안이 된 미저장분을 저장소 저장을 위해 큐에 붙잡아 두지만, 그 내용은 이미 이 기기에 남아 있다.
+    /// 아직 이 기기에 남지 않은 미저장분이 있는가. 저장소에 쓸 미저장분은 저장소 저장까지, 그 밖은 초안까지 본다 — 확인 대기 중에는
+    /// 초안이 된 미저장분을 저장소 저장을 위해 큐에 붙잡아 두지만, 그 내용은 이미 이 기기에 남아 있다.
     var hasUnsavedPending: Bool {
-        if persistsToStore { return !pendingMutations.isEmpty }
-        return !allPendingDrafted
-    }
-
-    /// 큐의 미저장분이 모두 그 revision 까지 초안이 됐는가.
-    var allPendingDrafted: Bool {
-        pendingMutations.allSatisfy { rowID, entry in (drafts.records[rowID]?.revision ?? 0) >= entry.revision }
+        pendingMutations.contains { rowID, entry in isStoreBound(entry) || !isDrafted(rowID, entry) }
     }
 
     /// 다시 합성해도 되는가 — 저장소 저장 · 초안 · 코덱이 멎었고, 남은 미저장분은 초안이 돼 다시 읽어도 겹쳐진다.
     ///
     /// `isFullyPersisted` 보다 넓다: 확인 대기 중 큐에 붙잡아 둔 미저장분은 이미 초안이라 다시 읽으면 지금 세션의 초안으로 다시 겹친다.
-    /// 그것까지 기다리면 계정 확인이 오래 걸리는 동안(오프라인) 회전 · 복원 재합성이 입력을 잠근 채 멈춘다.
+    /// 그것까지 기다리면 계정 확인이 오래 걸리는 동안(오프라인) 회전 · 복원 재합성이 입력을 잠근 채 멈춘다. 닫은 세션의 늦은 편집은
+    /// 지금 세션의 합성과 무관하므로 기다리지 않는다.
     var isSettledForReload: Bool {
-        if isFullyPersisted { return true }
-        return saveStatus == .idle && editQueue.isEmpty && !isPreparingEdit && !isSavingDrafts && !persistsToStore && allPendingDrafted
+        saveStatus == .idle && editQueue.isEmpty && !isPreparingEdit && !isSavingDrafts && !hasUnsavedPending
     }
 
     /// 저장에 실패해 **사용자에게 알려야 하는** 상태면 지금까지의 재시도 횟수. 아니면 nil.
@@ -161,7 +156,9 @@ extension ChapterCanvasFeature {
         let drafts = startDraftSaveIfPossible(state: &state, allowRetry: allowRetry)
         // 무효가 된 세션을 닫는 중이다 — 바뀐 계정 · 기준점 아래로 이전 세션의 편집을 저장하지 않는다(§12-6 구현 순서 ①).
         guard state.sessionEnd == nil else { return drafts }
-        // 귀속할 근거가 없는 세션(보존만 · 확인 대기)은 저장소에 쓰지 않는다 — `BibleDrawing` 은 동기화된다.
+        // 저장소로 가지 않는 미저장분(보존만 · 로그인하지 않은 세션, 보이기만 하는 초안을 이은 절) 가운데 초안이 된 것은 내린다.
+        dropDraftedPending(state: &state)
+        // 귀속할 근거가 없는 세션(보존만 · 확인 대기 · 로그인하지 않음)은 저장소에 쓰지 않는다 — `BibleDrawing` 은 동기화된다.
         guard state.persistsToStore else {
             return .merge(drafts, settleIfNeeded(state: &state))
         }
@@ -173,21 +170,28 @@ extension ChapterCanvasFeature {
         case .idle, .failed:
             break
         }
-        guard !state.pendingMutations.isEmpty else {
+        // 저장소로는 그 revision 까지 초안이 내구성 있게 남은 것만 보낸다 — 저장소 저장이 먼저 끝나면, 초안을 쓰기 전에 앱이 끝나고 계정이 바뀌는
+        // 순간 그 필기의 사본이 어디에도 없다(ACC-1 F29). 초안 저장 실패를 저장소 저장으로 대신하지 않는다. 초안 저장소가 없으면(시험 · 미리보기)
+        // 기다릴 초안이 없다.
+        let draftsFirst = draftStore != nil
+        let storeBound = state.pendingMutations.filter { rowID, entry in
+            state.isStoreBound(entry) && (!draftsFirst || state.isDrafted(rowID, entry))
+        }
+        guard !storeBound.isEmpty else {
             return .merge(drafts, settleIfNeeded(state: &state))
         }
         guard let generation = state.storeGeneration else {
             // 오지 않는 자리다 — 합성은 세대가 있을 때만 하고(`composeIfReady`) 미저장분은 합성한 내용 위에서만 생긴다.
             // 기준 없이 보내면 저장소가 대조할 수 없어 보내지 않는다.
-            Log.error("단일 Canvas — 기준 세대 없이 미저장분이 있다. 저장하지 않고 남긴다", "count=\(state.pendingMutations.count)")
+            Log.error("단일 Canvas — 기준 세대 없이 미저장분이 있다. 저장하지 않고 남긴다", "count=\(storeBound.count)")
             return drafts
         }
 
         // 한 batch 는 한 장이다. 이전 장의 미저장분이 남아 있으면 그것부터 보낸다.
-        let chapter = state.pendingMutations.values
+        let chapter = storeBound.values
             .map(\.chapter)
             .min { lhs, rhs in lhs != state.chapter && rhs == state.chapter } ?? state.chapter
-        let batch = state.pendingMutations.filter { $0.value.chapter == chapter }
+        let batch = storeBound.filter { $0.value.chapter == chapter }
         let revision = batch.values.map(\.revision).max() ?? state.editRevision
         let mutations = batch.values
             .sorted { $0.mutation.verse != $1.mutation.verse ? $0.mutation.verse < $1.mutation.verse : $0.mutation.rowID < $1.mutation.rowID }
@@ -264,7 +268,8 @@ extension ChapterCanvasFeature {
         for (rowID, savedRevision) in batch where state.pendingMutations[rowID]?.revision == savedRevision {
             state.pendingMutations[rowID] = nil
         }
-        // 저장소에 들어간 행 — 초안 정리의 근거이고, 이제 초안에만 있는 행이 아니다.
+        // 저장소에 들어간 행 — 그 revision 까지의 초안은 역할이 끝났고(다시 읽을 때 겹치지 않는다), 이제 초안에만 있는 행이 아니다.
+        // **초안은 지우지 않는다** — 전송 전에 계정이 바뀌면 미러링이 이 행을 지우고 되살리지 않는다(ACC-1 F29). 정리는 ③ 의 확정이 한다.
         for (rowID, savedRevision) in batch {
             state.drafts.storedRevisions[rowID] = max(state.drafts.storedRevisions[rowID] ?? 0, savedRevision)
             state.drafts.draftOnlyRowIDs.remove(rowID)
@@ -276,7 +281,7 @@ extension ChapterCanvasFeature {
         state.persistedRevision = max(state.persistedRevision, revision)
         state.consecutiveSaveFailures = 0
         state.saveStatus = .idle
-        return .merge(releaseStoredDrafts(state: &state), startSaveIfPossible(state: &state, allowRetry: false))
+        return .merge(markStoredDrafts(state: state, rows: Array(batch.keys)), startSaveIfPossible(state: &state, allowRetry: false))
     }
 
     /// 저장할 것이 없을 때 — 지우기가 기다리고 있으면 지금 보관하고, 아니면 예약된 재합성을 지금 읽는다.

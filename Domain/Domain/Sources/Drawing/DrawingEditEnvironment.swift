@@ -34,6 +34,9 @@ public struct DrawingEditEnvironment: Equatable, Sendable {
     public var storeOwnership: AccountScope?
     /// 이 기기의 로컬 삭제 세대(`LocalPreservationWriter`). 초안 · 격리 쓰기는 이 값을 들고 가고, 그 뒤 전체 삭제가 있었으면 거절된다.
     public var eraseGeneration: UInt64
+    /// 저장소 소유 근거가 **시험용 주입**이다(`StoreOwnershipInjection`, DEBUG 전용) — 소유 증명이 아니다. 이 환경에서 쓴 초안에 남아,
+    /// 주입 없는 실행은 그 초안의 소유 근거를 없는 것으로 읽는다.
+    public var ownershipInjected: Bool
 
     public init(
         accountState: AccountScopeState,
@@ -41,7 +44,8 @@ public struct DrawingEditEnvironment: Equatable, Sendable {
         knowledge: EraseEpochKnowledge?,
         generation: UInt64 = 0,
         storeOwnership: AccountScope? = nil,
-        eraseGeneration: UInt64 = 0
+        eraseGeneration: UInt64 = 0,
+        ownershipInjected: Bool = false
     ) {
         self.accountState = accountState
         self.serverWork = serverWork
@@ -49,6 +53,7 @@ public struct DrawingEditEnvironment: Equatable, Sendable {
         self.generation = generation
         self.storeOwnership = storeOwnership
         self.eraseGeneration = eraseGeneration
+        self.ownershipInjected = ownershipInjected
     }
 
     /// 이 환경에서 절 편집을 시작할 때의 계정 근거.
@@ -72,6 +77,54 @@ public struct DrawingEditEnvironment: Equatable, Sendable {
     )
 }
 
+/// 캔버스 초안 밖에서 동기화 저장소(`BibleDrawing` · `FavoriteVerse`)에 바로 쓰는 경로를 막는 사유 — 즐겨찾기 추가 · 해제 · 되돌리기,
+/// 위젯에 담으며 즐겨찾기로 보관, N-Canvas 저장 (정책 §12-6 결정 1, 2026-09-18).
+///
+/// 소유가 확인된 유효 환경에서만 쓴다. 미러링은 로그아웃 · 미확인 상태의 쓰기를 다음에 로그인한 계정으로 올린다(ACC-1 F30). 중간 빌드는
+/// **사유를 보이고 막는다** — 소유 근거가 생기기 전에는 늘 막힌다. 메뉴만이 아니라 실제 쓰기 직전에 다시 본다.
+public enum SyncedWriteBlock: Equatable, Sendable {
+    /// 로그인하지 않았다.
+    case signedOut
+    /// 계정을 확인하는 중이거나 확인하지 못했다.
+    case accountUnconfirmed
+    /// 이 기기의 저장소가 지금 계정의 것이라는 근거가 없다.
+    case ownershipUnverified
+    /// 삭제 기준점(K)을 읽지 못했다.
+    case knowledgeUnreadable
+
+    /// 이 환경에서 동기화 저장소에 바로 써도 되는가. 막으면 그 사유, 되면 nil.
+    public static func check(_ environment: DrawingEditEnvironment) -> SyncedWriteBlock? {
+        switch environment.accountState {
+        case .noAccount:
+            return .signedOut
+        case .unconfirmed:
+            return .accountUnconfirmed
+        case .confirmed(let scope):
+            guard environment.serverWork != nil else { return .accountUnconfirmed }
+            guard environment.knowledge != nil else { return .knowledgeUnreadable }
+            guard environment.storeOwnership == scope else { return .ownershipUnverified }
+            return nil
+        }
+    }
+}
+
+#if DEBUG
+/// ACC-1 2차 전용 — 확인된 계정이면 저장소 소유 근거를 그 계정으로 **가정**한다(테스트 계획 §3-2). **소유 증명이 아니다** — 판정 뒤의 경로
+/// (저장소 쓰기 · 이어 쓰기 · 전환 때 초안 보존)를 재현할 뿐이다. DEBUG 빌드 · 시뮬레이터 · 시험(dev) 컨테이너 · 실행 인자가 모두 맞을 때만
+/// 켜지고, Release 빌드에는 이 코드가 없다.
+public enum StoreOwnershipInjection {
+    public static let launchArgument = "-ACC1InjectStoreOwnership"
+
+    public static func isEnabled(containerID: ContainerID, arguments: [String] = ProcessInfo.processInfo.arguments) -> Bool {
+        #if targetEnvironment(simulator)
+        return arguments.contains(launchArgument) && containerID.localDBPath == "Carve.dev.sqlite"
+        #else
+        return false
+        #endif
+    }
+}
+#endif
+
 public protocol DrawingEditEnvironmentClient: Sendable {
     /// 지금 환경.
     func current() async -> DrawingEditEnvironment
@@ -91,6 +144,8 @@ public final class LiveDrawingEditEnvironment: DrawingEditEnvironmentClient, @un
     private let provider: AccountScopeProvider
     private let stateStore: FileEraseStateStore
     private let localPreservation: LocalPreservationWriter?
+    /// 시험용 소유 주입(`StoreOwnershipInjection`, DEBUG 전용). 확인된 계정일 때만 소유 근거를 채우고 주입 표식을 단다.
+    private let injectsOwnership: Bool
     private let notificationCenter: NotificationCenter
     private let lock = NSLock()
     private var subscribers: [UUID: AsyncStream<Void>.Continuation] = [:]
@@ -106,12 +161,14 @@ public final class LiveDrawingEditEnvironment: DrawingEditEnvironmentClient, @un
         containerID: String,
         stateStore: FileEraseStateStore,
         localPreservation: LocalPreservationWriter? = nil,
-        notificationCenter: NotificationCenter = .default
+        notificationCenter: NotificationCenter = .default,
+        injectsOwnership: Bool = false
     ) {
         self.provider = AccountScopeProvider(identity: identity, containerID: containerID, stateStore: stateStore)
         self.stateStore = stateStore
         self.localPreservation = localPreservation
         self.notificationCenter = notificationCenter
+        self.injectsOwnership = injectsOwnership
     }
 
     deinit {
@@ -190,9 +247,12 @@ public final class LiveDrawingEditEnvironment: DrawingEditEnvironmentClient, @un
             // K 를 읽는 사이 계정 · 로컬 삭제 세대가 바뀌지 않았어야 한 환경이다.
             let sameErase = (await localPreservation?.currentGeneration() ?? 0) == eraseGeneration
             if await provider.isGeneration(snapshot.generation), sameErase, !hasUnappliedNotification {
+                // 시험용 주입은 확인된 계정(표가 있음)일 때만 — 미확인 · 로그인 안 함의 보존만 경로는 주입 빌드에서도 같다.
+                var injected: AccountScope?
+                if injectsOwnership, case .confirmed(let scope) = snapshot.state, snapshot.token != nil { injected = scope }
                 return DrawingEditEnvironment(
                     accountState: snapshot.state, serverWork: snapshot.token, knowledge: knowledge, generation: snapshot.generation,
-                    eraseGeneration: eraseGeneration
+                    storeOwnership: injected, eraseGeneration: eraseGeneration, ownershipInjected: injected != nil
                 )
             }
         }

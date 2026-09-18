@@ -75,9 +75,8 @@ struct ChapterCanvasEditSessionBasisTesting: EditSessionTestHelpers {
             .success(DrawingChapterLoad(snapshots: [], generation: DrawingStoreGeneration(raw: 0)))
         ))
 
-        #expect(store.state.sessionEnd?.environment == session)
-        await store.receive(\.sessionHandoffTimedOut)
-        // 편집은 지금 세션의 출처(기준점을 모르는 K)를 단 초안으로 남았다.
+        // 캔버스가 없어 곧바로 닫았다. 편집은 지금 세션의 출처(기준점을 모르는 K)를 단 초안으로 남았다.
+        #expect(store.state.sessionEnd == nil)
         #expect(drafts.stored(in: accountA).first?.knownEpochs == [])
         #expect(store.state.editEnvironment == otherBasis)
         spy.releaseApply()
@@ -215,7 +214,6 @@ struct ChapterCanvasEditSessionBasisTesting: EditSessionTestHelpers {
 
         environment.change(to: confirmed(accountB, 2))
         await store.receive(\.editEnvironmentChanged)
-        await store.receive(\.sessionHandoffTimedOut)
         #expect(store.state.sessionEnd?.phase == .preserving)
 
         await store.send(.draftsSaved(requestID: UUID(99), saved: [], failure: nil))

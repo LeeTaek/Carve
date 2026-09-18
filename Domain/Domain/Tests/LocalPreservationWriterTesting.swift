@@ -14,6 +14,9 @@ import Testing
 /// - 사용자가 전체 삭제를 끝낸 뒤 늦게 도착한 격리 · 초안 쓰기가 사본을 다시 남기는 것(effect 취소로는 진행 중인 파일 쓰기를 막지 못한다)
 /// - 앱을 다시 켜면 삭제 세대를 잊어 오래된 쓰기 · 작업을 받아들이는 것
 /// - 전체 삭제가 중간에 끊겨 보존 폴더가 반쯤 남는 것
+/// - 이어받을 때 보지 않은 더 새 revision 을 지우는 것
+/// - 저장소에 들어간 표식이 아직 저장소에 없는 더 새 revision 을 덮는 것
+/// - 시작할 때 한 번 못 읽은 삭제 세대 때문에 이 실행 내내 초안을 읽지도 쓰지도 못하는 것
 @Suite("로컬 보존 직렬화 경계")
 struct LocalPreservationWriterTesting {
 
@@ -182,6 +185,27 @@ struct LocalPreservationWriterTesting {
 
     // MARK: - 세대를 읽지 못함
 
+    /// 첫 잠금 해제 전 파일 보호 · 일시적인 입출력 오류는 지나간다. 초안을 읽지 못한 장의 「다시 시도」가 성공할 수 있어야 한다.
+    @Test("시작할 때 삭제 세대를 읽지 못했어도, 다시 읽을 수 있게 되면 그 세대로 쓰기를 잇는다")
+    func unreadableGenerationIsReadAgain() async throws {
+        try await withAreas { areas in
+            let generationURL = areas.eraseState.root.appendingPathComponent("Carve.sqlite", isDirectory: true)
+                .appendingPathComponent("local-erase-generation.json")
+            try FileManager.default.createDirectory(at: generationURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data("깨진 값".utf8).write(to: generationURL)
+            let writer = LocalPreservationWriter(area: areas.preservation, eraseState: areas.eraseState)
+            #expect(await writer.currentGeneration() == nil)
+            await #expect(throws: LocalPreservationWriter.WriterError.self) { try await writer.drafts(in: account, chapter: chapter) }
+
+            try JSONEncoder().encode(UInt64(2)).write(to: generationURL)
+
+            #expect(await writer.currentGeneration() == 2)
+            #expect(try await writer.saveDraft(draft(generation: 2)) == .written)
+            // 삭제 전 세대에 기댄 쓰기는 여전히 거절한다.
+            #expect(try await writer.saveDraft(draft(revision: 2, generation: 0)) == .rejectedByErase(current: 2))
+        }
+    }
+
     @Test("삭제 세대를 읽지 못하면 쓰기를 멈춘다 — 늦은 쓰기를 가려낼 수 없다")
     func unreadableGenerationStopsWrites() async throws {
         try await withAreas { areas in
@@ -247,11 +271,47 @@ struct LocalPreservationWriterTesting {
             _ = try await writer.saveDraft(untouched)
 
             let next = draft(verse: 1, session: "session-new", ink: "이어 씀")
-            let outcome = try await writer.saveDraft(next, superseding: [old.key, next.key])
+            let outcome = try await writer.saveDraft(next, superseding: [old.ref, next.ref])
             #expect(outcome == .written)
 
             let remaining = try await writer.drafts(in: account, chapter: chapter)
             #expect(remaining.map { "\($0.key.verse)/\($0.key.sessionID)" } == ["1/session-new", "2/session-old"])
+        }
+    }
+
+    /// 닫은 세션의 늦은 편집이 같은 키를 더 새 revision 으로 덮은 뒤, 새 세션이 앞서 본 revision 을 이어받는 경우다.
+    @Test("이어받을 때 본 revision 이 아니면 대신하지 않는다 — 그 사이 쓰인 더 새 revision 을 남긴다")
+    func supersedingChecksRevision() async throws {
+        try await withAreas { areas in
+            let writer = LocalPreservationWriter(area: areas.preservation, eraseState: areas.eraseState)
+            let shown = draft(verse: 1, revision: 1, session: "session-old", ink: "본 것")
+            _ = try await writer.saveDraft(shown)
+            _ = try await writer.saveDraft(draft(verse: 1, revision: 2, session: "session-old", ink: "늦은 편집"))
+
+            let next = draft(verse: 1, revision: 3, session: "session-new", ink: "이어 씀")
+            #expect(try await writer.saveDraft(next, superseding: [shown.ref]) == .written)
+
+            let remaining = try await writer.drafts(in: account, chapter: chapter)
+            #expect(remaining.map { "\($0.key.sessionID)/\($0.revision)" } == ["session-new/3", "session-old/2"])
+        }
+    }
+
+    @Test("저장소에 들어간 표식은 그 revision 까지만 남기고, 더 새 revision 은 건드리지 않으며, 지우지 않는다")
+    func markStoredKeepsNewerRevisions() async throws {
+        try await withAreas { areas in
+            let writer = LocalPreservationWriter(area: areas.preservation, eraseState: areas.eraseState)
+            _ = try await writer.saveDraft(draft(verse: 1, revision: 3))
+            _ = try await writer.saveDraft(draft(verse: 2, revision: 5))
+
+            try await writer.markDraftStored(draft(verse: 1).key, scope: account, throughRevision: 3)
+            try await writer.markDraftStored(draft(verse: 2).key, scope: account, throughRevision: 4)
+
+            let found = try await writer.drafts(in: account, chapter: chapter)
+            #expect(found.map(\.storeState) == [.stored, nil])
+            #expect(found.map(\.revision) == [3, 5])
+            // 표식을 단 초안 위에 더 새 revision 이 오면 표식 없는 새 초안이 된다.
+            _ = try await writer.saveDraft(draft(verse: 1, revision: 6))
+            #expect(try await writer.drafts(in: account, chapter: chapter).first?.storeState == nil)
         }
     }
 
@@ -264,7 +324,7 @@ struct LocalPreservationWriterTesting {
             // 세대 0 에 기댄 쓰기가 전체 삭제(세대 1) 뒤에 도착한다. 삭제가 이미 옛 초안까지 지웠으므로 남은 것이 없어야 한다.
             try await writer.eraseAllLocal()
             let late = draft(verse: 1, generation: 0, session: "session-new")
-            let outcome = try await writer.saveDraft(late, superseding: [old.key])
+            let outcome = try await writer.saveDraft(late, superseding: [old.ref])
             #expect(outcome == .rejectedByErase(current: 1))
             let remaining = try await writer.drafts(in: account, chapter: chapter)
             #expect(remaining.isEmpty)
