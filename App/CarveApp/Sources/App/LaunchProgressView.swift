@@ -115,6 +115,9 @@ struct LaunchProgressView: View {
             "필사 저장소를 준비하지 못했어요.\n앱을 완전히 종료한 뒤 다시 열어 주세요."
         case .unreadable:
             "필사 저장소를 읽지 못했어요.\n앱을 완전히 종료한 뒤 다시 열어 주세요."
+        case .preservationFailed:
+            // 원시 사본(정책 §12-6 C3 ①)을 만들지 못했다. 공간이 모자란 경우가 가장 흔하다.
+            "새 형식으로 옮기기 전에 기존 필사를 따로 보관하지 못했어요.\n기기 저장 공간을 확보한 뒤 앱을 다시 열어 주세요."
         }
         Text("필사를 지키려고 시작을 멈췄어요.\n\(reason)\n\(Self.keepAppAdvice)")
             .font(.subheadline)
@@ -123,7 +126,7 @@ struct LaunchProgressView: View {
             .padding(.horizontal, 24)
     }
 
-    /// 막힌 세 경우에 공통으로 붙이는 당부. **앱을 지우면 이 기기의 필사가 사라진다.**
+    /// 막힌 경우에 공통으로 붙이는 당부. **앱을 지우면 이 기기의 필사가 사라진다.**
     private static var keepAppAdvice: String {
         let address = UserFeedback.initialState.feedbackAddress
         return address.isEmpty

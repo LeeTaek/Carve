@@ -14,7 +14,7 @@ import Dependencies
 public enum DrawingEraseOutcome: Equatable, Sendable {
     /// 전부 지웠다.
     case completed
-    /// 필사 행은 지웠지만 뒤따른 삭제(구 구조 행 · 즐겨찾기)가 실패했다.
+    /// 필사 행은 지웠지만 뒤따른 삭제(구 구조 행 · 즐겨찾기 · 보존 영역)가 실패했다.
     ///
     /// 필사 행이 사라졌으므로 **열린 장은 옛 잉크와 미저장분을 버려야 한다.** 그러지 않으면 다음 저장이
     /// 방금 지운 필사를 새 행으로 되살린다 (`ChapterCanvasDataClear`).
@@ -44,12 +44,19 @@ public protocol DrawingDataEraser: Sendable {
 ///
 /// 필사 행 삭제는 저장소 세대도 함께 올린다 (`eraseAllDrawingRows`). 삭제 전에 요청된 저장이 뒤늦게 실행돼도
 /// 행을 되살리지 못하게 하기 위함이다 (`DrawingStoreGeneration`).
+///
+/// 마지막으로 이 기기의 **보존 영역**(원시 사본, 정책 §12-6 C3 ①)을 지운다. 사용자가 이 기기에서 전체 삭제를 요청했으므로
+/// 숨은 사본을 남기지 않는다(§12-6 C11 단계 ④). 2.0.0 이 보존 영역을 지우는 경로는 이것뿐이다.
 public struct SwiftDataDrawingDataEraser: DrawingDataEraser {
     private let actor: SwiftDatabaseActor?
+    private let preservationArea: @Sendable () -> PreservationArea?
 
-    /// - Parameter actor: 사용할 actor. 생략하면 삭제할 때의 의존성 actor — 저장소(`SwiftDataDrawingRepository`)와 같은 actor 여야 세대가 맞는다.
-    public init(actor: SwiftDatabaseActor? = nil) {
+    /// - Parameters:
+    ///   - actor: 사용할 actor. 생략하면 삭제할 때의 의존성 actor — 저장소(`SwiftDataDrawingRepository`)와 같은 actor 여야 세대가 맞는다.
+    ///   - preservationArea: 함께 지울 보존 영역. 삭제할 때 정한다 — 앱은 그때의 저장소 경로를 따른다. 생략하면 지우지 않는다.
+    public init(actor: SwiftDatabaseActor? = nil, preservationArea: @escaping @Sendable () -> PreservationArea? = { nil }) {
         self.actor = actor
+        self.preservationArea = preservationArea
     }
 
     public func eraseAll() async -> DrawingEraseOutcome {
@@ -64,16 +71,28 @@ public struct SwiftDataDrawingDataEraser: DrawingDataEraser {
         do {
             try await database.deleteAll(BiblePageDrawing.self)
             try await database.deleteAll(FavoriteVerse.self)
-            return .completed
         } catch {
             Log.error("전체 삭제 — 필사 행은 지웠지만 구 구조 행 · 즐겨찾기를 지우지 못했다", "\(error)")
             return .partiallyFailed
         }
+        do {
+            try preservationArea()?.removeAll()
+            return .completed
+        } catch {
+            Log.error("전체 삭제 — 필사 행은 지웠지만 보존 영역을 지우지 못했다", "\(error)")
+            return .partiallyFailed
+        }
+    }
+
+    /// 앱이 쓰는 보존 영역. 삭제할 때의 저장소 경로(`containerId`)를 따른다.
+    static func liveArea() -> PreservationArea? {
+        @Dependency(\.containerId) var containerId
+        return .live(localDBPath: containerId.localDBPath)
     }
 }
 
 private enum DrawingDataEraserKey: DependencyKey {
-    static let liveValue: any DrawingDataEraser = SwiftDataDrawingDataEraser()
+    static let liveValue: any DrawingDataEraser = SwiftDataDrawingDataEraser(preservationArea: { SwiftDataDrawingDataEraser.liveArea() })
     static let testValue: any DrawingDataEraser = SwiftDataDrawingDataEraser()
 }
 

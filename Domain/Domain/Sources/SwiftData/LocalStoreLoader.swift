@@ -21,6 +21,9 @@ public enum LocalStoreFailure: Hashable, Sendable {
     case openFailed
     /// 저장소 정보를 읽지 못했다 — 손상됐거나 지금 접근할 수 없다.
     case unreadable
+    /// 새 형식으로 열기 전에 기존 저장소를 따로 보관하지 못했다(원시 사본, 정책 §12-6 C3 ①) — 공간 부족 · 읽기 실패 ·
+    /// 무결성 검사 실패. **저장소는 열지 않았다.** 보호되지 않은 채 새 모델로 열고 CloudKit 에 연결하지 않기 위해서다.
+    case preservationFailed
 }
 
 /// 앱 스키마로 로컬 저장소를 연다. 열지 못하면 **V1 폴백을 하기 전에** 어떤 저장소인지 가린다.
@@ -71,10 +74,27 @@ enum LocalStoreLoader {
     }
 
     /// 앱 스키마 + 마이그레이션 플랜으로 연다. 실패하면 저장소를 가린 뒤 확인된 1.0.x 저장소만 V1 전용 컨테이너로 연다.
+    ///
+    /// 보존 영역을 주면 **열기 전에** 원시 사본을 먼저 뜬다(`RawStoreSnapshot`). 뜨지 못하면 열지 않고 막는다.
     /// - Parameters:
     ///   - url: 저장소 파일.
     ///   - cloudKitDatabase: 앱은 `.private(컨테이너 ID)` 를 쓴다. 테스트는 `.none` 을 넘긴다 — 시뮬레이터 테스트에는 entitlement 가 없다.
-    static func load(at url: URL, cloudKitDatabase: ModelConfiguration.CloudKitDatabase) -> Outcome {
+    ///   - preservation: 원시 사본을 둘 곳. `nil` 이면 사본 없이 연다(기존 시험 하네스).
+    static func load(
+        at url: URL,
+        cloudKitDatabase: ModelConfiguration.CloudKitDatabase,
+        preservation: PreservationArea? = nil
+    ) -> Outcome {
+        if let preservation {
+            switch RawStoreSnapshot.takeIfNeeded(storeURL: url, area: preservation) {
+            case .success(let outcome):
+                Log.debug("원시 사본", "\(outcome)")
+            case .failure(let failure):
+                Log.error("원시 사본을 뜨지 못해 저장소를 열지 않았다", "\(failure)")
+                return .unavailable(.preservationFailed)
+            }
+        }
+
         let loadError: Error
         do {
             return .ready(try ModelContainer(

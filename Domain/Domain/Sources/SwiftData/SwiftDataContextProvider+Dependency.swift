@@ -23,13 +23,15 @@ extension ContainerID: DependencyKey {
 extension ModelContainer: @retroactive DependencyKey {
     /// 실제 앱 환경에서 사용할 SwiftData ModelContainer.
     /// - CloudKit Private DB와 연동되며, 로컬 파일 URL과 마이그레이션 플랜(DrawingDataMigrationPlan)을 함께 구성.
+    /// - 열기 전에 원시 사본을 뜬다(정책 §12-6 C3 ①). 뜨지 못하면 열지 않고 시작 화면에서 막는다.
     /// - 열지 못하면 `LocalStoreLoader` 가 **V1 폴백 전에** 메타데이터로 저장소를 가린다. 확인된 1.0.x 저장소만 V1 전용 컨테이너로
     ///   옮기고(마이그레이션 모드), 그 밖은 V1 폴백 없이 시작 화면에서 막는다 (정책 §3 표 4행 · 테스트 계획 MIG-F1).
     public static var liveValue: ModelContainer {
         @Dependency(\.containerId) var containerId
         @Dependency(\.clouodKitSyncManager) var cloudkitContainer
         let url = URL.applicationSupportDirectory.appending(path: containerId.localDBPath)
-        switch LocalStoreLoader.load(at: url, cloudKitDatabase: .private(containerId.id)) {
+        let preservation = PreservationArea.live(localDBPath: containerId.localDBPath)
+        switch LocalStoreLoader.load(at: url, cloudKitDatabase: .private(containerId.id), preservation: preservation) {
         case .ready(let container):
             return container
         case .legacyMigration(let container):
