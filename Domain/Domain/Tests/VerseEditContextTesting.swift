@@ -58,26 +58,44 @@ struct VerseEditContextTesting {
 
     // MARK: - 유효성
 
-    @Test("확인된 계정에서 시작한 문맥은 표가 유효하고 모르는 삭제가 없을 때만 유효하다")
+    /// 계정 변경 알림은 같은 계정에서도 온다. 확인 세대가 바뀐 것만으로 편집을 격리하면 계정이 그대로인데 필기가 사라진다.
+    @Test("확인된 계정에서 시작한 문맥은 계정 범위가 바뀔 때 끝나고, 같은 계정의 재확인에는 이어진다")
     func confirmedContextValidity() {
-        let edit = context(account: .confirmed(token(accountA)))
+        let edit = context(account: .confirmed(token(accountA, generation: 1)))
+        let empty = EraseEpochKnowledge()
+
+        #expect(VerseEditContextRule.validity(of: edit, accountState: .confirmed(accountA), deviceKnowledge: empty) == .valid)
+        #expect(VerseEditContextRule.validity(of: edit, accountState: .confirmed(accountB), deviceKnowledge: empty) == .accountChanged)
+        // 재확인하는 동안은 계정이 바뀌었는지 모른다 — 끝내지 않고 기다린다(확정은 표가 무효라 어차피 막힌다).
+        #expect(VerseEditContextRule.validity(of: edit, accountState: .unconfirmed(lastConfirmed: accountA), deviceKnowledge: empty)
+            == .awaitingAccountConfirmation)
+        #expect(VerseEditContextRule.validity(of: edit, accountState: .noAccount, deviceKnowledge: empty) == .accountChanged)
+    }
+
+    @Test("편집 도중 모르던 삭제를 알게 되면 문맥이 끝난다")
+    func learnedEraseEndsContext() {
         var learned = EraseEpochKnowledge()
         learned.receive("E1")
 
-        #expect(VerseEditContextRule.validity(of: edit, accountState: .confirmed(accountA), isTokenCurrent: true,
-                                              deviceKnowledge: EraseEpochKnowledge()) == .valid)
-        // 계정 변경 알림 · 재확인으로 표가 무효가 됐다.
-        #expect(VerseEditContextRule.validity(of: edit, accountState: .confirmed(accountA), isTokenCurrent: false,
-                                              deviceKnowledge: EraseEpochKnowledge()) == .accountChanged)
-        #expect(VerseEditContextRule.validity(of: edit, accountState: .unconfirmed(lastConfirmed: accountA), isTokenCurrent: false,
-                                              deviceKnowledge: EraseEpochKnowledge()) == .accountChanged)
-        // 편집 도중 삭제를 알게 됐다 — 편집 중이던 내용은 그 삭제를 모른 채 쓴 것이다.
-        #expect(VerseEditContextRule.validity(of: edit, accountState: .confirmed(accountA), isTokenCurrent: true,
-                                              deviceKnowledge: learned) == .eraseLearned)
+        #expect(VerseEditContextRule.validity(of: context(account: .confirmed(token(accountA))),
+                                              accountState: .confirmed(accountA), deviceKnowledge: learned) == .eraseLearned)
         // 그 삭제를 알고 시작한 문맥은 유효하다.
         #expect(VerseEditContextRule.validity(of: context(known: ["E1"], account: .confirmed(token(accountA))),
-                                              accountState: .confirmed(accountA), isTokenCurrent: true,
-                                              deviceKnowledge: learned) == .valid)
+                                              accountState: .confirmed(accountA), deviceKnowledge: learned) == .valid)
+    }
+
+    @Test("같은 계정으로 다시 확인되면 기준 · K · 확정 이력은 그대로 두고 새 표를 든다")
+    func refreshedContextKeepsEverythingButTheToken() {
+        var edit = context(base: .version(versionID: "v0"), known: ["E1"], account: .confirmed(token(accountA, generation: 1)))
+        edit.recordLocalCommit("v2")
+
+        let refreshed = edit.refreshed(with: token(accountA, generation: 2))
+
+        #expect(refreshed.contextID == edit.contextID)
+        #expect(refreshed.base == edit.base)
+        #expect(refreshed.knownEpochs == ["E1"])
+        #expect(refreshed.parentIDs(legacyParentID: nil) == ["v2"])
+        #expect(refreshed.account == .confirmed(token(accountA, generation: 2)))
     }
 
     @Test("확인 전에 시작한 문맥은 확인된 계정이 그때의 마지막 확인 계정과 같을 때만 잇는다")
@@ -86,16 +104,12 @@ struct VerseEditContextTesting {
         let withoutHint = context(account: .unverified(hint: nil))
         let empty = EraseEpochKnowledge()
 
-        #expect(VerseEditContextRule.validity(of: withHint, accountState: .unconfirmed(lastConfirmed: accountA), isTokenCurrent: false,
-                                              deviceKnowledge: empty) == .awaitingAccountConfirmation)
-        #expect(VerseEditContextRule.validity(of: withHint, accountState: .confirmed(accountA), isTokenCurrent: true,
-                                              deviceKnowledge: empty) == .valid)
-        #expect(VerseEditContextRule.validity(of: withHint, accountState: .confirmed(accountB), isTokenCurrent: true,
-                                              deviceKnowledge: empty) == .accountChanged)
-        #expect(VerseEditContextRule.validity(of: withoutHint, accountState: .confirmed(accountA), isTokenCurrent: true,
-                                              deviceKnowledge: empty) == .accountChanged)
-        #expect(VerseEditContextRule.validity(of: withHint, accountState: .noAccount, isTokenCurrent: false,
-                                              deviceKnowledge: empty) == .accountChanged)
+        #expect(VerseEditContextRule.validity(of: withHint, accountState: .unconfirmed(lastConfirmed: accountA), deviceKnowledge: empty)
+            == .awaitingAccountConfirmation)
+        #expect(VerseEditContextRule.validity(of: withHint, accountState: .confirmed(accountA), deviceKnowledge: empty) == .valid)
+        #expect(VerseEditContextRule.validity(of: withHint, accountState: .confirmed(accountB), deviceKnowledge: empty) == .accountChanged)
+        #expect(VerseEditContextRule.validity(of: withoutHint, accountState: .confirmed(accountA), deviceKnowledge: empty) == .accountChanged)
+        #expect(VerseEditContextRule.validity(of: withHint, accountState: .noAccount, deviceKnowledge: empty) == .accountChanged)
     }
 
     @Test("확인을 기다리는 문맥도 모르는 삭제가 있으면 먼저 끝낸다")
@@ -104,21 +118,19 @@ struct VerseEditContextTesting {
         learned.note(referenced: ["E1"])
 
         #expect(VerseEditContextRule.validity(of: context(account: .unverified(hint: accountA)),
-                                              accountState: .unconfirmed(lastConfirmed: accountA), isTokenCurrent: false,
-                                              deviceKnowledge: learned) == .eraseLearned)
+                                              accountState: .unconfirmed(lastConfirmed: accountA), deviceKnowledge: learned) == .eraseLearned)
     }
 
     /// 로그인 안 함 ↔ 계정 사이는 자동으로 잇지 않는다. 가져오기는 사용자가 명시적으로 하는 별도 작업이다.
-    @Test("로그인하지 않은 채 시작한 문맥은 로그인하면 끝난다")
+    @Test("로그인하지 않은 채 시작한 문맥은 로그인하면 끝나고, 확인 중에는 기다린다")
     func localOnlyContextValidity() {
         let edit = context(account: .localOnly)
         let empty = EraseEpochKnowledge()
 
-        #expect(VerseEditContextRule.validity(of: edit, accountState: .noAccount, isTokenCurrent: false, deviceKnowledge: empty) == .valid)
-        #expect(VerseEditContextRule.validity(of: edit, accountState: .confirmed(accountA), isTokenCurrent: true, deviceKnowledge: empty)
-            == .accountChanged)
-        #expect(VerseEditContextRule.validity(of: edit, accountState: .unconfirmed(lastConfirmed: nil), isTokenCurrent: false,
-                                              deviceKnowledge: empty) == .accountChanged)
+        #expect(VerseEditContextRule.validity(of: edit, accountState: .noAccount, deviceKnowledge: empty) == .valid)
+        #expect(VerseEditContextRule.validity(of: edit, accountState: .confirmed(accountA), deviceKnowledge: empty) == .accountChanged)
+        #expect(VerseEditContextRule.validity(of: edit, accountState: .unconfirmed(lastConfirmed: nil), deviceKnowledge: empty)
+            == .awaitingAccountConfirmation)
     }
 
     /// 초안(②)이 문맥을 파일로 남긴다.

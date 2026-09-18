@@ -21,7 +21,7 @@ public enum VerseEditBase: Codable, Equatable, Sendable {
 
 /// 편집 문맥이 기대는 계정 근거.
 public enum VerseEditAccountBasis: Codable, Equatable, Sendable {
-    /// 확인된 계정에서 시작했다. 표가 무효가 되면(계정 변경 알림 · 재확인) 문맥이 끝난다.
+    /// 확인된 계정에서 시작했다. 확정(서버 작업)은 이 표로 하고, 같은 계정으로 다시 확인되면 새 표로 바꿔 든다.
     case confirmed(AccountServerWorkToken)
     /// 계정을 확인하기 전에 시작했다. `hint` 는 그때의 마지막 확인 범위(참고 정보)다.
     case unverified(hint: AccountScope?)
@@ -57,6 +57,14 @@ public struct VerseEditContext: Codable, Equatable, Sendable {
         self.account = account
     }
 
+    /// 같은 계정으로 다시 확인된 뒤의 문맥 — 기준 · K · 확정 이력은 그대로 두고 새 표를 든다.
+    /// 판정(`VerseEditContextRule.validity`)이 `.valid` 일 때만 부른다.
+    public func refreshed(with token: AccountServerWorkToken) -> VerseEditContext {
+        var copy = VerseEditContext(contextID: contextID, verse: verse, base: base, knownEpochs: knownEpochs, account: .confirmed(token))
+        copy.lastLocalCommitID = lastLocalCommitID
+        return copy
+    }
+
     /// 이 문맥에서 버전을 확정했다.
     public mutating func recordLocalCommit(_ versionID: String) {
         lastLocalCommitID = versionID
@@ -81,9 +89,9 @@ public struct VerseEditContext: Codable, Equatable, Sendable {
 /// 편집 문맥이 아직 유효한가.
 public enum VerseEditContextValidity: Equatable, Sendable {
     case valid
-    /// 계정 확인을 기다린다 — 확인 전에 시작한 문맥이고 아직 확인되지 않았다. 확정(서버 작업)은 하지 않고 로컬 보존만 한다.
+    /// 계정을 확인하는 중이거나 확인하지 못했다 — 계정이 바뀌었는지 아직 모른다. 확정(서버 작업)은 하지 않고 로컬 보존만 한다.
     case awaitingAccountConfirmation
-    /// 문맥을 시작한 뒤 계정이 바뀌었거나, 시작할 때의 계정 근거를 지금 계정으로 이을 수 없다.
+    /// 문맥을 시작한 뒤 계정 범위가 바뀌었거나, 시작할 때의 계정 근거를 지금 계정으로 이을 수 없다.
     case accountChanged
     /// 문맥을 시작한 뒤 모르던 삭제 기준점을 알게 됐다 — 편집 중이던 내용은 그 삭제를 모른 채 쓴 것이다.
     case eraseLearned
@@ -92,40 +100,38 @@ public enum VerseEditContextValidity: Equatable, Sendable {
 /// 편집 문맥의 유효성 판정 (정책 §12-6 구현 순서 ①). 순수 함수라 표로 시험한다.
 ///
 /// 유효하지 않으면 호출부는 **문맥을 끝내고, 편집 중이던 내용을 격리한 뒤, 유효한 내용으로 다시 열고, 새 문맥을 시작한다.**
+///
+/// **문맥은 계정 범위가 실제로 바뀔 때 끝난다.** 확인 세대가 바뀌기만 한 것(같은 계정으로 다시 확인)은 바뀐 것이 아니다 —
+/// 계정 변경 알림은 같은 계정에서도 온다. 재확인하는 동안은 "확인 대기" 로 두고, 같은 계정으로 확인되면 새 표를 든다
+/// (`VerseEditContext.refreshed(with:)`). 확정 자체는 그때의 표가 유효한지(`AccountScopeProvider.isCurrent`)를 따로 확인한다.
 public enum VerseEditContextRule {
     /// - Parameters:
     ///   - context: 판정할 문맥.
     ///   - accountState: 지금 계정 상태.
-    ///   - isTokenCurrent: 문맥이 든 표가 지금도 유효한가(`AccountScopeProvider.isCurrent`). 확인된 계정에서 시작한 문맥만 본다.
     ///   - deviceKnowledge: 지금 `K(기기)` — 문맥의 계정 범위의 것.
     public static func validity(
         of context: VerseEditContext,
         accountState: AccountScopeState,
-        isTokenCurrent: Bool,
         deviceKnowledge: EraseEpochKnowledge
     ) -> VerseEditContextValidity {
         switch (context.account, accountState) {
-        case (.confirmed, _):
-            guard isTokenCurrent else { return .accountChanged }
-        case (.unverified, .unconfirmed):
-            // 아직 확인 전이다. K 는 확인 전에는 갱신되지 않으므로 기준점 판정만 이어서 본다.
-            break
+        case (.confirmed(let token), .confirmed(let scope)):
+            guard token.scope == scope else { return .accountChanged }
         case (.unverified(let hint), .confirmed(let scope)):
             // 확인 전에 시작한 편집을, 확인된 계정이 그때의 마지막 확인 계정과 같을 때만 잇는다. 다르면 그 편집이 본 내용이
             // 지금 계정의 것이라는 근거가 없다.
             guard let hint, hint == scope else { return .accountChanged }
-        case (.unverified, .noAccount), (.localOnly, .confirmed), (.localOnly, .unconfirmed):
-            // 로그인 안 함 ↔ 계정 사이는 자동으로 잇지 않는다 — 가져오기는 사용자가 명시적으로 하는 별도 작업이다.
+        case (.confirmed, .noAccount), (.unverified, .noAccount), (.localOnly, .confirmed):
+            // 계정 ↔ 로그인 안 함 사이는 자동으로 잇지 않는다 — 가져오기는 사용자가 명시적으로 하는 별도 작업이다.
             return .accountChanged
-        case (.localOnly, .noAccount):
+        case (.localOnly, .noAccount), (_, .unconfirmed):
+            // 로그인 안 함이 이어지거나, 확인 중 · 확인 실패라 계정이 바뀌었는지 아직 모른다. 기준점 판정만 이어서 본다.
             break
         }
         guard EraseEpochRule.isValid(recordKnown: context.knownEpochs, device: deviceKnowledge) else {
             return .eraseLearned
         }
-        if case .unverified = context.account, case .unconfirmed = accountState {
-            return .awaitingAccountConfirmation
-        }
+        if case .unconfirmed = accountState { return .awaitingAccountConfirmation }
         return .valid
     }
 }
