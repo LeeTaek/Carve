@@ -128,6 +128,51 @@ struct LaunchRouteTesting {
         #expect(container.syncState.launchRoute == .blocked(.unknownVersion))
     }
 
+    /// 결론이 난 뒤에 늦게 온 이벤트 · 대기가 그 결론을 뒤집지 못하는지 — 시작 화면이 진입 판정을 뒤늦게 번복당하지 않는다는 근거다
+    /// (2026-09-17 리뷰 P2-5). 코디네이터는 진입 직전에 한 번 더 보지만, 상태 쪽에서도 뒤집히지 않아야 한다.
+    private static let concludedEvents = [
+        CloudSyncEvent(kind: .cloudImport, ended: true, succeeded: true),
+        CloudSyncEvent(kind: .cloudImport, ended: true, succeeded: false),
+        CloudSyncEvent(kind: .cloudExport, ended: true, succeeded: false),
+        CloudSyncEvent(kind: .setup, ended: true, succeeded: false)
+    ]
+
+    @Test(
+        "들어가기로 결론이 난 뒤에는 늦게 온 이벤트 · 대기로도 막힘 · 재실행 요구가 되지 않는다",
+        arguments: [
+            PersistentCloudKitContainer.CloudSyncState.syncCompleted,
+            .stillWaiting,
+            .failed(.accountUnavailable),
+            .failed(.importFailed)
+        ]
+    )
+    func enteringConclusionStaysEnterable(_ state: PersistentCloudKitContainer.CloudSyncState) async {
+        let container = makeContainer(state, limit: 0.2)
+        for event in Self.concludedEvents { container.receive(event) }
+        await observe(container, account: StubCloudAccountStatusClient(.noAccount))
+
+        #expect(container.syncState.launchRoute == .enterWriting, "\(state) → \(container.syncState)")
+    }
+
+    @Test(
+        "막힘 · 재실행 요구로 결론이 난 뒤에는 늦게 온 이벤트 · 대기로도 들어가지 않는다",
+        arguments: [
+            PersistentCloudKitContainer.CloudSyncState.migrationCompleted,
+            .migrationEndedWithoutImport(nil),
+            .migrationEndedWithoutImport(.importFailed),
+            .storeUnavailable(.unknownVersion),
+            .storeUnavailable(.openFailed),
+            .storeUnavailable(.unreadable)
+        ]
+    )
+    func concludedBlockNeverEnters(_ state: PersistentCloudKitContainer.CloudSyncState) async {
+        let container = makeContainer(state, limit: 0.2)
+        for event in Self.concludedEvents { container.receive(event) }
+        await observe(container, account: StubCloudAccountStatusClient(.available))
+
+        #expect(container.syncState.launchRoute != .enterWriting, "\(state) → \(container.syncState)")
+    }
+
     @Test("마이그레이션 모드의 결론 표 — 일반 모드의 결론을 들어가지 않는 결론으로 옮긴다")
     func migrationOutcomeTable() {
         typealias Container = PersistentCloudKitContainer

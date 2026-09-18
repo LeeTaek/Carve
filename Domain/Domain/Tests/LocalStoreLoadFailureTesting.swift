@@ -48,9 +48,10 @@ enum NewerStoreSchemaV6: VersionedSchema {
     }
 }
 
-/// 1.0.x 가 쓰던 **버전 없는** 저장소의 `DrawingVO`. 1.0.7(`1c2adcf2`)의 필드 그대로다 —
-/// V1 과 달리 `isWritten` 이 있고 `isPresent` · `verse` 가 없어서 모델 해시가 V1 과 다르다.
-enum UnversionedStoreV10 {
+/// 반례 — 엔티티가 `DrawingVO` 하나뿐이지만 **어느 1.0.x 릴리스에도 없던 모양**(1.0.4~1.0.7 에 필드 하나를 더했다).
+///
+/// 엔티티 이름만 보고 V1 폴백을 허용하던 판별은 이런 저장소도 V1 스키마로 갈아치웠다(2026-09-17 리뷰).
+enum UnrecognizedDrawingVOStore {
     @Model
     final class DrawingVO {
         var id: String!
@@ -61,8 +62,33 @@ enum UnversionedStoreV10 {
         var updateDate: Date?
         @Attribute(.externalStorage) var lineData: Data?
         var isWritten: Bool = false
+        /// 확인된 1.0.x 모양에는 없는 필드.
+        var memo: String?
 
         init() { }
+    }
+}
+
+/// 확인된 1.0.x 저장소 모양. 앱이 허용 목록으로 쓰는 `UnversionedDrawingStore` 의 정의를 그대로 심는다.
+enum UnversionedShape: CaseIterable, Sendable, CustomTestStringConvertible {
+    /// 1.0.0 ~ 1.0.3 — 날짜 필드가 없다.
+    case release100
+    /// 1.0.4 ~ 1.0.7 — `creationDate` · `updateDate` 가 있다.
+    case release104
+
+    var testDescription: String {
+        switch self {
+        case .release100: "1.0.0~1.0.3"
+        case .release104: "1.0.4~1.0.7"
+        }
+    }
+
+    /// 이 모양의 행이 V1 → V2 를 거친 뒤 가지는 행 키. `creationDate` 가 없으면 원래 `id` 를 그대로 쓴다.
+    var migratedRowID: String {
+        switch self {
+        case .release100: "1-01Genesis.txt.1.1"
+        case .release104: "1-01Genesis.txt.1.1.1700000000"
+        }
     }
 }
 
@@ -102,20 +128,69 @@ private enum StoreFixture {
             .map { V6Row(rowUUID: $0.rowUUID, lineData: $0.lineData, addedInV6: $0.addedInV6) }
     }
 
-    static func seedUnversionedStore(at url: URL) throws {
-        let container = try ModelContainer(for: Schema([UnversionedStoreV10.DrawingVO.self]), configurations: ModelConfiguration(url: url))
+    /// 확인된 1.0.x 모양으로 저장소를 만들고 닫는다.
+    static func seedUnversionedStore(_ shape: UnversionedShape, at url: URL) throws {
+        switch shape {
+        case .release100:
+            let container = try ModelContainer(
+                for: Schema([UnversionedDrawingStore.Release100.DrawingVO.self]),
+                configurations: ModelConfiguration(url: url)
+            )
+            let context = ModelContext(container)
+            let row = UnversionedDrawingStore.Release100.DrawingVO()
+            row.id = "\(chapter.title.rawValue).\(chapter.chapter).1"
+            row.titleName = chapter.title.rawValue
+            row.titleChapter = chapter.chapter
+            row.section = 1
+            row.lineData = RealLegacyLineData.data
+            row.isWritten = true
+            context.insert(row)
+            try context.save()
+
+        case .release104:
+            let container = try ModelContainer(
+                for: Schema([UnversionedDrawingStore.Release104.DrawingVO.self]),
+                configurations: ModelConfiguration(url: url)
+            )
+            let context = ModelContext(container)
+            let row = UnversionedDrawingStore.Release104.DrawingVO()
+            row.id = "\(chapter.title.rawValue).\(chapter.chapter).1"
+            row.titleName = chapter.title.rawValue
+            row.titleChapter = chapter.chapter
+            row.section = 1
+            row.creationDate = Date(timeIntervalSince1970: 1_700_000_000)
+            row.updateDate = Date(timeIntervalSince1970: 1_700_000_100)
+            row.lineData = RealLegacyLineData.data
+            row.isWritten = true
+            context.insert(row)
+            try context.save()
+        }
+    }
+
+    /// 반례 저장소 — 엔티티 이름은 같고 필드가 다르다.
+    static func seedUnrecognizedDrawingVOStore(at url: URL) throws {
+        let container = try ModelContainer(
+            for: Schema([UnrecognizedDrawingVOStore.DrawingVO.self]),
+            configurations: ModelConfiguration(url: url)
+        )
         let context = ModelContext(container)
-        let row = UnversionedStoreV10.DrawingVO()
+        let row = UnrecognizedDrawingVOStore.DrawingVO()
         row.id = "\(chapter.title.rawValue).\(chapter.chapter).1"
         row.titleName = chapter.title.rawValue
-        row.titleChapter = chapter.chapter
         row.section = 1
-        row.creationDate = Date(timeIntervalSince1970: 1_700_000_000)
-        row.updateDate = Date(timeIntervalSince1970: 1_700_000_100)
         row.lineData = RealLegacyLineData.data
-        row.isWritten = true
+        row.memo = "확인되지 않은 모양"
         context.insert(row)
         try context.save()
+    }
+
+    /// 반례 저장소를 자기 스키마로 다시 열어 행 수와 잉크를 읽는다.
+    static func unrecognizedRows(at url: URL) throws -> [Data?] {
+        let container = try ModelContainer(
+            for: Schema([UnrecognizedDrawingVOStore.DrawingVO.self]),
+            configurations: ModelConfiguration(url: url)
+        )
+        return try ModelContext(container).fetch(FetchDescriptor<UnrecognizedDrawingVOStore.DrawingVO>()).map(\.lineData)
     }
 
     static func seedV1Store(at url: URL) throws {
@@ -226,10 +301,10 @@ struct LocalStoreLoadFailureTesting {
         }
     }
 
-    @Test("버전 없는 1.0.x 저장소는 이전처럼 V1 로 옮기고, 재실행하면 앱 스키마로 이어진다")
-    func unversionedStoreKeepsLegacyMigrationPath() async throws {
+    @Test("확인된 1.0.x 저장소는 이전처럼 V1 로 옮기고, 재실행하면 앱 스키마로 이어진다", arguments: UnversionedShape.allCases)
+    func unversionedStoreKeepsLegacyMigrationPath(_ shape: UnversionedShape) async throws {
         try await withStore { url in
-            try StoreFixture.seedUnversionedStore(at: url)
+            try StoreFixture.seedUnversionedStore(shape, at: url)
 
             do {
                 let outcome = LocalStoreLoader.load(at: url, cloudKitDatabase: .none)
@@ -250,8 +325,27 @@ struct LocalStoreLoadFailureTesting {
             }
             let drawings = try ModelContext(container).fetch(FetchDescriptor<BibleDrawing>())
             #expect(drawings.count == 1)
-            #expect(drawings.first?.id == "\(StoreFixture.chapter.title.rawValue).1.1.1700000000")
+            #expect(drawings.first?.id == shape.migratedRowID)
             #expect(drawings.first?.lineData == RealLegacyLineData.data)
+        }
+    }
+
+    /// 리뷰(2026-09-17) 지적 — 엔티티 이름이 `DrawingVO` 하나뿐이라는 것은 1.0.x 의 **필요조건일 뿐**이다.
+    /// 이름만 보고 폴백하던 판별은 이런 저장소도 V1 스키마로 갈아치웠다.
+    @Test("엔티티 이름만 같고 확인되지 않은 모양이면 V1 폴백 없이 막는다")
+    func unrecognizedDrawingVOStoreIsBlocked() async throws {
+        try await withStore { url in
+            try StoreFixture.seedUnrecognizedDrawingVOStore(at: url)
+            let before = try StoreFixture.storeBytes(at: url)
+
+            #expect(LocalStoreLoader.storeKind(at: url) == .unknown)
+            guard case .unavailable(let failure) = LocalStoreLoader.load(at: url, cloudKitDatabase: .none) else {
+                Issue.record("막지 않았다 — 확인되지 않은 모양을 V1 폴백에 태웠다")
+                return
+            }
+            #expect(failure == .unknownVersion)
+            #expect(try StoreFixture.storeBytes(at: url) == before)
+            #expect(try StoreFixture.unrecognizedRows(at: url) == [RealLegacyLineData.data])
         }
     }
 
@@ -272,7 +366,7 @@ struct LocalStoreLoadFailureTesting {
 
     // MARK: 판별
 
-    @Test("저장소를 열지 않고 가른다 — 아는 버전 · 버전 없는 1.0.x · 모르는 버전")
+    @Test("저장소를 열지 않고 가른다 — 아는 버전 · 확인된 1.0.x · 모르는 모델")
     func storeKindSeparatesVersions() async throws {
         try await withStore { url in
             _ = try ModelContainer(
@@ -286,12 +380,18 @@ struct LocalStoreLoadFailureTesting {
             try StoreFixture.seedV1Store(at: url)
             #expect(LocalStoreLoader.storeKind(at: url) == .known(Schema.Version(1, 0, 0)))
         }
-        try await withStore { url in
-            try StoreFixture.seedUnversionedStore(at: url)
-            #expect(LocalStoreLoader.storeKind(at: url) == .unversionedLegacy)
+        for shape in UnversionedShape.allCases {
+            try await withStore { url in
+                try StoreFixture.seedUnversionedStore(shape, at: url)
+                #expect(LocalStoreLoader.storeKind(at: url) == .unversionedLegacy, "\(shape.testDescription)")
+            }
         }
         try await withStore { url in
             try StoreFixture.seedV6Store(at: url)
+            #expect(LocalStoreLoader.storeKind(at: url) == .unknown)
+        }
+        try await withStore { url in
+            try StoreFixture.seedUnrecognizedDrawingVOStore(at: url)
             #expect(LocalStoreLoader.storeKind(at: url) == .unknown)
         }
     }
@@ -305,7 +405,7 @@ struct LocalStoreLoadFailureTesting {
         }
     }
 
-    @Test("열지 못한 저장소의 처리 — V1 폴백은 버전 없는 1.0.x 저장소이면서 loadIssue 일 때만이다")
+    @Test("열지 못한 저장소의 처리 — V1 폴백은 확인된 1.0.x 저장소이면서 loadIssue 일 때만이다")
     func planTable() {
         #expect(LocalStoreLoader.plan(for: .unversionedLegacy, isLoadIssue: true) == .fallbackToV1)
         #expect(LocalStoreLoader.plan(for: .unversionedLegacy, isLoadIssue: false) == .block(.openFailed))
