@@ -159,7 +159,7 @@ struct CloudObservationOrderTesting {
         container.stopObserving()
     }
 
-    @Test("마이그레이션 중이면 마이그레이션 한도로 기다리고 상태를 syncing 으로 바꾸지 않는다")
+    @Test("마이그레이션 중이면 마이그레이션 한도로 기다리고 상태를 syncing 으로 바꾸지 않는다 — 한도가 지나도 들어가는 상태가 되지 않는다")
     func migrationWaitKeepsItsStateAndLimit() async throws {
         let container = makeContainer(limit: 0.1, migrationLimit: 1.0)
         container.syncState = .migration
@@ -170,7 +170,9 @@ struct CloudObservationOrderTesting {
         #expect(container.syncState == .migration)
 
         await waiting.value
-        #expect(container.syncState == .stillWaiting)
+        // ★ 이전에는 여기서 `stillWaiting` 이 돼, 시작 화면이 V1 전용 컨테이너를 쥔 채 필사 화면에 들어갔다(MIG-F1).
+        #expect(container.syncState == .migrationEndedWithoutImport(nil))
+        #expect(container.syncState.launchRoute == .restartRequired)
         container.stopObserving()
     }
 }

@@ -72,17 +72,25 @@ public final class PersistentCloudKitContainer: ObservableObject {
         case migration
         /// 마이그레이션 모드 동기화가 완료된 상태.
         case migrationCompleted
+        /// 마이그레이션 모드의 대기가 import 성공 없이 끝났다. 원인이 `nil` 이면 제한 시간이 지났다.
+        ///
+        /// 일반 모드의 `failed` · `stillWaiting` 과 달리 **들어가지 않고 재실행을 요구한다** — 이번 실행의 저장소는
+        /// V1 전용 컨테이너라 필사를 저장할 수 없다(테스트 계획 MIG-F1).
+        case migrationEndedWithoutImport(CloudSyncFailure?)
         /// 기준 시간이 지났다. **실패가 아니다** — 관찰은 계속되고 원격 필사가 나중에 도착할 수 있다.
         case stillWaiting
         /// 확인된 오류로 멈췄다. 원인을 함께 들고 다녀야 화면이 맞는 안내를 한다.
         case failed(CloudSyncFailure)
+        /// 로컬 저장소를 쓸 수 없다. CloudKit 을 기다리지 않고 **들어가지 않는다** (정책 §3 표 4행).
+        /// 오프라인 · 계정 문제(`failed`)와 다른 축이다.
+        case storeUnavailable(LocalStoreFailure)
 
         /// 아직 결론이 나지 않아 **관찰이 이어지는** 상태인가. 진행 표시를 켤지 정하는 데 쓴다.
         /// `stillWaiting` 은 제한 시간이 지났을 뿐 관찰이 끝난 것이 아니므로 여기 포함된다.
         public var isInProgress: Bool {
             switch self {
             case .idle, .syncing, .migration, .stillWaiting: true
-            case .syncCompleted, .migrationCompleted, .failed: false
+            case .syncCompleted, .migrationCompleted, .migrationEndedWithoutImport, .failed, .storeUnavailable: false
             }
         }
     }
@@ -169,7 +177,8 @@ public final class PersistentCloudKitContainer: ObservableObject {
             return initialWaitLimit.migration
         case .syncing, .stillWaiting:
             return initialWaitLimit.normal
-        case .syncCompleted, .migrationCompleted, .failed:
+        case .syncCompleted, .migrationCompleted, .migrationEndedWithoutImport, .failed, .storeUnavailable:
+            // `storeUnavailable` 은 컨테이너를 만들 때 정해진다. 기다릴 CloudKit 도 조회할 계정도 없다.
             Log.debug("초기 대기 — 대기를 시작하기 전에 결론이 났다", "\(syncState)")
             return nil
         }
@@ -185,7 +194,20 @@ public final class PersistentCloudKitContainer: ObservableObject {
             Log.debug("초기 대기 — 이미 결론이 났다. 늦게 온 결과로 덮지 않는다", "\(syncState)", "\(error)")
             return
         }
-        syncState = outcome
+        syncState = (syncState == .migration) ? Self.migrationOutcome(outcome) : outcome
+    }
+
+    /// 마이그레이션 모드의 결론 — 일반 모드의 결론을 **들어가지 않는** 결론으로 옮긴다. 순수 함수다 (테스트 계획 MIG-F1).
+    ///
+    /// 이전 구현은 마이그레이션 모드에서도 계정 없음 · 확인 실패 · import 실패 · 시간 초과를 일반 모드와 같은 상태로 보내,
+    /// 시작 화면이 V1 전용 컨테이너를 쥔 채 필사 화면에 들어갔다.
+    static func migrationOutcome(_ outcome: CloudSyncState) -> CloudSyncState {
+        switch outcome {
+        case .syncCompleted: .migrationCompleted
+        case .failed(let reason): .migrationEndedWithoutImport(reason)
+        case .stillWaiting: .migrationEndedWithoutImport(nil)
+        case .idle, .syncing, .migration, .migrationCompleted, .migrationEndedWithoutImport, .storeUnavailable: outcome
+        }
     }
 
     /// 초기 대기를 끝낸 오류의 뜻. 순수 함수다.
@@ -274,11 +296,15 @@ public final class PersistentCloudKitContainer: ObservableObject {
     /// 원격 필사가 나중에 도착할 수 있기 때문이다 (정책 §3-1).
     private func applyToInitialWait(_ event: CloudSyncEvent) {
         guard syncState.isInProgress else { return }
+        let outcome: CloudSyncState
         if CloudSyncStateRule.isAwaitedImportSuccess(event) {
-            syncState = (syncState == .migration) ? .migrationCompleted : .syncCompleted
+            outcome = .syncCompleted
         } else if CloudSyncStateRule.isImportFailure(event) {
-            syncState = .failed(.importFailed)
+            outcome = .failed(.importFailed)
+        } else {
+            return
         }
+        syncState = (syncState == .migration) ? Self.migrationOutcome(outcome) : outcome
     }
 
     /// 초기 대기가 끝날 때까지 기다린다. 판정은 관찰 Task 가 하고 여기서는 결론만 본다.

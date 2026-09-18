@@ -102,6 +102,12 @@ public struct AppCoordinatorFeature {
         Reduce { state, action in
             switch action {
             case .root(.presented(.launchProgress(.syncCompleted))):
+                // 들어가기 직전에 시작 화면의 상태를 한 번 더 본다 — 막힘 · 재실행 요구로 바뀌었으면 들어가지 않는다 (테스트 계획 MIG-F1).
+                // 저장소를 쓸 수 없을 때 앱이 쥔 대체 컨테이너는 저장을 거절하지 않으므로 이 확인이 마지막 경계다.
+                guard case .launchProgress(let launch)? = state.root,
+                      launch.syncState.launchRoute == .enterWriting else {
+                    break
+                }
                 let currentVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
                 let previousVersion = state.lastSeenAppVersion
                 state.$lastSeenAppVersion.withLock { $0 = currentVersion }
