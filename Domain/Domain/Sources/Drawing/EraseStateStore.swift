@@ -6,26 +6,7 @@
 //  Copyright © 2026 leetaek. All rights reserved.
 //
 
-import CryptoKit
 import Foundation
-
-/// 계정 범위 — 저장과 작업이 어느 iCloud 계정에 속하는지 (정책 §12-6 용어).
-///
-/// 사용자 레코드 이름을 그대로 쓰지 않고 **해시한 값**을 키로 쓴다. 파일 이름 · 로그에 계정 식별자가 남지 않게 하려는 것이다.
-/// 어떤 값에서 만들지(사용자 레코드 이름 등)는 ACC-1 과 함께 정한다 — 이 타입은 만든 뒤의 키만 다룬다.
-public struct AccountScope: Hashable, Codable, Sendable {
-    public let key: String
-
-    public init(key: String) {
-        self.key = key
-    }
-
-    /// 계정 식별 값에서 범위 키를 만든다. 같은 값이면 언제나 같은 키다.
-    public static func make(fromAccountIdentity identity: String) -> AccountScope {
-        let digest = SHA256.hash(data: Data("carve.accountScope/1|\(identity)".utf8))
-        return AccountScope(key: "acct-" + digest.prefix(16).map { String(format: "%02x", $0) }.joined())
-    }
-}
 
 /// 삭제 판정 상태를 두는 곳 — `K(기기)` 와 삭제 작업 기록 (정책 §12-6 C11).
 ///
@@ -66,6 +47,7 @@ public final class FileEraseStateStore: @unchecked Sendable {
 
     private static let knowledgeFile = "erase-knowledge.json"
     private static let jobFile = "erase-job.json"
+    private static let lastConfirmedScopeFile = "last-confirmed-scope.json"
 
     public init(area: EraseStateArea, fileManager: FileManager = .default) {
         self.area = area
@@ -107,6 +89,25 @@ public final class FileEraseStateStore: @unchecked Sendable {
         try read(EraseEpochKnowledge.self, from: url(scope, Self.knowledgeFile)) ?? EraseEpochKnowledge()
     }
 
+    // MARK: - 마지막으로 확인한 계정 범위
+
+    /// **참고 정보일 뿐이다** — 저장소 내용의 소유를 정하는 근거로 쓰지 않는다(`AccountScopeState.unconfirmed`).
+    public func lastConfirmedScope() throws -> AccountScope? {
+        lock.lock()
+        defer { lock.unlock() }
+        return try read(AccountScope.self, from: lastConfirmedScopeURL)
+    }
+
+    public func rememberConfirmedScope(_ scope: AccountScope) throws {
+        lock.lock()
+        defer { lock.unlock() }
+        try write(scope, to: lastConfirmedScopeURL)
+    }
+
+    private var lastConfirmedScopeURL: URL {
+        area.root.appendingPathComponent(area.storeFileName, isDirectory: true).appendingPathComponent(Self.lastConfirmedScopeFile)
+    }
+
     // MARK: - 삭제 작업 기록
 
     public func job(for scope: AccountScope) throws -> EraseJobRecord? {
@@ -139,7 +140,9 @@ public final class FileEraseStateStore: @unchecked Sendable {
         defer { lock.unlock() }
         let storeDirectory = area.root.appendingPathComponent(area.storeFileName, isDirectory: true)
         guard fileManager.fileExists(atPath: storeDirectory.path) else { return [] }
-        return try fileManager.contentsOfDirectory(atPath: storeDirectory.path)
+        return try fileManager.contentsOfDirectory(at: storeDirectory, includingPropertiesForKeys: [.isDirectoryKey])
+            .filter { (try? $0.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true }
+            .map(\.lastPathComponent)
             .sorted()
             .compactMap { try read(EraseJobRecord.self, from: url(AccountScope(key: $0), Self.jobFile)) }
             .filter { !$0.isFinished }
