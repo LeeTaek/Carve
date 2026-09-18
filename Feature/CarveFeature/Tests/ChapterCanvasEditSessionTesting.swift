@@ -48,6 +48,7 @@ final class RecordingQuarantine: DrawingQuarantineClient, @unchecked Sendable {
     struct Call: Equatable, Sendable {
         let items: [DrawingQuarantineItem]
         let environment: DrawingEditEnvironment
+        let batchID: String
     }
 
     struct Full: Error {}
@@ -55,14 +56,14 @@ final class RecordingQuarantine: DrawingQuarantineClient, @unchecked Sendable {
     let calls = LockIsolated<[Call]>([])
     let failures = LockIsolated(0)
 
-    func quarantine(_ items: [DrawingQuarantineItem], environment: DrawingEditEnvironment) async throws {
+    func quarantine(_ items: [DrawingQuarantineItem], environment: DrawingEditEnvironment, batchID: String) async throws {
         let shouldFail = failures.withValue { remaining -> Bool in
             guard remaining > 0 else { return false }
             remaining -= 1
             return true
         }
         if shouldFail { throw Full() }
-        calls.withValue { $0.append(Call(items: items, environment: environment)) }
+        calls.withValue { $0.append(Call(items: items, environment: environment, batchID: batchID)) }
     }
 }
 
@@ -76,7 +77,7 @@ struct ChapterCanvasEditSessionTesting {
     private let accountA = AccountScope(key: "acct-a")
     private let accountB = AccountScope(key: "acct-b")
 
-    private func confirmed(_ scope: AccountScope, _ generation: UInt64, knowledge: EraseEpochKnowledge = EraseEpochKnowledge()) -> DrawingEditEnvironment {
+    private func confirmed(_ scope: AccountScope, _ generation: UInt64, knowledge: EraseEpochKnowledge? = EraseEpochKnowledge()) -> DrawingEditEnvironment {
         DrawingEditEnvironment(
             accountState: .confirmed(scope),
             serverWork: AccountServerWorkToken(scope: scope, generation: generation),
@@ -144,9 +145,10 @@ struct ChapterCanvasEditSessionTesting {
         await store.receive(\.sessionEndSettled)
         await store.receive(\.sessionQuarantineFinished)
 
-        // 격리본은 무효가 된 세션(계정 A)의 근거를 든다.
+        // 격리본은 무효가 된 세션(계정 A)의 근거를 들고, 닫는 세션의 ID 로 묶인다.
         let calls = quarantine.calls.value
         #expect(calls.count == 1)
+        #expect(calls.first?.batchID.isEmpty == false)
         #expect(calls.first?.environment == confirmed(accountA, 1))
         #expect(calls.first?.items.map(\.verse) == [2])
         #expect(calls.first?.items.first?.lineData == Data("create-a".utf8))
@@ -180,8 +182,8 @@ struct ChapterCanvasEditSessionTesting {
         await store.receive(\.sessionEndSettled)
         await store.receive(\.sessionQuarantineFinished)
 
-        #expect(quarantine.calls.value.first?.environment.knowledge.all == [])
-        #expect(store.state.editEnvironment.knowledge.all == ["E1"])
+        #expect(quarantine.calls.value.first?.environment.knowledge?.all == [])
+        #expect(store.state.editEnvironment.knowledge?.all == ["E1"])
         spy.releaseApply()
         await store.receive(\.drawingsLoaded)
         await end(store, environment)
@@ -259,13 +261,16 @@ struct ChapterCanvasEditSessionTesting {
         #expect(!store.state.pendingMutations.isEmpty)
         #expect(!store.state.isInputEnabled)
 
-        // 「다시 시도」 — 저장이 아니라 격리를 다시 한다.
+        let failedBatch = store.state.sessionEnd?.id
+
+        // 「다시 시도」 — 저장이 아니라 격리를 다시 한다. 같은 세션 ID 라 일부 저장된 격리본이 늘지 않는다.
         await store.send(.flushPending)
         await store.receive(\.sessionEndSettled)
         await store.receive(\.sessionQuarantineFinished)
         await store.receive(\.drawingsLoaded)
 
         #expect(quarantine.calls.value.count == 1)
+        #expect(quarantine.calls.value.first?.batchID == failedBatch)
         #expect(store.state.sessionEnd == nil)
         #expect(store.state.saveStatus == .idle)
         #expect(store.state.isInputEnabled)
@@ -336,6 +341,98 @@ struct ChapterCanvasEditSessionTesting {
         #expect(store.state.editEnvironment == confirmed(accountB, 2))
         #expect(spy.loadedChapters.value.count == loadsBefore + 1)
         #expect(store.state.isInputEnabled)
+        await end(store, environment)
+    }
+
+    // MARK: - 조회와 환경
+
+    /// 옛 계정으로 읽은 내용을 새 세션 아래 합성하면, 그 위의 편집이 다른 계정 데이터에 기대게 된다(6차 리뷰 4).
+    @Test("조회하는 사이 계정이 바뀌면 옛 조회 결과를 버리고 새 환경으로 다시 읽는다")
+    func accountChangeDuringLoadDiscardsOldResult() async {
+        let spy = RepositorySpy()
+        let environment = ControlledEditEnvironment(confirmed(accountA, 1))
+        let quarantine = RecordingQuarantine()
+        let store = makeStore(spy: spy, results: [], environment: environment, quarantine: quarantine)
+        spy.holdNextLoadCall()
+        await store.send(.load(chapter: CanvasTestSupport.chapter, expectedVerseCount: 3))
+        await store.receive(\.editEnvironmentChanged)
+        #expect(store.state.editEnvironment == confirmed(accountA, 1))
+        while environment.subscriberCount == 0 { await Task.yield() }
+        let heldRequest = store.state.loadRequestID
+
+        environment.change(to: confirmed(accountB, 2))
+        await store.receive(\.editEnvironmentChanged)
+        #expect(store.state.loadRequestID != heldRequest)
+        await store.receive(\.drawingsLoaded)
+        let freshRequest = store.state.loadRequestID
+
+        // 붙잡혀 있던 옛 조회가 이제 끝난다 — 결과는 버려진다.
+        spy.releaseLoad()
+        await store.receive(\.drawingsLoaded)
+
+        #expect(store.state.loadRequestID == freshRequest)
+        #expect(store.state.editEnvironment == confirmed(accountB, 2))
+        #expect(spy.loadedChapters.value.count == 2)
+        await end(store, environment)
+    }
+
+    // MARK: - 보존만
+
+    /// 마지막 확인 계정과 같다는 것은 귀속 근거가 아니다(6차 리뷰 3). 편집은 보존하되 세션을 그 계정으로 올리지 않는다.
+    @Test("확인 전에 시작한 세션은 같은 계정으로 확인돼도 귀속하지 않고, 지킬 편집이 없어진 뒤 새 세션으로 연다")
+    func unverifiedSessionIsNotPromotedByHint() async {
+        let spy = RepositorySpy()
+        let unverified = DrawingEditEnvironment(accountState: .unconfirmed(lastConfirmed: accountA), serverWork: nil,
+                                                knowledge: EraseEpochKnowledge())
+        let environment = ControlledEditEnvironment(unverified)
+        let quarantine = RecordingQuarantine()
+        let store = makeStore(spy: spy, results: [CanvasTestSupport.createResult("a")], environment: environment, quarantine: quarantine)
+        await composeAndSubscribe(store, environment)
+        await holdOneEdit(store, spy)
+
+        environment.change(to: confirmed(accountA, 1))
+        await store.receive(\.editEnvironmentChanged)
+
+        #expect(store.state.sessionEnd == nil)
+        #expect(store.state.editEnvironment == unverified)
+        #expect(quarantine.calls.value.isEmpty)
+
+        spy.releaseApply()
+        await store.receive(\.saveFinished)
+        environment.change(to: confirmed(accountA, 2))
+        await store.receive(\.editEnvironmentChanged)
+        await store.receive(\.drawingsLoaded)
+
+        #expect(store.state.editEnvironment == confirmed(accountA, 2))
+        #expect(quarantine.calls.value.isEmpty)
+        await end(store, environment)
+    }
+
+    /// 읽지 못한 K 를 빈 집합으로 다루면 삭제 사실을 잊은 채 편집을 귀속한다.
+    @Test("K 를 읽지 못한 채 시작한 세션은 보존만 하고, 지킬 편집이 없어진 뒤 읽힌 K 로 새 세션을 연다")
+    func unreadableKnowledgeSessionIsPreserveOnly() async {
+        let spy = RepositorySpy()
+        let blind = confirmed(accountA, 1, knowledge: nil)
+        let environment = ControlledEditEnvironment(blind)
+        let quarantine = RecordingQuarantine()
+        let store = makeStore(spy: spy, results: [CanvasTestSupport.createResult("a")], environment: environment, quarantine: quarantine)
+        await composeAndSubscribe(store, environment)
+        await holdOneEdit(store, spy)
+        var learned = EraseEpochKnowledge()
+        learned.receive("E1")
+
+        environment.change(to: confirmed(accountA, 1, knowledge: learned))
+        await store.receive(\.editEnvironmentChanged)
+        #expect(store.state.sessionEnd == nil)
+        #expect(store.state.editEnvironment == blind)
+
+        spy.releaseApply()
+        await store.receive(\.saveFinished)
+        environment.change(to: confirmed(accountA, 2, knowledge: learned))
+        await store.receive(\.editEnvironmentChanged)
+        await store.receive(\.drawingsLoaded)
+
+        #expect(store.state.editEnvironment == confirmed(accountA, 2, knowledge: learned))
         await end(store, environment)
     }
 

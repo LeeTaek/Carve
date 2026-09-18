@@ -38,7 +38,8 @@ public struct VerseEditContext: Codable, Equatable, Sendable {
     public let verse: Int
     public let base: VerseEditBase
     /// 편집을 시작할 때 알던 삭제 기준점 집합. 이 문맥의 확정은 모두 이 K 를 잇는다(§12-6 C11 K 계승).
-    public let knownEpochs: Set<String>
+    /// **nil 은 시작할 때 K 를 읽지 못했다는 뜻이다** — 빈 집합과 다르다. 그 문맥은 편집을 보존만 한다.
+    public let knownEpochs: Set<String>?
     public let account: VerseEditAccountBasis
     /// 이 문맥에서 마지막으로 확정한 버전. 같은 기기의 연속 확정은 이 버전을 부모로 잇는다.
     public private(set) var lastLocalCommitID: String?
@@ -47,7 +48,7 @@ public struct VerseEditContext: Codable, Equatable, Sendable {
         contextID: String = UUID().uuidString,
         verse: Int,
         base: VerseEditBase,
-        knownEpochs: Set<String>,
+        knownEpochs: Set<String>?,
         account: VerseEditAccountBasis
     ) {
         self.contextID = contextID
@@ -76,22 +77,44 @@ public struct VerseEditContext: Codable, Equatable, Sendable {
     /// 모든 끝을 부모로 삼는 것은 자동 해결이다. 보지 않은 원격 끝은 부모에 넣지 않고 분기로 남긴다.
     /// - Parameter legacyParentID: 기준이 legacy 행이면, 그 원본을 수용한 `legacyImport` 버전의 논리 ID(`LegacyVersionID`).
     /// - Returns: 부모 ID 들. 기준이 빈 절이고 아직 확정한 적이 없으면 빈 배열이다.
-    public func parentIDs(legacyParentID: String?) -> [String] {
+    /// - Throws: 기준이 legacy 행인데 수용한 버전의 ID 가 없으면 `legacyParentMissing` — 부모 수용 실패를 빈 루트로 통과시키지 않는다.
+    public func parentIDs(legacyParentID: String?) throws -> [String] {
         if let lastLocalCommitID { return [lastLocalCommitID] }
         switch base {
-        case .empty: return []
-        case .version(let versionID): return [versionID]
-        case .legacy: return legacyParentID.map { [$0] } ?? []
+        case .empty:
+            return []
+        case .version(let versionID):
+            return [versionID]
+        case .legacy:
+            guard let legacyParentID else { throw VerseEditContextError.legacyParentMissing }
+            return [legacyParentID]
         }
     }
 }
 
-/// 편집 문맥이 아직 유효한가.
+public enum VerseEditContextError: Error, Equatable, Sendable {
+    /// 기준이 legacy 행인데 그 원본을 수용한 버전의 ID 가 없다.
+    case legacyParentMissing
+}
+
+/// 편집은 보존하지만 계정에 귀속하지 않는 이유.
+public enum VerseEditPreserveOnlyReason: Equatable, Sendable {
+    /// 계정을 확인하기 전에 시작했고, 불러온 데이터가 지금 계정의 것이라는 근거가 없다.
+    /// **마지막 확인 계정은 근거가 아니다** — 이전 실행이 받은 계정 확인이 편집 중인 로컬 저장소의 소유와 이어져 있다는 보장이 없다.
+    case accountUnverifiedAtStart
+    /// 기준점 집합(K)을 읽지 못했다 — 시작할 때든 지금이든. 삭제 사실을 모른 채 판정하지 않는다.
+    case knowledgeUnreadable
+}
+
+/// 편집 문맥이 아직 유효한가. **편집 보존과 계정 귀속은 따로다** — `.preserveOnly` 는 보존은 이어 가되 귀속 · 확정은 하지 않는다.
 public enum VerseEditContextValidity: Equatable, Sendable {
+    /// 보존하고, 계정에 귀속 · 확정할 수 있다.
     case valid
-    /// 계정을 확인하는 중이거나 확인하지 못했다 — 계정이 바뀌었는지 아직 모른다. 확정(서버 작업)은 하지 않고 로컬 보존만 한다.
+    /// 확인된 계정에서 시작한 문맥인데 계정을 다시 확인하는 중이다 — 계정이 바뀌었는지 아직 모른다. 확정은 하지 않는다.
     case awaitingAccountConfirmation
-    /// 문맥을 시작한 뒤 계정 범위가 바뀌었거나, 시작할 때의 계정 근거를 지금 계정으로 이을 수 없다.
+    /// 보존만 한다 — 귀속할 근거가 없다.
+    case preserveOnly(VerseEditPreserveOnlyReason)
+    /// 문맥을 시작한 뒤 계정 범위가 바뀌었거나, 불러온 데이터가 지금 계정의 것이 아니다.
     case accountChanged
     /// 문맥을 시작한 뒤 모르던 삭제 기준점을 알게 됐다 — 편집 중이던 내용은 그 삭제를 모른 채 쓴 것이다.
     case eraseLearned
@@ -99,40 +122,60 @@ public enum VerseEditContextValidity: Equatable, Sendable {
 
 /// 편집 문맥의 유효성 판정 (정책 §12-6 구현 순서 ①). 순수 함수라 표로 시험한다.
 ///
-/// 유효하지 않으면 호출부는 **문맥을 끝내고, 편집 중이던 내용을 격리한 뒤, 유효한 내용으로 다시 열고, 새 문맥을 시작한다.**
+/// 무효(`accountChanged` · `eraseLearned`)면 호출부는 **문맥을 끝내고, 편집 중이던 내용을 격리한 뒤, 유효한 내용으로 다시 열고,
+/// 새 문맥을 시작한다.** 보존만(`preserveOnly`)이면 편집은 이어 보존하되 귀속 · 확정은 하지 않는다.
 ///
-/// **문맥은 계정 범위가 실제로 바뀔 때 끝난다.** 확인 세대가 바뀌기만 한 것(같은 계정으로 다시 확인)은 바뀐 것이 아니다 —
-/// 계정 변경 알림은 같은 계정에서도 온다. 재확인하는 동안은 "확인 대기" 로 두고, 같은 계정으로 확인되면 새 표를 든다
-/// (`VerseEditContext.refreshed(with:)`). 확정 자체는 그때의 표가 유효한지(`AccountScopeProvider.isCurrent`)를 따로 확인한다.
+/// - **문맥은 계정 범위가 실제로 바뀔 때 끝난다.** 확인 세대가 바뀐 것만(같은 계정으로 다시 확인)으로는 끝나지 않는다 — 계정 변경
+///   알림은 같은 계정에서도 온다. 재확인하는 동안은 기다리고, 같은 계정으로 확인되면 새 표를 든다(`VerseEditContext.refreshed(with:)`).
+///   확정 자체는 그때의 표가 유효한지(`isCurrent`)를 따로 확인한다.
+/// - **확인 전에 시작한 문맥은 불러온 데이터의 소유 근거가 있을 때만 귀속한다.** 마지막 확인 계정과 같다는 것은 근거가 아니다(6차 리뷰).
 public enum VerseEditContextRule {
     /// - Parameters:
     ///   - context: 판정할 문맥.
     ///   - accountState: 지금 계정 상태.
-    ///   - deviceKnowledge: 지금 `K(기기)` — 문맥의 계정 범위의 것.
+    ///   - deviceKnowledge: 지금 `K(기기)` — 문맥의 계정 범위의 것. nil 은 읽지 못함.
+    ///   - loadedDataOwner: 문맥이 불러온 데이터가 어느 계정의 것인지에 대한 근거. 없으면 nil — 확인 전에 시작한 문맥은 보존만 한다.
     public static func validity(
         of context: VerseEditContext,
         accountState: AccountScopeState,
-        deviceKnowledge: EraseEpochKnowledge
+        deviceKnowledge: EraseEpochKnowledge?,
+        loadedDataOwner: AccountScope? = nil
     ) -> VerseEditContextValidity {
+        var preserveOnly: VerseEditPreserveOnlyReason?
+        var awaiting = false
         switch (context.account, accountState) {
         case (.confirmed(let token), .confirmed(let scope)):
             guard token.scope == scope else { return .accountChanged }
-        case (.unverified(let hint), .confirmed(let scope)):
-            // 확인 전에 시작한 편집을, 확인된 계정이 그때의 마지막 확인 계정과 같을 때만 잇는다. 다르면 그 편집이 본 내용이
-            // 지금 계정의 것이라는 근거가 없다.
-            guard let hint, hint == scope else { return .accountChanged }
-        case (.confirmed, .noAccount), (.unverified, .noAccount), (.localOnly, .confirmed):
+        case (.confirmed, .unconfirmed), (.localOnly, .unconfirmed):
+            // 계정이 바뀌었는지 아직 모른다.
+            awaiting = true
+        case (.confirmed, .noAccount), (.localOnly, .confirmed):
             // 계정 ↔ 로그인 안 함 사이는 자동으로 잇지 않는다 — 가져오기는 사용자가 명시적으로 하는 별도 작업이다.
             return .accountChanged
-        case (.localOnly, .noAccount), (_, .unconfirmed):
-            // 로그인 안 함이 이어지거나, 확인 중 · 확인 실패라 계정이 바뀌었는지 아직 모른다. 기준점 판정만 이어서 본다.
+        case (.localOnly, .noAccount):
             break
+        case (.unverified, .confirmed(let scope)):
+            if let loadedDataOwner {
+                guard loadedDataOwner == scope else { return .accountChanged }
+            } else {
+                preserveOnly = .accountUnverifiedAtStart
+            }
+        case (.unverified, .unconfirmed), (.unverified, .noAccount):
+            preserveOnly = .accountUnverifiedAtStart
         }
-        guard EraseEpochRule.isValid(recordKnown: context.knownEpochs, device: deviceKnowledge) else {
-            return .eraseLearned
+
+        guard let deviceKnowledge else {
+            // 지금 K 를 읽지 못했다 — 삭제를 알게 됐는지 판정할 수 없다.
+            return .preserveOnly(preserveOnly ?? .knowledgeUnreadable)
         }
-        if case .unconfirmed = accountState { return .awaitingAccountConfirmation }
-        return .valid
+        if let known = context.knownEpochs {
+            guard EraseEpochRule.isValid(recordKnown: known, device: deviceKnowledge) else { return .eraseLearned }
+        } else if !deviceKnowledge.all.isEmpty {
+            // 시작할 때 K 를 읽지 못했다. 기기가 아는 기준점이 있으면 그 삭제를 알고 편집했는지 알 수 없다.
+            return .preserveOnly(preserveOnly ?? .knowledgeUnreadable)
+        }
+        if let preserveOnly { return .preserveOnly(preserveOnly) }
+        return awaiting ? .awaitingAccountConfirmation : .valid
     }
 }
 

@@ -81,6 +81,15 @@ public enum AccountScopeState: Equatable, Sendable {
         case .noAccount, .unconfirmed: nil
         }
     }
+
+    /// 확인 대기로 돌릴 때 들 마지막 확인 범위(참고 정보).
+    public var lastConfirmedHint: AccountScope? {
+        switch self {
+        case .confirmed(let scope): scope
+        case .unconfirmed(let hint): hint
+        case .noAccount: nil
+        }
+    }
 }
 
 /// 조회 결과로 이번 실행의 상태를 정한다. 순수 함수라 표로 시험한다.
@@ -145,6 +154,23 @@ public actor AccountScopeProvider {
         }
         state = next
         return next
+    }
+
+    /// 상태 · 표 · 세대를 **한 번에** 읽은 값.
+    public struct Snapshot: Equatable, Sendable {
+        public let state: AccountScopeState
+        public let token: AccountServerWorkToken?
+        public let generation: UInt64
+    }
+
+    /// 상태 · 표 · 세대를 한 번에 읽는다. 따로 `await` 해서 읽으면 그 사이 계정이 바뀌어 **상태는 A, 표는 B** 인 조합이 나올 수 있다.
+    public func snapshot() -> Snapshot {
+        Snapshot(state: state, token: serverWorkToken(), generation: generation)
+    }
+
+    /// 확인 세대가 아직 이 값인가 — 스냅샷을 읽은 뒤 다른 것(K)을 읽는 사이 계정이 바뀌지 않았는지 본다.
+    public func isGeneration(_ value: UInt64) -> Bool {
+        generation == value
     }
 
     /// 서버 작업을 시작할 때 받는 표. 확인된 계정일 때만 준다.

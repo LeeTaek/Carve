@@ -564,7 +564,8 @@ extension ChapterCanvasFeature {
         )
     }
 
-    private func requestLoad(state: inout State) -> Effect<Action> {
+    /// - Note: `private` 이 아닌 이유는 편집 세션(`ChapterCanvasEditSession.swift`)이 새 환경으로 조회를 다시 요청하기 때문이다.
+    func requestLoad(state: inout State) -> Effect<Action> {
         let requestID = uuid()
         state.loadRequestID = requestID
         let chapter = state.chapter
@@ -577,6 +578,12 @@ extension ChapterCanvasFeature {
             }
             do {
                 let loaded = try await repository.load(chapter: chapter)
+                // 조회하는 사이 환경이 바뀌었으면 결과보다 **먼저** 알린다. 세션이 바뀌면 이 조회는 새 요청으로 대체돼 결과가 버려진다 —
+                // 옛 계정 · K 로 읽은 내용을 새 세션 아래 합성하지 않는다(6차 리뷰 4).
+                let after = await editEnvironment.current()
+                if after != environment {
+                    await send(.editEnvironmentChanged(after))
+                }
                 await send(.drawingsLoaded(requestID: requestID, .success(loaded)))
             } catch {
                 await send(.drawingsLoaded(requestID: requestID, .failure(DrawingLoadFailure(message: "\(error)"))))

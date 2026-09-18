@@ -20,12 +20,23 @@ public struct DrawingEditEnvironment: Equatable, Sendable {
     public var serverWork: AccountServerWorkToken?
     /// 지금 계정 근거의 `K(기기)`. 확인 전이면 마지막 확인 범위의 것(표시 · 문맥용 — 그동안 K 는 갱신하지 않는다),
     /// 로그인 안 함이면 이 기기 전용 범위의 것이다.
-    public var knowledge: EraseEpochKnowledge
+    ///
+    /// **nil 은 읽지 못했다는 뜻이다** — 빈 집합(기준점 없음)과 다르다. 빈 집합으로 읽으면 삭제 사실을 잊은 환경이 된다.
+    /// 읽지 못한 동안은 편집을 보존하되, 그 K 에 기대는 귀속 · 확정 · 정리는 하지 않는다.
+    public var knowledge: EraseEpochKnowledge?
+    /// 이 환경을 읽은 계정 확인 세대. 같은 세대 안에서 읽은 상태 · 표 · K 만 한 환경으로 묶는다.
+    public var generation: UInt64
 
-    public init(accountState: AccountScopeState, serverWork: AccountServerWorkToken?, knowledge: EraseEpochKnowledge) {
+    public init(
+        accountState: AccountScopeState,
+        serverWork: AccountServerWorkToken?,
+        knowledge: EraseEpochKnowledge?,
+        generation: UInt64 = 0
+    ) {
         self.accountState = accountState
         self.serverWork = serverWork
         self.knowledge = knowledge
+        self.generation = generation
     }
 
     /// 이 환경에서 절 편집을 시작할 때의 계정 근거.
@@ -41,11 +52,11 @@ public struct DrawingEditEnvironment: Equatable, Sendable {
         }
     }
 
-    /// 확인 전 · 아무 정보도 없는 환경 — 서버 작업을 하지 않는 쪽이 기본이다.
+    /// 확인 전 · 아무 정보도 없는 환경 — 서버 작업을 하지 않는 쪽이 기본이다. K 도 모른다.
     public static let unknown = DrawingEditEnvironment(
         accountState: .unconfirmed(lastConfirmed: nil),
         serverWork: nil,
-        knowledge: EraseEpochKnowledge()
+        knowledge: nil
     )
 }
 
@@ -58,7 +69,12 @@ public protocol DrawingEditEnvironmentClient: Sendable {
     func changes() -> AsyncStream<Void>
 }
 
-/// 앱이 쓰는 구현. 시작할 때 계정을 확인하고, 계정 변경 알림을 받으면 **즉시** 서버 작업을 잠근 뒤 다시 확인한다.
+/// 앱이 쓰는 구현. 시작할 때 계정을 확인하고, 계정 변경 알림을 받으면 서버 작업을 막은 뒤 다시 확인한다.
+///
+/// - **환경은 한 확인 세대 안에서 읽는다.** 제공자에게서 상태 · 표 · 세대를 한 번에 받고(`AccountScopeProvider.snapshot`),
+///   그 범위의 K 를 읽은 뒤 세대가 그대로인지 확인한다. 바뀌었으면 다시 읽고, 계속 바뀌면 확인 대기 환경을 준다.
+/// - **알림 콜백 안에서 동기로 막는다.** 콜백이 돌아온 뒤 제공자를 무효화하기까지의 틈에도 옛 표가 쓰이지 않게,
+///   그 사이에는 `isCurrent` 가 거짓이고 `current()` 가 확인 대기 환경을 준다.
 public final class LiveDrawingEditEnvironment: DrawingEditEnvironmentClient, @unchecked Sendable {
     private let provider: AccountScopeProvider
     private let stateStore: FileEraseStateStore
@@ -66,6 +82,11 @@ public final class LiveDrawingEditEnvironment: DrawingEditEnvironmentClient, @un
     private let lock = NSLock()
     private var subscribers: [UUID: AsyncStream<Void>.Continuation] = [:]
     private var observation: (any NSObjectProtocol)?
+    /// 받았지만 아직 제공자에 반영하지 못한 계정 변경 알림 수.
+    private var unappliedNotifications = 0
+
+    /// 한 번에 읽는 시도 횟수. 계정이 계속 바뀌면 확인 대기로 둔다.
+    static let maxSnapshotAttempts = 3
 
     public init(
         identity: any CloudAccountIdentityClient,
@@ -88,8 +109,7 @@ public final class LiveDrawingEditEnvironment: DrawingEditEnvironmentClient, @un
         if observation == nil {
             // ★ 알림을 **동기로** 구독한다 — 확인하는 동안 온 알림을 놓치지 않는다.
             observation = notificationCenter.addObserver(forName: .CKAccountChanged, object: nil, queue: nil) { [weak self] _ in
-                guard let self else { return }
-                Task { await self.accountMayHaveChanged() }
+                self?.accountChangeNotified()
             }
         }
         lock.unlock()
@@ -97,12 +117,29 @@ public final class LiveDrawingEditEnvironment: DrawingEditEnvironmentClient, @un
         notifySubscribers()
     }
 
-    /// 계정이 바뀌었을 수 있다 — 잠그고 알린 뒤 다시 확인하고 한 번 더 알린다.
-    func accountMayHaveChanged() async {
+    /// 알림 콜백 — **여기서 동기로** 막고 알린 뒤, 제공자 무효화 · 재확인은 뒤이어 한다.
+    func accountChangeNotified() {
+        lock.lock()
+        unappliedNotifications += 1
+        lock.unlock()
+        notifySubscribers()
+        Task { await self.applyAccountChange() }
+    }
+
+    private func applyAccountChange() async {
         await provider.invalidate()
+        lock.lock()
+        unappliedNotifications -= 1
+        lock.unlock()
         notifySubscribers()
         await provider.refresh()
         notifySubscribers()
+    }
+
+    private var hasUnappliedNotification: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return unappliedNotifications > 0
     }
 
     /// `K(기기)` 가 바뀌었다(기준점 수신 등). 편집 문맥을 다시 판정하게 알린다.
@@ -111,26 +148,47 @@ public final class LiveDrawingEditEnvironment: DrawingEditEnvironmentClient, @un
     }
 
     public func current() async -> DrawingEditEnvironment {
-        let state = await provider.state
-        let token = await provider.serverWorkToken()
-        let knowledgeScope: AccountScope? = switch state {
+        for _ in 0..<Self.maxSnapshotAttempts {
+            guard !hasUnappliedNotification else { break }
+            let snapshot = await provider.snapshot()
+            let knowledge = readKnowledge(for: snapshot.state)
+            // K 를 읽는 사이 계정이 바뀌지 않았어야 한 환경이다.
+            if await provider.isGeneration(snapshot.generation), !hasUnappliedNotification {
+                return DrawingEditEnvironment(
+                    accountState: snapshot.state, serverWork: snapshot.token, knowledge: knowledge, generation: snapshot.generation
+                )
+            }
+        }
+        // 계정이 바뀌는 중이다 — 표 없이 확인 대기로 둔다. K 도 이 세대의 것이라 말할 수 없다.
+        let snapshot = await provider.snapshot()
+        return DrawingEditEnvironment(
+            accountState: .unconfirmed(lastConfirmed: snapshot.state.lastConfirmedHint),
+            serverWork: nil,
+            knowledge: nil,
+            generation: snapshot.generation
+        )
+    }
+
+    /// 상태에 맞는 범위의 K. 파일이 없으면 빈 집합(기준점 없음), **읽지 못하면 nil** 이다.
+    private func readKnowledge(for state: AccountScopeState) -> EraseEpochKnowledge? {
+        let scope: AccountScope? = switch state {
         case .confirmed(let scope): scope
         case .noAccount: .localOnly
         case .unconfirmed(let hint): hint
         }
-        var knowledge = EraseEpochKnowledge()
-        if let knowledgeScope {
-            do {
-                knowledge = try stateStore.knowledge(for: knowledgeScope)
-            } catch {
-                Log.error("편집 환경 — K(기기)를 읽지 못했다", "\(error)")
-            }
+        // 확인한 적이 없는 기기 — 받은 기준점이 없다.
+        guard let scope else { return EraseEpochKnowledge() }
+        do {
+            return try stateStore.knowledge(for: scope)
+        } catch {
+            Log.error("편집 환경 — K(기기)를 읽지 못했다. 빈 집합으로 두지 않는다", "\(error)")
+            return nil
         }
-        return DrawingEditEnvironment(accountState: state, serverWork: token, knowledge: knowledge)
     }
 
     public func isCurrent(_ token: AccountServerWorkToken) async -> Bool {
-        await provider.isCurrent(token)
+        guard !hasUnappliedNotification else { return false }
+        return await provider.isCurrent(token)
     }
 
     public func changes() -> AsyncStream<Void> {

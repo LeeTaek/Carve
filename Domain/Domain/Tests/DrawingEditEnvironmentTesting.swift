@@ -53,7 +53,7 @@ struct DrawingEditEnvironmentTesting {
             #expect(current.accountState == .confirmed(scope("_a")))
             let token = try #require(current.serverWork)
             #expect(current.accountBasis == .confirmed(token))
-            #expect(current.knowledge.received == ["E1"])
+            #expect(current.knowledge?.received == ["E1"])
             #expect(await environment.isCurrent(token))
         }
     }
@@ -74,7 +74,7 @@ struct DrawingEditEnvironmentTesting {
 
             #expect(current.serverWork == nil)
             #expect(current.accountBasis == .unverified(hint: scope("_a")))
-            #expect(current.knowledge.received == ["E1"])
+            #expect(current.knowledge?.received == ["E1"])
         }
     }
 
@@ -92,7 +92,7 @@ struct DrawingEditEnvironmentTesting {
 
             #expect(current.accountBasis == .localOnly)
             #expect(current.serverWork == nil)
-            #expect(current.knowledge.received == ["E-local"])
+            #expect(current.knowledge?.received == ["E-local"])
         }
     }
 
@@ -122,11 +122,68 @@ struct DrawingEditEnvironmentTesting {
         }
     }
 
+    /// 읽지 못한 K 를 빈 집합으로 주면 삭제 사실을 잊은 환경이 된다.
+    @Test("K 파일을 읽지 못하면 빈 집합이 아니라 읽지 못함(nil)으로 준다")
+    func unreadableKnowledgeIsNotEmpty() async throws {
+        try await withStateStore { store in
+            let environment = LiveDrawingEditEnvironment(
+                identity: SequencedIdentityClient([.identified(userRecordName: "_a")]),
+                containerID: container, stateStore: store, notificationCenter: NotificationCenter()
+            )
+            await environment.start()
+            try store.recordReceived("E1", knownAtCreation: [], for: scope("_a"))
+            let file = store.areaForTesting.scopeDirectory(scope("_a").key).appendingPathComponent("erase-knowledge.json")
+            try Data("깨진 값".utf8).write(to: file)
+
+            let current = await environment.current()
+
+            #expect(current.knowledge == nil)
+            // 계정 근거는 그대로 준다 — 보존은 이어 가고, K 에 기대는 판정만 보류한다.
+            #expect(current.accountState == .confirmed(scope("_a")))
+        }
+    }
+
+    /// 콜백이 돌아온 뒤 제공자를 무효화하기까지의 틈에도 옛 표가 쓰이면 안 된다.
+    @Test("알림 콜백이 돌아온 바로 뒤에도 옛 표는 무효이고, 환경은 옛 표를 주지 않는다")
+    func notificationBlocksSynchronously() async throws {
+        try await withStateStore { store in
+            let environment = LiveDrawingEditEnvironment(
+                identity: SequencedIdentityClient([.identified(userRecordName: "_a"), .identified(userRecordName: "_a")]),
+                containerID: container, stateStore: store, notificationCenter: NotificationCenter()
+            )
+            await environment.start()
+            let before = try #require(await environment.current().serverWork)
+
+            environment.accountChangeNotified()
+
+            #expect(await !environment.isCurrent(before))
+            #expect(await environment.current().serverWork != before)
+        }
+    }
+
+    @Test("환경의 상태 · 표 · 세대는 한 확인 세대에서 읽은 것이다")
+    func environmentIsReadFromOneGeneration() async throws {
+        try await withStateStore { store in
+            let environment = LiveDrawingEditEnvironment(
+                identity: SequencedIdentityClient([.identified(userRecordName: "_a")]),
+                containerID: container, stateStore: store, notificationCenter: NotificationCenter()
+            )
+            await environment.start()
+
+            let current = await environment.current()
+            let token = try #require(current.serverWork)
+
+            #expect(token.generation == current.generation)
+            #expect(current.accountState == .confirmed(token.scope))
+        }
+    }
+
     @Test("주입하지 않은 기본값은 확인 전 환경이다 — 서버 작업을 하지 않는다")
     func unconfiguredDefaultDoesNoServerWork() async {
         let current = await StubDrawingEditEnvironment(.unknown).current()
 
         #expect(current.serverWork == nil)
         #expect(current.accountBasis == .unverified(hint: nil))
+        #expect(current.knowledge == nil)
     }
 }

@@ -22,7 +22,7 @@ struct VerseEditContextTesting {
 
     private func context(
         base: VerseEditBase = .version(versionID: "v0"),
-        known: Set<String> = [],
+        known: Set<String>? = [],
         account: VerseEditAccountBasis
     ) -> VerseEditContext {
         VerseEditContext(verse: 1, base: base, knownEpochs: known, account: account)
@@ -35,25 +35,27 @@ struct VerseEditContextTesting {
     // MARK: - 부모
 
     @Test("부모는 편집을 시작할 때 보던 기준이다")
-    func parentIsTheBaseTheUserSaw() {
-        #expect(context(base: .empty, account: .localOnly).parentIDs(legacyParentID: nil) == [])
-        #expect(context(base: .version(versionID: "v0"), account: .localOnly).parentIDs(legacyParentID: nil) == ["v0"])
+    func parentIsTheBaseTheUserSaw() throws {
+        #expect(try context(base: .empty, account: .localOnly).parentIDs(legacyParentID: nil) == [])
+        #expect(try context(base: .version(versionID: "v0"), account: .localOnly).parentIDs(legacyParentID: nil) == ["v0"])
         let legacy = context(base: .legacy(rowID: BibleDrawingRowID(raw: "row-1"), contentFingerprint: "vc1-a"), account: .localOnly)
-        #expect(legacy.parentIDs(legacyParentID: "legacy-abc") == ["legacy-abc"])
+        #expect(try legacy.parentIDs(legacyParentID: "legacy-abc") == ["legacy-abc"])
+        // 수용한 버전의 ID 가 없으면 빈 루트로 통과시키지 않는다.
+        #expect(throws: VerseEditContextError.legacyParentMissing) { try legacy.parentIDs(legacyParentID: nil) }
     }
 
     /// 화면은 V0 인데 원격 V1 이 들어온 뒤 로컬 편집을 확정해도, 부모는 V0 다 — V1 은 분기로 남는다.
     /// 부모 계산은 저장소의 "현재 끝" 을 받지 않는다. 받을 수 없게 해 두는 것이 이 규칙의 경계다.
     @Test("같은 기기의 연속 확정만 직전 로컬 확정을 잇고, 보지 않은 원격 끝은 부모가 아니다")
-    func consecutiveLocalCommitsChain() {
+    func consecutiveLocalCommitsChain() throws {
         var edit = context(base: .version(versionID: "v0"), account: .localOnly)
-        #expect(edit.parentIDs(legacyParentID: nil) == ["v0"])
+        #expect(try edit.parentIDs(legacyParentID: nil) == ["v0"])
 
         edit.recordLocalCommit("v2")
-        #expect(edit.parentIDs(legacyParentID: nil) == ["v2"])
+        #expect(try edit.parentIDs(legacyParentID: nil) == ["v2"])
 
         edit.recordLocalCommit("v3")
-        #expect(edit.parentIDs(legacyParentID: nil) == ["v3"])
+        #expect(try edit.parentIDs(legacyParentID: nil) == ["v3"])
     }
 
     // MARK: - 유효성
@@ -85,7 +87,7 @@ struct VerseEditContextTesting {
     }
 
     @Test("같은 계정으로 다시 확인되면 기준 · K · 확정 이력은 그대로 두고 새 표를 든다")
-    func refreshedContextKeepsEverythingButTheToken() {
+    func refreshedContextKeepsEverythingButTheToken() throws {
         var edit = context(base: .version(versionID: "v0"), known: ["E1"], account: .confirmed(token(accountA, generation: 1)))
         edit.recordLocalCommit("v2")
 
@@ -94,22 +96,28 @@ struct VerseEditContextTesting {
         #expect(refreshed.contextID == edit.contextID)
         #expect(refreshed.base == edit.base)
         #expect(refreshed.knownEpochs == ["E1"])
-        #expect(refreshed.parentIDs(legacyParentID: nil) == ["v2"])
+        #expect(try refreshed.parentIDs(legacyParentID: nil) == ["v2"])
         #expect(refreshed.account == .confirmed(token(accountA, generation: 2)))
     }
 
-    @Test("확인 전에 시작한 문맥은 확인된 계정이 그때의 마지막 확인 계정과 같을 때만 잇는다")
-    func unverifiedContextValidity() {
+    /// 마지막 확인 계정과 같다는 것은 귀속 근거가 아니다(6차 리뷰) — 이전 실행이 받은 확인이 편집 중인 로컬 저장소의 소유와
+    /// 이어져 있다는 보장이 없다. 편집은 보존하고, 근거가 있을 때만 귀속한다.
+    @Test("확인 전에 시작한 문맥은 불러온 데이터의 소유 근거가 있을 때만 귀속하고, 없으면 보존만 한다")
+    func unverifiedContextNeedsOwnershipEvidence() {
         let withHint = context(account: .unverified(hint: accountA))
-        let withoutHint = context(account: .unverified(hint: nil))
         let empty = EraseEpochKnowledge()
 
+        #expect(VerseEditContextRule.validity(of: withHint, accountState: .confirmed(accountA), deviceKnowledge: empty)
+            == .preserveOnly(.accountUnverifiedAtStart))
+        #expect(VerseEditContextRule.validity(of: withHint, accountState: .confirmed(accountA), deviceKnowledge: empty,
+                                              loadedDataOwner: accountA) == .valid)
+        // 불러온 데이터가 다른 계정의 것이다 — 이 편집을 지금 계정에 귀속하면 계정이 섞인다.
+        #expect(VerseEditContextRule.validity(of: withHint, accountState: .confirmed(accountA), deviceKnowledge: empty,
+                                              loadedDataOwner: accountB) == .accountChanged)
         #expect(VerseEditContextRule.validity(of: withHint, accountState: .unconfirmed(lastConfirmed: accountA), deviceKnowledge: empty)
-            == .awaitingAccountConfirmation)
-        #expect(VerseEditContextRule.validity(of: withHint, accountState: .confirmed(accountA), deviceKnowledge: empty) == .valid)
-        #expect(VerseEditContextRule.validity(of: withHint, accountState: .confirmed(accountB), deviceKnowledge: empty) == .accountChanged)
-        #expect(VerseEditContextRule.validity(of: withoutHint, accountState: .confirmed(accountA), deviceKnowledge: empty) == .accountChanged)
-        #expect(VerseEditContextRule.validity(of: withHint, accountState: .noAccount, deviceKnowledge: empty) == .accountChanged)
+            == .preserveOnly(.accountUnverifiedAtStart))
+        #expect(VerseEditContextRule.validity(of: withHint, accountState: .noAccount, deviceKnowledge: empty)
+            == .preserveOnly(.accountUnverifiedAtStart))
     }
 
     @Test("확인을 기다리는 문맥도 모르는 삭제가 있으면 먼저 끝낸다")
@@ -119,6 +127,22 @@ struct VerseEditContextTesting {
 
         #expect(VerseEditContextRule.validity(of: context(account: .unverified(hint: accountA)),
                                               accountState: .unconfirmed(lastConfirmed: accountA), deviceKnowledge: learned) == .eraseLearned)
+    }
+
+    /// 읽지 못한 K 를 빈 집합으로 다루면 삭제 사실을 잊은 채 판정한다.
+    @Test("K 를 읽지 못하면 보존만 하고, 시작할 때 몰랐던 K 는 기기가 아는 기준점이 없을 때만 문제없다")
+    func unreadableKnowledgeIsPreserveOnly() {
+        let edit = context(account: .confirmed(token(accountA)))
+        var learned = EraseEpochKnowledge()
+        learned.receive("E1")
+
+        #expect(VerseEditContextRule.validity(of: edit, accountState: .confirmed(accountA), deviceKnowledge: nil)
+            == .preserveOnly(.knowledgeUnreadable))
+        let startedBlind = context(known: nil, account: .confirmed(token(accountA)))
+        #expect(VerseEditContextRule.validity(of: startedBlind, accountState: .confirmed(accountA), deviceKnowledge: EraseEpochKnowledge())
+            == .valid)
+        #expect(VerseEditContextRule.validity(of: startedBlind, accountState: .confirmed(accountA), deviceKnowledge: learned)
+            == .preserveOnly(.knowledgeUnreadable))
     }
 
     /// 로그인 안 함 ↔ 계정 사이는 자동으로 잇지 않는다. 가져오기는 사용자가 명시적으로 하는 별도 작업이다.

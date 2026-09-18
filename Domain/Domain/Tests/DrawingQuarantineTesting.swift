@@ -25,7 +25,7 @@ struct DrawingQuarantineTesting {
         var known = EraseEpochKnowledge()
         knowledge.forEach { known.receive($0) }
         let token: AccountServerWorkToken? = state.scopeForServerWork.map { AccountServerWorkToken(scope: $0, generation: 1) }
-        return DrawingEditEnvironment(accountState: state, serverWork: token, knowledge: known)
+        return DrawingEditEnvironment(accountState: state, serverWork: token, knowledge: known, generation: 1)
     }
 
     @Test("격리본은 무효가 된 세션의 계정 범위 · K 를 들고, 내용을 그대로 되돌려 준다")
@@ -34,10 +34,10 @@ struct DrawingQuarantineTesting {
             let store = FileRecoveryCopyStore(root: root)
             let quarantine = FileDrawingQuarantine(store: store, deviceID: "device-1")
             let account = AccountScope(key: "acct-a")
-            let item = DrawingQuarantineItem(chapter: chapter, verse: 3, lineData: Data("획".utf8), drawingVersion: 3,
+            let item = DrawingQuarantineItem(chapter: chapter, verse: 3, revision: 1, lineData: Data("획".utf8), drawingVersion: 3,
                                              layoutMetadataData: Data("meta".utf8))
 
-            try await quarantine.quarantine([item], environment: environment(.confirmed(account), knowledge: ["E1"]))
+            try await quarantine.quarantine([item], environment: environment(.confirmed(account), knowledge: ["E1"]), batchID: "session-1")
 
             let entries = try store.entries(accountScope: account.key)
             #expect(entries.count == 1)
@@ -57,10 +57,10 @@ struct DrawingQuarantineTesting {
         try await withRoot { root in
             let store = FileRecoveryCopyStore(root: root)
             let quarantine = FileDrawingQuarantine(store: store, deviceID: "device-1")
-            let item = DrawingQuarantineItem(chapter: chapter, verse: 1, lineData: Data("a".utf8), drawingVersion: 3, layoutMetadataData: nil)
+            let item = DrawingQuarantineItem(chapter: chapter, verse: 1, revision: 1, lineData: Data("a".utf8), drawingVersion: 3, layoutMetadataData: nil)
 
-            try await quarantine.quarantine([item], environment: environment(.unconfirmed(lastConfirmed: AccountScope(key: "acct-a"))))
-            try await quarantine.quarantine([item], environment: environment(.noAccount))
+            try await quarantine.quarantine([item], environment: environment(.unconfirmed(lastConfirmed: AccountScope(key: "acct-a"))), batchID: "session-1")
+            try await quarantine.quarantine([item], environment: environment(.noAccount), batchID: "session-2")
 
             #expect(try store.entries(accountScope: AccountScope.unverified.key).count == 1)
             #expect(try store.entries(accountScope: AccountScope.localOnly.key).count == 1)
@@ -76,12 +76,12 @@ struct DrawingQuarantineTesting {
             let account = AccountScope(key: "acct-a")
             let same = Data("같은 획".utf8)
             let items = [
-                DrawingQuarantineItem(chapter: chapter, verse: 1, lineData: same, drawingVersion: 3, layoutMetadataData: nil),
-                DrawingQuarantineItem(chapter: chapter, verse: 2, lineData: same, drawingVersion: 3, layoutMetadataData: nil),
-                DrawingQuarantineItem(chapter: chapter, verse: 3, lineData: nil, drawingVersion: nil, layoutMetadataData: nil)
+                DrawingQuarantineItem(chapter: chapter, verse: 1, revision: 1, lineData: same, drawingVersion: 3, layoutMetadataData: nil),
+                DrawingQuarantineItem(chapter: chapter, verse: 2, revision: 1, lineData: same, drawingVersion: 3, layoutMetadataData: nil),
+                DrawingQuarantineItem(chapter: chapter, verse: 3, revision: 1, lineData: nil, drawingVersion: nil, layoutMetadataData: nil)
             ]
 
-            try await quarantine.quarantine(items, environment: environment(.confirmed(account)))
+            try await quarantine.quarantine(items, environment: environment(.confirmed(account)), batchID: "session-1")
 
             let entries = try store.entries(accountScope: account.key)
             #expect(entries.count == 3)
@@ -92,10 +92,29 @@ struct DrawingQuarantineTesting {
         }
     }
 
+    /// 여러 절 중 일부만 저장하고 실패한 뒤 다시 하면, 매번 새 ID 로 사본이 늘었다(6차 리뷰).
+    @Test("같은 세션 · 절 · revision 을 다시 격리해도 격리본이 늘지 않고, revision 이 다르면 따로 남는다")
+    func quarantineIsIdempotent() async throws {
+        try await withRoot { root in
+            let store = FileRecoveryCopyStore(root: root)
+            let quarantine = FileDrawingQuarantine(store: store, deviceID: "device-1")
+            let account = AccountScope(key: "acct-a")
+            let first = DrawingQuarantineItem(chapter: chapter, verse: 1, revision: 1, lineData: Data("a".utf8), drawingVersion: 3, layoutMetadataData: nil)
+            let later = DrawingQuarantineItem(chapter: chapter, verse: 1, revision: 2, lineData: Data("b".utf8), drawingVersion: 3, layoutMetadataData: nil)
+
+            try await quarantine.quarantine([first], environment: environment(.confirmed(account)), batchID: "session-1")
+            try await quarantine.quarantine([first], environment: environment(.confirmed(account)), batchID: "session-1")
+            #expect(try store.entries(accountScope: account.key).count == 1)
+
+            try await quarantine.quarantine([later], environment: environment(.confirmed(account)), batchID: "session-1")
+            #expect(try store.entries(accountScope: account.key).count == 2)
+        }
+    }
+
     @Test("주입하지 않은 격리는 실패로 알린다 — 호출부가 화면을 정리하지 않게")
     func unconfiguredQuarantineFails() async {
         await #expect(throws: UnavailableDrawingQuarantine.NotConfigured.self) {
-            try await UnavailableDrawingQuarantine().quarantine([], environment: .unknown)
+            try await UnavailableDrawingQuarantine().quarantine([], environment: .unknown, batchID: "session-1")
         }
     }
 
