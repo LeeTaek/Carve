@@ -69,6 +69,8 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
         case scrolled(previous: CGFloat, current: CGFloat)
         /// 손가락 롱프레스로 절 메뉴를 요청했다(시안 E1). `point` 는 content 좌표, `anchor` · `verseFrame` 은 창 좌표다.
         case menuRequested(at: CGPoint, anchor: CGPoint, verseFrame: CGRect)
+        /// 인계를 마쳤다 — 이 토큰을 요청받기 전까지의 편집은 모두 보고했다(정책 §12-6 구현 순서 ②).
+        case handoffCompleted(token: Int)
     }
 
     /// 뷰가 매 업데이트마다 넘기는 표시 상태.
@@ -85,6 +87,8 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
         var scrollRequest: ChapterCanvasFeature.State.ScrollRequest?
         /// 스크롤 요청을 content y 로 바꿔 줄 레이아웃 (없으면 요청을 보류).
         var layout: ChapterLayout?
+        /// 인계 요청 토큰. 바뀌면 미보고 편집을 보고하고 `handoffCompleted` 로 알린다.
+        var handoffToken: Int = 0
     }
 
     var onEvent: (@MainActor (Event) -> Void)?
@@ -103,6 +107,10 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
     var memoryProbe: ChapterCanvasMemoryProbe?
     #endif
     private var appliedUndoVersion = 0
+    private var appliedHandoffToken = 0
+    /// 요청받았지만 아직 마치지 못한 인계. 획을 긋는 중이면 그 획이 반영된 뒤에 마친다.
+    private var pendingHandoffToken: Int?
+    private var handoffTask: Task<Void, Never>?
     private var appliedRedoVersion = 0
     private var appliedScrollToken = 0
     private var appliedTopInset: CGFloat = -1
@@ -208,6 +216,12 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
     }
 
     func apply(_ configuration: Configuration) {
+        // 인계 요청은 입력을 막기 **전에** 받는다 — 세션을 닫으며 입력을 막으면 긋던 획이 끝나는데, 그보다 먼저 요청을 받아 두어야
+        // 그 획이 반영될 때까지 기다린 뒤 마친다(`canvasViewDidEndUsingTool`).
+        if configuration.handoffToken != appliedHandoffToken {
+            appliedHandoffToken = configuration.handoffToken
+            requestHandoff(configuration.handoffToken)
+        }
         canvas.drawingGestureRecognizer.isEnabled = configuration.isInputEnabled
         probeLasso(tool: configuration.tool)
         canvas.tool = configuration.tool
@@ -384,6 +398,16 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
         probeLasso("didEndUsingTool")
         isUsingTool = false
         cancelCheckTask?.cancel()
+        if pendingHandoffToken != nil {
+            // 인계를 기다리는 중에 획이 끝났다. PencilKit 은 이 알림 뒤에 획을 반영하므로(§7-5) 반영될 시간을 두고 마친다.
+            handoffTask?.cancel()
+            handoffTask = Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .seconds(self?.editSettleInterval ?? 0.3))
+                guard let self, !Task.isCancelled else { return }
+                self.completeHandoff()
+            }
+            return
+        }
         if hasUnreportedChange {
             // 직전 획의 보고가 이 획 시작에 취소됐다. 이번 획이 변경을 만들면 canvasViewDrawingDidChange 가 다시 예약하므로
             // 마지막 변경까지 한 번에 보고되고, 변경이 없었다면(탭 등) 여기서 예약한 보고가 직전 획을 실어 나간다.
@@ -669,5 +693,37 @@ extension ChapterCanvasController {
         #if DEBUG
         lassoProbe?.recordToolAssignment(tool)
         #endif
+    }
+}
+
+// MARK: - 인계 (정책 §12-6 구현 순서 ②)
+
+extension ChapterCanvasController {
+    /// Feature 가 편집 세션을 닫거나 앱이 비활성화될 때 — 아직 보고하지 않은 편집을 **지금** 보고하고 끝났다고 알린다.
+    /// 시간을 재서 멎었다고 짐작하지 않는다(0.5초 대기는 완료 증명이 아니다). 획을 긋는 중이면 그 획이 끝난 뒤에 마친다.
+    fileprivate func requestHandoff(_ token: Int) {
+        pendingHandoffToken = token
+        guard !isUsingTool else { return }
+        completeHandoff()
+    }
+
+    fileprivate func completeHandoff() {
+        guard let token = pendingHandoffToken else { return }
+        pendingHandoffToken = nil
+        handoffTask?.cancel()
+        trailingEditTask?.cancel()
+        cancelCheckTask?.cancel()
+        let snapshot = hasUnreportedChange ? makeSnapshot(generation: appliedRevision) : nil
+        hasUnreportedChange = false
+        // 다음 턴에 한 Task 로 차례로 보낸다 — 뷰 갱신 도중에 액션을 보내지 않고, 편집이 인계 완료보다 먼저 도착한다.
+        // 보고할 변경이 없으면 열려 있을 수 있는 편집 구간을 닫는다(변경 없는 도구 사용의 취소 알림을 기다리지 않는다).
+        Task { @MainActor [weak self] in
+            if let snapshot {
+                self?.onEvent?(.editEnded(snapshot))
+            } else {
+                self?.onEvent?(.editCancelled)
+            }
+            self?.onEvent?(.handoffCompleted(token: token))
+        }
     }
 }

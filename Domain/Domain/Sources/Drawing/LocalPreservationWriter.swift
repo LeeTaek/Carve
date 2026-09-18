@@ -28,9 +28,16 @@ public struct VerseDraftKey: Hashable, Codable, Sendable {
 
     /// 파일 이름. 구성요소에 경로 구분자가 들어오지 않게 바꾼다.
     var fileName: String {
-        [translation, title, "\(chapter)", "\(verse)"]
-            .map { $0.replacingOccurrences(of: "/", with: "_") }
-            .joined(separator: "~") + ".json"
+        Self.fileStem([translation, title, "\(chapter)", "\(verse)"]) + ".json"
+    }
+
+    /// 한 장의 초안 파일 이름이 모두 이것으로 시작한다 — 파일을 열지 않고 장으로 거른다.
+    static func chapterFilePrefix(translation: Translation, chapter: BibleChapter) -> String {
+        fileStem([translation.rawValue, chapter.title.rawValue, "\(chapter.chapter)"]) + "~"
+    }
+
+    private static func fileStem(_ components: [String]) -> String {
+        components.map { $0.replacingOccurrences(of: "/", with: "_") }.joined(separator: "~")
     }
 }
 
@@ -38,6 +45,8 @@ public struct VerseDraftKey: Hashable, Codable, Sendable {
 public struct VerseDraft: Codable, Equatable, Sendable {
     public var key: VerseDraftKey
     public var revision: Int
+    /// 이 내용이 가는 행. 저장소에 행이 없던 절이면 편집이 미리 발급한 새 행이다 — 다시 열어도 같은 행으로 이어 쓴다.
+    public var rowID: BibleDrawingRowID
     public var lineData: Data?
     public var drawingVersion: Int?
     public var layoutMetadataData: Data?
@@ -54,6 +63,7 @@ public struct VerseDraft: Codable, Equatable, Sendable {
     public init(
         key: VerseDraftKey,
         revision: Int,
+        rowID: BibleDrawingRowID,
         lineData: Data?,
         drawingVersion: Int?,
         layoutMetadataData: Data?,
@@ -67,6 +77,7 @@ public struct VerseDraft: Codable, Equatable, Sendable {
     ) {
         self.key = key
         self.revision = revision
+        self.rowID = rowID
         self.lineData = lineData
         self.drawingVersion = drawingVersion
         self.layoutMetadataData = layoutMetadataData
@@ -77,6 +88,12 @@ public struct VerseDraft: Codable, Equatable, Sendable {
         self.storeOwnership = storeOwnership
         self.eraseGeneration = eraseGeneration
         self.savedAt = savedAt
+    }
+
+    /// 이 초안이 든 내용의 지문. 비운 절(`lineData == nil`)이면 nil — 저장소의 빈 절과 같다.
+    public var contentFingerprint: String? {
+        guard lineData != nil else { return nil }
+        return VerseContentFingerprint.make(lineData: lineData, drawingVersion: drawingVersion, layoutMetadataBlob: layoutMetadataData)
     }
 }
 
@@ -143,11 +160,15 @@ public actor LocalPreservationWriter {
     // MARK: - 초안
 
     /// 초안을 저장한다. 같은 키에 더 새 revision 이 이미 있으면 덮지 않는다(늦게 도착한 옛 쓰기).
-    public func saveDraft(_ draft: VerseDraft) throws -> WriteOutcome {
+    ///
+    /// - Parameter superseding: 이 초안이 이어받은 **다른 세션의** 초안. 새 초안이 내구성 있게 저장된 **뒤에** 지운다 — 그 사이에 끊기면
+    ///   둘 다 남을 뿐 어느 쪽도 잃지 않는다. 같은 세션의 키는 지우지 않는다(방금 쓴 초안이다).
+    public func saveDraft(_ draft: VerseDraft, superseding: [VerseDraftKey] = []) throws -> WriteOutcome {
         let current = try requireGeneration()
         guard draft.eraseGeneration == current else { return .rejectedByErase(current: current) }
         try stampLiveDirectory(current)
-        let url = draftURL(draft.key, scope: draft.account.preservationScope)
+        let scope = draft.account.preservationScope
+        let url = draftURL(draft.key, scope: scope)
         if let existing = try? readDraft(at: url), existing.revision > draft.revision {
             return .written
         }
@@ -155,6 +176,16 @@ public actor LocalPreservationWriter {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         try DurableFile.write(try encoder.encode(draft), to: url)
+        for key in superseding where key.sessionID != draft.key.sessionID {
+            let old = draftURL(key, scope: scope)
+            guard fileManager.fileExists(atPath: old.path) else { continue }
+            do {
+                try fileManager.removeItem(at: old)
+            } catch {
+                // 남아도 잃는 것은 없다 — 다음에 불러올 때 다시 판정한다.
+                Log.error("로컬 보존 — 이어받은 초안을 지우지 못했다", "\(error)")
+            }
+        }
         return .written
     }
 
@@ -175,6 +206,22 @@ public actor LocalPreservationWriter {
             .compactMap { try? readDraft(at: $0) }
             .filter { $0.eraseGeneration == current }
             .sorted { ($0.key.sessionID, $0.key.chapter, $0.key.verse) < ($1.key.sessionID, $1.key.chapter, $1.key.verse) }
+    }
+
+    /// 한 묶음에서 한 장의 초안들. 파일 이름으로 먼저 거르므로 다른 장의 초안은 열지 않는다. 지금 세대의 것만 준다.
+    public func drafts(in scope: AccountScope, chapter: BibleChapter, translation: Translation = .NKRV) throws -> [VerseDraft] {
+        let current = try requireGeneration()
+        let root = area.draftsDirectory.appendingPathComponent(scope.key, isDirectory: true)
+        guard let walker = fileManager.enumerator(at: root, includingPropertiesForKeys: nil) else { return [] }
+        let prefix = VerseDraftKey.chapterFilePrefix(translation: translation, chapter: chapter)
+        return walker.compactMap { $0 as? URL }
+            .filter { $0.pathExtension == "json" && $0.lastPathComponent.hasPrefix(prefix) }
+            .compactMap { try? readDraft(at: $0) }
+            .filter {
+                $0.eraseGeneration == current && $0.key.translation == translation.rawValue
+                    && $0.key.title == chapter.title.rawValue && $0.key.chapter == chapter.chapter
+            }
+            .sorted { ($0.key.verse, $0.key.sessionID) < ($1.key.verse, $1.key.sessionID) }
     }
 
     // MARK: - 격리
@@ -297,5 +344,30 @@ public extension DependencyValues {
     var localPreservationWriter: LocalPreservationWriter? {
         get { self[LocalPreservationWriterKey.self] }
         set { self[LocalPreservationWriterKey.self] = newValue }
+    }
+}
+
+/// 편집 화면이 쓰는 절 초안 저장 — 이 기기의 비동기화 보존 영역(`LocalPreservationWriter`)이 구현한다 (정책 §12-6 구현 순서 ②).
+///
+/// 편집 화면은 초안을 쓰고 · 장 단위로 읽고 · 저장을 마친 것을 지울 뿐이다. 전체 삭제 · 격리는 이 경계 밖이다.
+public protocol VerseDraftStore: Sendable {
+    func saveDraft(_ draft: VerseDraft, superseding: [VerseDraftKey]) async throws -> LocalPreservationWriter.WriteOutcome
+    func drafts(in scope: AccountScope, chapter: BibleChapter, translation: Translation) async throws -> [VerseDraft]
+    func removeDraft(_ key: VerseDraftKey, scope: AccountScope, ifRevision revision: Int) async throws
+}
+
+extension LocalPreservationWriter: VerseDraftStore {}
+
+private enum VerseDraftStoreKey: DependencyKey {
+    /// 앱이 `LocalPreservationWriter` 를 주입한다. 없으면 초안을 남기지 못한다 — 편집 화면은 초안이 유일한 보존일 때 실패로 알린다.
+    static let liveValue: (any VerseDraftStore)? = nil
+    static let testValue: (any VerseDraftStore)? = nil
+}
+
+public extension DependencyValues {
+    /// 편집 화면의 절 초안 저장.
+    var verseDraftStore: (any VerseDraftStore)? {
+        get { self[VerseDraftStoreKey.self] }
+        set { self[VerseDraftStoreKey.self] = newValue }
     }
 }

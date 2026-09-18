@@ -68,6 +68,11 @@ extension ChapterCanvasFeature {
     /// 확인창을 거친 지우기의 시작. 보관 rowID 를 **여기서 한 번만** 발급한다.
     func beginErase(state: inout State, verse: Int) -> Effect<Action> {
         guard state.isComposed, state.eraseTask == nil else { return .none }
+        guard state.persistsToStore else {
+            // 확인창을 띄운 뒤 세션이 저장소에 쓰지 않게 됐다(계정 확인 대기 등). 저장소 행을 바꾸지 않는다.
+            Log.error("단일 Canvas — 저장소에 쓰지 않는 세션이라 지우기를 하지 않는다", "verse=\(verse)")
+            return .none
+        }
         state.eraseTask = VerseEraseTask(
             verse: verse,
             chapter: state.chapter,

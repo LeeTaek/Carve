@@ -64,11 +64,6 @@ struct CarveApp: App {
             localPreservation: localPreservation
         )
         self.drawingEditEnvironment = drawingEditEnvironment
-        // 무효가 된 편집 세션의 미저장분을 남기는 곳. 직렬화 경계를 거쳐, 전체 삭제 뒤의 늦은 격리는 거절된다.
-        let drawingQuarantine = WriterDrawingQuarantine(
-            writer: localPreservation,
-            deviceID: (try? InstallationID.load(at: InstallationID.liveURL)) ?? "installation-unreadable"
-        )
         self.modelContainer = modelContainer
         let adConsent = AdConsentCoordinator(purchases: purchaseClient)
         self.adConsent = adConsent
@@ -81,7 +76,6 @@ struct CarveApp: App {
             purchaseClient: purchaseClient,
             sentenceSettingBackup: sentenceSettingBackup,
             drawingEditEnvironment: drawingEditEnvironment,
-            drawingQuarantine: drawingQuarantine,
             localPreservation: localPreservation
         )
         Task { await drawingEditEnvironment.start() }
@@ -156,7 +150,6 @@ extension CarveApp {
         purchaseClient: any PurchaseClient,
         sentenceSettingBackup: any SentenceSettingBackupClient,
         drawingEditEnvironment: any DrawingEditEnvironmentClient,
-        drawingQuarantine: any DrawingQuarantineClient,
         localPreservation: LocalPreservationWriter
     ) -> StoreOf<AppCoordinatorFeature> {
         withDependencies {
@@ -167,8 +160,9 @@ extension CarveApp {
             $0.purchaseClient = purchaseClient
             $0.sentenceSettingBackup = sentenceSettingBackup
             $0.drawingEditEnvironment = drawingEditEnvironment
-            $0.drawingQuarantine = drawingQuarantine
             $0.localPreservationWriter = localPreservation
+            // 편집 화면의 절 초안 — 무효가 된 세션의 미저장분도 그 세션의 초안으로 남는다(정책 §12-6 구현 순서 ②, ① 의 격리를 대신한다).
+            $0.verseDraftStore = localPreservation
             $0.photoLibraryClient = PhotoKitLibraryClient()
             $0.widgetVerseClient = AppGroupWidgetVerseClient()
             $0.analyticsClient = FirebaseAnalyticsClient()

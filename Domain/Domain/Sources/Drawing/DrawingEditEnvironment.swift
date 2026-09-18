@@ -271,7 +271,22 @@ public struct StubDrawingEditEnvironment: DrawingEditEnvironmentClient {
 private enum DrawingEditEnvironmentKey: DependencyKey {
     /// 앱이 `LiveDrawingEditEnvironment` 를 주입한다. 주입하지 않았으면 확인 전 환경 — 서버 작업을 하지 않는다.
     static let liveValue: any DrawingEditEnvironmentClient = StubDrawingEditEnvironment(.unknown)
-    static let testValue: any DrawingEditEnvironmentClient = StubDrawingEditEnvironment(.unknown)
+    /// 시험 기본값 — **소유가 확인된 유효 환경**. 저장 경로 시험이 계정 근거와 무관하게 저장소 저장을 보게 한다.
+    /// 확인 전 · 보존만 · 초안 전용 동작은 시험이 환경을 직접 준다.
+    static let testValue: any DrawingEditEnvironmentClient = StubDrawingEditEnvironment(.ownedForTesting)
+}
+
+public extension DrawingEditEnvironment {
+    /// 시험용 — 확인된 계정에 저장소 소유 근거까지 있는 유효 환경. 앱은 쓰지 않는다.
+    static let ownedForTesting: DrawingEditEnvironment = {
+        let scope = AccountScope(key: "acct-testing")
+        return DrawingEditEnvironment(
+            accountState: .confirmed(scope),
+            serverWork: AccountServerWorkToken(scope: scope, generation: 1),
+            knowledge: EraseEpochKnowledge(),
+            storeOwnership: scope
+        )
+    }()
 }
 
 public extension DependencyValues {

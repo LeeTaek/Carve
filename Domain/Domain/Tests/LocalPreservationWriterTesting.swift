@@ -34,10 +34,18 @@ struct LocalPreservationWriterTesting {
         ))
     }
 
-    private func draft(verse: Int = 1, revision: Int = 1, generation: UInt64 = 0, session: String = "session-1", ink: String = "획") -> VerseDraft {
+    private func draft(
+        verse: Int = 1,
+        revision: Int = 1,
+        generation: UInt64 = 0,
+        session: String = "session-1",
+        ink: String = "획",
+        chapter: BibleChapter? = nil
+    ) -> VerseDraft {
         VerseDraft(
-            key: VerseDraftKey(sessionID: session, chapter: chapter, verse: verse),
+            key: VerseDraftKey(sessionID: session, chapter: chapter ?? self.chapter, verse: verse),
             revision: revision,
+            rowID: BibleDrawingRowID(raw: "row-\(verse)"),
             lineData: Data(ink.utf8),
             drawingVersion: 3,
             layoutMetadataData: nil,
@@ -205,6 +213,61 @@ struct LocalPreservationWriterTesting {
             let unverifiedDrafts = try await writer.drafts(in: .unverified)
             #expect(confirmedDrafts.map(\.key.verse) == [1])
             #expect(unverifiedDrafts.map(\.key.verse) == [2])
+        }
+    }
+
+    // MARK: - ②-2 장 단위 조회 · 이어받은 초안
+
+    @Test("장 단위로 읽으면 그 장의 초안만 준다 — 다른 장 · 다른 권은 열지 않는다")
+    func draftsFilteredByChapter() async throws {
+        try await withAreas { areas in
+            let writer = LocalPreservationWriter(area: areas.preservation, eraseState: areas.eraseState)
+            let otherChapter = BibleChapter(title: .genesis, chapter: 11)
+            let otherBook = BibleChapter(title: .exodus, chapter: 1)
+            for item in [draft(verse: 2), draft(verse: 1, session: "session-2"), draft(verse: 1, chapter: otherChapter),
+                         draft(verse: 1, chapter: otherBook)] {
+                let outcome = try await writer.saveDraft(item)
+                #expect(outcome == .written)
+            }
+
+            let found = try await writer.drafts(in: account, chapter: chapter)
+            #expect(found.map { "\($0.key.verse)/\($0.key.sessionID)" } == ["1/session-2", "2/session-1"])
+            let eleven = try await writer.drafts(in: account, chapter: otherChapter)
+            #expect(eleven.map(\.key.chapter) == [11])
+        }
+    }
+
+    @Test("이어받은 다른 세션의 초안은 새 초안을 쓴 뒤에 지우고, 같은 세션 키는 지우지 않는다")
+    func supersededDraftsAreRemovedAfterWriting() async throws {
+        try await withAreas { areas in
+            let writer = LocalPreservationWriter(area: areas.preservation, eraseState: areas.eraseState)
+            let old = draft(verse: 1, session: "session-old", ink: "옛")
+            let untouched = draft(verse: 2, session: "session-old", ink: "다른 절")
+            _ = try await writer.saveDraft(old)
+            _ = try await writer.saveDraft(untouched)
+
+            let next = draft(verse: 1, session: "session-new", ink: "이어 씀")
+            let outcome = try await writer.saveDraft(next, superseding: [old.key, next.key])
+            #expect(outcome == .written)
+
+            let remaining = try await writer.drafts(in: account, chapter: chapter)
+            #expect(remaining.map { "\($0.key.verse)/\($0.key.sessionID)" } == ["1/session-new", "2/session-old"])
+        }
+    }
+
+    @Test("전체 삭제 뒤의 늦은 초안은 이어받은 초안도 지우지 않는다")
+    func rejectedDraftKeepsSupersededOne() async throws {
+        try await withAreas { areas in
+            let writer = LocalPreservationWriter(area: areas.preservation, eraseState: areas.eraseState)
+            let old = draft(verse: 1, session: "session-old")
+            _ = try await writer.saveDraft(old)
+            // 세대 0 에 기댄 쓰기가 전체 삭제(세대 1) 뒤에 도착한다. 삭제가 이미 옛 초안까지 지웠으므로 남은 것이 없어야 한다.
+            try await writer.eraseAllLocal()
+            let late = draft(verse: 1, generation: 0, session: "session-new")
+            let outcome = try await writer.saveDraft(late, superseding: [old.key])
+            #expect(outcome == .rejectedByErase(current: 1))
+            let remaining = try await writer.drafts(in: account, chapter: chapter)
+            #expect(remaining.isEmpty)
         }
     }
 }

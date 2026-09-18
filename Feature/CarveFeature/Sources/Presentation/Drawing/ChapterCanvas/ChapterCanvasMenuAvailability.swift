@@ -58,10 +58,13 @@ extension ChapterCanvasFeature {
             $0.rowID != representative?.rowID && DrawingContentRule.hasStrokes($0.lineData)
         }
 
+        // 지우기(보관 후 초기화)와 기록 복원은 저장소 행을 바꾼다. 귀속할 근거가 없는 세션은 저장소에 쓰지 않으므로 띄우지 않는다 —
+        // 초안에만 있는 필기를 두고 저장소 행만 바꾸면 다시 읽을 때 초안이 되살아나 지운 절이 돌아온다(§12-6 구현 순서 ②, ③ 에서 버전으로 되살린다).
+        let writesStore = state.persistsToStore
         return ChapterCanvasMenuAvailability(
             canFavorite: true,
-            canViewHistory: canViewHistory,
-            canErase: currentInkSnapshot(verse: verse, representative: representative, state: state) != nil
+            canViewHistory: writesStore && canViewHistory,
+            canErase: writesStore && currentInkSnapshot(verse: verse, representative: representative, state: state) != nil
         )
     }
 

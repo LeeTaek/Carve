@@ -28,6 +28,8 @@ struct ChapterCanvasView: UIViewControllerRepresentable {
         var redoRequestVersion: Int
         var scrollRequest: ChapterCanvasFeature.State.ScrollRequest?
         var layout: ChapterLayout?
+        /// 인계 요청 토큰 — 바뀌면 컨트롤러가 미보고 편집을 보고하고 끝났다고 알린다(정책 §12-6 구현 순서 ②).
+        var handoffToken: Int
 
         init(_ state: ChapterCanvasFeature.State) {
             renderedData = state.renderedData
@@ -38,6 +40,7 @@ struct ChapterCanvasView: UIViewControllerRepresentable {
             redoRequestVersion = state.redoRequestVersion
             scrollRequest = state.scrollRequest
             layout = state.layout
+            handoffToken = state.handoffToken
         }
     }
 
@@ -106,7 +109,8 @@ struct ChapterCanvasView: UIViewControllerRepresentable {
             undoRequestVersion: display.undoRequestVersion,
             redoRequestVersion: display.redoRequestVersion,
             scrollRequest: display.scrollRequest,
-            layout: display.layout
+            layout: display.layout,
+            handoffToken: display.handoffToken
         ))
     }
 
@@ -175,6 +179,8 @@ struct ChapterCanvasView: UIViewControllerRepresentable {
                 onScroll(previous, current)
             case let .menuRequested(point, anchor, verseFrame):
                 store.send(.verseMenuRequested(at: point, anchor: anchor, verseFrame: verseFrame))
+            case .handoffCompleted(let token):
+                store.send(.editHandoffCompleted(token: token))
             }
         }
     }
