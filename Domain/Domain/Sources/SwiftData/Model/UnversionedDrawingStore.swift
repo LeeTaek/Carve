@@ -20,7 +20,9 @@ enum UnversionedDrawingStore {
     /// 1.0.0 ~ 1.0.3 — `creationDate` · `updateDate` 가 없다.
     ///
     /// - Note: 1.0.0 은 앞의 네 속성을 `let` 으로 선언했다(`0998d2ff` "iOS18 Swiftdata crash 수정" 에서 `var`).
-    ///         조회 조건(`titleName` · `titleChapter` · `section`)에 쓰였으므로 저장 속성이었다.
+    ///         조회 조건(`titleName` · `titleChapter` · `section`)에 쓰였으므로 저장 속성이었고,
+    ///         `let` 으로 선언해도 **엔티티 해시가 아래 `var` 선언과 같다**(2026-09-18 실측 — 기본값 유무도 해시를 바꾸지 않는다).
+    ///         그래서 이 한 모양으로 1.0.0 ~ 1.0.3 저장소를 모두 받는다.
     enum Release100 {
         @Model
         final class DrawingVO {
