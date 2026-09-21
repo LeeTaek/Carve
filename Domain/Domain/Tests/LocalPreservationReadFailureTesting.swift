@@ -184,6 +184,49 @@ struct LocalPreservationReadFailureTesting {
         }
     }
 
+    // MARK: - 옛 형식
+
+    /// ②-2 이전에 쓴 초안 파일 — `storeState` · `ownershipInjected` · `sentFingerprints` 가 없다. 새 앱이 그 파일을 그대로 읽어야
+    /// 그 필기가 화면 · 복구에서 사라지지 않는다(11차 리뷰 P1, 고정 표본).
+    @Test("새 선택 항목이 없던 옛 초안 파일도 그대로 읽히고, 다시 쓰면 지금 형식이 된다")
+    func legacyDraftFileStillDecodes() async throws {
+        try await withAreas { areas in
+            let writer = LocalPreservationWriter(area: areas.preservation, eraseState: areas.eraseState)
+            let legacy = """
+            {"account":{"confirmed":{"_0":{"generation":2,"scope":{"key":"acct-a"}}}},\
+            "base":{"legacy":{"contentFingerprint":"vc1-base","rowID":{"raw":"row-a"}}},\
+            "baseFingerprint":"vc1-base","drawingVersion":3,"eraseGeneration":0,\
+            "key":{"chapter":1,"sessionID":"legacy-session","title":"1-01Genesis.txt","translation":"NKRV","verse":1},\
+            "knownEpochs":["E1"],"lineData":"AQID","revision":4,"rowID":{"raw":"row-a"},"savedAt":766000000}
+            """
+            let url = areas.preservation.draftsDirectory
+                .appendingPathComponent(account.key, isDirectory: true)
+                .appendingPathComponent("legacy-session", isDirectory: true)
+                .appendingPathComponent("NKRV~1-01Genesis.txt~1~1.json")
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data(legacy.utf8).write(to: url)
+
+            let read = try #require(try await writer.drafts(in: account, chapter: BibleChapter(title: .genesis, chapter: 1)).first)
+            #expect(read.key.sessionID == "legacy-session")
+            #expect(read.revision == 4)
+            #expect(read.lineData == Data([1, 2, 3]))
+            #expect(read.base == .legacy(rowID: BibleDrawingRowID(raw: "row-a"), contentFingerprint: "vc1-base"))
+            #expect(read.account == .confirmed(AccountServerWorkToken(scope: AccountScope(key: "acct-a"), generation: 2)))
+            #expect(read.knownEpochs == ["E1"])
+            // 새 항목은 "없음" 으로 읽힌다 — 보낸 적 없고, 주입도 아니고, 넣은 내용 기록도 없다.
+            #expect(read.storeState == nil)
+            #expect(read.ownershipInjected == nil)
+            #expect(read.sentFingerprints == nil)
+
+            // 그 위에 지금 형식으로 다시 써도 읽힌다.
+            var next = read
+            next.revision = 5
+            next.storeState = .sending
+            #expect(try await writer.saveDraft(next) == .written)
+            #expect(try await writer.drafts(in: account, chapter: BibleChapter(title: .genesis, chapter: 1)).first?.storeState == .sending)
+        }
+    }
+
     // MARK: - 덮지 않기
 
     @Test("같은 키의 읽지 못하는 초안은 덮지 않고 옆으로 옮겨 남긴다 — 새 초안은 그대로 읽힌다")

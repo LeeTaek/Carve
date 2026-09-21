@@ -101,4 +101,85 @@ struct ChapterCanvasClosedSessionTesting: DraftTestSamples {
         #expect(store.state.closedDrafts.contexts.isEmpty)
         await end(store, environment)
     }
+    /// 캔버스가 둘일 때다(화면 분할 · 뷰 재생성 직후). 하나가 새 세대를 표시해도 **다른 하나가 아직 옛 세대를 보고 있으면**
+    /// 그 세대의 늦은 편집이 올 수 있다 — 문맥을 놓으면 그 편집을 계산할 기준이 사라진다(11차 리뷰 P1).
+    @Test("캔버스 둘 가운데 하나만 새 세대를 표시하면 문맥을 두고, 남은 캔버스의 늦은 편집을 그 세션의 초안으로 남긴다")
+    func crossedHandoffBetweenTwoCanvases() async throws {
+        let spy = RepositorySpy()
+        let environment = ControlledEditEnvironment(confirmed(accountA, 1))
+        let drafts = RecordingDraftStore()
+        let first = UUID(710)
+        let second = UUID(711)
+        let store = makeStore(
+            spy: spy, results: [CanvasTestSupport.createResult("a"), CanvasTestSupport.createResult("late")],
+            environment: environment, drafts: drafts, clock: TestClock()
+        )
+        await composeAndSubscribe(store, environment)
+        await attachCanvas(store, id: first)
+        await attachCanvas(store, id: second)
+        let oldGeneration = store.state.renderedRevision
+        await holdOneEdit(store, spy)
+        await store.receive(\.draftsSaved)
+        let closingSession = try #require(store.state.drafts.sessionID)
+
+        // 계정이 바뀌어 세션을 닫는다. 인계는 마쳤다.
+        environment.change(to: confirmed(accountB, 2))
+        await store.receive(\.editEnvironmentChanged)
+        await store.send(.editHandoffCompleted(token: store.state.handoffToken))
+        spy.releaseApply()
+        await store.receive(\.drawingsLoaded)
+
+        // 한 캔버스만 새 세대를 표시했다 — 다른 하나는 아직 옛 세대다.
+        await store.send(.canvasDisplayed(id: first, revision: store.state.renderedRevision))
+        #expect(store.state.closedDrafts.contexts.map(\.generation).contains(oldGeneration))
+
+        // 남은 캔버스가 그 옛 세대의 편집을 이제 보고한다.
+        await store.send(.editEnded(CanvasTestSupport.edit("late", generation: oldGeneration)))
+        await store.receive(\.mutationsPrepared)
+        await store.receive(\.draftsSaved)
+
+        let late = try #require(drafts.stored(in: accountA).first { $0.lineData == Data("create-late".utf8) })
+        #expect(late.key.sessionID == closingSession)
+        #expect(drafts.stored(in: accountB).isEmpty)
+        #expect(spy.applied.value.count == 1)
+
+        // 남은 캔버스가 떨어지면(떨어지며 마지막 보고를 마친다) 더 올 보고가 없다 — 문맥을 놓는다.
+        await store.send(.canvasDetached(id: second))
+        #expect(store.state.closedDrafts.contexts.isEmpty)
+        #expect(store.state.closedDrafts.pending.isEmpty)
+        await end(store, environment)
+    }
+
+    /// 한 캔버스가 떨어져도 남은 캔버스가 옛 세대를 보고 있으면 문맥을 놓지 않는다.
+    @Test("캔버스 하나가 떨어져도 남은 캔버스가 옛 세대면 닫은 문맥을 둔다")
+    func detachOfOneCanvasKeepsContextForTheOther() async throws {
+        let spy = RepositorySpy()
+        let environment = ControlledEditEnvironment(confirmed(accountA, 1))
+        let drafts = RecordingDraftStore()
+        let first = UUID(712)
+        let second = UUID(713)
+        let store = makeStore(spy: spy, results: [CanvasTestSupport.createResult("a")], environment: environment, drafts: drafts)
+        await composeAndSubscribe(store, environment)
+        await attachCanvas(store, id: first)
+        await attachCanvas(store, id: second)
+        let oldGeneration = store.state.renderedRevision
+        await draw(store)
+        await store.receive(\.draftsSaved)
+        await store.receive(\.saveFinished)
+
+        environment.change(to: confirmed(accountB, 2))
+        await store.receive(\.editEnvironmentChanged)
+        await store.receive(\.drawingsLoaded)
+
+        // 한 캔버스가 새 세대를 표시하고 떨어졌다. 남은 캔버스는 아직 옛 세대다.
+        await store.send(.canvasDisplayed(id: first, revision: store.state.renderedRevision))
+        await store.send(.canvasDetached(id: first))
+        #expect(store.state.closedDrafts.contexts.map(\.generation) == [oldGeneration])
+        #expect(store.state.hasCanvas)
+
+        await store.send(.canvasDisplayed(id: second, revision: store.state.renderedRevision))
+        #expect(store.state.closedDrafts.contexts.isEmpty)
+        await end(store, environment)
+    }
+
 }
