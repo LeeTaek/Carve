@@ -75,6 +75,8 @@ enum VerseDraftContinuation: Equatable, Sendable {
 ///     사라졌을 수 있어(기존 필기를 고친 F29 — 올라간 적 없는 행) 기준 대신 **그 절이 비었는지**를 본다. 다른 내용이 들어와 있으면 가리지 않는다.
 ///   - 행이 편집 전 내용(기준) 그대로다 → 저장이 일어나지 않았거나, 계정 전환으로 지워진 뒤 옛 내용으로 다시 들어왔다(F29). 이 초안이
 ///     유일한 사본이다 — 보통 규칙으로 잇는다.
+///   - 행이 **내가 앞서 넣은 내용**(`sentFingerprints`) 그대로다 → 그 뒤 revision 은 저장소에 닿지 않았다(전송 전 전환으로 서버 내용이
+///     돌아온 경우 — ACC-1 2차 ⑪). 기준이 달라도 이 초안이 그 뒤 내용의 유일한 사본이므로 근거만 보고 잇는다.
 ///   - 행이 그 뒤로 바뀌었다(지우기 · 복원 · 다른 기기) → 보이지 않고 남긴다. 보내던 중이었고 들어갔는지 가릴 수 없으면 **저장 완료가
 ///     불확실한 초안**으로 따로 센다.
 /// - **보이는 것도 자동으로 저장소에 쓰지 않는다.** 겹쳐 보일 뿐이고, 사용자가 그 절을 다시 편집해야 그 세션의 초안 · 저장이 된다.
@@ -109,6 +111,13 @@ public enum VerseDraftRecoveryRule {
                     if uncertain { plan.uncertain.append(draft) }
                 case .candidate:
                     if let continuation = continuation(of: draft, storeFingerprint: storeContent[verse], environment: environment) {
+                        candidates.append((draft, continuation))
+                    } else {
+                        plan.kept.append(draft)
+                    }
+                case .resumable:
+                    // 기준은 달라졌지만 달라진 내용이 **내가 넣은 것**이다 — 근거(계정 · K · 소유)만 보고 잇는다.
+                    if let continuation = continuation(of: draft, environment: environment) {
                         candidates.append((draft, continuation))
                     } else {
                         plan.kept.append(draft)
@@ -151,6 +160,8 @@ public enum VerseDraftRecoveryRule {
         case settled
         /// 이어 볼 후보다(근거 · 기준 판정은 `continuation`).
         case candidate
+        /// 그 행이 내가 앞서 넣은 내용으로 돌아왔다 — 기준 대신 그 사실로 잇는다(근거만 본다).
+        case resumable
         /// 저장소로 보낸 행이 사라졌다 — 되살릴 수 있게 보이되 근거가 유효해도 보이기만 한다.
         case orphaned
         /// 보이지 않고 남긴다. `uncertain` 이면 저장 완료가 불확실하다.
@@ -168,6 +179,10 @@ public enum VerseDraftRecoveryRule {
             return draft.contentFingerprint == verseContent ? .settled : .orphaned
         }
         if row.contentFingerprint == draft.contentFingerprint { return .settled }
+        if let sent = draft.sentFingerprints, let now = row.contentFingerprint, sent.contains(now) {
+            // 내가 넣었던 내용 그대로다 — 그 뒤 revision 은 저장소에 닿지 못했다(전송 전 계정 전환 · 종료).
+            return .resumable
+        }
         if case .legacy(let baseRow, let baseFingerprint) = draft.base, baseRow == draft.rowID, row.contentFingerprint == baseFingerprint {
             // 그 행이 편집 전 내용 그대로다 — 저장이 일어나지 않았거나(보내기 전 종료), 계정 전환으로 지워진 뒤 옛 내용으로 다시 들어왔다(F29).
             // 이 초안이 유일한 사본이다.

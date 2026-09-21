@@ -64,6 +64,12 @@ public struct VerseDraft: Codable, Equatable, Sendable {
     public var storeState: VerseDraftStoreState?
     /// 소유 근거가 시험용 주입이었다(`DrawingEditEnvironment.ownershipInjected`). 주입 없는 실행은 이 초안의 소유 근거를 없는 것으로 읽는다.
     public var ownershipInjected: Bool?
+    /// **저장소에 넣은 내용의 지문들**(최근 것부터). 표식을 남길 때마다 그때 넣은 내용을 적는다.
+    ///
+    /// 표식(`storeState`)만으로는 "무엇을 넣었는지" 를 모른다. 그래서 계정 전환으로 그 행이 **내가 앞서 넣은 내용**으로 돌아왔을 때
+    /// (ACC-1 2차 ⑪ — 전송 전 수정이 사라지고 서버 내용이 돌아온다) 그 뒤 편집을 남의 변경과 구분하지 못해 감췄다. 이 목록이 있으면
+    /// 돌아온 행이 내가 넣었던 내용인지 가려, 그 뒤 revision 을 유일한 사본으로 이어 보인다.
+    public var sentFingerprints: [String]?
 
     public init(
         key: VerseDraftKey,
@@ -80,7 +86,8 @@ public struct VerseDraft: Codable, Equatable, Sendable {
         eraseGeneration: UInt64,
         savedAt: Date,
         storeState: VerseDraftStoreState? = nil,
-        ownershipInjected: Bool? = nil
+        ownershipInjected: Bool? = nil,
+        sentFingerprints: [String]? = nil
     ) {
         self.key = key
         self.revision = revision
@@ -97,6 +104,7 @@ public struct VerseDraft: Codable, Equatable, Sendable {
         self.savedAt = savedAt
         self.storeState = storeState
         self.ownershipInjected = ownershipInjected
+        self.sentFingerprints = sentFingerprints
     }
 
     /// 이 초안이 든 내용의 지문. 비운 절(`lineData == nil`)이면 nil — 저장소의 빈 절과 같다.
@@ -194,6 +202,9 @@ public actor LocalPreservationWriter {
         case draftsUnreadable(String)
     }
 
+    /// 초안에 남기는 "넣은 내용" 지문의 최대 개수. 왕복 한두 번을 덮을 만큼만 둔다.
+    static let sentFingerprintLimit = 5
+
     private static let generationFile = "local-erase-generation.json"
     private static let markerFile = "local-generation.json"
     private static let trashPrefix = ".erasing-"
@@ -237,9 +248,13 @@ public actor LocalPreservationWriter {
         try stampLiveDirectory(current)
         let scope = draft.account.preservationScope
         let url = draftURL(draft.key, scope: scope)
+        var draft = draft
         if fileManager.fileExists(atPath: url.path) {
             do {
-                if try readDraft(at: url).revision > draft.revision { return .written }
+                let existing = try readDraft(at: url)
+                if existing.revision > draft.revision { return .written }
+                // 앞선 revision 이 저장소에 넣은 내용의 지문을 이어받는다 — 이 키의 "무엇을 넣었는지" 기록은 revision 을 넘어 이어진다.
+                if draft.sentFingerprints == nil { draft.sentFingerprints = existing.sentFingerprints }
             } catch {
                 // 같은 키의 초안을 읽지 못한다 — 덮지 않고 옆으로 옮겨 남긴다(`.json` 이 아니라 읽기에서 빠진다). 복구는 ④ 에서 다룬다.
                 let aside = url.deletingPathExtension().appendingPathExtension("unreadable-\(UUID().uuidString)")
@@ -282,6 +297,13 @@ public actor LocalPreservationWriter {
         guard var existing = try? readDraft(at: url), existing.eraseGeneration == current, existing.revision <= revision,
               existing.storeState != .stored else { return }
         existing.storeState = .stored
+        // 무엇을 넣었는지도 함께 남긴다 — 그 행이 나중에 이 내용으로 돌아오면 그 뒤 편집이 전송되지 않은 것이다.
+        if let fingerprint = existing.contentFingerprint {
+            var sent = existing.sentFingerprints ?? []
+            sent.removeAll { $0 == fingerprint }
+            sent.insert(fingerprint, at: 0)
+            existing.sentFingerprints = Array(sent.prefix(Self.sentFingerprintLimit))
+        }
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         try DurableFile.write(try encoder.encode(existing), to: url)

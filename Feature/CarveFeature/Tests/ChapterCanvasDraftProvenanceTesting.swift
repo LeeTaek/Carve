@@ -122,7 +122,7 @@ struct ChapterCanvasDraftProvenanceTesting: DraftTestSamples {
     }
 
     /// 확인 전 초안은 "계정 미확인" 묶음에 남는다. 이어 그려도 그 근거(당시의 마지막 확인 힌트까지)를 지금 환경의 것으로 바꾸지 않는다.
-    @Test("처음부터 미확인이던 초안을 이어 그려도 그 미확인 근거가 남고, 계정이 확인돼도 그 계정으로 옮겨지지 않는다")
+    @Test("처음부터 미확인이던 초안을 이어 그려도 그 미확인 근거가 남고, 그 계정으로 확인돼도 보이기만 한다")
     func unverifiedDraftKeepsItsBasis() async throws {
         let spy = spyWithVerseOne()
         let unverified = DrawingEditEnvironment(accountState: .unconfirmed(lastConfirmed: nil), serverWork: nil,
@@ -149,7 +149,10 @@ struct ChapterCanvasDraftProvenanceTesting: DraftTestSamples {
         #expect(store.state.editEnvironment == confirmed(accountA, 1))
         #expect(drafts.stored(in: accountA).isEmpty)
         #expect(drafts.stored(in: .unverified).map(\.account) == [.unverified(hint: accountA)])
-        #expect(store.state.loadedDrawings?.first { $0.verse == 1 }?.lineData == Data([1]))
+        // 확인된 계정이 그 초안이 참고하던 계정과 같다 — 이어 보이되 **보이기만** 하고, 묶음 · 출처 · 저장소는 그대로다(사용자 결정 2026-09-21).
+        #expect(store.state.loadedDrawings?.first { $0.verse == 1 }?.lineData == Data("continued".utf8))
+        #expect(store.state.drafts.inherited[verseOne]?.account == .unverified(hint: accountA))
+        #expect(!store.state.writesStore(verse: 1))
         #expect(spy.applied.value.isEmpty)
         await end(store, environment)
     }
@@ -177,4 +180,46 @@ struct ChapterCanvasDraftProvenanceTesting: DraftTestSamples {
         #expect(!store.state.writesStore(verse: 2))
         await end(store, environment)
     }
+    // MARK: - 확인 전 묶음 (ACC-1 2차 ④ · 사용자 결정 2026-09-21)
+
+    @Test("확인 전에 쓴 초안은 그때 참고하던 계정으로 확인되면 보이기만 하고, 이어 그려도 그 묶음 · 출처에 남는다")
+    func unverifiedDraftIsCarriedIntoMatchingAccount() async throws {
+        let spy = spyWithVerseOne()
+        let drafts = RecordingDraftStore()
+        let carried = previousDraft(session: "unverified-session", ink: "확인 전", account: .unverified(hint: accountA))
+        drafts.seed(carried)
+        let environment = ControlledEditEnvironment(confirmed(accountA, 1))
+        let store = makeStore(spy: spy, results: [replaceVerseOne("이어")], environment: environment, drafts: drafts)
+        await composeAndSubscribe(store, environment)
+
+        #expect(store.state.loadedDrawings?.first { $0.verse == 1 }?.lineData == Data("확인 전".utf8))
+        #expect(store.state.drafts.inherited[verseOne] == carried.provenance)
+        #expect(!store.state.writesStore(verse: 1))
+
+        await draw(store, "이어")
+        await store.receive(\.draftsSaved)
+
+        let continued = try #require(drafts.stored(in: .unverified).first { $0.lineData == Data("이어".utf8) })
+        #expect(continued.account == .unverified(hint: accountA))
+        #expect(spy.applied.value.isEmpty)
+        #expect(drafts.stored(in: accountA).isEmpty)
+        await end(store, environment)
+    }
+
+    @Test("확인 전 초안의 힌트가 다른 계정이면 그 계정 화면에 보이지 않는다 — 파일은 남는다")
+    func unverifiedDraftWithOtherHintIsNotShown() async throws {
+        let spy = spyWithVerseOne()
+        let drafts = RecordingDraftStore()
+        let other = previousDraft(session: "unverified-other", ink: "다른 계정 참고", account: .unverified(hint: accountB))
+        drafts.seed(other)
+        let environment = ControlledEditEnvironment(confirmed(accountA, 1))
+        let store = makeStore(spy: spy, results: [], environment: environment, drafts: drafts)
+        await composeAndSubscribe(store, environment)
+
+        #expect(store.state.loadedDrawings?.first { $0.verse == 1 }?.lineData == Data([1]))
+        #expect(store.state.drafts.inherited[verseOne] == nil)
+        #expect(drafts.stored(in: .unverified) == [other])
+        await end(store, environment)
+    }
+
 }

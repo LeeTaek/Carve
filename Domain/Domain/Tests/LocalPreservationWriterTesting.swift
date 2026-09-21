@@ -315,6 +315,29 @@ struct LocalPreservationWriterTesting {
         }
     }
 
+    /// 표식만으로는 "무엇을 넣었는지" 를 모른다 — 계정 전환으로 그 행이 앞서 넣은 내용으로 돌아왔을 때 가릴 수 있어야 한다(ACC-1 2차 ⑪).
+    @Test("저장소에 넣은 내용의 지문을 초안에 남기고, 다음 revision 도 그 기록을 이어받는다")
+    func markStoredRecordsSentFingerprints() async throws {
+        try await withAreas { areas in
+            let writer = LocalPreservationWriter(area: areas.preservation, eraseState: areas.eraseState)
+            let first = draft(verse: 1, revision: 1, ink: "처음")
+            _ = try await writer.saveDraft(first)
+            try await writer.markDraftStored(first.key, scope: account, throughRevision: 1)
+            let firstSent = try #require(first.contentFingerprint)
+            #expect(try await writer.drafts(in: account, chapter: chapter).first?.sentFingerprints == [firstSent])
+
+            // 다음 revision 은 그 기록을 이어받고(아직 넣기 전), 넣고 나면 자기 내용을 앞에 더한다.
+            let second = draft(verse: 1, revision: 2, ink: "고침")
+            let secondSent = try #require(second.contentFingerprint)
+            _ = try await writer.saveDraft(second)
+            #expect(try await writer.drafts(in: account, chapter: chapter).first?.sentFingerprints == [firstSent])
+            try await writer.markDraftStored(second.key, scope: account, throughRevision: 2)
+            let after = try #require(try await writer.drafts(in: account, chapter: chapter).first)
+            #expect(after.sentFingerprints == [secondSent, firstSent])
+            #expect(after.storeState == .stored)
+        }
+    }
+
     @Test("전체 삭제 뒤의 늦은 초안은 이어받은 초안도 지우지 않는다")
     func rejectedDraftKeepsSupersededOne() async throws {
         try await withAreas { areas in

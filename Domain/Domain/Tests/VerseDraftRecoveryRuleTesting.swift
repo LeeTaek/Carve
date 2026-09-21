@@ -297,6 +297,32 @@ struct VerseDraftRecoveryRuleTesting {
         #expect(result.uncertain == [sending])
     }
 
+    /// 전송 전에 계정이 바뀌어 그 행이 **내가 앞서 넣은 내용**으로 돌아왔다(ACC-1 2차 ⑪). 그 뒤 revision 은 이 초안에만 있다.
+    @Test("행이 내가 넣었던 내용으로 돌아왔으면 기준이 달라도 이어 보고, 소유 근거가 없으면 보이기만 한다")
+    func rowBackToSentContentIsResumed() {
+        var sent = draft(ink: "고친 내용", storeOwnership: accountA, storeState: .stored)
+        sent.sentFingerprints = ["vc1-sent-old", sent.contentFingerprint ?? ""]
+        let rows = [sent.rowID: row("vc1-sent-old")]
+
+        let owned = plan([sent], store: [1: "vc1-sent-old"], environment: confirmed(accountA, owned: true), rows: rows)
+        #expect(owned.shown == [sent])
+        #expect(owned.showOnly.isEmpty)
+
+        let unowned = plan([sent], store: [1: "vc1-sent-old"], environment: confirmed(accountA), rows: rows)
+        #expect(unowned.shown == [sent])
+        #expect(unowned.showOnly == [sent.key])
+    }
+
+    @Test("내가 넣은 적 없는 내용으로 바뀐 행은 그대로 보존만 한다 — 넣은 지문 기록이 있어도 같다")
+    func rowWithForeignContentIsStillKept() {
+        var sent = draft(ink: "고친 내용", storeOwnership: accountA, storeState: .stored)
+        sent.sentFingerprints = ["vc1-sent-old"]
+        let result = plan([sent], store: [1: "vc1-remote"], environment: confirmed(accountA, owned: true),
+                          rows: [sent.rowID: row("vc1-remote")])
+        #expect(result.shown.isEmpty)
+        #expect(result.kept == [sent])
+    }
+
     // MARK: - 시험용 소유 주입
 
     @Test("시험용으로 주입한 소유 근거의 초안은 주입 없는 환경에서 보이기만 하고, 주입 환경에서는 이어 쓴다")

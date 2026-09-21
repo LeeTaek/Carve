@@ -488,9 +488,15 @@ extension ChapterCanvasFeature {
         chapter: BibleChapter
     ) async throws -> [VerseDraft] {
         guard let store else { return [] }
-        let drafts: [VerseDraft]
+        var drafts: [VerseDraft]
         do {
             drafts = try await store.drafts(in: environment.accountBasis.preservationScope, chapter: chapter, translation: .NKRV)
+            // 계정을 확인하기 전에 쓴 초안도, 그때 참고하던 계정이 지금 계정이면 함께 읽는다 — 묶음은 그대로 두고 **보이기만** 한다
+            // (사용자 결정 2026-09-21). 힌트가 다른 초안은 다른 계정의 필기일 수 있어 읽지 않는다.
+            if case .confirmed(let token) = environment.accountBasis {
+                let carried = try await store.drafts(in: .unverified, chapter: chapter, translation: .NKRV)
+                drafts += carried.filter { $0.account == .unverified(hint: token.scope) }
+            }
         } catch {
             Log.error("단일 Canvas — 이 장의 초안을 읽지 못했다. 입력을 막고 다시 시도를 기다린다", "\(error)")
             throw DrawingLoadFailure(message: "\(error)", source: .drafts)
