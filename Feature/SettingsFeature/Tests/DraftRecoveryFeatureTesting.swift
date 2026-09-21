@@ -265,6 +265,31 @@ struct DraftRecoveryFeatureTesting {
         await store.receive(\.loaded)
     }
 
+    @Test("로그아웃 상태에서 이 기기 전용 묶음은 「지금 계정」 이 아니라 「로그인하지 않은 동안」 이다")
+    func localOnlyBucketIsNotCalledCurrentAccountWhenSignedOut() async throws {
+        // 로그아웃 상태에서는 이 기기 전용 묶음이 "지금 근거의 묶음" 이지만 계정은 없다(2026-09-21 기기 확인).
+        let signedOut = DrawingEditEnvironment(accountState: .noAccount, serverWork: nil, knowledge: EraseEpochKnowledge())
+        let reader = ReaderStub(
+            buckets: [.localOnly],
+            summaries: [.localOnly: Self.summary(.localOnly, drafts: 1)],
+            drafts: [.localOnly: [Self.draft(verse: 3, account: Self.accountA)]]
+        )
+        let store = TestStore(initialState: .initialState) {
+            DraftRecoveryFeature()
+        } withDependencies: {
+            $0.verseDraftRecoveryReader = reader
+            $0.verseDraftUnreadableCleaner = nil
+            $0.drawingRepository = RepositoryStub()
+            $0.drawingEditEnvironment = StubDrawingEditEnvironment(signedOut)
+        }
+        store.exhaustivity = .off
+
+        await store.send(.view(.onAppear))
+        await store.receive(\.loaded)
+
+        #expect(store.state.buckets.first?.title == "로그인하지 않은 동안")
+    }
+
     @Test("묶음을 펼쳤다 접는다")
     func openingAndClosingABucket() async throws {
         let reader = ReaderStub(

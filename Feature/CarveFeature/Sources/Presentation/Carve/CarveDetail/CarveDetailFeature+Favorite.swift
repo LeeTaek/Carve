@@ -85,6 +85,7 @@ extension CarveDetailFeature {
             return showFavoriteNotice(state: &state, .added, duration: Self.favoriteAddedNoticeDuration)
 
         case let .favoriteChangeBlocked(change, block):
+            Log.info("즐겨찾기 — 동기화 저장소에 쓰지 않고 막았다", "\(block)")
             // 먼저 바꿔 둔 표시를 되돌리고 막은 사유를 보인다.
             setFavoriteMark(state: &state, key: change.key, isFavorite: !change.isAdding)
             return showFavoriteNotice(state: &state, .blocked(change, block), duration: Self.favoriteFailureNoticeDuration)
@@ -129,7 +130,11 @@ extension CarveDetailFeature {
     ///   - verse: 절 번호.
     ///   - ink: 캔버스가 지금 보이는 그 절의 필기. 획이 없으면 nil.
     func toggleFavorite(state: inout State, verse: Int, ink: Data?) -> Effect<Action> {
-        guard let chapter = state.favoriteChapter else { return .none }
+        guard let chapter = state.favoriteChapter else {
+            // 이 장의 즐겨찾기를 아직 읽지 못했다 — 누른 것이 아무 일도 하지 않으므로 그 사실을 남긴다.
+            Log.error("즐겨찾기 — 이 장을 아직 읽지 못해 누름을 무시했다", "verse=\(verse)")
+            return .none
+        }
         let key = FavoriteVerseKey(chapter: chapter, verse: verse)
         guard !state.favoriteVerses.contains(verse) else {
             return applyFavoriteChange(state: &state, .remove(key))

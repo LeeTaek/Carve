@@ -321,12 +321,13 @@ extension DraftRecoveryFeature.Item {
 
 /// 화면 문구를 한곳에 둔다 — 같은 사실을 화면마다 다르게 말하지 않게.
 public enum DraftRecoveryCopy {
+    /// 묶음 이름. **로그인하지 않은 동안 · 계정을 확인하지 못한 동안을 먼저 가린다** — 로그아웃 상태에서는 이 기기 전용 묶음이
+    /// "지금 근거의 묶음" 이라 「지금 계정」 으로 읽히는데, 그때는 계정이 없다(2026-09-21 기기 확인).
     public static func bucketTitle(_ scope: AccountScope, environment: DrawingEditEnvironment) -> String {
-        if scope == environment.accountBasis.preservationScope { return "지금 계정" }
         switch scope {
         case .unverified: return "계정을 확인하지 못한 동안"
         case .localOnly: return "로그인하지 않은 동안"
-        default: return "다른 계정 · \(scope.key.suffix(6))"
+        default: return scope == environment.accountBasis.preservationScope ? "지금 계정" : "다른 계정 · \(scope.key.suffix(6))"
         }
     }
 
