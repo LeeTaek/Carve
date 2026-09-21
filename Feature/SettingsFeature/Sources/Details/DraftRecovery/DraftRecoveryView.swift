@@ -38,6 +38,7 @@ public struct DraftRecoveryView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(CarveColor.surface)
         .onAppear { send(.onAppear) }
+        .onDisappear { send(.onDisappear) }
     }
 
     // MARK: - 요약
@@ -57,6 +58,13 @@ public struct DraftRecoveryView: View {
                 ))
                     .font(CarveTypography.body)
                     .foregroundStyle(CarveColor.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if store.unopenedCount > 0 {
+                // 분류하지 않은 수는 "자동으로 표시되지 않는 것" 에 섞지 않고 따로 말한다(P0-1).
+                Text(DraftRecoveryCopy.unopenedLine(store.unopenedCount))
+                    .font(CarveTypography.caption)
+                    .foregroundStyle(CarveColor.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if store.totalUnreadableCount > 0 {
@@ -143,11 +151,7 @@ public struct DraftRecoveryView: View {
     }
 
     private func bucketDetail(_ bucket: DraftRecoveryFeature.Bucket) -> String {
-        if bucket.readFailed { return "읽지 못했어요 · 파일은 그대로 있어요" }
-        var parts = ["초안 \(bucket.draftCount)개 · \(DraftRecoveryCopy.bytesText(bucket.draftBytes))"]
-        if bucket.unreadableCount > 0 { parts.append("읽지 못한 파일 \(bucket.unreadableCount)개") }
-        parts.append(bucket.items.isEmpty ? "자동으로 표시되지 않는 것 없음" : "자동으로 표시되지 않는 것 \(bucket.items.count)개")
-        return parts.joined(separator: " · ")
+        DraftRecoveryCopy.bucketDetail(bucket)
     }
 
     @ViewBuilder
@@ -158,11 +162,14 @@ public struct DraftRecoveryView: View {
             if bucket.readFailed {
                 note("이 묶음을 읽지 못했어요. 파일은 그대로 두고 다시 읽어 볼 수 있어요.", emphasized: true)
             } else if !bucket.comparedWithStore {
-                // 다른 계정 묶음은 지금 저장소와 견주지 않는다 — 지금 저장소는 그 계정의 내용이 아니다.
-                note("이 필기들은 지금 보고 있는 필사와 견주지 않았어요. 그 계정으로 돌아오면 자세히 볼 수 있어요.", emphasized: false)
+                // 다른 계정 묶음은 지금 저장소와 견주지 않고 상세도 만들지 않는다 — 수 · 용량만 보인다(P0-1).
+                note(DraftRecoveryCopy.notOpenedBucket, emphasized: false)
+            } else if bucket.inaccessibleCount > 0 {
+                note(DraftRecoveryCopy.otherHintNote(bucket.inaccessibleCount), emphasized: false)
             }
 
-            if bucket.unreadableCount > 0 {
+            // 읽지 못한 파일의 내보내기 · 지우기도 대조한 묶음에서만 — 다른 계정의 파일을 이 계정에서 꺼내거나 지우지 않는다(P0-1).
+            if bucket.unreadableCount > 0, bucket.comparedWithStore {
                 unreadableSection(bucket)
             }
 
@@ -170,7 +177,7 @@ public struct DraftRecoveryView: View {
                 note("이 장들은 대조하지 못했어요 — \(bucket.unreadChapters.joined(separator: ", ")). 파일은 그대로 있어요.", emphasized: true)
             }
 
-            if bucket.items.isEmpty, !bucket.readFailed {
+            if bucket.items.isEmpty, !bucket.readFailed, bucket.comparedWithStore {
                 note(bucket.draftCount == 0 ? "남은 초안이 없어요." : DraftRecoveryCopy.nothingHidden, emphasized: false)
             } else {
                 ForEach(bucket.items) { item in

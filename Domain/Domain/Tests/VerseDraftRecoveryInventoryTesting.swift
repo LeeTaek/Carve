@@ -13,7 +13,7 @@ import Testing
 /// 이 파일이 막는 것:
 /// - 편집 화면에 **보이는** 초안을 "보이지 않게 남은 것" 으로 또 알리는 것(사용자가 판단할 것과 아닌 것이 섞인다)
 /// - 이미 저장소에 들어간 초안(`settled`)을 남아 있다는 이유만으로 안내하는 것
-/// - 다른 계정 묶음의 초안을 **지금 계정의 저장소**와 견주어 엉뚱하게 분류하는 것(그 계정으로 돌아왔을 때 연다)
+/// - 다른 계정 묶음의 초안을 **지금 계정의 저장소**와 견주어 엉뚱하게 분류하는 것, 그 잉크를 항목에 담는 것(그 계정으로 돌아왔을 때 연다)
 /// - 한 장을 읽지 못해 목록 전체가 막히는 것 — 나머지 장의 초안까지 보이지 않는다
 ///
 /// 판정 자체는 `VerseDraftRecoveryRuleTesting` 이 표로 다룬다. 여기서는 **실제 초안 파일**을 두고, 화면이 보이는 것과 목록이 알리는 것이
@@ -187,7 +187,8 @@ struct VerseDraftRecoveryInventoryTesting {
 
     // MARK: - 다른 계정 묶음
 
-    @Test("다른 계정 묶음은 저장소를 읽지 않고 세어 보이기만 한다 — 지금 저장소는 그 계정의 내용이 아니다")
+    /// 2026-09-21 후속 리뷰 P0-1 — 대조하지 않는 묶음도 초안(잉크)을 항목에 담아, 화면이 미리보기를 그렸다.
+    @Test("다른 계정 묶음은 저장소를 읽지 않고 상세도 만들지 않는다 — 수 · 용량만 둔다")
     func otherAccountBucketIsNotComparedWithTheStore() async throws {
         try await withWriter { writer, _ in
             let other = VerseEditAccountBasis.confirmed(AccountServerWorkToken(scope: accountB, generation: 1))
@@ -200,13 +201,17 @@ struct VerseDraftRecoveryInventoryTesting {
             let inventory = try await query.inventory(in: accountB, environment: environment(accountA))
 
             #expect(!inventory.comparedWithStore)
-            #expect(inventory.entries.count == 2)
-            #expect(inventory.entries.allSatisfy { $0.reason == .otherBasis && $0.current == nil })
+            // 잉크를 든 항목이 없다 — 분류하지 않은 수만 남는다.
+            #expect(inventory.entries.isEmpty)
+            #expect(inventory.inaccessibleCount == 2)
+            #expect(inventory.summary.draftCount == 2)
+            #expect(inventory.summary.draftBytes > 0)
+            #expect(inventory.unreadChapters.isEmpty)
             #expect(await repository.loadCount == 0)
         }
     }
 
-    @Test("확인 전 묶음에서 힌트가 다른 초안은 다른 근거로 오르고, 힌트가 같아 화면에 오르는 초안은 목록에 없다")
+    @Test("확인 전 묶음에서 힌트가 다른 초안은 상세 없이 수만 세고, 힌트가 같아 화면에 오르는 초안은 목록에 없다")
     func unverifiedDraftsFollowTheSameHintRuleAsTheScreen() async throws {
         try await withWriter { writer, _ in
             _ = try await writer.saveDraft(draft(verse: 1, session: "hint-a", ink: "가", baseInk: "옛", account: .unverified(hint: accountA)))
@@ -221,10 +226,10 @@ struct VerseDraftRecoveryInventoryTesting {
             let inventory = try await query.inventory(in: .unverified, environment: environment(accountA))
 
             #expect(inventory.comparedWithStore)
-            // 1절은 힌트가 지금 계정과 같아 편집 화면에 오른다 — 목록은 그것을 또 알리지 않는다.
-            #expect(inventory.entries.map(\.draft.key.verse) == [2])
-            #expect(inventory.entries.first?.reason == .otherBasis)
-            #expect(inventory.entries.first?.current == nil)
+            // 1절은 힌트가 지금 계정과 같아 편집 화면에 오른다 — 목록은 그것을 또 알리지 않는다. 2절은 다른 계정의 필기일 수 있어
+            // 상세를 만들지 않는다(P0-1).
+            #expect(inventory.entries.isEmpty)
+            #expect(inventory.inaccessibleCount == 1)
         }
     }
 

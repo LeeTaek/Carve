@@ -13,6 +13,124 @@ import ComposableArchitecture
 
 @testable import SettingsFeature
 
+// MARK: - 대역
+
+/// 정해 둔 초안을 돌려주는 대역. 요약을 주지 않은 묶음은 **읽지 못하는 묶음**이다.
+private struct ReaderStub: VerseDraftRecoveryReading {
+    struct CannotRead: Error {}
+    /// nil 이면 묶음 목록부터 읽지 못한다.
+    var buckets: [AccountScope]?
+    var summaries: [AccountScope: DraftBucketSummary] = [:]
+    var drafts: [AccountScope: [VerseDraft]] = [:]
+    var unreadable: [AccountScope: [URL]] = [:]
+    /// 초안 · 파일 자리를 읽은 묶음 — 지금 계정에서 열어 보지 않는 묶음은 **읽지도 않는다**(P0-1).
+    let reads = LockIsolated<[AccountScope]>([])
+
+    func draftBuckets() async throws -> [AccountScope] {
+        guard let buckets else { throw CannotRead() }
+        return buckets
+    }
+
+    func draftSummary(in scope: AccountScope) async throws -> DraftBucketSummary {
+        guard let summary = summaries[scope] else { throw CannotRead() }
+        return summary
+    }
+
+    func drafts(in scope: AccountScope, chapter: BibleChapter, translation: Translation) async throws -> [VerseDraft] {
+        reads.withValue { $0.append(scope) }
+        return (drafts[scope] ?? []).filter { $0.key.title == chapter.title.rawValue && $0.key.chapter == chapter.chapter }
+    }
+
+    func unreadableDraftFiles(in scope: AccountScope) async throws -> [URL] {
+        reads.withValue { $0.append(scope) }
+        return unreadable[scope] ?? []
+    }
+}
+
+/// 그 장을 돌려주는 저장소. `ink` 가 있으면 3절에 그 필기가 있다. `holdLoads()` 면 `release()` 까지 조회를 붙잡는다.
+private final class RepositoryStub: DrawingRepository, @unchecked Sendable {
+    private let ink: Data?
+    private let hold = LockIsolated(false)
+    private let gate = LockIsolated<AsyncStream<Void>.Continuation?>(nil)
+    /// 붙잡힌 조회가 들어왔다.
+    let entered = LockIsolated(0)
+
+    init(ink: Data? = nil) {
+        self.ink = ink
+    }
+
+    func holdLoads() { hold.setValue(true) }
+    func release() { gate.withValue { $0?.yield(); $0?.finish(); $0 = nil } }
+
+    func load(chapter: BibleChapter) async throws -> DrawingChapterLoad {
+        if hold.value {
+            let (stream, continuation) = AsyncStream<Void>.makeStream()
+            gate.setValue(continuation)
+            entered.withValue { $0 += 1 }
+            for await _ in stream { break }
+        }
+        let snapshots = ink.map {
+            [VerseDrawingSnapshot(verse: 3, rowID: BibleDrawingRowID(raw: "row-3"), isPresent: true, updateDate: nil,
+                                  lineData: $0, drawingVersion: 3, metadata: nil)]
+        } ?? []
+        return DrawingChapterLoad(snapshots: snapshots, generation: DrawingStoreGeneration(raw: 0))
+    }
+
+    func apply(_ mutations: [VerseDrawingMutation], chapter: BibleChapter, generation: DrawingStoreGeneration) async throws {
+        Issue.record("남은 필기 화면이 저장소에 썼다")
+    }
+
+    func archiveAndReset(_ command: VerseDrawingArchiveCommand, chapter: BibleChapter) async throws -> VerseDrawingArchiveOutcome {
+        Issue.record("남은 필기 화면이 저장소에 썼다")
+        return .alreadyEmpty
+    }
+}
+
+/// 지운 묶음을 적어 두는 대역. **초안을 지우는 길은 이 화면에 없다** — 이 대역이 받는 것은 읽지 못한 파일뿐이다.
+private final class CleanerSpy: VerseDraftUnreadableCleaning, @unchecked Sendable {
+    let calls = LockIsolated<[AccountScope]>([])
+    private let removed: Int
+
+    init(removed: Int = 1) {
+        self.removed = removed
+    }
+
+    func removeUnreadableDraftFiles(in scope: AccountScope) async throws -> Int {
+        calls.withValue { $0.append(scope) }
+        return removed
+    }
+}
+
+/// 시험이 바꿀 수 있는 편집 환경. 바꾸면 구독자에게 알린다.
+private final class ControlledEnvironment: DrawingEditEnvironmentClient, @unchecked Sendable {
+    let environment: LockIsolated<DrawingEditEnvironment>
+    private let continuations = LockIsolated<[AsyncStream<Void>.Continuation]>([])
+
+    init(_ initial: DrawingEditEnvironment) {
+        environment = LockIsolated(initial)
+    }
+
+    var subscriberCount: Int { continuations.value.count }
+
+    func current() async -> DrawingEditEnvironment { environment.value }
+    func isCurrent(_ token: AccountServerWorkToken) async -> Bool { environment.value.serverWork == token }
+
+    func changes() -> AsyncStream<Void> {
+        let (stream, continuation) = AsyncStream<Void>.makeStream()
+        continuations.withValue { $0.append(continuation) }
+        return stream
+    }
+
+    func change(to next: DrawingEditEnvironment) {
+        environment.setValue(next)
+        continuations.value.forEach { $0.yield() }
+    }
+
+    func finish() {
+        continuations.value.forEach { $0.finish() }
+    }
+}
+
 /// 이 파일이 막는 것:
 /// - 보존 영역을 열지 못한 것을 **"남은 필기가 없어요"** 로 보이는 것(있는데 없다고 말하면 사용자가 지워도 된다고 읽는다)
 /// - 한 묶음을 읽지 못해 나머지 묶음까지 보이지 않는 것
@@ -25,65 +143,10 @@ struct DraftRecoveryFeatureTesting {
     private static let accountB = AccountScope(key: "acct-b")
     private static let chapter = BibleChapter(title: .genesis, chapter: 1)
 
-    /// 정해 둔 초안을 돌려주는 대역. 요약을 주지 않은 묶음은 **읽지 못하는 묶음**이다.
-    private struct ReaderStub: VerseDraftRecoveryReading {
-        struct CannotRead: Error {}
-        /// nil 이면 묶음 목록부터 읽지 못한다.
-        var buckets: [AccountScope]?
-        var summaries: [AccountScope: DraftBucketSummary] = [:]
-        var drafts: [AccountScope: [VerseDraft]] = [:]
-
-        func draftBuckets() async throws -> [AccountScope] {
-            guard let buckets else { throw CannotRead() }
-            return buckets
-        }
-
-        func draftSummary(in scope: AccountScope) async throws -> DraftBucketSummary {
-            guard let summary = summaries[scope] else { throw CannotRead() }
-            return summary
-        }
-
-        func drafts(in scope: AccountScope, chapter: BibleChapter, translation: Translation) async throws -> [VerseDraft] {
-            (drafts[scope] ?? []).filter { $0.key.title == chapter.title.rawValue && $0.key.chapter == chapter.chapter }
-        }
-
-        func unreadableDraftFiles(in scope: AccountScope) async throws -> [URL] { [] }
-    }
-
-    /// 빈 장을 돌려주는 저장소.
-    private struct RepositoryStub: DrawingRepository {
-        func load(chapter: BibleChapter) async throws -> DrawingChapterLoad {
-            DrawingChapterLoad(snapshots: [], generation: DrawingStoreGeneration(raw: 0))
-        }
-
-        func apply(_ mutations: [VerseDrawingMutation], chapter: BibleChapter, generation: DrawingStoreGeneration) async throws {
-            Issue.record("남은 필기 화면이 저장소에 썼다")
-        }
-
-        func archiveAndReset(_ command: VerseDrawingArchiveCommand, chapter: BibleChapter) async throws -> VerseDrawingArchiveOutcome {
-            Issue.record("남은 필기 화면이 저장소에 썼다")
-            return .alreadyEmpty
-        }
-    }
-
-    /// 지운 묶음을 적어 두는 대역. **초안을 지우는 길은 이 화면에 없다** — 이 대역이 받는 것은 읽지 못한 파일뿐이다.
-    private final class CleanerSpy: VerseDraftUnreadableCleaning, @unchecked Sendable {
-        let calls = LockIsolated<[AccountScope]>([])
-        private let removed: Int
-
-        init(removed: Int = 1) {
-            self.removed = removed
-        }
-
-        func removeUnreadableDraftFiles(in scope: AccountScope) async throws -> Int {
-            calls.withValue { $0.append(scope) }
-            return removed
-        }
-    }
-
-    private static func environment(_ scope: AccountScope) -> DrawingEditEnvironment {
+    private static func environment(_ scope: AccountScope, generation: UInt64 = 1) -> DrawingEditEnvironment {
         DrawingEditEnvironment(
-            accountState: .confirmed(scope), serverWork: AccountServerWorkToken(scope: scope, generation: 1), knowledge: EraseEpochKnowledge()
+            accountState: .confirmed(scope), serverWork: AccountServerWorkToken(scope: scope, generation: generation), knowledge: EraseEpochKnowledge(),
+            generation: generation
         )
     }
 
@@ -115,15 +178,17 @@ struct DraftRecoveryFeatureTesting {
     private func makeStore(
         reader: (any VerseDraftRecoveryReading)?,
         account: AccountScope = accountA,
-        cleaner: (any VerseDraftUnreadableCleaning)? = nil
+        cleaner: (any VerseDraftUnreadableCleaning)? = nil,
+        repository: RepositoryStub = RepositoryStub(),
+        environment: (any DrawingEditEnvironmentClient)? = nil
     ) -> TestStoreOf<DraftRecoveryFeature> {
         let store = TestStore(initialState: .initialState) {
             DraftRecoveryFeature()
         } withDependencies: {
             $0.verseDraftRecoveryReader = reader
             $0.verseDraftUnreadableCleaner = cleaner
-            $0.drawingRepository = RepositoryStub()
-            $0.drawingEditEnvironment = StubDrawingEditEnvironment(Self.environment(account))
+            $0.drawingRepository = repository
+            $0.drawingEditEnvironment = environment ?? StubDrawingEditEnvironment(Self.environment(account))
         }
         store.exhaustivity = .off
         return store
@@ -176,14 +241,16 @@ struct DraftRecoveryFeatureTesting {
         #expect(store.state.failure?.contains("파일은 그대로") == true)
     }
 
-    @Test("다른 계정 묶음은 견주지 않았다고 표시하고 다른 근거로 센다")
-    func otherAccountBucketIsMarkedAsNotCompared() async throws {
+    /// 2026-09-21 후속 리뷰 P0-1 — 대조하지 않는 묶음도 잉크를 상태에 담아 미리보기를 그렸다. 화면에서 가리는 것으로는 부족하다.
+    @Test("B 환경에서 A 묶음은 수 · 용량만이다 — 항목 · 잉크 · 파일 자리를 만들지 않고, 초안 파일을 읽지도 않는다")
+    func otherAccountBucketCarriesCountsOnly() async throws {
         let reader = ReaderStub(
-            buckets: [Self.accountB],
-            summaries: [Self.accountB: Self.summary(Self.accountB, drafts: 1, unreadable: 1)],
-            drafts: [Self.accountB: [Self.draft(verse: 5, account: Self.accountB)]]
+            buckets: [Self.accountA],
+            summaries: [Self.accountA: Self.summary(Self.accountA, drafts: 1, bytes: 2_048, unreadable: 1)],
+            drafts: [Self.accountA: [Self.draft(verse: 5, account: Self.accountA)]],
+            unreadable: [Self.accountA: [URL(fileURLWithPath: "/tmp/acct-a/unreadable-1")]]
         )
-        let store = makeStore(reader: reader)
+        let store = makeStore(reader: reader, account: Self.accountB)
 
         await store.send(.view(.onAppear))
         await store.receive(\.loaded)
@@ -191,11 +258,101 @@ struct DraftRecoveryFeatureTesting {
         let bucket = try #require(store.state.buckets.first)
         #expect(!bucket.comparedWithStore)
         #expect(bucket.title.hasPrefix("다른 계정"))
+        #expect(bucket.draftCount == 1)
+        #expect(bucket.draftBytes == 2_048)
         #expect(bucket.unreadableCount == 1)
-        #expect(bucket.items.map(\.reason) == [.otherBasis])
-        // 견주지 않았으므로 "지금 그 절" 을 말하지 않는다.
-        #expect(bucket.items.first?.currentIsEmpty == nil)
-        #expect(bucket.items.first?.provenance == "다른 계정에서 씀")
+        // 상세가 없다 — 잉크 · 자리 · 시각을 담은 항목도, 내보낼 파일 자리도 없다.
+        #expect(bucket.items.isEmpty)
+        #expect(bucket.items.allSatisfy { $0.ink == nil })
+        #expect(bucket.unreadableFiles.isEmpty)
+        #expect(reader.reads.value.isEmpty)
+        // 분류한 적 없는 수를 "자동으로 표시되지 않는 것" 으로 부르지 않는다.
+        #expect(bucket.inaccessibleCount == 1)
+        #expect(store.state.hiddenCount == 0)
+        #expect(store.state.unopenedCount == 1)
+        let detail = DraftRecoveryCopy.bucketDetail(bucket)
+        #expect(detail.contains("초안 1개"))
+        #expect(!detail.contains("자동으로 표시되지 않는"))
+        // 그 묶음의 파일은 이 계정에서 다루지 않는다.
+        await store.send(.view(.askRemoveUnreadable(Self.accountA)))
+        #expect(store.state.pendingRemoval == nil)
+    }
+
+    @Test("A 목록을 연 채 계정이 바뀌면 불러온 상세 · 비교를 비우고, 새 계정 근거로 다시 읽는다")
+    func accountChangeClearsLoadedDetails() async throws {
+        let environment = ControlledEnvironment(Self.environment(Self.accountA))
+        let reader = ReaderStub(
+            buckets: [Self.accountA],
+            summaries: [Self.accountA: Self.summary(Self.accountA, drafts: 1)],
+            drafts: [Self.accountA: [Self.draft(verse: 3, account: Self.accountA)]]
+        )
+        let store = makeStore(reader: reader, repository: RepositoryStub(ink: Data("지금 A".utf8)), environment: environment)
+        await store.send(.view(.onAppear))
+        await store.receive(\.loaded)
+        while environment.subscriberCount == 0 { await Task.yield() }
+        let item = try #require(store.state.buckets.first?.items.first)
+        #expect(item.ink != nil)
+        await store.send(.view(.open(Self.accountA)))
+        await store.send(.view(.compare(item)))
+        await store.receive(\.currentLoaded)
+        #expect(store.state.comparison?.currentInk == Data("지금 A".utf8))
+
+        environment.change(to: Self.environment(Self.accountB, generation: 2))
+        await store.receive(\.environmentChanged)
+
+        // 바뀐 즉시 앞선 근거로 불러온 것은 모두 사라진다 — 다시 읽기를 기다리지 않는다.
+        #expect(store.state.buckets.isEmpty)
+        #expect(store.state.comparison == nil)
+        #expect(store.state.opened == nil)
+        #expect(store.state.stamp == DraftRecoveryFeature.Stamp(Self.environment(Self.accountB, generation: 2)))
+
+        await store.receive(\.loaded)
+        let bucket = try #require(store.state.buckets.first)
+        #expect(!bucket.comparedWithStore)
+        #expect(bucket.items.isEmpty)
+        environment.finish()
+        await store.finish()
+    }
+
+    @Test("이전 계정에서 시작한 응답은 버린다 — 견주기 · 조회 모두")
+    func lateResponsesFromThePreviousAccountAreDropped() async throws {
+        let environment = ControlledEnvironment(Self.environment(Self.accountA))
+        let reader = ReaderStub(
+            buckets: [Self.accountA],
+            summaries: [Self.accountA: Self.summary(Self.accountA, drafts: 1)],
+            drafts: [Self.accountA: [Self.draft(verse: 3, account: Self.accountA)]]
+        )
+        let repository = RepositoryStub(ink: Data("A 저장소".utf8))
+        let store = makeStore(reader: reader, repository: repository, environment: environment)
+        await store.send(.view(.onAppear))
+        await store.receive(\.loaded)
+        while environment.subscriberCount == 0 { await Task.yield() }
+        let stampA = try #require(store.state.stamp)
+        let loadedUnderA = store.state.buckets
+        let item = try #require(loadedUnderA.first?.items.first)
+
+        // A 에서 견주기를 시작했는데 저장소를 읽는 사이 계정이 B 로 바뀐다.
+        repository.holdLoads()
+        await store.send(.view(.compare(item)))
+        while repository.entered.value == 0 { await Task.yield() }
+        environment.change(to: Self.environment(Self.accountB, generation: 2))
+        await store.receive(\.environmentChanged)
+        repository.release()
+        await store.receive(\.loaded)
+        environment.finish()
+        await store.finish()
+        await store.skipReceivedActions(strict: false)
+
+        // A 저장소에서 읽은 필기는 어디에도 담기지 않았다.
+        #expect(store.state.comparison == nil)
+        #expect(store.state.stamp != stampA)
+
+        // 늦게 온 A 의 응답을 그대로 넣어도 버린다.
+        await store.send(.currentLoaded(itemID: item.id, stamp: stampA, ink: Data("A 저장소".utf8), updatedAt: nil))
+        #expect(store.state.comparison == nil)
+        let staleSequence = store.state.loadSequence - 1
+        await store.send(.loaded(sequence: staleSequence, stamp: stampA, loadedUnderA))
+        #expect(store.state.buckets.allSatisfy { $0.items.isEmpty })
     }
 
     @Test("견줄 때 그 절의 지금 필기를 읽고, 다시 누르면 접는다")
