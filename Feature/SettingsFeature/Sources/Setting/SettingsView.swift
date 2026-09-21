@@ -17,6 +17,8 @@ public struct SettingsView: View {
     @Bindable public var store: StoreOf<SettingsFeature>
     /// 광고 제거를 샀는지. 사이드바 행의 값만 바꾼다.
     @SharedReader(.isAdFree) private var isAdFree: Bool
+    /// 고른 화면 모드. 사이드바 행의 값만 바꾼다.
+    @SharedReader(.appearanceMode) private var appearanceMode: AppearanceMode
 
     public init(store: StoreOf<SettingsFeature>) {
         self.store = store
@@ -49,29 +51,35 @@ public struct SettingsView: View {
     }
 
     private var sideBar: some View {
-        List(selection: $store.path.sending(\.push)) {
+        // 선택은 경로 상태가 아니라 행으로 비교한다 — 상세 화면의 상태가 바뀌어도 선택 표시가 남는다.
+        List(selection: $store.selectedSidebarItem.sending(\.selectSidebarItem)) {
             Section("필사") {
-                NavigationLink(value: SettingsFeature.Path.State.canvas(.initialState)) {
+                NavigationLink(value: SettingsFeature.SidebarItem.canvas) {
                     sidebarRow("필사 캔버스", value: "단일")
                 }
-                NavigationLink("위젯", value: SettingsFeature.Path.State.widget(.initialState))
+                NavigationLink("위젯", value: SettingsFeature.SidebarItem.widget)
+            }
+            Section("화면") {
+                NavigationLink(value: SettingsFeature.SidebarItem.appearance) {
+                    sidebarRow("화면 모드", value: appearanceMode.title)
+                }
             }
             Section("저장") {
-                NavigationLink(value: SettingsFeature.Path.State.iCloud(.initialState)) {
+                NavigationLink(value: SettingsFeature.SidebarItem.iCloud) {
                     sidebarRow("iCloud", value: "켬")
                 }
             }
             Section("지원") {
-                NavigationLink("도움말", value: SettingsFeature.Path.State.help(.initialState))
-                NavigationLink("패치노트", value: SettingsFeature.Path.State.patchnote(.initialState))
-                NavigationLink("의견 보내기", value: SettingsFeature.Path.State.sendFeedback(.initialState))
-                NavigationLink(value: SettingsFeature.Path.State.appVersion(.initialState)) {
+                NavigationLink("도움말", value: SettingsFeature.SidebarItem.help)
+                NavigationLink("패치노트", value: SettingsFeature.SidebarItem.patchnote)
+                NavigationLink("의견 보내기", value: SettingsFeature.SidebarItem.sendFeedback)
+                NavigationLink(value: SettingsFeature.SidebarItem.appVersion) {
                     sidebarRow("앱 버전", value: UIDevice.appVersion())
                 }
             }
             Section("광고") {
                 // 구매를 권하지 않고 설정에 한 줄로만 둔다(시안 K4).
-                NavigationLink(value: SettingsFeature.Path.State.removeAds(.initialState)) {
+                NavigationLink(value: SettingsFeature.SidebarItem.removeAds) {
                     sidebarRow("광고 제거", value: isAdFree ? "구매함" : "")
                 }
                 if store.isPrivacyOptionsRequired {
@@ -128,6 +136,10 @@ public struct SettingsView: View {
         case .widget:
             if let store = store.scope(state: \.path?.widget, action: \.path.widget) {
                 WidgetSettingsView(store: store)
+            }
+        case .appearance:
+            if let store = store.scope(state: \.path?.appearance, action: \.path.appearance) {
+                AppearanceSettingsView(store: store)
             }
         case .help:
             if let store = store.scope(state: \.path?.help, action: \.path.help) {

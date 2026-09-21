@@ -8,6 +8,7 @@
 
 import CarveFeature
 import ChartFeature
+import ClientInterfaces
 import SettingsFeature
 import SwiftUI
 import UIComponents
@@ -19,6 +20,8 @@ import ComposableArchitecture
 ///  Settings / Charts(예정) 은 Stack 기반 네비게이션으로 구현.
 public struct AppCoordinatorView: View {
     @Bindable private var store: StoreOf<AppCoordinatorFeature>
+    /// 설정 > 화면 모드에서 고른 값. 설정 화면이 쓰고 여기서는 읽기만 한다.
+    @SharedReader(.appearanceMode) private var appearanceMode: AppearanceMode
     
     public init(store: StoreOf<AppCoordinatorFeature>) {
         self.store = store
@@ -73,6 +76,19 @@ public struct AppCoordinatorView: View {
             if let patchnoteStore = store.scope(state: \.patchnote, action: \.patchnote.presented) {
                 PatchnoteView(store: patchnoteStore)
             }
+        }
+        // 이 창의 오버레이 · 팝오버까지 같은 모드를 따른다. 필사 영역은 모드와 무관하게 라이트로 그린다(결정 8-1 안 1).
+        .preferredColorScheme(appearanceMode.colorScheme)
+    }
+}
+
+private extension AppearanceMode {
+    /// `nil` 이면 기기의 라이트 · 다크 설정을 따른다.
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .system: nil
+        case .light: .light
+        case .dark: .dark
         }
     }
 }
