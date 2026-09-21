@@ -298,19 +298,34 @@ struct VerseDraftRecoveryRuleTesting {
     }
 
     /// 전송 전에 계정이 바뀌어 그 행이 **내가 앞서 넣은 내용**으로 돌아왔다(ACC-1 2차 ⑪). 그 뒤 revision 은 이 초안에만 있다.
-    @Test("행이 내가 넣었던 내용으로 돌아왔으면 기준이 달라도 이어 보고, 소유 근거가 없으면 보이기만 한다")
-    func rowBackToSentContentIsResumed() {
+    /// 그래도 겹치지 않는다 — 같은 입력이 "다른 기기가 일부러 그 내용으로 되돌렸다" 와 구분되지 않는다(11차 리뷰 P0-1).
+    @Test("행이 내가 넣었던 내용으로 돌아왔으면 겹치지 않고 복구 후보로 남긴다 — 소유 근거가 있어도 같다")
+    func rowBackToSentContentIsRecoveryCandidate() {
         var sent = draft(ink: "고친 내용", storeOwnership: accountA, storeState: .stored)
         sent.sentFingerprints = ["vc1-sent-old", sent.contentFingerprint ?? ""]
         let rows = [sent.rowID: row("vc1-sent-old")]
 
         let owned = plan([sent], store: [1: "vc1-sent-old"], environment: confirmed(accountA, owned: true), rows: rows)
-        #expect(owned.shown == [sent])
-        #expect(owned.showOnly.isEmpty)
+        #expect(owned.shown.isEmpty)
+        #expect(owned.kept == [sent])
+        #expect(owned.recoverable == [sent])
 
         let unowned = plan([sent], store: [1: "vc1-sent-old"], environment: confirmed(accountA), rows: rows)
-        #expect(unowned.shown == [sent])
-        #expect(unowned.showOnly == [sent.key])
+        #expect(unowned.shown.isEmpty)
+        #expect(unowned.recoverable == [sent])
+    }
+
+    /// 초안이 가리키는 행이 그 절의 **대표가 아닐 때** 그 내용을 대표 행에 겹치면 지금 보이는 필기를 가린다(11차 리뷰 P0-1).
+    @Test("초안의 행이 대표가 아니면 그 절의 지금 내용을 가리지 않는다")
+    func draftDoesNotCoverOtherRepresentativeRow() {
+        var sent = draft(ink: "고친 내용", storeOwnership: accountA, storeState: .stored)
+        sent.sentFingerprints = ["vc1-sent-old"]
+        let other = BibleDrawingRowID(raw: "row-other")
+        // 초안의 행은 옛 내용으로 남아 있지만, 그 절의 대표는 다른 행(다른 기기가 쓴 내용)이다.
+        let result = plan([sent], store: [1: "vc1-other-device"], environment: confirmed(accountA, owned: true),
+                          rows: [sent.rowID: row("vc1-sent-old"), other: row("vc1-other-device")])
+        #expect(result.shown.isEmpty)
+        #expect(result.recoverable == [sent])
     }
 
     @Test("내가 넣은 적 없는 내용으로 바뀐 행은 그대로 보존만 한다 — 넣은 지문 기록이 있어도 같다")

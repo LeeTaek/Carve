@@ -91,6 +91,9 @@ public enum SyncedWriteBlock: Equatable, Sendable {
     case ownershipUnverified
     /// 삭제 기준점(K)을 읽지 못했다.
     case knowledgeUnreadable
+    /// 그 절의 필기가 **다른 출처**다 — 다른 계정 · 확인 전에 쓴 초안을 이어 보고 있다. 환경이 아니라 절 단위 사유라 `check(_:)` 가 아니라
+    /// 부르는 쪽(캔버스 상태)이 판정한다. 그 잉크를 지금 계정의 동기화 저장소로 옮기면 계정 간 가져오기가 된다(④ 의 명시적 가져오기 전까지).
+    case verseFromOtherSession
 
     /// 이 환경에서 동기화 저장소에 바로 써도 되는가. 막으면 그 사유, 되면 nil.
     public static func check(_ environment: DrawingEditEnvironment) -> SyncedWriteBlock? {
@@ -111,7 +114,7 @@ public enum SyncedWriteBlock: Equatable, Sendable {
 #if DEBUG
 /// ACC-1 2차 전용 — 확인된 계정이면 저장소 소유 근거를 그 계정으로 **가정**한다(테스트 계획 §3-2). **소유 증명이 아니다** — 판정 뒤의 경로
 /// (저장소 쓰기 · 이어 쓰기 · 전환 때 초안 보존)를 재현할 뿐이다. DEBUG 빌드 · 시뮬레이터 · 시험(dev) 컨테이너 · 실행 인자가 모두 맞을 때만
-/// 켜지고, Release 빌드에는 이 코드가 없다.
+/// 켜진다. 이 판정과 앱의 분기는 `#if DEBUG` 안이라 **Release 에는 켜는 경로가 없다** — 환경 쪽 분기(`injectsOwnership`)는 남지만 값이 늘 false 다(11차 리뷰 P2).
 public enum StoreOwnershipInjection {
     public static let launchArgument = "-ACC1InjectStoreOwnership"
 

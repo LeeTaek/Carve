@@ -28,16 +28,22 @@ public struct VerseDraftRecoveryPlan: Equatable, Sendable {
     /// `kept` 가운데 **저장 완료가 불확실한** 초안 — 저장소로 보내던 중(`sending`)에 앱이 끝났는데 그 행이 그 뒤로 바뀌어, 들어갔는지 가릴 수
     /// 없다. 확정된 사실로 되살리지 않고 보존하며, 복구 화면(④)에서 따로 알린다.
     public var uncertain: [VerseDraft] = []
+    /// `kept` 가운데 **그 행이 내가 앞서 넣은 내용으로 돌아온** 초안 — 그 뒤 편집이 저장소에 닿지 않았다(전송 전 계정 전환 · 종료, F29).
+    ///
+    /// **자동으로 겹치지 않는다**(사용자 결정 2026-09-21, 11차 리뷰 P0-1). 같은 입력이 "다른 기기가 일부러 옛 내용으로 되돌렸다" 와
+    /// 구분되지 않기 때문이다. ④ 의 복구 화면이 **지금 필기와 나란히 보여 주고**, 사용자가 고르면 새 버전으로 남긴다 — 지금 필기도 지우지 않는다.
+    public var recoverable: [VerseDraft] = []
 
     public init(
         shown: [VerseDraft] = [], showOnly: Set<VerseDraftKey> = [], settled: [VerseDraft] = [], kept: [VerseDraft] = [],
-        uncertain: [VerseDraft] = []
+        uncertain: [VerseDraft] = [], recoverable: [VerseDraft] = []
     ) {
         self.shown = shown
         self.showOnly = showOnly
         self.settled = settled
         self.kept = kept
         self.uncertain = uncertain
+        self.recoverable = recoverable
     }
 }
 
@@ -76,7 +82,8 @@ enum VerseDraftContinuation: Equatable, Sendable {
 ///   - 행이 편집 전 내용(기준) 그대로다 → 저장이 일어나지 않았거나, 계정 전환으로 지워진 뒤 옛 내용으로 다시 들어왔다(F29). 이 초안이
 ///     유일한 사본이다 — 보통 규칙으로 잇는다.
 ///   - 행이 **내가 앞서 넣은 내용**(`sentFingerprints`) 그대로다 → 그 뒤 revision 은 저장소에 닿지 않았다(전송 전 전환으로 서버 내용이
-///     돌아온 경우 — ACC-1 2차 ⑪). 기준이 달라도 이 초안이 그 뒤 내용의 유일한 사본이므로 근거만 보고 잇는다.
+///     돌아온 경우 — ACC-1 2차 ⑪). **겹치지 않고 복구 후보로만 남긴다**(`recoverable`) — 같은 입력이 "다른 기기가 일부러 그 내용으로
+///     되돌렸다" 와 구분되지 않는다. 화면 복구는 ④ 에서 사용자가 지금 필기와 견주어 고른다(사용자 결정 2026-09-21).
 ///   - 행이 그 뒤로 바뀌었다(지우기 · 복원 · 다른 기기) → 보이지 않고 남긴다. 보내던 중이었고 들어갔는지 가릴 수 없으면 **저장 완료가
 ///     불확실한 초안**으로 따로 센다.
 /// - **보이는 것도 자동으로 저장소에 쓰지 않는다.** 겹쳐 보일 뿐이고, 사용자가 그 절을 다시 편집해야 그 세션의 초안 · 저장이 된다.
@@ -116,12 +123,9 @@ public enum VerseDraftRecoveryRule {
                         plan.kept.append(draft)
                     }
                 case .resumable:
-                    // 기준은 달라졌지만 달라진 내용이 **내가 넣은 것**이다 — 근거(계정 · K · 소유)만 보고 잇는다.
-                    if let continuation = continuation(of: draft, environment: environment) {
-                        candidates.append((draft, continuation))
-                    } else {
-                        plan.kept.append(draft)
-                    }
+                    // 그 행이 내가 넣었던 내용으로 돌아왔다 — 그 뒤 편집은 이 초안에만 있다. 자동으로 겹치지 않고 복구 후보로 남긴다.
+                    plan.kept.append(draft)
+                    plan.recoverable.append(draft)
                 case .orphaned:
                     // 보낸 행이 사라졌다. 그 절이 비었거나 기준 그대로면 가릴 내용이 없다 — 근거(계정 · K)만 보고 보이기만 한다.
                     let verseContent = storeContent[verse]

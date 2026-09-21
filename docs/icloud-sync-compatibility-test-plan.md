@@ -292,7 +292,7 @@ OLD의 실제 전체 삭제가 특정 모델 삭제인지 컨테이너·존 삭�
 
 **DEBUG 소유 주입 — 구현(10차 리뷰에서 조건을 더해 승인)**
 
-- **켜는 법:** DEBUG 빌드 · **시뮬레이터** · **시험(dev) 컨테이너(`Carve.dev.sqlite`)** · 실행 인자 `-ACC1InjectStoreOwnership` 이 모두 맞을 때만(`StoreOwnershipInjection.isEnabled`). Release 빌드에는 코드가 없다.
+- **켜는 법:** DEBUG 빌드 · **시뮬레이터** · **시험(dev) 컨테이너(`Carve.dev.sqlite`)** · 실행 인자 `-ACC1InjectStoreOwnership` 이 모두 맞을 때만(`StoreOwnershipInjection.isEnabled`). 이 판정과 앱의 분기는 `#if DEBUG` 안이라 Release 에는 **켜는 경로가 없다**(환경 쪽 분기는 남지만 값이 늘 false 다).
 - **주입하는 것:** `LiveDrawingEditEnvironment.current()` 가 **확인된 계정일 때만** 저장소 소유 근거를 그 계정으로 채우고 `ownershipInjected` 를 켠다. 미확인 · 로그인 안 함 · K 읽기 실패는 그대로다 — 보존만 경로는 주입 빌드에서도 같다.
 - **드러나게:** 켜지면 시작할 때 경고 로그(`소유 주입(DEBUG · 시뮬레이터 · dev 컨테이너) — 소유 증명이 아니다`)와 필사 화면 위 배지("소유 주입(DEBUG) · 소유 증명 아님")를 띄운다.
 - **번지지 않게:** 주입한 세션의 초안 · 닫은 세션의 초안 · 늦은 편집의 초안 · 이어 쓴 초안이 `ownershipInjected` 를 잇는다. 주입 없는 실행은 그 초안의 소유 근거를 없는 것으로 읽는다 — 보이기만 하고, **이후 편집도 그 계정에 귀속하지 않는다**(원 초안의 출처를 이은 초안만 쓰고 저장소에 쓰지 않는다).

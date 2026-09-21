@@ -152,6 +152,12 @@ extension ChapterCanvasFeature.State {
         persistsToStore && mayReachStore(entry)
     }
 
+    /// 그 절의 지금 필기가 **다른 출처**인가 — 보이기만 하는 초안(다른 계정 · 확인 전)을 이어 보고 있다. 그 잉크를 즐겨찾기 · 위젯처럼
+    /// 동기화되는 다른 저장소로 옮기면 계정 간 가져오기가 된다(11차 리뷰 P0-2).
+    func inheritsOtherSessionInk(verse: Int) -> Bool {
+        drafts.inherited[DraftVerse(chapter: chapter, verse: verse)] != nil
+    }
+
     /// 이 장의 그 절을 지금 저장소에 쓰는가 — 지우기 · 기록 복원처럼 저장소 행을 바로 바꾸는 일의 게이트.
     func writesStore(verse: Int) -> Bool {
         persistsToStore && sessionEnd == nil && drafts.inherited[DraftVerse(chapter: chapter, verse: verse)] == nil

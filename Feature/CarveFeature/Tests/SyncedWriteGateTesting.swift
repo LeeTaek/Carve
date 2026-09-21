@@ -5,6 +5,7 @@
 //  동기화 저장소에 바로 쓰는 경로는 **쓰기 진입점에서** 막는다 (정책 §12-6 결정 1, ACC-1 F30).
 //
 
+import CoreGraphics
 import Domain
 import Foundation
 import PencilKit
@@ -202,6 +203,73 @@ struct SyncedWriteGateTesting {
         }
     }
 
+    // MARK: - 절 단위 출처 (11차 리뷰 P0-2)
+
+    /// 보이기만 하는 초안(다른 계정 · 확인 전)을 이어 보는 절이다. 환경은 소유가 확인됐어도 그 잉크는 이 계정의 것이 아니다.
+    private static func detailStateWithInheritedInk() -> CarveDetailFeature.State {
+        var state = detailState()
+        var canvas = ChapterCanvasFeature.State(chapter: chapter)
+        canvas.drafts.inherited[DraftVerse(chapter: chapter, verse: 1)] = VerseDraftProvenance(
+            account: .unverified(hint: nil), knownEpochs: [], storeOwnership: nil
+        )
+        state.chapterCanvas = canvas
+        return state
+    }
+
+    private func makeOwnedDetailStore(
+        favorites: FavoriteRepositorySpy,
+        widget: WidgetVerseClientSpy,
+        state: CarveDetailFeature.State
+    ) -> StoreOf<CarveDetailFeature> {
+        Store(initialState: state) {
+            CarveDetailFeature()
+        } withDependencies: {
+            $0.favoriteVerseRepository = favorites
+            $0.widgetVerseClient = widget
+            // 환경은 열려 있다 — 막는 근거는 그 절의 출처뿐이다.
+            $0.drawingEditEnvironment = StubDrawingEditEnvironment(.ownedForTesting)
+            $0.continuousClock = TestClock()
+            $0.date = .constant(Self.now)
+            $0.drawingRepository = RepositorySpy()
+            $0.drawingCodec = CanvasTestSupport.codec(results: LockIsolated([]))
+            $0.uuid = .incrementing
+            $0.undoManager = SharedUndoManager()
+        }
+    }
+
+    @Test("보이기만 하는 초안을 이어 보는 절은 소유가 확인된 환경에서도 즐겨찾기에 보관하지 않는다")
+    func inheritedInkIsNotSavedIntoFavorites() async throws {
+        let favorites = FavoriteRepositorySpy()
+        let store = makeOwnedDetailStore(favorites: favorites, widget: WidgetVerseClientSpy(), state: Self.detailStateWithInheritedInk())
+
+        store.send(.scope(.chapterCanvasAction(.delegate(.favoriteToggled(verse: 1, ink: Data([1]))))))
+
+        try await waitUntil { store.favoriteNotice != nil }
+        if case .blocked(_, let reason) = store.favoriteNotice {
+            #expect(reason == .verseFromOtherSession)
+        } else {
+            Issue.record("막은 안내가 아니다: \(String(describing: store.favoriteNotice))")
+        }
+        // 별 표시도 켜지 않는다 — 되돌릴 것이 없다.
+        #expect(store.favoriteVerses.isEmpty)
+        #expect(favorites.saved.value.isEmpty)
+    }
+
+    @Test("보이기만 하는 초안을 이어 보는 절은 위젯에도 보관하지 않는다")
+    func inheritedInkIsNotArchivedForWidget() async throws {
+        let favorites = FavoriteRepositorySpy()
+        let widget = WidgetVerseClientSpy()
+        let store = makeOwnedDetailStore(favorites: favorites, widget: widget, state: Self.detailStateWithInheritedInk())
+
+        store.send(.scope(.chapterCanvasAction(.delegate(.widgetRequested(verse: 1, ink: Data([1]))))))
+
+        try await waitUntil { store.widgetNotice != nil }
+        #expect(store.widgetNotice == .blocked(.verseFromOtherSession))
+        #expect(favorites.saved.value.isEmpty)
+        #expect(widget.added.value.isEmpty)
+        #expect(store.favoriteVerses.isEmpty)
+    }
+
     // MARK: - 즐겨찾기 목록
 
     @Test("소유가 확인되지 않으면 목록의 해제를 쓰지 않고 목록을 되돌린다")
@@ -272,5 +340,67 @@ struct SyncedWriteGateTesting {
         #expect(VerseDrawingHistoryView.blockedMessage(.signedOut).hasPrefix("이 회차로 바꾸지 않았어요"))
         // 지금 보이는 회차는 그대로다 — 목록 표시도 바꾸지 않았다.
         #expect(store.drawings.first { $0.isPresent == true } === present)
+    }
+}
+
+/// 절 지우기(보관 후 초기화)는 확인창 · flush 를 기다린 뒤에 실제 트랜잭션을 시작한다 — 그 사이 환경이 바뀔 수 있다(11차 리뷰 P0-3).
+@Suite("동기화 쓰기 게이트 — 지우기 보관 트랜잭션")
+@MainActor
+struct EraseArchiveGateTesting: DraftTestSamples {
+    private static let pointInVerse = CGPoint(x: 10, y: 45)
+
+    @Test("flush 를 기다리는 사이 저장소에 쓰지 않게 되면 보관 트랜잭션을 시작하지 않는다")
+    func archiveIsBlockedWhenSessionStopsWriting() async throws {
+        let spy = spyWithVerseOne()
+        let environment = ControlledEditEnvironment(confirmed(accountA, 1))
+        let drafts = RecordingDraftStore()
+        let store = makeStore(spy: spy, results: [replaceVerseOne("a")], environment: environment, drafts: drafts)
+        await composeAndSubscribe(store, environment)
+
+        // 저장이 붙잡혀 큐가 비지 않는다 — 지우기는 flush 를 기다린다.
+        await holdOneEdit(store, spy)
+        await store.receive(\.draftsSaved)
+        await store.send(.eraseRequested(at: Self.pointInVerse))
+        await store.send(.eraseAlert(.presented(.confirm(verse: 1))))
+        #expect(store.state.eraseTask?.phase == .flushing)
+
+        // 기다리는 사이 계정 확인 대기로 바뀐다 — 세션은 살아 있지만 저장소에는 쓰지 않는다.
+        environment.change(to: DrawingEditEnvironment(accountState: .unconfirmed(lastConfirmed: accountA), serverWork: nil,
+                                                      knowledge: EraseEpochKnowledge()))
+        await store.receive(\.editEnvironmentChanged)
+        #expect(!store.state.writesStore(verse: 1))
+
+        spy.releaseApply()
+        await store.receive(\.saveFinished)
+
+        // 보관 · 비우기 트랜잭션이 시작되지 않았고, 작업도 접혔다.
+        #expect(spy.archived.value.isEmpty)
+        #expect(store.state.eraseTask == nil)
+        await end(store, environment)
+    }
+
+    @Test("실패한 지우기의 「다시 시도」도 저장소에 쓰지 않는 세션에서는 시작하지 않는다")
+    func retryIsBlockedWhenSessionStopsWriting() async throws {
+        let spy = spyWithVerseOne()
+        let environment = ControlledEditEnvironment(confirmed(accountA, 1))
+        let drafts = RecordingDraftStore()
+        let store = makeStore(spy: spy, results: [], environment: environment, drafts: drafts)
+        await composeAndSubscribe(store, environment)
+
+        spy.archiveFailures.setValue([.persistenceFailed("boom")])
+        await store.send(.eraseRequested(at: Self.pointInVerse))
+        await store.send(.eraseAlert(.presented(.confirm(verse: 1))))
+        await store.receive(\.eraseFinished)
+        #expect(store.state.eraseTask?.phase == .failed)
+        #expect(spy.archived.value.count == 1)
+
+        environment.change(to: DrawingEditEnvironment(accountState: .unconfirmed(lastConfirmed: accountA), serverWork: nil,
+                                                      knowledge: EraseEpochKnowledge()))
+        await store.receive(\.editEnvironmentChanged)
+
+        await store.send(.eraseAlert(.presented(.retry)))
+        #expect(store.state.eraseTask == nil)
+        #expect(spy.archived.value.count == 1)
+        await end(store, environment)
     }
 }

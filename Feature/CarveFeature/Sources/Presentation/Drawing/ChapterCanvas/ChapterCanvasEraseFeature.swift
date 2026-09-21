@@ -86,6 +86,13 @@ extension ChapterCanvasFeature {
     /// 실패한 지우기를 **같은 보관 rowID** 로 다시 시도한다 — 재시도가 보관 행을 늘리지 않는 지점이다.
     func retryErase(state: inout State) -> Effect<Action> {
         guard var task = state.eraseTask, task.phase == .failed else { return .none }
+        guard state.writesStore(verse: task.verse) else {
+            // 실패한 뒤 세션이 저장소에 쓰지 않게 됐다(계정 확인 대기 · 보이기만 하는 초안). 작업을 접는다(11차 리뷰 P0-3).
+            Log.error("단일 Canvas — 저장소에 쓰지 않는 세션이라 지우기 재시도를 접는다", "verse=\(task.verse)")
+            state.eraseTask = nil
+            state.eraseAlert = nil
+            return .none
+        }
         task.phase = .flushing
         state.eraseTask = task
         return startSaveIfPossible(state: &state, allowRetry: true)
@@ -94,6 +101,13 @@ extension ChapterCanvasFeature {
     /// flush 가 끝난 뒤의 보관 트랜잭션.
     func startArchive(state: inout State) -> Effect<Action> {
         guard var task = state.eraseTask, task.phase == .flushing else { return .none }
+        // ★ 실제 보관 트랜잭션을 시작하는 지점이다 — 확인창 · flush 를 기다리는 사이 환경이 바뀌었으면 여기서 막는다(11차 리뷰 P0-3).
+        guard state.writesStore(verse: task.verse) else {
+            Log.error("단일 Canvas — 저장소에 쓰지 않는 세션이라 보관을 시작하지 않는다", "verse=\(task.verse)")
+            state.eraseTask = nil
+            state.eraseAlert = nil
+            return .none
+        }
         guard task.chapter == state.chapter else {
             // 장이 바뀌었다 — 이 작업의 활성 행 문맥이 없다. 조용히 접는다 (장 전환은 `beginLoad` 에서도 접는다).
             state.eraseTask = nil

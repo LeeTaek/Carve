@@ -136,6 +136,11 @@ extension CarveDetailFeature {
         }
         let sentence = state.sentenceWithDrawingState.first { $0.sentence.verse == verse }?.sentence.sentenceScript ?? ""
         let favorite = FavoriteVerseSnapshot(key: key, sentence: sentence, lineData: ink, createdDate: date.now)
+        // 보이기만 하는 초안(다른 계정 · 확인 전)을 이어 보는 절이다 — 그 잉크를 즐겨찾기로 옮기지 않는다(11차 리뷰 P0-2).
+        guard !state.usesSingleCanvas || !state.chapterCanvas.inheritsOtherSessionInk(verse: verse) else {
+            return showFavoriteNotice(state: &state, .blocked(.add(favorite), .verseFromOtherSession),
+                                      duration: Self.favoriteFailureNoticeDuration)
+        }
         return applyFavoriteChange(state: &state, .add(favorite))
     }
 

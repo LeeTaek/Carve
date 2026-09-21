@@ -114,6 +114,10 @@ extension CarveDetailFeature {
     private func startWidgetAdd(state: inout State, _ request: WidgetDisplayRequest) -> Effect<Action> {
         // 담는 동안 다시 누르면 무시한다 — 같은 절을 두 번 보관하지 않게.
         guard !state.isAddingToWidget, let chapter = state.favoriteChapter else { return .none }
+        // 보이기만 하는 초안을 이어 보는 절이다 — 보관은 그 잉크를 즐겨찾기(동기화)로 옮기는 일이라 막는다(11차 리뷰 P0-2).
+        guard !state.usesSingleCanvas || !state.chapterCanvas.inheritsOtherSessionInk(verse: request.verse) else {
+            return showWidgetNotice(state: &state, .blocked(.verseFromOtherSession), duration: Self.widgetNoticeDuration)
+        }
         let key = FavoriteVerseKey(chapter: chapter, verse: request.verse)
         let sentence = state.sentenceWithDrawingState.first { $0.sentence.verse == request.verse }?.sentence.sentenceScript ?? ""
         let createdDate = date.now
