@@ -282,6 +282,10 @@ extension ChapterCanvasFeature {
         if chapter == state.chapter, let loaded = state.loadedDrawings {
             state.loadedDrawings = overlay(loaded, with: mutations)
         }
+        // 늦게 도착한 필사를 가릴 기준에도 겹친다 — 내 저장은 도착이 아니다. 그 행을 원격이 다시 바꾸면 기준과 달라져 도착으로 본다(P0-3).
+        if chapter == state.chapter, let baseline = state.arrival.storeBaseline {
+            state.arrival.storeBaseline = overlay(baseline, with: mutations)
+        }
         state.persistedRevision = max(state.persistedRevision, revision)
         state.consecutiveSaveFailures = 0
         state.saveStatus = .idle

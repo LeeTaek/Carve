@@ -22,7 +22,8 @@ import ComposableArchitecture
 ///
 /// - **펜을 대고 있는지만 보지 않는다.** 이미 편집하고 펜을 뗀 장도 자동으로 바꾸지 않는다 — 그 장의 절 기준(`drafts.bases`)이 편집한 흔적이다.
 /// - 도착 신호(`CloudImportArrivalClient`)는 어느 장이 바뀌었는지 모른다. 조용해지면 뷰에서 미보고 획까지 인계받고 **저장소만 다시 읽어** 이
-///   장이 실제로 바뀌었는지 먼저 본다 — 바뀌지 않았으면 아무것도 하지 않는다. 이 세션이 저장소에 쓴 행은 비교에서 뺀다.
+///   장이 실제로 바뀌었는지 먼저 본다 — 바뀌지 않았으면 아무것도 하지 않는다. 기준은 마지막으로 읽은 저장소 내용에 **이 세션이 쓴 것을 겹친
+///   것**이다 — 내 저장은 도착이 아니지만, 내가 저장한 행이라도 원격이 바꾸거나 지우면 도착이다(행을 통째로 빼지 않는다, 2026-09-21 후속 리뷰 2차).
 /// - **「확인하기」 는 앱을 다시 연 것과 같다.** 지금 필기를 보존한 뒤(인계 · 초안 · 저장이 끝나기를 기다림) 저장소와 초안을 다시 읽고, **읽은
 ///   뒤에야** 이 세션을 닫아 그 초안들을 다른 세션의 초안으로 다시 판정한다(`VerseDraftRecoveryRule`). 기준이 달라진 초안은 조용히 숨기지 않고
 ///   「남은 필기」 로 잇는다. 다시 읽지 못하면 세션도 화면도 그대로다. 자동 병합 · 새 복구 기능은 없다.
@@ -40,8 +41,9 @@ struct ArrivalState: Equatable, Sendable {
         case waiting(Intent)
         /// 뷰에 인계를 요청했다 — 미보고 획까지 받은 뒤 이어 간다.
         case handingOff(Intent, token: Int)
-        /// 저장소만 다시 읽어 이 장이 바뀌었는지 본다.
-        case checking(requestID: UUID)
+        /// 저장소만 다시 읽어 이 장이 바뀌었는지 본다. `persisted` 는 시작할 때의 저장 완료 revision — 읽는 사이 이 세션이 저장소에 썼으면
+        /// 읽은 것과 기준이 서로 다른 때의 것이라 다시 확인한다.
+        case checking(requestID: UUID, persisted: Int)
         /// 다시 읽는 중 — 이 요청의 결과가 오면 마무리한다. 재조회가 미뤄져 새 요청이 나가면 그 요청을 따라간다(`requestLoad`).
         case reloading(Intent, requestID: UUID)
     }
@@ -53,8 +55,9 @@ struct ArrivalState: Equatable, Sendable {
     var arrivedAgain = false
     /// 사용자에게 보이는 안내.
     var notice: ArrivalNotice?
-    /// 마지막으로 합성한 저장소 내용(행마다) — 도착 확인 조회와 견준다.
-    var baseline: [BibleDrawingRowID: VerseDraftStoreRow]?
+    /// 마지막으로 읽은 이 장의 저장소 내용에 **그 뒤 이 세션이 저장소에 쓴 것을 겹친 것**(저장소와 같은 규칙, `overlay`) — 도착 확인 조회와
+    /// 견준다. 내가 쓴 행도 빼지 않는다: 그 행을 원격이 바꾸거나 지우면 도착이다.
+    var storeBaseline: [VerseDrawingSnapshot]?
     /// 「확인하기」 직전 이 장에 보이던 초안 — 다시 읽은 뒤 자동으로 표시되지 않게 된 것을 센다.
     var displayedDrafts: Set<VerseDraftKey> = []
 }
@@ -194,7 +197,7 @@ extension ChapterCanvasFeature {
         switch intent {
         case .check:
             let requestID = uuid()
-            state.arrival.phase = .checking(requestID: requestID)
+            state.arrival.phase = .checking(requestID: requestID, persisted: state.persistedRevision)
             let chapter = state.chapter
             return .run { [repository] send in
                 do {
@@ -210,7 +213,7 @@ extension ChapterCanvasFeature {
 
     /// 확인 조회의 결과 — 이 장이 바뀌었으면 편집하지 않은 장은 자동으로 다시 읽고, 편집한 장은 알린다.
     func arrivalChecked(state: inout State, requestID: UUID, result: Result<DrawingChapterLoad, DrawingLoadFailure>) -> Effect<Action> {
-        guard case .checking(let current) = state.arrival.phase, current == requestID else { return .none }
+        guard case .checking(let current, let persisted) = state.arrival.phase, current == requestID else { return .none }
         state.arrival.phase = .idle
         switch result {
         case .failure(let failure):
@@ -220,9 +223,13 @@ extension ChapterCanvasFeature {
             rearmIfArrivedAgain(state: &state)
             return .none
         case .success(let loaded):
-            let own = Set(state.drafts.storedRevisions.keys).union(state.inFlightBatch.keys)
-            let changed = loaded.generation != state.storeGeneration
-                || Self.storeChanged(VerseDraftStoreView(snapshots: loaded.snapshots).rows, since: state.arrival.baseline, excluding: own)
+            guard persisted == state.persistedRevision else {
+                // 읽는 사이 이 세션이 저장소에 썼다 — 읽은 것은 그 저장 전, 기준은 그 저장 뒤라 견주면 내 저장을 도착으로 읽는다. 다시 확인한다.
+                state.arrival.arrivedAgain = false
+                state.arrival.phase = .waiting(.check)
+                return .none
+            }
+            let changed = loaded.generation != state.storeGeneration || Self.storeChanged(loaded.snapshots, since: state.arrival.storeBaseline)
             guard changed else {
                 // 이 장은 그대로다 — 다른 장의 필사가 도착했다. 아무것도 하지 않는다.
                 rearmIfArrivedAgain(state: &state)
@@ -335,14 +342,15 @@ extension ChapterCanvasFeature {
         state.arrival.phase = .waiting(.check)
     }
 
-    /// 이 장의 저장소 내용이 마지막으로 합성한 뒤 바뀌었는가 — 이 세션이 저장소에 쓴 행은 빼고 견준다. 기준이 없으면 바뀐 것으로 본다.
-    static func storeChanged(
-        _ fresh: [BibleDrawingRowID: VerseDraftStoreRow],
-        since baseline: [BibleDrawingRowID: VerseDraftStoreRow]?,
-        excluding own: Set<BibleDrawingRowID>
-    ) -> Bool {
+    /// 이 장의 저장소 내용이 기준(마지막으로 읽은 내용 + 이 세션이 쓴 것) 뒤로 바뀌었는가. 기준이 없으면 바뀐 것으로 본다.
+    ///
+    /// 두 가지를 견준다 — **행마다의 내용**(원격 수정 · 삭제 · 새 행)과 **절마다의 대표 내용**(다른 기기의 기록 복원처럼 `isPresent` 만 바뀌어
+    /// 행 내용은 그대로인데 화면에 보일 필기가 바뀐 경우). 이 세션이 쓴 행도 빼지 않는다 — 내 저장은 기준에 이미 겹쳐 있어 같으면 그대로다.
+    static func storeChanged(_ fresh: [VerseDrawingSnapshot], since baseline: [VerseDrawingSnapshot]?) -> Bool {
         guard let baseline else { return true }
-        return fresh.filter { !own.contains($0.key) } != baseline.filter { !own.contains($0.key) }
+        let now = VerseDraftStoreView(snapshots: fresh)
+        let known = VerseDraftStoreView(snapshots: baseline)
+        return now.rows != known.rows || now.verseContent != known.verseContent
     }
 }
 

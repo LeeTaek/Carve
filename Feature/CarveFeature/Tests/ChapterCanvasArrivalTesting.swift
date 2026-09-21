@@ -60,7 +60,20 @@ struct ChapterCanvasArrivalTesting: DraftTestSamples {
     /// 합성하고 환경 · 도착 구독이 걸릴 때까지 기다린다.
     private func open(_ store: TestStoreOf<ChapterCanvasFeature>, _ environment: ControlledEditEnvironment, _ arrivals: ControlledArrivals) async {
         await composeAndSubscribe(store, environment)
-        while arrivals.subscriberCount == 0 { await Task.yield() }
+        await waitUntil("도착 구독") { arrivals.subscriberCount > 0 }
+    }
+
+    /// 조건이 설 때까지 기다린다 — 서지 않으면 **실패로 기록하고 돌아온다**(시험이 멈추지 않게).
+    func waitUntil(_ what: String, timeout: Duration = .seconds(2), _ condition: () -> Bool) async {
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: timeout)
+        while !condition() {
+            guard clock.now < deadline else {
+                Issue.record("기다린 일이 일어나지 않았다: \(what)")
+                return
+            }
+            try? await Task.sleep(for: .milliseconds(2))
+        }
     }
 
     private func close(_ store: TestStoreOf<ChapterCanvasFeature>, _ environment: ControlledEditEnvironment, _ arrivals: ControlledArrivals) async {
@@ -304,11 +317,11 @@ struct ChapterCanvasArrivalTesting: DraftTestSamples {
         spy.holdNextLoadCall()
         arrivals.arrive()
         await store.receive(\.importArrived)
-        while spy.loadGate.value == nil { await Task.yield() }
+        await waitUntil("붙잡힌 조회") { spy.loadGate.value != nil }
         spy.holdNextLoadCall()
         spy.releaseLoad()
         await store.receive(\.arrivalChecked)
-        while spy.loadGate.value == nil { await Task.yield() }
+        await waitUntil("붙잡힌 조회") { spy.loadGate.value != nil }
         spy.loadFailures.setValue(["reload boom"])
         spy.releaseLoad()
         await store.receive(\.drawingsLoaded)
@@ -447,12 +460,12 @@ extension ChapterCanvasArrivalTesting {
         arrivals.arrive()
         await store.receive(\.importArrived)
         // 확인 조회가 붙잡혔다 — 풀고 다시 읽기를 붙잡는다.
-        while spy.loadGate.value == nil { await Task.yield() }
+        await waitUntil("붙잡힌 조회") { spy.loadGate.value != nil }
         spy.holdNextLoadCall()
         spy.releaseLoad()
         await store.receive(\.arrivalChecked)
         #expect(store.state.isReloading)
-        while spy.loadGate.value == nil { await Task.yield() }
+        await waitUntil("붙잡힌 조회") { spy.loadGate.value != nil }
         await store.send(.editBegan)
         #expect(!store.state.isSettledForReload)
         let rendered = store.state.renderedRevision
@@ -516,6 +529,159 @@ extension ChapterCanvasArrivalTesting {
         #expect(store.state.drafts.bases[edited] == editedBase)
         #expect(store.state.drafts.adopted[shownPlace] == adopted)
         #expect(store.state.drafts.inherited[shownPlace] == inherited)
+        await close(store, environment, arrivals)
+    }
+}
+
+// MARK: - 내가 저장소에 쓴 행 (2026-09-21 후속 리뷰 2차)
+
+/// 예전 판정은 이 세션이 저장소에 쓴 행(`storedRevisions`)을 비교에서 **통째로 뺐다.** 그래서 내가 저장한 절을 다른 iPad 가 고치거나 지워도,
+/// 그 행만 바뀌었다면 「다른 필사가 도착했어요」 가 뜨지 않았다(저장소 세대는 보통 import 에서 바뀌지 않는다). 이제 기준에 내 저장을 겹쳐 두고
+/// 행을 빼지 않고 견준다.
+extension ChapterCanvasArrivalTesting {
+    /// 이 세션이 저장소에 넣은 1절 행(rowA) — 저장소가 쓰는 그대로(v3 · 좌표 정보).
+    private func storedVerseOne(_ tag: String) -> VerseDrawingSnapshot {
+        VerseDrawingSnapshot(verse: 1, rowID: CanvasTestSupport.rowA, isPresent: true, updateDate: Date(timeIntervalSince1970: 1_000),
+                             lineData: Data(tag.utf8), drawingVersion: 3, metadata: CanvasTestSupport.metadata())
+    }
+
+    /// 소유가 확인된 세션에서 1절을 고쳐 저장소 저장까지 마친다.
+    private func saveVerseOne(
+        _ tags: [String],
+        spy: RepositorySpy,
+        environment: ControlledEditEnvironment,
+        arrivals: ControlledArrivals
+    ) async -> TestStoreOf<ChapterCanvasFeature> {
+        let store = makeArrivalStore(
+            spy: spy, results: tags.map(replaceVerseOne), environment: environment, drafts: RecordingDraftStore(), arrivals: arrivals
+        )
+        await open(store, environment, arrivals)
+        #expect(store.state.persistsToStore)
+        await draw(store, tags[0])
+        await store.receive(\.draftsSaved)
+        await store.receive(\.saveFinished)
+        #expect(store.state.drafts.storedRevisions[CanvasTestSupport.rowA] != nil)
+        return store
+    }
+
+    @Test("내가 저장소에 저장한 절을 다른 기기가 고치면 「다른 필사가 도착했어요」 — 내 행이라고 빼지 않는다")
+    func remoteEditOfMySavedRowIsNotified() async throws {
+        let spy = spyWithVerseOne()
+        let environment = ControlledEditEnvironment(confirmed(accountA, 1))
+        let arrivals = ControlledArrivals()
+        let store = await saveVerseOne(["mine"], spy: spy, environment: environment, arrivals: arrivals)
+
+        spy.snapshots = { _ in [VerseDrawingSnapshot(verse: 1, rowID: CanvasTestSupport.rowA, isPresent: true, updateDate: nil,
+                                                     lineData: Data("remote".utf8), drawingVersion: 3, metadata: CanvasTestSupport.metadata())] }
+        arrivals.arrive()
+        await store.receive(\.importArrived)
+        await store.receive(\.arrivalChecked)
+
+        #expect(store.state.arrival.notice == .arrived)
+        #expect(verseOne(store) == Data("mine".utf8))
+        await close(store, environment, arrivals)
+    }
+
+    @Test("내가 저장소에 저장한 절을 다른 기기가 지워도 알린다")
+    func remoteRemovalOfMySavedRowIsNotified() async throws {
+        let spy = spyWithVerseOne()
+        let environment = ControlledEditEnvironment(confirmed(accountA, 1))
+        let arrivals = ControlledArrivals()
+        let store = await saveVerseOne(["mine"], spy: spy, environment: environment, arrivals: arrivals)
+
+        spy.snapshots = { _ in [] }
+        arrivals.arrive()
+        await store.receive(\.importArrived)
+        await store.receive(\.arrivalChecked)
+
+        #expect(store.state.arrival.notice == .arrived)
+        await close(store, environment, arrivals)
+    }
+
+    @Test("저장소에 내 저장만 있으면 도착이 아니다 — 안내도 다시 읽기도 없다")
+    func myOwnSaveIsNotAnArrival() async throws {
+        let spy = spyWithVerseOne()
+        let environment = ControlledEditEnvironment(confirmed(accountA, 1))
+        let arrivals = ControlledArrivals()
+        let store = await saveVerseOne(["mine"], spy: spy, environment: environment, arrivals: arrivals)
+        let saved = storedVerseOne("mine")
+        spy.snapshots = { _ in [saved] }
+        let loads = spy.loadedChapters.value.count
+
+        arrivals.arrive()
+        await store.receive(\.importArrived)
+        await store.receive(\.arrivalChecked)
+
+        #expect(store.state.arrival.notice == nil)
+        #expect(store.state.arrival.phase == .idle)
+        #expect(spy.loadedChapters.value.count == loads + 1)
+        await close(store, environment, arrivals)
+    }
+
+    @Test("확인 조회가 읽는 사이 내가 저장소에 쓰면 그 결과로 판정하지 않고 다시 확인한다 — 내 저장을 도착으로 읽지 않는다")
+    func saveDuringTheCheckIsRechecked() async throws {
+        let spy = spyWithVerseOne()
+        let environment = ControlledEditEnvironment(confirmed(accountA, 1))
+        let arrivals = ControlledArrivals()
+        let store = await saveVerseOne(["first", "second"], spy: spy, environment: environment, arrivals: arrivals)
+        let first = storedVerseOne("first")
+        let second = storedVerseOne("second")
+        spy.snapshots = { _ in [first] }
+
+        // 확인 조회를 붙잡고, 그 사이 두 번째 획을 저장소까지 저장한다. 붙잡힌 조회는 두 번째 저장 전의 저장소를 읽는다.
+        spy.holdNextLoadCall()
+        arrivals.arrive()
+        await store.receive(\.importArrived)
+        await waitUntil("붙잡힌 조회") { spy.loadGate.value != nil }
+        await draw(store, "second")
+        await store.receive(\.draftsSaved)
+        await store.receive(\.saveFinished)
+
+        spy.holdNextLoadCall()
+        spy.releaseLoad()
+        await store.receive(\.arrivalChecked)
+        // 읽은 것(첫 저장 뒤)과 기준(두 번째 저장 뒤)이 다른 때의 것이다 — 도착으로 읽지 않고 다시 확인한다.
+        #expect(store.state.arrival.notice == nil)
+        if case .checking = store.state.arrival.phase {} else { Issue.record("다시 확인하지 않았다: \(store.state.arrival.phase)") }
+
+        await waitUntil("붙잡힌 조회") { spy.loadGate.value != nil }
+        spy.snapshots = { _ in [second] }
+        spy.releaseLoad()
+        await store.receive(\.arrivalChecked)
+        #expect(store.state.arrival.notice == nil)
+        #expect(store.state.arrival.phase == .idle)
+        await close(store, environment, arrivals)
+    }
+
+    /// 다른 기기에서 기록의 옛 필기를 고르면 행 내용은 그대로이고 `isPresent` 만 바뀐다 — 행 내용만 견주면 놓친다.
+    @Test("다른 기기가 기록에서 옛 필기를 골라 대표만 바뀌어도 도착이다 — 편집하지 않은 장은 그 필기로 자동 반영한다")
+    func remoteRepresentativeChangeIsDetected() async throws {
+        let spy = RepositorySpy()
+        let older = BibleDrawingRowID(raw: "row-older")
+        func verseOneRows(presentOlder: Bool) -> [VerseDrawingSnapshot] {
+            [VerseDrawingSnapshot(verse: 1, rowID: CanvasTestSupport.rowA, isPresent: !presentOlder, updateDate: Date(timeIntervalSince1970: 200),
+                                  lineData: Data([1]), drawingVersion: 1, metadata: nil),
+             VerseDrawingSnapshot(verse: 1, rowID: older, isPresent: presentOlder, updateDate: Date(timeIntervalSince1970: 100),
+                                  lineData: Data([2]), drawingVersion: 1, metadata: nil)]
+        }
+        let before = verseOneRows(presentOlder: false)
+        let after = verseOneRows(presentOlder: true)
+        spy.snapshots = { _ in before }
+        let environment = ControlledEditEnvironment(confirmed(accountA, 1, owned: false))
+        let arrivals = ControlledArrivals()
+        let store = makeArrivalStore(spy: spy, environment: environment, drafts: RecordingDraftStore(), arrivals: arrivals)
+        await open(store, environment, arrivals)
+        let shown = { VerseDraftStoreView(snapshots: store.state.loadedDrawings ?? []).representatives[1]?.lineData }
+        #expect(shown() == Data([1]))
+
+        spy.snapshots = { _ in after }
+        arrivals.arrive()
+        await store.receive(\.importArrived)
+        await store.receive(\.arrivalChecked)
+        await store.receive(\.drawingsLoaded)
+
+        #expect(shown() == Data([2]))
+        #expect(store.state.arrival.notice == nil)
         await close(store, environment, arrivals)
     }
 }

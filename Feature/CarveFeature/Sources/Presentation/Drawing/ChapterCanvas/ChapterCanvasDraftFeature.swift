@@ -578,8 +578,8 @@ extension ChapterCanvasFeature {
         // 절 메뉴가 「남은 필기 N」 을 띄울 근거 — 복구 화면(④)이 그 절에서 보일 것과 같은 수다.
         state.drafts.hiddenCounts = Dictionary(grouping: plan.kept, by: { $0.key.verse }).mapValues(\.count)
         state.drafts.hiddenKeys = Set(plan.kept.map(\.key))
-        // 늦게 도착한 필사를 가릴 기준 — 이번에 읽은 저장소 내용 그대로(P0-3).
-        state.arrival.baseline = view.rows
+        // 늦게 도착한 필사를 가릴 기준 — 이번에 읽은 저장소 내용 그대로(P0-3). 그 뒤 이 세션이 저장소에 쓴 것은 `finishSave` 가 겹친다.
+        state.arrival.storeBaseline = snapshots
         var mutations: [VerseDrawingMutation] = []
         for draft in plan.shown {
             let verse = draft.key.verse
