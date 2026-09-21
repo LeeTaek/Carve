@@ -51,6 +51,7 @@ final class ChapterPKCanvasView: PKCanvasView {
 ///    `canvasViewDidEndUsingTool` 을 저장 지점으로 쓰지 않는다 — PencilKit 이 획을 반영하기 전에 호출된다 (§7-5 실측).
 ///    새 획이 시작되면 직전 획의 trailing 보고를 **취소**한다. 획 도중 `editEnded` 가 나가면 `isEditing` 이 풀려 보류된 레이아웃이
 ///    획 중간에 적용된다. 미보고 변경은 다음 도구 종료 뒤에 함께 보고한다.
+///    도구 사용 없이 내용이 바뀌는 올가미 이동 · 팔레트 Undo/Redo 는 그 변경 시점에 `editBegan` 을 따로 낸다.
 /// 3. **기하:** 텍스트 컬럼 높이 = 컬럼 자신의 높이(content 높이가 아니다), 헤더는 `contentInset.top` 으로 비운다 (콘텐츠 좌표는 헤더와 무관).
 ///    하단은 safe area와 하단 팔레트만큼 inset 을 더해 마지막 절이 가리지 않게 한다 (§5 미결 → `.never` + inset 채택).
 /// 4. **절 메뉴:** 텍스트 호스트는 터치를 받지 않으므로(`isUserInteractionEnabled = false`) 행별 컨텍스트 메뉴가 닿지 않는다.
@@ -94,6 +95,8 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
     /// 캔버스가 지금 표시하는 내용의 세대 (`renderedRevision`). `editEnded` 에 실어 보낸다.
     private(set) var appliedRevision = -1
     #if DEBUG
+    /// 올가미 실측 계측 (`-LassoProbe`, 올가미 설계 §5). 읽기만 한다.
+    var lassoProbe: ChapterCanvasLassoProbe?
     /// 실행 인자로 켜는 표시 계측. 별도의 실험 모드에서만 명시적인 표시 갱신 명령을 받는다.
     var displayProbe: ChapterCanvasDisplayProbe?
     /// R20 진단 — jetsam 한도까지의 여유 (`-CanvasMemoryProbe`).
@@ -110,6 +113,9 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
     private var columnHeight: CGFloat = 0
     private var isApplyingDrawing = false
     private var isPerformingHistory: EditReason?
+    /// 도구 사용이 열려 있는가 (`didBeginUsingTool` ~ `didEndUsingTool`).
+    /// 올가미 **이동**은 이 구간 밖에서 일어난다 — 그래서 편집 구간을 따로 열어 준다 (올가미 설계 §4-3-a).
+    private var isUsingTool = false
     /// drawing 이 바뀌었는데 아직 `editEnded` 로 보고하지 않았다.
     private(set) var hasUnreportedChange = false
     private var unreportedReason: EditReason = .ink
@@ -207,6 +213,7 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
 
     func apply(_ configuration: Configuration) {
         canvas.drawingGestureRecognizer.isEnabled = configuration.isInputEnabled
+        probeLasso(tool: configuration.tool)
         canvas.tool = configuration.tool
         canvas.drawingPolicy = configuration.drawingPolicy
 
@@ -365,38 +372,11 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
         return min(max(target, minOffset), maxOffset)
     }
 
-    // MARK: undo / redo
-
-    private func performHistory(_ reason: EditReason) {
-        guard let undoManager = canvas.undoManager else { return }
-        isPerformingHistory = reason
-        defer { isPerformingHistory = nil }
-        switch reason {
-        case .undo where undoManager.canUndo: undoManager.undo()
-        case .redo where undoManager.canRedo: undoManager.redo()
-        default: break
-        }
-    }
-
-    /// undo/redo 가능 여부를 알린다.
-    /// - Parameter deferred: 뷰 갱신(`updateUIViewController`) 안에서 부를 때 `true`. 값은 지금 읽고 보고만 다음 턴에 한다.
-    private func reportUndoState(deferred: Bool = false) {
-        let event = Event.undoStateChanged(
-            canUndo: canvas.undoManager?.canUndo ?? false,
-            canRedo: canvas.undoManager?.canRedo ?? false
-        )
-        guard deferred else {
-            onEvent?(event)
-            return
-        }
-        Task { @MainActor [weak self] in
-            self?.onEvent?(event)
-        }
-    }
-
     // MARK: PKCanvasViewDelegate — 편집 계약 (§8-1)
 
     func canvasViewDidBeginUsingTool(_ canvasView: PKCanvasView) {
+        probeLasso("didBeginUsingTool")
+        isUsingTool = true
         // 직전 획의 trailing 보고가 이 획 도중에 나가면 isEditing 이 풀려 보류된 레이아웃이 획 중간에 적용된다.
         // 취소하고, 미보고 변경(hasUnreportedChange)은 이 도구 사용이 끝난 뒤 함께 보고한다.
         trailingEditTask?.cancel()
@@ -405,6 +385,8 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
     }
 
     func canvasViewDidEndUsingTool(_ canvasView: PKCanvasView) {
+        probeLasso("didEndUsingTool")
+        isUsingTool = false
         cancelCheckTask?.cancel()
         if hasUnreportedChange {
             // 직전 획의 보고가 이 획 시작에 취소됐다. 이번 획이 변경을 만들면 canvasViewDrawingDidChange 가 다시 예약하므로
@@ -422,13 +404,17 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
 
     func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
         guard !isApplyingDrawing else { return }
-        hasUnreportedChange = true
-        cancelCheckTask?.cancel()
-        if let history = isPerformingHistory {
-            unreportedReason = history
-        } else {
-            unreportedReason = canvasView.tool is PKEraserTool ? .erase : .ink
+        probeLasso("drawingDidChange")
+        let reason = Self.editReason(for: canvasView.tool, history: isPerformingHistory)
+        // 올가미 이동은 도구 시작 알림 없이 온다 (실측 L-3). 편집 구간이 열리지 않으면 보류돼야 할 레이아웃 ·
+        // `columnOrigin` · 복원 재합성이 제스처 도중에 적용돼 `canvas.drawing` 이 한가운데서 교체된다 (§4-3-a).
+        // 한 이동에 한 번만 낸다 — 미보고 변경이 없을 때가 그 이동의 첫 변경이다.
+        if reason == .lasso, !isUsingTool, !hasUnreportedChange {
+            onEvent?(.editBegan)
         }
+        hasUnreportedChange = true
+        unreportedReason = reason
+        cancelCheckTask?.cancel()
         // 제스처의 마지막 변경까지 반드시 포함시키기 위한 trailing debounce (§7-5).
         scheduleTrailingEdit()
     }
@@ -456,6 +442,48 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
         let previous = lastReportedTop
         lastReportedTop = current
         onEvent?(.scrolled(previous: previous, current: current))
+    }
+}
+
+// MARK: - undo / redo
+
+/// 본문에 두면 `type_body_length`(300)를 넘는다. 같은 파일의 확장이라 `private` 상태를 그대로 쓴다.
+extension ChapterCanvasController {
+    private func performHistory(_ reason: EditReason) {
+        guard let undoManager = canvas.undoManager else { return }
+        // 획 도중이거나 미보고 변경이 있으면 편집 구간은 이미 열려 있다.
+        let opensEdit = !isUsingTool && !hasUnreportedChange
+        isPerformingHistory = reason
+        defer { isPerformingHistory = nil }
+        switch reason {
+        case .undo where undoManager.canUndo: undoManager.undo()
+        case .redo where undoManager.canRedo: undoManager.redo()
+        default: return
+        }
+        // ★ Undo/Redo 는 도구 사용 없이 drawing 을 바꾼다. 편집 구간을 열지 않으면 trailing 보고(0.3초) 전까지 Feature 가
+        //   미저장 변경이 없다고 보고 "이 기기에 저장됨" 을 유지한다 (리뷰 P2-6). 변경 알림은 undo 안에서 동기로 오므로
+        //   실제로 바뀐 때만 연다 — 시뮬레이터에서 손가락으로 그은 실제 획의 Undo · Redo 로 확인했다(2026-09-17).
+        //   뷰 갱신(`apply`) 안이라 다음 턴에 보낸다 — trailing `editEnded` 보다 먼저 도착한다.
+        guard opensEdit, hasUnreportedChange else { return }
+        Task { @MainActor [weak self] in
+            self?.onEvent?(.editBegan)
+        }
+    }
+
+    /// undo/redo 가능 여부를 알린다.
+    /// - Parameter deferred: 뷰 갱신(`updateUIViewController`) 안에서 부를 때 `true`. 값은 지금 읽고 보고만 다음 턴에 한다.
+    private func reportUndoState(deferred: Bool = false) {
+        let event = Event.undoStateChanged(
+            canUndo: canvas.undoManager?.canUndo ?? false,
+            canRedo: canvas.undoManager?.canRedo ?? false
+        )
+        guard deferred else {
+            onEvent?(event)
+            return
+        }
+        Task { @MainActor [weak self] in
+            self?.onEvent?(event)
+        }
     }
 }
 
@@ -609,5 +637,41 @@ extension ChapterCanvasController {
                 subview.removeInteraction(interaction)
             }
         }
+    }
+}
+
+// MARK: - 편집 이유 (§8-1 · 올가미 설계 §4-3)
+
+extension ChapterCanvasController {
+    /// 도구와 히스토리 상태에서 편집 이유를 정한다. 상태를 읽지 않는 순수 함수라 테스트가 직접 부른다.
+    /// - Parameters:
+    ///   - tool: 지금 캔버스의 도구.
+    ///   - history: undo/redo 를 수행하는 중이면 그 이유. 도구보다 우선한다.
+    static func editReason(for tool: PKTool, history: EditReason?) -> EditReason {
+        if let history { return history }
+        switch tool {
+        case is PKEraserTool: return .erase
+        case is PKLassoTool: return .lasso
+        default: return .ink
+        }
+    }
+}
+
+// MARK: - 올가미 계측 훅 (올가미 설계 §5)
+
+/// 계측 호출을 **확장**에 둔다 — 본문에 `#if DEBUG` 세 줄짜리 블록을 흩으면 `type_body_length`(300)를 넘는다.
+/// Release 에서는 본문이 비어 호출이 사라진다.
+extension ChapterCanvasController {
+    func probeLasso(_ event: String) {
+        #if DEBUG
+        lassoProbe?.record(event)
+        #endif
+    }
+
+    /// `apply` 의 도구 재대입 — 올가미 선택 도중에 일어나면 선택이 지워질 수 있다 (L-6).
+    func probeLasso(tool: PKTool) {
+        #if DEBUG
+        lassoProbe?.recordToolAssignment(tool)
+        #endif
     }
 }

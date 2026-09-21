@@ -57,6 +57,7 @@ public struct SettingsView: View {
                 NavigationLink(value: SettingsFeature.SidebarItem.canvas) {
                     sidebarRow("필사 캔버스", value: "단일")
                 }
+                NavigationLink("위젯", value: SettingsFeature.SidebarItem.widget)
             }
             Section("화면") {
                 NavigationLink(value: SettingsFeature.SidebarItem.appearance) {
@@ -131,6 +132,10 @@ public struct SettingsView: View {
         case .canvas:
             if let store = store.scope(state: \.path?.canvas, action: \.path.canvas) {
                 CanvasSettingsView(store: store)
+            }
+        case .widget:
+            if let store = store.scope(state: \.path?.widget, action: \.path.widget) {
+                WidgetSettingsView(store: store)
             }
         case .appearance:
             if let store = store.scope(state: \.path?.appearance, action: \.path.appearance) {

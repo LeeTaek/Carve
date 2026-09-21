@@ -288,4 +288,68 @@ struct DrawingCodecTesting {
 
         #expect(result.mutations.isEmpty)
     }
+
+    @Test("1.3.0의 여러 절 필사는 단일 Canvas 합성 뒤 위치와 모든 획이 보존된다")
+    func version130DrawingsKeepPositionAndEveryStrokeOnSingleCanvas() throws {
+        // 1.3.0(V3)이 저장한 legacy 행과 같은 조건: drawingVersion 1, layout metadata 없음.
+        // 실제 추출 필사 중 한 줄 샘플과 여러 줄 샘플을 서로 떨어진 절에 배치한다.
+        let firstStored = try LegacyDrawingFixture.single.drawing()
+        let thirdStored = try LegacyDrawingFixture.multiLine.drawing()
+        let updateLayout = OwnershipTestSupport.uniformLayout(verseCount: 4, lineSpace: 240)
+        let updateColumnOrigin = CGPoint(x: 366.7, y: 0)
+        let snapshots = [
+            VerseDrawingSnapshot(
+                verse: 1, rowID: BibleDrawingRowID(raw: "v130-verse-1"), isPresent: true,
+                updateDate: Date(timeIntervalSince1970: 1), lineData: firstStored.dataRepresentation(),
+                drawingVersion: 1, metadata: nil
+            ),
+            VerseDrawingSnapshot(
+                verse: 3, rowID: BibleDrawingRowID(raw: "v130-verse-3"), isPresent: true,
+                updateDate: Date(timeIntervalSince1970: 2), lineData: thirdStored.dataRepresentation(),
+                drawingVersion: 1, metadata: nil
+            )
+        ]
+
+        let composed = codec.compose(
+            snapshots: snapshots,
+            layout: updateLayout,
+            columnOrigin: updateColumnOrigin
+        )
+        let displayed = try PKDrawing(data: composed.data)
+
+        // 어느 절의 획도 합성 과정에서 빠지거나 다른 절 소유가 되면 안 된다.
+        #expect(displayed.strokes.count == firstStored.strokes.count + thirdStored.strokes.count)
+        #expect(composed.legacyVerses == [1, 3])
+        #expect(composed.undecodableVerses.isEmpty)
+        #expect(composed.activeRowIDs.keys.sorted() == [1, 3])
+
+        for (verse, stored) in [(1, firstStored), (3, thirdStored)] {
+            let region = try #require(updateLayout.region(verse: verse))
+            let expected = stored.transformed(using: CGAffineTransform(
+                translationX: region.writingRect.minX + updateColumnOrigin.x,
+                y: region.writingRect.minY + updateColumnOrigin.y
+            ))
+            let verseStrokes = displayed.strokes.filter { composed.ownership.owner(of: $0) == verse }
+            let actual = PKDrawing(strokes: verseStrokes)
+
+            #expect(verseStrokes.count == stored.strokes.count)
+            #expect(abs(actual.bounds.minX - expected.bounds.minX) < 0.05)
+            #expect(abs(actual.bounds.minY - expected.bounds.minY) < 0.05)
+            #expect(abs(actual.bounds.width - expected.bounds.width) < 0.05)
+            #expect(abs(actual.bounds.height - expected.bounds.height) < 0.05)
+        }
+
+        // 화면 표시만으로 저장 mutation 이 생기면 업데이트 직후 원본을 덮어쓸 수 있다.
+        let unchanged = codec.mutations(
+            beforeData: composed.data,
+            beforeOwnership: composed.ownership,
+            afterData: displayed.dataRepresentation(),
+            context: DrawingEditContext(
+                layout: updateLayout,
+                columnOrigin: updateColumnOrigin,
+                activeRowIDs: composed.activeRowIDs
+            )
+        )
+        #expect(unchanged.mutations.isEmpty)
+    }
 }

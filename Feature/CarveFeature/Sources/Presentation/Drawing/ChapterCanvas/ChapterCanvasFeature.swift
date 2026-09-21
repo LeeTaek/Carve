@@ -29,7 +29,7 @@ public struct CanvasEditSnapshot: Equatable, Sendable {
     let generation: Int
 }
 
-public enum EditReason: Equatable, Sendable { case ink, erase, undo, redo }
+public enum EditReason: Equatable, Sendable { case ink, erase, lasso, undo, redo }
 
 /// 저장 중 도착한 최신 편집을 보호하기 위해 revision 과 장을 함께 보관한다 (§8-3).
 struct PendingDrawingMutation: Equatable, Sendable {
@@ -41,7 +41,7 @@ struct PendingDrawingMutation: Equatable, Sendable {
 
 enum SaveStatus: Equatable, Sendable {
     case idle
-    case saving(revision: Int)
+    case saving(revision: Int, requestID: UUID)
     case failed(revision: Int, retryCount: Int)
 }
 
@@ -99,6 +99,10 @@ public struct ChapterCanvasFeature {
         var layout: ChapterLayout?
         /// 마지막으로 알고 있는 이 장의 DB 내용. 성공한 저장을 겹쳐 두므로 재조회 없이도 현재 내용의 근거가 된다.
         var loadedDrawings: [VerseDrawingSnapshot]?
+        /// 지금 들고 있는 모든 것(합성한 잉크 · 미저장분 · 물러난 장의 편집)이 기준으로 삼은 저장소 세대. 저장은 이 세대로 보낸다.
+        /// 첫 조회에서 정하고, 전부 지워진 뒤의 정리(`clearAfterExternalDelete`)가 내려놓으면 다음 조회에서 다시 정한다.
+        /// 그 밖의 조회는 덮어쓰지 않는다 — 장 전환은 이전 장 미저장분을 들고 가고, 다른 세대가 오면 정리로 이어진다(`finishLoad`).
+        var storeGeneration: DrawingStoreGeneration?
         var loadRequestID: UUID?
         var loadFailure: DrawingLoadFailure?
         /// 캔버스 content 좌표 = layout 좌표 + columnOrigin (§5). 값은 호스팅이 준다.
@@ -130,6 +134,8 @@ public struct ChapterCanvasFeature {
         // §8-1 편집 계약
         var editRevision = 0
         var persistedRevision = 0
+        /// 필사 데이터가 밖에서 전부 지워진 시점의 `editRevision`. 그 뒤에 쓴 것이 없으면 "저장됨" 이라고 말하지 않는다.
+        var editRevisionAtClear = 0
         var isEditing = false
         /// 편집 중 도착한 변경. pencil-up 뒤에 한 번에 적용한다 — 획 도중 재합성하면 획이 사라진다.
         var pendingLayout: ChapterLayout?
@@ -146,6 +152,8 @@ public struct ChapterCanvasFeature {
         // §8-3 저장 대기열
         var pendingMutations: [BibleDrawingRowID: PendingDrawingMutation] = [:]
         var saveStatus: SaveStatus = .idle
+        /// 성공 없이 이어진 저장 실패 횟수. 재시도가 `.saving` 을 거치므로 `saveStatus` 만으로는 누적되지 않아 따로 센다.
+        var consecutiveSaveFailures = 0
         /// 지금 저장 중인 batch 의 rowID → revision. 성공 시 같은 revision 인 항목만 제거한다 (§8-3 5번).
         var inFlightBatch: [BibleDrawingRowID: Int] = [:]
         /// 지금 저장 중인 batch 의 내용과 장. 성공하면 `loadedDrawings` 에 겹쳐 DB 내용을 따라가게 한다.
@@ -192,6 +200,9 @@ public struct ChapterCanvasFeature {
         }
 
         var isComposed: Bool { renderedData != nil }
+        /// 조회에 실패해 **합성하지 못한** 장의 실패. 화면이 안내와 「다시 시도」(`retryLoad`)를 띄운다.
+        /// 합성된 장의 재조회 실패는 마지막으로 알던 내용으로 이미 복구했으므로 들지 않는다.
+        var blockingLoadFailure: DrawingLoadFailure? { isComposed ? nil : loadFailure }
         /// §6-2 입력 게이트 — 합성이 끝났고, 다시 합성하지도 지우지도 않는 중일 때만 입력을 받는다.
         var isInputEnabled: Bool { isComposed && !isReloading && !isErasing }
         /// 지우기가 실제로 도는 중인가. `.failed` 는 **포함하지 않는다** — 실패하면 잠금을 풀고 필기를 그대로 쓰게 둔다.
@@ -236,7 +247,9 @@ public struct ChapterCanvasFeature {
     public enum Action: Equatable {
         /// 장 진입. 이전 장의 미저장분은 버리지 않고 자기 장으로 저장된다.
         case load(chapter: BibleChapter, expectedVerseCount: Int)
-        case drawingsLoaded(requestID: UUID, Result<[VerseDrawingSnapshot], DrawingLoadFailure>)
+        case drawingsLoaded(requestID: UUID, Result<DrawingChapterLoad, DrawingLoadFailure>)
+        /// 조회에 실패해 합성하지 못한 장을 다시 읽는다 — 첫 조회 실패, 전부 지운 뒤의 재조회 실패.
+        case retryLoad
         case layoutCompleted(ChapterLayout)
         case columnOriginChanged(CGPoint)
         /// 예측 좌표와 실제 렌더의 Δ 안전망 판정이 갱신됐다 (§14 — D9 R13). 새 입력만 좌우한다.
@@ -247,9 +260,11 @@ public struct ChapterCanvasFeature {
         /// 도구는 댔지만 drawing 이 바뀌지 않은 경우 (탭 등). 보류된 변경을 적용한다.
         case editCancelled
         case mutationsPrepared(revision: Int, DrawingEditResult)
-        case saveFinished(revision: Int, failure: DrawingRepositoryError?)
+        case saveFinished(requestID: UUID, revision: Int, failure: DrawingRepositoryError?)
         /// 장 전환 · 백그라운드 진입 시 대기열 저장 (§8-5). 실패했던 저장의 재시도이기도 하다.
         case flushPending
+        /// 밖에서 필사 데이터가 전부 지워졌다 (설정 → 「모든 필사 데이터 삭제」).
+        case drawingDataCleared
         /// 히스토리에서 다른 회차를 선택해 `isPresent` 가 바뀐 뒤. mutation 을 만들지 않고 다시 합성한다 (§8-7).
         case verseRowRestored(verse: Int, rowID: BibleDrawingRowID)
         case undoStateChanged(canUndo: Bool, canRedo: Bool)
@@ -268,6 +283,10 @@ public struct ChapterCanvasFeature {
         case verseMenuFavoriteTapped
         /// 절 메뉴의 「이전 필사 내용 보기」.
         case verseMenuHistoryTapped
+        /// 절 메뉴의 「이미지 저장」(시안 G1).
+        case verseMenuImageTapped
+        /// 절 메뉴의 「위젯에 표시」(시안 N6).
+        case verseMenuWidgetTapped
         /// 절 메뉴의 「지우기」.
         case verseMenuEraseTapped
         case eraseAlert(PresentationAction<EraseAlert>)
@@ -289,6 +308,10 @@ public struct ChapterCanvasFeature {
             case showHistory(verse: Int)
             /// 이 절의 즐겨찾기를 켜거나 꺼 달라(시안 N1). `ink` 는 지금 보이는 필기 — 추가할 때 그대로 보존한다. 획이 없으면 nil.
             case favoriteToggled(verse: Int, ink: Data?)
+            /// 이 절을 이미지로 사진에 저장해 달라(시안 G1). 필기 칸은 캔버스에 보이는 그대로다.
+            case imageSaveRequested(VerseImageHandwriting)
+            /// 이 절을 위젯에 표시해 달라(시안 N6). `ink` 는 지금 보이는 필기 — 즐겨찾기에 없던 절이면 이대로 보관한다.
+            case widgetRequested(verse: Int, ink: Data?)
         }
     }
 
@@ -305,6 +328,11 @@ public struct ChapterCanvasFeature {
 
             case .drawingsLoaded(let requestID, let result):
                 return finishLoad(state: &state, requestID: requestID, result: result)
+
+            case .retryLoad:
+                guard state.blockingLoadFailure != nil else { return .none }
+                state.loadFailure = nil
+                return requestLoad(state: &state)
 
             case .layoutCompleted(let layout):
                 if state.isEditing {
@@ -370,11 +398,14 @@ public struct ChapterCanvasFeature {
             case .mutationsPrepared(let revision, let result):
                 return finishEdit(state: &state, revision: revision, result: result)
 
-            case .saveFinished(let revision, let failure):
-                return finishSave(state: &state, revision: revision, failure: failure)
+            case .saveFinished(let requestID, let revision, let failure):
+                return finishSave(state: &state, requestID: requestID, revision: revision, failure: failure)
 
             case .flushPending:
                 return startSaveIfPossible(state: &state, allowRetry: true)
+
+            case .drawingDataCleared:
+                return clearAfterExternalDelete(state: &state)
 
             case .verseRowRestored:
                 // isPresent 이전은 호출부(히스토리 시트)가 이미 DB 에 반영했다. 여기서는 mutation 없이 다시 합성만 한다.
@@ -414,7 +445,8 @@ public struct ChapterCanvasFeature {
                 state.eraseAlert = Self.confirmEraseAlert(chapter: state.chapter, verse: verse)
                 return .none
 
-            case .verseMenuRequested, .verseMenuDismissed, .verseMenuFavoriteTapped, .verseMenuHistoryTapped, .verseMenuEraseTapped:
+            case .verseMenuRequested, .verseMenuDismissed, .verseMenuFavoriteTapped, .verseMenuHistoryTapped, .verseMenuImageTapped,
+                 .verseMenuWidgetTapped, .verseMenuEraseTapped:
                 return reduceVerseMenu(state: &state, action: action)
 
             case .eraseAlert(.presented(.confirm(let verse))):
@@ -508,8 +540,8 @@ extension ChapterCanvasFeature {
         let chapter = state.chapter
         return .run { [repository] send in
             do {
-                let snapshots = try await repository.load(chapter: chapter)
-                await send(.drawingsLoaded(requestID: requestID, .success(snapshots)))
+                let loaded = try await repository.load(chapter: chapter)
+                await send(.drawingsLoaded(requestID: requestID, .success(loaded)))
             } catch {
                 await send(.drawingsLoaded(requestID: requestID, .failure(DrawingLoadFailure(message: "\(error)"))))
             }
@@ -519,13 +551,21 @@ extension ChapterCanvasFeature {
     private func finishLoad(
         state: inout State,
         requestID: UUID,
-        result: Result<[VerseDrawingSnapshot], DrawingLoadFailure>
+        result: Result<DrawingChapterLoad, DrawingLoadFailure>
     ) -> Effect<Action> {
         // 이전 장(또는 이전 요청)의 결과는 폐기한다 (§6-4).
         guard requestID == state.loadRequestID else { return .none }
         switch result {
-        case .success(let snapshots):
-            state.loadedDrawings = snapshots
+        case .success(let loaded):
+            if let base = state.storeGeneration, base != loaded.generation {
+                // ★ 이 화면이 삭제 소식을 받기 전에 필사 데이터가 전부 지워졌다. 들고 있는 잉크 · 미저장분의 기준이 사라졌으므로
+                //   이 결과로 합성하지 않고 삭제 뒤처리부터 한다 — 그러지 않으면 지운 데이터 기준의 편집이 새 세대로 저장된다.
+                Log.error("단일 Canvas — 조회 사이에 필사 데이터가 전부 지워졌다. 미저장분을 버리고 다시 읽는다",
+                          "기준 세대=\(base.raw)", "조회 세대=\(loaded.generation.raw)")
+                return clearAfterExternalDelete(state: &state)
+            }
+            state.storeGeneration = loaded.generation
+            state.loadedDrawings = loaded.snapshots
             state.loadFailure = nil
             if state.isReloading, !state.isFullyPersisted {
                 // 재조회 결과가 아직 저장 중인 편집보다 앞선다. 저장이 정리되면 다시 읽는다 — 지금 합성하면 그 편집이 화면에서 빠진다.
@@ -534,8 +574,9 @@ extension ChapterCanvasFeature {
             }
         case .failure(let failure):
             state.loadFailure = failure
-            guard state.isReloading, state.loadedDrawings != nil else {
-                // 첫 조회 실패를 빈 장으로 취급하면 기존 행 위에 새 행이 생긴다. 게이트를 닫아 둔다.
+            guard state.isReloading, state.loadedDrawings != nil, state.storeGeneration != nil else {
+                // 기준(내용과 세대)이 없다 — 첫 조회 실패이거나 전부 지운 뒤의 재조회 실패다. 빈 장으로 합성하면 기존 행 위에
+                // 새 행이 생기고, 세대 없이 연 입력의 필기는 저장되지 않는다. 게이트를 닫아 두고 `retryLoad` 를 기다린다.
                 return .none
             }
             // 재조회 실패 — 입력을 영원히 잠그는 대신 마지막으로 알고 있는 내용으로 다시 합성한다 (성공한 저장은 이미 겹쳐져 있다).
@@ -604,8 +645,10 @@ extension ChapterCanvasFeature {
     /// 합성 입력은 `DB 내용 ⊕ 이 장의 미저장분` 이다. 저장이 실패한 채 장을 떠났다 돌아와도, 재합성 중 저장이 실패해도
     /// 미저장 잉크가 화면에서 사라지지 않는다. 미저장 행이 대표 행이 되므로 `activeRowIDs` 도 그 행을 가리킨다.
     private func composeIfReady(state: inout State) {
+        // 저장소 세대 없이 합성하지 않는다 — 합성이 입력을 열고, 그 입력의 필기는 세대가 있어야 저장된다.
         guard let layout = state.layout,
               let loaded = state.loadedDrawings,
+              state.storeGeneration != nil,
               let expected = state.expectedVerseCount,
               layout.satisfiesCompositionGate(expectedVerseCount: expected) else { return }
 
@@ -636,41 +679,6 @@ extension ChapterCanvasFeature {
                       "\(state.chapter.title.rawValue).\(state.chapter.chapter)",
                       "verses=\(composed.undecodableVerses.sorted())")
         }
-    }
-
-    /// 저장 명령을 스냅샷 위에 겹친다 — 저장소의 `create`(upsert) · `replace` · `clear`(행 유지, 없으면 빈 행) 와 같은 의미다.
-    func overlay(_ snapshots: [VerseDrawingSnapshot], with mutations: [VerseDrawingMutation]) -> [VerseDrawingSnapshot] {
-        guard !mutations.isEmpty else { return snapshots }
-        let now = date.now
-        var result = snapshots
-        var indexByRow: [BibleDrawingRowID: Int] = [:]
-        for (index, snapshot) in result.enumerated() { indexByRow[snapshot.rowID] = index }
-
-        func upsert(_ snapshot: VerseDrawingSnapshot) {
-            if let index = indexByRow[snapshot.rowID] {
-                result[index] = snapshot
-            } else {
-                indexByRow[snapshot.rowID] = result.count
-                result.append(snapshot)
-            }
-        }
-
-        for mutation in mutations {
-            let existing = indexByRow[mutation.rowID].map { result[$0] }
-            switch mutation {
-            case .create(let verse, let rowID, let data, let metadata), .replace(let verse, let rowID, let data, let metadata):
-                upsert(VerseDrawingSnapshot(
-                    verse: verse, rowID: rowID, isPresent: existing?.isPresent ?? true, updateDate: now,
-                    lineData: data, drawingVersion: 3, metadata: metadata
-                ))
-            case .clear(let verse, let rowID):
-                upsert(VerseDrawingSnapshot(
-                    verse: verse, rowID: rowID, isPresent: existing?.isPresent ?? true, updateDate: now,
-                    lineData: nil, drawingVersion: existing?.drawingVersion ?? 3, metadata: existing?.metadata
-                ))
-            }
-        }
-        return result.sorted { lhs, rhs in lhs.verse != rhs.verse ? lhs.verse < rhs.verse : lhs.rowID < rhs.rowID }
     }
 
     /// 미저장분이 전부 저장된 뒤 DB 에서 다시 합성한다. 저장할 것이 없으면 즉시 다시 읽는다.

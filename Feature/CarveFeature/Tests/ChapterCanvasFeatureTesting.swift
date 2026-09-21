@@ -29,8 +29,12 @@ final class RepositorySpy: DrawingRepository, @unchecked Sendable {
     let loadFailures = LockIsolated<[String]>([])
     struct LoadBoom: Error, CustomStringConvertible { let description: String }
     var snapshots: @Sendable (BibleChapter) -> [VerseDrawingSnapshot] = { _ in [] }
+    /// 지금 저장소 세대. 전체 삭제를 흉내 내려면 올린다 — 조회는 이 값을 돌려주고, 다른 세대의 저장은 거절한다.
+    let generation = LockIsolated(DrawingStoreGeneration(raw: 0))
+    /// 도착한 저장의 세대. 거절된 저장도 남는다 — `applied` 는 **실제로 쓴** 저장만 남긴다.
+    let appliedGenerations = LockIsolated<[DrawingStoreGeneration]>([])
 
-    func load(chapter: BibleChapter) async throws -> [VerseDrawingSnapshot] {
+    func load(chapter: BibleChapter) async throws -> DrawingChapterLoad {
         if let (stream, continuation) = makeLoadGateIfNeeded() {
             loadGate.setValue(continuation)
             for await _ in stream { break }
@@ -39,7 +43,7 @@ final class RepositorySpy: DrawingRepository, @unchecked Sendable {
         if let message = loadFailures.withValue({ $0.isEmpty ? nil : $0.removeFirst() }) {
             throw LoadBoom(description: message)
         }
-        return snapshots(chapter)
+        return DrawingChapterLoad(snapshots: snapshots(chapter), generation: generation.value)
     }
 
     /// 다음 `load` 를 `releaseLoad()` 까지 붙잡는다 — 늦게 도착하는 조회 결과를 재현하기 위함.
@@ -54,10 +58,15 @@ final class RepositorySpy: DrawingRepository, @unchecked Sendable {
         return AsyncStream<Void>.makeStream()
     }
 
-    func apply(_ mutations: [VerseDrawingMutation], chapter: BibleChapter) async throws {
+    func apply(_ mutations: [VerseDrawingMutation], chapter: BibleChapter, generation: DrawingStoreGeneration) async throws {
         if let (stream, continuation) = makeGateIfNeeded() {
             applyGate.setValue(continuation)
             for await _ in stream { break }
+        }
+        // 게이트 **뒤에서** 대조한다 — 저장소도 요청이 아니라 실행 시점의 세대로 판정한다.
+        appliedGenerations.withValue { $0.append(generation) }
+        guard generation == self.generation.value else {
+            throw DrawingRepositoryError.staleStoreGeneration
         }
         applied.withValue { $0.append((chapter, mutations)) }
         if let failure = applyFailures.withValue({ $0.isEmpty ? nil : $0.removeFirst() }) {
@@ -308,6 +317,7 @@ struct ChapterCanvasComposeTesting {
         }
         await store.send(.layoutCompleted(CanvasTestSupport.layout))
         #expect(!store.state.isInputEnabled)
+        #expect(store.state.blockingLoadFailure != nil)
     }
 
     @Test("장 진입은 세대를 올리고 스크롤 토큰은 장이 바뀌어도 이어진다 — 뷰의 잔존 토큰과 겹치지 않게")
@@ -366,7 +376,7 @@ struct ChapterCanvasEditTesting {
             $0.baselineData = CanvasTestSupport.edit("1").drawingData
             $0.activeRowIDs[2] = self.newRow
             $0.pendingMutations = [self.newRow: PendingDrawingMutation(revision: 1, chapter: CanvasTestSupport.chapter, mutation: self.createResult("1").mutations[0])]
-            $0.saveStatus = .saving(revision: 1)
+            $0.saveStatus = .saving(revision: 1, requestID: UUID(1))
             $0.inFlightBatch = [self.newRow: 1]
             $0.inFlightMutations = self.createResult("1").mutations
             $0.inFlightChapter = CanvasTestSupport.chapter
@@ -396,7 +406,7 @@ struct ChapterCanvasEditTesting {
         spy.holdNextApply()
         await store.send(.editEnded(CanvasTestSupport.edit("1")))
         await store.receive(\.mutationsPrepared)
-        #expect(store.state.saveStatus == .saving(revision: 1))
+        #expect(store.state.saveStatus == .saving(revision: 1, requestID: UUID(1)))
 
         // 첫 저장이 붙잡힌 동안 두 번째 편집이 들어온다.
         await store.send(.editEnded(CanvasTestSupport.edit("2")))
@@ -404,13 +414,13 @@ struct ChapterCanvasEditTesting {
         let merged = store.state.pendingMutations[newRow]
         #expect(merged?.revision == 2)
         #expect(merged?.mutation == .create(verse: 2, rowID: newRow, data: Data("replace-2".utf8), metadata: CanvasTestSupport.metadata()))
-        #expect(store.state.saveStatus == .saving(revision: 1))
+        #expect(store.state.saveStatus == .saving(revision: 1, requestID: UUID(1)))
 
         spy.releaseApply()
         await store.receive(\.saveFinished) {
             // revision 1 로 저장된 항목만 제거되는데, 큐의 항목은 revision 2 라 남는다.
             $0.persistedRevision = 1
-            $0.saveStatus = .saving(revision: 2)
+            $0.saveStatus = .saving(revision: 2, requestID: UUID(2))
             $0.inFlightBatch = [self.newRow: 2]
         }
         await store.receive(\.saveFinished) {
@@ -457,7 +467,7 @@ struct ChapterCanvasEditTesting {
         #expect(!store.state.isFullyPersisted)
 
         await store.send(.flushPending) {
-            $0.saveStatus = .saving(revision: 1)
+            $0.saveStatus = .saving(revision: 1, requestID: UUID(2))
             $0.inFlightBatch = [self.newRow: 1]
         }
         await store.receive(\.saveFinished) {
@@ -583,7 +593,7 @@ struct ChapterCanvasEditTesting {
             $0.chapter = next
             $0.renderedData = nil
             // 장 전환은 flush 지점이다 — 이전 장의 batch 가 곧바로 다시 나간다.
-            $0.saveStatus = .saving(revision: 1)
+            $0.saveStatus = .saving(revision: 1, requestID: UUID(3))
             $0.inFlightBatch = [self.newRow: 1]
         }
         await store.receive(\.saveFinished) {
@@ -633,7 +643,7 @@ struct ChapterCanvasGenerationTesting {
             $0.pendingMutations = [self.newRow: PendingDrawingMutation(
                 revision: 1, chapter: CanvasTestSupport.chapter, mutation: CanvasTestSupport.createResult("late").mutations[0]
             )]
-            $0.saveStatus = .saving(revision: 1)
+            $0.saveStatus = .saving(revision: 1, requestID: UUID(2))
         }
         await store.receive(\.saveFinished) {
             $0.pendingMutations = [:]
@@ -687,12 +697,14 @@ struct ChapterCanvasGenerationTesting {
             $0.layout = CanvasTestSupport.otherLayout
             $0.reloadWhenSettled = true
             $0.isReloading = true
-            $0.saveStatus = .saving(revision: 1)
+            $0.saveStatus = .saving(revision: 1, requestID: UUID(2))
         }
         #expect(!store.state.isInputEnabled)
         await store.receive(\.saveFinished) {
-            // retryCount 는 `.saving` 을 거치며 1 로 돌아온다 (기존 동작 — 재시도 횟수는 로그용이다).
-            $0.saveStatus = .failed(revision: 1, retryCount: 1)
+            // 성공 없이 두 번째 실패다. 재시도가 `.saving` 을 거쳐도 누적된다 — 화면이 반복 실패를 구분하는 근거다.
+            // (이전에는 늘 1 로 돌아와 "로그용" 으로만 쓰였다.)
+            $0.saveStatus = .failed(revision: 1, retryCount: 2)
+            $0.consecutiveSaveFailures = 2
             // 이전 구현은 여기서 isReloading 이 영원히 true — 입력이 잠긴 채 재시도할 편집도 생기지 않았다.
             $0.isReloading = false
             $0.renderedRevision = 3
@@ -708,7 +720,7 @@ struct ChapterCanvasGenerationTesting {
         #expect(spy.loadedChapters.value.count == 1)
 
         // 저장이 성공하면 미뤄 둔 DB 재조회가 이어진다.
-        await store.send(.flushPending) { $0.saveStatus = .saving(revision: 1) }
+        await store.send(.flushPending) { $0.saveStatus = .saving(revision: 1, requestID: UUID(3)) }
         await store.receive(\.saveFinished) {
             $0.pendingMutations = [:]
             $0.saveStatus = .idle
@@ -744,6 +756,8 @@ struct ChapterCanvasGenerationTesting {
             $0.renderedLayout = CanvasTestSupport.otherLayout
         }
         #expect(store.state.isInputEnabled)
+        // 복구했으므로 쓸 수 없다는 안내를 띄우지 않는다.
+        #expect(store.state.blockingLoadFailure == nil)
         #expect(store.state.loadedDrawings == [CanvasTestSupport.snapshot(verse: 1, rowID: CanvasTestSupport.rowA)])
         #expect(composeInputs.value.last == [CanvasTestSupport.snapshot(verse: 1, rowID: CanvasTestSupport.rowA)])
     }

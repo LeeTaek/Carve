@@ -187,6 +187,9 @@ public struct CarveDetailView: View {
                 }
                 // scenePhase 훅은 여기 두지 않는다 — 사이드바가 열리면 이 뷰가 트리에서 빠져 훅이 돌지 않는다.
                 // 항상 트리에 있는 CarveNavigationView 가 appWillResignActive 를 보낸다 (§8-5).
+                // 설정의 「모든 필사 데이터 삭제」도 같은 이유로 **값으로** 확인한다 — 지워지는 순간 이 뷰가
+                // 트리에 없을 수 있으므로, 돌아온 뒤 `initial: true` 로 한 번 더 비교해 놓치지 않는다.
+                .onDrawingDataChange(store.drawingDataRevision) { send(.drawingDataRevisionChanged) }
                 .onChange(of: store.usesSingleCanvas) { _, _ in
                     // 설정 토글(또는 defaults write)로 경로가 바뀌면 현재 장을 새 경로로 다시 불러온다.
                     send(.fetchSentence)
@@ -508,27 +511,79 @@ private extension CarveDetailView {
                 isFavorite: store.favoriteVerses.contains(menu.verse),
                 onFavorite: { send(.verseMenuFavoriteTapped) },
                 onHistory: { send(.verseMenuHistoryTapped) },
+                onImage: { send(.verseMenuImageTapped) },
+                onWidget: { send(.verseMenuWidgetTapped) },
                 onErase: { send(.verseMenuEraseTapped) },
                 onDismiss: { send(.verseMenuDismissed) }
             )
         }
     }
 
-    /// 즐겨찾기 결과 안내(시안 N2). 접힌 도구 팔레트와 같은 줄의 반대쪽 — 도구는 필기하는 손에서 먼 쪽이다(문서 4-1).
+    /// 즐겨찾기 · 이미지 저장 결과 안내(시안 N2 · G2). 접힌 도구 팔레트와 같은 줄의 반대쪽 — 도구는 필기하는 손에서 먼 쪽이다(문서 4-1).
     /// 펼친 팔레트는 가운데를 차지하므로 그 위로 올린다. 절 메뉴 가림막보다 아래 층이다.
     var favoriteNoticeOverlay: some View {
         ZStack {
-            if let notice = store.favoriteNotice {
+            // 저장 실패가 **가장 먼저**다. 다른 안내는 일이 끝났다는 소식이지만 이것은 아직 끝나지 않았다는 뜻이고,
+            // 이대로 앱을 닫으면 미저장분이 사라진다.
+            if let retryCount = store.chapterCanvas.saveRetryCount {
+                SaveFailureNoticeView(retryCount: retryCount) {
+                    send(.saveRetryTapped)
+                }
+                .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+            } else if store.chapterCanvas.blockingLoadFailure != nil {
+                // 불러오지 못한 장은 쓸 수 없게 닫혀 있다. 저장 실패 다음으로 — 그쪽은 이미 쓴 필사가 위험하다.
+                LoadFailureNoticeView {
+                    send(.loadRetryTapped)
+                }
+                .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+            } else if let notice = store.favoriteNotice {
                 FavoriteNoticeView(notice: notice) {
                     send(.favoriteRetryTapped)
                 }
                 .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+            } else if let notice = store.imageSaveNotice {
+                // 안내 자리는 하나라 즐겨찾기 안내와 번갈아 쓴다 — 새 안내가 뜨면 Feature 가 다른 쪽을 내린다.
+                VerseImageNoticeView(notice: notice) {
+                    send(.imageSaveRetryTapped)
+                }
+                .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+            } else if let notice = store.widgetNotice {
+                WidgetNoticeView(notice: notice) {
+                    send(.widgetRetryTapped)
+                }
+                .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+            } else if let text = localSaveText {
+                // 다른 안내가 없을 때만, 조용한 한 줄로. 캡슐 안내처럼 끼어들지 않는다.
+                Text(text)
+                    .font(CarveTypography.caption)
+                    .foregroundStyle(CarveColor.secondary)
+                    .lineLimit(1)
+                    .accessibilityLabel(text)
+                    .transition(.opacity)
             }
         }
         .frame(maxWidth: .infinity, alignment: store.headerState.isLeftHanded ? .leading : .trailing)
         .padding(.horizontal, CarveSpacing.large)
         .padding(.bottom, favoriteNoticeBottomInset)
+        .animation(reduceMotion ? .easeOut(duration: 0.12) : .snappy(duration: 0.25), value: store.chapterCanvas.saveRetryCount)
+        .animation(reduceMotion ? .easeOut(duration: 0.12) : .snappy(duration: 0.25), value: store.chapterCanvas.blockingLoadFailure)
+        .animation(.easeOut(duration: 0.2), value: localSaveText)
         .animation(reduceMotion ? .easeOut(duration: 0.12) : .snappy(duration: 0.25), value: store.favoriteNotice)
+        .animation(reduceMotion ? .easeOut(duration: 0.12) : .snappy(duration: 0.25), value: store.imageSaveNotice)
+        .animation(reduceMotion ? .easeOut(duration: 0.12) : .snappy(duration: 0.25), value: store.widgetNotice)
+        // 사진 추가 권한이 꺼져 있으면 어디서 켜는지 알린다(시안 G2). 결과 안내와 같은 자리에서 띄운다.
+        .alert($store.scope(state: \.photoPermissionAlert, action: \.photoPermissionAlert))
+    }
+
+    /// 로컬 저장 상태 한 줄(로드맵 SAVE-1). **이 기기**에 관한 것이며 iCloud 전송은 말하지 않는다.
+    /// 실패는 위에서 지속 안내로 따로 그리므로 여기서는 다루지 않는다.
+    var localSaveText: String? {
+        switch store.chapterCanvas.localSaveIndicator {
+        case .none, .failed: nil
+        case .pending: "저장 대기 중"
+        case .saving: "저장 중…"
+        case .saved: "이 기기에 저장됨"
+        }
     }
 
     /// 안내 줄의 아래 여백. 접힌 팔레트면 도구 원(도크 맨 위 64pt)과 세로 가운데를 맞추고, 펼친 팔레트면 도크 위로 올린다.
@@ -631,4 +686,14 @@ private struct ChapterColumnHeader: View {
         }
     )
     CarveDetailView(store: store)
+}
+
+// MARK: - 전체 삭제 감지
+
+private extension View {
+    /// 공유 세대가 바뀌면, 그리고 **뷰가 트리로 돌아올 때마다** 알린다.
+    /// 지워지는 순간 이 화면이 트리에 없을 수 있어 `initial: true` 로 한 번 더 비교한다.
+    func onDrawingDataChange(_ revision: Int, perform: @escaping () -> Void) -> some View {
+        onChange(of: revision, initial: true) { _, _ in perform() }
+    }
 }

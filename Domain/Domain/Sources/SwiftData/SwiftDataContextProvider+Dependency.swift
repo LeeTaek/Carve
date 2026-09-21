@@ -23,49 +23,28 @@ extension ContainerID: DependencyKey {
 extension ModelContainer: @retroactive DependencyKey {
     /// 실제 앱 환경에서 사용할 SwiftData ModelContainer.
     /// - CloudKit Private DB와 연동되며, 로컬 파일 URL과 마이그레이션 플랜(DrawingDataMigrationPlan)을 함께 구성.
+    /// - 열기 전에 원시 사본을 뜬다(정책 §12-6 C3 ①). 뜨지 못하면 열지 않고 시작 화면에서 막는다.
+    /// - 열지 못하면 `LocalStoreLoader` 가 **V1 폴백 전에** 메타데이터로 저장소를 가린다. 확인된 1.0.x 저장소만 V1 전용 컨테이너로
+    ///   옮기고(마이그레이션 모드), 그 밖은 V1 폴백 없이 시작 화면에서 막는다 (정책 §3 표 4행 · 테스트 계획 MIG-F1).
     public static var liveValue: ModelContainer {
         @Dependency(\.containerId) var containerId
-        do {
-            let url = URL.applicationSupportDirectory.appending(path: containerId.localDBPath)
-            let schema = Schema([
-                BibleDrawing.self,
-                BiblePageDrawing.self,
-                FavoriteVerse.self
-            ])
-            let config = ModelConfiguration(
-                url: url,
-                cloudKitDatabase: .private(containerId.id)
-            )
-            return try ModelContainer(for: schema,
-                                      migrationPlan: DrawingDataMigrationPlan.self,
-                                      configurations: config)
-        } catch {
-            if let error = error as? SwiftDataError, error == .loadIssueModelContainer {
-                /// 기존 컨테이너 로드에 실패한 경우(V1 스키마) 마이그레이션 모드로 전환하여 V1 전용 컨테이너를 구성.
-                @Dependency(\.clouodKitSyncManager) var cloudkitContainer
-                cloudkitContainer.syncState = .migration
-                
-                do {
-                    /// V1 스키마(DrawingVO)만을 사용하는 ModelContainer를 생성하여 마이그레이션.
-                    /// MigrationPlanV1Only: Schema.Version 설정
-                    let url = URL.applicationSupportDirectory.appending(path: containerId.localDBPath)
-                    let schema = Schema([
-                        DrawingVO.self
-                    ])
-                    let config = ModelConfiguration(
-                        url: url,
-                        cloudKitDatabase: .private(containerId.id)
-                    )
-                    cloudkitContainer.syncState = .migration
-                    return try ModelContainer(for: schema,
-                                              migrationPlan: MigrationPlanV1Only.self,
-                                              configurations: config)
-                    
-                } catch {
-                    fatalError("Failed to migration live ModelContainer: \(error.localizedDescription)")
-                }
-            } else {
-                fatalError("Failed to create live ModelContainer: \(error.localizedDescription)")
+        @Dependency(\.clouodKitSyncManager) var cloudkitContainer
+        let url = URL.applicationSupportDirectory.appending(path: containerId.localDBPath)
+        let preservation = PreservationArea.live(localDBPath: containerId.localDBPath)
+        switch LocalStoreLoader.load(at: url, cloudKitDatabase: .private(containerId.id), preservation: preservation) {
+        case .ready(let container):
+            return container
+        case .legacyMigration(let container):
+            /// V1 로 옮긴 저장소는 재실행해야 앱 스키마로 이어진다. 시작 화면은 이 모드의 어떤 결론에서도 들어가지 않는다.
+            cloudkitContainer.syncState = .migration
+            return container
+        case .unavailable(let failure):
+            /// 앱은 컨테이너를 쥐어야 하므로 메모리에만 있는 빈 컨테이너를 준다. 시작 화면이 진입을 막는다.
+            cloudkitContainer.syncState = .storeUnavailable(failure)
+            do {
+                return try LocalStoreLoader.makeUnavailableStandIn()
+            } catch {
+                fatalError("Failed to create stand-in ModelContainer: \(error.localizedDescription)")
             }
         }
     }
@@ -74,13 +53,7 @@ extension ModelContainer: @retroactive DependencyKey {
     public static var previewValue: ModelContainer {
         do {
             let config = ModelConfiguration(isStoredInMemoryOnly: true)
-            return try ModelContainer(
-                for: Schema([
-                    BibleDrawing.self,
-                    BiblePageDrawing.self,
-                    FavoriteVerse.self
-                ]),
-                configurations: config)
+            return try ModelContainer(for: AppStoreSchema.schema, configurations: config)
         } catch {
             fatalError("Failed to create preview ModelContainer")
         }
@@ -90,12 +63,7 @@ extension ModelContainer: @retroactive DependencyKey {
     public static var testValue: ModelContainer {
         do {
             let config = ModelConfiguration(isStoredInMemoryOnly: true)
-            let schema = Schema([
-                BibleDrawing.self,
-                BiblePageDrawing.self,
-                FavoriteVerse.self
-            ])
-            return try ModelContainer(for: schema, configurations: config)
+            return try ModelContainer(for: AppStoreSchema.schema, configurations: config)
         } catch {
             fatalError("Failed to create test ModelContainer")
         }

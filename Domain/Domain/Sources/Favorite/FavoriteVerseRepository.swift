@@ -30,7 +30,7 @@ public struct FavoriteVerseKey: Hashable, Sendable {
 /// 즐겨찾기 한 항목 — **추가한 당시의 본문과 필기**다 (2026-09-15 결정).
 ///
 /// 원래 절의 필사 행을 참조하지 않는다. 이후 그 절을 지우거나 다시 써도 이 값은 바뀌지 않는다.
-public struct FavoriteVerseSnapshot: Equatable, Sendable, Identifiable {
+public struct FavoriteVerseSnapshot: Hashable, Sendable, Identifiable {
     public var id: FavoriteVerseKey { key }
 
     public let key: FavoriteVerseKey

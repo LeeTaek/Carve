@@ -47,8 +47,8 @@ extension ChapterCanvasFeature {
 }
 
 extension ChapterCanvasFeature {
-    /// 절 메뉴 액션(시안 E1 · N1). 기록 · 지우기는 기존 `historyRequested` · `eraseRequested` 흐름으로 넘기고,
-    /// 즐겨찾기는 이 Feature 가 모르는 저장소의 일이라 부모(`CarveDetailFeature`)에 맡긴다.
+    /// 절 메뉴 액션(시안 E1 · N1 · G1). 기록 · 지우기는 기존 `historyRequested` · `eraseRequested` 흐름으로 넘기고,
+    /// 즐겨찾기 · 이미지 저장은 이 Feature 가 모르는 저장소 · 사진 보관함의 일이라 부모(`CarveDetailFeature`)에 맡긴다.
     func reduceVerseMenu(state: inout State, action: Action) -> Effect<Action> {
         switch action {
         case let .verseMenuRequested(point, anchor, verseFrame):
@@ -80,6 +80,27 @@ extension ChapterCanvasFeature {
             state.verseMenu = nil
             state.historyAnchorFrame = menu.verseFrame
             return .send(.historyRequested(at: menu.contentPoint))
+
+        case .verseMenuImageTapped:
+            guard let menu = state.verseMenu else { return .none }
+            state.verseMenu = nil
+            guard let region = state.renderedLayout?.region(verse: menu.verse) else { return .none }
+            // 이미지에 넣을 필기는 지금 보이는 필기다 — 저장 대기 중인 획까지, 화면처럼 현재 밑줄에 맞춘 모습으로.
+            // 필기가 없어도 넘긴다 — 부모가 본문만 담은 이미지를 만든다(2026-09-15 결정).
+            let ink = Self.currentInkSnapshot(verse: menu.verse, state: state).flatMap { codec.verseImageInk($0, region) }
+            return .send(.delegate(.imageSaveRequested(VerseImageHandwriting(
+                verse: menu.verse,
+                writingSize: region.writingRect.size,
+                underlineAnchors: region.underlineAnchors,
+                inkData: ink
+            ))))
+
+        case .verseMenuWidgetTapped:
+            guard let menu = state.verseMenu, menu.availability.canFavorite else { return .none }
+            state.verseMenu = nil
+            // 즐겨찾기에 없는 절이면 부모가 지금 필기 그대로 보관한 뒤 위젯 대상으로 삼는다(시안 N6).
+            let widgetInk = Self.currentInk(verse: menu.verse, state: state)
+            return .send(.delegate(.widgetRequested(verse: menu.verse, ink: widgetInk)))
 
         case .verseMenuEraseTapped:
             guard let menu = state.verseMenu, menu.availability.canErase else { return .none }

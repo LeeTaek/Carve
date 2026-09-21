@@ -30,6 +30,13 @@ struct DrawingCodecClient: Sendable {
         _ afterData: Data,
         _ context: DrawingEditContext
     ) -> DrawingEditResult
+    /// 절 이미지(시안 G1)에 넣을 그 절의 필기 — 현재 밑줄에 맞춘 모습을 필사 영역 좌상단 원점으로. 획이 없으면 nil.
+    ///
+    /// 기본값은 필기 없음이다 — 합성 · 편집만 바꿔 끼우는 기존 테스트 스텁이 그대로 쓰인다.
+    var verseImageInk: @Sendable (
+        _ snapshot: VerseDrawingSnapshot,
+        _ region: VerseCanvasRegion
+    ) -> Data? = { _, _ in nil }
 }
 
 extension DrawingCodecClient: DependencyKey {
@@ -37,7 +44,8 @@ extension DrawingCodecClient: DependencyKey {
         let codec = DrawingCodec()
         return DrawingCodecClient(
             compose: { codec.compose(snapshots: $0, layout: $1, columnOrigin: $2) },
-            mutations: { codec.mutations(beforeData: $0, beforeOwnership: $1, afterData: $2, context: $3) }
+            mutations: { codec.mutations(beforeData: $0, beforeOwnership: $1, afterData: $2, context: $3) },
+            verseImageInk: { codec.verseImageInk(of: $0, in: $1) }
         )
     }()
 

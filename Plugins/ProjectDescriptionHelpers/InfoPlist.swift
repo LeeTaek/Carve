@@ -22,7 +22,17 @@ public extension InfoPlist {
                 "UILaunchStoryboardName": "LaunchScreen",
                 "UISupportedInterfaceOrientations": "UIInterfaceOrientationPortrait",
                 "FeedbackAddress": "$(FEEDBACK_ADDRESS)",
+                // 절 이미지 저장(시안 G1) — 추가 전용 권한만 쓴다. 보관함을 읽지 않으므로 읽기 권한 문구는 두지 않는다.
+                "NSPhotoLibraryAddUsageDescription": "필사한 절을 이미지로 사진에 저장하려면 사진 추가 권한이 필요해요.",
                 "UIBackgroundModes": ["remote-notification"],
+                // 위젯을 누르면 그 절로 들어간다(시안 N7 · WIDGET-0 §3).
+                "CFBundleURLTypes": [
+                    [
+                        "CFBundleTypeRole": "Editor",
+                        "CFBundleURLName": "kr.co.carve.leetaek.verse",
+                        "CFBundleURLSchemes": ["carve"]
+                    ]
+                ],
                 "CLOUDKIT_CONTAINER_ID": "$(CLOUDKIT_CONTAINER_ID)",
                 "GADApplicationIdentifier": "ca-app-pub-7073697298801242~1655419837",
                 "SKAdNetworkItems": .array(

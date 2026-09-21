@@ -96,6 +96,10 @@ struct CarveApp: App {
             .task {
                 await adConsent.gatherConsent()
             }
+            // 위젯을 누르면 그 절로 들어간다(시안 N6 · N7). 콜드 런치면 준비 화면이 끝난 뒤 이동한다.
+            .onOpenURL { url in
+                store.send(.openedURL(url))
+            }
     }
 }
 
@@ -135,6 +139,8 @@ extension CarveApp {
             $0.adConsentClient = adConsentClient
             $0.purchaseClient = purchaseClient
             $0.sentenceSettingBackup = sentenceSettingBackup
+            $0.photoLibraryClient = PhotoKitLibraryClient()
+            $0.widgetVerseClient = AppGroupWidgetVerseClient()
             $0.analyticsClient = FirebaseAnalyticsClient()
         } operation: {
             Store(initialState: .initialState) {

@@ -54,6 +54,8 @@ public struct SettingsFeature {
         case iCloud(CloudSettingsFeature)
         /// 필사 캔버스 — 단일 Canvas flag 토글 (설계 §13 Phase 3 (3/3)).
         case canvas(CanvasSettingsFeature)
+        /// 위젯에 표시할 말씀(시안 N7 · N8).
+        case widget(WidgetSettingsFeature)
         /// 화면 모드 — 시스템 설정 · 라이트 · 다크.
         case appearance(AppearanceSettingsFeature)
         /// 필사 사용법과 첫 안내 다시 보기.
@@ -73,6 +75,7 @@ public struct SettingsFeature {
     public enum SidebarItem: Hashable, CaseIterable, Sendable {
         case iCloud
         case canvas
+        case widget
         case appearance
         case help
         case patchnote
@@ -122,6 +125,7 @@ extension SettingsFeature.Path.State {
         switch self {
         case .iCloud: .iCloud
         case .canvas: .canvas
+        case .widget: .widget
         case .appearance: .appearance
         case .help: .help
         case .patchnote: .patchnote
@@ -138,6 +142,7 @@ extension SettingsFeature.SidebarItem {
         switch self {
         case .iCloud: .iCloud(.initialState)
         case .canvas: .canvas(.initialState)
+        case .widget: .widget(.initialState)
         case .appearance: .appearance(.initialState)
         case .help: .help(.initialState)
         case .patchnote: .patchnote(.initialState)

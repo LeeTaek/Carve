@@ -71,9 +71,14 @@ struct StrokeOwnershipResolver: Sendable {
     /// 이전 소유권을 새 drawing 에 승계한다 (설계 §7-3).
     ///
     /// 규칙 우선순위
-    /// 1. `StrokeIdentityKey` 완전 일치 → 기존 owner 승계.
+    /// 1. `StrokeIdentityKey` 완전 일치 **+ 앵커 불변** → 기존 owner 승계.
     ///    S1-2/S1-4 실측상 **bitmap 지우개 경로는 전부 여기서 해결된다.**
-    ///    조각들은 원본과 같은 키를 가지므로 자동으로 같은 owner 를 받는다.
+    ///    조각들은 원본과 같은 키를 갖고 원본 control point 까지 그대로 물려받아 앵커도 같다.
+    /// 1''. `StrokeIdentityKey` 완전 일치 **+ 앵커 이동** → 규칙 4 로 보낸다 (올가미 설계 §4-4).
+    ///    올가미로 옮긴 획은 **놓인 자리의 절**에 속한다. 승계로 두면 3절 자리에 보이는 잉크가 1절 행에 저장돼
+    ///    글자 크기 · 회전 때 1절을 따라가고, 1절 「지우기」 · 절 이미지 · 위젯까지 그 잉크를 데려간다
+    ///    (2026-09-16 시뮬레이터에서 재현 — 올가미 설계 §5-2).
+    ///    겹침(규칙 3)을 건너뛰는 이유는 그것이 "놓인 자리" 가 아니라 "이전 세대 잉크와 겹친 자리" 를 고르기 때문이다.
     /// 2. *(설계의 2번 규칙 — 유사도 판정은 생략)* `randomSeed` **또는** `creationTime` 이 이전 세대의 어떤 획과 일치하면
     ///    "같은 논리적 획의 변형" 으로 보고 **3번으로 넘긴다.** 유사도 임계값 대신 3번의 겹침이 그 역할을 한다.
     /// 3. 2번의 전제가 있는 획에 한해, 이전 세대 획과 공간적으로 가장 많이 겹치는 owner 승계.
@@ -85,6 +90,16 @@ struct StrokeOwnershipResolver: Sendable {
     /// 3번이 실제로 발동하는 것은 **새 획**뿐이었고, 새 획이 이웃 절 잉크의 `renderBounds` 와 겹치면(절 경계 근처의 긴 획 · 큰 글씨)
     /// 시작 절이 아니라 **이웃 절**에 귀속돼 reflow 때 그 절과 함께 움직였다 — U1("시작한 절에 속한다")의 위반이다.
     /// 새 획은 seed 도 creationTime 도 새것이라 2번의 전제가 없고, 곧바로 4번으로 간다.
+    ///
+    /// ### 앵커 이동 판정의 근거 (2026-09-16 실측)
+    /// 올가미 이동은 `path` 를 건드리지 않고 **`transform` 만** 바꾼다 — 첫 control point 는 그대로이고
+    /// `t.ty` 만 0 → 327 로 변했다. `randomSeed` · `creationDate` · `path.count` 는 전부 불변이라
+    /// 규칙 1 이 그대로 승계해 버린다. 반대로 `.bitmap` 지우개(S1-4) · reflow(§9-4 는 이 경로를 타지 않는다) ·
+    /// 표시용 재구성(D9 H)은 앵커를 바꾸지 않는다. 그래서 "앵커가 움직였는가" 는 **올가미 이동과 그 되돌리기**만
+    /// 골라낸다. 되돌리기도 앵커가 원래 자리로 돌아오므로 같은 규칙이 원래 절로 되돌려 놓는다.
+    ///
+    /// 임계값은 두지 않는다 — 같은 세대 안의 좌표 동일성 비교이고, 건드리지 않은 획의 좌표는 실측에서
+    /// 소수점까지 같았다. 잡음이 관측되면 그때 근거와 함께 ε 를 넣는다.
     ///
     /// ### 2번의 유사도 판정을 생략한 근거
     /// - S1-4 실측(§19-2)에서 지우개 전후로 `randomSeed` / `creationDate` / `path.count` 는 물론
@@ -114,18 +129,24 @@ struct StrokeOwnershipResolver: Sendable {
     ) -> OwnershipSnapshot {
         let previousGeometry = ownerGeometry(of: previousDrawing, ownership: previous)
         let previousIdentities = PartialIdentityIndex(previousDrawing)
+        let previousAnchors = AnchorIndex(previousDrawing) { anchorPoint(of: $0) }
         let groups = groupByIdentity(drawing)
 
         var resolved: [StrokeIdentityKey: Int] = [:]
         resolved.reserveCapacity(groups.count)
         for group in groups {
-            if let inherited = previous.owner(of: group.key) {
-                resolved[group.key] = inherited                                  // 규칙 1
-            } else if previousIdentities.partiallyMatches(group.key),           // 규칙 2 의 전제
+            // 규칙 1'' — 앵커가 움직인 획은 승계도 겹침도 건너뛰고 **놓인 자리**로 간다 (올가미 이동).
+            let moved = previous.owner(of: group.key) != nil
+                && previousAnchors.hasMoved(group.key, to: anchors(of: group.strokes))
+
+            if !moved, let inherited = previous.owner(of: group.key) {
+                resolved[group.key] = inherited                                  // 규칙 1'
+            } else if !moved,
+                      previousIdentities.partiallyMatches(group.key),           // 규칙 2 의 전제
                       let overlapped = overlapOwner(of: group.strokes, in: previousGeometry) {
                 resolved[group.key] = overlapped                                 // 규칙 3
             } else if let fresh = freshOwner(of: group.strokes, in: layout) {
-                resolved[group.key] = fresh                                      // 규칙 4 (U1)
+                resolved[group.key] = fresh                                      // 규칙 4 (U1) · 1''
             }
             // 어느 규칙에도 걸리지 않으면(앵커가 캔버스 밖 등) map 에 넣지 않는다.
             // "조회 실패 = 소유자 없음" 이며, 0 같은 대체값을 만들지 않는다.
@@ -156,6 +177,34 @@ struct StrokeOwnershipResolver: Sendable {
         func partiallyMatches(_ key: StrokeIdentityKey) -> Bool {
             seeds.contains(key.randomSeed) || creationTimes.contains(key.creationTime)
         }
+    }
+
+    /// 이전 세대 획들의 `StrokeIdentityKey` → 앵커 집합. 규칙 1 을 "앵커 불변" 으로 조이는 데 쓴다 (올가미 설계 §4-4).
+    ///
+    /// 여기서도 열거는 `drawing.strokes` 다 (§7-2). 한 원본에서 갈라진 조각들은 원본 path 를 공유해 앵커가 서로 같으므로,
+    /// 집합은 보통 원소 하나다. 조각 하나만 움직이면 집합이 달라져 그룹 전체가 재귀속된다 — 소유권의 단위가 키이기 때문이다.
+    private struct AnchorIndex {
+        private let anchors: [StrokeIdentityKey: Set<CGPoint>]
+
+        init(_ drawing: PKDrawing, anchor: (PKStroke) -> CGPoint?) {
+            var anchors: [StrokeIdentityKey: Set<CGPoint>] = [:]
+            for stroke in drawing.strokes {
+                guard let point = anchor(stroke) else { continue }
+                anchors[StrokeIdentityKey(stroke: stroke), default: []].insert(point)
+            }
+            self.anchors = anchors
+        }
+
+        /// 이전 세대에 같은 키가 있었고 그 앵커 집합이 달라졌는가. 키가 없었으면 "움직였다" 가 아니다(승계할 것이 없다).
+        func hasMoved(_ key: StrokeIdentityKey, to current: Set<CGPoint>) -> Bool {
+            guard let previous = anchors[key] else { return false }
+            return previous != current
+        }
+    }
+
+    /// 획 묶음의 앵커 집합. 앵커를 얻지 못하는 획(control point 없음)은 빠진다.
+    private func anchors(of strokes: [PKStroke]) -> Set<CGPoint> {
+        Set(strokes.compactMap { anchorPoint(of: $0) })
     }
 
     /// 같은 `StrokeIdentityKey` 를 공유하는 stroke 묶음.
