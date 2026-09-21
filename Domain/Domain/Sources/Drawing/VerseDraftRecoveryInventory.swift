@@ -162,6 +162,14 @@ public struct VerseDraftRecoveryQuery: Sendable {
         )
     }
 
+    /// 비교의 한쪽 — 그 절의 **지금 대표 행**(필기 바이트까지).
+    ///
+    /// 목록은 지금 필기의 바이트를 들고 있지 않다(절마다 들면 목록 하나가 장 전체를 메모리에 올린다). 카드를 열어 견줄 때
+    /// 그 장만 읽는다. 행이 없거나 비운 절이면 nil 이다 — "지금 그 절에는 필기가 없다" 는 뜻이다.
+    public func currentVerse(chapter: BibleChapter, verse: Int) async throws -> VerseDrawingSnapshot? {
+        VerseDraftStoreView(snapshots: try await repository.load(chapter: chapter).snapshots).representatives[verse]
+    }
+
     /// 한 장에서 보이지 않게 남은 초안들. 초안이나 저장소를 읽지 못하면 던진다 — 부르는 쪽이 "대조하지 못한 장" 으로 남긴다.
     private func entries(
         chapter: BibleChapter,

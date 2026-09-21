@@ -47,6 +47,9 @@ public struct DraftRecoveryFeature {
         public var id: String
         /// "창세기 1:3".
         public var place: String
+        /// 비교할 때 이 장만 읽는다.
+        public var chapter: BibleChapter
+        public var verse: Int
         public var savedAt: Date
         public var reason: VerseDraftRecoveryReason
         /// 그때의 계정 근거 한 줄.
@@ -61,6 +64,17 @@ public struct DraftRecoveryFeature {
         public var currentIsEmpty: Bool?
     }
 
+    /// 견주기 — 지금 필기와 보관된 것. **바꾸지 않는다**(읽기 전용 단계).
+    public struct Comparison: Hashable {
+        public var itemID: String
+        public var isLoading: Bool = true
+        /// 그 절의 지금 필기. nil 이면 지금 그 절에는 필기가 없다.
+        public var currentInk: Data?
+        public var currentUpdatedAt: Date?
+        /// 지금 필기를 읽지 못했다 — 없다는 뜻이 아니다.
+        public var failure: String?
+    }
+
     @ObservableState
     public struct State: Hashable {
         public static let initialState = Self()
@@ -70,6 +84,8 @@ public struct DraftRecoveryFeature {
         public var buckets: [Bucket] = []
         /// 펼쳐 본 묶음.
         public var opened: AccountScope?
+        /// 펼쳐 견주는 중인 초안.
+        public var comparison: Comparison?
 
         public var totalDraftCount: Int { buckets.reduce(0) { $0 + $1.draftCount } }
         public var totalDraftBytes: Int64 { buckets.reduce(0) { $0 + $1.draftBytes } }
@@ -90,11 +106,17 @@ public struct DraftRecoveryFeature {
         case failed(String)
         case view(View)
 
+        /// 그 절의 지금 필기를 읽었다.
+        case currentLoaded(itemID: String, ink: Data?, updatedAt: Date?)
+        case currentFailed(itemID: String, String)
+
         public enum View {
             case onAppear
             case reload
             /// 묶음을 펼치거나 접는다.
             case open(AccountScope?)
+            /// 초안을 지금 필기와 견주어 본다(다시 누르면 접는다).
+            case compare(Item)
         }
     }
 
@@ -112,9 +134,29 @@ public struct DraftRecoveryFeature {
                 return load()
             case .view(.open(let scope)):
                 state.opened = state.opened == scope ? nil : scope
+                state.comparison = nil
+            case .view(.compare(let item)):
+                guard state.comparison?.itemID != item.id else {
+                    state.comparison = nil
+                    return .none
+                }
+                state.comparison = Comparison(itemID: item.id)
+                return compare(item)
+            case .currentLoaded(let itemID, let ink, let updatedAt):
+                guard state.comparison?.itemID == itemID else { return .none }
+                state.comparison?.isLoading = false
+                state.comparison?.currentInk = ink
+                state.comparison?.currentUpdatedAt = updatedAt
+            case .currentFailed(let itemID, let message):
+                guard state.comparison?.itemID == itemID else { return .none }
+                state.comparison?.isLoading = false
+                state.comparison?.failure = message
             case .loaded(let buckets):
                 state.isLoading = false
                 state.buckets = buckets
+                if let comparison = state.comparison, !buckets.contains(where: { $0.items.contains { $0.id == comparison.itemID } }) {
+                    state.comparison = nil
+                }
                 if let opened = state.opened, !buckets.contains(where: { $0.scope == opened }) {
                     state.opened = nil
                 }
@@ -122,6 +164,7 @@ public struct DraftRecoveryFeature {
                 state.isLoading = false
                 state.failure = message
                 state.buckets = []
+                state.comparison = nil
             }
             return .none
         }
@@ -155,6 +198,24 @@ public struct DraftRecoveryFeature {
             }
             // 볼 것이 있는 묶음을 먼저, 그 안에서는 지금 계정 · 계정 미확인 · 이 기기 전용 · 다른 계정 차례로.
             await send(.loaded(buckets.sorted { Self.order($0, $1) }))
+        }
+    }
+
+    /// 견줄 때 그 장만 읽는다 — 목록은 지금 필기의 바이트를 들고 있지 않다.
+    private func compare(_ item: Item) -> Effect<Action> {
+        .run { [reader, repository] send in
+            guard let reader else {
+                await send(.currentFailed(itemID: item.id, "이 기기의 보존 영역을 열지 못했어요."))
+                return
+            }
+            do {
+                let current = try await VerseDraftRecoveryQuery(reader: reader, repository: repository)
+                    .currentVerse(chapter: item.chapter, verse: item.verse)
+                await send(.currentLoaded(itemID: item.id, ink: current?.lineData, updatedAt: current?.updateDate))
+            } catch {
+                Log.error("남은 필기 — 지금 필기를 읽지 못했다", item.place, "\(error)")
+                await send(.currentFailed(itemID: item.id, "지금 그 절의 필기를 읽지 못했어요. 없다는 뜻은 아니에요."))
+            }
         }
     }
 
@@ -198,6 +259,8 @@ extension DraftRecoveryFeature.Item {
         self.init(
             id: "\(key.sessionID)/\(key.title)/\(key.chapter)/\(key.verse)",
             place: DraftRecoveryCopy.place(key),
+            chapter: BibleChapter(title: BibleTitle(rawValue: key.title) ?? .genesis, chapter: key.chapter),
+            verse: key.verse,
             savedAt: entry.draft.savedAt,
             reason: entry.reason,
             provenance: DraftRecoveryCopy.provenance(of: entry.draft, environment: environment),

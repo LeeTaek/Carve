@@ -187,7 +187,25 @@ public struct DraftRecoveryView: View {
 
     // MARK: - 초안 한 줄
 
+    @ViewBuilder
     private func itemCard(_ item: DraftRecoveryFeature.Item, comparedWithStore: Bool) -> some View {
+        VStack(alignment: .leading, spacing: CarveSpacing.small) {
+            if comparedWithStore {
+                // 견줄 수 있는 묶음만 누를 수 있다 — 다른 계정 묶음은 지금 저장소와 견줄 것이 없다.
+                Button { send(.compare(item)) } label: { itemSummary(item, comparedWithStore: true) }
+                    .buttonStyle(.plain)
+                if store.comparison?.itemID == item.id {
+                    comparison(item)
+                }
+            } else {
+                itemSummary(item, comparedWithStore: false)
+            }
+        }
+        .padding(CarveSpacing.small)
+        .background(CarveColor.surface, in: RoundedRectangle(cornerRadius: CarveRadius.control, style: .continuous))
+    }
+
+    private func itemSummary(_ item: DraftRecoveryFeature.Item, comparedWithStore: Bool) -> some View {
         HStack(alignment: .top, spacing: CarveSpacing.small) {
             preview(of: item)
             VStack(alignment: .leading, spacing: CarveSpacing.xxSmall) {
@@ -221,11 +239,77 @@ public struct DraftRecoveryView: View {
                         .font(CarveTypography.caption)
                         .foregroundStyle(CarveColor.secondary)
                 }
+                if comparedWithStore {
+                    Text(store.comparison?.itemID == item.id ? "견주기 접기" : "지금 필기와 견주어 보기")
+                        .font(CarveTypography.caption)
+                        .foregroundStyle(CarveColor.accent)
+                }
             }
             Spacer(minLength: 0)
         }
-        .padding(CarveSpacing.small)
-        .background(CarveColor.surface, in: RoundedRectangle(cornerRadius: CarveRadius.control, style: .continuous))
+        .contentShape(Rectangle())
+    }
+
+    // MARK: - 견주기
+
+    /// 지금 필기와 보관된 것을 나란히. **바꾸지 않는다** — 고르기는 ③ 과 같은 시기에 붙는다.
+    @ViewBuilder
+    private func comparison(_ item: DraftRecoveryFeature.Item) -> some View {
+        let comparison = store.comparison
+        VStack(alignment: .leading, spacing: CarveSpacing.xSmall) {
+            CarveDivider()
+            if comparison?.isLoading == true {
+                HStack {
+                    ProgressView()
+                    Text("지금 필기를 읽는 중이에요")
+                        .font(CarveTypography.caption)
+                        .foregroundStyle(CarveColor.secondary)
+                }
+            } else if let failure = comparison?.failure {
+                note(failure, emphasized: true)
+            } else {
+                HStack(alignment: .top, spacing: CarveSpacing.small) {
+                    side(
+                        title: "지금 필기",
+                        ink: comparison?.currentInk,
+                        emptyText: "필기 없음",
+                        detail: comparison?.currentUpdatedAt.map(DraftRecoveryCopy.dateText) ?? "바뀐 때를 모름"
+                    )
+                    side(
+                        title: "보관된 것",
+                        ink: item.ink,
+                        emptyText: "비운 절",
+                        detail: DraftRecoveryCopy.dateText(item.savedAt)
+                    )
+                }
+                note("견주어 보기만 해요. 되살리기는 준비 중이고, 고를 때까지 어느 쪽도 바뀌지 않아요.", emphasized: false)
+            }
+        }
+    }
+
+    private func side(title: String, ink: Data?, emptyText: String, detail: String) -> some View {
+        VStack(alignment: .leading, spacing: CarveSpacing.xxSmall) {
+            Text(title)
+                .font(CarveTypography.caption)
+                .foregroundStyle(CarveColor.ink)
+            Group {
+                if let image = CarveInkThumbnail.image(of: ink) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFit()
+                } else {
+                    Text(ink == nil ? emptyText : "미리보기 없음")
+                        .font(CarveTypography.caption)
+                        .foregroundStyle(CarveColor.secondary)
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: 72, maxHeight: 72)
+            .background(CarveColor.Paper.background, in: RoundedRectangle(cornerRadius: CarveRadius.inner, style: .continuous))
+            Text(detail)
+                .font(CarveTypography.caption)
+                .foregroundStyle(CarveColor.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// 지금 그 절이 어떤 상태인지 — 비교 화면이 붙기 전에도 견줄 실마리는 준다.

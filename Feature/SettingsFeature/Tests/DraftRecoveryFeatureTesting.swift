@@ -178,6 +178,30 @@ struct DraftRecoveryFeatureTesting {
         #expect(bucket.items.first?.provenance == "다른 계정에서 씀")
     }
 
+    @Test("견줄 때 그 절의 지금 필기를 읽고, 다시 누르면 접는다")
+    func comparingLoadsTheCurrentInk() async throws {
+        let reader = ReaderStub(
+            buckets: [Self.accountA],
+            summaries: [Self.accountA: Self.summary(Self.accountA, drafts: 1)],
+            drafts: [Self.accountA: [Self.draft(verse: 3, account: Self.accountA)]]
+        )
+        let store = makeStore(reader: reader)
+        await store.send(.view(.onAppear))
+        await store.receive(\.loaded)
+        let item = try #require(store.state.buckets.first?.items.first)
+
+        await store.send(.view(.compare(item)))
+        await store.receive(\.currentLoaded)
+
+        #expect(store.state.comparison?.itemID == item.id)
+        #expect(store.state.comparison?.isLoading == false)
+        // 대역 저장소의 그 장은 비어 있다 — "지금 그 절에는 필기가 없다".
+        #expect(store.state.comparison?.currentInk == nil)
+        #expect(store.state.comparison?.failure == nil)
+
+        await store.send(.view(.compare(item))) { $0.comparison = nil }
+    }
+
     @Test("묶음을 펼쳤다 접는다")
     func openingAndClosingABucket() async throws {
         let reader = ReaderStub(
