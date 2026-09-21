@@ -9,6 +9,7 @@
 import SwiftUI
 import CarveToolkit
 import Domain
+import UIComponents
 
 import ComposableArchitecture
 
@@ -39,6 +40,14 @@ struct LaunchProgressView: View {
                             .frame(width: 150)
                     }
                     cloudkitSyncStateMessage(state: store.syncState)
+                    if store.offersStartFirst {
+                        // 초기 복원에서는 **처음부터** 둔다 — 20초를 기다리게 하지 않는다(정책 §3-1, 사용자 결정 2026-09-21).
+                        // 「계속 기다리기」 는 따로 버튼 없이 이 화면에 머무는 것이다.
+                        Button(startFirstTitle) {
+                            send(.startFirstTapped)
+                        }
+                        .buttonStyle(.carve(.primary))
+                    }
                     Spacer()
                 }
             }
@@ -74,19 +83,20 @@ struct LaunchProgressView: View {
         }
     }
     
+    /// 「먼저 시작하기」 의 제목. 확인된 오류로 기다릴 것이 없으면 「시작하기」 다.
+    private var startFirstTitle: String {
+        if case .failed = store.syncState { return "시작하기" }
+        return "먼저 시작하기"
+    }
+
     /// CloudKit 동기화 상태에 따라 적절한 안내 문구(에러/진행/완료).
     @ViewBuilder
     func cloudkitSyncStateMessage(state: PersistentCloudKitContainer.CloudSyncState) -> some View {
         switch state {
-        case .idle:
-            statusText("초기화 중...")
-        case .syncing:
-            statusText("데이터 동기화 중...")
+        case .idle, .syncing, .stillWaiting:
+            waitingText
         case .migration:
             statusText("데이터 마이그레이션 중...\n조금만 기다려주세요.")
-        case .stillWaiting:
-            // 실패가 아니다. 관찰은 계속되고 원격 필사가 나중에 도착할 수 있다 (정책 §3-2).
-            statusText("기존 필사를 확인하는 데 시간이 걸리고 있어요.\n먼저 시작해도 나중에 나타날 수 있어요.")
         case .failed(let reason):
             failureText(reason)
         case .storeUnavailable(let failure):
@@ -96,6 +106,34 @@ struct LaunchProgressView: View {
         default: EmptyView()
         }
     }
+
+    /// 결론이 나기 전의 안내 — 대기 방식에 따라 다르다.
+    ///
+    /// 초기 복원은 20초 · 60초에 **안내만** 바꾼다(들어가지 않는다). 먼저 시작해도 늦게 도착한 필사는 열린 장에 반영하거나 알린다 —
+    /// 그 약속은 `ChapterCanvasArrivalFeature` 가 지킨다(2026-09-21 후속 리뷰 P0-3). 예전 문구 "먼저 시작해도 나중에 나타날 수 있어요" 는
+    /// 지켜지지 않던 약속이었다.
+    @ViewBuilder
+    private var waitingText: some View {
+        switch store.mode {
+        case .initialRestore?:
+            switch store.stage {
+            case .checking:
+                statusText("iCloud에 저장된 필사를 확인하고 있어요.\n\(Self.arrivalPromise)")
+            case .slow:
+                statusText("기존 필사를 불러오는 데 시간이 걸리고 있어요.\n계속 기다리거나 먼저 시작할 수 있어요.\n\(Self.arrivalPromise)")
+            case .verySlow:
+                statusText("아직 기존 필사를 받고 있어요.\n필사가 많거나 네트워크가 느리면 오래 걸릴 수 있어요.\n\(Self.arrivalPromise)")
+            }
+        case .normal?:
+            // 이 기기에 필사가 있다 — 기다리지 않고 들어간다. 동기화는 앱 안에서 계속 본다.
+            statusText("필사를 여는 중이에요")
+        case nil:
+            statusText("초기화 중...")
+        }
+    }
+
+    /// 먼저 시작했을 때 늦게 도착한 필사가 어떻게 되는지 — 편집하지 않은 장은 반영하고, 편집한 장은 알린다.
+    private static let arrivalPromise = "먼저 시작해도 기존 필사는 도착하는 대로 화면에 반영하거나 알려 드려요."
 
     /// 로컬 저장소를 쓸 수 없을 때의 안내. **iCloud · 네트워크 안내와 섞지 않는다** — 들어가지 않는 이유와 할 수 있는 일을 말한다
     /// (정책 §3 표 4행).

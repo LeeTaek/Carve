@@ -83,6 +83,13 @@ public actor SwiftDatabaseActor {
         let objects: [T] = try self.fetch()
         return objects.isEmpty
     }
+
+    /// 그 모델이 하나라도 있는가 — 행을 불러오지 않고 센다. 시작 화면이 초기 복원인지 가릴 때 쓴다(정책 §3, 2026-09-21 후속 리뷰 P0-3).
+    public func hasAny<T: PersistentModel>(_ type: T.Type) throws -> Bool {
+        var descriptor = FetchDescriptor<T>()
+        descriptor.fetchLimit = 1
+        return try modelContext.fetchCount(descriptor) > 0
+    }
 }
 
 
