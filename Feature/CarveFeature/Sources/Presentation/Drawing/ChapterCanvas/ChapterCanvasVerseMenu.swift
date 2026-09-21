@@ -7,6 +7,7 @@
 //
 
 import CoreGraphics
+import Foundation
 
 import ComposableArchitecture
 
@@ -116,5 +117,23 @@ extension ChapterCanvasFeature {
         default:
             return .none
         }
+    }
+}
+
+// MARK: - 부모에게 보내는 사건
+
+extension ChapterCanvasFeature.Action {
+    /// 부모(`CarveDetailFeature`)가 처리하는 사건.
+    public enum Delegate: Equatable, Sendable {
+        /// 이 절의 필사 기록 시트를 열어 달라.
+        case showHistory(verse: Int)
+        /// 이 절의 즐겨찾기를 켜거나 꺼 달라(시안 N1). `ink` 는 지금 보이는 필기 — 추가할 때 그대로 보존한다. 획이 없으면 nil.
+        case favoriteToggled(verse: Int, ink: Data?)
+        /// 이 절을 이미지로 사진에 저장해 달라(시안 G1). 필기 칸은 캔버스에 보이는 그대로다.
+        case imageSaveRequested(VerseImageHandwriting)
+        /// 이 절을 위젯에 표시해 달라(시안 N6). `ink` 는 지금 보이는 필기 — 즐겨찾기에 없던 절이면 이대로 보관한다.
+        case widgetRequested(verse: Int, ink: Data?)
+        /// 보이지 않게 남은 필기를 보는 자리(설정 → 남은 필기)를 열어 달라(정책 §12-6 ④). **되살리지 않는다** — 보여 주기만 한다.
+        case draftRecoveryRequested
     }
 }

@@ -204,7 +204,8 @@ extension ChapterCanvasFeature {
     func reduceCanvasPresence(state: inout State, action: Action) -> Effect<Action> {
         switch action {
         case .canvasAttached(let id): canvasAttached(state: &state, id: id)
-        case .canvasDetached(let id): canvasDetached(state: &state, id: id)
+        // 인계를 기다리던 도착 반영도 잇는다 — 떨어지며 미보고 획을 먼저 보고했다(P0-3).
+        case .canvasDetached(let id): .merge(canvasDetached(state: &state, id: id), arrivalCanvasDetached(state: &state))
         case let .canvasDisplayed(id, revision): canvasDisplayed(state: &state, id: id, revision: revision)
         default: .none
         }

@@ -510,6 +510,12 @@ private extension CarveDetailView {
                     send(.loadRetryTapped)
                 }
                 .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+            } else if store.usesSingleCanvas, let notice = store.chapterCanvas.arrival.notice {
+                // 늦게 도착한 필사 — 편집한 장은 자동으로 바꾸지 않고 여기서 알린다(P0-3). 실패 안내 다음이다 — 그쪽은 이미 쓴 필사가 위험하다.
+                // 캔버스의 일이라 그 스토어로 바로 보낸다(절 메뉴 · 지우기 확인창처럼).
+                let canvas = store.scope(state: \.chapterCanvas, action: \.scope.chapterCanvasAction)
+                ArrivalNoticeView(notice: notice, onAction: { canvas.send(.arrivalNoticeTapped) }, onDismiss: { canvas.send(.arrivalNoticeDismissed) })
+                    .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
             } else if !store.usesSingleCanvas, let block = store.nCanvasWriteBlock {
                 // 입력을 닫은 사유를 보인다 — 다시 시도해도 같은 사유라 버튼을 두지 않는다(정책 §12-6 결정 1).
                 CarveStatusMessage(.failure, message: "절마다 쓰는 화면에서는 지금 필기를 받지 않아요. " + block.reasonText)
@@ -545,6 +551,7 @@ private extension CarveDetailView {
         .padding(.bottom, favoriteNoticeBottomInset)
         .animation(reduceMotion ? .easeOut(duration: 0.12) : .snappy(duration: 0.25), value: store.chapterCanvas.saveRetryCount)
         .animation(reduceMotion ? .easeOut(duration: 0.12) : .snappy(duration: 0.25), value: store.chapterCanvas.blockingLoadFailure)
+        .animation(reduceMotion ? .easeOut(duration: 0.12) : .snappy(duration: 0.25), value: store.chapterCanvas.arrival.notice)
         .animation(.easeOut(duration: 0.2), value: localSaveText)
         .animation(reduceMotion ? .easeOut(duration: 0.12) : .snappy(duration: 0.25), value: store.favoriteNotice)
         .animation(reduceMotion ? .easeOut(duration: 0.12) : .snappy(duration: 0.25), value: store.imageSaveNotice)

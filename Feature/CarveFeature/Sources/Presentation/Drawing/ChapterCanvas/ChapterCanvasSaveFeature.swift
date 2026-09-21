@@ -67,13 +67,17 @@ extension ChapterCanvasFeature.State {
         pendingMutations.contains { rowID, entry in isStoreBound(entry) || !isDrafted(rowID, entry) }
     }
 
-    /// 다시 합성해도 되는가 — 저장소 저장 · 초안 · 코덱이 멎었고, 남은 미저장분은 초안이 돼 다시 읽어도 겹쳐진다.
+    /// 다시 합성해도 되는가 — 획을 긋는 중이 아니고, 저장소 저장 · 초안 · 코덱이 멎었고, 남은 미저장분은 초안이 돼 다시 읽어도 겹쳐진다.
     ///
     /// `isFullyPersisted` 보다 넓다: 확인 대기 중 큐에 붙잡아 둔 미저장분은 이미 초안이라 다시 읽으면 지금 세션의 초안으로 다시 겹친다.
     /// 그것까지 기다리면 계정 확인이 오래 걸리는 동안(오프라인) 회전 · 복원 재합성이 입력을 잠근 채 멈춘다. 닫은 세션의 늦은 편집은
     /// 지금 세션의 합성과 무관하므로 기다리지 않는다.
+    ///
+    /// **획을 긋는 중(`isEditing`)도 기다린다**(2026-09-21 후속 리뷰 P0-3 필수 조건). 도구를 쓰는 동안과, 획이 끝난 뒤 뷰가 아직 보고하지 않은
+    /// 동안(디바운스)이 모두 `editBegan` ~ `editEnded`/`editCancelled` 사이다. 그 사이 다시 합성하면 긋던 획이 화면에서 사라진다 — 늦게 도착한
+    /// 필사의 다시 읽기가 그 순간에 올 수 있다. 뷰에만 있는 변경은 인계(`handoffToken`)로 받는다.
     var isSettledForReload: Bool {
-        saveStatus == .idle && editQueue.isEmpty && !isPreparingEdit && !isSavingDrafts && !hasUnsavedPending
+        !isEditing && saveStatus == .idle && editQueue.isEmpty && !isPreparingEdit && !isSavingDrafts && !hasUnsavedPending
     }
 
     /// 저장에 실패해 **사용자에게 알려야 하는** 상태면 지금까지의 재시도 횟수. 아니면 nil.
@@ -289,6 +293,11 @@ extension ChapterCanvasFeature {
             markStoredDrafts(state: state, rows: Array(batch.keys), sent: sent),
             startSaveIfPossible(state: &state, allowRetry: false)
         )
+    }
+
+    /// 획이 끝났다(보고 · 취소) — 긋는 중이라 미뤄 둔 다시 읽기가 있으면 이제 한다(`isSettledForReload` 는 긋는 중을 기다린다).
+    func settleAfterEdit(state: inout State) -> Effect<Action> {
+        state.reloadWhenSettled ? settleIfNeeded(state: &state) : .none
     }
 
     /// 저장할 것이 없을 때 — 지우기가 기다리고 있으면 지금 보관하고, 아니면 예약된 재합성을 지금 읽는다.
