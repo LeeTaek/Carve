@@ -92,7 +92,9 @@ SwiftData는 내부적으로 `NSPersistentCloudKitContainer`를 사용한다. �
 누르자 필사 화면으로 들어갔고 설정 파일에 `initialRestoreOutcome = startedWithoutICloud` 가 남았다. 다시 실행하자 일반 실행이 되어 버튼 없이 곧바로 들어갔다.
 계정이 없어 곧바로 결론이 나므로 「확인하고 있어요」 · 20초 · 60초 안내 화면은 이 확인에서 보지 못했다(단계 판정은 `LaunchWaitRuleTesting` 이 고정한다).
 **남은 것:** §3-1 의 6 "앱 안에서 원격 확인 상태를 계속 안내" 는 설정 → iCloud 의 동기화 활동(§4-1)으로만 한다 — 필사 화면의 「받아오는 중」 띠(§3-2 순서 4)는
-넣지 않았다. 재설치 · 실제 계정의 늦은 import 는 기기에서 아직 보지 않았다(아래 §3-2 기기 확인 계획).
+넣지 않았다. 재설치 · 실제 계정 흐름은 2026-09-21 기기(시뮬레이터 · 샌드박스 계정)에서 봤다 — 아래 §3-2 기기 확인 결과.
+대기 화면 · 처음부터 「먼저 시작하기」 · import 성공 뒤 진입 · 오류 뒤 import 성공 진입은 기기에서 확인했고, 20초 · 60초 안내는
+초기 import 가 약 2초에 끝나 기기에서 만들지 못했다(재현 조건 미충족 — `LaunchWaitRuleTesting` 으로 고정).
 
 ### 3-2. 안내와 제한
 
@@ -147,13 +149,22 @@ SwiftData는 내부적으로 `NSPersistentCloudKitContainer`를 사용한다. �
   앱을 다시 열어 주세요」** 처럼 실제 동작을 알리고, **출시 범위 축소를 명시**한다.
 - 구현: 후속 리뷰 P0-3 — 열린 장 반영 `b24c468c`, 시작 화면 `311352ef`. 2차 보완 — 내가 저장한 절 · 대표 바뀜 `e2f3710f`, 오류 뒤 성공 `a2b11942`.
   단위 · 리듀서 시험으로 고정했다(§12-6 후속 리뷰 표 · 2차 표).
-  **기기 확인 계획(미수행 — 계정 · 데이터 조작은 사용자가 한다):** 서버에 필사가 있는 샌드박스 계정으로 앱을 지우고 다시 깔아 ① 초기 복원 화면 · 「먼저 시작하기」
+  **기기 확인 계획(2026-09-21 수행 — 결과는 이 목록 끝 · 계정 조작은 사용자가 했다):** 서버에 필사가 있는 샌드박스 계정으로 앱을 지우고 다시 깔아 ① 초기 복원 화면 · 「먼저 시작하기」
   ② 편집하지 않은 장의 자동 반영 ③ 편집한 장의 안내 · 확인하기 · 「남은 필기」 로 잇기를 본다. 후속 리뷰 2차로 더한 것:
   ④ **내가 저장소에 저장을 마친 절**을 다른 기기가 고치거나 지우면 안내되는가(지금 빌드는 소유 근거가 없어 저장소에 쓰지 않는다 — 받는 쪽은 Debug 소유 주입이 켜지는 **시뮬레이터** · dev 컨테이너 · 실행 인자 `-ACC1InjectStoreOwnership` 로 본다. 실기기에서는 주입이 켜지지 않는다. 또 켜 둔 앱이 **다시 import 해야** 보인다 — 푸시 권한이 없어(F8) 실행 중에는 원격 변경을 가져오지 않을 수 있다.
   import 이벤트가 나지 않으면 재실행 없이 만들 수 없는 상황이라 "확인 불가(F8)" 로 적고 단위 시험으로만 고정했다고 남긴다)
   ⑤ 초기 복원 대기 중 **확인된 오류가 난 뒤**(예: 오프라인으로 계정 확인 실패) 네트워크를 되살려 import 가 성공하면 들어가는가.
+  **기기 확인 결과(2026-09-21 — 시뮬레이터 두 대 · 샌드박스 계정 B · Debug `712bdaac`, [테스트 계획](./icloud-sync-compatibility-test-plan.md) §5-1 「P0-3 기기 확인」):**
+  - **기기로 확인** — ① 대기 화면과 처음부터 「먼저 시작하기」 · import 성공 뒤 진입 · 다시 실행하면 곧바로 진입.
+    ② · ③ 은 **복귀 import** 로 만든 순서에서 확인했다 — 편집하지 않은 장은 자동 반영, 편집한 장은 안내 → 확인하기 → 「남은 필기」, 초안 파일 유지.
+    ④ 내가 저장을 마친 절의 원격 수정 · 삭제 모두 안내(받는 쪽 주입). ⑤ 로그아웃 상태로 설치(계정 없음 안내) → 로그인 → import 성공 → 진입.
+  - **기기 미확인(재현 조건 미충족 — 단위 시험으로만 고정)** — ① 의 20초 · 60초 안내(초기 import 가 약 2초, `LaunchWaitRuleTesting`).
+    초기 import 와 겹친 ② · ③ — 다섯 번 시도했다. 「먼저 시작하기」 는 매번 import 전에 눌렸지만, 도착 반영 경로를 타는 순서(장의 첫 조회 → import)는
+    만들지 못했다(`ChapterCanvasArrivalTesting`).
+  - 사용자 결정(2026-09-21): 가져오기를 늦추는 도구는 쓰지 않는다. **미재현만으로 범위 축소 · 문구 변경을 하지 않는다** — 위 임시 동작으로 가지 않는다.
 
-**나중 변경(F8)은 별개다** — 켜 둔 앱은 다른 기기의 변경을 재실행 전까지 가져오지 않았고 푸시 권한(`aps-environment`)이 없다. 첫 실행의 import 는 이미 진행 중이므로 1번으로 해결되지만, 그 뒤의 원격 변경까지 바로 받으려면 푸시가 필요하다.
+**나중 변경(F8)은 별개다** — 켜 둔 앱은 다른 기기의 변경을 재실행 전까지 가져오지 않았고 푸시 권한(`aps-environment`)이 없다.
+다만 **홈 → 복귀하면 import 한다**(테스트 계획 F31, 2026-09-21) — 가져오지 않는 것은 앱이 앞에 머무는 동안이다. 첫 실행의 import 는 이미 진행 중이므로 1번으로 해결되지만, 그 뒤의 원격 변경까지 바로 받으려면 푸시가 필요하다.
 
 초기 import는 설치 후 첫 실행에서 예약되지만 실제 실행 시점은 시스템이 결정한다. 앱에서 동기화 시간을 강제 지정하는 방식으로 해결하지 않는다. [Apple 동기화 설명](https://developer.apple.com/documentation/technotes/tn3163-understanding-the-synchronization-of-nspersistentcloudkitcontainer), [동기화 시점 제약](https://developer.apple.com/documentation/technotes/tn3164-debugging-the-synchronization-of-nspersistentcloudkitcontainer)
 
@@ -593,14 +604,14 @@ F29 는 주입으로(⑨~⑭ — 소유 근거가 없어 주입으로만 재현�
 전체 삭제는 보존 영역을 통째로 지우고 삭제 세대를 올린다. **남은 제한: F26**(실행 중 계정이 바뀌면 열린 장이 빈 채 — ③ 까지) ·
 **F25 는 확인 불가**(오프라인에서는 iCloud 로그아웃 자체가 막혀 "네트워크를 끊은 채 전환" 을 만들 수 없다).
 
-**2026-09-21 후속 리뷰 — 반영 대기 → 반영 완료(같은 날, 다음 세션).** 11차 리뷰(위, 반영 완료)와 **섞지 않는다.** 일곱 항목 모두 구현 · 시험을 마쳤다(각 행의 커밋 · 시험). 기기 확인이 남은 것은 P0-3 의 재설치 · 실제 계정 흐름(§3-2 기기 확인 계획)이다.
+**2026-09-21 후속 리뷰 — 반영 대기 → 반영 완료(같은 날, 다음 세션).** 11차 리뷰(위, 반영 완료)와 **섞지 않는다.** 일곱 항목 모두 구현 · 시험을 마쳤다(각 행의 커밋 · 시험). P0-3 의 재설치 · 실제 계정 흐름은 2026-09-21 기기에서 확인했다(§3-2 기기 확인 결과 — 20초 · 60초 안내와 초기 import 와 겹친 도착은 재현 조건 미충족).
 
 | # | 항목 | 수정 대상 | 필수 시험 | 구현 | 검증 |
 |---|---|---|---|---|---|
 | P0-1 | **다른 계정 초안이 화면에 남는다.** 대조하지 않는 묶음도 잉크를 상태에 담아 미리보기를 그린다. 계정이 바뀌어도 이미 불러온 상세 · 비교가 남는다 | `VerseDraftRecoveryQuery.entries`(접근 불가 묶음은 상세를 만들지 않는다) · `DraftRecoveryFeature`(계정 · 세대 도장 · 환경 변화 구독 · 늦은 응답 버리기 · `compare` 전후 재확인) · `DraftRecoveryView`(묶음 카드 문구 — 분류한 적 없는 수를 "보이지 않게 남은 것" 으로 말하지 않는다) | B 환경에서 A 묶음은 수 · 용량만이고 `Item.ink` 가 없다 · A 목록을 연 채 계정이 바뀌면 상세 · 비교가 비워진다 · 이전 계정에서 시작한 응답은 버린다 | ☑ `69986bac` — 도장(`DraftRecoveryFeature.Stamp` = 초안 묶음 · 참고 계정 · 확인 세대) 한 장치 + 요청 번호. 대조하지 않는 묶음은 초안 파일을 열지 않고(`inaccessibleCount`), 읽지 못한 파일 자리 · 내보내기 · 지우기도 대조한 묶음만 | ☑ Settings `otherAccountBucketCarriesCountsOnly` · `accountChangeClearsLoadedDetails` · `lateResponsesFromThePreviousAccountAreDropped`(견주기가 저장소를 읽는 사이 전환) · Domain 조회 시험 둘 갱신 |
 | P0-2a | **묶음별로 따로 판정해 어디에도 없는 초안이 생긴다.** 캔버스는 읽을 수 있는 묶음을 합쳐 한 번 판정하는데 목록은 묶음마다 돈다 | `VerseDraftRecoveryQuery` — 한 장의 읽을 수 있는 묶음을 **합쳐 한 번** 판정한 뒤 결과를 묶음별로 나눈다 | 같은 절 · 같은 기준의 초안이 `계정 A` 와 `확인 전(힌트 A)` 에 하나씩일 때, 캔버스의 `kept` 와 목록 항목이 일치한다 | ☑ `60b27c9a` — 판정 입력을 `VerseDraftRecoveryRule.screenDrafts` 한 곳으로 모아 캔버스 · 목록이 같이 쓴다. 문구 「자동으로 표시되지 않는 필사 초안」 | ☑ Domain `inventoryMatchesTheCanvasAcrossBuckets`(어느 쪽이 밀려도) · Feature `canvasHiddenDraftIsListedInRecovery`(실제 파일 · 실제 캔버스 로드) · Settings `copySaysNotAutomaticallyShown` |
 | P0-2b | **정상 저장 경로에서 메타데이터 없는 초안이 조용히 생긴다** — `metadataBlob = try? metadata.encodedBlob()`. 캔버스는 건너뛰고 목록은 `shown` 이라 뺀다 | `ChapterCanvasDraftFeature`(초안을 만들 때의 `try?`) · 표시 가능성 판정을 공통 분류에 넣거나 표시 실패 항목으로 반환 | 잉크는 있고 메타데이터가 없는 초안이 **캔버스에도 목록에도 없지 않다**(표시 실패 사유와 함께 목록에 오른다) | ☑ `94674a16` — 잉크는 보존하고 겹칠 수 있는지를 공통 분류에 넣었다(`VerseDraftRecoveryRule.isDisplayable` · `plan.undisplayable` · 사유 `undisplayable`). 생성 때 `try?` 대신 오류를 기록한다 | ☑ Feature `draftWithUnencodableMetadataIsListedAsUndisplayable`(NaN 좌표 — 정상 저장 경로) · `seededDraftWithoutMetadataIsCountedAndListed` · Domain 규칙 넷 · 조회 하나 |
-| P0-3 | **2.0.0 진입 흐름의 완료 조건** — §3-1 의 선택형 대기(자동 진입 없음)와 **늦게 도착한 필사의 안전한 반영**. ④ 수정과는 별도 작업이되 출시 조건에서 빼지 않는다 | 시작 화면 · 변경 수신 경계 · 열린 장의 반영 | 반영 경로를 만들 때: `isSettledForReload` 에 **편집 중(`isEditing`) · 미보고 변경 · 도구 사용 중**을 포함하고, 다시 읽어도 `bases` · `adopted` · `inherited` 가 유지된다 | ☑ `b24c468c` 열린 장 반영(`ChapterCanvasArrivalFeature` · `CloudImportArrivalClient` · `isSettledForReload` 에 `isEditing`) · `311352ef` 시작 화면 선택형 대기(`LaunchWaitRule`) — 사용자 결정 표 그대로(§3-2) | ☑ Feature `ChapterCanvasArrivalTesting` 14(자동 반영 · 편집한 장 안내 · 획/초안 저장 중 보류 · 미보고 획 인계 · 재조회 실패 · 확인하기 성공/실패 · 기준/이어받기/출처 유지 · 긋는 중 재조회 미룸) · Domain `LaunchWaitRuleTesting` 7 · `CloudImportArrivalTesting` 2 · 앱 Debug 빌드. **기기(재설치 · 실제 계정)는 미확인** · 2차 보완 R2-1~3(아래 2차 표) |
+| P0-3 | **2.0.0 진입 흐름의 완료 조건** — §3-1 의 선택형 대기(자동 진입 없음)와 **늦게 도착한 필사의 안전한 반영**. ④ 수정과는 별도 작업이되 출시 조건에서 빼지 않는다 | 시작 화면 · 변경 수신 경계 · 열린 장의 반영 | 반영 경로를 만들 때: `isSettledForReload` 에 **편집 중(`isEditing`) · 미보고 변경 · 도구 사용 중**을 포함하고, 다시 읽어도 `bases` · `adopted` · `inherited` 가 유지된다 | ☑ `b24c468c` 열린 장 반영(`ChapterCanvasArrivalFeature` · `CloudImportArrivalClient` · `isSettledForReload` 에 `isEditing`) · `311352ef` 시작 화면 선택형 대기(`LaunchWaitRule`) — 사용자 결정 표 그대로(§3-2) | ☑ Feature `ChapterCanvasArrivalTesting` 14(자동 반영 · 편집한 장 안내 · 획/초안 저장 중 보류 · 미보고 획 인계 · 재조회 실패 · 확인하기 성공/실패 · 기준/이어받기/출처 유지 · 긋는 중 재조회 미룸) · Domain `LaunchWaitRuleTesting` 7 · `CloudImportArrivalTesting` 2 · 앱 Debug 빌드. **기기 확인 2026-09-21**(테스트 계획 §5-1 「P0-3 기기 확인」 — 복귀 import 로 자동 반영 · 안내 · 확인하기 · 「남은 필기」, 시작 화면 · 오류 뒤 진입. 20초 · 60초 안내와 초기 import 와 겹친 순서는 재현 조건 미충족) · 2차 보완 R2-1~3(아래 2차 표) |
 | P1-4 | 전체 삭제 문구와 집계가 다르다 — `remainingDraftCount` 는 **전체 파일 수**인데 문구는 "보이지 않게 남은 필기 N개" 다 | `CloudSettingsFeature.remainingDraftCount` · `eraseConfirmBody` | 문구의 수 = 실제로 지워질 대상 수 | ☑ `63c8907e` — 수는 그대로(전체 삭제는 보존 영역을 통째로 지운다), 문구를 「이 기기의 필사 초안 N개도 모두 지워져요(다른 계정에서 쓴 것 · 읽지 못한 파일 포함)」 로 | ☑ Settings `countMatchesWhatEraseRemoves`(실제 보존 영역 — 센 수 = 파일 수 = 전체 삭제로 사라진 수) |
 | P1-5 | `isUnreadableFile` 이 **일반 파일인지 보지 않는다** — 같은 이름의 폴더 · 심볼릭 링크도 지우기 대상이 된다 | `LocalPreservationWriter.isUnreadableFile` — 일반 파일 · 표식 형식 · 경로 범위 검사 | 폴더 · 심볼릭 링크는 지워지지 않는다(실제 파일 시험) | ☑ `86cc0d06` — 이름 형식(`<초안 줄기>.unreadable-<UUID>`) · `lstat` 일반 파일 · 실제 세션 폴더 안(경로 범위). 세기 · 내보내기 · 지우기가 한 판정을 쓴다 | ☑ Domain `onlyRegularAsideFilesAreUnreadable`(폴더 · 밖을 가리키는 링크 · 표식만 든 파일 · 링크된 세션 폴더) |
 | P1-6 | **재실행 복구 시험이 없다.** 지금 `.sending` 시험은 같은 writer 로 다시 읽을 뿐이다 | `LocalPreservationWriterTesting` — `.sending` 초안을 남기고 **새 writer** 로 열어 복구 판정 · 무손실 · 무중복을 본다(제품에 중단 훅을 넣지 않는다. `generationSurvivesRelaunch` 와 같은 방식) | 재실행 뒤 그 초안이 "저장 완료 불확실" 로 남고 중복 · 유실이 없다 | ☑ `3e937f36` — 시험만(제품 훅 없음) | ☑ Domain `sendingDraftSurvivesRelaunchAsUncertain`(새 writer — 한 벌 · 내용 그대로 · 행이 바뀌면 `uncertain` · 그대로면 `settled`) |
@@ -622,7 +633,7 @@ F29 는 주입으로(⑨~⑭ — 소유 근거가 없어 주입으로만 재현�
 | R2-2 | **대표만 바뀐 도착을 놓친다(R2-1 을 고치다 찾음).** 다른 기기가 기록에서 옛 필기를 고르면(`updatePresentDrawing` — `isPresent` 만 바뀜) 행 내용은 그대로라 행만 견주면 "그대로" 다 | 같은 `storeChanged` — 절마다의 대표 내용(`VerseDraftStoreView.verseContent`)도 견준다 | 편집하지 않은 장에서 대표만 바뀌면 그 필기로 자동 반영 | ☑ `e2f3710f`(R2-1 과 같은 커밋) | ☑ 위 시험 중 대표 바뀜 — 행만 견주게 하면 이 시험 1개만 실패함을 확인 |
 | R2-3 | **초기 복원 대기 중 한 번 오류가 나면 뒤의 import 성공이 반영되지 않는다.** `failed` 는 진행 중이 아니라서 결론이 바뀌지 않았고, 초기 복원 화면은 오류에서 들어가지 않고 기다리므로 필사를 받았는데도 오류 안내에 머물렀다("import 성공 후 진입" 위반) | `PersistentCloudKitContainer.applyToInitialWait` — `failed` 뒤 import 성공이면 `syncCompleted` 로 바꾼다. 마이그레이션 결론 · 저장소 사용 불가는 그대로(MIG-F1). 시작 화면은 `syncState` 를 계속 구독하므로 바뀐 결론으로 다시 판정해 들어간다 | 계정 확인 실패 · 계정 없음 · import 실패 · 모르는 오류 뒤 성공 → 진입 결론. 실패 이벤트 → 성공 이벤트. 막힘 상태는 불변 | ☑ `a2b11942` | ☑ Domain `CloudInitialWaitTesting` +3(11). 회복 분기를 빼면 회복 시험 2개가 실패하고 막힘 유지 시험은 통과함을 확인 |
 
-기준: **Domain 380 · CarveFeature 457 · Settings 50** 통과, 앱 Debug 빌드 통과, lint 경고는 기존 넷뿐(이번 라운드 변경 파일 전체). **기기는 미확인** — §3-2 기기 확인 계획에 ④ · ⑤ 를 더했다.
+기준: **Domain 380 · CarveFeature 457 · Settings 50** 통과, 앱 Debug 빌드 통과, lint 경고는 기존 넷뿐(이번 라운드 변경 파일 전체). 기기 — §3-2 기기 확인 계획에 ④ · ⑤ 를 더했고, **2026-09-21 기기에서 확인했다**(④ 원격 수정 · 삭제 모두 안내 = R2-1, ⑤ 계정 없음 뒤 로그인 → import 성공 → 진입 = R2-3. R2-2 대표만 바뀐 도착은 기기에서 만들지 않았다).
 
 **남은 것(다음 라운드):** ③ 과 같은 시기에 붙일 **④ 의 되살리기 · 귀속 동의** · 결정 2(1.3.0 무계정 legacy 분리) 미구현 ·
 최근 5개 지문 제한은 왕복 횟수 기준이 아니다(오프라인에서 여섯 번 넘게 고치면 밀린다 — 파일은 남고 복구 후보 판정만 못 한다) ·
