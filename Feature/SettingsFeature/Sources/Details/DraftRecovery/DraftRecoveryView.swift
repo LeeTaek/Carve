@@ -63,6 +63,11 @@ public struct DraftRecoveryView: View {
                     .font(CarveTypography.caption)
                     .foregroundStyle(CarveColor.secondary)
             }
+            if let result = store.removalResult {
+                Text(result)
+                    .font(CarveTypography.caption)
+                    .foregroundStyle(CarveColor.ink)
+            }
             if store.needsAttentionCount > 0 {
                 Text("그중 \(store.needsAttentionCount)개는 확인이 필요해요.")
                     .font(CarveTypography.caption)
@@ -157,8 +162,7 @@ public struct DraftRecoveryView: View {
             }
 
             if bucket.unreadableCount > 0 {
-                note("읽지 못해 옆으로 옮겨 둔 파일이 \(bucket.unreadableCount)개 있어요 · "
-                     + "\(DraftRecoveryCopy.bytesText(bucket.unreadableBytes)). 되살릴 수는 없고 보관만 해요.", emphasized: false)
+                unreadableSection(bucket)
             }
 
             if !bucket.unreadChapters.isEmpty {
@@ -177,7 +181,65 @@ public struct DraftRecoveryView: View {
         }
     }
 
-    private func note(_ text: String, emphasized: Bool) -> some View {
+}
+
+// 읽지 못한 파일 · 초안 한 줄 · 견주기는 확장으로 나눈다 — 한 타입의 몸통이 길어지면 무엇이 무엇을 부르는지 읽기 어렵다.
+private extension DraftRecoveryView {
+    // MARK: - 읽지 못한 파일
+
+    /// 되살릴 수 없는 파일 — **내보내기와 지우기가 있는 유일한 자리다.** 초안을 지우는 길은 이 화면에 없다(사용자 결정 2026-09-21).
+    @ViewBuilder
+    func unreadableSection(_ bucket: DraftRecoveryFeature.Bucket) -> some View {
+        VStack(alignment: .leading, spacing: CarveSpacing.xSmall) {
+            note("읽지 못해 옆으로 옮겨 둔 파일이 \(bucket.unreadableCount)개 있어요 · "
+                 + "\(DraftRecoveryCopy.bytesText(bucket.unreadableBytes)). 되살릴 수는 없고 보관만 해요.", emphasized: false)
+            HStack(spacing: CarveSpacing.small) {
+                if !bucket.unreadableFiles.isEmpty {
+                    // 지우기 전에 먼저 꺼내 둘 수 있게 내보내기를 앞에 둔다.
+                    ShareLink(items: bucket.unreadableFiles) {
+                        Text("내보내기")
+                            .font(CarveTypography.label)
+                            .foregroundStyle(CarveColor.accent)
+                    }
+                }
+                Button("지우기") { send(.askRemoveUnreadable(bucket.scope)) }
+                    .font(CarveTypography.label)
+                    .foregroundStyle(CarveColor.danger)
+                    .buttonStyle(.plain)
+            }
+            if store.pendingRemoval == bucket.scope {
+                removalConfirmation(bucket)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// 지우기 확인 — **무엇이 지워지고 무엇이 그대로인지**를 먼저 말한다(C11 문구 규칙).
+    func removalConfirmation(_ bucket: DraftRecoveryFeature.Bucket) -> some View {
+        VStack(alignment: .leading, spacing: CarveSpacing.xSmall) {
+            Text("읽지 못한 파일 \(bucket.unreadableCount)개를 지울까요?")
+                .font(CarveTypography.body)
+                .foregroundStyle(CarveColor.ink)
+            Text("지금 보고 있는 필사와 남은 초안은 그대로예요. 지우는 것은 **읽지 못해 되살릴 수 없는 파일**이에요.")
+                .font(CarveTypography.caption)
+                .foregroundStyle(CarveColor.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Text("지운 파일은 되돌릴 수 없어요. 먼저 내보내 두면 나중에 살펴볼 수 있어요.")
+                .font(CarveTypography.caption)
+                .foregroundStyle(CarveColor.ink)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: CarveSpacing.small) {
+                Button("지우기") { send(.removeUnreadableConfirmed(bucket.scope)) }
+                    .buttonStyle(.carve(.destructive))
+                Button("취소") { send(.askRemoveUnreadable(nil)) }
+                    .buttonStyle(.carve(.secondary))
+            }
+        }
+        .padding(CarveSpacing.small)
+        .background(CarveColor.selected, in: RoundedRectangle(cornerRadius: CarveRadius.control, style: .continuous))
+    }
+
+    func note(_ text: String, emphasized: Bool) -> some View {
         Text(text)
             .font(CarveTypography.caption)
             .foregroundStyle(emphasized ? CarveColor.ink : CarveColor.secondary)
@@ -188,7 +250,7 @@ public struct DraftRecoveryView: View {
     // MARK: - 초안 한 줄
 
     @ViewBuilder
-    private func itemCard(_ item: DraftRecoveryFeature.Item, comparedWithStore: Bool) -> some View {
+    func itemCard(_ item: DraftRecoveryFeature.Item, comparedWithStore: Bool) -> some View {
         VStack(alignment: .leading, spacing: CarveSpacing.small) {
             if comparedWithStore {
                 // 견줄 수 있는 묶음만 누를 수 있다 — 다른 계정 묶음은 지금 저장소와 견줄 것이 없다.
@@ -205,7 +267,7 @@ public struct DraftRecoveryView: View {
         .background(CarveColor.surface, in: RoundedRectangle(cornerRadius: CarveRadius.control, style: .continuous))
     }
 
-    private func itemSummary(_ item: DraftRecoveryFeature.Item, comparedWithStore: Bool) -> some View {
+    func itemSummary(_ item: DraftRecoveryFeature.Item, comparedWithStore: Bool) -> some View {
         HStack(alignment: .top, spacing: CarveSpacing.small) {
             preview(of: item)
             VStack(alignment: .leading, spacing: CarveSpacing.xxSmall) {
@@ -254,7 +316,7 @@ public struct DraftRecoveryView: View {
 
     /// 지금 필기와 보관된 것을 나란히. **바꾸지 않는다** — 고르기는 ③ 과 같은 시기에 붙는다.
     @ViewBuilder
-    private func comparison(_ item: DraftRecoveryFeature.Item) -> some View {
+    func comparison(_ item: DraftRecoveryFeature.Item) -> some View {
         let comparison = store.comparison
         VStack(alignment: .leading, spacing: CarveSpacing.xSmall) {
             CarveDivider()
@@ -287,7 +349,7 @@ public struct DraftRecoveryView: View {
         }
     }
 
-    private func side(title: String, ink: Data?, emptyText: String, detail: String) -> some View {
+    func side(title: String, ink: Data?, emptyText: String, detail: String) -> some View {
         VStack(alignment: .leading, spacing: CarveSpacing.xxSmall) {
             Text(title)
                 .font(CarveTypography.caption)
@@ -313,7 +375,7 @@ public struct DraftRecoveryView: View {
     }
 
     /// 지금 그 절이 어떤 상태인지 — 비교 화면이 붙기 전에도 견줄 실마리는 준다.
-    private func currentText(of item: DraftRecoveryFeature.Item) -> String? {
+    func currentText(of item: DraftRecoveryFeature.Item) -> String? {
         guard let isEmpty = item.currentIsEmpty else { return nil }
         if isEmpty { return "지금 그 절: 필기 없음" }
         guard let updatedAt = item.currentUpdatedAt else { return "지금 그 절: 다른 필기가 있음" }
@@ -321,7 +383,7 @@ public struct DraftRecoveryView: View {
     }
 
     @ViewBuilder
-    private func preview(of item: DraftRecoveryFeature.Item) -> some View {
+    func preview(of item: DraftRecoveryFeature.Item) -> some View {
         Group {
             if let image = CarveInkThumbnail.image(of: item.ink) {
                 Image(uiImage: image)
@@ -339,7 +401,7 @@ public struct DraftRecoveryView: View {
         .accessibilityHidden(true)
     }
 
-    private func badge(_ text: String) -> some View {
+    func badge(_ text: String) -> some View {
         Text(text)
             .font(CarveTypography.caption)
             .foregroundStyle(CarveColor.ink)

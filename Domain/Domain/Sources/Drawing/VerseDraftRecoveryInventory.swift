@@ -27,7 +27,30 @@ public protocol VerseDraftRecoveryReading: Sendable {
     func unreadableDraftFiles(in scope: AccountScope) async throws -> [URL]
 }
 
+/// 복구 화면(④)이 **지울 수 있는 유일한 것** — 읽지 못해 옆으로 옮긴 파일(사용자 결정 2026-09-21).
+///
+/// 읽는 경계(`VerseDraftRecoveryReading`)와 나눠 둔다. 초안을 지우는 길은 이 화면에 **없다** — 되살리기(③)가 붙기 전에는
+/// 그 초안이 유일한 사본일 수 있다(ACC-1 F29). 나누면 실수로 초안을 지우는 호출 자체가 만들어지지 않는다.
+public protocol VerseDraftUnreadableCleaning: Sendable {
+    /// - Returns: 실제로 지운 파일 수.
+    func removeUnreadableDraftFiles(in scope: AccountScope) async throws -> Int
+}
+
 extension LocalPreservationWriter: VerseDraftRecoveryReading {}
+extension LocalPreservationWriter: VerseDraftUnreadableCleaning {}
+
+private enum VerseDraftUnreadableCleanerKey: DependencyKey {
+    static let liveValue: (any VerseDraftUnreadableCleaning)? = nil
+    static let testValue: (any VerseDraftUnreadableCleaning)? = nil
+}
+
+public extension DependencyValues {
+    /// 복구 화면(④)의 읽지 못한 파일 지우기.
+    var verseDraftUnreadableCleaner: (any VerseDraftUnreadableCleaning)? {
+        get { self[VerseDraftUnreadableCleanerKey.self] }
+        set { self[VerseDraftUnreadableCleanerKey.self] = newValue }
+    }
+}
 
 private enum VerseDraftRecoveryReaderKey: DependencyKey {
     /// 앱이 `LocalPreservationWriter` 를 주입한다. 없으면 복구 화면은 "이 기기의 보존 영역을 열 수 없다" 로 막는다.

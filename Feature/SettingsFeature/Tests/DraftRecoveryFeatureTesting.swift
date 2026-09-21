@@ -66,6 +66,21 @@ struct DraftRecoveryFeatureTesting {
         }
     }
 
+    /// 지운 묶음을 적어 두는 대역. **초안을 지우는 길은 이 화면에 없다** — 이 대역이 받는 것은 읽지 못한 파일뿐이다.
+    private final class CleanerSpy: VerseDraftUnreadableCleaning, @unchecked Sendable {
+        let calls = LockIsolated<[AccountScope]>([])
+        private let removed: Int
+
+        init(removed: Int = 1) {
+            self.removed = removed
+        }
+
+        func removeUnreadableDraftFiles(in scope: AccountScope) async throws -> Int {
+            calls.withValue { $0.append(scope) }
+            return removed
+        }
+    }
+
     private static func environment(_ scope: AccountScope) -> DrawingEditEnvironment {
         DrawingEditEnvironment(
             accountState: .confirmed(scope), serverWork: AccountServerWorkToken(scope: scope, generation: 1), knowledge: EraseEpochKnowledge()
@@ -97,11 +112,16 @@ struct DraftRecoveryFeatureTesting {
         )
     }
 
-    private func makeStore(reader: (any VerseDraftRecoveryReading)?, account: AccountScope = accountA) -> TestStoreOf<DraftRecoveryFeature> {
+    private func makeStore(
+        reader: (any VerseDraftRecoveryReading)?,
+        account: AccountScope = accountA,
+        cleaner: (any VerseDraftUnreadableCleaning)? = nil
+    ) -> TestStoreOf<DraftRecoveryFeature> {
         let store = TestStore(initialState: .initialState) {
             DraftRecoveryFeature()
         } withDependencies: {
             $0.verseDraftRecoveryReader = reader
+            $0.verseDraftUnreadableCleaner = cleaner
             $0.drawingRepository = RepositoryStub()
             $0.drawingEditEnvironment = StubDrawingEditEnvironment(Self.environment(account))
         }
@@ -200,6 +220,49 @@ struct DraftRecoveryFeatureTesting {
         #expect(store.state.comparison?.failure == nil)
 
         await store.send(.view(.compare(item))) { $0.comparison = nil }
+    }
+
+    @Test("지우기는 묻고 받은 뒤에만 읽지 못한 파일을 지우고, 지운 뒤 다시 센다")
+    func removingUnreadableFilesAsksFirst() async throws {
+        let cleaner = CleanerSpy()
+        let reader = ReaderStub(
+            buckets: [Self.accountA],
+            summaries: [Self.accountA: Self.summary(Self.accountA, drafts: 1, unreadable: 1)],
+            drafts: [Self.accountA: [Self.draft(verse: 3, account: Self.accountA)]]
+        )
+        let store = makeStore(reader: reader, cleaner: cleaner)
+        await store.send(.view(.onAppear))
+        await store.receive(\.loaded)
+
+        // 먼저 묻는다 — 누른 것만으로는 아무것도 지우지 않는다.
+        await store.send(.view(.askRemoveUnreadable(Self.accountA))) { $0.pendingRemoval = Self.accountA }
+        #expect(cleaner.calls.value.isEmpty)
+
+        await store.send(.view(.removeUnreadableConfirmed(Self.accountA))) { $0.pendingRemoval = nil }
+        await store.receive(\.removedUnreadable)
+
+        #expect(cleaner.calls.value == [Self.accountA])
+        #expect(store.state.removalResult?.contains("1개") == true)
+        // 지운 뒤 다시 센다 — 남은 것이 있으면 그대로 보여야 한다.
+        await store.receive(\.loaded)
+    }
+
+    @Test("지울 길이 없으면 파일이 그대로 있다고 알린다")
+    func removingWithoutCleanerIsReported() async throws {
+        let reader = ReaderStub(
+            buckets: [Self.accountA],
+            summaries: [Self.accountA: Self.summary(Self.accountA, drafts: 1, unreadable: 1)],
+            drafts: [Self.accountA: [Self.draft(verse: 3, account: Self.accountA)]]
+        )
+        let store = makeStore(reader: reader, cleaner: nil)
+        await store.send(.view(.onAppear))
+        await store.receive(\.loaded)
+
+        await store.send(.view(.removeUnreadableConfirmed(Self.accountA)))
+        await store.receive(\.removedUnreadable)
+
+        #expect(store.state.removalResult?.contains("지우지 못했어요") == true)
+        await store.receive(\.loaded)
     }
 
     @Test("묶음을 펼쳤다 접는다")

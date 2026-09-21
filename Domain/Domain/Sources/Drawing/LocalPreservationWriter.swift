@@ -436,7 +436,7 @@ public actor LocalPreservationWriter {
         var chapters: Set<BibleChapter> = []
         for url in files {
             let size = Int64((try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
-            if url.lastPathComponent.contains("unreadable-") {
+            if Self.isUnreadableFile(url) {
                 unreadableCount += 1
                 unreadableBytes += size
             } else if url.pathExtension == "json" {
@@ -456,7 +456,31 @@ public actor LocalPreservationWriter {
 
     /// 읽지 못해 옆으로 옮긴 파일들 — 복구 화면이 내보내기로 넘긴다.
     public func unreadableDraftFiles(in scope: AccountScope) throws -> [URL] {
-        try draftEntries(in: scope).filter { $0.lastPathComponent.contains("unreadable-") }.sorted { $0.path < $1.path }
+        try draftEntries(in: scope).filter(Self.isUnreadableFile).sorted { $0.path < $1.path }
+    }
+
+    /// 읽지 못해 옆으로 옮긴 파일을 지운다. **복구 화면이 지울 수 있는 유일한 것이다**(사용자 결정 2026-09-21).
+    ///
+    /// **초안(`.json`)은 지우지 않는다** — 되살리기(③)가 붙기 전에는 그 초안이 유일한 사본일 수 있다(ACC-1 F29).
+    /// 하나를 지우지 못해도 나머지는 지우고, 지운 수만 돌려준다 — 남은 것은 다음 조회에서 다시 보인다.
+    /// - Returns: 실제로 지운 파일 수.
+    @discardableResult
+    public func removeUnreadableDraftFiles(in scope: AccountScope) throws -> Int {
+        var removed = 0
+        for url in try draftEntries(in: scope) where Self.isUnreadableFile(url) {
+            do {
+                try fileManager.removeItem(at: url)
+                removed += 1
+            } catch {
+                Log.error("로컬 보존 — 읽지 못한 파일을 지우지 못했다", url.lastPathComponent, "\(error)")
+            }
+        }
+        return removed
+    }
+
+    /// 읽지 못해 옆으로 옮긴 파일인가 — 표식이 있고 **`.json` 이 아니다.** 초안은 어떤 경우에도 이 판정에 걸리지 않는다.
+    static func isUnreadableFile(_ url: URL) -> Bool {
+        url.pathExtension != "json" && url.lastPathComponent.contains("unreadable-")
     }
 
     // MARK: - 격리

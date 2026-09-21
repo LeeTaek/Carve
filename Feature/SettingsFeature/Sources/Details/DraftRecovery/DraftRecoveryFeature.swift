@@ -29,9 +29,11 @@ public struct DraftRecoveryFeature {
         public var title: String
         public var draftCount: Int
         public var draftBytes: Int64
-        /// 읽지 못해 옆으로 옮긴 파일 — 되살릴 수 없고 보관만 한다.
+        /// 읽지 못해 옆으로 옮긴 파일 — 되살릴 수 없고 보관만 한다. 내보내고 지울 수 있는 **유일한** 것이다.
         public var unreadableCount: Int
         public var unreadableBytes: Int64
+        /// 그 파일들의 자리 — 내보내기로 넘긴다.
+        public var unreadableFiles: [URL]
         /// 저장소와 대조했는가. 아니면 분류 없이 세어 보이기만 한다.
         public var comparedWithStore: Bool
         /// 이 묶음을 아예 읽지 못했다 — **초안이 없다는 뜻이 아니다.**
@@ -86,6 +88,10 @@ public struct DraftRecoveryFeature {
         public var opened: AccountScope?
         /// 펼쳐 견주는 중인 초안.
         public var comparison: Comparison?
+        /// 읽지 못한 파일 지우기를 묻는 중인 묶음.
+        public var pendingRemoval: AccountScope?
+        /// 방금 지운 결과 한 줄.
+        public var removalResult: String?
 
         public var totalDraftCount: Int { buckets.reduce(0) { $0 + $1.draftCount } }
         public var totalDraftBytes: Int64 { buckets.reduce(0) { $0 + $1.draftBytes } }
@@ -109,6 +115,8 @@ public struct DraftRecoveryFeature {
         /// 그 절의 지금 필기를 읽었다.
         case currentLoaded(itemID: String, ink: Data?, updatedAt: Date?)
         case currentFailed(itemID: String, String)
+        /// 읽지 못한 파일을 지웠다(또는 지우지 못했다).
+        case removedUnreadable(String)
 
         public enum View {
             case onAppear
@@ -117,10 +125,15 @@ public struct DraftRecoveryFeature {
             case open(AccountScope?)
             /// 초안을 지금 필기와 견주어 본다(다시 누르면 접는다).
             case compare(Item)
+            /// 읽지 못한 파일 지우기를 묻는다(nil 이면 묻기를 닫는다).
+            case askRemoveUnreadable(AccountScope?)
+            /// 묻고 받은 뒤 실제로 지운다 — **읽지 못한 파일만**이다.
+            case removeUnreadableConfirmed(AccountScope)
         }
     }
 
     @Dependency(\.verseDraftRecoveryReader) private var reader
+    @Dependency(\.verseDraftUnreadableCleaner) private var cleaner
     @Dependency(\.drawingRepository) private var repository
     @Dependency(\.drawingEditEnvironment) private var editEnvironment
 
@@ -151,6 +164,17 @@ public struct DraftRecoveryFeature {
                 guard state.comparison?.itemID == itemID else { return .none }
                 state.comparison?.isLoading = false
                 state.comparison?.failure = message
+            case .view(.askRemoveUnreadable(let scope)):
+                state.pendingRemoval = state.pendingRemoval == scope ? nil : scope
+                state.removalResult = nil
+            case .view(.removeUnreadableConfirmed(let scope)):
+                state.pendingRemoval = nil
+                state.isLoading = true
+                return removeUnreadable(in: scope)
+            case .removedUnreadable(let message):
+                state.removalResult = message
+                // 지운 뒤에는 다시 세어 보인다 — 남은 것이 있으면 그대로 보여야 한다.
+                return load()
             case .loaded(let buckets):
                 state.isLoading = false
                 state.buckets = buckets
@@ -190,7 +214,10 @@ public struct DraftRecoveryFeature {
             var buckets: [Bucket] = []
             for scope in scopes {
                 do {
-                    buckets.append(Bucket(try await query.inventory(in: scope, environment: environment), environment: environment))
+                    let inventory = try await query.inventory(in: scope, environment: environment)
+                    // 내보낼 파일 자리는 목록과 함께 읽는다. 읽지 못하면 내보내기만 못 하고 나머지는 그대로 보인다.
+                    let files = (try? await reader.unreadableDraftFiles(in: scope)) ?? []
+                    buckets.append(Bucket(inventory, files: files, environment: environment))
                 } catch {
                     Log.error("남은 필기 — 이 묶음을 읽지 못했다", scope.key, "\(error)")
                     buckets.append(Bucket(unreadable: scope, environment: environment))
@@ -219,6 +246,23 @@ public struct DraftRecoveryFeature {
         }
     }
 
+    /// **읽지 못한 파일만** 지운다. 초안을 지우는 길은 이 화면에 없다(사용자 결정 2026-09-21).
+    private func removeUnreadable(in scope: AccountScope) -> Effect<Action> {
+        .run { [cleaner] send in
+            guard let cleaner else {
+                await send(.removedUnreadable("이 기기의 보존 영역을 열지 못해 지우지 못했어요."))
+                return
+            }
+            do {
+                let removed = try await cleaner.removeUnreadableDraftFiles(in: scope)
+                await send(.removedUnreadable("읽지 못한 파일 \(removed)개를 지웠어요."))
+            } catch {
+                Log.error("남은 필기 — 읽지 못한 파일을 지우지 못했다", scope.key, "\(error)")
+                await send(.removedUnreadable("읽지 못한 파일을 지우지 못했어요. 파일은 그대로 있어요."))
+            }
+        }
+    }
+
     private static func order(_ lhs: Bucket, _ rhs: Bucket) -> Bool {
         if lhs.comparedWithStore != rhs.comparedWithStore { return lhs.comparedWithStore }
         return lhs.scope.key < rhs.scope.key
@@ -228,7 +272,7 @@ public struct DraftRecoveryFeature {
 // MARK: - 조회 결과를 화면의 값으로
 
 extension DraftRecoveryFeature.Bucket {
-    init(_ inventory: VerseDraftRecoveryInventory, environment: DrawingEditEnvironment) {
+    init(_ inventory: VerseDraftRecoveryInventory, files: [URL], environment: DrawingEditEnvironment) {
         self.init(
             scope: inventory.scope,
             title: DraftRecoveryCopy.bucketTitle(inventory.scope, environment: environment),
@@ -236,6 +280,7 @@ extension DraftRecoveryFeature.Bucket {
             draftBytes: inventory.summary.draftBytes,
             unreadableCount: inventory.summary.unreadableCount,
             unreadableBytes: inventory.summary.unreadableBytes,
+            unreadableFiles: files,
             comparedWithStore: inventory.comparedWithStore,
             readFailed: false,
             items: inventory.entries.map { DraftRecoveryFeature.Item($0, environment: environment) },
@@ -247,7 +292,7 @@ extension DraftRecoveryFeature.Bucket {
     init(unreadable scope: AccountScope, environment: DrawingEditEnvironment) {
         self.init(
             scope: scope, title: DraftRecoveryCopy.bucketTitle(scope, environment: environment),
-            draftCount: 0, draftBytes: 0, unreadableCount: 0, unreadableBytes: 0,
+            draftCount: 0, draftBytes: 0, unreadableCount: 0, unreadableBytes: 0, unreadableFiles: [],
             comparedWithStore: false, readFailed: true, items: [], unreadChapters: []
         )
     }

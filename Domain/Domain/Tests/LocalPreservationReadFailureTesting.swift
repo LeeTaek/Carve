@@ -68,6 +68,42 @@ struct LocalPreservationReadFailureTesting {
         try FileManager.default.setAttributes([.posixPermissions: value], ofItemAtPath: url.path)
     }
 
+    // MARK: - 읽지 못한 파일 지우기
+
+    @Test("읽지 못한 파일만 지우고 초안은 남긴다 — 복구 화면이 지울 수 있는 유일한 것")
+    func removingUnreadableFilesKeepsDrafts() async throws {
+        try await withAreas { areas in
+            let writer = LocalPreservationWriter(area: areas.preservation, eraseState: areas.eraseState)
+            _ = try await writer.saveDraft(draft(verse: 1))
+            let second = draft(verse: 2)
+            _ = try await writer.saveDraft(second)
+            // 같은 키의 초안을 읽지 못하게 만들고 다시 쓰면, 옛 파일이 옆으로 옮겨진다.
+            try Data("{ 잘린".utf8).write(to: fileURL(areas, second))
+            _ = try await writer.saveDraft(draft(verse: 2, revision: 2))
+            #expect(try await writer.unreadableDraftFiles(in: account).count == 1)
+
+            let removed = try await writer.removeUnreadableDraftFiles(in: account)
+
+            #expect(removed == 1)
+            #expect(try await writer.unreadableDraftFiles(in: account).isEmpty)
+            // 초안은 그대로다 — 되살리기가 붙기 전에는 그것이 유일한 사본일 수 있다.
+            let summary = try await writer.draftSummary(in: account)
+            #expect(summary.draftCount == 2)
+            #expect(summary.unreadableCount == 0)
+            #expect(try await writer.drafts(in: account, chapter: chapter).map(\.key.verse) == [1, 2])
+        }
+    }
+
+    @Test("지울 것이 없으면 0개를 지운다 — 던지지 않는다")
+    func removingWithNothingToRemoveIsQuiet() async throws {
+        try await withAreas { areas in
+            let writer = LocalPreservationWriter(area: areas.preservation, eraseState: areas.eraseState)
+            _ = try await writer.saveDraft(draft(verse: 1))
+            #expect(try await writer.removeUnreadableDraftFiles(in: account) == 0)
+            #expect(try await writer.draftSummary(in: account).draftCount == 1)
+        }
+    }
+
     // MARK: - 깨진 파일
 
     @Test("그 장의 초안 파일이 깨졌으면 빈 목록이 아니라 던진다 — 잘린 JSON · 빈 파일 · 다른 모양 · 쓰레기 바이트")
