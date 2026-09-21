@@ -34,7 +34,8 @@ extension DraftTestSamples {
         drawingVersion: Int? = 3,
         withMetadata: Bool = true,
         account: VerseEditAccountBasis? = nil,
-        storeOwnership: AccountScope? = nil
+        storeOwnership: AccountScope? = nil,
+        ownershipInjected: Bool? = nil
     ) -> VerseDraft {
         let base = baseFingerprint ?? storedVerseOneFingerprint
         let metadata = withMetadata ? try? CanvasTestSupport.metadata().encodedBlob() : nil
@@ -51,7 +52,8 @@ extension DraftTestSamples {
             knownEpochs: [],
             storeOwnership: storeOwnership,
             eraseGeneration: 0,
-            savedAt: Date(timeIntervalSince1970: 500)
+            savedAt: Date(timeIntervalSince1970: 500),
+            ownershipInjected: ownershipInjected
         )
     }
 

@@ -211,6 +211,68 @@ struct DrawingEditEnvironmentTesting {
         }
     }
 
+    // MARK: - 동기화 저장소에 바로 쓰는 경로의 판정 (정책 §12-6 결정 1)
+
+    @Test("동기화 쓰기는 확인된 계정 · 표 · K · 그 계정의 저장소 소유 근거가 모두 있을 때만 연다")
+    func syncedWriteBlockTable() {
+        let owner = scope("_a")
+        let other = scope("_b")
+        let token = AccountServerWorkToken(scope: owner, generation: 1)
+        func environment(
+            _ state: AccountScopeState, _ work: AccountServerWorkToken?, _ knowledge: EraseEpochKnowledge?, _ owner: AccountScope?
+        ) -> DrawingEditEnvironment {
+            DrawingEditEnvironment(accountState: state, serverWork: work, knowledge: knowledge, storeOwnership: owner)
+        }
+
+        #expect(SyncedWriteBlock.check(environment(.noAccount, nil, EraseEpochKnowledge(), nil)) == .signedOut)
+        #expect(SyncedWriteBlock.check(environment(.unconfirmed(lastConfirmed: owner), nil, EraseEpochKnowledge(), owner)) == .accountUnconfirmed)
+        // 확인은 됐지만 표가 없다 — 그 계정으로 서버 작업을 할 수 없다.
+        #expect(SyncedWriteBlock.check(environment(.confirmed(owner), nil, EraseEpochKnowledge(), owner)) == .accountUnconfirmed)
+        #expect(SyncedWriteBlock.check(environment(.confirmed(owner), token, nil, owner)) == .knowledgeUnreadable)
+        #expect(SyncedWriteBlock.check(environment(.confirmed(owner), token, EraseEpochKnowledge(), nil)) == .ownershipUnverified)
+        // 소유 근거가 **다른** 계정의 것이면 막는다.
+        #expect(SyncedWriteBlock.check(environment(.confirmed(owner), token, EraseEpochKnowledge(), other)) == .ownershipUnverified)
+        #expect(SyncedWriteBlock.check(environment(.confirmed(owner), token, EraseEpochKnowledge(), owner)) == nil)
+    }
+
+    // MARK: - ACC-1 2차 DEBUG 소유 주입 (테스트 계획 §3-2)
+
+    @Test("소유 주입은 실행 인자와 시험(dev) 컨테이너가 모두 맞을 때만 켜진다")
+    func ownershipInjectionNeedsArgumentAndDevContainer() {
+        let dev = ContainerID(id: "iCloud.Carve.SwiftData.iCloud.dev")
+        let production = ContainerID(id: "iCloud.Carve.SwiftData.iCloud")
+        let argument = StoreOwnershipInjection.launchArgument
+
+        #expect(StoreOwnershipInjection.isEnabled(containerID: dev, arguments: [argument]))
+        #expect(!StoreOwnershipInjection.isEnabled(containerID: dev, arguments: []))
+        #expect(!StoreOwnershipInjection.isEnabled(containerID: production, arguments: [argument]))
+    }
+
+    @Test("주입한 환경은 확인된 계정에만 소유 근거를 채우고 주입했다는 표식을 단다")
+    func injectedEnvironmentMarksOwnership() async throws {
+        try await withStateStore { store in
+            let injected = LiveDrawingEditEnvironment(
+                identity: SequencedIdentityClient([.identified(userRecordName: "_a")]),
+                containerID: container, stateStore: store, notificationCenter: NotificationCenter(), injectsOwnership: true
+            )
+            await injected.start()
+            let current = await injected.current()
+            #expect(current.storeOwnership == scope("_a"))
+            #expect(current.ownershipInjected)
+            #expect(SyncedWriteBlock.check(current) == nil)
+
+            // 로그인하지 않은 경로는 주입 빌드에서도 그대로다 — 보존만 한다.
+            let signedOut = LiveDrawingEditEnvironment(
+                identity: SequencedIdentityClient([.noAccount]),
+                containerID: container, stateStore: store, notificationCenter: NotificationCenter(), injectsOwnership: true
+            )
+            await signedOut.start()
+            let withoutAccount = await signedOut.current()
+            #expect(withoutAccount.storeOwnership == nil)
+            #expect(!withoutAccount.ownershipInjected)
+        }
+    }
+
     @Test("주입하지 않은 기본값은 확인 전 환경이다 — 서버 작업을 하지 않는다")
     func unconfiguredDefaultDoesNoServerWork() async {
         let current = await StubDrawingEditEnvironment(.unknown).current()

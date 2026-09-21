@@ -192,7 +192,7 @@ extension EditSessionTestHelpers {
         spy: RepositorySpy,
         results: [DrawingEditResult],
         environment: ControlledEditEnvironment,
-        drafts: RecordingDraftStore?,
+        drafts: (any VerseDraftStore)?,
         clock: any Clock<Duration> = ImmediateClock(),
         composeInputs: LockIsolated<[[VerseDrawingSnapshot]]>? = nil
     ) -> TestStoreOf<ChapterCanvasFeature> {
