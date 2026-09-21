@@ -256,9 +256,9 @@ extension ChapterCanvasFeature {
             state.arrival.phase = .waiting(.confirm)
             return continueArrival(state: &state)
         case .reloadFailed(.check):
-            guard state.arrival.phase == .idle else { return .none }
+            // 다시 확인한다. 다른 도착으로 이미 확인이 돌고 있으면 그 결과에 맡긴다 — 버튼이 아무 일도 하지 않는 것처럼 두지 않는다.
             state.arrival.notice = nil
-            state.arrival.phase = .waiting(.check)
+            if state.arrival.phase == .idle { state.arrival.phase = .waiting(.check) }
             return continueArrival(state: &state)
         case .draftsHidden:
             // 자동으로 표시되지 않게 된 초안을 보는 자리 — 설정 → 「남은 필기」(읽기 전용).
