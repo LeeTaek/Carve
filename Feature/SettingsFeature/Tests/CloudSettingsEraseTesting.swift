@@ -62,23 +62,66 @@ private final class WidgetClearSpy: WidgetVerseClient, @unchecked Sendable {
 @Suite("설정 — 전체 삭제 문구")
 struct CloudSettingsEraseCopyTesting {
 
-    @Test("남은 필기가 있으면 문구가 그 수까지 말한다")
+    @Test("남은 초안이 있으면 문구가 그 수까지 말한다 — 자동으로 표시되는 것 · 다른 계정 · 읽지 못한 파일까지 모두라는 것도")
     func bodyMentionsRemainingDrafts() {
         let body = CloudSettingsFeature.eraseConfirmBody(remainingDrafts: 13)
-        #expect(body.contains("남은 필기 13개도 함께 지워져요"))
+        #expect(body.contains("이 기기의 필사 초안 13개도 모두 지워져요"))
+        #expect(body.contains("다른 계정에서 쓴 것 · 읽지 못한 파일 포함"))
+        // 센 것은 "보이지 않는 것" 만이 아니다 — 그렇게 말하지 않는다(P1-4).
+        #expect(!body.contains("보이지 않"))
     }
 
-    @Test("남은 필기를 세지 못했으면 수 없이 말하되 빼지 않는다")
+    @Test("남은 초안을 세지 못했으면 수 없이 말하되 빼지 않는다")
     func bodyMentionsDraftsWithoutCountWhenUnknown() {
         let body = CloudSettingsFeature.eraseConfirmBody(remainingDrafts: nil)
-        #expect(body.contains("남은 필기도 함께 지워져요"))
+        #expect(body.contains("이 기기의 필사 초안도 모두 지워져요"))
     }
 
-    @Test("남은 필기가 없으면 그 줄을 넣지 않는다")
+    @Test("남은 초안이 없으면 그 줄을 넣지 않는다")
     func bodyOmitsDraftLineWhenNone() {
         let body = CloudSettingsFeature.eraseConfirmBody(remainingDrafts: 0)
-        #expect(!body.contains("남은 필기"))
+        #expect(!body.contains("초안"))
         #expect(body.contains("모든 장의 필기와 이전 필사 기록이 지워져요"))
+    }
+
+    /// 2026-09-21 후속 리뷰 P1-4 — 문구의 수와 실제로 지워지는 대상이 같아야 한다. 실제 보존 영역에 여러 묶음의 초안과 읽지 못한 파일을 두고
+    /// 전체 삭제를 돌려, 센 수만큼 파일이 사라지는지 본다.
+    @Test("문구의 수는 전체 삭제가 실제로 지우는 초안 파일 수다 — 다른 계정 묶음 · 읽지 못한 파일까지")
+    func countMatchesWhatEraseRemoves() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("erase-count-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let area = PreservationArea(root: root.appendingPathComponent("Preservation", isDirectory: true), storeFileName: "Carve.sqlite")
+        let writer = LocalPreservationWriter(
+            area: area, eraseState: EraseStateArea(root: root.appendingPathComponent("EraseState", isDirectory: true), storeFileName: "Carve.sqlite")
+        )
+        let chapter = BibleChapter(title: .genesis, chapter: 1)
+        func draft(_ verse: Int, _ scope: AccountScope, revision: Int = 1) -> VerseDraft {
+            VerseDraft(
+                key: VerseDraftKey(sessionID: "s-\(scope.key)", chapter: chapter, verse: verse), revision: revision,
+                rowID: BibleDrawingRowID(raw: "row-\(verse)"), lineData: Data("획".utf8), drawingVersion: 3, layoutMetadataData: nil,
+                base: .empty, baseFingerprint: nil, account: .confirmed(AccountServerWorkToken(scope: scope, generation: 1)),
+                knownEpochs: [], storeOwnership: nil, eraseGeneration: 0, savedAt: Date(timeIntervalSince1970: 1_000)
+            )
+        }
+        let accountA = AccountScope(key: "acct-a")
+        let accountB = AccountScope(key: "acct-b")
+        _ = try await writer.saveDraft(draft(1, accountA))
+        _ = try await writer.saveDraft(draft(2, accountA))
+        _ = try await writer.saveDraft(draft(3, accountB))
+        // 같은 키의 초안을 읽지 못하게 만들고 다시 쓰면 옛 파일이 옆으로 옮겨진다 — 읽지 못한 파일 하나.
+        let files = { (try? FileManager.default.subpathsOfDirectory(atPath: area.draftsDirectory.path)) ?? [] }
+        let draftTwo = try #require(files().first { $0.hasPrefix(accountA.key) && $0.hasSuffix("~2.json") })
+        try Data("{ 잘린".utf8).write(to: area.draftsDirectory.appendingPathComponent(draftTwo))
+        _ = try await writer.saveDraft(draft(2, accountA, revision: 2))
+
+        let counted = try #require(await CloudSettingsFeature.remainingDraftCount(writer))
+        let draftFiles = files().filter { $0.hasSuffix(".json") || $0.contains(".unreadable-") }
+        #expect(counted == 4)
+        #expect(counted == draftFiles.count)
+        #expect(CloudSettingsFeature.eraseConfirmBody(remainingDrafts: counted).contains("필사 초안 \(counted)개"))
+
+        try await writer.eraseAllLocal()
+        #expect(files().isEmpty)
     }
 
     @Test("보존 영역을 열지 못하면 남은 필기 수는 nil 이다 — 0 이 아니다")

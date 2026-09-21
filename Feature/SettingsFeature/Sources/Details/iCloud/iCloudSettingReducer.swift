@@ -204,7 +204,9 @@ public struct CloudSettingsFeature {
 }
 
 extension CloudSettingsFeature {
-    /// 이 기기에 남은 필기(초안 · 읽지 못해 옆으로 옮긴 파일) 수. **읽지 못하면 nil** — 없다고 단정하지 않는다.
+    /// 전체 삭제가 함께 지우는 **이 기기의 초안 파일 수** — 모든 묶음(다른 계정 · 계정 미확인 · 로그인하지 않은 동안)의 초안과 읽지 못해 옆으로
+    /// 옮긴 파일. 화면에 자동으로 표시되는 초안도 든다 — 전체 삭제는 보존 영역을 통째로 지운다(`LocalPreservationWriter.eraseAllLocal`).
+    /// **읽지 못하면 nil** — 없다고 단정하지 않는다.
     static func remainingDraftCount(_ reader: (any VerseDraftRecoveryReading)?) async -> Int? {
         guard let reader else { return nil }
         do {
@@ -220,7 +222,10 @@ extension CloudSettingsFeature {
         }
     }
 
-    /// 지워지는 범위를 적는다. **남은 필기도 함께 지워진다** — 세지 못했으면 수 없이 말한다(정책 §12-5 C11 문구 규칙).
+    /// 지워지는 범위를 적는다. **이 기기의 초안도 모두 지워진다** — 세지 못했으면 수 없이 말한다(정책 §12-5 C11 문구 규칙).
+    ///
+    /// 수는 `remainingDraftCount` 그대로 — **실제로 지워지는 초안 파일 수**다. 예전 문구는 "화면에 보이지 않게 남은 필기 N개" 라 해, 자동으로
+    /// 표시되는 초안 · 다른 계정의 초안 · 읽지 못한 파일까지 센 수와 말이 달랐다(2026-09-21 후속 리뷰 P1-4).
     static func eraseConfirmBody(remainingDrafts: Int?) -> String {
         var lines = [
             "모든 장의 필기와 이전 필사 기록이 지워져요.",
@@ -228,9 +233,9 @@ extension CloudSettingsFeature {
         ]
         switch remainingDrafts {
         case .some(let remaining) where remaining > 0:
-            lines.append("화면에 보이지 않게 남은 필기 \(remaining)개도 함께 지워져요.")
+            lines.append("이 기기의 필사 초안 \(remaining)개도 모두 지워져요(다른 계정에서 쓴 것 · 읽지 못한 파일 포함).")
         case .none:
-            lines.append("화면에 보이지 않게 남은 필기도 함께 지워져요.")
+            lines.append("이 기기의 필사 초안도 모두 지워져요(다른 계정에서 쓴 것 · 읽지 못한 파일 포함).")
         default:
             break
         }
