@@ -1090,8 +1090,7 @@ OLD·CURRENT·NEW 커밋 / 테스트 변경 diff: 수정 전 = develop 2c124cb3(
 ### SEP-2 — 대응 없는 행의 업로드와 삭제 전파 (2026-09-21)
 
 **환경:** SEP-0 과 같다(dut · Debug `73c20f73` · 샌드박스 계정 B). 손질은 여분 시뮬레이터에서 `LegacyRowSeparationProbeTesting` 으로, 연결은 dut 에서.
-**두 iPad 시뮬레이터를 동시에 띄우면 SpringBoard 가 죽는다**(`Mach error -308`) — 이후 한 번에 한 대만 띄웠다. 관측 도구가 없어 서버 상태는
-dut 저장소의 `ANSCKEVENT`(0 setup · 1 import · 2 export) · `ANSCKRECORDMETADATA` 로 읽었다. B 기기의 서버 확인은 로그인이 붙지 않아 대기.
+관측 도구가 없어 서버 상태는 dut 저장소의 `ANSCKEVENT`(0 setup · 1 import · 2 export) · `ANSCKRECORDMETADATA` 로 읽었다. B 기기의 서버 확인은 로그인이 붙지 않아 대기.
 
 **손질 방법:** 저장소 사본을 `cloudKitContainerOptions = nil` · `NSPersistentHistoryTrackingKey = true` 로 열어 Core Data 로 넣고 지운다 — 1.3.0 이 쓰던
 조건(미러링 없음 · 이력 있음)과 같다. 손질한 사본을 dut 의 앱 컨테이너에 되돌려 놓고 앱을 띄운다. **밖에서 바꿔 넣은 저장소는 setup 이 오래 걸린다**
