@@ -233,7 +233,7 @@ private struct StateSamples: View {
 /// 시안 D1 을 부품으로 조립해 본 것. 실제 화면은 Feature 가 조립한다.
 private struct TextSettingsPanelSample: View {
     private enum SampleFont: CaseIterable {
-        case gothic, myeongjo, flower
+        case myeongjo, gothic, flower
 
         var title: String {
             switch self {
@@ -252,7 +252,7 @@ private struct TextSettingsPanelSample: View {
         }
     }
 
-    @State private var font = SampleFont.gothic
+    @State private var font = SampleFont.myeongjo
     @State private var fontSize: CGFloat = 20
     @State private var lineSpace: CGFloat = 30
     @State private var tracking: CGFloat = 1
@@ -260,7 +260,7 @@ private struct TextSettingsPanelSample: View {
     @State private var allowsFingerDrawing = false
 
     private var isDefault: Bool {
-        font == .gothic && fontSize == 20 && lineSpace == 30 && tracking == 1
+        font == .myeongjo && fontSize == 20 && lineSpace == 30 && tracking == 1
     }
 
     var body: some View {
@@ -292,7 +292,7 @@ private struct TextSettingsPanelSample: View {
             CarveDivider()
 
             Button("본문 모양 초기화") {
-                font = .gothic
+                font = .myeongjo
                 fontSize = 20
                 lineSpace = 30
                 tracking = 1

@@ -54,6 +54,8 @@ struct ChapterCanvasView: UIViewControllerRepresentable {
 
     @Shared(.appStorage("pencilConfig")) private var pencilConfig: PencilPalatte = .initialState
     @Shared(.appStorage("allowFingerDrawing")) private var allowFingerDrawing: Bool = false
+    /// 올가미 도구 선택 (올가미 설계 §4-1). 팔레트가 쓰고 여기서 읽는다 — `canUndo` 와 같은 관용구다.
+    @Shared(.inMemory("isLassoSelected")) private var isLassoSelected: Bool = false
 
     func makeUIViewController(context: Context) -> ChapterCanvasController {
         let controller = ChapterCanvasController()
@@ -70,6 +72,9 @@ struct ChapterCanvasView: UIViewControllerRepresentable {
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains(ChapterCanvasMemoryProbe.launchArgument) {
             controller.memoryProbe = ChapterCanvasMemoryProbe(controller: controller)
+        }
+        if ProcessInfo.processInfo.arguments.contains(ChapterCanvasLassoProbe.launchArgument) {
+            controller.lassoProbe = ChapterCanvasLassoProbe(canvas: controller.canvas)
         }
         if ProcessInfo.processInfo.arguments.contains("-CanvasDisplayProbe") {
             controller.displayProbe = ChapterCanvasDisplayProbe(controller: controller) { [store] in
@@ -94,7 +99,7 @@ struct ChapterCanvasView: UIViewControllerRepresentable {
             renderedData: display.renderedData,
             renderedRevision: display.renderedRevision,
             isInputEnabled: display.isInputEnabled,
-            tool: Self.tool(for: pencilConfig),
+            tool: Self.tool(for: pencilConfig, isLasso: isLassoSelected),
             drawingPolicy: allowFingerDrawing ? .anyInput : .pencilOnly,
             topInset: topInset,
             bottomInset: bottomInset,
@@ -135,9 +140,13 @@ struct ChapterCanvasView: UIViewControllerRepresentable {
         )
     }
 
-    /// 팔레트 설정 → PencilKit 도구. `CanvasView` 와 같은 규칙(monoline = 지우개, §7-4 `.bitmap`).
-    private static func tool(for config: PencilPalatte) -> PKTool {
-        config.pencilType == .monoline
+    /// 팔레트 설정 → PencilKit 도구. `CanvasView` 와 같은 규칙(monoline = 지우개, §7-4 `.bitmap`)에
+    /// 올가미를 **우선하는 한 칸**으로 얹었다 (올가미 설계 §4-2). 도구 판정이 이 함수 하나뿐이라 진실이 갈라지지 않는다.
+    ///
+    /// 올가미도 같은 `drawingGestureRecognizer` 를 쓰므로 입력 게이트(§6-2)가 그대로 걸린다 — 별도 게이트가 필요 없다.
+    static func tool(for config: PencilPalatte, isLasso: Bool) -> PKTool {
+        if isLasso { return PKLassoTool() }
+        return config.pencilType == .monoline
             ? PKEraserTool(.bitmap)
             : PKInkingTool(config.pencilType, color: config.lineColor.color, width: config.lineWidth)
     }

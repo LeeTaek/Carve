@@ -27,6 +27,8 @@ public extension TargetDependency {
     static let FirebaseMessaging: Self = .external(name:  "FirebaseMessaging")
     static let FirebaseCrashlytics: Self = .external(name: "FirebaseCrashlytics")
     static let GoogleAds: Self = .external(name: "GoogleMobileAds")
+    /// 광고 동의(UMP). GoogleMobileAds 패키지가 이미 의존하는 패키지라 새로 받지 않는다.
+    static let GoogleUMP: Self = .external(name: "GoogleUserMessagingPlatform")
 }
 
 

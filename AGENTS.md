@@ -50,7 +50,7 @@ xcodebuild -version                   # Xcode 26.3 / Build 17C529 확인
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer   # 필요할 때만
 ```
 
-**tuist 는 `.mise.toml` 로 4.39.0 에 고정돼 있다.** `PATH` 기본값과 다르므로 반드시
+**tuist 는 `.mise.toml` 로 4.208.0 에 고정돼 있다.** `PATH` 기본값과 다르므로 반드시
 `mise x -- tuist ...` 로 실행한다.
 
 ## 공통 명령어
@@ -95,6 +95,15 @@ mise x -- swiftlint lint --quiet --config .swiftlint.yml <파일들>
   `xcrun xctrace list devices` 로 확인한다.
 - 앱 인자를 넘길 때는 `--` 로 구분한다:
   `xcrun devicectl device process launch --device <id> <bundle> -- -MyFlag`
+- **실기기 UI 테스트는 시작 장을 인자로 정한다** — `-UITestChapter <BibleChapter JSON>`(Debug 전용, `UITestLaunchChapter`,
+  UITests 에서는 `startChapterArguments`). 앱은 마지막으로 연 장에서 시작하므로 인자 없이는 기기 상태에 따라 결과가 갈린다.
+  헤더 다음 장 버튼(`nextChapter`)과 절 메뉴 항목(`verseMenu.favorite` · `history` · `image` · `widget` · `erase`)은 접근성 이름이 아니라 식별자로 찾는다.
+  절 메뉴는 2026-09-15 부터 필기가 없는 절에서도 「즐겨찾기」 로 뜬다 — 「이전 필사 내용 보기」 는 보관본이, 「지우기」 는 필기가 있어야 보인다.
+  메뉴 항목은 누르지 않는다(「지우기」 는 실제 필사를 비우고 「즐겨찾기」 는 실제로 저장되며 「이미지 저장」 은 사진 추가 권한을 묻고 사진 보관함에 넣고 「위젯에 추가」 는 즐겨찾기에 보관하고 위젯 목록을 바꾼다). 즐겨찾기한 절 번호는 이름 「1절」 을 그대로 두고 값 「즐겨찾기」 만 더한다.
+  누를 좌표는 **보이는 요소 기준**으로 만든다(절 메뉴는 「1절」 번호와 필사 열 라벨, 드래그는 창 기준 `windowPoint`). 창 모드(iPadOS 창 버튼)에서는
+  앱 좌표 원점이 화면 원점이라 `app.coordinate` 에 창 크기 비율을 더한 좌표가 창 위치만큼 어긋난다 (2026-09-15 창 y=177 에서 헤더 위를 눌러 실패).
+  사이드바(즐겨찾기 · 차트 · 설정)는 **가로에서도 접혀 있을 수 있다** — 「즐겨찾기」 가 트리에 없으면 먼저 「사이드바 보기」 버튼을 누른다 (2026-09-16).
+  **새로 만든 시뮬레이터는 첫 실행 안내(FirstRunGuideView)가 롱탭을 먹는다** — 절을 누르기 전에 「건너뛰기」 버튼이 있으면 먼저 누른다 (2026-09-16).
 - 기록 중에는 **`pgrep`/`pkill` 로 프로세스를 건드리지 않는다.** 마무리 단계에 끼어들면
   트레이스가 템플릿 메타데이터 없이 저장되어 `xctrace export` 가 실패한다.
 
@@ -111,7 +120,7 @@ mise x -- swiftlint lint --quiet --config .swiftlint.yml <파일들>
 - **터치 주입은 불가하다.** MCP 시뮬레이터 제어는 `xcode-select` 가 CLT 를 가리켜 막혀 있고(S4 §20-4 와 같음),
   호스트 쪽 도구(cliclick · Quartz)도 없다. 시스템 설정을 바꾸지 말고 **Debug 전용 실행 인자 시나리오**를 쓴다:
   `-ChapterLayoutAutoScroll`(11단계 스크롤) · `-ChapterLayoutAutoNext`(다음 장) · `-ChapterLayoutOverlay`(레이아웃 오버레이·HUD) ·
-  `-SingleCanvas`(단일 Canvas 경로 강제 — Phase 3 flag `singleCanvasEnabled` 와 같은 효과, 기본은 N-Canvas. 앱 안에서는 **설정 > 필사 캔버스** 토글, 키는 Domain `SingleCanvasFlag`).
+  `-SingleCanvas`(단일 Canvas 경로 강제 — Phase 3 flag `singleCanvasEnabled` 와 같은 효과, 기본은 단일 Canvas. 앱 안에서는 **설정 > 필사 캔버스** 토글, 키는 Domain `SingleCanvasFlag`).
 - **표시 진단 인자(Debug 전용, 주로 실기기).** `-CanvasDisplayProbe`(읽기 전용 상태·drawing 샘플링) · `-CanvasDisplayExperiments`(원격 실험 명령 수신) ·
   ⚠️ **`-CanvasReuseStrokesOnApply` 는 D9 H 수정을 끄고 결함을 재현하는 opt-out** 이다 — 기본 검증은 이 인자 **없이** 돈다. 절차는 `docs/device-debugging-cli.md`.
 - **장 지정 시드는 저장된 앱 상태에 밀린다.** 앱이 한 번 장을 바꾼 뒤에는 컨테이너의
@@ -126,6 +135,9 @@ mise x -- swiftlint lint --quiet --config .swiftlint.yml <파일들>
   그 계열은 `H`(totalHeight)를 새 진입값과 비교해 본다 (런북 §6-9 D9-0-d).
   행 안의 `onGeometryChange` 는 중첩 `UIHostingController`(`touchIgnoringContextMenu`) 때문에 바깥 `.named` 공간을 보지 못하고 **조용히 global 을 쓴다** —
   그래서 행 frame 은 바깥 트리에서 재고 행 안 영역과 합친다(설계 §6-1 rev.16). Δ 가 0 이 아니면 레이아웃보다 측정 경로를 먼저 의심한다.
+  ⚠️ **저장 당시 줄 수가 지금보다 많은 필사 절(slack)이 있어도 `Δ max 0.00` 이 기대값이다.** 레이아웃과 행은 텍스트 줄 수만큼만 차지하고,
+  잉크가 초과 줄에 걸쳐 있으면 reflow 가 그 절 안에 같은 비율로 줄여 보여 준다(설계 §6-3 · §9-3). HUD 의 `slack v1+1·… = N줄 · 초과 필기는 절 안 축소` 는 그 후보 절이다.
+  2026-09-14 실기기 시편 119편 `Δ max 195.63`(v1·v2·v4 +1) · 가로 586.90 은 레이아웃만 초과 줄만큼 늘리던 §6-3 Pass 2 의 결함이었다 (2026-09-15 제거).
 
 ## 변경 정책
 - 변경은 최소 범위로 유지한다.

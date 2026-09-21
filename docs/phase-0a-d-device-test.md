@@ -109,7 +109,7 @@
 | 항목 | 기준값 | 확인 |
 |---|---|---|
 | `xcode-select -p` · `xcodebuild -version` | **Xcode 26.3 (17C529)** — 다른 버전은 빌드되지 않습니다 (AGENTS.md 툴체인 제약) | 머신마다 경로가 다릅니다. **하드코딩 금지** |
-| tuist | **4.39.0** — `PATH` 기본값과 다르므로 반드시 `mise x -- tuist …` | `mise x -- tuist version` |
+| tuist | **4.208.0** — `PATH` 기본값과 다르므로 반드시 `mise x -- tuist …` | `mise x -- tuist version` |
 | iPad 시뮬레이터 런타임 | 검증은 **iPad** destination 으로만 (AGENTS.md). iOS 17/18 iPad 런타임은 없어 "저사양 iOS 17 iPad" 리스크는 시뮬레이터로 보완 불가 | `xcrun simctl list devices available` |
 | **`sqlite3`** ★ | `/usr/bin/sqlite3` 3.54.0 — `median()` 집계까지 사용 가능. **§6-1 D8 추출의 핵심 도구** | ✅ 실행 확인 |
 | **`plutil`** ★ | `/usr/bin/plutil` — `-extract '<공백 포함 키>' raw -o -` 로 바이너리 plist 값을 꺼낼 수 있음 | ✅ 모의 plist 로 실행 확인 |
@@ -414,7 +414,7 @@ D8 추출이면 **비암호화**입니다 (§2-4).
 cd <저장소 루트>
 git status --short          # "… 2.swift" 중복 사본이 없어야 함 (§1-1)
 xcodebuild -version         # Xcode 26.3 / 17C529
-mise x -- tuist version     # 4.39.0
+mise x -- tuist version     # 4.208.0
 ```
 
 ### P0-2. 프로젝트 생성 (필요 시) — D8 에는 불필요
@@ -1417,7 +1417,7 @@ xcrun devicectl device process launch --device "$DEV" --terminate-existing \
 |---|---|---|
 | `gate PASS` (초록) | **PASS** | `FAIL` 이면 **장 전체가 필기 불가**. 설계 §6-2 게이트 |
 | `176/176` | 실측/기대 절 수 일치 | 모자라면 아래 `missing` 줄에 절 번호가 뜸 |
-| `Δ max` | **0.00** (초록, tol 1.00pt) | 0 이 아니면 **레이아웃보다 측정 경로를 먼저 의심** (AGENTS.md — 중첩 호스팅의 `.named` → global 대체). ⚠️ **rev.6 — 이 값은 R16 계열을 잡지 못합니다.** D9-0-d 를 함께 도십시오 |
+| `Δ max` | **0.00** (초록, tol 1.00pt). HUD 에 `slack` 줄이 있어도 같습니다 | 0 이 아니면 **레이아웃보다 측정 경로를 먼저 의심** (AGENTS.md — 중첩 호스팅의 `.named` → global 대체). ⚠️ **rev.6 — 이 값은 R16 계열을 잡지 못합니다.** D9-0-d 를 함께 도십시오. `slack` 줄은 저장 당시 줄 수가 지금보다 많은 필사 절입니다 — 절 간격은 그대로이고, 잉크가 초과 줄에 걸쳐 있으면 그 절 안에 줄어 보입니다(설계 §9-3). 2026-09-14 시편 119편의 `Δ max 195.63`(v1·v2·v4 +1)은 레이아웃만 늘리던 §6-3 Pass 2 의 결함이었습니다(2026-09-15 제거) |
 | `guard` | **`OPEN`** (초록) | `BLOCKED` 면 Δ 안전망이 새 획 입력을 막는 중입니다 (합성·표시·저장은 계속 돕니다). Δ 가 0 인데 `BLOCKED` 면 **오탐**입니다. `guard —` 는 N-Canvas 이거나 실측 대기 (설계 §14) |
 | `columnX` | **`W` 와 같음** (오른손 · iPad mini 세로 372.00). 2.0 레이아웃 전에는 행 좌우 여백 때문에 366.70 | 다르면 화면 크기·왼손 설정을 먼저 확인 |
 | `missing` 줄 | **없어야 함** (있으면 노란색) | 있으면 게이트가 열리지 않은 절 |
@@ -1792,7 +1792,7 @@ settle 대기 시간        (§18-3 은 cold launch 후 8초)
 | 실행자 | leetaek |
 | Mac / macOS | ❓ **미기록** |
 | Xcode | **26.3** |
-| tuist (`mise x -- tuist version`) | ❓ **미기록** (§1-2 기준 4.39.0) |
+| tuist (`mise x -- tuist version`) | ❓ **미기록** (당시 §1-2 기준 4.39.0) |
 | 저장소 커밋 (`git rev-parse --short HEAD`) | `cff1bdee` — 문서 반영 시점의 HEAD (branch `feat/canvas`). ❓ 세션 중의 정확한 커밋은 별도로 기록하지 않았습니다 |
 | 워킹 트리 상태 | clean · **소스 변경 없음** (저장소에 이미 있는 Debug 빌드와 S4 하네스 사용) |
 | **기기 A** — 모델 / iOS / 화면(pt) | **iPad mini (A17 Pro)** / **iOS 27.0 beta (24A5408d)** / ❓ 화면 pt 미기록 (§18-3 기준 744×1133pt) |

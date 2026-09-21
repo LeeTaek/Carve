@@ -113,7 +113,17 @@ private struct CarveSurfaceModifier<S: Shape>: ViewModifier {
     func body(content: Content) -> some View {
         let content = content.environment(\.carveBackdrop, .surface)
         if #available(iOS 26.0, *), usesGlass {
-            content.glassEffect(.regular, in: shape)
+            if style == .floatingControl {
+                // ⚠️ 종이 위에 떠 있는 유리는 실행 중 라이트 → 다크 전환을 받지 못해, 팔레트가 다크에서도 라이트 유리 · 라이트 아이콘으로
+                //    남았다(iOS 26.2, 2026-09-15 — 유리 안쪽 뷰에 외관 변경이 오지 않는다. 다크 → 라이트 · 다크로 새로 띄우기는 정상).
+                //    안쪽에 외관을 넘기거나 틴트를 바꿔도 그대로여서, 외관이 바뀌면 유리를 새로 만든다(안쪽 `@State` 도 처음으로 돌아간다).
+                //    패널은 딤 위에서 전환을 따라가므로(설정 패널) 내용을 다시 만들지 않는다.
+                content
+                    .glassEffect(.regular, in: shape)
+                    .id(colorScheme)
+            } else {
+                content.glassEffect(.regular, in: shape)
+            }
         } else {
             content
                 .background(opaqueFill, in: shape)

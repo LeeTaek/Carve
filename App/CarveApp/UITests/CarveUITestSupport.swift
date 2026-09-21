@@ -68,11 +68,22 @@ extension XCTestCase {
     }
 
     /// 판정용 캡처. 이름은 결과 판독 때 파일명이 된다.
+    ///
+    /// 앱이 아니라 **화면 전체**를 찍는다 — 창 모드(iPadOS 창 버튼)에서는 `app.screenshot()` 이 창 크기만큼을
+    /// 화면 원점에서 잘라 창 아래쪽을 잃는다 (2026-09-15, 창 y=177).
     func capture(_ app: XCUIApplication, _ name: String) {
-        let shot = XCTAttachment(screenshot: app.screenshot())
+        let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         shot.name = name
         shot.lifetime = .keepAlways
         add(shot)
+    }
+
+    /// 창 안의 정규화 좌표(0...1)를 누를 지점으로 만든다.
+    ///
+    /// ⚠️ `app.coordinate(withNormalizedOffset:)` 를 기준으로 삼지 않는다. 창 모드에서는 앱 요소의 원점이 창 위치가 아니라
+    /// 화면 원점으로 잡혀, 창 크기 비율로 만든 좌표가 창 위치만큼 어긋난다 (2026-09-15 창 y=177 에서 헤더 위 여백을 눌러 실패).
+    func windowPoint(_ app: XCUIApplication, dx: CGFloat, dy: CGFloat) -> XCUICoordinate {
+        app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: dx, dy: dy))
     }
 
     /// 접근성 트리 덤프 — 조작 대상을 찾을 때 쓴다.
@@ -81,6 +92,16 @@ extension XCTestCase {
         tree.name = name
         tree.lifetime = .keepAlways
         add(tree)
+    }
+
+    /// 시작할 장을 정하는 실행 인자. 앱의 `UITestLaunchChapter` 가 받는다 (Debug 전용).
+    ///
+    /// 앱은 마지막으로 연 장에서 시작하므로, 이 인자 없이 띄우면 기기에 남은 장에 따라 결과가 갈린다 (2026-09-14 로마서 1장에서 시작해 실패).
+    /// - Parameters:
+    ///   - bookFile: `BibleTitle` 의 rawValue (예: 시편 `1-19Psalms.txt`).
+    ///   - chapter: 장 번호.
+    func startChapterArguments(bookFile: String, chapter: Int) -> [String] {
+        ["-UITestChapter", "{\"title\":\"\(bookFile)\",\"chapter\":\(chapter)}"]
     }
 
     /// 오버레이를 켠 채 앱을 띄운다.

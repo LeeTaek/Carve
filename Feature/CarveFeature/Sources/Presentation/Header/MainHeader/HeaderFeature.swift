@@ -7,10 +7,12 @@
 //
 
 import CarveToolkit
+import ClientInterfaces
 import Domain
 import SwiftUI
 
 import ComposableArchitecture
+import UIComponents
 
 @Reducer
 public struct HeaderFeature {
@@ -22,6 +24,25 @@ public struct HeaderFeature {
     public static let expandedPaletteBottomInset: CGFloat = 96
     /// 하단 접힘 팔레트와 도구 이름이 마지막 절을 가리지 않도록 비우는 높이.
     public static let collapsedPaletteBottomInset: CGFloat = 112
+    /// 펼친 헤더에서 상태바 아래부터 버튼 줄까지의 여백.
+    static let expandedControlsTopInset: CGFloat = 28
+    /// 축소 헤더에서 상태바 아래부터 버튼 줄까지의 여백.
+    static let compactControlsTopInset: CGFloat = 10
+
+    /// 버튼 줄 위 여백(화면 맨 위부터). 상태바 높이에 축소 진행률(0 펼침 · 1 축소)에 따른 여백을 더한다.
+    static func controlsTopPadding(collapseProgress: CGFloat, safeAreaTop: CGFloat) -> CGFloat {
+        let insetRange = expandedControlsTopInset - compactControlsTopInset
+        return safeAreaTop + expandedControlsTopInset - insetRange * collapseProgress
+    }
+
+    /// 화면에 그리는 헤더 높이(화면 맨 위부터).
+    ///
+    /// 축소 높이 78pt 는 상태바 24pt 기준(24 + 10 + 버튼 줄 44)이다. 상태바가 더 높은 기기(iPadOS 26 의 iPad mini 는 32pt)에서는
+    /// 버튼 줄이 헤더 아래로 삐져나오지 않도록 그만큼 늘린다. 펼친 높이는 본문 시작점이라 바꾸지 않는다.
+    static func displayedHeight(collapseProgress: CGFloat, safeAreaTop: CGFloat) -> CGFloat {
+        let compact = max(compactHeight, safeAreaTop + compactControlsTopInset + CarveSize.minimumHitTarget)
+        return expandedHeight - (expandedHeight - compact) * collapseProgress
+    }
 
     @ObservableState
     public struct State {
@@ -37,12 +58,14 @@ public struct HeaderFeature {
         public var palatteSetting: PencilPalatteFeature.State = .initialState
         /// 헤더 본문 설정 버튼에 붙는 팝오버 상태.
         @Presents public var sentenceSettings: SentenceSettingsFeature.State?
-        /// 필기 열을 왼쪽에 둘지. 본문 설정 버튼과 팝오버의 위치를 정한다.
+        /// 필기 열을 왼쪽에 둘지. 헤더 버튼 위치는 바꾸지 않는다 — 서재 쪽에 버튼이 늘면 헤더 광고 자리가 사라진다.
         @Shared(.appStorage("isLeftHanded")) public var isLeftHanded: Bool = false
         /// 탭으로 전환한 축소 헤더 상태. 광고 영역이 생겨도 헤더는 항상 남는다.
         public var isManuallyCollapsed: Bool = false
         /// NavigationSplitView가 열려 있는지 헤더의 탐색 버튼에 전달한다.
         public var isNavigationPresented: Bool = false
+        /// 헤더 줄 네이티브 광고(시안 K2). 필사하는 동안 계속 보이는 자리라 만료되면 바로 새로 받는다.
+        public var adSlot: SponsorAdSlotFeature.State = .init(placement: .headerStrip, refreshesOnExpiry: true)
         
         public enum SwipeDirection {
             case up
@@ -63,9 +86,12 @@ public struct HeaderFeature {
         case palatteAction(PencilPalatteFeature.Action)
         case sentenceSettings(PresentationAction<SentenceSettingsFeature.Action>)
         case toggleCompact
+        case adSlot(SponsorAdSlotFeature.Action)
         case view(View)
-        
+
         public enum View {
+            /// 헤더가 화면에 나타남 — 헤더 줄 광고를 받는다.
+            case onAppear
             /// 서재 아이콘을 탭해 탐색 열림 상태를 전환한다.
             case libraryDidTapped
             case titleDidTapped
@@ -80,6 +106,10 @@ public struct HeaderFeature {
     }
     
     public var body: some Reducer<State, Action> {
+        Scope(state: \.adSlot, action: \.adSlot) {
+            SponsorAdSlotFeature()
+        }
+
         Scope(state: \.palatteSetting, action: \.palatteAction) {
             PencilPalatteFeature()
         }
@@ -136,6 +166,9 @@ public struct HeaderFeature {
                     state.isPaletteExpanded = true
                 }
 
+            case .view(.onAppear):
+                return .send(.adSlot(.startLoad))
+
             case .view(.expandPalette):
                 state.isPaletteExpanded = true
 
@@ -160,13 +193,6 @@ public struct HeaderFeature {
             default: break
             }
             return .none
-        }
-        .onChange(of: \.isLeftHanded) { _, _ in
-            Reduce { state, _ in
-                // 팝오버의 anchor가 필기 열 쪽으로 바뀌므로, 열린 상태에서는 닫고 새 위치에서 다시 연다.
-                state.sentenceSettings = nil
-                return .none
-            }
         }
     }
 

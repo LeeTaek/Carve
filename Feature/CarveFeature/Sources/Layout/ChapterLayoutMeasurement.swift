@@ -111,7 +111,7 @@ public struct LayoutDeltaVerdict: Equatable, Sendable {
 /// 높이는 실측을 쓰고(`VerseLayoutInput.measuredHeight`), 검증은 `topDelta` 가 이어받는다.
 ///
 /// > ⚠️ **알려진 부작용.** 실측 높이를 레이아웃 입력으로 쓰면 `frameDeltas.heightDelta` 가 **구조적으로 0** 이 된다
-/// > (Pass 2 여유 높이가 붙은 절만 예외이며, 그때는 정확히 `−extraBands × lineSpace` 다).
+/// > (2026-09-15 §6-3 Pass 2 를 없애기 전에는 여유 높이가 붙은 절만 예외로 정확히 `−extraBands × lineSpace` 였다).
 /// > 즉 높이 Δ 는 더 이상 독립 검증이 아니라 자기 자신을 검증한다. 남는 독립 검증은 **`topDelta`** 이고,
 /// > 그것은 여전히 `metrics`(`topInset`/`verseSpacing`/`bottomInset`)와 `leadingInset` 의 적재를 검증한다.
 ///
@@ -129,6 +129,15 @@ struct ChapterLayoutMeasurement: Equatable, Sendable {
         var magnitude: CGFloat { max(abs(topDelta), abs(heightDelta)) }
     }
 
+    /// 저장 band 수가 현재 텍스트 줄 수보다 많은 절 하나 (slack). HUD 진단용이다.
+    ///
+    /// 레이아웃은 이 절도 텍스트 줄 수만큼만 차지하고(설계 §6-3), 잉크가 초과 줄에 걸쳐 있으면 reflow 가 절 안에 줄여 넣는다(§9-3).
+    struct ReflowSlack: Equatable, Sendable {
+        let verse: Int
+        /// 저장 band 수 − 현재 텍스트 줄 수. 항상 1 이상이다.
+        let extraBands: Int
+    }
+
     /// 측정 대상 장. `begin` 전에는 nil.
     private(set) var chapter: BibleChapter?
     /// 본문 fetch 로 확정된 절 개수 (설계 §6-4 의 `expectedVerseCount`). 게이트의 기준값이다.
@@ -139,7 +148,7 @@ struct ChapterLayoutMeasurement: Equatable, Sendable {
     private(set) var textMeasurements: [Int: VerseTextMeasurement] = [:]
     /// 절별 소제목 높이 (소제목이 있는 절만).
     private(set) var titleHeights: [Int: CGFloat] = [:]
-    /// 절별 저장 band 수 (설계 §6-3 의 `N_saved`). metadata 가 없는 legacy 행은 없다.
+    /// 절별 저장 band 수 (설계 §6-3 의 `N_saved`). metadata 가 없는 legacy 행은 없다. **레이아웃 입력이 아니다** — HUD 진단(`reflowSlacks`) 전용.
     private(set) var savedBandCounts: [Int: Int] = [:]
     /// 절별 캔버스 영역의 실측 frame (`ChapterLayoutHosting.coordinateSpaceName` 좌표). **검증 전용.**
     private(set) var measuredFrames: [Int: CGRect] = [:]
@@ -209,15 +218,24 @@ struct ChapterLayoutMeasurement: Equatable, Sendable {
         frameDeltas.max { $0.magnitude < $1.magnitude }
     }
 
-    /// Pass 2 여유 높이(설계 §6-3)가 실제로 붙은 절이 하나라도 있는가.
+    /// 저장 band 수가 현재 텍스트 줄 수보다 많은 절(slack)이 하나라도 있는가. HUD · 콘솔 표시용이다.
     ///
-    /// 그 여유는 저장된 필사가 현재 텍스트보다 많은 줄을 요구할 때 `writingRect` 를 **의도적으로** 부풀린 값이라
-    /// 행은 그만큼 커지지 않는다. 즉 Δ 가 의도적으로 커지며, 그 상태의 Δ 로는 "의도한 여유" 와 "예측 결함" 을
-    /// 구별할 수 없다. 안전망은 구별할 수 없을 때 **막지 않는다** — 무해한 조건으로 필기를 막는 쪽이 더 나쁜 회귀다.
+    /// 그런 절도 레이아웃은 텍스트 줄 수만큼만 차지하므로(설계 §6-3) Δ 는 여전히 행과 레이아웃의 어긋남이고, 안전망은 평소대로 판정한다.
+    /// 2026-09-15 전에는 Pass 2 가 레이아웃만 여유만큼 늘려 Δ 가 의도적으로 컸고, 그래서 이 값이 참이면 판정을 보류했었다
+    /// (실기기 시편 119편 Δ 195.63 — 그동안 여유 절 이후의 필기 귀속이 텍스트 행과 어긋나 있었다).
     var hasReflowSlack: Bool {
-        verses.contains { verse in
-            guard let saved = savedBandCounts[verse] else { return false }
-            return saved > (textMeasurements[verse]?.lineCount ?? 0)
+        !reflowSlacks.isEmpty
+    }
+
+    /// 저장 band 수가 현재 텍스트 줄 수보다 많은 절과 초과 band 수. 본문 순서이며 없으면 빈 배열이다.
+    ///
+    /// `저장 band 수 − 텍스트 줄 수` 로 센다. 줄 수를 알 수 없는 **텍스트 실측 전 절은 세지 않는다.**
+    /// 잉크가 실제로 초과 줄에 걸쳤는지는 보지 않는다 — 걸쳤으면 reflow 가 절 안에 줄여 넣고, 비어 있으면 그대로 옮긴다(§9-3).
+    var reflowSlacks: [ReflowSlack] {
+        verses.compactMap { verse in
+            guard let saved = savedBandCounts[verse], let lineCount = textMeasurements[verse]?.lineCount else { return nil }
+            let extraBands = saved - lineCount
+            return extraBands > 0 ? ReflowSlack(verse: verse, extraBands: extraBands) : nil
         }
     }
 
@@ -230,7 +248,7 @@ struct ChapterLayoutMeasurement: Equatable, Sendable {
             topDelta: worst.topDelta,
             heightDelta: worst.heightDelta,
             lineSpace: lineSpace,
-            blocksInput: lineSpace > 0 && worst.magnitude > lineSpace && !hasReflowSlack
+            blocksInput: lineSpace > 0 && worst.magnitude > lineSpace
         )
     }
 
@@ -398,7 +416,6 @@ struct ChapterLayoutMeasurement: Equatable, Sendable {
             return VerseLayoutInput(
                 verse: verse,
                 textLineCount: text?.lineCount ?? 0,
-                savedBandCount: savedBandCounts[verse],
                 measuredUnderlineAnchors: text?.underlineAnchors,
                 // R13 — 행 높이는 예측하지 않고 실측을 쓴다. 아직 도착하지 않은 절만 빌더의 예측식으로 떨어진다.
                 measuredHeight: canvasFramesInRow[verse]?.height,

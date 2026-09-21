@@ -10,16 +10,23 @@ import SwiftUI
 
 import UIComponents
 
-/// 절 롱탭 메뉴(시안 E1) — 가림막 · 들어 올린 절 · 메뉴 카드.
+/// 절 롱탭 메뉴(시안 E1 · N1) — 가림막 · 들어 올린 절 · 메뉴 카드.
 ///
 /// 가림막은 롱탭한 절 행만 비워 두어 그 절이 떠 보이게 한다. 메뉴는 절 아래에 두고, 자리가 없으면 위, 그래도 없으면
 /// 누른 지점 가까이에 둔다. 좌표는 창 좌표로 받아 이 뷰의 전역 원점을 빼서 쓴다.
 ///
 /// 항목은 할 수 있을 때만 둔다(UI-2) — 「이전 필사 내용 보기」 는 지난 회차가 있을 때, 「지우기」 는 획이 있을 때.
-/// 「이미지 저장」 · 「위젯에 표시」 는 기능이 붙기 전까지 **비활성**으로 보인다.
+/// 「즐겨찾기에 추가」 는 늘 첫 항목이고, 이미 즐겨찾기한 절이면 채운 별과 「즐겨찾기 해제」 로 바뀐다(시안 N1).
+/// 「이미지 저장」 은 절만 찾으면 늘 할 수 있다 — 필기가 없으면 본문만 담는다(시안 G1, 2026-09-15 결정).
+/// 「위젯에 표시」 도 늘 할 수 있다 — 즐겨찾기에 없는 절은 지금 모습을 즐겨찾기에 보관하고 위젯 대상으로 삼는다(시안 N6, 2026-09-16 결정).
 struct VerseMenuOverlay: View {
     let menu: ChapterCanvasVerseMenu
+    /// 롱탭한 절이 이미 즐겨찾기에 있는가.
+    let isFavorite: Bool
+    let onFavorite: () -> Void
     let onHistory: () -> Void
+    let onImage: () -> Void
+    let onWidget: () -> Void
     let onErase: () -> Void
     let onDismiss: () -> Void
 
@@ -32,12 +39,13 @@ struct VerseMenuOverlay: View {
     private static let cornerRadius: CGFloat = 16
 
     private enum Item: CaseIterable {
-        case history, image, widget, erase
+        case favorite, history, image, widget, erase
     }
 
     private var items: [Item] {
         Item.allCases.filter { item in
             switch item {
+            case .favorite: menu.availability.canFavorite
             case .history: menu.availability.canViewHistory
             case .erase: menu.availability.canErase
             case .image, .widget: true
@@ -124,33 +132,47 @@ struct VerseMenuOverlay: View {
     }
 
     private func row(_ item: Item) -> some View {
-        let isEnabled = item == .history || item == .erase
         let color = item == .erase ? CarveColor.danger : CarveColor.ink
         return Button {
             switch item {
+            case .favorite: onFavorite()
             case .history: onHistory()
+            case .image: onImage()
+            case .widget: onWidget()
             case .erase: onErase()
-            case .image, .widget: break
             }
         } label: {
             HStack(spacing: CarveSpacing.medium) {
                 icon(item).image
+                    // 즐겨찾기 별만 강조색이다(시안 N1).
+                    .foregroundStyle(item == .favorite ? CarveColor.accent : color)
                 title(item)
                     .font(CarveTypography.body)
                 Spacer(minLength: 0)
             }
-            .foregroundStyle(isEnabled ? color : CarveColor.ink.opacity(0.35))
+            .foregroundStyle(color)
             .padding(.horizontal, CarveSpacing.medium + CarveSpacing.xxSmall)
             .frame(minHeight: Self.rowHeight)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .disabled(!isEnabled)
-        .accessibilityHint(isEnabled ? "" : "준비 중인 기능이에요")
+        .accessibilityIdentifier(identifier(item))
+    }
+
+    /// 실기기 UI 테스트가 항목을 찾는 식별자. 항목 문구가 바뀌어도 유지한다.
+    private func identifier(_ item: Item) -> String {
+        switch item {
+        case .favorite: "verseMenu.favorite"
+        case .history: "verseMenu.history"
+        case .image: "verseMenu.image"
+        case .widget: "verseMenu.widget"
+        case .erase: "verseMenu.erase"
+        }
     }
 
     private func icon(_ item: Item) -> CarveIcon {
         switch item {
+        case .favorite: isFavorite ? .starFill : .star
         case .history: .history
         case .image: .photo
         case .widget: .widget
@@ -160,9 +182,10 @@ struct VerseMenuOverlay: View {
 
     private func title(_ item: Item) -> Text {
         switch item {
+        case .favorite: Text(isFavorite ? "즐겨찾기 해제" : "즐겨찾기에 추가")
         case .history: Text("이전 필사 내용 보기")
         case .image: Text("이미지 저장")
-        case .widget: Text("위젯에 표시")
+        case .widget: Text("위젯에 추가")
         case .erase: Text("지우기")
         }
     }

@@ -7,6 +7,7 @@
 //
 
 import CarveToolkit
+import ClientInterfaces
 import Domain
 import SwiftUI
 import PencilKit
@@ -40,7 +41,8 @@ public struct CarveDetailFeature {
 
         // MARK: Phase 3 — feature flag 뒤 단일 Canvas (설계 §13 Phase 3)
 
-        /// 단일 Canvas 경로 사용 여부. 기본 off — flag off 가 §10-3 의 유일한 롤백 수단이다.
+        /// 단일 Canvas 경로 사용 여부. 기본 on(`SingleCanvasFlag.defaultValue`) — flag off 가 §10-3 의 유일한 롤백 수단이다.
+        /// 앱 시작 때 `SingleCanvasFlag.resetStoredValueOnce(in:)` 가 기존 저장값을 설치당 한 번 지워 기존 사용자도 기본값을 따른다.
         /// 설정 > 필사 캔버스 의 토글(`CanvasSettingsFeature`)이 같은 키에 쓴다. Debug 실행 인자 `-SingleCanvas` 도 같은 효과다.
         @Shared(.appStorage(SingleCanvasFlag.appStorageKey))
         public var isSingleCanvasEnabled: Bool = SingleCanvasFlag.defaultValue
@@ -51,6 +53,33 @@ public struct CarveDetailFeature {
         /// 단일 Canvas 의 절 필사 기록 시트 (§8-7 히스토리 UI, B 구조). 롱프레스 → `ChapterCanvasFeature.Delegate.showHistory` 로 연다.
         @Presents var chapterHistory: VerseDrawingHistoryFeature.State?
 
+        // MARK: 즐겨찾기 (시안 N1 · N2 — `CarveDetailFeature+Favorite.swift`)
+
+        /// 지금 장에서 즐겨찾기한 절. 절 메뉴의 항목 문구와 절 번호 아래 별 표시가 읽는다.
+        var favoriteVerses: Set<Int> = []
+        /// `favoriteVerses` 가 가리키는 장. 장이 바뀐 뒤 늦게 도착한 조회 · 저장 결과를 버리는 기준이다.
+        var favoriteChapter: BibleChapter?
+        /// 이 화면에서 즐겨찾기를 바꾼 횟수. 바꾸기 전에 시작한 조회가 방금 바꾼 표시를 덮지 않게 한다.
+        var favoriteEditCount = 0
+        /// 필사 화면 아래 즐겨찾기 결과 안내.
+        var favoriteNotice: FavoriteNotice?
+
+        // MARK: 이미지 저장 (시안 G1 · G2 — `CarveDetailFeature+VerseImage.swift`)
+
+        /// 필사 화면 아래 이미지 저장 결과 안내. 즐겨찾기 안내와 같은 자리라 둘 중 하나만 보인다.
+        var imageSaveNotice: ImageSaveNotice?
+        /// 이미지를 그려 사진에 넣는 중. 같은 요청이 겹치지 않게 한다.
+        var isSavingVerseImage = false
+        /// 사진 추가 권한이 꺼져 있다는 확인창(시안 G2).
+        @Presents var photoPermissionAlert: AlertState<Action.PhotoPermissionAlert>?
+
+        // MARK: 위젯에 추가 (시안 N6 — `CarveDetailFeature+Widget.swift`)
+
+        /// 필사 화면 아래 위젯 결과 안내. 다른 안내와 같은 자리를 나눠 쓴다.
+        var widgetNotice: WidgetNotice?
+        /// 보관하고 위젯에 담는 중. 같은 요청이 겹치지 않게 한다.
+        var isAddingToWidget = false
+
         /// flag 또는 Debug 실행 인자로 단일 Canvas 를 쓸지.
         public var usesSingleCanvas: Bool {
             #if DEBUG
@@ -60,9 +89,13 @@ public struct CarveDetailFeature {
         }
         
         /// 성경 문장 출력시 자간 폰트 등 설정
-        @Shared(.appStorage("sentenceSetting")) public var sentenceSetting: SentenceSetting = .initialState
+        @Shared(.appStorage(SentenceSetting.appStorageKey)) public var sentenceSetting: SentenceSetting = .initialState
         /// 왼손잡이용 레이아웃 여부
         @Shared(.appStorage("isLeftHanded")) public var isLeftHanded: Bool = false
+        /// 설정의 「모든 필사 데이터 삭제」가 올리는 세대. 설정과 이 화면은 서로를 모르므로 공유 값으로 잇는다.
+        @Shared(.inMemory(DrawingDataRevision.key)) public var drawingDataRevision: Int = 0
+        /// 이 화면이 마지막으로 반영한 세대. 뷰가 트리에서 빠졌다 돌아와도 놓치지 않도록 **값으로** 비교한다.
+        public var seenDrawingDataRevision: Int = 0
         
         public static let initialState = State(
             headerState: .initialState
@@ -71,6 +104,13 @@ public struct CarveDetailFeature {
     @Dependency(\.drawingData) var drawingContext
     @Dependency(\.bibleTextClient) var bibleTextClient
     @Dependency(\.undoManager) var undoManager
+    @Dependency(\.favoriteVerseRepository) var favoriteRepository
+    @Dependency(\.date) var date
+    @Dependency(\.continuousClock) var clock
+    @Dependency(\.verseImageRenderer) var verseImageRenderer
+    @Dependency(\.photoLibraryClient) var photoLibraryClient
+    @Dependency(\.openURL) var openURL
+    @Dependency(\.widgetVerseClient) var widgetVerseClient
     
     public enum Action: ViewAction, CarveToolkit.ScopeAction {
         /// 화면 최상단으로 스크롤
@@ -79,14 +119,40 @@ public struct CarveDetailFeature {
         case setScrollTarget(BibleVerse)
         /// 단일 Canvas 의 절 필사 기록 시트.
         case chapterHistory(PresentationAction<VerseDrawingHistoryFeature.Action>)
+        /// 장의 즐겨찾기를 읽었다. `editCount` 는 조회를 시작할 때의 `favoriteEditCount` 다.
+        case favoritesLoaded(chapter: BibleChapter, editCount: Int, verses: Set<Int>)
+        /// 즐겨찾기 추가 · 해제의 저장이 끝났다.
+        case favoriteChangeFinished(FavoriteChange, failed: Bool)
+        /// 다른 화면(즐겨찾기 목록)에서 즐겨찾기가 바뀌었다 — 지금 장의 표시를 다시 읽는다.
+        case reloadFavorites
+        /// 즐겨찾기 결과 안내를 내린다.
+        case favoriteNoticeExpired
+        /// 절 이미지를 사진 보관함에 넣는 일이 끝났다.
+        case verseImageSaveFinished(VerseImageContent, VerseImageSaveResult)
+        /// 이미지 저장 결과 안내를 내린다.
+        case imageSaveNoticeExpired
+        /// 사진 추가 권한 확인창.
+        case photoPermissionAlert(PresentationAction<PhotoPermissionAlert>)
+        /// 위젯 표시 지정이 끝났다. `addedToFavorites` 면 즐겨찾기에도 새로 담았다.
+        case widgetAddFinished(WidgetDisplayRequest, WidgetAddOutcome)
+        /// 위젯 표시 안내를 내린다.
+        case widgetNoticeExpired
         
         case view(View)
         case scope(ScopeAction)
+
+        /// 사진 추가 권한 확인창의 버튼.
+        public enum PhotoPermissionAlert: Equatable, Sendable {
+            /// 「설정 열기」 — 이 앱의 설정 화면을 연다.
+            case openSettings
+        }
         
         @CasePathable
         public enum View {
             /// 성경 구절 fetch
             case fetchSentence
+            /// 밖에서 필사 데이터가 지워졌는지 확인한다 (공유 세대 비교).
+            case drawingDataRevisionChanged
             #if DEBUG
             /// HUD가 나타나거나 표시할 진단 값이 바뀌었을 때 콘솔에 기록한다.
             case debugHUDSnapshotChanged(String)
@@ -119,8 +185,24 @@ public struct CarveDetailFeature {
             case moveToNext
             /// 장이 바뀐 뒤 본문을 최상단으로 이동
             case scrollToTop
+            /// 절 메뉴의 즐겨찾기 추가 · 해제
+            case verseMenuFavoriteTapped
+            /// 즐겨찾기 저장 실패 안내의 다시 시도
+            case favoriteRetryTapped
             /// 절 메뉴의 이전 필사 보기
             case verseMenuHistoryTapped
+            /// 절 메뉴의 이미지 저장
+            case verseMenuImageTapped
+            /// 이미지 저장 실패 안내의 다시 시도
+            case imageSaveRetryTapped
+            /// 절 메뉴의 위젯에 표시
+            case verseMenuWidgetTapped
+            /// 위젯 표시 실패 안내의 다시 시도
+            case widgetRetryTapped
+            /// 저장 실패 안내의 다시 시도. 큐는 이미 보존돼 있으므로 flush 를 앞당기는 것이다.
+            case saveRetryTapped
+            /// 조회 실패 안내의 다시 시도. 불러오지 못한 장은 쓸 수 없게 닫혀 있다.
+            case loadRetryTapped
             /// 절 메뉴의 지우기
             case verseMenuEraseTapped
             /// 절 메뉴 닫기
@@ -145,6 +227,14 @@ public struct CarveDetailFeature {
     enum CancelID: Hashable {
         /// 성경 불러올떄
         case fetchBible(title: BibleChapter)
+        /// 장의 즐겨찾기 조회
+        case loadFavorites
+        /// 즐겨찾기 결과 안내의 자동 닫힘
+        case favoriteNotice
+        /// 이미지 저장 결과 안내의 자동 닫힘
+        case imageSaveNotice
+        /// 위젯 표시 안내의 자동 닫힘
+        case widgetNotice
     }
     
     
@@ -169,6 +259,20 @@ public struct CarveDetailFeature {
             case .view(.headerAnimation(let previous, let current)):
                 return .send(.scope(.headerAction(.headerAnimation(previous, current))))
                 
+            case .view(.drawingDataRevisionChanged):
+                guard state.seenDrawingDataRevision != state.drawingDataRevision else { return .none }
+                state.seenDrawingDataRevision = state.drawingDataRevision
+                // 즐겨찾기 표시도 함께 지워졌다.
+                var effects: [Effect<Action>] = [.send(.reloadFavorites)]
+                if state.usesSingleCanvas {
+                    // 미저장분까지 버리고 DB 에서 다시 합성한다 — 레이아웃은 그대로라 다시 재지 않는다.
+                    effects.append(.send(.scope(.chapterCanvasAction(.drawingDataCleared))))
+                } else {
+                    // N-Canvas 롤백 경로는 절마다 drawing 을 들고 있어 장을 다시 읽는다.
+                    effects.append(.send(.view(.fetchSentence)))
+                }
+                return .merge(effects)
+
             case .view(.fetchSentence):
                 let oldChapter = state.headerState.currentTitle
                                 
@@ -195,14 +299,28 @@ public struct CarveDetailFeature {
                 beginLayoutMeasurement(state: &state, sentences: sentences)
                 // 단일 Canvas 면 팔레트의 undo/redo 는 캔버스가 처리한다 — 팔레트가 SharedUndoManager 값으로 공유 canUndo 를 덮지 않게.
                 state.headerState.palatteSetting.delegatesUndoToCanvas = state.usesSingleCanvas
+                // 올가미도 단일 Canvas 전용이다 (올가미 설계 §4-8). flag 를 끄고 돌아온 장에서는 선택까지 내린다 —
+                // 버튼만 잠그면 이전에 고른 올가미가 남아 N-Canvas 에서 필기가 되지 않는 것처럼 보인다.
+                state.headerState.palatteSetting.isLassoAvailable = state.usesSingleCanvas
+                if !state.usesSingleCanvas {
+                    state.headerState.palatteSetting.$isLassoSelected.withLock { $0 = false }
+                }
                 state.chapterHistory = nil
+                let chapter = sentences.first?.title ?? state.headerState.currentTitle
+                // 절 번호 아래 즐겨찾기 표시는 두 경로(단일 Canvas · N-Canvas)가 같은 본문 컬럼에 그리므로 경로와 무관하게 읽는다.
+                let favorites = loadFavorites(state: &state, chapter: chapter)
                 guard state.usesSingleCanvas else {
                     // flag 를 끄고 돌아온 장 — 단일 Canvas 에 남은 미저장분은 여기서 마저 저장한다 (§8-5).
-                    return state.chapterCanvas.isFullyPersisted ? .none : .send(.scope(.chapterCanvasAction(.flushPending)))
+                    return .merge(
+                        favorites,
+                        state.chapterCanvas.isFullyPersisted ? .none : .send(.scope(.chapterCanvasAction(.flushPending)))
+                    )
                 }
                 // 단일 Canvas: 본문이 확정된 시점에 조회를 시작한다 (§6-4). 레이아웃은 실측이 끝나면 따로 들어간다.
-                let chapter = sentences.first?.title ?? state.headerState.currentTitle
-                return .send(.scope(.chapterCanvasAction(.load(chapter: chapter, expectedVerseCount: sentences.count))))
+                return .merge(
+                    favorites,
+                    .send(.scope(.chapterCanvasAction(.load(chapter: chapter, expectedVerseCount: sentences.count))))
+                )
                 
             case .setScrollTarget(let verse):
                 state.scrollTargetID = makeSentenceID(for: verse)
@@ -223,6 +341,13 @@ public struct CarveDetailFeature {
                 // flag 와 무관하게 보낸다 — 방금 flag 를 끈 뒤에도 단일 Canvas 에 미저장분이 남아 있을 수 있다. 없으면 no-op.
                 return .send(.scope(.chapterCanvasAction(.flushPending)))
 
+            case .view(.saveRetryTapped):
+                // `flushPending` 이 곧 실패한 저장의 재시도다 (§8-5). 사용자가 기다리지 않고 지금 시도하게 한다.
+                return .send(.scope(.chapterCanvasAction(.flushPending)))
+
+            case .view(.loadRetryTapped):
+                return .send(.scope(.chapterCanvasAction(.retryLoad)))
+
             case .view(.scrollToVerse(let verse)):
                 guard state.usesSingleCanvas else { return .none }
                 return .send(.scope(.chapterCanvasAction(.scrollToVerse(verse))))
@@ -233,8 +358,35 @@ public struct CarveDetailFeature {
             case .view(.scrollToTop):
                 return .send(.scrollToTop)
 
+            case .view(.verseMenuFavoriteTapped):
+                return .send(.scope(.chapterCanvasAction(.verseMenuFavoriteTapped)))
+
+            case .scope(.chapterCanvasAction(.delegate(.favoriteToggled(let verse, let ink)))):
+                return toggleFavorite(state: &state, verse: verse, ink: ink)
+
+            case .favoritesLoaded, .favoriteChangeFinished, .reloadFavorites, .favoriteNoticeExpired, .view(.favoriteRetryTapped):
+                return reduceFavorite(state: &state, action: action)
+
             case .view(.verseMenuHistoryTapped):
                 return .send(.scope(.chapterCanvasAction(.verseMenuHistoryTapped)))
+
+            case .view(.verseMenuImageTapped):
+                return .send(.scope(.chapterCanvasAction(.verseMenuImageTapped)))
+
+            case .scope(.chapterCanvasAction(.delegate(.imageSaveRequested(let handwriting)))):
+                return saveVerseImage(state: &state, handwriting: handwriting)
+
+            case .verseImageSaveFinished, .imageSaveNoticeExpired, .photoPermissionAlert, .view(.imageSaveRetryTapped):
+                return reduceVerseImage(state: &state, action: action)
+
+            case .view(.verseMenuWidgetTapped):
+                return .send(.scope(.chapterCanvasAction(.verseMenuWidgetTapped)))
+
+            case let .scope(.chapterCanvasAction(.delegate(.widgetRequested(verse, ink)))):
+                return addVerseToWidget(state: &state, verse: verse, ink: ink)
+
+            case .widgetAddFinished, .widgetNoticeExpired, .view(.widgetRetryTapped):
+                return reduceWidget(state: &state, action: action)
 
             case .view(.verseMenuEraseTapped):
                 return .send(.scope(.chapterCanvasAction(.verseMenuEraseTapped)))
@@ -357,6 +509,7 @@ public struct CarveDetailFeature {
         .ifLet(\.$chapterHistory, action: \.chapterHistory) {
             VerseDrawingHistoryFeature()
         }
+        .ifLet(\.$photoPermissionAlert, action: \.photoPermissionAlert)
     }
 }
 

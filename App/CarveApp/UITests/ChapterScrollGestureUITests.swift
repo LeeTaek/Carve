@@ -15,16 +15,26 @@ import XCTest
 
 final class ChapterScrollGestureUITests: XCTestCase {
 
+    /// 헤더의 다음 장 버튼 식별자. 접근성 이름(「다음 장」)은 문구 변경으로 바뀌므로 식별자로 찾는다
+    /// (2026-09-11 이름이 `Next` → `다음 장` 으로 바뀌어 두 테스트가 깨졌다).
+    private let nextChapterButtonID = "nextChapter"
+
     override func setUp() {
         super.setUp()
         continueAfterFailure = false
     }
 
+    /// 테스트 장(시편 122편)에서 앱을 띄운다 — 기기에 마지막으로 열린 장에 결과가 좌우되지 않게 한다 (안전 규칙 1).
+    private func launchAtTestChapter() -> XCUIApplication {
+        launchCarve(extra: startChapterArguments(bookFile: "1-19Psalms.txt", chapter: 122))
+    }
+
     /// 헤더의 다음 장 버튼으로 목표 장까지 이동한다. HUD 의 장 라벨로 도착을 확인한다.
+    /// 시작 장 인자로 이미 목표 장에서 뜨므로 보통은 누르지 않고 도착만 확인한다.
     private func move(_ app: XCUIApplication, toChapter chapter: String, maxSteps: Int = 8) -> Bool {
         for _ in 0..<maxSteps {
             if hudValue(app, prefix: chapter) != nil { return true }
-            app.buttons["Next"].tap()
+            app.buttons[nextChapterButtonID].tap()
             _ = poll(timeout: 20) { self.hudValue(app, prefix: "gate PASS") != nil }
             usleep(800_000)
         }
@@ -35,7 +45,7 @@ final class ChapterScrollGestureUITests: XCTestCase {
     func testInertialFlingKeepsInkAlignedWithText() throws {
         try skipUnlessPhysicalDevice()
         XCUIDevice.shared.orientation = .portrait
-        let app = launchCarve()
+        let app = launchAtTestChapter()
         waitForChapterReady(app)
 
         XCTAssertTrue(move(app, toChapter: "시편 122장"), "테스트 장(시편 122편)에 도달하지 못했다")
@@ -43,11 +53,8 @@ final class ChapterScrollGestureUITests: XCTestCase {
         capture(app, "d97-01-before-fling")
 
         // 본문 왼쪽 절반에서 스와이프한다 — 잉크 컬럼을 건드리지 않기 위함이다.
-        let frame = app.windows.firstMatch.frame
-        let top = app.coordinate(withNormalizedOffset: .zero)
-            .withOffset(CGVector(dx: frame.width * 0.25, dy: frame.height * 0.30))
-        let bottom = app.coordinate(withNormalizedOffset: .zero)
-            .withOffset(CGVector(dx: frame.width * 0.25, dy: frame.height * 0.80))
+        let top = windowPoint(app, dx: 0.25, dy: 0.30)
+        let bottom = windowPoint(app, dx: 0.25, dy: 0.80)
 
         for _ in 0..<4 { bottom.press(forDuration: 0.01, thenDragTo: top) }   // 아래로 빠르게
         usleep(1_500_000)
@@ -74,16 +81,13 @@ final class ChapterScrollGestureUITests: XCTestCase {
     func testHeaderTapAndScrollDuringAnimation() throws {
         try skipUnlessPhysicalDevice()
         XCUIDevice.shared.orientation = .portrait
-        let app = launchCarve()
+        let app = launchAtTestChapter()
         waitForChapterReady(app)
         XCTAssertTrue(move(app, toChapter: "시편 122장"), "테스트 장에 도달하지 못했다")
         waitForChapterReady(app)
 
-        let frame = app.windows.firstMatch.frame
-        let top = app.coordinate(withNormalizedOffset: .zero)
-            .withOffset(CGVector(dx: frame.width * 0.25, dy: frame.height * 0.30))
-        let bottom = app.coordinate(withNormalizedOffset: .zero)
-            .withOffset(CGVector(dx: frame.width * 0.25, dy: frame.height * 0.80))
+        let top = windowPoint(app, dx: 0.25, dy: 0.30)
+        let bottom = windowPoint(app, dx: 0.25, dy: 0.80)
 
         // 헤더가 접히도록 아래로 스크롤한 뒤, 애니메이션이 도는 동안 곧바로 반대로 스크롤한다.
         bottom.press(forDuration: 0.01, thenDragTo: top)
@@ -92,6 +96,6 @@ final class ChapterScrollGestureUITests: XCTestCase {
         usleep(1_200_000)
         capture(app, "d97-05-header-restored")
 
-        XCTAssertTrue(app.buttons["Next"].exists, "헤더 버튼이 사라졌다")
+        XCTAssertTrue(app.buttons[nextChapterButtonID].exists, "헤더 버튼이 사라졌다")
     }
 }

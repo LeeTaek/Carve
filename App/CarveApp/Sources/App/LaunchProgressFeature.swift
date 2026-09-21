@@ -16,8 +16,8 @@ import ComposableArchitecture
 public struct LaunchProgressFeature {
     @ObservableState
     public struct State {
-        /// 데이터 마이그레이션 완료 알림(Alert)을 표시할지 여부.
-        /// - Note: `CloudSyncState.migrationCompleted` 시점에 true로 설정
+        /// 재실행 안내(Alert)를 표시할지 여부.
+        /// - Note: 마이그레이션 모드가 끝난 시점(`migrationCompleted` · `migrationEndedWithoutImport`)에 true로 설정
         public var shouldShowMigrationAlert: Bool = false
         /// CloudKit 동기화/마이그레이션의 현재 상태.
         public var syncState: PersistentCloudKitContainer.CloudSyncState = .idle
@@ -29,8 +29,12 @@ public struct LaunchProgressFeature {
     
     /// CloudKit 동기화 상태를 조회/관찰하기 위한 PersistentCloudKitContainer 의존성.
     @Dependency(\.clouodKitSyncManager) var cloudkitContainer
-    
-    
+
+    /// 진입 대기 효과의 식별자. 막힘 · 재실행 요구가 오면 기다리던 진입을 끊는다.
+    private enum CancelID {
+        case enterWriting
+    }
+
     public enum Action: ViewAction {
         case view(View)
         case binding
@@ -64,20 +68,28 @@ public struct LaunchProgressFeature {
                 }
             case .updateSyncState(let syncState):
                 state.syncState = syncState
-                switch syncState {
-                case .failed:
+                // 들어갈지는 Domain 의 `launchRoute` 가 정한다 — 이 모듈에는 테스트 타깃이 없다 (테스트 계획 MIG-F1).
+                switch syncState.launchRoute {
+                case .enterWriting:
+                    // `failed` · `stillWaiting` · `syncCompleted` 셋 다 "이 화면을 떠난다" 는 같지만 **안내 문구가 다르다**.
+                    // 특히 `stillWaiting` 은 실패가 아니라 기다리는 중이며, 원격 필사가 나중에 도착할 수 있다.
                     return .run { send in
-                        try? await Task.sleep(nanoseconds: 1_500_000_000)
+                        // `try?` 로 삼키면 취소돼도 진입한다 — 취소되면 여기서 끝나야 한다.
+                        try await Task.sleep(nanoseconds: 1_500_000_000)
                         await send(.syncCompleted)
                     }
-                case .migrationCompleted:
-                    return .send(.view(.setMigratioinAlert(true)))
-                case .syncCompleted:
-                    return .run { send in
-                        try? await Task.sleep(nanoseconds: 1_500_000_000)
-                        await send(.syncCompleted)
-                    }
-                default: break
+                    .cancellable(id: CancelID.enterWriting)
+                case .restartRequired:
+                    // 지금 상태 전이에서는 진입 결론 뒤에 이 결론이 오지 않는다(`LaunchRouteTesting`). 그래도 기다리던 진입이 있으면 끊는다.
+                    return .merge(
+                        .cancel(id: CancelID.enterWriting),
+                        .send(.view(.setMigratioinAlert(true)))
+                    )
+                case .blocked:
+                    // 로컬 저장소를 쓸 수 없다. 안내만 보이고 들어가지 않는다 (정책 §3 표 4행).
+                    return .cancel(id: CancelID.enterWriting)
+                case .stay:
+                    break
                 }
             case .view(.setMigratioinAlert(let isShow)):
                 state.shouldShowMigrationAlert = isShow

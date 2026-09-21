@@ -91,8 +91,12 @@ private struct CarveIconButtonStyle: ButtonStyle {
             )
 
         let surface = Group {
-            if isHighlighted, background == .plain {
-                // 표면 안 도구의 선택(시안 M2 · J1): 라이트는 밝은 바탕, 다크는 선택 배경. 아이콘은 잉크 그대로다.
+            if isEnabled, isSelected, background == .plain {
+                // 표면 안 도구의 선택(시안 M2 · J1). 라이트의 밝은 바탕은 팔레트 표면과 거의 같아 무엇을 골랐는지 보이지 않았다
+                // (2026-09-15 피드백). 라이트는 강조색 바탕에 밝은 아이콘으로 칠하고, 다크는 선택 배경이 표면과 이미 뚜렷해 그대로 둔다.
+                label.background(colorScheme == .dark ? CarveColor.selected : CarveColor.accent, in: shape)
+            } else if isHighlighted, background == .plain {
+                // 눌림은 선택보다 옅게 — 실행 취소 · 다시 실행을 누를 때 선택처럼 보이지 않게 한다.
                 label.background(colorScheme == .dark ? CarveColor.selected : CarveColor.fill, in: shape)
             } else if isHighlighted {
                 label
@@ -114,6 +118,10 @@ private struct CarveIconButtonStyle: ButtonStyle {
 
     private func iconColor(isHighlighted: Bool) -> Color {
         if !isEnabled { return CarveColor.ink.opacity(0.25) }
-        return isHighlighted && background == .floating ? CarveColor.accent : CarveColor.ink
+        if background == .plain {
+            // 라이트의 선택 바탕은 강조색이라 아이콘을 밝게 뒤집는다(대비 약 6.2:1).
+            return isSelected && colorScheme != .dark ? CarveColor.canvas : CarveColor.ink
+        }
+        return isHighlighted ? CarveColor.accent : CarveColor.ink
     }
 }

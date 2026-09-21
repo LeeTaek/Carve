@@ -13,14 +13,14 @@ import Foundation
 ///
 /// **측정 결과를 받는 값이지 측정을 요청하는 값이 아니다.**
 /// 텍스트 줄 수와 밑줄 위치는 View 계층(`Text.LayoutKey`)이 실측해 채워 넣는다.
+///
+/// **저장된 필사는 입력이 아니다.** 저장 당시 줄 수(설계 §6-3의 `N_saved`)가 지금보다 많아도 절 높이는 텍스트만으로 정하고,
+/// 초과 줄에 걸친 필기는 reflow 가 그 절 안에 같은 비율로 줄여 넣는다 (설계 §6-3 · §9-3, 2026-09-15).
 public struct VerseLayoutInput: Equatable, Sendable {
     /// 절 번호.
     public let verse: Int
     /// 현재 설정·폭에서 실측된 텍스트 줄 수 (설계 §6-3의 `N_now`).
     public let textLineCount: Int
-    /// 저장된 필사가 차지하던 band(줄) 수 (설계 §6-3의 `N_saved`).
-    /// 저장 데이터가 없거나 metadata가 없는 legacy 행이면 nil.
-    public let savedBandCount: Int?
     /// View 계층이 실측한 밑줄 y. **`writingRect` 기준 상대값**으로 이미 변환된 값이어야 한다.
     ///
     /// nil이거나 개수가 `textLineCount`와 다르면 빌더가 `lineSpace` 기반 band 하단으로 근사한다.
@@ -38,8 +38,8 @@ public struct VerseLayoutInput: Equatable, Sendable {
     /// 실기기(iOS 27.0 beta)에서 절당 정확히 0.5pt(= @2x 의 1픽셀)씩 어긋나 시편 119편 176절에서 87.50pt 가 누적됐다.
     /// 빌더가 SwiftUI 의 내부 반올림을 모델링하는 구조라 **OS 판올림마다 재발**한다. 그래서 실측을 쓴다.
     ///
-    /// **좌표가 아니라 크기다.** 설계 §6-3 이 "Pass 2 는 좌표를 전혀 참조하지 않는다" 로 순환을 막는 것과 어긋나지 않는다 —
-    /// 이 값은 `measuredUnderlineAnchors` 와 같은 범주의 실측 **입력**이고, 배치(좌표)는 여전히 빌더가 위에서부터 쌓아 만든다.
+    /// **좌표가 아니라 크기다.** 이 값은 `measuredUnderlineAnchors` 와 같은 범주의 실측 **입력**이고,
+    /// 배치(좌표)는 여전히 빌더가 위에서부터 쌓아 만든다.
     ///
     /// **순환하지 않는 근거 (R16 의 `fixedSize` 가 이 입력의 전제다).**
     /// `layout → totalHeight → contentSize/호스트 높이 → 컬럼 → 행 높이 → layout` 이 닫힌 고리가 될 수 있지만,
@@ -65,7 +65,6 @@ public struct VerseLayoutInput: Equatable, Sendable {
     public init(
         verse: Int,
         textLineCount: Int,
-        savedBandCount: Int? = nil,
         measuredUnderlineAnchors: [CGFloat]? = nil,
         measuredHeight: CGFloat? = nil,
         leadingInset: CGFloat = 0,
@@ -73,7 +72,6 @@ public struct VerseLayoutInput: Equatable, Sendable {
     ) {
         self.verse = verse
         self.textLineCount = textLineCount
-        self.savedBandCount = savedBandCount
         self.measuredUnderlineAnchors = measuredUnderlineAnchors
         self.measuredHeight = measuredHeight.map { max(0, $0) }
         self.leadingInset = max(0, leadingInset)
@@ -135,42 +133,32 @@ public struct ChapterLayoutBuilder: Sendable {
         let lineSpace = max(0, linePitch ?? setting.lineSpace)
         let width = max(0, writingWidth)
 
-        // ── Pass 1 ──────────────────────────────────────────────────────────
+        // ── 높이 ──────────────────────────────────────────────────────────────
         // 각 절의 밑줄 개수와 높이를 구한다. 아직 좌표를 만들지 않는다.
         // 높이는 **실측이 있으면 실측**이고, 없을 때만 `topPadding + 줄 수 × lineSpace` 로 예측한다 (R13).
         // 예측은 뷰가 정확히 `N × lineSpace` 로 렌더된다는 가정인데 SwiftUI 의 픽셀 스냅이 그것을 깬다
         // (`VerseLayoutInput.measuredHeight` 주석 참조). 실측이 있으면 그것이 언제나 이긴다.
         // `topPadding` 은 `writingRect` 안의 여백이라 예측 높이에 더해지고 근사 anchor 도 그만큼 내려간다 —
         // 실측 높이는 행 전체를 잰 값이라 이미 그 여백을 **포함**하므로 다시 더하지 않는다.
-        var lineCounts: [Int] = []
+        //
+        // **저장된 필사는 높이에 관여하지 않는다** (설계 §6-3). 2026-09-15 까지는 Pass 2 가 저장 band 수가 현재 줄 수보다 많은 절에
+        // `(N_saved − N_now) × lineSpace` 를 더했는데, 행은 그만큼 커지지 않아 그 절 이후의 잉크 · 필기 귀속이 텍스트 행과
+        // 계단으로 어긋났다 (실기기 시편 119편 Δ 195.63). 행까지 늘리면 저장 필사가 있는 절만 간격이 벌어진다.
+        // 초과 줄에 걸친 필기는 reflow(§9-3)가 그 절 안에 같은 비율로 줄여 넣는다.
         var textHeights: [CGFloat] = []
         var anchors: [[CGFloat]] = []
         for input in verses {
             let lineCount = max(0, input.textLineCount)
-            lineCounts.append(lineCount)
             textHeights.append(input.measuredHeight ?? (input.topPadding + CGFloat(lineCount) * lineSpace))
             anchors.append(Self.underlineAnchors(for: input, lineCount: lineCount, lineSpace: lineSpace))
         }
 
-        // ── Pass 2 ──────────────────────────────────────────────────────────
-        // 저장된 band 수(N_saved)와 현재 밑줄 수(N_now)를 **개수로만** 비교해 여유 높이를 더한다.
-        //   N_saved > N_now  →  extraHeight = (N_saved - N_now) × lineSpace
-        // Pass 2는 좌표를 전혀 참조하지 않는다. 이것이 "reflow 결과 → 레이아웃 → reflow" 순환을
-        // 만들지 않는 근거다(설계 §6-3). 따라서 이 단계에 좌표 계산을 추가하면 안 된다.
-        // band 모델은 실측 높이와 무관하게 `lineSpace` 를 그대로 쓴다 — reflow(§9-2)의 band 폭과 같은 값이어야 한다.
-        var effectiveHeights: [CGFloat] = []
-        for (index, input) in verses.enumerated() {
-            let savedBandCount = max(0, input.savedBandCount ?? 0)
-            let extraBands = max(0, savedBandCount - lineCounts[index])
-            effectiveHeights.append(textHeights[index] + CGFloat(extraBands) * lineSpace)
-        }
-
         // ── 배치 ────────────────────────────────────────────────────────────
-        // Pass 2로 확정된 높이를 위에서부터 쌓는다.
+        // 높이를 위에서부터 쌓는다.
         // `leadingInset` 은 `writingRect` 밖의 여백이라 절 사이 gap 처럼 cursor 만 밀고 rect 에는 들어가지 않는다.
         var writingRects: [CGRect] = []
         var cursorY = metrics.topInset
-        for (index, height) in effectiveHeights.enumerated() {
+        for (index, height) in textHeights.enumerated() {
             if index > 0 {
                 cursorY += metrics.verseSpacing
             }

@@ -20,7 +20,11 @@ public actor SwiftDatabaseActor {
         /// 주어진 ID에 해당하는 데이터가 존재하지 않을 때 발생하는 에러
         case storedDataIsNone
     }
-    
+
+    /// 필사 저장소의 세대 (`DrawingStoreGeneration`). 확장에는 저장 프로퍼티를 둘 수 없어 여기 둔다.
+    /// 올리는 곳은 `eraseAllDrawingRows()` 하나, 대조하는 곳은 `applyDrawingMutations` 하나다.
+    var drawingStoreGeneration = 0
+
     /// 주어진 FetchDescriptor를 사용해 SwiftData에서 모델 배열을 조회.
     /// - Parameter descriptor: 조회 조건이 담긴 FetchDescriptor. 기본값은 전체 조회.
     /// - Returns: 조회된 PersistentModel 배열.

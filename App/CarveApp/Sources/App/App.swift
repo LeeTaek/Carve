@@ -27,20 +27,42 @@ struct CarveApp: App {
     let modelContainer: ModelContainer
     /// 광고용 인스턴스
     private let nativeAdClient: any NativeAdClient
-    
+    /// 광고 동의(UMP) 확인과 광고 SDK 시작
+    private let adConsent: AdConsentCoordinator
+    /// 본문 모양(글꼴 · 글자 크기 · 줄 간격 · 자간) iCloud 백업. 실행 뒤에 늦게 내려오는 백업도 받도록 앱이 붙잡아 둔다.
+    private let sentenceSettingBackup: SentenceSettingCloudBackup
+
     // 앱 시작 시 필요한 의존성(ContainerID, ModelContainer, Store)을 생성하는 생성자.
     init() {
+        // 환불 · 보호자 승인 같은 거래 변경을 놓치지 않도록 가장 먼저 만든다.
+        let purchaseClient = StoreKitPurchaseClient()
+        // 기존 사용자도 단일 Canvas 기본값(on)을 따르게 한다. flag 를 읽는 Store 생성보다 앞서야 하고, 설치당 한 번만 지운다.
+        SingleCanvasFlag.resetStoredValueOnce(in: .standard)
+        // 앱을 다시 깐 기기에 iCloud 에 백업한 본문 모양을 되살린다. 본문 설정은 처음 읽을 때 기본값이 저장돼
+        // 그 뒤로는 새 설치인지 가릴 수 없으므로, 본문 설정을 읽는 Store 생성보다 앞서야 한다.
+        let sentenceSettingBackup = SentenceSettingCloudBackup()
+        sentenceSettingBackup.start()
+        self.sentenceSettingBackup = sentenceSettingBackup
+        #if DEBUG
+        // 실기기 UI 테스트가 정한 장(`-UITestChapter`)에서 시작한다. 헤더 · 탐색 상태가 시작 장을 읽는 Store 생성보다 앞서야 한다.
+        UITestLaunchChapter.apply()
+        #endif
         let containerID = Self.makeContainerID()
         let modelContainer = Self.makeModelContainer(containerID: containerID)
         self.modelContainer = modelContainer
-        self.nativeAdClient = GoogleNativeAdClient()
+        let adConsent = AdConsentCoordinator(purchases: purchaseClient)
+        self.adConsent = adConsent
+        self.nativeAdClient = GoogleNativeAdClient(consent: adConsent, purchases: purchaseClient)
         self.store = Self.makeStore(
             containerID: containerID,
             modelContainer: modelContainer,
-            nativeAdClient: nativeAdClient
+            nativeAdClient: nativeAdClient,
+            adConsentClient: adConsent,
+            purchaseClient: purchaseClient,
+            sentenceSettingBackup: sentenceSettingBackup
         )
     }
-    
+
     var body: some Scene {
         WindowGroup {
             #if DEBUG
@@ -69,6 +91,15 @@ struct CarveApp: App {
                     "screen_class": .string("AppCoordinatorView")
                 ]
             )
+            // 화면이 뜬 뒤라야 동의 폼을 띄울 수 있다. 앱을 실행할 때마다 동의 정보를 갱신한다(UMP).
+            // 광고 제거를 샀으면 동의 폼도 광고 SDK 도 띄우지 않는다.
+            .task {
+                await adConsent.gatherConsent()
+            }
+            // 위젯을 누르면 그 절로 들어간다(시안 N6 · N7). 콜드 런치면 준비 화면이 끝난 뒤 이동한다.
+            .onOpenURL { url in
+                store.send(.openedURL(url))
+            }
     }
 }
 
@@ -96,12 +127,20 @@ extension CarveApp {
     private static func makeStore(
         containerID: ContainerID,
         modelContainer: ModelContainer,
-        nativeAdClient: any NativeAdClient
+        nativeAdClient: any NativeAdClient,
+        adConsentClient: any AdConsentClient,
+        purchaseClient: any PurchaseClient,
+        sentenceSettingBackup: any SentenceSettingBackupClient
     ) -> StoreOf<AppCoordinatorFeature> {
         withDependencies {
             $0.containerId = containerID
             $0.modelContainer = modelContainer
             $0.nativeAdClient = nativeAdClient
+            $0.adConsentClient = adConsentClient
+            $0.purchaseClient = purchaseClient
+            $0.sentenceSettingBackup = sentenceSettingBackup
+            $0.photoLibraryClient = PhotoKitLibraryClient()
+            $0.widgetVerseClient = AppGroupWidgetVerseClient()
             $0.analyticsClient = FirebaseAnalyticsClient()
         } operation: {
             Store(initialState: .initialState) {

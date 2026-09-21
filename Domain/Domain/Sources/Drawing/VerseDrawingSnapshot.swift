@@ -119,6 +119,10 @@ public enum DrawingRepositoryError: Error, Equatable, Sendable {
     case metadataEncodingFailed(verse: Int)
     /// SwiftData 저장 실패. 원인 설명만 담는다.
     case persistenceFailed(String)
+    /// 명령이 기준으로 삼은 조회 뒤에 필사 데이터가 전부 지워졌다. **아무것도 쓰지 않았다.**
+    ///
+    /// 다시 시도해도 같은 결과다. 호출부는 들고 있는 미저장분을 버리고 다시 조회해야 한다 (`DrawingStoreGeneration`).
+    case staleStoreGeneration
 }
 
 // MARK: - 지우기 = 보관 후 초기화 (UI-2)

@@ -136,68 +136,6 @@ struct ChapterLayoutBuilderTesting {
         #expect(layout.totalHeight == expectedTotalHeight)
     }
 
-    // MARK: - §6-3 2-pass 높이
-
-    @Test("저장된 band 가 현재 줄 수보다 많으면 그 절이 커지고 이후 절이 전부 아래로 밀린다")
-    func savedBandCountBeyondTextLinesGrowsVerseAndShiftsFollowingVerses() {
-        let metrics = ChapterLayoutMetrics(topInset: 20, verseSpacing: 10)
-        let base = makeLayout(
-            verses: [
-                VerseLayoutInput(verse: 1, textLineCount: 3),
-                VerseLayoutInput(verse: 2, textLineCount: 2),
-                VerseLayoutInput(verse: 3, textLineCount: 3)
-            ],
-            metrics: metrics
-        )
-        let reflowed = makeLayout(
-            verses: [
-                VerseLayoutInput(verse: 1, textLineCount: 3),
-                VerseLayoutInput(verse: 2, textLineCount: 2, savedBandCount: 4),
-                VerseLayoutInput(verse: 3, textLineCount: 3)
-            ],
-            metrics: metrics
-        )
-
-        let extraHeight: CGFloat = 2 * 30
-
-        // 앞 절은 그대로.
-        #expect(reflowed.regions[0] == base.regions[0])
-        // 해당 절만 (N_saved - N_now) × lineSpace 만큼 커진다.
-        #expect(reflowed.regions[1].writingRect.minY == base.regions[1].writingRect.minY)
-        #expect(reflowed.regions[1].writingRect.height == base.regions[1].writingRect.height + extraHeight)
-        // 뒤 절은 통째로 아래로 밀린다.
-        #expect(reflowed.regions[2].writingRect.minY == base.regions[2].writingRect.minY + extraHeight)
-        #expect(reflowed.regions[2].writingRect.height == base.regions[2].writingRect.height)
-        #expect(reflowed.totalHeight == base.totalHeight + extraHeight)
-        // 밑줄은 늘어나지 않는다. 늘어난 것은 마지막 밑줄 아래의 여유 공간이다.
-        #expect(reflowed.regions[1].underlineAnchors == base.regions[1].underlineAnchors)
-        #expect(reflowed.regions[1].underlineAnchors.count == 2)
-    }
-
-    @Test("저장된 band 가 현재 줄 수 이하이면 높이가 변하지 않는다")
-    func savedBandCountWithinTextLinesKeepsHeightUnchanged() {
-        let metrics = ChapterLayoutMetrics(topInset: 20, verseSpacing: 10)
-        let base = makeLayout(
-            verses: [
-                VerseLayoutInput(verse: 1, textLineCount: 3),
-                VerseLayoutInput(verse: 2, textLineCount: 3)
-            ],
-            metrics: metrics
-        )
-
-        for savedBandCount in [0, 1, 2, 3] {
-            let layout = makeLayout(
-                verses: [
-                    VerseLayoutInput(verse: 1, textLineCount: 3, savedBandCount: savedBandCount),
-                    VerseLayoutInput(verse: 2, textLineCount: 3, savedBandCount: savedBandCount)
-                ],
-                metrics: metrics
-            )
-            #expect(layout.regions == base.regions)
-            #expect(layout.totalHeight == base.totalHeight)
-        }
-    }
-
     // MARK: - underlineAnchors / storageOrigin
 
     @Test("밑줄 anchor 는 writingRect 기준 상대값이고 storageOrigin 은 첫 밑줄과 일치한다")
@@ -243,8 +181,6 @@ struct ChapterLayoutBuilderTesting {
         let second = makeLayout(verses: verses)
 
         #expect(first.signature == second.signature)
-        // 저장된 band 수는 signature 구성요소가 아니다. 같은 설정이면 같은 값이어야 한다.
-        #expect(makeLayout(verses: [VerseLayoutInput(verse: 1, textLineCount: 3, savedBandCount: 9)]).signature == first.signature)
     }
 
     @Test("signature 구성요소가 하나라도 바뀌면 signature 가 달라진다")
@@ -402,7 +338,7 @@ struct ChapterLayoutBuilderHeightTesting {
                 VerseLayoutInput(verse: 1, textLineCount: 2, measuredHeight: 60.5, leadingInset: 0, topPadding: 25),
                 VerseLayoutInput(verse: 2, textLineCount: 1, measuredHeight: 30.5, leadingInset: 34, topPadding: 0),
                 VerseLayoutInput(verse: 3, textLineCount: 3, measuredHeight: 91.25, leadingInset: 0, topPadding: 0),
-                VerseLayoutInput(verse: 4, textLineCount: 2, savedBandCount: 4, measuredHeight: 60.5)
+                VerseLayoutInput(verse: 4, textLineCount: 2, measuredHeight: 60.5)
             ],
             metrics: ChapterLayoutMetrics(topInset: 2, verseSpacing: 12, bottomInset: 2)
         )
@@ -422,15 +358,14 @@ struct ChapterLayoutBuilderHeightTesting {
         }
     }
 
-    @Test("실측 높이와 함께 있어도 leadingInset · topPadding · Pass 2 extraBands 가 규정대로 적재된다")
-    func measuredHeightComposesWithInsetsAndPassTwo() {
+    @Test("실측 높이와 함께 있어도 leadingInset · topPadding 이 규정대로 적재된다")
+    func measuredHeightComposesWithInsets() {
         let metrics = ChapterLayoutMetrics(topInset: 2, verseSpacing: 12, bottomInset: 2)
         let layout = makeLayout(
             verses: [
                 // 실측 높이는 topPadding 을 이미 포함한 값이다 — 빌더가 다시 더하지 않는다.
                 VerseLayoutInput(verse: 1, textLineCount: 2, measuredHeight: 85.5, topPadding: 25),
-                // Pass 2 는 실측 높이 **위에** band 개수만큼 더한다 (band 모델은 lineSpace 그대로).
-                VerseLayoutInput(verse: 2, textLineCount: 2, savedBandCount: 4, measuredHeight: 60.5, leadingInset: 34)
+                VerseLayoutInput(verse: 2, textLineCount: 2, measuredHeight: 60.5, leadingInset: 34)
             ],
             metrics: metrics
         )
@@ -445,11 +380,10 @@ struct ChapterLayoutBuilderHeightTesting {
         // 매크로 안의 리터럴 산술식이 다른 숫자 타입으로 추론되지 않도록 CGFloat 로 고정한다.
         let expectedSecondMinY: CGFloat = 2 + 85.5 + 12 + 34
         #expect(layout.regions[1].writingRect.minY == expectedSecondMinY)
-        // 실측 60.5 + 초과 band 2개 × 30.
-        let expectedSecondHeight: CGFloat = 60.5 + 60
-        #expect(layout.regions[1].writingRect.height == expectedSecondHeight)
+        // 실측 그대로 — 저장 필사는 높이에 관여하지 않는다 (§6-3).
+        #expect(layout.regions[1].writingRect.height == 60.5)
         #expect(layout.regions[1].underlineAnchors == [30, 60])
-        let expectedTotalHeight: CGFloat = 2 + 85.5 + 12 + 34 + 120.5 + 2
+        let expectedTotalHeight: CGFloat = 2 + 85.5 + 12 + 34 + 60.5 + 2
         #expect(layout.totalHeight == expectedTotalHeight)
     }
 }
@@ -545,17 +479,6 @@ struct ChapterLayoutBuilderInsetTesting {
         #expect(layout.regions[0].underlineAnchors == [49.5, 79.5])
         let expectedHeight: CGFloat = 25 + 60
         #expect(layout.regions[0].writingRect.height == expectedHeight)
-    }
-
-    @Test("topPadding 이 있어도 Pass 2 여유 높이는 band 개수로만 더해진다")
-    func topPaddingDoesNotInterfereWithPassTwo() {
-        let layout = makeLayout(verses: [
-            VerseLayoutInput(verse: 1, textLineCount: 2, savedBandCount: 4, topPadding: 25)
-        ])
-
-        let expectedHeight: CGFloat = 25 + 60 + 60
-        #expect(layout.regions[0].writingRect.height == expectedHeight)
-        #expect(layout.regions[0].underlineAnchors == [55, 85])
     }
 
     @Test("leadingInset 과 topPadding 은 signature 구성요소가 아니다")

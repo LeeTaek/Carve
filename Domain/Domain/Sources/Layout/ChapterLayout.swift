@@ -18,12 +18,8 @@ public struct VerseCanvasRegion: Equatable, Sendable {
     public let verse: Int
     /// 밑줄이 실제 표시되는 영역.
     ///
-    /// - Note: 저장된 band 수가 현재 텍스트 줄 수보다 많으면(설계 §6-3 Pass 2)
-    ///         그만큼의 여유 높이가 이 사각형 **하단에 포함**된다.
-    ///         즉 `height >= underlineAnchors.count * lineSpace` 이며,
-    ///         초과 band는 마지막 밑줄 아래의 여유 공간에 놓인다(설계 §9-3).
-    ///         여유 높이를 절 사이 gap으로 두지 않고 `writingRect`에 포함시키는 이유는,
-    ///         `captureRect`가 midpoint로 갈라질 때 그 공간의 절반이 다음 절 소유로 넘어가는 것을 막기 위함이다.
+    /// - Note: 높이는 텍스트 줄 수(실측 높이)만큼이다. 저장된 band 수가 현재 텍스트 줄 수보다 많아도 늘지 않고,
+    ///         초과 줄에 걸친 필기는 reflow 가 이 절의 줄 묶음 안에 같은 비율로 줄여 넣는다(설계 §6-3 · §9-3).
     public let writingRect: CGRect
     /// 획 소유권을 판정하는 영역 (인접 절과의 midpoint로 분할).
     public let captureRect: CGRect

@@ -116,32 +116,11 @@ struct DrawingCodec: Sendable {
             guard let region = layout.region(verse: verse) else { continue }
             guard !stored.strokes.isEmpty else { continue }
 
-            let placed: PKDrawing
-            var isLegacyPlacement = false
-            if snapshot.hasVersionedLayout, let metadata = snapshot.metadata {
-                let result = reflow.reflow(
-                    LineBandReflow.Input(verse: verse, storedDrawing: stored, metadata: metadata),
-                    into: region
-                )
-                if result.isLayoutMismatch { mismatch.insert(verse) }
-                placed = result.displayDrawing
-            } else if snapshot.drawingVersion == 3 {
-                // v3 인데 metadata 가 없다. 좌표 형식의 진실은 `drawingVersion` 이므로(§10-1) **첫 밑줄 원점**으로 읽는다.
-                // band 를 매핑할 근거가 없으니 §9-3-1 그대로 첫 밑줄 기준 통짜 보존 + mismatch 기록이다.
-                // 여기서 `writingRect` 원점(v2 의미)에 놓으면 첫 밑줄만큼 위로 밀린 채 아무 표식 없이 표시된다.
-                mismatch.insert(verse)
-                placed = stored.transformed(using: Self.translation(region.storageOrigin))
-            } else {
-                if snapshot.drawingVersion == nil || snapshot.drawingVersion == 1 {
-                    legacy.insert(verse)
-                    isLegacyPlacement = true
-                }
-                placed = stored.transformed(using: CGAffineTransform(
-                    translationX: region.writingRect.minX, y: region.writingRect.minY
-                ))
-            }
-            let content = placed.transformed(using: Self.translation(columnOrigin))
-            if isLegacyPlacement { legacyInk = Self.union(legacyInk, content.bounds) }
+            let placement = place(stored, of: snapshot, in: region)
+            if placement.isLayoutMismatch { mismatch.insert(verse) }
+            if placement.isLegacy { legacy.insert(verse) }
+            let content = placement.drawing.transformed(using: Self.translation(columnOrigin))
+            if placement.isLegacy { legacyInk = Self.union(legacyInk, content.bounds) }
             for stroke in content.strokes {
                 map[StrokeIdentityKey(stroke: stroke)] = verse
                 strokes.append(stroke)
@@ -157,6 +136,59 @@ struct DrawingCodec: Sendable {
             undecodableVerses: undecodable,
             legacyInkBounds: legacyInk
         )
+    }
+
+    /// 저장 행 하나를 현재 `region` 의 layout 좌표에 놓은 결과.
+    private struct VersePlacement {
+        let drawing: PKDrawing
+        /// §9-3-1 로 처리했다.
+        let isLayoutMismatch: Bool
+        /// metadata 없이 무변환 배치했다 (§10-2 — `drawingVersion` nil/1).
+        let isLegacy: Bool
+    }
+
+    /// 저장 행 하나를 현재 `region` 의 layout 좌표에 놓는다 — 장 합성과 절 이미지(시안 G1)가 같은 규칙을 쓴다.
+    private func place(_ stored: PKDrawing, of snapshot: VerseDrawingSnapshot, in region: VerseCanvasRegion) -> VersePlacement {
+        if snapshot.hasVersionedLayout, let metadata = snapshot.metadata {
+            let result = reflow.reflow(
+                LineBandReflow.Input(verse: snapshot.verse, storedDrawing: stored, metadata: metadata),
+                into: region
+            )
+            return VersePlacement(drawing: result.displayDrawing, isLayoutMismatch: result.isLayoutMismatch, isLegacy: false)
+        }
+        if snapshot.drawingVersion == 3 {
+            // v3 인데 metadata 가 없다. 좌표 형식의 진실은 `drawingVersion` 이므로(§10-1) **첫 밑줄 원점**으로 읽는다.
+            // band 를 매핑할 근거가 없으니 §9-3-1 그대로 첫 밑줄 기준 통짜 보존 + mismatch 기록이다.
+            // 여기서 `writingRect` 원점(v2 의미)에 놓으면 첫 밑줄만큼 위로 밀린 채 아무 표식 없이 표시된다.
+            return VersePlacement(
+                drawing: stored.transformed(using: Self.translation(region.storageOrigin)),
+                isLayoutMismatch: true,
+                isLegacy: false
+            )
+        }
+        return VersePlacement(
+            drawing: stored.transformed(using: CGAffineTransform(
+                translationX: region.writingRect.minX, y: region.writingRect.minY
+            )),
+            isLayoutMismatch: false,
+            isLegacy: snapshot.drawingVersion == nil || snapshot.drawingVersion == 1
+        )
+    }
+
+    // MARK: 절 이미지 (시안 G1)
+
+    /// 절 이미지에 넣을 그 절의 필기 — 캔버스에 보이는 그대로(현재 밑줄에 재배치한 것)를 **`writingRect` 좌상단 원점**으로 옮긴다.
+    ///
+    /// 절 경계를 넘는 획도 소유한 절의 행에 통째로 들어 있어 잘리지 않고, 다른 절의 획은 섞이지 않는다(행 = 절, §7-3).
+    /// - Parameters:
+    ///   - snapshot: 그 절의 지금 필기를 담은 행(저장 대기 중인 편집이 있으면 그것).
+    ///   - region: 현재 레이아웃의 그 절 영역.
+    /// - Returns: `PKDrawing` 데이터. 획이 없거나 디코드하지 못하면 nil.
+    func verseImageInk(of snapshot: VerseDrawingSnapshot, in region: VerseCanvasRegion) -> Data? {
+        guard let stored = Self.decodeStored(snapshot.lineData), !stored.strokes.isEmpty else { return nil }
+        return place(stored, of: snapshot, in: region).drawing
+            .transformed(using: Self.translation(CGPoint(x: -region.writingRect.minX, y: -region.writingRect.minY)))
+            .dataRepresentation()
     }
 
     /// 빈/무효 rect 를 섞지 않는 합집합. `CGRect.union` 은 `.null` 이 아닌 빈 rect 를 그대로 흡수해 원점을 (0,0) 으로 끌어당긴다.

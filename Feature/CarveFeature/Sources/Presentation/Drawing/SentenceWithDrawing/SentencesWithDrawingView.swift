@@ -22,6 +22,7 @@ public struct SentencesWithDrawingView: View, Equatable {
             && lhs.halfWidth == rhs.halfWidth
             && lhs.isLayoutReady == rhs.isLayoutReady
             && lhs.isCanvasActive == rhs.isCanvasActive
+            && lhs.isFavorite == rhs.isFavorite
     }
 
     @Bindable public var store: StoreOf<SentencesWithDrawingFeature>
@@ -33,7 +34,9 @@ public struct SentencesWithDrawingView: View, Equatable {
     /// 텍스트·밑줄·frame 실측은 이 값과 무관하게 항상 일어나므로 장 레이아웃은 전 절에 대해 완성된다.
     /// false 인 동안은 같은 크기의 빈 자리만 차지한다 — 행 높이는 텍스트가 정하므로 배치가 바뀌지 않는다.
     private let isCanvasActive: Bool
-    
+    /// 즐겨찾기한 절인가 — 절 번호 아래 별 표시(시안 N2). 상위(`CarveDetailFeature.favoriteVerses`)가 준다.
+    private let isFavorite: Bool
+
     /// 1절의 상단 여백. 캔버스 **안**의 여백이라 레이아웃에서는 `VerseLayoutInput.topPadding` 이 된다.
     private var topDrawingInset: CGFloat {
         ChapterLayoutHosting.topPadding(forVerse: store.sentence.verse)
@@ -55,6 +58,7 @@ public struct SentencesWithDrawingView: View, Equatable {
         halfWidth: Binding<CGFloat>,
         isLayoutReady: Bool = true,
         isCanvasActive: Bool = true,
+        isFavorite: Bool = false,
         onUnderlineLayoutChange: @escaping (VerseRowFeature.State.ID, Text.LayoutKey.Value) -> Void,
         onTitleHeightChange: @escaping (VerseRowFeature.State.ID, CGFloat) -> Void = { _, _ in },
         onCanvasFrameInRowChange: @escaping (VerseRowFeature.State.ID, CGRect) -> Void = { _, _ in }
@@ -63,6 +67,7 @@ public struct SentencesWithDrawingView: View, Equatable {
         self._halfWidth = halfWidth
         self.isLayoutReady = isLayoutReady
         self.isCanvasActive = isCanvasActive
+        self.isFavorite = isFavorite
         self.onUnderlineLayoutChange = onUnderlineLayoutChange
         self.onTitleHeightChange = onTitleHeightChange
         self.onCanvasFrameInRowChange = onCanvasFrameInRowChange
@@ -113,6 +118,7 @@ public struct SentencesWithDrawingView: View, Equatable {
         VerseTextView(
             store: self.store.scope(state: \.sentenceState,
                                     action: \.scope.sentenceAction),
+            isFavorite: isFavorite,
             onLayoutChange: { layout in
                 onUnderlineLayoutChange(store.id, layout)
             }

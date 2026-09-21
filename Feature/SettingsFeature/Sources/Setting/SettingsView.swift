@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import ClientInterfaces
 import Resources
 
 import ComposableArchitecture
@@ -14,11 +15,15 @@ import UIComponents
 @ViewAction(for: SettingsFeature.self)
 public struct SettingsView: View {
     @Bindable public var store: StoreOf<SettingsFeature>
-    
+    /// 광고 제거를 샀는지. 사이드바 행의 값만 바꾼다.
+    @SharedReader(.isAdFree) private var isAdFree: Bool
+    /// 고른 화면 모드. 사이드바 행의 값만 바꾼다.
+    @SharedReader(.appearanceMode) private var appearanceMode: AppearanceMode
+
     public init(store: StoreOf<SettingsFeature>) {
         self.store = store
     }
-    
+
     public var body: some View {
         VStack(spacing: 0) {
             CarvePanelHeader("설정") {
@@ -44,27 +49,50 @@ public struct SettingsView: View {
         )
         .clipShape(RoundedRectangle(cornerRadius: CarveRadius.panel, style: .continuous))
     }
-    
+
     private var sideBar: some View {
-        List(selection: $store.path.sending(\.push)) {
+        // 선택은 경로 상태가 아니라 행으로 비교한다 — 상세 화면의 상태가 바뀌어도 선택 표시가 남는다.
+        List(selection: $store.selectedSidebarItem.sending(\.selectSidebarItem)) {
             Section("필사") {
-                NavigationLink(value: SettingsFeature.Path.State.canvas(.initialState)) {
+                NavigationLink(value: SettingsFeature.SidebarItem.canvas) {
                     sidebarRow("필사 캔버스", value: "단일")
+                }
+                NavigationLink("위젯", value: SettingsFeature.SidebarItem.widget)
+            }
+            Section("화면") {
+                NavigationLink(value: SettingsFeature.SidebarItem.appearance) {
+                    sidebarRow("화면 모드", value: appearanceMode.title)
                 }
             }
             Section("저장") {
-                NavigationLink(value: SettingsFeature.Path.State.iCloud(.initialState)) {
+                NavigationLink(value: SettingsFeature.SidebarItem.iCloud) {
                     sidebarRow("iCloud", value: "켬")
                 }
             }
             Section("지원") {
-                NavigationLink("도움말", value: SettingsFeature.Path.State.help(.initialState))
-                NavigationLink("패치노트", value: SettingsFeature.Path.State.patchnote(.initialState))
-                NavigationLink("의견 보내기", value: SettingsFeature.Path.State.sendFeedback(.initialState))
-                NavigationLink(value: SettingsFeature.Path.State.appVersion(.initialState)) {
+                NavigationLink("도움말", value: SettingsFeature.SidebarItem.help)
+                NavigationLink("패치노트", value: SettingsFeature.SidebarItem.patchnote)
+                NavigationLink("의견 보내기", value: SettingsFeature.SidebarItem.sendFeedback)
+                NavigationLink(value: SettingsFeature.SidebarItem.appVersion) {
                     sidebarRow("앱 버전", value: UIDevice.appVersion())
                 }
             }
+            Section("광고") {
+                // 구매를 권하지 않고 설정에 한 줄로만 둔다(시안 K4).
+                NavigationLink(value: SettingsFeature.SidebarItem.removeAds) {
+                    sidebarRow("광고 제거", value: isAdFree ? "구매함" : "")
+                }
+                if store.isPrivacyOptionsRequired {
+                    // 동의가 필요한 지역에서는 광고 동의를 다시 고를 수 있는 진입점을 둬야 한다(UMP 개인정보 옵션).
+                    Button("광고 개인정보 옵션") {
+                        send(.privacyOptionsTapped)
+                    }
+                    .foregroundStyle(CarveColor.ink)
+                }
+            }
+        }
+        .onAppear {
+            send(.onAppear)
         }
         .safeAreaInset(edge: .bottom) {
             VStack(alignment: .leading, spacing: CarveSpacing.xxSmall) {
@@ -92,8 +120,8 @@ public struct SettingsView: View {
                 .foregroundStyle(CarveColor.secondary)
         }
     }
-    
-    
+
+
     @ViewBuilder
     private func detailView() -> some View {
         switch store.path {
@@ -104,6 +132,14 @@ public struct SettingsView: View {
         case .canvas:
             if let store = store.scope(state: \.path?.canvas, action: \.path.canvas) {
                 CanvasSettingsView(store: store)
+            }
+        case .widget:
+            if let store = store.scope(state: \.path?.widget, action: \.path.widget) {
+                WidgetSettingsView(store: store)
+            }
+        case .appearance:
+            if let store = store.scope(state: \.path?.appearance, action: \.path.appearance) {
+                AppearanceSettingsView(store: store)
             }
         case .help:
             if let store = store.scope(state: \.path?.help, action: \.path.help) {
@@ -120,6 +156,10 @@ public struct SettingsView: View {
         case .appVersion:
             if let store = store.scope(state: \.path?.appVersion, action: \.path.appVersion) {
                 AppVersionView(store: store)
+            }
+        case .removeAds:
+            if let store = store.scope(state: \.path?.removeAds, action: \.path.removeAds) {
+                RemoveAdsView(store: store)
             }
         default:
             EmptyView()

@@ -25,4 +25,17 @@ public enum SingleCanvasFlag {
     public static let defaultValue = true
     /// Debug 빌드에서 flag 와 같은 효과를 내는 실행 인자 (`xcrun simctl launch … -SingleCanvas`).
     public static let debugLaunchArgument = "-SingleCanvas"
+    /// 기존 저장값을 지웠는지 기록하는 `UserDefaults` 키 (`resetStoredValueOnce(in:)`).
+    public static let storedValueResetKey = "singleCanvasStoredValueReset"
+
+    /// 기존 사용자도 기본값(`defaultValue`, on)을 따르게 한다 — 설치당 한 번, flag 를 읽는 Store 를 만들기 전에 부른다.
+    ///
+    /// 기본값은 키가 **없을 때만** 쓰이므로, 값이 한 번이라도 저장된 사용자에게는 기본값을 바꿔도 닿지 않는다.
+    /// 그래서 끈 값까지 포함해 저장값을 한 번 지운다. 지운 뒤 토글로 끈 값은 다시 지우지 않으므로 flag off 롤백 수단은 남는다.
+    /// - Parameter defaults: flag 가 저장된 `UserDefaults`. 앱은 `@Shared(.appStorage)` 와 같은 `.standard` 를 넘긴다.
+    public static func resetStoredValueOnce(in defaults: UserDefaults) {
+        guard !defaults.bool(forKey: storedValueResetKey) else { return }
+        defaults.removeObject(forKey: appStorageKey)
+        defaults.set(true, forKey: storedValueResetKey)
+    }
 }
