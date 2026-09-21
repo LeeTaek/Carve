@@ -94,6 +94,56 @@ struct LocalPreservationReadFailureTesting {
         }
     }
 
+    /// 2026-09-21 후속 리뷰 P1-5 — 예전 판정은 이름에 `unreadable-` 이 있고 `.json` 이 아니기만 하면 지웠다. 같은 이름의 폴더 · 심볼릭 링크
+    /// (가리키는 곳이 보존 영역 밖일 수 있다)까지 지우기 · 내보내기 대상이 됐다.
+    @Test("읽지 못한 파일로 세고 · 내보내고 · 지우는 것은 형식이 맞는 일반 파일뿐이다 — 같은 이름의 폴더 · 심볼릭 링크 · 링크된 세션 폴더는 건드리지 않는다")
+    func onlyRegularAsideFilesAreUnreadable() async throws {
+        try await withAreas { areas in
+            let writer = LocalPreservationWriter(area: areas.preservation, eraseState: areas.eraseState)
+            let second = draft(verse: 2)
+            _ = try await writer.saveDraft(second)
+            // 진짜로 옆으로 옮긴 파일 하나.
+            try Data("{ 잘린".utf8).write(to: fileURL(areas, second))
+            _ = try await writer.saveDraft(draft(verse: 2, revision: 2))
+            let fileManager = FileManager.default
+            let session = fileURL(areas, second).deletingLastPathComponent()
+            let bucket = session.deletingLastPathComponent()
+            let outside = areas.preservation.root.deletingLastPathComponent().appendingPathComponent("outside", isDirectory: true)
+            try fileManager.createDirectory(at: outside, withIntermediateDirectories: true)
+            let victim = outside.appendingPathComponent("victim.txt")
+            try Data("보존 영역 밖의 파일".utf8).write(to: victim)
+            func asideName(verse: Int) -> String { "NKRV~genesis~1~\(verse).unreadable-\(UUID().uuidString)" }
+
+            // ① 같은 형식 이름의 **폴더**(안에 파일이 있다)
+            let folder = session.appendingPathComponent(asideName(verse: 5), isDirectory: true)
+            try fileManager.createDirectory(at: folder, withIntermediateDirectories: true)
+            try Data("폴더 안".utf8).write(to: folder.appendingPathComponent("inner.txt"))
+            // ② 같은 형식 이름의 **심볼릭 링크** — 보존 영역 밖의 파일을 가리킨다
+            let link = session.appendingPathComponent(asideName(verse: 6))
+            try fileManager.createSymbolicLink(at: link, withDestinationURL: victim)
+            // ③ 형식이 다른 이름(표식만 들어 있음)의 일반 파일
+            let misnamed = session.appendingPathComponent("memo-unreadable-1.txt")
+            try Data("메모".utf8).write(to: misnamed)
+            // ④ **링크된 세션 폴더** — 보존 영역 밖 폴더를 가리키고, 그 안에 형식이 맞는 일반 파일이 있다
+            let outsideAside = outside.appendingPathComponent(asideName(verse: 7))
+            try Data("밖에 있는 옆 파일".utf8).write(to: outsideAside)
+            try fileManager.createSymbolicLink(at: bucket.appendingPathComponent("linked-session"), withDestinationURL: outside)
+
+            #expect(try await writer.unreadableDraftFiles(in: account).count == 1)
+            #expect(try await writer.draftSummary(in: account).unreadableCount == 1)
+
+            #expect(try await writer.removeUnreadableDraftFiles(in: account) == 1)
+
+            #expect(fileManager.fileExists(atPath: folder.appendingPathComponent("inner.txt").path))
+            #expect((try? fileManager.destinationOfSymbolicLink(atPath: link.path)) != nil)
+            #expect(try Data(contentsOf: victim) == Data("보존 영역 밖의 파일".utf8))
+            #expect(fileManager.fileExists(atPath: misnamed.path))
+            #expect(fileManager.fileExists(atPath: outsideAside.path))
+            // 초안은 그대로다.
+            #expect(try await writer.drafts(in: account, chapter: chapter).map(\.key.verse) == [2])
+        }
+    }
+
     @Test("지울 것이 없으면 0개를 지운다 — 던지지 않는다")
     func removingWithNothingToRemoveIsQuiet() async throws {
         try await withAreas { areas in

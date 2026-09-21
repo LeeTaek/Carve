@@ -320,7 +320,7 @@ public actor LocalPreservationWriter {
                 carried = (existing.sentFingerprints ?? []) + carried
             } catch {
                 // 같은 키의 초안을 읽지 못한다 — 덮지 않고 옆으로 옮겨 남긴다(`.json` 이 아니라 읽기에서 빠진다). 복구는 ④ 에서 다룬다.
-                let aside = url.deletingPathExtension().appendingPathExtension("unreadable-\(UUID().uuidString)")
+                let aside = url.deletingPathExtension().appendingPathExtension("\(Self.unreadableMarker)\(UUID().uuidString)")
                 Log.error("로컬 보존 — 읽지 못하는 초안을 덮지 않고 옆으로 옮긴다", "\(error)")
                 try fileManager.moveItem(at: url, to: aside)
             }
@@ -431,12 +431,13 @@ public actor LocalPreservationWriter {
     /// 그 묶음의 개수 · 용량 · 남은 장. **지금 세대의 것만** 세지 않는다 — 옛 세대의 잔여도 자리를 차지하므로 함께 보인다.
     public func draftSummary(in scope: AccountScope) throws -> DraftBucketSummary {
         let files = try draftEntries(in: scope)
+        let bucket = bucketRoot(scope)
         var draftCount = 0, unreadableCount = 0
         var draftBytes: Int64 = 0, unreadableBytes: Int64 = 0
         var chapters: Set<BibleChapter> = []
         for url in files {
             let size = Int64((try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
-            if Self.isUnreadableFile(url) {
+            if Self.isUnreadableFile(url, bucketRoot: bucket) {
                 unreadableCount += 1
                 unreadableBytes += size
             } else if url.pathExtension == "json" {
@@ -456,7 +457,8 @@ public actor LocalPreservationWriter {
 
     /// 읽지 못해 옆으로 옮긴 파일들 — 복구 화면이 내보내기로 넘긴다.
     public func unreadableDraftFiles(in scope: AccountScope) throws -> [URL] {
-        try draftEntries(in: scope).filter(Self.isUnreadableFile).sorted { $0.path < $1.path }
+        let bucket = bucketRoot(scope)
+        return try draftEntries(in: scope).filter { Self.isUnreadableFile($0, bucketRoot: bucket) }.sorted { $0.path < $1.path }
     }
 
     /// 읽지 못해 옆으로 옮긴 파일을 지운다. **복구 화면이 지울 수 있는 유일한 것이다**(사용자 결정 2026-09-21).
@@ -466,8 +468,9 @@ public actor LocalPreservationWriter {
     /// - Returns: 실제로 지운 파일 수.
     @discardableResult
     public func removeUnreadableDraftFiles(in scope: AccountScope) throws -> Int {
+        let bucket = bucketRoot(scope)
         var removed = 0
-        for url in try draftEntries(in: scope) where Self.isUnreadableFile(url) {
+        for url in try draftEntries(in: scope) where Self.isUnreadableFile(url, bucketRoot: bucket) {
             do {
                 try fileManager.removeItem(at: url)
                 removed += 1
@@ -476,11 +479,6 @@ public actor LocalPreservationWriter {
             }
         }
         return removed
-    }
-
-    /// 읽지 못해 옆으로 옮긴 파일인가 — 표식이 있고 **`.json` 이 아니다.** 초안은 어떤 경우에도 이 판정에 걸리지 않는다.
-    static func isUnreadableFile(_ url: URL) -> Bool {
-        url.pathExtension != "json" && url.lastPathComponent.contains("unreadable-")
     }
 
     // MARK: - 격리
@@ -551,7 +549,7 @@ public actor LocalPreservationWriter {
     /// **묶음 폴더가 없을 때만(ENOENT) 빈 목록이다.** 권한 · 입출력 오류로 폴더를 보지 못하는 것을 "없음" 으로 치면 보이지 않는 초안 위에
     /// 새 초안이 덮인다 — 폴더가 아니거나, 어느 세션 폴더든 목록을 읽지 못하면 던진다.
     private func draftEntries(in scope: AccountScope) throws -> [URL] {
-        let root = area.draftsDirectory.appendingPathComponent(scope.key, isDirectory: true)
+        let root = bucketRoot(scope)
         var status = stat()
         guard lstat(root.path, &status) == 0 else {
             if errno == ENOENT { return [] }
@@ -578,10 +576,14 @@ public actor LocalPreservationWriter {
     }
 
     private func draftURL(_ key: VerseDraftKey, scope: AccountScope) -> URL {
-        area.draftsDirectory
-            .appendingPathComponent(scope.key, isDirectory: true)
+        bucketRoot(scope)
             .appendingPathComponent(key.sessionID, isDirectory: true)
             .appendingPathComponent(key.fileName)
+    }
+
+    /// 그 묶음의 폴더.
+    private func bucketRoot(_ scope: AccountScope) -> URL {
+        area.draftsDirectory.appendingPathComponent(scope.key, isDirectory: true)
     }
 
     private func readDraft(at url: URL) throws -> VerseDraft {
@@ -627,6 +629,44 @@ public actor LocalPreservationWriter {
         let trash = root.appendingPathComponent(trashPrefix + UUID().uuidString, isDirectory: true)
         try fileManager.moveItem(at: directory, to: trash)
         try? fileManager.removeItem(at: trash)
+    }
+}
+
+// MARK: - 읽지 못해 옆으로 옮긴 파일
+
+extension LocalPreservationWriter {
+    /// 읽지 못해 옆으로 옮길 때 붙이는 확장자 앞머리 — `<초안 파일 이름 줄기>.unreadable-<UUID>`.
+    static let unreadableMarker = "unreadable-"
+
+    /// 이 묶음에서 **읽지 못해 옆으로 옮긴 파일**인가 — 세면 · 내보내면 · 지우면 되는 것.
+    ///
+    /// 셋을 모두 본다(2026-09-21 후속 리뷰 P1-5). 예전에는 이름에 `unreadable-` 이 들어 있고 `.json` 이 아니기만 하면 걸려, 같은 이름의
+    /// 폴더 · 심볼릭 링크(가리키는 곳이 보존 영역 밖일 수 있다)까지 지우기 대상이었다.
+    /// 1. **이름 형식** — 이 writer 가 옮길 때 쓰는 `<초안 파일 이름 줄기>.unreadable-<UUID>` 그대로다(`isUnreadableFileName`).
+    /// 2. **일반 파일** — 링크를 따라가지 않고(`lstat`) 본다. 폴더 · 심볼릭 링크 · 그 밖의 특수 파일은 아니다.
+    /// 3. **경로 범위** — 그 묶음 폴더 바로 아래, 링크가 아닌 실제 세션 폴더 안에 있다.
+    ///
+    /// 초안(`.json`)은 어떤 경우에도 걸리지 않는다.
+    static func isUnreadableFile(_ url: URL, bucketRoot: URL) -> Bool {
+        guard isUnreadableFileName(url.lastPathComponent), fileType(url) == S_IFREG else { return false }
+        let session = url.deletingLastPathComponent()
+        guard fileType(session) == S_IFDIR else { return false }
+        return session.deletingLastPathComponent().resolvingSymlinksInPath().path == bucketRoot.resolvingSymlinksInPath().path
+    }
+
+    /// 이름이 옆으로 옮긴 파일의 형식인가 — 줄기는 초안 파일 이름(번역~권~장~절)이고 확장자는 `unreadable-<UUID>` 다.
+    static func isUnreadableFileName(_ name: String) -> Bool {
+        let url = URL(fileURLWithPath: name)
+        let marker = url.pathExtension
+        guard marker.hasPrefix(unreadableMarker), UUID(uuidString: String(marker.dropFirst(unreadableMarker.count))) != nil else { return false }
+        return VerseDraftKey.chapter(fromFileName: url.deletingPathExtension().lastPathComponent) != nil
+    }
+
+    /// 링크를 따라가지 않은 파일 종류(`S_IFREG` · `S_IFDIR` · `S_IFLNK` …). 보지 못하면 nil.
+    private static func fileType(_ url: URL) -> mode_t? {
+        var status = stat()
+        guard lstat(url.path, &status) == 0 else { return nil }
+        return status.st_mode & S_IFMT
     }
 }
 
