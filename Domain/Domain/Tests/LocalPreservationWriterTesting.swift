@@ -394,3 +394,64 @@ struct LocalPreservationWriterTesting {
         }
     }
 }
+
+// MARK: - 재실행 복구 (2026-09-21 후속 리뷰 P1-6)
+
+extension LocalPreservationWriterTesting {
+    /// 2026-09-21 후속 리뷰 P1-6 — 예전 `.sending` 시험은 같은 writer 로 다시 읽을 뿐이라, 앱이 끝나고 **새 프로세스가 파일에서 다시 읽는**
+    /// 경로를 보지 않았다. 제품에 중단 훅을 넣지 않고, "보내는 중" 초안을 남긴 writer 를 버린 뒤 같은 영역에 새 writer 를 연다
+    /// (`generationSurvivesRelaunch` 와 같은 방식).
+    @Test("보내는 중 표식을 남기고 끝난 초안은 재실행 뒤에도 그대로 한 벌 남고, 그 행이 바뀌었으면 저장 완료 불확실로 판정된다")
+    func sendingDraftSurvivesRelaunchAsUncertain() async throws {
+        try await withAreas { areas in
+            let metadata = try DrawingLayoutMetadata(
+                baseWritingWidth: 320, baseWritingHeight: 30, baseUnderlineAnchors: [0], layoutSignature: "cl1-relaunch"
+            ).encodedBlob()
+            var sending = draft(verse: 3, revision: 4, ink: "보내던 필기")
+            sending.layoutMetadataData = metadata
+            sending.base = .legacy(rowID: sending.rowID, contentFingerprint: "vc1-before")
+            sending.baseFingerprint = "vc1-before"
+            sending.storeState = .sending
+            // 앞선 실행 — 초안을 "보내는 중" 으로 남긴 뒤, 저장소 저장 · 표식 전에 끝났다.
+            do {
+                let beforeCrash = LocalPreservationWriter(area: areas.preservation, eraseState: areas.eraseState)
+                #expect(try await beforeCrash.saveDraft(sending) == .written)
+            }
+
+            let relaunched = LocalPreservationWriter(area: areas.preservation, eraseState: areas.eraseState)
+            let recovered = try await relaunched.drafts(in: account, chapter: chapter)
+
+            // 무손실 · 무중복 — 그 초안이 파일에서 한 벌만, 표식 · 내용 그대로 돌아온다.
+            #expect(recovered == [sending])
+            #expect(try await relaunched.draftSummary(in: account).draftCount == 1)
+
+            // 그 사이 그 행이 다른 내용으로 바뀌었다(다른 기기 · 지우기) — 들어갔는지 가릴 수 없다.
+            let movedRow = VerseDrawingSnapshot(
+                verse: 3, rowID: sending.rowID, isPresent: true, updateDate: nil, lineData: Data("다른 기기".utf8), drawingVersion: 3, metadata: nil
+            )
+            let view = VerseDraftStoreView(snapshots: [movedRow])
+            let plan = VerseDraftRecoveryRule.plan(
+                drafts: recovered, storeContent: view.verseContent, environment: environment(eraseGeneration: 0), sessionID: "after-relaunch",
+                storeRows: view.rows
+            )
+            #expect(plan.uncertain == [sending])
+            #expect(plan.kept == [sending])
+            #expect(plan.shown.isEmpty)
+            #expect(plan.settled.isEmpty)
+
+            // 그 행이 초안 내용 그대로면 들어간 것이다 — 겹치지 않고(중복 없음) 정리 대상으로만 남긴다. 지우지 않는다.
+            let landedRow = VerseDrawingSnapshot(
+                verse: 3, rowID: sending.rowID, isPresent: true, updateDate: nil, lineData: sending.lineData, drawingVersion: 3,
+                metadata: DrawingLayoutMetadata.decode(blob: metadata)
+            )
+            let landed = VerseDraftStoreView(snapshots: [landedRow])
+            let settled = VerseDraftRecoveryRule.plan(
+                drafts: recovered, storeContent: landed.verseContent, environment: environment(eraseGeneration: 0), sessionID: "after-relaunch",
+                storeRows: landed.rows
+            )
+            #expect(settled.settled == [sending])
+            #expect(settled.shown.isEmpty)
+            #expect(try await relaunched.drafts(in: account, chapter: chapter) == [sending])
+        }
+    }
+}
