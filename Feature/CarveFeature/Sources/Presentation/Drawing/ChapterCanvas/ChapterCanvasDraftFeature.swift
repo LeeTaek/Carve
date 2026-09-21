@@ -508,14 +508,18 @@ extension ChapterCanvasFeature {
         chapter: BibleChapter
     ) async throws -> [VerseDraft] {
         guard let store else { return [] }
+        let scope = environment.accountBasis.preservationScope
+        // 확인 전 묶음의 초안은 **그때 참고하던 계정(힌트)이 지금 참고하는 계정과 같을 때만** 화면에 올린다(사용자 결정 2026-09-21,
+        // 11차 리뷰 P1). 확인된 환경이든 확인 전 환경이든 같은 규칙이다 — 다른 힌트의 초안은 다른 계정의 필기일 수 있다. 파일은 남는다.
+        let reference = Self.unverifiedHint(of: environment.accountBasis)
         var drafts: [VerseDraft]
         do {
-            drafts = try await store.drafts(in: environment.accountBasis.preservationScope, chapter: chapter, translation: .NKRV)
-            // 계정을 확인하기 전에 쓴 초안도, 그때 참고하던 계정이 지금 계정이면 함께 읽는다 — 묶음은 그대로 두고 **보이기만** 한다
-            // (사용자 결정 2026-09-21). 힌트가 다른 초안은 다른 계정의 필기일 수 있어 읽지 않는다.
-            if case .confirmed(let token) = environment.accountBasis {
+            drafts = try await store.drafts(in: scope, chapter: chapter, translation: .NKRV)
+            if scope == .unverified {
+                drafts = drafts.filter { $0.account == .unverified(hint: reference) }
+            } else if case .confirmed = environment.accountBasis {
                 let carried = try await store.drafts(in: .unverified, chapter: chapter, translation: .NKRV)
-                drafts += carried.filter { $0.account == .unverified(hint: token.scope) }
+                drafts += carried.filter { $0.account == .unverified(hint: reference) }
             }
         } catch {
             Log.error("단일 Canvas — 이 장의 초안을 읽지 못했다. 입력을 막고 다시 시도를 기다린다", "\(error)")
@@ -528,6 +532,15 @@ extension ChapterCanvasFeature {
             throw DrawingLoadFailure(message: "erase generation changed", source: .drafts)
         }
         return drafts
+    }
+
+    /// 이 환경이 참고하는 계정 — 확인됐으면 그 계정, 확인 전이면 마지막 확인 힌트, 로그인하지 않았으면 없다.
+    static func unverifiedHint(of basis: VerseEditAccountBasis) -> AccountScope? {
+        switch basis {
+        case .confirmed(let token): token.scope
+        case .unverified(let hint): hint
+        case .localOnly: nil
+        }
     }
 
     /// 조회한 저장소 내용 위에 남은 초안을 겹친다 — 지금 세션의 초안과, 이어 보여도 되는 다른 세션의 초안(`VerseDraftRecoveryRule`).

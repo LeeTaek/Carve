@@ -25,9 +25,10 @@ extension DraftTestSamples {
         VerseContentFingerprint.make(lineData: Data([1]), drawingVersion: 1, layoutMetadataBlob: nil)
     }
 
-    /// 앞선 세션이 1절에 남긴 초안.
+    /// 앞선 세션이 남긴 초안. 기본은 1절(저장소에 행이 있는 절)이고, 다른 절이면 빈 절 기준으로 둔다.
     func previousDraft(
         session: String = "earlier-session",
+        verse: Int = 1,
         ink: String = "earlier",
         baseFingerprint: String? = nil,
         lineData: Data? = nil,
@@ -37,16 +38,18 @@ extension DraftTestSamples {
         storeOwnership: AccountScope? = nil,
         ownershipInjected: Bool? = nil
     ) -> VerseDraft {
-        let base = baseFingerprint ?? storedVerseOneFingerprint
+        // 1절은 저장소 행(rowA)을 고친 초안이고, 다른 절은 저장소에 행이 없던 빈 절의 초안이다.
+        let rowID = verse == 1 ? CanvasTestSupport.rowA : BibleDrawingRowID(raw: "row-\(verse)")
+        let base = verse == 1 ? (baseFingerprint ?? storedVerseOneFingerprint) : baseFingerprint
         let metadata = withMetadata ? try? CanvasTestSupport.metadata().encodedBlob() : nil
         return VerseDraft(
-            key: VerseDraftKey(sessionID: session, chapter: CanvasTestSupport.chapter, verse: 1),
+            key: VerseDraftKey(sessionID: session, chapter: CanvasTestSupport.chapter, verse: verse),
             revision: 3,
-            rowID: CanvasTestSupport.rowA,
+            rowID: rowID,
             lineData: lineData ?? Data(ink.utf8),
             drawingVersion: drawingVersion,
             layoutMetadataData: metadata,
-            base: .legacy(rowID: CanvasTestSupport.rowA, contentFingerprint: base),
+            base: base.map { .legacy(rowID: rowID, contentFingerprint: $0) } ?? .empty,
             baseFingerprint: base,
             account: account ?? .confirmed(AccountServerWorkToken(scope: accountA, generation: 0)),
             knownEpochs: [],
