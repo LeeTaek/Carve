@@ -205,6 +205,13 @@ public actor LocalPreservationWriter {
     /// 초안에 남기는 "넣은 내용" 지문의 최대 개수. 왕복 한두 번을 덮을 만큼만 둔다.
     static let sentFingerprintLimit = 5
 
+    /// 넣은 내용 지문 목록을 합친다 — 앞이 최근이고, 같은 지문은 한 번만, 최대 `sentFingerprintLimit` 개.
+    static func merged(_ first: [String], _ second: [String]) -> [String]? {
+        var seen: Set<String> = []
+        let list = (first + second).filter { seen.insert($0).inserted }.prefix(sentFingerprintLimit)
+        return list.isEmpty ? nil : Array(list)
+    }
+
     private static let generationFile = "local-erase-generation.json"
     private static let markerFile = "local-generation.json"
     private static let trashPrefix = ".erasing-"
@@ -249,12 +256,17 @@ public actor LocalPreservationWriter {
         let scope = draft.account.preservationScope
         let url = draftURL(draft.key, scope: scope)
         var draft = draft
+        // 이어받는 다른 세션의 초안이 저장소에 넣었던 지문도 물려받는다 — 그 파일은 곧 지워지지만, 복구 후보 판정의 근거는 이어져야 한다.
+        var carried: [String] = []
+        for ref in superseding where ref.key.sessionID != draft.key.sessionID {
+            carried += (try? readDraft(at: draftURL(ref.key, scope: scope)))?.sentFingerprints ?? []
+        }
         if fileManager.fileExists(atPath: url.path) {
             do {
                 let existing = try readDraft(at: url)
                 if existing.revision > draft.revision { return .written }
                 // 앞선 revision 이 저장소에 넣은 내용의 지문을 이어받는다 — 이 키의 "무엇을 넣었는지" 기록은 revision 을 넘어 이어진다.
-                if draft.sentFingerprints == nil { draft.sentFingerprints = existing.sentFingerprints }
+                carried = (existing.sentFingerprints ?? []) + carried
             } catch {
                 // 같은 키의 초안을 읽지 못한다 — 덮지 않고 옆으로 옮겨 남긴다(`.json` 이 아니라 읽기에서 빠진다). 복구는 ④ 에서 다룬다.
                 let aside = url.deletingPathExtension().appendingPathExtension("unreadable-\(UUID().uuidString)")
@@ -262,6 +274,7 @@ public actor LocalPreservationWriter {
                 try fileManager.moveItem(at: url, to: aside)
             }
         }
+        draft.sentFingerprints = Self.merged(draft.sentFingerprints ?? [], carried)
         try fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
@@ -291,19 +304,28 @@ public actor LocalPreservationWriter {
 
     /// 그 revision 까지의 초안 내용이 저장소(`BibleDrawing`)에 들어갔다는 표식을 남긴다(`VerseDraft.storeState = .stored`).
     /// **지우지 않는다.** 더 새 revision 이 이미 쓰였으면 건드리지 않는다 — 그 revision 은 아직 저장소에 없다. 지금 세대의 파일만 바꾼다.
-    public func markDraftStored(_ key: VerseDraftKey, scope: AccountScope, throughRevision revision: Int) throws {
+    public func markDraftStored(
+        _ key: VerseDraftKey,
+        scope: AccountScope,
+        throughRevision revision: Int,
+        contentFingerprint: String? = nil
+    ) throws {
         let current = try requireGeneration()
         let url = draftURL(key, scope: scope)
-        guard var existing = try? readDraft(at: url), existing.eraseGeneration == current, existing.revision <= revision,
-              existing.storeState != .stored else { return }
-        existing.storeState = .stored
-        // 무엇을 넣었는지도 함께 남긴다 — 그 행이 나중에 이 내용으로 돌아오면 그 뒤 편집이 전송되지 않은 것이다.
-        if let fingerprint = existing.contentFingerprint {
-            var sent = existing.sentFingerprints ?? []
-            sent.removeAll { $0 == fingerprint }
-            sent.insert(fingerprint, at: 0)
-            existing.sentFingerprints = Array(sent.prefix(Self.sentFingerprintLimit))
+        guard var existing = try? readDraft(at: url), existing.eraseGeneration == current else { return }
+        var changed = false
+        // **무엇을 넣었는지**는 파일이 이미 더 새 revision 이어도 남긴다 — 그 내용이 저장소에 들어간 사실은 파일의 revision 과 별개다.
+        // 부르는 쪽이 보낸 내용을 주면 그것을, 주지 않으면 그 revision 까지의 파일 내용을 적는다(11차 리뷰 P1).
+        if let sent = contentFingerprint ?? (existing.revision <= revision ? existing.contentFingerprint : nil),
+           existing.sentFingerprints?.first != sent {
+            existing.sentFingerprints = Self.merged([sent], existing.sentFingerprints ?? [])
+            changed = true
         }
+        if existing.revision <= revision, existing.storeState != .stored {
+            existing.storeState = .stored
+            changed = true
+        }
+        guard changed else { return }
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         try DurableFile.write(try encoder.encode(existing), to: url)
@@ -500,7 +522,8 @@ public protocol VerseDraftStore: Sendable {
     func drafts(in scope: AccountScope, chapter: BibleChapter, translation: Translation) async throws -> [VerseDraft]
     func removeDraft(_ key: VerseDraftKey, scope: AccountScope, ifRevision revision: Int) async throws
     /// 그 revision 까지의 초안 내용이 저장소에 들어갔다는 표식을 남긴다(지우지 않는다).
-    func markDraftStored(_ key: VerseDraftKey, scope: AccountScope, throughRevision revision: Int) async throws
+    /// - Parameter contentFingerprint: 저장소에 **실제로 넣은 내용**의 지문. 파일이 그 사이 더 새 revision 이어도 이 지문은 남긴다.
+    func markDraftStored(_ key: VerseDraftKey, scope: AccountScope, throughRevision revision: Int, contentFingerprint: String?) async throws
     /// 지금 로컬 삭제 세대. 읽지 못하면 nil.
     func currentGeneration() async -> UInt64?
 }

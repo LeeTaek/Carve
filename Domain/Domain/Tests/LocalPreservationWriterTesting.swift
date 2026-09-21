@@ -338,6 +338,46 @@ struct LocalPreservationWriterTesting {
         }
     }
 
+    /// 저장이 끝나기 전에 다음 편집이 초안을 덮으면, 그 저장의 내용은 파일에 남지 않는다. 그래도 **무엇을 넣었는지**는 남아야 한다(11차 리뷰 P1).
+    @Test("파일이 더 새 revision 이어도 넣은 내용의 지문은 남기고, 표식은 그 revision 까지만 단다")
+    func sentFingerprintIsRecordedEvenWhenFileMovedOn() async throws {
+        try await withAreas { areas in
+            let writer = LocalPreservationWriter(area: areas.preservation, eraseState: areas.eraseState)
+            let first = draft(verse: 1, revision: 1, ink: "처음")
+            _ = try await writer.saveDraft(first)
+            // 다음 편집이 먼저 초안을 덮었다.
+            _ = try await writer.saveDraft(draft(verse: 1, revision: 2, ink: "다음"))
+
+            let firstSent = try #require(first.contentFingerprint)
+            try await writer.markDraftStored(first.key, scope: account, throughRevision: 1, contentFingerprint: firstSent)
+
+            let kept = try #require(try await writer.drafts(in: account, chapter: chapter).first)
+            #expect(kept.revision == 2)
+            #expect(kept.sentFingerprints == [firstSent])
+            // 파일의 내용(revision 2)은 아직 저장소에 없다 — 표식을 달지 않는다.
+            #expect(kept.storeState == nil)
+        }
+    }
+
+    /// 다른 세션이 초안을 이어받으면 그 파일은 지워진다. 넣었던 지문까지 사라지면 복구 후보 판정의 근거가 끊긴다(11차 리뷰 P1).
+    @Test("이어받은 초안이 저장소에 넣었던 지문을 새 초안이 물려받는다")
+    func supersedingCarriesSentFingerprints() async throws {
+        try await withAreas { areas in
+            let writer = LocalPreservationWriter(area: areas.preservation, eraseState: areas.eraseState)
+            let old = draft(verse: 1, revision: 1, session: "session-old", ink: "앞선 세션")
+            _ = try await writer.saveDraft(old)
+            let oldSent = try #require(old.contentFingerprint)
+            try await writer.markDraftStored(old.key, scope: account, throughRevision: 1, contentFingerprint: oldSent)
+
+            let next = draft(verse: 1, revision: 2, session: "session-new", ink: "이어 씀")
+            #expect(try await writer.saveDraft(next, superseding: [VerseDraftRef(key: old.key, revision: 1)]) == .written)
+
+            let remaining = try await writer.drafts(in: account, chapter: chapter)
+            #expect(remaining.map(\.key.sessionID) == ["session-new"])
+            #expect(remaining.first?.sentFingerprints == [oldSent])
+        }
+    }
+
     @Test("전체 삭제 뒤의 늦은 초안은 이어받은 초안도 지우지 않는다")
     func rejectedDraftKeepsSupersededOne() async throws {
         try await withAreas { areas in

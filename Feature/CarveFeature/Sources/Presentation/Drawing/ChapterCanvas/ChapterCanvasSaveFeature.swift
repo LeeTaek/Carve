@@ -281,7 +281,14 @@ extension ChapterCanvasFeature {
         state.persistedRevision = max(state.persistedRevision, revision)
         state.consecutiveSaveFailures = 0
         state.saveStatus = .idle
-        return .merge(markStoredDrafts(state: state, rows: Array(batch.keys)), startSaveIfPossible(state: &state, allowRetry: false))
+        // 방금 넣은 내용의 지문을 함께 남긴다 — 그 행이 나중에 이 내용으로 돌아오면 그 뒤 편집이 전송되지 않은 것이다.
+        let sent = Dictionary(mutations.compactMap { mutation in
+            Self.sentFingerprint(of: mutation).map { (mutation.rowID, $0) }
+        }, uniquingKeysWith: { _, last in last })
+        return .merge(
+            markStoredDrafts(state: state, rows: Array(batch.keys), sent: sent),
+            startSaveIfPossible(state: &state, allowRetry: false)
+        )
     }
 
     /// 저장할 것이 없을 때 — 지우기가 기다리고 있으면 지금 보관하고, 아니면 예약된 재합성을 지금 읽는다.

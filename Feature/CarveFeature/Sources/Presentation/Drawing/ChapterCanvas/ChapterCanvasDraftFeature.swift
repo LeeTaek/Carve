@@ -345,21 +345,35 @@ extension ChapterCanvasFeature {
     /// 저장소 저장을 마친 revision 의 초안에 "들어감" 표식을 남긴다(`VerseDraft.storeState = .stored`). 초안은 저장소 쓰기보다 먼저 "보내는 중"
     /// 으로 남았으므로, 표식을 남기지 못해도(그 사이 종료 · 쓰기 실패) 다음 세션은 그 초안을 저장 완료가 불확실한 것으로 다룬다 — 기준이 같다는
     /// 이유로 확정된 사실처럼 되살리지 않는다.
-    func markStoredDrafts(state: State, rows: [BibleDrawingRowID]) -> Effect<Action> {
-        let marks: [DraftRecord] = rows.compactMap { rowID in
+    /// - Parameter sent: 방금 저장소에 **실제로 넣은 내용**의 지문(행마다). 초안 파일이 그 사이 더 새 revision 이어도 이 지문은 남는다 —
+    ///   그 행이 나중에 이 내용으로 돌아오면 그 뒤 편집이 전송되지 않은 것이다(11차 리뷰 P1).
+    func markStoredDrafts(state: State, rows: [BibleDrawingRowID], sent: [BibleDrawingRowID: String] = [:]) -> Effect<Action> {
+        let marks: [(record: DraftRecord, sent: String?)] = rows.compactMap { rowID in
             guard let record = state.drafts.records[rowID], let stored = state.drafts.storedRevisions[rowID],
                   record.revision <= stored else { return nil }
-            return DraftRecord(key: record.key, scope: record.scope, revision: stored)
+            return (DraftRecord(key: record.key, scope: record.scope, revision: stored), sent[rowID])
         }
         guard !marks.isEmpty, let writer = draftStore else { return .none }
         return .run { _ in
             for mark in marks {
                 do {
-                    try await writer.markDraftStored(mark.key, scope: mark.scope, throughRevision: mark.revision)
+                    try await writer.markDraftStored(
+                        mark.record.key, scope: mark.record.scope, throughRevision: mark.record.revision, contentFingerprint: mark.sent
+                    )
                 } catch {
                     Log.error("단일 Canvas — 저장소에 넣은 초안에 표식을 남기지 못했다(초안은 남는다)", "\(error)")
                 }
             }
+        }
+    }
+
+    /// 저장소에 넣은 그 명령의 내용 지문. 비운 절(`clear`)은 지문이 없다.
+    static func sentFingerprint(of mutation: VerseDrawingMutation) -> String? {
+        switch mutation {
+        case let .create(_, _, data, metadata), let .replace(_, _, data, metadata):
+            VerseContentFingerprint.make(lineData: data, drawingVersion: 3, layoutMetadataBlob: try? metadata.encodedBlob())
+        case .clear:
+            nil
         }
     }
 

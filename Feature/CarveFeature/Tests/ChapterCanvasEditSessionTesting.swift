@@ -102,6 +102,12 @@ final class RecordingDraftStore: VerseDraftStore, @unchecked Sendable {
         let removedKeys = entries.withValue { entries -> [VerseDraftKey] in
             let id = Self.id(scope, draft.key)
             if let existing = entries[id], existing.draft.revision > draft.revision { return [] }
+            // 실제 저장소처럼, 같은 키의 앞선 revision 과 이어받는 초안이 넣었던 지문을 물려받는다.
+            var draft = draft
+            let carried = (entries[id]?.draft.sentFingerprints ?? [])
+                + superseding.flatMap { entries[Self.id(scope, $0.key)]?.draft.sentFingerprints ?? [] }
+            let sent = Self.merged(draft.sentFingerprints ?? [], carried)
+            draft.sentFingerprints = sent.isEmpty ? nil : sent
             entries[id] = Entry(scope: scope, draft: draft)
             return superseding.filter { ref in
                 // 그 revision 일 때만 대신한다 — 더 새 revision 이 쓰였으면 남긴다.
@@ -130,7 +136,7 @@ final class RecordingDraftStore: VerseDraftStore, @unchecked Sendable {
     /// 이만큼 "들어감" 표식 쓰기를 실패한다 — 저장소 저장 뒤 표식을 남기기 전에 끝난 것과 같다.
     let markFailures = LockIsolated(0)
 
-    func markDraftStored(_ key: VerseDraftKey, scope: AccountScope, throughRevision revision: Int) async throws {
+    func markDraftStored(_ key: VerseDraftKey, scope: AccountScope, throughRevision revision: Int, contentFingerprint: String?) async throws {
         let shouldFail = markFailures.withValue { remaining -> Bool in
             guard remaining > 0 else { return false }
             remaining -= 1
@@ -139,11 +145,21 @@ final class RecordingDraftStore: VerseDraftStore, @unchecked Sendable {
         if shouldFail { throw Full() }
         entries.withValue { entries in
             let id = Self.id(scope, key)
-            guard let entry = entries[id], entry.draft.revision <= revision else { return }
+            guard let entry = entries[id] else { return }
             var draft = entry.draft
-            draft.storeState = .stored
+            // 실제 저장소처럼 **넣은 내용**의 지문을 남긴다 — 파일이 더 새 revision 이어도 남는다.
+            if let sent = contentFingerprint ?? (draft.revision <= revision ? draft.contentFingerprint : nil) {
+                draft.sentFingerprints = Self.merged([sent], draft.sentFingerprints ?? [])
+            }
+            if draft.revision <= revision { draft.storeState = .stored }
             entries[id] = Entry(scope: scope, draft: draft)
         }
+    }
+
+    /// 넣은 내용 지문 합치기 — 실제 저장소(`LocalPreservationWriter.merged`)와 같은 규칙이다.
+    private static func merged(_ first: [String], _ second: [String]) -> [String] {
+        var seen: Set<String> = []
+        return Array((first + second).filter { seen.insert($0).inserted }.prefix(5))
     }
 
     /// 로컬 삭제 세대 — 시험 환경의 기본값(0)과 같다.

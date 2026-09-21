@@ -122,6 +122,36 @@ struct ChapterCanvasDraftOrderTesting: DraftTestSamples {
         await end(third, thirdEnvironment)
     }
 
+    /// 이어받으면 앞선 초안 파일은 지워진다. 그 초안이 **저장소에 넣었던 지문**까지 사라지면 복구 후보 판정의 근거가 끊긴다(11차 리뷰 P1).
+    @Test("다른 세션의 초안을 이어받아 쓰면 그 초안이 넣었던 지문을 물려받고, 방금 넣은 내용의 지문도 더한다")
+    func adoptedDraftCarriesSentFingerprints() async throws {
+        let spy = spyWithVerseOne()
+        let environment = ControlledEditEnvironment(confirmed(accountA, 1))
+        let drafts = RecordingDraftStore()
+        var earlier = previousDraft(storeOwnership: accountA)
+        earlier.sentFingerprints = ["vc1-old-sent"]
+        drafts.seed(earlier)
+        let store = makeStore(spy: spy, results: [replaceVerseOne("이어")], environment: environment, drafts: drafts)
+        await composeAndSubscribe(store, environment)
+        #expect(store.state.drafts.adopted[place] == earlier.ref)
+
+        await draw(store, "이어")
+        await store.receive(\.draftsSaved)
+        await store.receive(\.saveFinished)
+
+        var continued = try #require(drafts.stored(in: accountA).first { $0.lineData == Data("이어".utf8) })
+        while continued.storeState != .stored {
+            await Task.yield()
+            continued = try #require(drafts.stored(in: accountA).first { $0.lineData == Data("이어".utf8) })
+        }
+        let sent = try #require(continued.sentFingerprints)
+        #expect(sent.contains("vc1-old-sent"))
+        // 방금 넣은 내용이 맨 앞이다 — 옛 지문은 뒤로 밀리되 남는다.
+        #expect(sent.first == continued.contentFingerprint)
+        #expect(drafts.stored(in: accountA).count == 1)
+        await end(store, environment)
+    }
+
     /// ACC-1 F29 를 **기존 필기 수정**으로 본다 — 전송된 적 있는 행이면 서버의 옛 내용으로 돌아온다.
     @Test("고친 필기의 행이 옛 내용으로 돌아오면 그 초안이 유일한 사본이다 — 이어 보이고 이어 쓴다")
     func existingVerseF29ContinuesWhenRowReturnsToBase() async throws {
