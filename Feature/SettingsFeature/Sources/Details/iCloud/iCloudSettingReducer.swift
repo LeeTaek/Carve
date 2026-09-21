@@ -36,6 +36,8 @@ public struct CloudSettingsFeature {
     private enum CancelID { case activity }
     @Dependency(\.widgetVerseClient) private var widgetVerseClient
     @Dependency(\.drawingDataEraser) private var drawingDataEraser
+    /// 전체 삭제가 함께 지우는 **남은 필기**(보존 영역)를 세기 위해 읽는다.
+    @Dependency(\.verseDraftRecoveryReader) private var draftReader
 
     public enum Action: ViewAction {
         case path(PresentationAction<Path.Action>)
@@ -91,19 +93,19 @@ public struct CloudSettingsFeature {
             case .activityChanged(let activity):
                 state.activity = activity
             case .view(.databaseIsEmpty):
-                return .run { [widgetVerseClient] send in
+                return .run { [widgetVerseClient, draftReader] send in
                     // 「필사 데이터」 에는 즐겨찾기에 복사해 둔 필기와 위젯에 담은 말씀도 포함된다 — 셋을 함께 본다.
                     let hasDrawings = !(try await database.databaseIsEmpty(BibleDrawing.self))
                     let hasFavorites = !(try await database.databaseIsEmpty(FavoriteVerse.self))
                     let hasWidgetVerses = !(await widgetVerseClient.selection().isEmpty)
-                    if hasDrawings || hasFavorites || hasWidgetVerses {
+                    // 전체 삭제는 이 기기의 보존 영역(남은 필기)도 지운다 — 저장소가 비어도 초안만 남아 있을 수 있다(ACC-1 2차 ㉓).
+                    let remainingDrafts = await Self.remainingDraftCount(draftReader)
+                    // 세지 못했으면(nil) 있을 수 있다고 본다 — 없다고 단정해 지울 것이 없다고 말하지 않는다.
+                    if hasDrawings || hasFavorites || hasWidgetVerses || (remainingDrafts ?? 1) > 0 {
                         // 문구와 구성은 시안 F2 를 따른다 — 지워지는 범위 · 되돌릴 수 없다는 경고 · 한 절만 비우는 대안.
                         await send(.presentPopover(
                             title: "모든 필사 데이터를 지울까요?",
-                            body: """
-                            모든 장의 필기와 이전 필사 기록이 지워져요.
-                            즐겨찾기와 위젯에 담은 말씀도 함께 사라져요.
-                            """,
+                            body: Self.eraseConfirmBody(remainingDrafts: remainingDrafts),
                             emphasis: "지운 데이터는 되돌릴 수 없어요.",
                             hint: "한 절만 비우려면 해당 절을 길게 눌러\n지우기를 선택해 주세요.",
                             confirmTitle: "모두 지우기",
@@ -202,6 +204,39 @@ public struct CloudSettingsFeature {
 }
 
 extension CloudSettingsFeature {
+    /// 이 기기에 남은 필기(초안 · 읽지 못해 옆으로 옮긴 파일) 수. **읽지 못하면 nil** — 없다고 단정하지 않는다.
+    static func remainingDraftCount(_ reader: (any VerseDraftRecoveryReading)?) async -> Int? {
+        guard let reader else { return nil }
+        do {
+            var total = 0
+            for scope in try await reader.draftBuckets() {
+                let summary = try await reader.draftSummary(in: scope)
+                total += summary.draftCount + summary.unreadableCount
+            }
+            return total
+        } catch {
+            Log.error("전체 삭제 — 남은 필기를 세지 못했다. 없다고 보지 않는다", "\(error)")
+            return nil
+        }
+    }
+
+    /// 지워지는 범위를 적는다. **남은 필기도 함께 지워진다** — 세지 못했으면 수 없이 말한다(정책 §12-5 C11 문구 규칙).
+    static func eraseConfirmBody(remainingDrafts: Int?) -> String {
+        var lines = [
+            "모든 장의 필기와 이전 필사 기록이 지워져요.",
+            "즐겨찾기와 위젯에 담은 말씀도 함께 사라져요."
+        ]
+        switch remainingDrafts {
+        case .some(let remaining) where remaining > 0:
+            lines.append("화면에 보이지 않게 남은 필기 \(remaining)개도 함께 지워져요.")
+        case .none:
+            lines.append("화면에 보이지 않게 남은 필기도 함께 지워져요.")
+        default:
+            break
+        }
+        return lines.joined(separator: "\n")
+    }
+
     /// 전체 삭제가 끝나지 못했을 때 **확인된 범위만** 말한다. 남은 것을 뭉뚱그리지도, 확인하지 못한 것을 단정하지도 않는다.
     ///
     /// 필사 행 삭제가 실패하면(`.failed`) 일부가 지워졌는지 증명하지 못한다(`DrawingEraseOutcome.failed`). 미저장분을

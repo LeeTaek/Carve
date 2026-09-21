@@ -56,6 +56,37 @@ private final class WidgetClearSpy: WidgetVerseClient, @unchecked Sendable {
     }
 }
 
+/// 전체 삭제 확인 문구 — **남은 필기(보존 영역)도 함께 지워진다**(ACC-1 2차 ㉓).
+///
+/// 저장소가 비어도 초안만 남아 있을 수 있는데, 이전 문구는 그것을 말하지 않았고 "지울 필사 데이터가 없어요" 로 닫혔다.
+@Suite("설정 — 전체 삭제 문구")
+struct CloudSettingsEraseCopyTesting {
+
+    @Test("남은 필기가 있으면 문구가 그 수까지 말한다")
+    func bodyMentionsRemainingDrafts() {
+        let body = CloudSettingsFeature.eraseConfirmBody(remainingDrafts: 13)
+        #expect(body.contains("남은 필기 13개도 함께 지워져요"))
+    }
+
+    @Test("남은 필기를 세지 못했으면 수 없이 말하되 빼지 않는다")
+    func bodyMentionsDraftsWithoutCountWhenUnknown() {
+        let body = CloudSettingsFeature.eraseConfirmBody(remainingDrafts: nil)
+        #expect(body.contains("남은 필기도 함께 지워져요"))
+    }
+
+    @Test("남은 필기가 없으면 그 줄을 넣지 않는다")
+    func bodyOmitsDraftLineWhenNone() {
+        let body = CloudSettingsFeature.eraseConfirmBody(remainingDrafts: 0)
+        #expect(!body.contains("남은 필기"))
+        #expect(body.contains("모든 장의 필기와 이전 필사 기록이 지워져요"))
+    }
+
+    @Test("보존 영역을 열지 못하면 남은 필기 수는 nil 이다 — 0 이 아니다")
+    func remainingCountIsNilWithoutReader() async {
+        #expect(await CloudSettingsFeature.remainingDraftCount(nil) == nil)
+    }
+}
+
 /// 이전 구현은 삭제 중 하나라도 throw 하면
 /// ① 로딩 해제에 도달하지 못해 **화면 전체가 잠겼고**
 /// ② 필사 행은 지워졌는데 열린 장에 알리지 않아 **다음 저장이 지운 필사를 되살렸고**
