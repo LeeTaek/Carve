@@ -404,12 +404,12 @@ extension ChapterCanvasFeature {
         // 편집은 늘 현재 레이아웃 기준 v3 로 저장된다(`DrawingCodec.mutations`). 비운 절은 내용이 없다.
         var lineData: Data?
         var metadataBlob: Data?
-        if case .create(_, _, let data, let metadata) = entry.mutation {
+        if case .create(let verse, _, let data, let metadata) = entry.mutation {
             lineData = data
-            metadataBlob = try? metadata.encodedBlob()
-        } else if case .replace(_, _, let data, let metadata) = entry.mutation {
+            metadataBlob = draftMetadataBlob(metadata, verse: verse)
+        } else if case .replace(let verse, _, let data, let metadata) = entry.mutation {
             lineData = data
-            metadataBlob = try? metadata.encodedBlob()
+            metadataBlob = draftMetadataBlob(metadata, verse: verse)
         }
         return VerseDraft(
             key: VerseDraftKey(sessionID: sessionID, chapter: entry.chapter, verse: entry.mutation.verse),
@@ -428,6 +428,19 @@ extension ChapterCanvasFeature {
             storeState: storeState,
             ownershipInjected: provenance.ownershipInjected
         )
+    }
+
+    /// 초안에 남길 좌표 정보. **인코딩하지 못해도 잉크는 남긴다** — 그 획의 사본은 이 초안뿐일 수 있다(초안이 먼저다). 그런 초안은 겹칠 수 없어
+    /// 캔버스 · 「남은 필기」 가 같은 판정(`VerseDraftRecoveryRule.isDisplayable`)으로 **표시 실패**로 알린다. 조용히 넘기지 않는다(2026-09-21
+    /// 후속 리뷰 P0-2b — 예전에는 `try?` 로 좌표 없는 초안이 생겨도 기록이 없었고, 그 초안은 어디에도 보이지 않았다).
+    static func draftMetadataBlob(_ metadata: DrawingLayoutMetadata, verse: Int) -> Data? {
+        do {
+            return try metadata.encodedBlob()
+        } catch {
+            Log.error("단일 Canvas — 초안의 좌표 정보를 인코딩하지 못했다. 잉크만 남기고, 이 초안은 「남은 필기」 에 표시 실패로 오른다",
+                      "verse=\(verse)", "\(error)")
+            return nil
+        }
     }
 
     // MARK: - 세션
@@ -572,6 +585,7 @@ extension ChapterCanvasFeature {
             if draft.lineData != nil {
                 metadata = DrawingLayoutMetadata.decode(blob: draft.layoutMetadataData)
                 guard metadata != nil else {
+                    // 오지 않는 자리다 — 판정(`isDisplayable`)이 겹칠 수 없는 초안을 `kept` · `undisplayable` 로 이미 뺐다.
                     Log.error("단일 Canvas — 초안의 좌표 정보를 읽지 못해 겹치지 않는다(초안은 남김)", "verse=\(verse)")
                     continue
                 }
@@ -596,7 +610,8 @@ extension ChapterCanvasFeature {
         }
         if !plan.kept.isEmpty || !plan.settled.isEmpty {
             Log.info("단일 Canvas — 보이지 않고 남긴 초안", "chapter=\(chapter.title.rawValue).\(chapter.chapter)",
-                     "kept=\(plan.kept.count)", "uncertain=\(plan.uncertain.count)", "settled=\(plan.settled.count)")
+                     "kept=\(plan.kept.count)", "uncertain=\(plan.uncertain.count)", "undisplayable=\(plan.undisplayable.count)",
+                     "settled=\(plan.settled.count)")
         }
         return overlay(snapshots, with: mutations)
     }

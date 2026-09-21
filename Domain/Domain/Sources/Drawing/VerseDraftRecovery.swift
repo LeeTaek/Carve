@@ -33,10 +33,13 @@ public struct VerseDraftRecoveryPlan: Equatable, Sendable {
     /// **자동으로 겹치지 않는다**(사용자 결정 2026-09-21, 11차 리뷰 P0-1). 같은 입력이 "다른 기기가 일부러 옛 내용으로 되돌렸다" 와
     /// 구분되지 않기 때문이다. ④ 의 복구 화면이 **지금 필기와 나란히 보여 주고**, 사용자가 고르면 새 버전으로 남긴다 — 지금 필기도 지우지 않는다.
     public var recoverable: [VerseDraft] = []
+    /// `kept` 가운데 **화면에 겹칠 수 없는** 초안 — 잉크는 있는데 좌표 정보(레이아웃 메타데이터)를 읽지 못해 어디에 놓을지 모른다
+    /// (2026-09-21 후속 리뷰 P0-2b). 겹치지 않되 목록(④)이 표시 실패 사유와 함께 알린다. 잉크는 그대로 남는다.
+    public var undisplayable: [VerseDraft] = []
 
     public init(
         shown: [VerseDraft] = [], showOnly: Set<VerseDraftKey> = [], settled: [VerseDraft] = [], kept: [VerseDraft] = [],
-        uncertain: [VerseDraft] = [], recoverable: [VerseDraft] = []
+        uncertain: [VerseDraft] = [], recoverable: [VerseDraft] = [], undisplayable: [VerseDraft] = []
     ) {
         self.shown = shown
         self.showOnly = showOnly
@@ -44,6 +47,7 @@ public struct VerseDraftRecoveryPlan: Equatable, Sendable {
         self.kept = kept
         self.uncertain = uncertain
         self.recoverable = recoverable
+        self.undisplayable = undisplayable
     }
 }
 
@@ -121,6 +125,9 @@ enum VerseDraftContinuation: Equatable, Sendable {
 ///   - 행이 그 뒤로 바뀌었다(지우기 · 복원 · 다른 기기) → 보이지 않고 남긴다. 보내던 중이었고 들어갔는지 가릴 수 없으면 **저장 완료가
 ///     불확실한 초안**으로 따로 센다.
 /// - **보이는 것도 자동으로 저장소에 쓰지 않는다.** 겹쳐 보일 뿐이고, 사용자가 그 절을 다시 편집해야 그 세션의 초안 · 저장이 된다.
+/// - **겹칠 수 없는 초안은 보인다고 치지 않는다**(P0-2b). 잉크는 있는데 좌표 정보를 읽지 못하면 `shown` 에 넣지 않고 `kept` ·
+///   `undisplayable` 로 남긴다 — 예전에는 `shown` 에 들어간 뒤 캔버스가 건너뛰어, 캔버스에도 목록에도 없었다. 그 절에 겹칠 수 있는 다른
+///   후보가 있으면 그중 가장 늦게 쓴 것을 보인다.
 public enum VerseDraftRecoveryRule {
     /// - Parameters:
     ///   - drafts: 지금 계정 근거 묶음에 있는 이 장의 초안.
@@ -170,13 +177,24 @@ public enum VerseDraftRecoveryRule {
                     }
                 }
             }
+            // 이어 볼 후보였지만 겹칠 수 없는 초안 — 보존만 하고 표시 실패로 알린다(P0-2b). 다른 후보는 그대로 고른다. 다른 까닭(기준이
+            // 달라짐 · 근거가 막힘)으로 이미 남긴 초안은 그 까닭 그대로다.
+            for undisplayable in candidates.filter({ !isDisplayable($0.draft) }) {
+                plan.kept.append(undisplayable.draft)
+                plan.undisplayable.append(undisplayable.draft)
+            }
+            candidates.removeAll { !isDisplayable($0.draft) }
             if let own {
                 let stored = (storedRevisions[own.rowID] ?? 0) >= own.revision
                     || (own.storeState == .stored && storeRows[own.rowID]?.contentFingerprint == own.contentFingerprint)
                 if stored {
                     plan.settled.append(own)
-                } else {
+                } else if isDisplayable(own) {
                     plan.shown.append(own)
+                } else {
+                    // 이 세션이 쓴 초안인데 좌표 정보가 없다 — 겹치지 못한다. 잉크는 남기고 표시 실패로 알린다(P0-2b).
+                    plan.kept.append(own)
+                    plan.undisplayable.append(own)
                 }
                 plan.kept.append(contentsOf: candidates.map(\.draft))
                 continue
@@ -190,6 +208,14 @@ public enum VerseDraftRecoveryRule {
             plan.kept.append(contentsOf: candidates.map(\.draft).filter { $0 != latest.draft })
         }
         return plan
+    }
+
+    /// 이 초안을 화면에 **겹칠 수 있는가** — 비운 절이거나, 잉크와 그 좌표 정보(레이아웃 메타데이터)를 읽을 수 있다.
+    ///
+    /// 좌표 정보가 없는 잉크는 어디에 놓을지 몰라 겹치지 않는다. 캔버스(`recoverDrafts`)와 목록(④)이 이 한 판정으로 가른다 —
+    /// 따로 가리면 한쪽은 "보인다" 로, 다른 쪽은 "겹치지 못함" 으로 읽어 어디에도 없는 초안이 생긴다(2026-09-21 후속 리뷰 P0-2b).
+    public static func isDisplayable(_ draft: VerseDraft) -> Bool {
+        draft.lineData == nil || DrawingLayoutMetadata.decode(blob: draft.layoutMetadataData) != nil
     }
 
     /// 이 초안이 지금 환경의 화면에 오를 수 있는 묶음의 것인가.

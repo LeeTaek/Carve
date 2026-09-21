@@ -69,6 +69,12 @@ struct VerseDraftRecoveryInventoryTesting {
 
     // MARK: - 표본
 
+    /// 실제 초안 · 행처럼 잉크에는 좌표 정보가 붙는다 — 초안의 지문과 행의 지문이 같은 규칙으로 만들어진다.
+    private static let metadata = DrawingLayoutMetadata(
+        baseWritingWidth: 320, baseWritingHeight: 30, baseUnderlineAnchors: [0], layoutSignature: "cl1-inventory"
+    )
+    private static let metadataBlob = try? metadata.encodedBlob()
+
     private func environment(_ scope: AccountScope) -> DrawingEditEnvironment {
         DrawingEditEnvironment(
             accountState: .confirmed(scope), serverWork: AccountServerWorkToken(scope: scope, generation: 1), knowledge: EraseEpochKnowledge()
@@ -79,12 +85,12 @@ struct VerseDraftRecoveryInventoryTesting {
     private func row(verse: Int, rowID: String, ink: String?, updatedAt: TimeInterval = 500) -> VerseDrawingSnapshot {
         VerseDrawingSnapshot(
             verse: verse, rowID: BibleDrawingRowID(raw: rowID), isPresent: true, updateDate: Date(timeIntervalSince1970: updatedAt),
-            lineData: ink.map { Data($0.utf8) }, drawingVersion: ink == nil ? nil : 3, metadata: nil
+            lineData: ink.map { Data($0.utf8) }, drawingVersion: ink == nil ? nil : 3, metadata: ink == nil ? nil : Self.metadata
         )
     }
 
     private func fingerprint(_ ink: String) -> String {
-        VerseContentFingerprint.make(lineData: Data(ink.utf8), drawingVersion: 3, layoutMetadataBlob: nil)
+        VerseContentFingerprint.make(lineData: Data(ink.utf8), drawingVersion: 3, layoutMetadataBlob: Self.metadataBlob)
     }
 
     private func draft(
@@ -97,7 +103,8 @@ struct VerseDraftRecoveryInventoryTesting {
         account: VerseEditAccountBasis? = nil,
         savedAt: TimeInterval = 1_000,
         storeState: VerseDraftStoreState? = nil,
-        sentFingerprints: [String]? = nil
+        sentFingerprints: [String]? = nil,
+        withMetadata: Bool = true
     ) -> VerseDraft {
         let chapter = chapter ?? genesis1
         let row = BibleDrawingRowID(raw: rowID ?? "row-\(verse)")
@@ -107,7 +114,7 @@ struct VerseDraftRecoveryInventoryTesting {
             rowID: row,
             lineData: ink.map { Data($0.utf8) },
             drawingVersion: ink == nil ? nil : 3,
-            layoutMetadataData: nil,
+            layoutMetadataData: ink != nil && withMetadata ? Self.metadataBlob : nil,
             base: baseInk.map { .legacy(rowID: row, contentFingerprint: fingerprint($0)) } ?? .empty,
             baseFingerprint: baseInk.map { fingerprint($0) },
             account: account ?? .confirmed(AccountServerWorkToken(scope: accountA, generation: 1)),
@@ -275,6 +282,24 @@ struct VerseDraftRecoveryInventoryTesting {
                 #expect((newerIsAccount ? unverifiedEntries : accountEntries).map(\.reason) == [.newerDraftShown])
                 #expect((newerIsAccount ? accountEntries : unverifiedEntries).isEmpty)
             }
+        }
+    }
+
+    // MARK: - 겹칠 수 없는 초안 (2026-09-21 후속 리뷰 P0-2b)
+
+    /// 예전에는 규칙이 이 초안을 `shown` 에 넣고 캔버스가 건너뛰어, 목록에서도 "보인다" 로 빠졌다 — 어디에도 없었다.
+    @Test("잉크는 있고 좌표 정보가 없는 초안은 목록에 「표시하지 못함」 으로 오른다")
+    func undisplayableDraftIsListedWithItsReason() async throws {
+        try await withWriter { writer, _ in
+            let lost = draft(verse: 1, ink: "좌표 없음", baseInk: "옛", withMetadata: false)
+            _ = try await writer.saveDraft(lost)
+            let repository = StubRepository([genesis1: [row(verse: 1, rowID: "row-1", ink: "옛")]])
+
+            let inventory = try await VerseDraftRecoveryQuery(reader: writer, repository: repository)
+                .inventory(in: accountA, environment: environment(accountA))
+
+            #expect(inventory.entries.map(\.draft) == [lost])
+            #expect(inventory.entries.map(\.reason) == [.undisplayable])
         }
     }
 

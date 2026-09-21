@@ -114,6 +114,71 @@ struct ChapterCanvasDraftFileTesting: DraftTestSamples {
         await end(store, environment)
     }
 
+    // MARK: - 좌표 정보 없는 초안 (2026-09-21 후속 리뷰 P0-2b)
+
+    /// 예전에는 `try? metadata.encodedBlob()` 이 조용히 nil 을 남겼고, 그 초안은 캔버스가 건너뛰고(`recoverDrafts`) 목록은 "보인다" 로 빼
+    /// 어디에도 없었다.
+    @Test("정상 저장 경로에서 좌표 정보를 인코딩하지 못해도 잉크는 초안에 남고, 다시 읽으면 캔버스가 감추되 「남은 필기」 에 표시 실패로 오른다")
+    func draftWithUnencodableMetadataIsListedAsUndisplayable() async throws {
+        let area = makeArea()
+        defer { try? FileManager.default.removeItem(at: area.root) }
+        let spy = RepositorySpy()
+        // JSON 은 NaN 을 적지 못한다 — 좌표 정보 인코딩이 실패하는 편집이다.
+        let broken = DrawingLayoutMetadata(
+            baseWritingWidth: .nan, baseWritingHeight: 30, baseUnderlineAnchors: [0], layoutSignature: CanvasTestSupport.layout.signature
+        )
+        let result = DrawingEditResult(
+            ownership: OwnershipSnapshot(map: [:], layoutSignature: CanvasTestSupport.layout.signature),
+            mutations: [.create(verse: 2, rowID: CanvasTestSupport.newRow, data: Data("ink-without-layout".utf8), metadata: broken)],
+            issuedRowIDs: [2: CanvasTestSupport.newRow]
+        )
+        let current = confirmed(accountA, 1, owned: false)
+        let environment = ControlledEditEnvironment(current)
+        let store = makeStore(spy: spy, results: [result], environment: environment, drafts: area.writer)
+        await composeAndSubscribe(store, environment)
+        await draw(store)
+        await store.receive(\.draftsSaved)
+
+        // 잉크는 초안에 남았다 — 좌표 정보만 없다. 초안 저장을 실패로 끝내지 않는다(그 획의 사본은 이것뿐이다).
+        let saved = try #require(try await area.writer.drafts(in: accountA, chapter: CanvasTestSupport.chapter).first)
+        #expect(saved.lineData == Data("ink-without-layout".utf8))
+        #expect(saved.layoutMetadataData == nil)
+
+        // 다시 읽는다(레이아웃 변경) — 겹칠 수 없어 캔버스는 감추고, 절 메뉴의 「남은 필기」 로 센다.
+        await store.send(.layoutCompleted(CanvasTestSupport.otherLayout))
+        await store.receive(\.drawingsLoaded)
+        #expect(store.state.loadedDrawings?.contains { $0.verse == 2 } == false)
+        #expect(store.state.drafts.hiddenCounts == [2: 1])
+
+        let listed = try await VerseDraftRecoveryQuery(reader: area.writer, repository: spy).inventory(in: accountA, environment: current)
+        #expect(listed.entries.map(\.draft) == [saved])
+        #expect(listed.entries.map(\.reason) == [.undisplayable])
+        await end(store, environment)
+    }
+
+    @Test("앞선 세션이 남긴 좌표 정보 없는 초안도 캔버스가 감춘 수와 목록이 같다")
+    func seededDraftWithoutMetadataIsCountedAndListed() async throws {
+        let area = makeArea()
+        defer { try? FileManager.default.removeItem(at: area.root) }
+        let spy = spyWithVerseOne()
+        let lost = previousDraft(ink: "earlier-without-layout", withMetadata: false)
+        _ = try await area.writer.saveDraft(lost)
+        let current = confirmed(accountA, 1, owned: false)
+        let environment = ControlledEditEnvironment(current)
+        let store = makeStore(spy: spy, results: [], environment: environment, drafts: area.writer)
+        await composeAndSubscribe(store, environment)
+
+        // 저장소의 1절이 그대로 보이고, 그 초안은 감춘 것으로 센다.
+        #expect(store.state.loadedDrawings?.first { $0.verse == 1 }?.lineData == Data([1]))
+        #expect(store.state.drafts.hiddenCounts == [1: 1])
+        #expect(store.state.drafts.adopted.isEmpty)
+
+        let listed = try await VerseDraftRecoveryQuery(reader: area.writer, repository: spy).inventory(in: accountA, environment: current)
+        #expect(listed.entries.map(\.draft) == [lost])
+        #expect(listed.entries.map(\.reason) == [.undisplayable])
+        await end(store, environment)
+    }
+
     @Test("초안 폴더를 읽지 못하는 동안에도 막고, 권한이 돌아오면 그 초안을 그대로 보인다")
     func unreadableDraftFolderBlocksChapter() async throws {
         let area = makeArea()

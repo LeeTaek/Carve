@@ -132,10 +132,10 @@ public struct DraftRecoveryFeature {
             buckets.contains { $0.scope == scope && $0.comparedWithStore }
         }
 
-        /// 사용자가 판단할 것이 있는가 — 되살릴 수 있음 · 저장 완료 불확실.
+        /// 사용자가 판단할 것이 있는가 — 되살릴 수 있음 · 저장 완료 불확실 · 표시하지 못함.
         public var needsAttentionCount: Int {
             buckets.reduce(0) { count, bucket in
-                count + bucket.items.count { $0.reason == .recoverable || $0.reason == .uncertain }
+                count + bucket.items.count { $0.reason == .recoverable || $0.reason == .uncertain || $0.reason == .undisplayable }
             }
         }
     }
@@ -523,6 +523,7 @@ public enum DraftRecoveryCopy {
         case .storeMoved: "다른 내용이 들어옴"
         case .otherBasis: "다른 계정 근거"
         case .newerDraftShown: "더 새 초안이 보임"
+        case .undisplayable: "표시하지 못함"
         }
     }
 
@@ -539,6 +540,8 @@ public enum DraftRecoveryCopy {
             "이 필기를 쓸 때의 삭제 기록 근거가 지금과 달라 자동으로 표시하지 않아요. 지금 필사로 자동으로 가져오지 않아요."
         case .newerDraftShown:
             "같은 절에 더 늦게 쓴 초안이 있어 그쪽이 화면에 보여요. 이 필기도 지우지 않고 남겨 둬요."
+        case .undisplayable:
+            "이 필기를 놓을 자리 정보(좌표)를 읽지 못해 자동으로 표시하지 못해요. 필기는 그대로 남아 있어요."
         }
     }
 

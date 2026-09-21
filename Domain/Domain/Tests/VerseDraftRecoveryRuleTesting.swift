@@ -23,6 +23,10 @@ struct VerseDraftRecoveryRuleTesting {
     private let accountA = AccountScope(key: "acct-a")
     private let accountB = AccountScope(key: "acct-b")
     private let base = "vc1-base"
+    /// 실제 초안처럼 잉크에는 좌표 정보가 붙는다 — 없으면 겹칠 수 없는 초안이다(P0-2b).
+    private static let metadataBlob = try? DrawingLayoutMetadata(
+        baseWritingWidth: 320, baseWritingHeight: 30, baseUnderlineAnchors: [0], layoutSignature: "cl1-rule"
+    ).encodedBlob()
 
     private func confirmed(
         _ scope: AccountScope,
@@ -46,7 +50,8 @@ struct VerseDraftRecoveryRuleTesting {
         savedAt: TimeInterval = 1_000,
         revision: Int = 1,
         storeState: VerseDraftStoreState? = nil,
-        ownershipInjected: Bool? = nil
+        ownershipInjected: Bool? = nil,
+        withMetadata: Bool = true
     ) -> VerseDraft {
         VerseDraft(
             key: VerseDraftKey(sessionID: session, chapter: chapter, verse: verse),
@@ -54,7 +59,7 @@ struct VerseDraftRecoveryRuleTesting {
             rowID: BibleDrawingRowID(raw: "row-\(verse)"),
             lineData: ink.map { Data($0.utf8) },
             drawingVersion: ink == nil ? nil : 3,
-            layoutMetadataData: nil,
+            layoutMetadataData: ink != nil && withMetadata ? Self.metadataBlob : nil,
             base: baseFingerprint.map { .legacy(rowID: BibleDrawingRowID(raw: "row-\(verse)"), contentFingerprint: $0) } ?? .empty,
             baseFingerprint: baseFingerprint,
             account: account ?? .confirmed(AccountServerWorkToken(scope: accountA, generation: 1)),
@@ -368,5 +373,44 @@ struct VerseDraftRecoveryRuleTesting {
         let result = plan([first, second])
         #expect(result.shown == [first])
         #expect(result.kept == [second])
+    }
+}
+
+// MARK: - 겹칠 수 없는 초안 (2026-09-21 후속 리뷰 P0-2b)
+
+extension VerseDraftRecoveryRuleTesting {
+    /// 예전에는 이 초안이 `shown` 에 들어가고 캔버스가 건너뛰었다 — 목록은 "보인다" 로 빼, 어디에도 없었다.
+    @Test("좌표 정보가 없는 지금 세션의 초안은 보인다고 치지 않고, 남기며 표시 실패로 센다")
+    func ownDraftWithoutMetadataIsKeptAsUndisplayable() {
+        let own = draft(session: "now", withMetadata: false)
+        let result = plan([own])
+        #expect(result.shown.isEmpty)
+        #expect(result.kept == [own])
+        #expect(result.undisplayable == [own])
+    }
+
+    @Test("이어 볼 다른 세션 초안이 좌표 정보가 없으면 표시 실패로 남기고, 겹칠 수 있는 후보 가운데 가장 늦은 것을 보인다")
+    func undisplayableCandidateGivesWayToADisplayableOne() {
+        let newer = draft(session: "newer", ink: "새", savedAt: 2_000, withMetadata: false)
+        let older = draft(session: "older", ink: "옛", savedAt: 1_000)
+        let result = plan([newer, older], session: nil)
+        #expect(result.shown == [older])
+        #expect(result.kept == [newer])
+        #expect(result.undisplayable == [newer])
+    }
+
+    @Test("다른 까닭(기준이 달라짐)으로 남긴 초안은 좌표 정보가 없어도 그 까닭 그대로다 — 표시 실패로 세지 않는다")
+    func movedDraftWithoutMetadataKeepsItsReason() {
+        let moved = draft(baseFingerprint: "vc1-older", withMetadata: false)
+        let result = plan([moved], session: nil)
+        #expect(result.kept == [moved])
+        #expect(result.undisplayable.isEmpty)
+    }
+
+    @Test("비운 절의 초안은 좌표 정보 없이도 겹칠 수 있다")
+    func clearedDraftIsDisplayable() {
+        #expect(VerseDraftRecoveryRule.isDisplayable(draft(ink: nil)))
+        #expect(!VerseDraftRecoveryRule.isDisplayable(draft(withMetadata: false)))
+        #expect(VerseDraftRecoveryRule.isDisplayable(draft()))
     }
 }

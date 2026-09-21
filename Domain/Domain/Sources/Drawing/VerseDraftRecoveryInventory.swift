@@ -84,6 +84,8 @@ public enum VerseDraftRecoveryReason: String, Equatable, Sendable, CaseIterable 
     case otherBasis
     /// 같은 절의 **더 새 초안**이 화면에 올라 이것은 보이지 않는다.
     case newerDraftShown
+    /// 이어 볼 초안인데 **겹칠 수 없다** — 잉크는 있는데 좌표 정보(레이아웃 메타데이터)를 읽지 못해 어디에 놓을지 모른다(P0-2b).
+    case undisplayable
 }
 
 /// 비교의 한쪽 — 그 절의 지금 저장소 내용. 저장소와 대조하지 않은 묶음이면 없다.
@@ -240,12 +242,10 @@ public struct VerseDraftRecoveryQuery: Sendable {
         let plan = VerseDraftRecoveryRule.plan(
             drafts: screen.map(\.draft), storeContent: view.verseContent, environment: environment, sessionID: nil, storeRows: view.rows
         )
-        let recoverable = Set(plan.recoverable.map(\.ref))
-        let uncertain = Set(plan.uncertain.map(\.ref))
         for draft in plan.kept where mine.contains(draft) {
             result.entries.append(VerseDraftRecoveryEntry(
                 draft: draft,
-                reason: Self.reason(for: draft, recoverable: recoverable, uncertain: uncertain, view: view, environment: environment),
+                reason: Self.reason(for: draft, plan: plan, view: view, environment: environment),
                 current: view.currentVerse(draft.key.verse)
             ))
         }
@@ -255,13 +255,13 @@ public struct VerseDraftRecoveryQuery: Sendable {
     /// 왜 이 초안이 자동으로 표시되지 않는가 — 판정 자체는 편집 화면과 같은 규칙이 이미 했다. 여기서는 그 까닭만 읽는다.
     private static func reason(
         for draft: VerseDraft,
-        recoverable: Set<VerseDraftRef>,
-        uncertain: Set<VerseDraftRef>,
+        plan: VerseDraftRecoveryPlan,
         view: VerseDraftStoreView,
         environment: DrawingEditEnvironment
     ) -> VerseDraftRecoveryReason {
-        if recoverable.contains(draft.ref) { return .recoverable }
-        if uncertain.contains(draft.ref) { return .uncertain }
+        if plan.undisplayable.contains(draft) { return .undisplayable }
+        if plan.recoverable.contains(draft) { return .recoverable }
+        if plan.uncertain.contains(draft) { return .uncertain }
         guard VerseDraftRecoveryRule.continuation(of: draft, environment: environment) != nil else { return .otherBasis }
         let verseContent = view.verseContent[draft.key.verse]
         switch VerseDraftRecoveryRule.standing(of: draft, verseContent: verseContent, rows: view.rows) {
