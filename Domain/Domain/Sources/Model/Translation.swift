@@ -15,7 +15,7 @@ public enum Translation: String, Codable, Sendable {
     /// 화면에 적는 번역본 이름. 필사 화면 헤더 부제(`HeaderView`)와 같은 표기다.
     public var displayName: String {
         switch self {
-        case .NKRV: "개역한글"
+        case .NKRV: "개역개정"
         }
     }
 }

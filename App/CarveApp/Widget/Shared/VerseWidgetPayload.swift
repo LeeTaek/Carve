@@ -45,7 +45,7 @@ public struct VerseWidgetPayload: Codable, Equatable, Sendable {
     public var verse: Int
     /// 번역본 식별자(`Translation.rawValue`).
     public var translation: String
-    /// 번역본 이름(「개역한글」).
+    /// 번역본 이름(「개역개정」).
     public var translationDisplayName: String
     /// 지정 당시의 본문. 필기가 없는 말씀은 위젯이 이 글을 보여 준다.
     public var sentence: String

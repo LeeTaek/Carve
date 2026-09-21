@@ -160,7 +160,7 @@ struct CarveDetailVerseImageTesting {
         #expect(renderer.rendered.value == [VerseImageContent(
             sentence: Self.sentence,
             setting: store.sentenceSetting,
-            reference: "시편 23장 1절 · 개역한글",
+            reference: "시편 23장 1절 · 개역개정",
             handwriting: Self.handwriting
         )])
         #expect(photos.added.value == [Data("png".utf8)])

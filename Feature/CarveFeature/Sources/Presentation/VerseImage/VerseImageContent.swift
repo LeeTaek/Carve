@@ -28,7 +28,7 @@ public struct VerseImageContent: Equatable, Sendable {
     let sentence: String
     /// 본문 모양 — 필사 화면과 같은 글꼴 · 크기 · 줄 간격 · 자간으로 그린다.
     let setting: SentenceSetting
-    /// 아래에 적는 출처(「시편 23장 1절 · 개역한글」).
+    /// 아래에 적는 출처(「시편 23장 1절 · 개역개정」).
     let reference: String
     /// 필기 칸.
     let handwriting: VerseImageHandwriting

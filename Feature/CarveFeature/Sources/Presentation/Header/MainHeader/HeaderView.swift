@@ -177,7 +177,7 @@ public struct HeaderView: View {
                     // 세로 화면에서 광고와 함께 두면 폭이 좁아진다. 줄바꿈 대신 줄여 그린다.
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
-                Text("개역한글 · \(store.currentTitle.title.isOldtestment ? "구약" : "신약") / \(store.currentTitle.title.koreanTitle())")
+                Text("개역개정 · \(store.currentTitle.title.isOldtestment ? "구약" : "신약") / \(store.currentTitle.title.koreanTitle())")
                     .font(CarveTypography.caption)
                     .foregroundStyle(CarveColor.secondary)
                     .lineLimit(1)

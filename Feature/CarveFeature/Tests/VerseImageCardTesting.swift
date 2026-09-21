@@ -42,7 +42,7 @@ struct VerseImageCardTesting {
 
     @Test("출처는 「권 장 절 · 번역본」 이다 — 시편도 앱의 다른 화면처럼 「장」 으로 적는다")
     func referenceText() {
-        #expect(VerseImageContent.reference(chapter: BibleChapter(title: .psalms, chapter: 23), verse: 1) == "시편 23장 1절 · 개역한글")
+        #expect(VerseImageContent.reference(chapter: BibleChapter(title: .psalms, chapter: 23), verse: 1) == "시편 23장 1절 · 개역개정")
     }
 
     @Test("카드 폭은 필사 폭에 좌우 여백을 더한 것이고, 배율만큼 픽셀이 커진다")
