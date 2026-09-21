@@ -379,7 +379,7 @@ private struct FavoriteHandwritingPreview: View {
         }
         .task(id: lineData) {
             guard lineData != nil else { return }
-            rendered = VerseDrawingHistoryView.thumbnail(of: lineData).map(Rendered.image) ?? .unavailable
+            rendered = CarveInkThumbnail.image(of: lineData).map(Rendered.image) ?? .unavailable
         }
     }
 

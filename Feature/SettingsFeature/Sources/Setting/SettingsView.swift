@@ -60,6 +60,8 @@ public struct SettingsView: View {
                 NavigationLink(value: SettingsFeature.Path.State.iCloud(.initialState)) {
                     sidebarRow("iCloud", value: "켬")
                 }
+                // 보이지 않게 남은 필기의 지속적인 진입점(정책 §12-6 ④) — 개수는 화면을 열 때 센다.
+                NavigationLink("남은 필기", value: SettingsFeature.Path.State.draftRecovery(.initialState))
             }
             Section("지원") {
                 NavigationLink("도움말", value: SettingsFeature.Path.State.help(.initialState))
@@ -120,6 +122,10 @@ public struct SettingsView: View {
         case .iCloud:
             if let store = store.scope(state: \.path?.iCloud, action: \.path.iCloud) {
                 CloudSettingView(store: store)
+            }
+        case .draftRecovery:
+            if let store = store.scope(state: \.path?.draftRecovery, action: \.path.draftRecovery) {
+                DraftRecoveryView(store: store)
             }
         case .canvas:
             if let store = store.scope(state: \.path?.canvas, action: \.path.canvas) {

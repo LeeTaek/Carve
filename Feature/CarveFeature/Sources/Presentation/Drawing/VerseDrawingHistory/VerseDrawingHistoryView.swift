@@ -8,7 +8,6 @@
 
 import Domain
 import SwiftUI
-import PencilKit
 
 import ComposableArchitecture
 import UIComponents
@@ -106,7 +105,7 @@ public struct VerseDrawingHistoryView: View {
     @ViewBuilder
     private func row(for drawing: BibleDrawing) -> some View {
         let isCurrent = drawing.isPresent == true
-        if let image = Self.thumbnail(of: drawing.lineData) {
+        if let image = CarveInkThumbnail.image(of: drawing.lineData) {
             Button {
                 send(.selectDrawing(drawing))
             } label: {
@@ -167,20 +166,6 @@ public struct VerseDrawingHistoryView: View {
             in: RoundedRectangle(cornerRadius: CarveRadius.control, style: .continuous)
         )
         .contentShape(Rectangle())
-    }
-
-    /// 회차 썸네일 — 필기 범위를 고정 폭에 비율을 지켜 줄인다(시안 E2).
-    ///
-    /// 종이 위 필기라 라이트 외관으로 그린다. 다크 외관으로 그리면 PencilKit 이 잉크 색을 바꿔 저장된 색과 달라진다.
-    static func thumbnail(of data: Data?) -> UIImage? {
-        guard let data, let drawing = try? PKDrawing(data: data), !drawing.strokes.isEmpty else { return nil }
-        let bounds = drawing.bounds.insetBy(dx: -4, dy: -4)
-        guard bounds.width > 0, bounds.height > 0 else { return nil }
-        var image: UIImage?
-        UITraitCollection(userInterfaceStyle: .light).performAsCurrent {
-            image = drawing.image(from: bounds, scale: 2)
-        }
-        return image
     }
 
     static func dateText(_ date: Date?) -> String {

@@ -49,6 +49,8 @@ public struct SettingsFeature {
     @Reducer
     public enum Path {
         case iCloud(CloudSettingsFeature)
+        /// 보이지 않게 남은 필기 — 개수 · 용량 · 목록(정책 §12-6 구현 순서 ④, 읽기 전용).
+        case draftRecovery(DraftRecoveryFeature)
         /// 필사 캔버스 — 단일 Canvas flag 토글 (설계 §13 Phase 3 (3/3)).
         case canvas(CanvasSettingsFeature)
         /// 위젯에 표시할 말씀(시안 N7 · N8).
