@@ -80,6 +80,17 @@ public struct VerseDraftStoreView: Equatable, Sendable {
     }
 }
 
+/// 읽은 묶음과 그 초안 — 합쳐 판정한 결과를 묶음별로 다시 나눌 때 쓴다(`VerseDraftRecoveryRule.screenDrafts`).
+public struct ScopedVerseDraft: Equatable, Sendable {
+    public let scope: AccountScope
+    public let draft: VerseDraft
+
+    public init(scope: AccountScope, draft: VerseDraft) {
+        self.scope = scope
+        self.draft = draft
+    }
+}
+
 /// 다른 세션의 초안을 지금 세션에서 어떻게 잇는가.
 enum VerseDraftContinuation: Equatable, Sendable {
     /// 초안의 근거가 지금 환경에서 유효하고 지금 세션도 소유 근거가 있다 — 지금 세션으로 이어 쓴다. 이어 쓴 초안이 원 초안을 대신한다.
@@ -189,6 +200,26 @@ public enum VerseDraftRecoveryRule {
     public static func reachesScreen(_ draft: VerseDraft, environment: DrawingEditEnvironment) -> Bool {
         guard case .unverified(let hint) = draft.account else { return true }
         return hint == environment.accountBasis.referencedAccount
+    }
+
+    /// 이 환경의 편집 화면이 한 장에서 판정하는 초안 — 읽는 묶음(`readableDraftScopes`)을 **모두 합치고** 화면에 오를 수 있는 것만 남긴다.
+    ///
+    /// 편집 화면과 복구 화면(④)이 **같은 입력으로** `plan` 을 돌게 하는 자리다(2026-09-21 후속 리뷰 P0-2a). 묶음마다 따로 판정하면, 같은 절 ·
+    /// 같은 기준의 초안이 두 묶음(계정 · 확인 전)에 하나씩 있을 때 캔버스에서 밀린 쪽이 자기 묶음 안에서는 유일한 후보라 목록에도 오르지 않는다 —
+    /// 어디에도 없는 초안이 된다.
+    /// - Parameter read: 한 묶음의 이 장 초안. 하나라도 읽지 못하면 던진다 — 편집 화면은 그 장을 막고, 복구 화면은 "대조하지 못한 장" 으로 남긴다.
+    /// - Returns: 읽은 묶음과 함께 — 판정 결과를 묶음별로 나눌 때 쓴다.
+    public static func screenDrafts(
+        environment: DrawingEditEnvironment,
+        read: (AccountScope) async throws -> [VerseDraft]
+    ) async throws -> [ScopedVerseDraft] {
+        var drafts: [ScopedVerseDraft] = []
+        for scope in environment.readableDraftScopes {
+            for draft in try await read(scope) where reachesScreen(draft, environment: environment) {
+                drafts.append(ScopedVerseDraft(scope: scope, draft: draft))
+            }
+        }
+        return drafts
     }
 
     /// 다른 세션의 초안이 지금 저장소와 어떤 관계인가.

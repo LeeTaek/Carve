@@ -228,6 +228,51 @@ struct VerseDraftRecoveryInventoryTesting {
         }
     }
 
+    // MARK: - 묶음을 합쳐 한 번 판정한다 (2026-09-21 후속 리뷰 P0-2a)
+
+    /// 같은 절 · 같은 기준의 초안이 계정 A 묶음과 확인 전(힌트 A) 묶음에 하나씩 있다. 편집 화면은 둘을 **합쳐** 판정해 늦게 쓴 쪽을 보이고
+    /// 다른 쪽을 남긴다. 목록이 묶음마다 따로 판정하면 두 초안이 각자 묶음의 유일한 후보라 둘 다 "보인다" 로 빠져, 밀린 초안이 어디에도 없었다.
+    @Test("같은 절 · 같은 기준의 초안이 계정 묶음과 확인 전 묶음에 하나씩이면, 목록 항목이 편집 화면의 kept 와 같다 — 어느 쪽이 밀려도")
+    func inventoryMatchesTheCanvasAcrossBuckets() async throws {
+        for newerIsAccount in [true, false] {
+            try await withWriter { writer, _ in
+                let accountDraft = draft(
+                    verse: 1, session: "account-session", ink: "계정에서 씀", baseInk: "옛", savedAt: newerIsAccount ? 2_000 : 1_000
+                )
+                let unverifiedDraft = draft(
+                    verse: 1, session: "unverified-session", ink: "확인 전에 씀", baseInk: "옛", account: .unverified(hint: accountA),
+                    savedAt: newerIsAccount ? 1_000 : 2_000
+                )
+                _ = try await writer.saveDraft(accountDraft)
+                _ = try await writer.saveDraft(unverifiedDraft)
+                let snapshots = [row(verse: 1, rowID: "row-1", ink: "옛")]
+                let repository = StubRepository([genesis1: snapshots])
+                let current = environment(accountA)
+
+                // 편집 화면이 판정하는 입력 · 규칙 그대로(`ChapterCanvasFeature.loadDrafts` · `recoverDrafts`). 새로 연 장이라 세션 초안은 없다.
+                let screen = try await VerseDraftRecoveryRule.screenDrafts(environment: current) { scope in
+                    try await writer.drafts(in: scope, chapter: genesis1, translation: .NKRV)
+                }
+                let view = VerseDraftStoreView(snapshots: snapshots)
+                let canvas = VerseDraftRecoveryRule.plan(
+                    drafts: screen.map(\.draft), storeContent: view.verseContent, environment: current, sessionID: nil, storeRows: view.rows
+                )
+                let pushed = newerIsAccount ? unverifiedDraft : accountDraft
+                #expect(canvas.shown == [newerIsAccount ? accountDraft : unverifiedDraft])
+                #expect(canvas.kept == [pushed])
+
+                let query = VerseDraftRecoveryQuery(reader: writer, repository: repository)
+                let accountEntries = try await query.inventory(in: accountA, environment: current).entries
+                let unverifiedEntries = try await query.inventory(in: .unverified, environment: current).entries
+
+                // 밀린 초안은 **자기 묶음**의 목록에 한 번 오른다 — 다른 묶음에 새지 않는다.
+                #expect((accountEntries + unverifiedEntries).map(\.draft) == canvas.kept)
+                #expect((newerIsAccount ? unverifiedEntries : accountEntries).map(\.reason) == [.newerDraftShown])
+                #expect((newerIsAccount ? accountEntries : unverifiedEntries).isEmpty)
+            }
+        }
+    }
+
     // MARK: - 읽지 못하는 장
 
     @Test("한 장을 읽지 못해도 나머지 장은 알린다 — 그 장은 따로 알리고 파일은 남는다")

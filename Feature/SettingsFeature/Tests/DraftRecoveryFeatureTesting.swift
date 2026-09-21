@@ -290,6 +290,16 @@ struct DraftRecoveryFeatureTesting {
         #expect(store.state.buckets.first?.title == "로그인하지 않은 동안")
     }
 
+    /// 목록의 기준은 "그 장을 다시 열어도 자동으로 표시되지 않는 초안" 이다(2026-09-21 후속 리뷰 확정). 열린 캔버스에 지금 겹쳐 보이는지가 아니다.
+    @Test("목록이 모으는 것을 「자동으로 표시되지 않는 필사 초안」 으로 말하고, 「화면에 보이지 않는」 이라 하지 않는다")
+    func copySaysNotAutomaticallyShown() {
+        #expect(DraftRecoveryCopy.introduction.contains("자동으로 표시되지 않는 필사 초안"))
+        #expect(DraftRecoveryCopy.totalLine(draftCount: 3, draftBytes: 0, hiddenCount: 1).hasSuffix("자동으로 표시되지 않는 것 1개"))
+        for text in [DraftRecoveryCopy.introduction, DraftRecoveryCopy.nothingHidden, DraftRecoveryCopy.reasonDetail(.storeMoved)] {
+            #expect(!text.contains("화면에 보이지 않"))
+        }
+    }
+
     @Test("묶음을 펼쳤다 접는다")
     func openingAndClosingABucket() async throws {
         let reader = ReaderStub(

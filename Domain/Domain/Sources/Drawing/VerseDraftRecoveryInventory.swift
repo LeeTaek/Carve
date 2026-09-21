@@ -68,9 +68,9 @@ public extension DependencyValues {
 
 // MARK: - 목록에 오르는 것
 
-/// 복구 화면이 한 초안을 목록에 올리는 까닭 — **왜 이 초안이 화면에 보이지 않는가.**
+/// 복구 화면이 한 초안을 목록에 올리는 까닭 — **왜 이 초안이 그 장을 다시 열어도 자동으로 표시되지 않는가.**
 ///
-/// 보이는 초안(`VerseDraftRecoveryPlan.shown`)과 역할이 끝난 초안(`settled`)은 목록에 넣지 않는다. 남아 있다는 이유만으로 모두 안내하면
+/// 자동으로 표시되는 초안(`VerseDraftRecoveryPlan.shown`)과 역할이 끝난 초안(`settled`)은 목록에 넣지 않는다. 남아 있다는 이유만으로 모두 안내하면
 /// 사용자가 판단할 것과 판단할 필요 없는 것이 섞인다(사용자 결정 2026-09-21).
 public enum VerseDraftRecoveryReason: String, Equatable, Sendable, CaseIterable {
     /// 그 행이 **내가 앞서 넣은 내용**으로 돌아왔다 — 그 뒤 편집은 이 초안에만 있다(F29). 되살릴 수 있는 후보다.
@@ -123,7 +123,7 @@ public struct VerseDraftRecoveryInventory: Equatable, Sendable {
     /// 이 묶음을 지금 환경에서 저장소와 대조했는가. 대조하지 않았으면(다른 계정 · 이 기기 전용) 분류 없이 세어 보이기만 한다 —
     /// 그 계정으로 돌아왔을 때 연다.
     public let comparedWithStore: Bool
-    /// 보이지 않게 남은 초안들. 최근에 쓴 것부터.
+    /// 그 장을 다시 열어도 자동으로 표시되지 않는 초안들. 최근에 쓴 것부터.
     public let entries: [VerseDraftRecoveryEntry]
     /// 대조하지 못한 장 — 초안이나 저장소를 읽지 못했다. **파일은 그대로 남는다**(지우지 않는다).
     public let unreadChapters: [BibleChapter]
@@ -144,6 +144,10 @@ public struct VerseDraftRecoveryInventory: Equatable, Sendable {
 
 /// 복구 화면(④)의 조회 — **초안이 남은 장만** 저장소와 대조해, 편집 화면과 같은 규칙(`VerseDraftRecoveryRule`)으로 분류한다.
 ///
+/// 목록의 기준은 **"그 장을 다시 열어도 자동으로 표시되지 않는 초안"** 이다(2026-09-21 후속 리뷰 확정). 열려 있는 캔버스의 일시적 상태로
+/// 목록이 흔들리지 않게 지금 편집 세션 없이(`sessionID: nil`) 판정하고, 판정 입력은 편집 화면과 같게 **읽는 묶음을 모두 합친다**
+/// (`VerseDraftRecoveryRule.screenDrafts`).
+///
 /// - 저장소를 먼저 훑지 않는다. 초안 파일 이름이 어느 장인지 알려 주므로(`DraftBucketSummary.chapters`) 그 장만 읽는다.
 /// - **아무것도 쓰지 않는다.** 읽지 못한 장이 있어도 다른 장은 그대로 알리고, 그 장의 파일은 남긴다.
 /// - 편집 화면이 읽지 않는 묶음은 저장소와 대조하지 않는다 — 지금 저장소의 내용은 그 계정의 것이 아니다.
@@ -156,7 +160,7 @@ public struct VerseDraftRecoveryQuery: Sendable {
         self.repository = repository
     }
 
-    /// 한 묶음에서 **보이지 않게 남은** 초안.
+    /// 한 묶음에서 그 장을 다시 열어도 **자동으로 표시되지 않는** 초안.
     /// - Parameters:
     ///   - scope: 볼 묶음.
     ///   - environment: 지금 편집 환경 — 무엇이 화면에 보이는지를 가리는 기준이다.
@@ -193,7 +197,7 @@ public struct VerseDraftRecoveryQuery: Sendable {
         VerseDraftStoreView(snapshots: try await repository.load(chapter: chapter).snapshots).representatives[verse]
     }
 
-    /// 한 장에서 보이지 않게 남은 초안들. 초안이나 저장소를 읽지 못하면 던진다 — 부르는 쪽이 "대조하지 못한 장" 으로 남긴다.
+    /// 한 장에서 자동으로 표시되지 않는 이 묶음의 초안들. 초안이나 저장소를 읽지 못하면 던진다 — 부르는 쪽이 "대조하지 못한 장" 으로 남긴다.
     private func entries(
         chapter: BibleChapter,
         scope: AccountScope,
@@ -208,16 +212,22 @@ public struct VerseDraftRecoveryQuery: Sendable {
         // 힌트가 다른 확인 전 초안은 편집 화면에도 오르지 않는다 — 저장소와 견주지 않고 다른 근거로 센다.
         var entries = drafts.filter { !VerseDraftRecoveryRule.reachesScreen($0, environment: environment) }
             .map { VerseDraftRecoveryEntry(draft: $0, reason: .otherBasis, current: nil) }
-        let onScreen = drafts.filter { VerseDraftRecoveryRule.reachesScreen($0, environment: environment) }
-        guard !onScreen.isEmpty else { return entries }
+        guard drafts.contains(where: { VerseDraftRecoveryRule.reachesScreen($0, environment: environment) }) else { return entries }
+        // 편집 화면과 **같은 입력**으로 판정한다 — 이 환경이 읽는 묶음을 모두 합쳐 한 번(2026-09-21 후속 리뷰 P0-2a). 이 묶음만 넣으면 다른 묶음의
+        // 더 새 초안에 밀려 캔버스에 보이지 않는 초안이 여기서는 유일한 후보라 "보인다" 로 빠진다.
+        let screen = try await VerseDraftRecoveryRule.screenDrafts(environment: environment) { readable in
+            readable == scope ? drafts : try await reader.drafts(in: readable, chapter: chapter, translation: translation)
+        }
+        // 결과는 묶음별로 나눈다 — 이 묶음의 초안만 이 묶음의 목록에 오른다.
+        let mine = screen.filter { $0.scope == scope }.map(\.draft)
         let view = VerseDraftStoreView(snapshots: try await repository.load(chapter: chapter).snapshots)
-        // 지금 편집 세션은 없다 — 복구 화면은 캔버스가 아니다. 열려 있는 세션의 초안도 "그 장을 열면 보이는가" 로 같이 가린다.
+        // 지금 편집 세션은 없다 — 복구 화면은 캔버스가 아니다. 열려 있는 세션의 초안도 "그 장을 다시 열면 자동으로 표시되는가" 로 같이 가린다.
         let plan = VerseDraftRecoveryRule.plan(
-            drafts: onScreen, storeContent: view.verseContent, environment: environment, sessionID: nil, storeRows: view.rows
+            drafts: screen.map(\.draft), storeContent: view.verseContent, environment: environment, sessionID: nil, storeRows: view.rows
         )
         let recoverable = Set(plan.recoverable.map(\.ref))
         let uncertain = Set(plan.uncertain.map(\.ref))
-        for draft in plan.kept {
+        for draft in plan.kept where mine.contains(draft) {
             entries.append(VerseDraftRecoveryEntry(
                 draft: draft,
                 reason: Self.reason(for: draft, recoverable: recoverable, uncertain: uncertain, view: view, environment: environment),
@@ -227,7 +237,7 @@ public struct VerseDraftRecoveryQuery: Sendable {
         return entries
     }
 
-    /// 왜 이 초안이 화면에 보이지 않는가 — 판정 자체는 편집 화면과 같은 규칙이 이미 했다. 여기서는 그 까닭만 읽는다.
+    /// 왜 이 초안이 자동으로 표시되지 않는가 — 판정 자체는 편집 화면과 같은 규칙이 이미 했다. 여기서는 그 까닭만 읽는다.
     private static func reason(
         for draft: VerseDraft,
         recoverable: Set<VerseDraftRef>,

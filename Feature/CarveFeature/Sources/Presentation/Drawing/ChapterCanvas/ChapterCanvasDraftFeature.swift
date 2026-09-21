@@ -513,13 +513,13 @@ extension ChapterCanvasFeature {
         guard let store else { return [] }
         // 확인 전 묶음의 초안은 **그때 참고하던 계정(힌트)이 지금 참고하는 계정과 같을 때만** 화면에 올린다(사용자 결정 2026-09-21,
         // 11차 리뷰 P1). 확인된 환경이든 확인 전 환경이든 같은 규칙이다 — 다른 힌트의 초안은 다른 계정의 필기일 수 있다. 파일은 남는다.
-        // 복구 화면(④)이 "보이지 않게 남은 것" 을 세는 기준도 같은 규칙이다.
-        var drafts: [VerseDraft] = []
+        // 복구 화면(④)도 **같은 함수로 같은 입력**(읽는 묶음을 모두 합침)을 만들어 판정한다 — 묶음마다 따로 판정하면 여기서 밀린 초안이
+        // 목록에도 없다(2026-09-21 후속 리뷰 P0-2a).
+        let drafts: [VerseDraft]
         do {
-            for scope in environment.readableDraftScopes {
-                drafts += try await store.drafts(in: scope, chapter: chapter, translation: .NKRV)
-            }
-            drafts = drafts.filter { VerseDraftRecoveryRule.reachesScreen($0, environment: environment) }
+            drafts = try await VerseDraftRecoveryRule.screenDrafts(environment: environment) { scope in
+                try await store.drafts(in: scope, chapter: chapter, translation: .NKRV)
+            }.map(\.draft)
         } catch {
             Log.error("단일 Canvas — 이 장의 초안을 읽지 못했다. 입력을 막고 다시 시도를 기다린다", "\(error)")
             throw DrawingLoadFailure(message: "\(error)", source: .drafts)

@@ -46,14 +46,15 @@ public struct DraftRecoveryView: View {
     @ViewBuilder
     private var summary: some View {
         VStack(alignment: .leading, spacing: CarveSpacing.xSmall) {
-            Text("이 기기에 남아 있는 필사 초안이에요. 그중 **화면에 보이지 않는 것**을 여기서 찾아볼 수 있어요.")
+            Text(LocalizedStringKey(DraftRecoveryCopy.introduction))
                 .font(CarveTypography.body)
                 .foregroundStyle(CarveColor.ink)
                 .fixedSize(horizontal: false, vertical: true)
             if !store.buckets.isEmpty {
-                // 전체 개수와 "보이지 않는 것" 을 따로 적는다 — 같은 수로 뭉뚱그리면 보이는 초안까지 사라진 것처럼 읽힌다.
-                Text("초안 \(store.totalDraftCount)개 · \(DraftRecoveryCopy.bytesText(store.totalDraftBytes))"
-                     + " · 화면에 보이지 않는 것 \(store.hiddenCount)개")
+                // 전체 개수와 "자동으로 표시되지 않는 것" 을 따로 적는다 — 같은 수로 뭉뚱그리면 표시되는 초안까지 사라진 것처럼 읽힌다.
+                Text(DraftRecoveryCopy.totalLine(
+                    draftCount: store.totalDraftCount, draftBytes: store.totalDraftBytes, hiddenCount: store.hiddenCount
+                ))
                     .font(CarveTypography.body)
                     .foregroundStyle(CarveColor.ink)
                     .fixedSize(horizontal: false, vertical: true)
@@ -145,7 +146,7 @@ public struct DraftRecoveryView: View {
         if bucket.readFailed { return "읽지 못했어요 · 파일은 그대로 있어요" }
         var parts = ["초안 \(bucket.draftCount)개 · \(DraftRecoveryCopy.bytesText(bucket.draftBytes))"]
         if bucket.unreadableCount > 0 { parts.append("읽지 못한 파일 \(bucket.unreadableCount)개") }
-        parts.append(bucket.items.isEmpty ? "보이지 않게 남은 것 없음" : "보이지 않게 남은 것 \(bucket.items.count)개")
+        parts.append(bucket.items.isEmpty ? "자동으로 표시되지 않는 것 없음" : "자동으로 표시되지 않는 것 \(bucket.items.count)개")
         return parts.joined(separator: " · ")
     }
 
@@ -170,9 +171,7 @@ public struct DraftRecoveryView: View {
             }
 
             if bucket.items.isEmpty, !bucket.readFailed {
-                note(bucket.draftCount == 0
-                     ? "남은 초안이 없어요."
-                     : "남은 초안은 모두 화면에 보이거나 이미 저장된 것이에요.", emphasized: false)
+                note(bucket.draftCount == 0 ? "남은 초안이 없어요." : DraftRecoveryCopy.nothingHidden, emphasized: false)
             } else {
                 ForEach(bucket.items) { item in
                     itemCard(item, comparedWithStore: bucket.comparedWithStore)

@@ -2,7 +2,7 @@
 //  DraftRecoveryFeature.swift
 //  SettingsFeature
 //
-//  설정 → 「남은 필기」. 보이지 않게 남은 초안을 보고 · 견주는 한 자리 (정책 §12-6 구현 순서 ④).
+//  설정 → 「남은 필기」. 그 장을 다시 열어도 자동으로 표시되지 않는 초안을 보고 · 견주는 한 자리 (정책 §12-6 구현 순서 ④).
 //
 
 import CarveToolkit
@@ -11,11 +11,12 @@ import Foundation
 
 import ComposableArchitecture
 
-/// 이 기기에 **보이지 않게 남은 필기**를 보이는 화면.
+/// 이 기기에 남아, 그 장을 다시 열어도 **자동으로 표시되지 않는 필사 초안**을 보이는 화면(2026-09-21 후속 리뷰 확정 기준).
 ///
 /// - **읽기 전용이다**(사용자 결정 2026-09-21). 개수 · 용량 · 목록 · 출처까지 보이고, 되살리기 · 귀속 동의는 ③ 의 버전 쓰기와 같은 시기에
 ///   붙인다. 그동안에도 파일은 지우지 않는다 — 보이지 않는다는 것이 사라졌다는 뜻이 아니다.
-/// - **판정은 편집 화면과 같은 규칙**을 쓴다(`VerseDraftRecoveryQuery`). 화면에 보이는 초안과 이미 저장소에 든 초안은 목록에 넣지 않는다.
+/// - **판정은 편집 화면과 같은 규칙 · 같은 입력**을 쓴다(`VerseDraftRecoveryQuery`). 자동으로 표시되는 초안과 이미 저장소에 든 초안은 목록에
+///   넣지 않는다.
 /// - 다른 계정 묶음은 **저장소와 대조하지 않고** 세어 보이기만 한다. 그 계정으로 돌아왔을 때 연다.
 @Reducer
 public struct DraftRecoveryFeature {
@@ -38,7 +39,7 @@ public struct DraftRecoveryFeature {
         public var comparedWithStore: Bool
         /// 이 묶음을 아예 읽지 못했다 — **초안이 없다는 뜻이 아니다.**
         public var readFailed: Bool
-        /// 보이지 않게 남은 초안들. 최근에 쓴 것부터.
+        /// 자동으로 표시되지 않는 초안들. 최근에 쓴 것부터.
         public var items: [Item]
         /// 대조하지 못한 장 이름 — 그 장의 초안은 세어졌지만 분류하지 못했다.
         public var unreadChapters: [String]
@@ -97,7 +98,7 @@ public struct DraftRecoveryFeature {
         public var totalDraftBytes: Int64 { buckets.reduce(0) { $0 + $1.draftBytes } }
         public var totalUnreadableCount: Int { buckets.reduce(0) { $0 + $1.unreadableCount } }
         public var totalUnreadableBytes: Int64 { buckets.reduce(0) { $0 + $1.unreadableBytes } }
-        /// 그중 **화면에 보이지 않는** 초안 — 나머지는 화면에 보이거나 이미 저장된 것이다.
+        /// 그중 그 장을 다시 열어도 **자동으로 표시되지 않는** 초안 — 나머지는 자동으로 표시되거나 이미 저장된 것이다.
         public var hiddenCount: Int { buckets.reduce(0) { $0 + $1.items.count } }
         /// 사용자가 판단할 것이 있는가 — 되살릴 수 있음 · 저장 완료 불확실.
         public var needsAttentionCount: Int {
@@ -321,6 +322,21 @@ extension DraftRecoveryFeature.Item {
 
 /// 화면 문구를 한곳에 둔다 — 같은 사실을 화면마다 다르게 말하지 않게.
 public enum DraftRecoveryCopy {
+    /// 목록이 모으는 것 — **"그 장을 다시 열어도 자동으로 표시되지 않는 필사 초안"**(2026-09-21 후속 리뷰 확정). 열린 캔버스의 일시적 상태가
+    /// 아니라 다시 열었을 때를 기준으로 삼는다. 이전 문구("화면에 보이지 않는 것")는 지금 캔버스에 겹쳐 보이는 초안까지 떠올리게 했다.
+    public static let hiddenKind = "자동으로 표시되지 않는 필사 초안"
+
+    /// 화면 첫 줄.
+    public static let introduction = "이 기기에 남아 있는 필사 초안이에요. 그중 그 장을 다시 열어도 **\(hiddenKind)**을 여기서 찾아볼 수 있어요."
+
+    /// 전체 요약 — 파일 수와 "자동으로 표시되지 않는 것" 을 따로 적는다. 같은 수로 뭉뚱그리면 표시되는 초안까지 사라진 것처럼 읽힌다.
+    public static func totalLine(draftCount: Int, draftBytes: Int64, hiddenCount: Int) -> String {
+        "초안 \(draftCount)개 · \(bytesText(draftBytes)) · 자동으로 표시되지 않는 것 \(hiddenCount)개"
+    }
+
+    /// 대조한 묶음에 목록이 비었을 때.
+    public static let nothingHidden = "남은 초안은 모두 그 장을 열면 자동으로 표시되거나 이미 저장된 것이에요."
+
     /// 묶음 이름. **로그인하지 않은 동안 · 계정을 확인하지 못한 동안을 먼저 가린다** — 로그아웃 상태에서는 이 기기 전용 묶음이
     /// "지금 근거의 묶음" 이라 「지금 계정」 으로 읽히는데, 그때는 계정이 없다(2026-09-21 기기 확인).
     public static func bucketTitle(_ scope: AccountScope, environment: DrawingEditEnvironment) -> String {
@@ -369,7 +385,7 @@ public enum DraftRecoveryCopy {
         case .uncertain:
             "저장소로 보내던 중에 앱이 끝났고, 그 절은 그 뒤로 바뀌었어요. 들어갔는지 가릴 수 없어 그대로 남겨 둬요."
         case .storeMoved:
-            "이 필기를 쓴 뒤 그 절에 다른 내용이 들어왔어요. 겹쳐 보이면 그 내용을 가리게 돼 보이지 않아요."
+            "이 필기를 쓴 뒤 그 절에 다른 내용이 들어왔어요. 겹쳐 보이면 그 내용을 가리게 돼 자동으로 표시하지 않아요."
         case .otherBasis:
             "그 계정으로 돌아오면 다시 볼 수 있어요. 지금 계정으로 자동으로 가져오지 않아요."
         case .newerDraftShown:

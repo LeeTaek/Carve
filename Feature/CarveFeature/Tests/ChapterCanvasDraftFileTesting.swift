@@ -84,6 +84,36 @@ struct ChapterCanvasDraftFileTesting: DraftTestSamples {
         await end(store, environment)
     }
 
+    /// 2026-09-21 후속 리뷰 P0-2a — 캔버스는 읽는 묶음을 합쳐 한 번 판정하는데 목록은 묶음마다 돌아, 캔버스에서 밀린 초안이 목록에도 없었다.
+    @Test("같은 절 · 같은 기준의 초안이 계정 묶음과 확인 전(힌트 A) 묶음에 하나씩이면, 캔버스가 감춘 초안이 「남은 필기」 목록에 그대로 오른다")
+    func canvasHiddenDraftIsListedInRecovery() async throws {
+        let area = makeArea()
+        defer { try? FileManager.default.removeItem(at: area.root) }
+        let spy = spyWithVerseOne()
+        var newer = previousDraft(session: "account-session", ink: "account-ink")
+        newer.savedAt = Date(timeIntervalSince1970: 900)
+        var older = previousDraft(session: "unverified-session", ink: "unverified-ink", account: .unverified(hint: accountA))
+        older.savedAt = Date(timeIntervalSince1970: 800)
+        _ = try await area.writer.saveDraft(newer)
+        _ = try await area.writer.saveDraft(older)
+        let current = confirmed(accountA, 1, owned: false)
+        let environment = ControlledEditEnvironment(current)
+        let store = makeStore(spy: spy, results: [], environment: environment, drafts: area.writer)
+        await composeAndSubscribe(store, environment)
+
+        // 캔버스 — 늦게 쓴 계정 묶음의 초안을 보이고, 확인 전 묶음의 초안은 감춘다(절 메뉴의 「남은 필기 1」).
+        #expect(store.state.loadedDrawings?.first { $0.verse == 1 }?.lineData == Data("account-ink".utf8))
+        #expect(store.state.drafts.hiddenCounts == [1: 1])
+
+        // 목록 — 같은 파일 · 같은 저장소로 묶음마다 조회한다. 감춘 그 초안이 자기 묶음에 한 번 오른다.
+        let query = VerseDraftRecoveryQuery(reader: area.writer, repository: spy)
+        let listed = try await query.inventory(in: accountA, environment: current).entries
+            + query.inventory(in: .unverified, environment: current).entries
+        #expect(listed.map(\.draft) == [older])
+        #expect(listed.map(\.reason) == [.newerDraftShown])
+        await end(store, environment)
+    }
+
     @Test("초안 폴더를 읽지 못하는 동안에도 막고, 권한이 돌아오면 그 초안을 그대로 보인다")
     func unreadableDraftFolderBlocksChapter() async throws {
         let area = makeArea()
