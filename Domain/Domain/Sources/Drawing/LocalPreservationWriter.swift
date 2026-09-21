@@ -39,6 +39,13 @@ public struct VerseDraftKey: Hashable, Codable, Sendable {
     private static func fileStem(_ components: [String]) -> String {
         components.map { $0.replacingOccurrences(of: "/", with: "_") }.joined(separator: "~")
     }
+
+    /// 파일 이름이 가리키는 장 — 파일을 열지 않고 읽는다(깨진 초안도 어느 장인지는 안다). 모양이 다르면 nil.
+    static func chapter(fromFileName name: String) -> BibleChapter? {
+        let parts = name.replacingOccurrences(of: ".json", with: "").split(separator: "~", omittingEmptySubsequences: false)
+        guard parts.count == 4, let title = BibleTitle(rawValue: String(parts[1])), let chapter = Int(parts[2]) else { return nil }
+        return BibleChapter(title: title, chapter: chapter)
+    }
 }
 
 /// 절 하나의 초안 — 그 절의 **완전한** 획 집합과, 그것을 쓴 편집 문맥의 근거를 함께 든다.
@@ -178,6 +185,30 @@ public extension VerseEditAccountBasis {
         case .unverified: .unverified
         case .localOnly: .localOnly
         }
+    }
+}
+
+/// 복구 화면(④)이 쓰는 묶음 요약 — **파일만 보고 센다.** 저장소를 읽지 않으므로 깨진 초안이 있어도 개수 · 용량은 나온다.
+public struct DraftBucketSummary: Equatable, Sendable {
+    public let scope: AccountScope
+    /// 읽을 수 있는 초안 파일 수와 바이트.
+    public let draftCount: Int
+    public let draftBytes: Int64
+    /// 읽지 못해 옆으로 옮긴 파일(`*.unreadable-*`) — 되살릴 수 없고 내보내기만 한다.
+    public let unreadableCount: Int
+    public let unreadableBytes: Int64
+    /// 초안이 남아 있는 장. 분류(저장소 대조)는 이 장만 읽으면 된다.
+    public let chapters: [BibleChapter]
+
+    public init(
+        scope: AccountScope, draftCount: Int, draftBytes: Int64, unreadableCount: Int, unreadableBytes: Int64, chapters: [BibleChapter]
+    ) {
+        self.scope = scope
+        self.draftCount = draftCount
+        self.draftBytes = draftBytes
+        self.unreadableCount = unreadableCount
+        self.unreadableBytes = unreadableBytes
+        self.chapters = chapters
     }
 }
 
@@ -356,6 +387,58 @@ public actor LocalPreservationWriter {
             .sorted { ($0.key.verse, $0.key.sessionID) < ($1.key.verse, $1.key.sessionID) }
     }
 
+    // MARK: - 복구 화면(④)이 보는 것
+
+    /// 이 기기에 초안이 남아 있는 묶음(계정 범위)들. 폴더가 없으면 빈 목록이다.
+    public func draftBuckets() throws -> [AccountScope] {
+        let root = area.draftsDirectory
+        var status = stat()
+        guard lstat(root.path, &status) == 0 else {
+            if errno == ENOENT { return [] }
+            throw WriterError.draftsUnreadable(root.lastPathComponent)
+        }
+        do {
+            return try fileManager.contentsOfDirectory(at: root, includingPropertiesForKeys: [.isDirectoryKey])
+                .filter { (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true }
+                .map { AccountScope(key: $0.lastPathComponent) }
+                .sorted { $0.key < $1.key }
+        } catch {
+            Log.error("로컬 보존 — 초안 묶음 목록을 읽지 못했다", "\(error)")
+            throw WriterError.draftsUnreadable(root.lastPathComponent)
+        }
+    }
+
+    /// 그 묶음의 개수 · 용량 · 남은 장. **지금 세대의 것만** 세지 않는다 — 옛 세대의 잔여도 자리를 차지하므로 함께 보인다.
+    public func draftSummary(in scope: AccountScope) throws -> DraftBucketSummary {
+        let files = try draftEntries(in: scope)
+        var draftCount = 0, unreadableCount = 0
+        var draftBytes: Int64 = 0, unreadableBytes: Int64 = 0
+        var chapters: Set<BibleChapter> = []
+        for url in files {
+            let size = Int64((try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
+            if url.lastPathComponent.contains("unreadable-") {
+                unreadableCount += 1
+                unreadableBytes += size
+            } else if url.pathExtension == "json" {
+                draftCount += 1
+                draftBytes += size
+            } else {
+                continue
+            }
+            if let chapter = VerseDraftKey.chapter(fromFileName: url.lastPathComponent) { chapters.insert(chapter) }
+        }
+        return DraftBucketSummary(
+            scope: scope, draftCount: draftCount, draftBytes: draftBytes, unreadableCount: unreadableCount,
+            unreadableBytes: unreadableBytes,
+            chapters: chapters.sorted { ($0.title.rawValue, $0.chapter) < ($1.title.rawValue, $1.chapter) }
+        )
+    }
+
+    /// 읽지 못해 옆으로 옮긴 파일들 — 복구 화면이 내보내기로 넘긴다.
+    public func unreadableDraftFiles(in scope: AccountScope) throws -> [URL] {
+        try draftEntries(in: scope).filter { $0.lastPathComponent.contains("unreadable-") }.sorted { $0.path < $1.path }
+    }
+
     // MARK: - 격리
 
     /// 무효가 된 편집 세션의 미저장분을 격리본으로 남긴다. 세션이 기댄 세대 뒤에 전체 삭제가 있었으면 쓰지 않는다.
@@ -423,7 +506,7 @@ public actor LocalPreservationWriter {
     ///
     /// **묶음 폴더가 없을 때만(ENOENT) 빈 목록이다.** 권한 · 입출력 오류로 폴더를 보지 못하는 것을 "없음" 으로 치면 보이지 않는 초안 위에
     /// 새 초안이 덮인다 — 폴더가 아니거나, 어느 세션 폴더든 목록을 읽지 못하면 던진다.
-    private func draftFiles(in scope: AccountScope, matching include: (URL) -> Bool) throws -> [URL] {
+    private func draftEntries(in scope: AccountScope) throws -> [URL] {
         let root = area.draftsDirectory.appendingPathComponent(scope.key, isDirectory: true)
         var status = stat()
         guard lstat(root.path, &status) == 0 else {
@@ -436,14 +519,18 @@ public actor LocalPreservationWriter {
             var files: [URL] = []
             for session in try fileManager.contentsOfDirectory(at: root, includingPropertiesForKeys: [.isDirectoryKey]) {
                 guard try session.resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true else { continue }
-                files += try fileManager.contentsOfDirectory(at: session, includingPropertiesForKeys: nil)
-                    .filter { $0.pathExtension == "json" && include($0) }
+                files += try fileManager.contentsOfDirectory(at: session, includingPropertiesForKeys: [.fileSizeKey])
             }
             return files
         } catch {
             Log.error("로컬 보존 — 초안 폴더를 끝까지 읽지 못했다", "\(error)")
             throw WriterError.draftsUnreadable(scope.key)
         }
+    }
+
+    /// 묶음의 초안 파일(`.json`, 쓰다 남은 임시 · 옆으로 옮긴 파일은 빼고).
+    private func draftFiles(in scope: AccountScope, matching include: (URL) -> Bool) throws -> [URL] {
+        try draftEntries(in: scope).filter { $0.pathExtension == "json" && include($0) }
     }
 
     private func draftURL(_ key: VerseDraftKey, scope: AccountScope) -> URL {

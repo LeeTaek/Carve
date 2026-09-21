@@ -250,4 +250,59 @@ struct LocalPreservationReadFailureTesting {
             #expect(try Data(contentsOf: asideURL) == brokenBytes)
         }
     }
+    // MARK: - 복구 화면(④)이 보는 것
+
+    @Test("묶음마다 개수 · 용량 · 남은 장을 세고, 읽지 못한 파일은 따로 센다")
+    func summaryCountsDraftsAndUnreadableFilesPerBucket() async throws {
+        try await withAreas { areas in
+            let writer = LocalPreservationWriter(area: areas.preservation, eraseState: areas.eraseState)
+            let other = BibleChapter(title: .genesis, chapter: 11)
+            _ = try await writer.saveDraft(draft(verse: 1))
+            _ = try await writer.saveDraft(draft(verse: 2))
+            _ = try await writer.saveDraft(draft(verse: 1, chapter: other))
+            var unverified = draft(verse: 3)
+            unverified.account = .unverified(hint: account)
+            _ = try await writer.saveDraft(unverified)
+            // 읽지 못해 옆으로 옮긴 파일 — 같은 키에 새 초안을 쓰면 생긴다.
+            try Data("깨짐".utf8).write(to: fileURL(areas, draft(verse: 2)))
+            _ = try await writer.saveDraft(draft(verse: 2, revision: 2))
+
+            #expect(try await writer.draftBuckets().map(\.key) == [account.key, AccountScope.unverified.key])
+
+            let summary = try await writer.draftSummary(in: account)
+            #expect(summary.draftCount == 3)
+            #expect(summary.draftBytes > 0)
+            #expect(summary.unreadableCount == 1)
+            #expect(summary.unreadableBytes == Int64(Data("깨짐".utf8).count))
+            #expect(summary.chapters == [chapter, other])
+
+            let unverifiedSummary = try await writer.draftSummary(in: .unverified)
+            #expect(unverifiedSummary.draftCount == 1)
+            #expect(unverifiedSummary.unreadableCount == 0)
+
+            let aside = try await writer.unreadableDraftFiles(in: account)
+            #expect(aside.count == 1)
+            #expect(try Data(contentsOf: try #require(aside.first)) == Data("깨짐".utf8))
+        }
+    }
+
+    @Test("초안을 쓴 적 없으면 묶음이 없고, 깨진 초안이 있어도 개수 · 용량은 센다")
+    func summaryWorksWithoutDraftsAndWithBrokenOnes() async throws {
+        try await withAreas { areas in
+            let writer = LocalPreservationWriter(area: areas.preservation, eraseState: areas.eraseState)
+            #expect(try await writer.draftBuckets().isEmpty)
+
+            _ = try await writer.saveDraft(draft(verse: 1))
+            _ = try await writer.saveDraft(draft(verse: 2))
+            // 하나가 깨져도 목록 · 용량은 나온다 — 분류만 못 할 뿐이다.
+            try Data("깨짐".utf8).write(to: fileURL(areas, draft(verse: 2)))
+
+            let summary = try await writer.draftSummary(in: account)
+            #expect(summary.draftCount == 2)
+            #expect(summary.chapters == [chapter])
+            // 그 장을 읽으려 하면 여전히 막는다.
+            await #expect(throws: (any Error).self) { try await writer.drafts(in: account, chapter: chapter) }
+        }
+    }
+
 }
