@@ -169,6 +169,16 @@ public struct VerseDraftProvenance: Codable, Equatable, Sendable {
 }
 
 public extension DrawingEditEnvironment {
+    /// 이 환경의 편집 화면이 **읽는** 초안 묶음 — 지금 근거의 묶음과, 확인된 계정이면 확인 전 묶음(힌트가 같은 초안만 올라온다).
+    ///
+    /// 그 밖의 묶음(다른 계정 · 이 기기 전용)은 읽지 않는다. 지금 저장소의 내용은 그 묶음의 계정 것이 아니라, 견주면 엉뚱한 판정이 된다 —
+    /// 복구 화면(④)도 그 묶음은 세어 보이기만 하고 저장소와 대조하지 않는다.
+    var readableDraftScopes: [AccountScope] {
+        let scope = accountBasis.preservationScope
+        guard case .confirmed = accountBasis else { return [scope] }
+        return [scope, .unverified]
+    }
+
     /// 이 환경에서 쓰는 초안의 출처.
     var draftProvenance: VerseDraftProvenance {
         VerseDraftProvenance(
@@ -184,6 +194,16 @@ public extension VerseEditAccountBasis {
         case .confirmed(let token): token.scope
         case .unverified: .unverified
         case .localOnly: .localOnly
+        }
+    }
+
+    /// 이 근거가 **참고하는 계정** — 확인됐으면 그 계정, 확인 전이면 그때의 마지막 확인 힌트, 로그인하지 않았으면 없다.
+    /// 확인 전 묶음의 초안을 화면에 올릴지 가리는 기준이다(`VerseDraftRecoveryRule.reachesScreen`).
+    var referencedAccount: AccountScope? {
+        switch self {
+        case .confirmed(let token): token.scope
+        case .unverified(let hint): hint
+        case .localOnly: nil
         }
     }
 }

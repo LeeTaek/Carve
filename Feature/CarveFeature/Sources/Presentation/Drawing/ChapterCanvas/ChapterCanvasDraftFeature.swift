@@ -508,19 +508,15 @@ extension ChapterCanvasFeature {
         chapter: BibleChapter
     ) async throws -> [VerseDraft] {
         guard let store else { return [] }
-        let scope = environment.accountBasis.preservationScope
         // 확인 전 묶음의 초안은 **그때 참고하던 계정(힌트)이 지금 참고하는 계정과 같을 때만** 화면에 올린다(사용자 결정 2026-09-21,
         // 11차 리뷰 P1). 확인된 환경이든 확인 전 환경이든 같은 규칙이다 — 다른 힌트의 초안은 다른 계정의 필기일 수 있다. 파일은 남는다.
-        let reference = Self.unverifiedHint(of: environment.accountBasis)
-        var drafts: [VerseDraft]
+        // 복구 화면(④)이 "보이지 않게 남은 것" 을 세는 기준도 같은 규칙이다.
+        var drafts: [VerseDraft] = []
         do {
-            drafts = try await store.drafts(in: scope, chapter: chapter, translation: .NKRV)
-            if scope == .unverified {
-                drafts = drafts.filter { $0.account == .unverified(hint: reference) }
-            } else if case .confirmed = environment.accountBasis {
-                let carried = try await store.drafts(in: .unverified, chapter: chapter, translation: .NKRV)
-                drafts += carried.filter { $0.account == .unverified(hint: reference) }
+            for scope in environment.readableDraftScopes {
+                drafts += try await store.drafts(in: scope, chapter: chapter, translation: .NKRV)
             }
+            drafts = drafts.filter { VerseDraftRecoveryRule.reachesScreen($0, environment: environment) }
         } catch {
             Log.error("단일 Canvas — 이 장의 초안을 읽지 못했다. 입력을 막고 다시 시도를 기다린다", "\(error)")
             throw DrawingLoadFailure(message: "\(error)", source: .drafts)
@@ -532,15 +528,6 @@ extension ChapterCanvasFeature {
             throw DrawingLoadFailure(message: "erase generation changed", source: .drafts)
         }
         return drafts
-    }
-
-    /// 이 환경이 참고하는 계정 — 확인됐으면 그 계정, 확인 전이면 마지막 확인 힌트, 로그인하지 않았으면 없다.
-    static func unverifiedHint(of basis: VerseEditAccountBasis) -> AccountScope? {
-        switch basis {
-        case .confirmed(let token): token.scope
-        case .unverified(let hint): hint
-        case .localOnly: nil
-        }
     }
 
     /// 조회한 저장소 내용 위에 남은 초안을 겹친다 — 지금 세션의 초안과, 이어 보여도 되는 다른 세션의 초안(`VerseDraftRecoveryRule`).
@@ -556,26 +543,19 @@ extension ChapterCanvasFeature {
         state.drafts.adopted = state.drafts.adopted.filter { !isFresh($0.key) }
         state.drafts.inherited = state.drafts.inherited.filter { !isFresh($0.key) }
 
-        var representatives: [Int: VerseDrawingSnapshot] = [:]
-        var storeContent: [Int: String] = [:]
-        for (verse, rows) in Dictionary(grouping: snapshots, by: \.verse) {
-            guard let representative = rows.representative() else { continue }
-            representatives[verse] = representative
-            if let fingerprint = Self.contentFingerprint(representative) { storeContent[verse] = fingerprint }
-        }
+        // 대표 행 · 절 내용 · 행 내용 — 복구 화면(④)과 같은 자리에서 만든다.
+        let view = VerseDraftStoreView(snapshots: snapshots)
+        let representatives = view.representatives
         // 저장소 내용 그대로의 기준 — 아직 편집하지 않은 절이 편집을 시작하면 이것을 든다.
         for (verse, representative) in representatives {
-            let fingerprint = storeContent[verse]
+            let fingerprint = view.verseContent[verse]
             state.drafts.loadedBases[DraftVerse(chapter: chapter, verse: verse)] = fingerprint.map {
                 DraftBase(base: .legacy(rowID: representative.rowID, contentFingerprint: $0), fingerprint: $0)
             } ?? .empty
         }
-        let storeRows = Dictionary(
-            snapshots.map { ($0.rowID, VerseDraftStoreRow(contentFingerprint: Self.contentFingerprint($0))) }, uniquingKeysWith: { first, _ in first }
-        )
         let plan = VerseDraftRecoveryRule.plan(
-            drafts: drafts, storeContent: storeContent, environment: state.editEnvironment, sessionID: state.drafts.sessionID,
-            storedRevisions: state.drafts.storedRevisions, storeRows: storeRows
+            drafts: drafts, storeContent: view.verseContent, environment: state.editEnvironment, sessionID: state.drafts.sessionID,
+            storedRevisions: state.drafts.storedRevisions, storeRows: view.rows
         )
         var mutations: [VerseDrawingMutation] = []
         for draft in plan.shown {
@@ -614,13 +594,5 @@ extension ChapterCanvasFeature {
                      "kept=\(plan.kept.count)", "uncertain=\(plan.uncertain.count)", "settled=\(plan.settled.count)")
         }
         return overlay(snapshots, with: mutations)
-    }
-
-    /// 저장소 행의 내용 지문. 비운 행이면 nil — 빈 절과 같다.
-    static func contentFingerprint(_ snapshot: VerseDrawingSnapshot) -> String? {
-        guard let lineData = snapshot.lineData else { return nil }
-        return VerseContentFingerprint.make(
-            lineData: lineData, drawingVersion: snapshot.drawingVersion, layoutMetadataBlob: try? snapshot.metadata?.encodedBlob()
-        )
     }
 }

@@ -175,6 +175,8 @@ extension CarveApp {
             $0.localPreservationWriter = localPreservation
             // 편집 화면의 절 초안 — 무효가 된 세션의 미저장분도 그 세션의 초안으로 남는다(정책 §12-6 구현 순서 ②, ① 의 격리를 대신한다).
             $0.verseDraftStore = localPreservation
+            // 복구 화면(④)이 읽는 초안 — 보이지 않게 남은 것을 세어 보이기만 한다(읽기 전용).
+            $0.verseDraftRecoveryReader = localPreservation
             $0.photoLibraryClient = PhotoKitLibraryClient()
             $0.widgetVerseClient = AppGroupWidgetVerseClient()
             $0.analyticsClient = FirebaseAnalyticsClient()

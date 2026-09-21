@@ -57,6 +57,29 @@ public struct VerseDraftStoreRow: Equatable, Sendable {
     }
 }
 
+/// 한 장의 저장소 내용 — 초안 판정(`VerseDraftRecoveryRule.plan`)이 쓰는 입력을 한 번에 만든다.
+///
+/// 편집 화면과 복구 화면(④)이 **같은 규칙**으로 대표 행을 고르고 같은 지문을 견주게 하는 자리다. 따로 만들면 한쪽이 보이는 초안을
+/// 다른 쪽이 "보이지 않게 남은 것" 으로 알린다.
+public struct VerseDraftStoreView: Equatable, Sendable {
+    /// 절마다의 대표 행(§8-7).
+    public let representatives: [Int: VerseDrawingSnapshot]
+    /// 절마다의 지금 대표 내용 지문. 비운 절은 들어 있지 않다 — 행이 없는 절과 같다.
+    public let verseContent: [Int: String]
+    /// 행마다의 지금 내용. 대표가 아닌 행(보관 · 비운 행)도 든다 — 초안이 보낸 행을 그대로 찾는다.
+    public let rows: [BibleDrawingRowID: VerseDraftStoreRow]
+
+    public init(snapshots: [VerseDrawingSnapshot]) {
+        let representatives = snapshots.representativesByVerse()
+        self.representatives = representatives
+        self.verseContent = representatives.compactMapValues(\.contentFingerprint)
+        self.rows = Dictionary(
+            snapshots.map { ($0.rowID, VerseDraftStoreRow(contentFingerprint: $0.contentFingerprint)) },
+            uniquingKeysWith: { first, _ in first }
+        )
+    }
+}
+
 /// 다른 세션의 초안을 지금 세션에서 어떻게 잇는가.
 enum VerseDraftContinuation: Equatable, Sendable {
     /// 초안의 근거가 지금 환경에서 유효하고 지금 세션도 소유 근거가 있다 — 지금 세션으로 이어 쓴다. 이어 쓴 초안이 원 초안을 대신한다.
@@ -156,6 +179,16 @@ public enum VerseDraftRecoveryRule {
             plan.kept.append(contentsOf: candidates.map(\.draft).filter { $0 != latest.draft })
         }
         return plan
+    }
+
+    /// 이 초안이 지금 환경의 화면에 오를 수 있는 묶음의 것인가.
+    ///
+    /// **확인 전 묶음의 초안은 그때 참고하던 계정(힌트)이 지금 참고하는 계정과 같을 때만**이다(사용자 결정 2026-09-21, 11차 리뷰 P1).
+    /// 다른 힌트의 초안은 다른 계정의 필기일 수 있다. **보이기만** 가리는 규칙이고 파일 · 출처 · 묶음은 그대로 남는다 — 보이지 않는
+    /// 초안은 복구 화면(④)이 알린다.
+    public static func reachesScreen(_ draft: VerseDraft, environment: DrawingEditEnvironment) -> Bool {
+        guard case .unverified(let hint) = draft.account else { return true }
+        return hint == environment.accountBasis.referencedAccount
     }
 
     /// 다른 세션의 초안이 지금 저장소와 어떤 관계인가.
