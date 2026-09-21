@@ -135,6 +135,13 @@ public struct AppCoordinatorFeature {
 
             case .root(.presented(.carve(.view(.moveToSetting)))):
                 state.settings = .initialState
+
+            // 절 메뉴의 「남은 필기 N」 — 설정을 그 자리로 연다(정책 §12-6 ④). 되살리지 않고 보여 주기만 한다.
+            case .root(.presented(.carve(.scope(.carveDetailAction(
+                .scope(.chapterCanvasAction(.delegate(.draftRecoveryRequested)))
+            ))))):
+                state.settings = SettingsFeature.State.initialState(path: .draftRecovery(.initialState))
+                return .send(.root(.presented(.carve(.view(.closeNavigationBar)))))
                 
             case .root(.presented(.carve(.view(.moveToChart)))):
                 state.path.append(.chart(.initialState))

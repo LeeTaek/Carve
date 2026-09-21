@@ -56,7 +56,41 @@ struct ChapterCanvasVerseMenuTesting {
         )
 
         #expect(state.verseMenu?.verse == 1)
-        #expect(state.verseMenu?.availability == ChapterCanvasMenuAvailability(canFavorite: true, canViewHistory: false, canErase: false))
+        #expect(state.verseMenu?.availability == ChapterCanvasMenuAvailability(
+            canFavorite: true, canViewHistory: false, canErase: false, hiddenDraftCount: 0
+        ))
+    }
+
+    @Test("그 절에 보이지 않게 남은 초안이 있으면 메뉴가 그 수를 들고, 고르면 남은 필기를 보는 자리를 연다")
+    func hiddenDraftsOpenTheRecoveryScreen() async {
+        var initialState = await composedState(withInk: true)
+        // 불러올 때 센 값이다 — 절 1 에 보이지 않고 남은 초안 둘.
+        initialState.drafts.hiddenCounts = [1: 2]
+        let store = TestStore(initialState: initialState) {
+            ChapterCanvasFeature()
+        }
+        store.exhaustivity = .off
+
+        await store.send(.verseMenuRequested(at: Self.pointInVerse, anchor: .zero, verseFrame: Self.verseFrame))
+        #expect(store.state.verseMenu?.availability.hiddenDraftCount == 2)
+
+        await store.send(.verseMenuDraftsTapped)
+        await store.receive(.delegate(.draftRecoveryRequested))
+        // 메뉴는 닫히고, 이 화면은 아무것도 되살리지 않는다.
+        #expect(store.state.verseMenu == nil)
+    }
+
+    @Test("보이지 않게 남은 초안이 없으면 그 항목을 들지 않는다")
+    func noHiddenDraftsMeansNoItem() async {
+        var state = await composedState(withInk: true)
+        state.drafts.hiddenCounts = [2: 3]
+
+        _ = ChapterCanvasFeature().reduce(
+            into: &state,
+            action: .verseMenuRequested(at: Self.pointInVerse, anchor: .zero, verseFrame: Self.verseFrame)
+        )
+
+        #expect(state.verseMenu?.availability.hiddenDraftCount == 0)
     }
 
     @Test("획이 있는 절은 메뉴가 열리고, 「지우기」 를 고르면 메뉴가 닫히며 지우기 확인으로 이어진다")

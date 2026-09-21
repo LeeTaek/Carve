@@ -342,6 +342,8 @@ public struct ChapterCanvasFeature {
         case verseMenuImageTapped
         /// 절 메뉴의 「위젯에 표시」(시안 N6).
         case verseMenuWidgetTapped
+        /// 절 메뉴의 「남은 필기 N」 — 이 절에 보이지 않게 남은 초안을 보러 간다(정책 §12-6 ④).
+        case verseMenuDraftsTapped
         /// 절 메뉴의 「지우기」.
         case verseMenuEraseTapped
         case eraseAlert(PresentationAction<EraseAlert>)
@@ -367,6 +369,8 @@ public struct ChapterCanvasFeature {
             case imageSaveRequested(VerseImageHandwriting)
             /// 이 절을 위젯에 표시해 달라(시안 N6). `ink` 는 지금 보이는 필기 — 즐겨찾기에 없던 절이면 이대로 보관한다.
             case widgetRequested(verse: Int, ink: Data?)
+            /// 보이지 않게 남은 필기를 보는 자리(설정 → 남은 필기)를 열어 달라(정책 §12-6 ④). **되살리지 않는다** — 보여 주기만 한다.
+            case draftRecoveryRequested
         }
     }
 
@@ -527,7 +531,7 @@ public struct ChapterCanvasFeature {
                 return .none
 
             case .verseMenuRequested, .verseMenuDismissed, .verseMenuFavoriteTapped, .verseMenuHistoryTapped, .verseMenuImageTapped,
-                 .verseMenuWidgetTapped, .verseMenuEraseTapped:
+                 .verseMenuWidgetTapped, .verseMenuDraftsTapped, .verseMenuEraseTapped:
                 return reduceVerseMenu(state: &state, action: action)
 
             case .eraseAlert(.presented(.confirm(let verse))):

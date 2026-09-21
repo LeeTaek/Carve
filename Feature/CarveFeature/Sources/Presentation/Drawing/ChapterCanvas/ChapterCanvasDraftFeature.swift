@@ -57,6 +57,9 @@ struct DraftSessionState: Equatable, Sendable {
     var inherited: [DraftVerse: VerseDraftProvenance] = [:]
     /// 저장소에 없고 초안에만 있는 행. 저장소에 쓸 때는 `replace` 가 아니라 `create` 로 보낸다.
     var draftOnlyRowIDs: Set<BibleDrawingRowID> = []
+    /// 절마다 **화면에 보이지 않고 남은** 초안 수(`VerseDraftRecoveryPlan.kept`). 절 메뉴가 「남은 필기 N」 을 띄울 근거다 —
+    /// 복구 화면(④)이 그 절에서 보일 것과 같은 수다. 불러올 때마다 다시 센다.
+    var hiddenCounts: [Int: Int] = [:]
 }
 
 enum DraftSaveStatus: Equatable, Sendable {
@@ -557,6 +560,8 @@ extension ChapterCanvasFeature {
             drafts: drafts, storeContent: view.verseContent, environment: state.editEnvironment, sessionID: state.drafts.sessionID,
             storedRevisions: state.drafts.storedRevisions, storeRows: view.rows
         )
+        // 절 메뉴가 「남은 필기 N」 을 띄울 근거 — 복구 화면(④)이 그 절에서 보일 것과 같은 수다.
+        state.drafts.hiddenCounts = Dictionary(grouping: plan.kept, by: { $0.key.verse }).mapValues(\.count)
         var mutations: [VerseDrawingMutation] = []
         for draft in plan.shown {
             let verse = draft.key.verse

@@ -487,6 +487,7 @@ private extension CarveDetailView {
                 onImage: { send(.verseMenuImageTapped) },
                 onWidget: { send(.verseMenuWidgetTapped) },
                 onErase: { send(.verseMenuEraseTapped) },
+                onDrafts: { send(.verseMenuDraftsTapped) },
                 onDismiss: { send(.verseMenuDismissed) }
             )
         }

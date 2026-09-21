@@ -210,6 +210,8 @@ public struct CarveDetailFeature {
             case saveRetryTapped
             /// 조회 실패 안내의 다시 시도. 불러오지 못한 장은 쓸 수 없게 닫혀 있다.
             case loadRetryTapped
+            /// 절 메뉴의 「남은 필기 N」 — 보이지 않게 남은 초안을 보는 자리로 간다
+            case verseMenuDraftsTapped
             /// 절 메뉴의 지우기
             case verseMenuEraseTapped
             /// 절 메뉴 닫기
@@ -375,6 +377,9 @@ public struct CarveDetailFeature {
 
             case .widgetAddFinished, .widgetNoticeExpired, .view(.widgetRetryTapped):
                 return reduceWidget(state: &state, action: action)
+
+            case .view(.verseMenuDraftsTapped):
+                return .send(.scope(.chapterCanvasAction(.verseMenuDraftsTapped)))
 
             case .view(.verseMenuEraseTapped):
                 return .send(.scope(.chapterCanvasAction(.verseMenuEraseTapped)))

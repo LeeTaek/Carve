@@ -25,11 +25,15 @@ struct ChapterCanvasMenuAvailability: Equatable {
     let canViewHistory: Bool
     /// 대표 행의 현재 내용에 획이 있다. 저장분과 **대기 중인 편집**을 함께 본다.
     let canErase: Bool
+    /// 이 절에 **화면에 보이지 않고 남은** 초안 수. 0 이면 항목을 띄우지 않는다(정책 §12-6 ④).
+    let hiddenDraftCount: Int
 
     /// 띄울 항목이 하나도 없다 — 절을 찾지 못한 자리다. 이때는 메뉴 자체를 올리지 않는다.
-    var isEmpty: Bool { !canFavorite && !canViewHistory && !canErase }
+    var isEmpty: Bool { !canFavorite && !canViewHistory && !canErase && hiddenDraftCount == 0 }
 
-    static let none = ChapterCanvasMenuAvailability(canFavorite: false, canViewHistory: false, canErase: false)
+    static let none = ChapterCanvasMenuAvailability(
+        canFavorite: false, canViewHistory: false, canErase: false, hiddenDraftCount: 0
+    )
 }
 
 extension ChapterCanvasFeature {
@@ -77,7 +81,9 @@ extension ChapterCanvasFeature {
         return ChapterCanvasMenuAvailability(
             canFavorite: true,
             canViewHistory: writesStore && canViewHistory,
-            canErase: writesStore && currentInkSnapshot(verse: verse, representative: representative, state: state) != nil
+            canErase: writesStore && currentInkSnapshot(verse: verse, representative: representative, state: state) != nil,
+            // 보이지 않게 남은 초안은 **저장소에 쓰지 않는 절에서도** 알린다 — 그 절이야말로 초안에만 남아 있을 때가 많다.
+            hiddenDraftCount: state.drafts.hiddenCounts[verse] ?? 0
         )
     }
 

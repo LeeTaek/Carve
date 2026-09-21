@@ -102,6 +102,12 @@ extension ChapterCanvasFeature {
             let widgetInk = Self.currentInk(verse: menu.verse, state: state)
             return .send(.delegate(.widgetRequested(verse: menu.verse, ink: widgetInk)))
 
+        case .verseMenuDraftsTapped:
+            guard let menu = state.verseMenu, menu.availability.hiddenDraftCount > 0 else { return .none }
+            state.verseMenu = nil
+            // 이 화면은 초안을 되살리지 않는다 — 보이지 않게 남은 것을 보는 자리(설정 → 남은 필기)로 보낸다(정책 §12-6 ④).
+            return .send(.delegate(.draftRecoveryRequested))
+
         case .verseMenuEraseTapped:
             guard let menu = state.verseMenu, menu.availability.canErase else { return .none }
             state.verseMenu = nil
