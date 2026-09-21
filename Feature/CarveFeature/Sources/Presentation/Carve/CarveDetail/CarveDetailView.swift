@@ -31,9 +31,6 @@ public struct CarveDetailView: View {
     @State private var activeCanvasIDs: Set<SentencesWithDrawingFeature.State.ID> = []
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    /// 캔버스를 미리 만들어 둘 범위 — 뷰포트 위아래로 이 배수만큼.
-    private static let canvasActivationMargin: CGFloat = 1.5
-    
     public init(store: StoreOf<CarveDetailFeature>) {
         self.store = store
     }
@@ -428,6 +425,10 @@ public struct CarveDetailView: View {
 }
 
 private extension CarveDetailView {
+    /// 캔버스를 미리 만들어 둘 범위 — 뷰포트 위아래로 이 배수만큼.
+    /// 타입 본문이 아니라 확장에 둔다 — `CarveDetailView` 본문을 길이 제한(300줄) 안에 둔다.
+    static var canvasActivationMargin: CGFloat { 1.5 }
+
     /// 헤더 스크롤 애니메이션 등 과도한 이벤트 호출을 방지하기 위한 딜레이
     func delay(
         to delay: TimeInterval = 0.1,
