@@ -294,7 +294,16 @@ public final class PersistentCloudKitContainer: ObservableObject {
     ///
     /// 이미 결론이 난 뒤에도 늦게 도착한 import 는 반영한다 — `stillWaiting` 으로 먼저 진입한 사용자에게
     /// 원격 필사가 나중에 도착할 수 있기 때문이다 (정책 §3-1).
+    ///
+    /// **확인된 오류(`failed`)로 멈춘 뒤에도 import 가 성공하면 받은 것이다** — 결론을 `syncCompleted` 로 바꾼다(2026-09-21 후속 리뷰 2차).
+    /// 초기 복원 화면은 오류에서 들어가지 않고 기다리므로(`LaunchWaitRule`), 바꾸지 않으면 실제로 필사를 받았는데도 오류 안내에 머물러
+    /// "import 성공 후 진입" 을 지키지 못한다. 마이그레이션 결론 · 저장소를 쓸 수 없는 상태는 그대로 둔다 — 재실행 요구 · 막힘이다(MIG-F1).
     private func applyToInitialWait(_ event: CloudSyncEvent) {
+        if case .failed = syncState, CloudSyncStateRule.isAwaitedImportSuccess(event) {
+            Log.info("초기 대기 — 오류로 멈춘 뒤 import 가 성공했다. 받은 것으로 결론을 바꾼다", "\(syncState)")
+            syncState = .syncCompleted
+            return
+        }
         guard syncState.isInProgress else { return }
         let outcome: CloudSyncState
         if CloudSyncStateRule.isAwaitedImportSuccess(event) {

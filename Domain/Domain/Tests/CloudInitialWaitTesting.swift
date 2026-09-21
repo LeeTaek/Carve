@@ -172,6 +172,47 @@ struct CloudInitialWaitTesting {
         #expect(container.syncState == .syncCompleted)
     }
 
+    /// 2026-09-21 후속 리뷰 2차 — `failed` 는 진행 중이 아니라서 그 뒤의 import 성공이 결론에 반영되지 않았다. 초기 복원 화면은 오류에서
+    /// 들어가지 않고 기다리므로(`LaunchWaitRule`) 필사를 받았는데도 오류 안내에 머물렀다.
+    @Test(
+        "확인된 오류로 멈춘 뒤에도 import 가 성공하면 받은 것이다 — 초기 복원 화면이 들어가는 결론으로 회복한다",
+        arguments: [CloudSyncFailure.importFailed, .accountCheckFailed, .accountUnavailable, .unknown]
+    )
+    func importAfterFailureRecovers(_ failure: CloudSyncFailure) {
+        let container = makeContainer(limit: 5)
+        container.syncState = .failed(failure)
+        #expect(LaunchWaitRule.route(container.syncState, mode: .initialRestore, startedFirst: false) == .stay)
+
+        container.receive(importSucceeded)
+
+        #expect(container.syncState == .syncCompleted)
+        #expect(LaunchWaitRule.route(container.syncState, mode: .initialRestore, startedFirst: false) == .enterWriting)
+    }
+
+    @Test("import 가 실패로 끝난 뒤 다시 성공해도 회복한다 — 관찰 경로 그대로(실패 이벤트 → 성공 이벤트)")
+    func importFailureThenSuccessRecovers() async {
+        let container = makeContainer(limit: 5)
+        container.syncState = .syncing
+        container.receive(CloudSyncEvent(kind: .cloudImport, ended: true, succeeded: false))
+        #expect(container.syncState == .failed(.importFailed))
+
+        container.receive(importSucceeded)
+        #expect(container.syncState == .syncCompleted)
+    }
+
+    @Test("마이그레이션 결론 · 저장소를 쓸 수 없는 상태는 import 가 성공해도 그대로다 — 재실행 요구 · 막힘을 풀지 않는다")
+    func blockedConclusionsDoNotRecover() {
+        let blocked: [PersistentCloudKitContainer.CloudSyncState] = [
+            .migrationCompleted, .migrationEndedWithoutImport(nil), .migrationEndedWithoutImport(.importFailed), .storeUnavailable(.openFailed)
+        ]
+        for state in blocked {
+            let container = makeContainer(limit: 5)
+            container.syncState = state
+            container.receive(importSucceeded)
+            #expect(container.syncState == state)
+        }
+    }
+
     @Test("끝난 이유의 뜻 — 시간 초과만 기다리는 중이고, 취소는 바꾸지 않으며, 모르는 오류는 실패다")
     func outcomeTable() {
         typealias Container = PersistentCloudKitContainer
