@@ -98,6 +98,27 @@ struct LegacySeparationGateTesting {
         }
     }
 
+    @Test("장 전체 필기 · 즐겨찾기의 대응 없는 행도 원형 그대로 분리본에 든다(C14 ⑦) — 장 필기는 절로 쪼개지 않는다")
+    func pageAndFavoriteRowsArePreserved() throws {
+        try withDirectory { directory, area in
+            let url = try LinkageFixture.makeV6Store(in: directory, page: true, favorite: true)
+            for pk in 1...3 { try LinkageFixture.link(url, entity: .bibleDrawing, primaryKey: Int64(pk)) }
+            try LinkageFixture.addIdentityKeys(url)
+
+            guard case .held(_, let hold) = load(url, area), let jobID = hold.jobID else { Issue.record("보류가 아니다"); return }
+
+            #expect(hold.reason == .unlinkedRowsAwaitSeparation(count: 2))
+            let records = LegacySeparationRecordStore(area: area)
+            let job = try #require(try records.jobs().first { $0.jobID == jobID })
+            let rows = try records.rows(of: job)
+            let page = try #require(rows.first { $0.identity.entity == .biblePageDrawing })
+            let favorite = try #require(rows.first { $0.identity.entity == .favoriteVerse })
+            #expect(page.blob("ZFULLLINEDATA") == RealLegacyLineData.data && page.verseContentFingerprint == nil)
+            #expect(page.integer("ZTITLECHAPTER") == 1 && page.columns["ZVERSE"] == nil)
+            #expect(favorite.blob("ZLINEDATA") == RealLegacyLineData.data && favorite.text("ZSENTENCE") == "태초에")
+        }
+    }
+
     @Test("같은 대상이면 다시 실행해도 같은 작업 기록이다 — 폴더가 늘지 않는다(멱등)")
     func rerunReusesTheSameJob() throws {
         try withDirectory { directory, area in

@@ -303,13 +303,29 @@ struct LegacyRowLinkageReaderTesting {
             try LinkageFixture.link(url, entity: .favoriteVerse, primaryKey: 1)
             try LinkageFixture.addIdentityKeys(url)
 
-            #expect(reason(reader.judge(storeAt: url)) == .unvalidatedEntity(.favoriteVerse))
+            var narrow = reader
+            narrow.validatedEntities = [.bibleDrawing]
+            #expect(reason(narrow.judge(storeAt: url)) == .unvalidatedEntity(.favoriteVerse))
 
-            var widened = reader
-            widened.validatedEntities.insert(.favoriteVerse)
-            let reading = widened.judge(storeAt: url)
+            let reading = reader.judge(storeAt: url)
             #expect(reading.verdict == .allLinked && reading.linkedCount == 4)
             #expect(reading.rows.keys.contains { $0.entity == .favoriteVerse && $0.primaryKey == 1 })
+        }
+    }
+
+    @Test("기본 검증 집합은 legacy 3종 전부다(v2, F51) — 장 전체 필기 · 즐겨찾기의 대응 없는 행도 「검증된 대응 없음」 으로 판정한다")
+    func defaultValidatedSetCoversAllLegacyEntities() throws {
+        #expect(LegacyRowLinkageReader().validatedEntities == Set(LegacyEntity.allCases))
+        #expect(LegacyRowLinkageReader.version == 2)
+        try withStore(page: true, favorite: true) { url in
+            for pk in 1...3 { try LinkageFixture.link(url, entity: .bibleDrawing, primaryKey: Int64(pk)) }
+            try LinkageFixture.addIdentityKeys(url)
+
+            let reading = reader.judge(storeAt: url)
+
+            guard case .hasVerifiedUnlinked(let unlinked) = reading.verdict else { Issue.record("판정이 다르다: \(reading.summary)"); return }
+            #expect(Set(unlinked.map(\.entity)) == [.biblePageDrawing, .favoriteVerse])
+            #expect(reading.linkedCount == 3)
         }
     }
 
@@ -534,14 +550,15 @@ extension LegacyRowLinkageReaderTesting {
         }
     }
 
-    @Test("대응 관측이 없던 엔티티에 행이 있으면 「알 수 없음」 — 기본 검증 집합은 BibleDrawing 뿐이다")
+    @Test("대응 관측이 없는 엔티티(검증 집합 밖)에 행이 있으면 「알 수 없음」")
     func unvalidatedEntityRowsAreUnknown() throws {
+        var narrow = reader
+        narrow.validatedEntities = [.bibleDrawing]
         try withStore(page: true) { url in
             for pk in 1...3 { try LinkageFixture.link(url, entity: .bibleDrawing, primaryKey: Int64(pk)) }
             try LinkageFixture.addIdentityKeys(url)
 
-            #expect(LegacyRowLinkageReader().validatedEntities == [.bibleDrawing])
-            #expect(reason(reader.judge(storeAt: url)) == .unvalidatedEntity(.biblePageDrawing))
+            #expect(reason(narrow.judge(storeAt: url)) == .unvalidatedEntity(.biblePageDrawing))
         }
         // 행은 없고 대응만 그 엔티티를 가리켜도 같다.
         try withStore { url in
@@ -549,7 +566,7 @@ extension LegacyRowLinkageReaderTesting {
             try LinkageFixture.link(url, entity: .favoriteVerse, primaryKey: 7)
             try LinkageFixture.addIdentityKeys(url)
 
-            #expect(reason(reader.judge(storeAt: url)) == .unvalidatedEntity(.favoriteVerse))
+            #expect(reason(narrow.judge(storeAt: url)) == .unvalidatedEntity(.favoriteVerse))
         }
     }
 

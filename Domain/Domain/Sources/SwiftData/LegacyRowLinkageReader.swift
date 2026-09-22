@@ -154,16 +154,18 @@ public struct LegacyRowLinkageReading: Equatable, Sendable {
 
 /// C14 ② 의 판독기. 값(`validated…`)이 곧 검증 범위다 — 넓히려면 실제 저장소 관측(테스트 계획 §5-1)을 먼저 기록한다.
 public struct LegacyRowLinkageReader: Sendable {
-    /// 판독기 자체의 버전. 읽는 표 · 열 · 규칙이 바뀌면 올린다.
-    public static let version = 1
+    /// 판독기 자체의 버전. 읽는 표 · 열 · 규칙 · 검증 범위가 바뀌면 올린다.
+    /// v2(2026-09-22): 검증 엔티티에 `BiblePageDrawing` · `FavoriteVerse` 를 더했다(테스트 계획 F51).
+    public static let version = 2
 
     /// 판독기를 검증한 OS 주 버전. SEP-0 ~ SEP-2 는 iOS 26 시뮬레이터에서 수행했다(2026-09-21).
     public var validatedOSMajors: Set<Int> = [26]
     /// 판독기를 검증한 저장소 스키마 주 버전 — 1.3.0 의 V3(마이그레이션 전)와 현재 V6(마이그레이션 뒤). SEP-1 F39.
     public var validatedSchemaMajors: Set<Int> = [3, 6]
     /// `ZENTITYID = Z_ENT` 를 **실제 미러링 저장소에서 관측한** 엔티티. 관측이 없는 엔티티에 행 · 대응이 있으면 「알 수 없음」 이다.
-    /// `BibleDrawing` 은 SEP-0 ~ SEP-2(F34 · F36 ~ F40). 나머지는 관측을 기록한 뒤 넣는다(테스트 계획 §3-3 SEP-1 통과 기준).
-    public var validatedEntities: Set<LegacyEntity> = [.bibleDrawing]
+    /// `BibleDrawing` 은 SEP-0 ~ SEP-2(F34 · F36 ~ F40), `BiblePageDrawing` · `FavoriteVerse` 는 2026-09-22 G3 — V6 저장소에서 미러링이 만든 대응이
+    /// 그 엔티티의 `Z_ENT`(2 · 4)로 적히고, 가리키는 서버 레코드의 유형 · 행 ID 가 그 행과 같았다(F51). 새 엔티티는 관측을 기록한 뒤 넣는다.
+    public var validatedEntities: Set<LegacyEntity> = [.bibleDrawing, .biblePageDrawing, .favoriteVerse]
     /// 지금 OS 주 버전. 시험이 바꾼다.
     public var osMajor: Int = ProcessInfo.processInfo.operatingSystemVersion.majorVersion
 
