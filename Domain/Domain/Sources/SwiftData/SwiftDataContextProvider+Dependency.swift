@@ -29,14 +29,27 @@ extension ModelContainer: @retroactive DependencyKey {
     public static var liveValue: ModelContainer {
         @Dependency(\.containerId) var containerId
         @Dependency(\.clouodKitSyncManager) var cloudkitContainer
+        @Dependency(\.legacySeparationHoldState) var holdState
         let url = URL.applicationSupportDirectory.appending(path: containerId.localDBPath)
         let preservation = PreservationArea.live(localDBPath: containerId.localDBPath)
-        switch LocalStoreLoader.load(at: url, cloudKitDatabase: .private(containerId.id), preservation: preservation) {
+        // C14 게이트 — 연결하는 모든 실행이 지난다(D4). 「모두 대응 있음」 일 때만 `.private` 로 연다.
+        let gate = LegacySeparationGate(area: preservation)
+        switch LocalStoreLoader.load(at: url, cloudKitDatabase: .private(containerId.id), preservation: preservation, separationGate: gate) {
         case .ready(let container):
+            return container
+        case .held(let container, let hold):
+            /// 연결 보류 — 앱에는 들어가되 이 실행은 이 기기에만 저장한다. 쓰기 · 전체 삭제는 보류 사유로 막힌다(정책 §12-6 C14 ③ · D6).
+            holdState.hold = hold
+            cloudkitContainer.syncState = .connectionHeld(hold)
             return container
         case .legacyMigration(let container):
             /// V1 로 옮긴 저장소는 재실행해야 앱 스키마로 이어진다. 시작 화면은 이 모드의 어떤 결론에서도 들어가지 않는다.
             cloudkitContainer.syncState = .migration
+            return container
+        case .legacyMigrationHeld(let container, let hold):
+            /// V1 로 옮겼지만 연결하지 않았다 — 기다릴 import 가 없으니 곧바로 재실행을 요구한다. 다음 실행이 앱 스키마로 옮긴 뒤 다시 판정한다.
+            holdState.hold = hold
+            cloudkitContainer.syncState = .migrationEndedWithoutImport(nil)
             return container
         case .unavailable(let failure):
             /// 앱은 컨테이너를 쥐어야 하므로 메모리에만 있는 빈 컨테이너를 준다. 시작 화면이 진입을 막는다.

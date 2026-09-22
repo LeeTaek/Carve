@@ -27,10 +27,13 @@ public struct CloudSettingsFeature {
         /// 이번 실행에서의 동기화 활동. **앱을 방금 켰다면 비어 있으며, 그것이 동기화되지 않았다는 뜻은 아니다.**
         public var activity = CloudSyncActivity()
         public var isLoading: Bool = false
+        /// 이번 실행의 C14 연결 보류(정책 §12-6 C14 ③). 화면이 뜰 때 읽는다. 있으면 전체 삭제를 막는다(D6).
+        public var connectionHold: LegacySeparationHold?
     }
     @Dependency(\.createSwiftDataActor) private var database
     @Dependency(\.cloudAccountStatus) private var accountStatus
     @Dependency(\.cloudSyncActivity) private var syncActivity
+    @Dependency(\.legacySeparationHoldState) private var holdState
 
     /// 화면이 떠 있는 동안만 활동을 구독한다.
     private enum CancelID { case activity }
@@ -75,6 +78,7 @@ public struct CloudSettingsFeature {
             switch action {
             case .view(.onAppear):
                 state.availability = .checking
+                state.connectionHold = holdState.hold
                 return .merge(
                     .run { send in
                         await send(.accountChecked(await accountStatus.availability()))
@@ -93,6 +97,10 @@ public struct CloudSettingsFeature {
             case .activityChanged(let activity):
                 state.activity = activity
             case .view(.databaseIsEmpty):
+                // C14 연결 보류 중에는 전체 삭제를 시작하지 않는다(D6) — 예약했다가 연결 뒤 자동 실행하지도 않는다.
+                if holdState.isHeld {
+                    return .send(.presentPopover(body: Self.eraseHeldBody, confirmTitle: "확인", action: .dismiss))
+                }
                 return .run { [widgetVerseClient, draftReader] send in
                     // 「필사 데이터」 에는 즐겨찾기에 복사해 둔 필기와 위젯에 담은 말씀도 포함된다 — 셋을 함께 본다.
                     let hasDrawings = !(try await database.databaseIsEmpty(BibleDrawing.self))
@@ -133,6 +141,10 @@ public struct CloudSettingsFeature {
                     confirmAction: action
                 ))
             case .removeAlliCloudData:
+                // 재시도 진입점도 막는다 — 확인 팝업의 「다시 시도」 는 이 액션으로 다시 들어온다(D6 "실행 진입점과 재시도 진입점을 모두").
+                if holdState.isHeld {
+                    return .send(.presentPopover(body: Self.eraseHeldBody, confirmTitle: "확인", action: .dismiss))
+                }
                 return .run { [widgetVerseClient, drawingDataEraser] send in
                     await send(.setLoading(true))
                     // 필사 행 · 구 구조 잔존 행 · 즐겨찾기(필기 복사본)를 지운다. 필사 행이 가장 먼저다.
@@ -204,6 +216,19 @@ public struct CloudSettingsFeature {
 }
 
 extension CloudSettingsFeature {
+    /// 연결 보류 중의 전체 삭제 거절 문구(정책 §12-6 C14 ③, 사용자 결정 2026-09-21).
+    static let eraseHeldBody = "지금은 iCloud 연결이 보류되어 전체 삭제를 할 수 없어요.\n연결 문제를 해결한 뒤 다시 시도해 주세요."
+
+    /// 설정 화면의 보류 안내 — 지금은 이 기기에만 저장된다는 것 · 까닭 · 다시 시도(다음 실행이 자동으로 다시 판정한다).
+    static func holdCopy(_ hold: LegacySeparationHold) -> (title: String, detail: String) {
+        let reason: String = switch hold.reason {
+        case .linkageUnknown: "이 기기의 옛 필사가 어느 계정의 것인지 확인하지 못했어요."
+        case .unlinkedRowsAwaitSeparation(let count): "이 기기에 계정과 연결되지 않은 옛 필사 \(count)개가 있어요. 사본은 이 기기에 보관했어요."
+        case .preservationFailed: "옛 필사의 사본을 남기지 못했어요."
+        }
+        return ("지금은 iCloud 연결이 보류돼 이 기기에만 저장돼요", reason + " 앱을 다시 실행하면 다시 확인해요.")
+    }
+
     /// 전체 삭제가 함께 지우는 **이 기기의 초안 파일 수** — 모든 묶음(다른 계정 · 계정 미확인 · 로그인하지 않은 동안)의 초안과 읽지 못해 옆으로
     /// 옮긴 파일. 화면에 자동으로 표시되는 초안도 든다 — 전체 삭제는 보존 영역을 통째로 지운다(`LocalPreservationWriter.eraseAllLocal`).
     /// **읽지 못하면 nil** — 없다고 단정하지 않는다.

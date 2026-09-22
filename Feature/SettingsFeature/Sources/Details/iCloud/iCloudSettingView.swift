@@ -87,6 +87,21 @@ public struct CloudSettingView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    /// 연결 보류 한 줄 — 지금은 이 기기에만 저장된다는 것 · 까닭 · 다시 시도.
+    private func holdRow(_ hold: LegacySeparationHold) -> some View {
+        let copy = CloudSettingsFeature.holdCopy(hold)
+        return VStack(alignment: .leading, spacing: CarveSpacing.xSmall) {
+            Text(copy.title)
+                .font(CarveTypography.body)
+                .foregroundStyle(CarveColor.ink)
+            Text(copy.detail)
+                .font(CarveTypography.caption)
+                .foregroundStyle(CarveColor.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityIdentifier("cloudSettings.connectionHeld")
+    }
+
     private func activityLine(_ text: String, emphasized: Bool) -> some View {
         Text(text)
             .font(CarveTypography.caption)
@@ -116,8 +131,11 @@ public struct CloudSettingView: View {
                     // 조작할 수 없는 토글을 켜 둔 채로 보여 주지 않는다. 지금 확인된 계정 상태를 그대로 적는다.
                     accountStatusRow
 
-                    // 계정을 쓸 수 있을 때만 — 계정이 없으면 주고받을 수 없으므로 활동을 말할 것이 없다.
-                    if store.availability.canSync {
+                    // C14 연결 보류 — 계정이 있어도 이 실행은 이 기기에만 저장한다(정책 §12-6 C14 ③). 까닭과 다시 시도를 적는다.
+                    if let hold = store.connectionHold {
+                        holdRow(hold)
+                    } else if store.availability.canSync {
+                        // 계정을 쓸 수 있을 때만 — 계정이 없으면 주고받을 수 없으므로 활동을 말할 것이 없다.
                         syncActivityRow
                     }
 

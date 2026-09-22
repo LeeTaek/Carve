@@ -77,6 +77,8 @@ public enum LaunchWaitRule {
         case .stay, .enterWriting:
             break
         }
+        // 연결 보류 — 기다릴 초기 복원이 없다. 대기 방식과 무관하게 들어간다(정책 §12-6 C14 ③).
+        if case .connectionHeld = state { return .enterWriting }
         guard state != .migration, let mode else { return .stay }
         switch mode {
         case .normal:
@@ -91,7 +93,7 @@ public enum LaunchWaitRule {
         guard mode == .initialRestore else { return false }
         switch state {
         case .idle, .syncing, .stillWaiting, .failed: return true
-        case .syncCompleted, .migration, .migrationCompleted, .migrationEndedWithoutImport, .storeUnavailable: return false
+        case .syncCompleted, .migration, .migrationCompleted, .migrationEndedWithoutImport, .storeUnavailable, .connectionHeld: return false
         }
     }
 
@@ -102,6 +104,8 @@ public enum LaunchWaitRule {
         startedFirst: Bool
     ) -> InitialRestoreOutcome? {
         guard mode == .initialRestore, route(state, mode: mode, startedFirst: startedFirst) == .enterWriting else { return nil }
+        // 연결 보류로 들어간 것은 초기 복원의 결과가 아니다 — 남기지 않는다. 보류가 풀린 실행이 초기 복원을 한다.
+        if case .connectionHeld = state { return nil }
         if state == .syncCompleted { return .importSucceeded }
         if case .failed = state { return .startedWithoutICloud }
         return .startedFirst

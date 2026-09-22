@@ -37,6 +37,8 @@ public struct DrawingEditEnvironment: Equatable, Sendable {
     /// 저장소 소유 근거가 **시험용 주입**이다(`StoreOwnershipInjection`, DEBUG 전용) — 소유 증명이 아니다. 이 환경에서 쓴 초안에 남아,
     /// 주입 없는 실행은 그 초안의 소유 근거를 없는 것으로 읽는다.
     public var ownershipInjected: Bool
+    /// 이번 실행의 미러링 연결이 C14 게이트로 **보류**됐다(정책 §12-6 C14 ③). 독립된 쓰기 차단 사유다 — 소유 근거가 생겨도 풀리지 않는다.
+    public var connectionHeld: Bool
 
     public init(
         accountState: AccountScopeState,
@@ -45,7 +47,8 @@ public struct DrawingEditEnvironment: Equatable, Sendable {
         generation: UInt64 = 0,
         storeOwnership: AccountScope? = nil,
         eraseGeneration: UInt64 = 0,
-        ownershipInjected: Bool = false
+        ownershipInjected: Bool = false,
+        connectionHeld: Bool = false
     ) {
         self.accountState = accountState
         self.serverWork = serverWork
@@ -54,6 +57,7 @@ public struct DrawingEditEnvironment: Equatable, Sendable {
         self.storeOwnership = storeOwnership
         self.eraseGeneration = eraseGeneration
         self.ownershipInjected = ownershipInjected
+        self.connectionHeld = connectionHeld
     }
 
     /// 이 환경에서 절 편집을 시작할 때의 계정 근거.
@@ -94,9 +98,13 @@ public enum SyncedWriteBlock: Equatable, Sendable {
     /// 그 절의 필기가 **다른 출처**다 — 다른 계정 · 확인 전에 쓴 초안을 이어 보고 있다. 환경이 아니라 절 단위 사유라 `check(_:)` 가 아니라
     /// 부르는 쪽(캔버스 상태)이 판정한다. 그 잉크를 지금 계정의 동기화 저장소로 옮기면 계정 간 가져오기가 된다(④ 의 명시적 가져오기 전까지).
     case verseFromOtherSession
+    /// 이번 실행의 미러링 연결이 **보류**됐다(정책 §12-6 C14 ③ · D2). 저장소는 CloudKit 없이 열려 있고, 여기 쓴 것은 이 기기에만 남는다.
+    /// 계정 · 소유 근거와 **독립된** 사유다 — 가장 먼저 보고, 소유 근거가 생겨도 풀리지 않는다.
+    case connectionHeld
 
     /// 이 환경에서 동기화 저장소에 바로 써도 되는가. 막으면 그 사유, 되면 nil.
     public static func check(_ environment: DrawingEditEnvironment) -> SyncedWriteBlock? {
+        guard !environment.connectionHeld else { return .connectionHeld }
         switch environment.accountState {
         case .noAccount:
             return .signedOut
@@ -242,6 +250,9 @@ public final class LiveDrawingEditEnvironment: DrawingEditEnvironmentClient, @un
     }
 
     public func current() async -> DrawingEditEnvironment {
+        // C14 연결 보류 — 컨테이너를 만들 때 정해지고 이 실행 동안 바뀌지 않는다. 어느 환경에나 그대로 실린다.
+        @Dependency(\.legacySeparationHoldState) var holdState
+        let connectionHeld = holdState.isHeld
         for _ in 0..<Self.maxSnapshotAttempts {
             guard !hasUnappliedNotification else { break }
             let snapshot = await provider.snapshot()
@@ -255,7 +266,7 @@ public final class LiveDrawingEditEnvironment: DrawingEditEnvironmentClient, @un
                 if injectsOwnership, case .confirmed(let scope) = snapshot.state, snapshot.token != nil { injected = scope }
                 return DrawingEditEnvironment(
                     accountState: snapshot.state, serverWork: snapshot.token, knowledge: knowledge, generation: snapshot.generation,
-                    storeOwnership: injected, eraseGeneration: eraseGeneration, ownershipInjected: injected != nil
+                    storeOwnership: injected, eraseGeneration: eraseGeneration, ownershipInjected: injected != nil, connectionHeld: connectionHeld
                 )
             }
         }
@@ -266,7 +277,8 @@ public final class LiveDrawingEditEnvironment: DrawingEditEnvironmentClient, @un
             serverWork: nil,
             knowledge: nil,
             generation: snapshot.generation,
-            eraseGeneration: await localPreservation?.currentGeneration() ?? 0
+            eraseGeneration: await localPreservation?.currentGeneration() ?? 0,
+            connectionHeld: connectionHeld
         )
     }
 

@@ -103,6 +103,9 @@ struct LaunchProgressView: View {
             storeUnavailableText(failure)
         case .syncCompleted:
             statusText("데이터 동기화 완료")
+        case .connectionHeld:
+            // C14 연결 보류 — 들어가되 이 실행은 이 기기에만 저장한다. 까닭과 다시 시도는 필사 화면의 띠 · 설정이 말한다(정책 §12-6 C14 ③).
+            statusText("지금은 이 기기에만 저장하는 상태로 시작해요")
         default: EmptyView()
         }
     }

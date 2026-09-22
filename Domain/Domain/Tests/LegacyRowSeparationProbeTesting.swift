@@ -15,6 +15,9 @@
 //                             {"op":"delete","select":"withoutRecordID","count":1} · {"op":"delete","id":"SEP2-…"}
 //                             {"op":"migrate"}                               · V3 → 현재 스키마(마이그레이션 플랜) — 기본 키 · 대응이 유지되는지
 //                             "schema":"v3" 를 더하면 V3 모델로 연다(마이그레이션 없이 V3 저장소에 손질할 때).
+//                             {"op":"insert","count":1,"entity":"FavoriteVerse"} · 다른 legacy 엔티티 행 넣기(관문 ② — 3종의 대응)
+//                             {"op":"truncateHistory"}                       · 이력 표를 비운다(관문 ① — 삽입 이력이 잘린 무대응 행)
+//                             {"op":"deleteSwiftData","id":"SEP2-…"}          · 제품이 쓸 SwiftData 경로로 지운다(관문 ③)
 //  `plan.json` 이 없으면 아무것도 하지 않는다.
 //
 
@@ -52,6 +55,8 @@ struct LegacyRowSeparationProbeTesting {
         var id: String?
         /// `"v3"` 면 V3 모델로 연다. 없으면 현재 앱 스키마.
         var schema: String?
+        /// 넣을 엔티티 이름(`BibleDrawing` · `BiblePageDrawing` · `FavoriteVerse`). 없으면 `BibleDrawing`.
+        var entity: String?
     }
 
     private static var plan: Plan? {
@@ -77,6 +82,10 @@ struct LegacyRowSeparationProbeTesting {
         var drawingRows: [Int64: String] = [:]
         /// 현재 스키마(V6) 표식 — `VerseDrawingVersion` 표가 있는가.
         var hasCurrentSchemaTables = false
+        /// 다른 legacy 엔티티 표의 행 수(표가 없으면 빠진다) — 관문 ②.
+        var otherLegacyRows: [String: Int] = [:]
+        /// 대응이 가리키는 엔티티 ID 별 수 — `ZENTITYID = Z_ENT` 를 엔티티마다 확인하는 데 쓴다.
+        var correspondencesByEntity: [Int64: Int] = [:]
 
         struct Pair: Hashable { var entity: Int64; var pk: Int64 }
 
@@ -125,6 +134,13 @@ struct LegacyRowSeparationProbeTesting {
         }
         rows("select count(*) from sqlite_master where type='table' and name='ZVERSEDRAWINGVERSION'") { stmt in
             state.hasCurrentSchemaTables = sqlite3_column_int64(stmt, 0) > 0
+        }
+        // 관문 ② — 다른 legacy 엔티티의 행 수와, 대응이 가리키는 엔티티 ID 별 수.
+        for table in ["ZBIBLEPAGEDRAWING", "ZFAVORITEVERSE"] {
+            rows("select count(*) from \(table)") { stmt in state.otherLegacyRows[table] = Int(sqlite3_column_int64(stmt, 0)) }
+        }
+        rows("select ZENTITYID, count(*) from ANSCKRECORDMETADATA where ZCKRECORDNAME is not null group by ZENTITYID") { stmt in
+            state.correspondencesByEntity[sqlite3_column_int64(stmt, 0)] = Int(sqlite3_column_int64(stmt, 1))
         }
         return state
     }
@@ -175,28 +191,66 @@ struct LegacyRowSeparationProbeTesting {
         return Int64(last.dropFirst())
     }
 
-    private func insertRows(_ container: NSPersistentContainer, count: Int) throws -> [String] {
+    private func insertRows(_ container: NSPersistentContainer, count: Int, entity: String = "BibleDrawing") throws -> [String] {
         let context = container.newBackgroundContext()
         var made: [String] = []
         var thrown: Error?
         context.performAndWait {
             for index in 0 ..< count {
-                let object = NSEntityDescription.insertNewObject(forEntityName: "BibleDrawing", into: context)
+                let object = NSEntityDescription.insertNewObject(forEntityName: entity, into: context)
                 let known = object.entity.attributesByName.keys
                 let identifier = "SEP2-\(UUID().uuidString.prefix(8))"
                 // 그 스키마에 있는 속성만 채운다 — V3 와 V6 가 같은 값을 받는다.
-                let values: [String: Any] = [
+                let values: [String: Any] = switch entity {
+                case "FavoriteVerse": [
+                    "favoriteID": identifier, "titleName": "1-01Genesis.txt", "titleChapter": 1, "verse": 20 + index,
+                    "createdDate": Date(), "sentence": "SEP2 즐겨찾기", "lineData": Data("SEP2-즐겨찾기-행".utf8)
+                ]
+                case "BiblePageDrawing": [
+                    "id": identifier, "titleName": "1-01Genesis.txt", "titleChapter": 30 + index,
+                    "creationDate": Date(), "updateDate": Date(), "fullLineData": Data("SEP2-장-행".utf8)
+                ]
+                default: [
                     "id": identifier, "titleName": "1-01Genesis.txt", "titleChapter": 1, "verse": 10 + index,
                     "creationDate": Date(), "updateDate": Date(), "isPresent": true, "drawingVersion": 1,
-                    "lineData": Data("SEP2-대응없는-행".utf8),
+                    "lineData": Data("SEP2-대응없는-행".utf8)
                 ]
+                }
                 for (key, value) in values where known.contains(key) { object.setValue(value, forKey: key) }
-                made.append(identifier)
+                made.append("\(entity) \(identifier)")
             }
             do { try context.save() } catch { thrown = error }
         }
         if let thrown { throw thrown }
         return made
+    }
+
+    /// 이력 표를 비운다 — 오래전에 쓰여 이력이 정리된(또는 잘린) 무대응 행을 흉내 낸다(관문 미확인 항목 ①). 사본에서만 한다.
+    private func truncateHistory(_ path: String) throws -> String {
+        var handle: OpaquePointer?
+        guard sqlite3_open_v2(path, &handle, SQLITE_OPEN_READWRITE, nil) == SQLITE_OK, let db = handle else {
+            throw ProbeFailure.cannotOpenSQLite(String(cString: sqlite3_errmsg(handle)))
+        }
+        defer { sqlite3_close(db) }
+        var message: UnsafeMutablePointer<CChar>?
+        guard sqlite3_exec(db, "DELETE FROM ACHANGE; DELETE FROM ATRANSACTION; DELETE FROM ATRANSACTIONSTRING;", nil, nil, &message) == SQLITE_OK else {
+            let text = message.map { String(cString: $0) } ?? "?"
+            sqlite3_free(message)
+            throw ProbeFailure.cannotOpenSQLite(text)
+        }
+        return "이력 표(ACHANGE · ATRANSACTION · ATRANSACTIONSTRING)를 비웠다"
+    }
+
+    /// 제품이 쓸 경로로 지운다 — 앱 스키마 · 마이그레이션 플랜 · `ModelContext.delete`(이력 추적은 SwiftData 기본값). 관문 미확인 항목 ③.
+    private func deleteViaSwiftData(_ path: String, id: String) throws -> String {
+        let configuration = ModelConfiguration(url: URL(fileURLWithPath: path), cloudKitDatabase: .none)
+        let container = try ModelContainer(for: AppStoreSchema.schema, migrationPlan: DrawingDataMigrationPlan.self, configurations: configuration)
+        let context = ModelContext(container)
+        let rows = try context.fetch(FetchDescriptor<BibleDrawing>(predicate: #Predicate { $0.id == id }))
+        guard let row = rows.first else { return "id \(id) 행이 없다" }
+        context.delete(row)
+        try context.save()
+        return "SwiftData 로 지웠다: id \(id)"
     }
 
     private func deleteRows(_ container: NSPersistentContainer, state: MirroringState, select: String, count: Int, id: String? = nil) throws -> [String] {
@@ -251,8 +305,13 @@ struct LegacyRowSeparationProbeTesting {
             break
         case "insert":
             let container = try open(path, schema: plan.schema)
-            let made = try insertRows(container, count: plan.count ?? 1)
+            let made = try insertRows(container, count: plan.count ?? 1, entity: plan.entity ?? "BibleDrawing")
             lines.append("  넣은 행: \(made.joined(separator: ", "))")
+        case "truncateHistory":
+            lines.append("  " + (try truncateHistory(path)))
+        case "deleteSwiftData":
+            guard let id = plan.id else { lines.append("  id 가 없다"); break }
+            lines.append("  " + (try deleteViaSwiftData(path, id: id)))
         case "delete":
             let container = try open(path, schema: plan.schema)
             let removed = try deleteRows(container, state: before, select: plan.select ?? "withoutRecordID", count: plan.count ?? 1, id: plan.id)
@@ -282,6 +341,10 @@ struct LegacyRowSeparationProbeTesting {
         let identity = state.metadataKeys.filter { $0.contains("CKIdentity") }
         text += " (계정 식별 키 \(identity.isEmpty ? "없음" : "있음"))"
         text += " · 현재 스키마 표 \(state.hasCurrentSchemaTables ? "있음" : "없음")"
+        let entities = state.entityIDs.sorted { $0.value < $1.value }.filter { $0.value < 16000 }.map { "\($0.key)=\($0.value)" }
+        text += "\n    엔티티 등록 \(entities.joined(separator: " "))"
+        text += " · 다른 legacy 행 \(state.otherLegacyRows.sorted { $0.key < $1.key }.map { "\($0.key) \($0.value)" }.joined(separator: " · "))"
+        text += " · 대응(엔티티 ID 별) \(state.correspondencesByEntity.sorted { $0.key < $1.key }.map { "\($0.key):\($0.value)" }.joined(separator: " "))"
         return text
     }
 

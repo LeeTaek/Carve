@@ -74,6 +74,7 @@ extension SyncedWriteBlock {
         case .ownershipUnverified: "이 기기의 필사가 지금 계정의 것인지 아직 확인하지 못했어요"
         case .knowledgeUnreadable: "삭제 기록을 읽지 못했어요"
         case .verseFromOtherSession: "이 절의 필기는 다른 계정 · 확인 전에 쓴 것이에요"
+        case .connectionHeld: "지금은 iCloud 연결이 보류되어 이 기기에만 저장돼요"
         }
     }
 }

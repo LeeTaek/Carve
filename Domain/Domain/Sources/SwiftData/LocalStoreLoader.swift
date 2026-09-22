@@ -42,6 +42,10 @@ enum LocalStoreLoader {
         /// 확인된 1.0.x 저장소를 V1 전용 컨테이너로 열었다(V1 로 옮겼다).
         /// **이번 실행에서는 필사를 저장할 수 없다** — 재실행하면 앱 스키마로 이어서 옮겨진다.
         case legacyMigration(ModelContainer)
+        /// 앱 스키마로 열었지만 **CloudKit 없이** 열었다 — C14 게이트가 연결을 보류했다(정책 §12-6 C14 ③).
+        case held(ModelContainer, LegacySeparationHold)
+        /// 1.0.x 저장소를 V1 전용 컨테이너로, **CloudKit 없이** 열었다 — 게이트를 지나지 않은 저장소는 연결하지 않는다. 재실행해야 이어진다.
+        case legacyMigrationHeld(ModelContainer, LegacySeparationHold)
         /// 쓸 수 없다. V1 폴백은 하지 않았다.
         case unavailable(LocalStoreFailure)
     }
@@ -76,14 +80,17 @@ enum LocalStoreLoader {
     /// 앱 스키마 + 마이그레이션 플랜으로 연다. 실패하면 저장소를 가린 뒤 확인된 1.0.x 저장소만 V1 전용 컨테이너로 연다.
     ///
     /// 보존 영역을 주면 **열기 전에** 원시 사본을 먼저 뜬다(`RawStoreSnapshot`). 뜨지 못하면 열지 않고 막는다.
+    /// 게이트를 주면 연결 직전에 C14 판정을 지난다 — 「모두 대응 있음」 일 때만 `cloudKitDatabase` 로 열고, 그 밖은 `.none` 으로 열어 보류한다.
     /// - Parameters:
     ///   - url: 저장소 파일.
     ///   - cloudKitDatabase: 앱은 `.private(컨테이너 ID)` 를 쓴다. 테스트는 `.none` 을 넘긴다 — 시뮬레이터 테스트에는 entitlement 가 없다.
     ///   - preservation: 원시 사본을 둘 곳. `nil` 이면 사본 없이 연다(기존 시험 하네스).
+    ///   - separationGate: C14 게이트. `nil` 이면 판정 없이 연다(기존 시험 하네스).
     static func load(
         at url: URL,
         cloudKitDatabase: ModelConfiguration.CloudKitDatabase,
-        preservation: PreservationArea? = nil
+        preservation: PreservationArea? = nil,
+        separationGate: LegacySeparationGate? = nil
     ) -> Outcome {
         if let preservation {
             switch RawStoreSnapshot.takeIfNeeded(storeURL: url, area: preservation) {
@@ -94,29 +101,20 @@ enum LocalStoreLoader {
                 return .unavailable(.preservationFailed)
             }
         }
+        if let separationGate {
+            return loadThroughGate(at: url, cloudKitDatabase: cloudKitDatabase, gate: separationGate)
+        }
 
         let loadError: Error
         do {
-            return .ready(try ModelContainer(
-                for: appSchema,
-                migrationPlan: DrawingDataMigrationPlan.self,
-                configurations: ModelConfiguration(url: url, cloudKitDatabase: cloudKitDatabase)
-            ))
+            return .ready(try open(url, cloudKitDatabase: cloudKitDatabase))
         } catch {
             loadError = error
         }
-
-        let kind = storeKind(at: url)
-        let isLoadIssue = (loadError as? SwiftDataError) == .loadIssueModelContainer
-        Log.error("로컬 저장소를 앱 스키마로 열지 못했다", "\(kind)", "\(loadError)")
-        switch plan(for: kind, isLoadIssue: isLoadIssue) {
+        switch classify(url, loadError: loadError) {
         case .fallbackToV1:
             do {
-                return .legacyMigration(try ModelContainer(
-                    for: Schema([DrawingVO.self]),
-                    migrationPlan: MigrationPlanV1Only.self,
-                    configurations: ModelConfiguration(url: url, cloudKitDatabase: cloudKitDatabase)
-                ))
+                return .legacyMigration(try openV1Only(url, cloudKitDatabase: cloudKitDatabase))
             } catch {
                 Log.error("버전 없는 저장소를 V1 로 옮기지 못했다", "\(error)")
                 return .unavailable(.openFailed)
@@ -124,6 +122,82 @@ enum LocalStoreLoader {
         case .block(let failure):
             return .unavailable(failure)
         }
+    }
+
+    /// C14 ① 의 순서 — ② CloudKit 없이 열어 마이그레이션 → ③ 판정 → ④ 보존 · 기록 → ⑦ 연결(또는 보류).
+    ///
+    /// `.none` 컨테이너는 이 함수 안의 지역 범위에서만 살고, 연결용 컨테이너를 만들기 전에 놓는다(「동시 열기」 규칙).
+    private static func loadThroughGate(at url: URL, cloudKitDatabase: ModelConfiguration.CloudKitDatabase, gate: LegacySeparationGate) -> Outcome {
+        do {
+            try migrateWithoutCloudKit(url)
+        } catch {
+            switch classify(url, loadError: error) {
+            case .block(let failure):
+                return .unavailable(failure)
+            case .fallbackToV1:
+                // 1.0.x 모양은 `BibleDrawing` 이 없어 판정이 「알 수 없음」 이다 — 게이트를 지나지 않은 저장소는 연결하지 않는다.
+                let decision = gate.decide(storeURL: url)
+                Log.info("C14 게이트 — V1 폴백 경로", decision.hold.map { "\($0.reason)" } ?? "연결")
+                do {
+                    if let hold = decision.hold {
+                        return .legacyMigrationHeld(try openV1Only(url, cloudKitDatabase: .none), hold)
+                    }
+                    return .legacyMigration(try openV1Only(url, cloudKitDatabase: cloudKitDatabase))
+                } catch {
+                    Log.error("버전 없는 저장소를 V1 로 옮기지 못했다", "\(error)")
+                    return .unavailable(.openFailed)
+                }
+            }
+        }
+
+        let decision = gate.decide(storeURL: url)
+        switch decision {
+        case .connect(let reading):
+            Log.info("C14 게이트 — 연결", reading.summary)
+            do {
+                return .ready(try open(url, cloudKitDatabase: cloudKitDatabase))
+            } catch {
+                Log.error("게이트를 지난 저장소를 연결해 열지 못했다", "\(error)")
+                return .unavailable(.openFailed)
+            }
+        case .hold(let hold, let reading):
+            Log.error("C14 게이트 — 연결 보류", "\(hold.reason)", reading.summary)
+            do {
+                return .held(try open(url, cloudKitDatabase: .none), hold)
+            } catch {
+                Log.error("보류한 저장소를 CloudKit 없이 열지 못했다", "\(error)")
+                return .unavailable(.openFailed)
+            }
+        }
+    }
+
+    /// 앱 스키마 + 마이그레이션 플랜으로 **CloudKit 없이** 열었다 닫는다 — 마이그레이션만 일으킨다(SEP-1 의 열기와 같다).
+    private static func migrateWithoutCloudKit(_ url: URL) throws {
+        _ = try open(url, cloudKitDatabase: .none)
+    }
+
+    private static func open(_ url: URL, cloudKitDatabase: ModelConfiguration.CloudKitDatabase) throws -> ModelContainer {
+        try ModelContainer(
+            for: appSchema,
+            migrationPlan: DrawingDataMigrationPlan.self,
+            configurations: ModelConfiguration(url: url, cloudKitDatabase: cloudKitDatabase)
+        )
+    }
+
+    private static func openV1Only(_ url: URL, cloudKitDatabase: ModelConfiguration.CloudKitDatabase) throws -> ModelContainer {
+        try ModelContainer(
+            for: Schema([DrawingVO.self]),
+            migrationPlan: MigrationPlanV1Only.self,
+            configurations: ModelConfiguration(url: url, cloudKitDatabase: cloudKitDatabase)
+        )
+    }
+
+    /// 앱 스키마로 열지 못한 저장소를 가려 처리 방식을 정한다.
+    private static func classify(_ url: URL, loadError: Error) -> Plan {
+        let kind = storeKind(at: url)
+        let isLoadIssue = (loadError as? SwiftDataError) == .loadIssueModelContainer
+        Log.error("로컬 저장소를 앱 스키마로 열지 못했다", "\(kind)", "\(loadError)")
+        return plan(for: kind, isLoadIssue: isLoadIssue)
     }
 
     /// 열지 못한 저장소를 어떻게 다룰지. 순수 함수라 테스트로 고정한다.

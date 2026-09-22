@@ -84,13 +84,16 @@ public final class PersistentCloudKitContainer: ObservableObject {
         /// 로컬 저장소를 쓸 수 없다. CloudKit 을 기다리지 않고 **들어가지 않는다** (정책 §3 표 4행).
         /// 오프라인 · 계정 문제(`failed`)와 다른 축이다.
         case storeUnavailable(LocalStoreFailure)
+        /// C14 게이트가 미러링 연결을 **보류**했다 — 저장소는 앱 스키마로, CloudKit 없이 열려 있다(정책 §12-6 C14 ③).
+        /// 들어가되 이 실행은 이 기기에만 저장한다. 기다릴 CloudKit 이 없다. 자동으로 풀리지 않는다.
+        case connectionHeld(LegacySeparationHold)
 
         /// 아직 결론이 나지 않아 **관찰이 이어지는** 상태인가. 진행 표시를 켤지 정하는 데 쓴다.
         /// `stillWaiting` 은 제한 시간이 지났을 뿐 관찰이 끝난 것이 아니므로 여기 포함된다.
         public var isInProgress: Bool {
             switch self {
             case .idle, .syncing, .migration, .stillWaiting: true
-            case .syncCompleted, .migrationCompleted, .migrationEndedWithoutImport, .failed, .storeUnavailable: false
+            case .syncCompleted, .migrationCompleted, .migrationEndedWithoutImport, .failed, .storeUnavailable, .connectionHeld: false
             }
         }
     }
@@ -177,8 +180,8 @@ public final class PersistentCloudKitContainer: ObservableObject {
             return initialWaitLimit.migration
         case .syncing, .stillWaiting:
             return initialWaitLimit.normal
-        case .syncCompleted, .migrationCompleted, .migrationEndedWithoutImport, .failed, .storeUnavailable:
-            // `storeUnavailable` 은 컨테이너를 만들 때 정해진다. 기다릴 CloudKit 도 조회할 계정도 없다.
+        case .syncCompleted, .migrationCompleted, .migrationEndedWithoutImport, .failed, .storeUnavailable, .connectionHeld:
+            // `storeUnavailable` · `connectionHeld` 는 컨테이너를 만들 때 정해진다. 기다릴 CloudKit 이 없다.
             Log.debug("초기 대기 — 대기를 시작하기 전에 결론이 났다", "\(syncState)")
             return nil
         }
@@ -206,7 +209,7 @@ public final class PersistentCloudKitContainer: ObservableObject {
         case .syncCompleted: .migrationCompleted
         case .failed(let reason): .migrationEndedWithoutImport(reason)
         case .stillWaiting: .migrationEndedWithoutImport(nil)
-        case .idle, .syncing, .migration, .migrationCompleted, .migrationEndedWithoutImport, .storeUnavailable: outcome
+        case .idle, .syncing, .migration, .migrationCompleted, .migrationEndedWithoutImport, .storeUnavailable, .connectionHeld: outcome
         }
     }
 
