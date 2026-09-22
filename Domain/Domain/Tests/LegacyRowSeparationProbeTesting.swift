@@ -57,6 +57,8 @@ struct LegacyRowSeparationProbeTesting {
         var schema: String?
         /// 넣을 엔티티 이름(`BibleDrawing` · `BiblePageDrawing` · `FavoriteVerse`). 없으면 `BibleDrawing`.
         var entity: String?
+        /// 여러 단계를 차례로 — `{"op":"steps","steps":[{…},{…}]}`. 단계마다 앞 단계의 결과 위에서 돈다.
+        var steps: [Plan]?
     }
 
     private static var plan: Plan? {
@@ -191,7 +193,7 @@ struct LegacyRowSeparationProbeTesting {
         return Int64(last.dropFirst())
     }
 
-    private func insertRows(_ container: NSPersistentContainer, count: Int, entity: String = "BibleDrawing") throws -> [String] {
+    private func insertRows(_ container: NSPersistentContainer, count: Int, entity: String = "BibleDrawing", id: String? = nil) throws -> [String] {
         let context = container.newBackgroundContext()
         var made: [String] = []
         var thrown: Error?
@@ -199,7 +201,8 @@ struct LegacyRowSeparationProbeTesting {
             for index in 0 ..< count {
                 let object = NSEntityDescription.insertNewObject(forEntityName: entity, into: context)
                 let known = object.entity.attributesByName.keys
-                let identifier = "SEP2-\(UUID().uuidString.prefix(8))"
+                // 이름을 정해 주면 그 이름을 쓴다(여러 행이면 뒤에 번호) — 라운드마다 어느 행인지 서버 기록과 맞춰 보기 위해서다.
+                let identifier = id.map { count > 1 ? "\($0)-\(index)" : $0 } ?? "SEP2-\(UUID().uuidString.prefix(8))"
                 // 그 스키마에 있는 속성만 채운다 — V3 와 V6 가 같은 값을 받는다.
                 let values: [String: Any] = switch entity {
                 case "FavoriteVerse": [
@@ -242,15 +245,30 @@ struct LegacyRowSeparationProbeTesting {
     }
 
     /// 제품이 쓸 경로로 지운다 — 앱 스키마 · 마이그레이션 플랜 · `ModelContext.delete`(이력 추적은 SwiftData 기본값). 관문 미확인 항목 ③.
-    private func deleteViaSwiftData(_ path: String, id: String) throws -> String {
+    private func deleteViaSwiftData(_ path: String, id: String, entity: String?) throws -> String {
         let configuration = ModelConfiguration(url: URL(fileURLWithPath: path), cloudKitDatabase: .none)
         let container = try ModelContainer(for: AppStoreSchema.schema, migrationPlan: DrawingDataMigrationPlan.self, configurations: configuration)
         let context = ModelContext(container)
-        let rows = try context.fetch(FetchDescriptor<BibleDrawing>(predicate: #Predicate { $0.id == id }))
-        guard let row = rows.first else { return "id \(id) 행이 없다" }
-        context.delete(row)
+        let name = entity ?? "BibleDrawing"
+        switch name {
+        case "FavoriteVerse":
+            guard let row = try context.fetch(FetchDescriptor<FavoriteVerse>(predicate: #Predicate { $0.favoriteID == id })).first else {
+                return "\(name) \(id) 행이 없다"
+            }
+            context.delete(row)
+        case "BiblePageDrawing":
+            guard let row = try context.fetch(FetchDescriptor<BiblePageDrawing>(predicate: #Predicate { $0.id == id })).first else {
+                return "\(name) \(id) 행이 없다"
+            }
+            context.delete(row)
+        default:
+            guard let row = try context.fetch(FetchDescriptor<BibleDrawing>(predicate: #Predicate { $0.id == id })).first else {
+                return "\(name) \(id) 행이 없다"
+            }
+            context.delete(row)
+        }
         try context.save()
-        return "SwiftData 로 지웠다: id \(id)"
+        return "SwiftData 로 지웠다: \(name) \(id)"
     }
 
     private func deleteRows(_ container: NSPersistentContainer, state: MirroringState, select: String, count: Int, id: String? = nil) throws -> [String] {
@@ -300,27 +318,8 @@ struct LegacyRowSeparationProbeTesting {
         var lines = ["SEP 손질 — 지시서 \(plan.op)\(plan.schema.map { " · 모델 \($0)" } ?? "")"]
         lines.append(describe(before, title: "손질 전"))
 
-        switch plan.op {
-        case "report":
-            break
-        case "insert":
-            let container = try open(path, schema: plan.schema)
-            let made = try insertRows(container, count: plan.count ?? 1, entity: plan.entity ?? "BibleDrawing")
-            lines.append("  넣은 행: \(made.joined(separator: ", "))")
-        case "truncateHistory":
-            lines.append("  " + (try truncateHistory(path)))
-        case "deleteSwiftData":
-            guard let id = plan.id else { lines.append("  id 가 없다"); break }
-            lines.append("  " + (try deleteViaSwiftData(path, id: id)))
-        case "delete":
-            let container = try open(path, schema: plan.schema)
-            let removed = try deleteRows(container, state: before, select: plan.select ?? "withoutRecordID", count: plan.count ?? 1, id: plan.id)
-            lines.append("  지운 행(\(plan.id ?? plan.select ?? "withoutRecordID")): \(removed.isEmpty ? "없음" : removed.joined(separator: " / "))")
-        case "migrate":
-            try migrate(path)
-            lines.append("  마이그레이션 플랜으로 열었다 닫음")
-        default:
-            lines.append("  모르는 지시서다")
+        for step in plan.steps ?? [plan] {
+            try apply(step, at: path, lines: &lines)
         }
 
         let after = try readMirroringState(at: path)
@@ -333,6 +332,33 @@ struct LegacyRowSeparationProbeTesting {
         try? report.write(toFile: Self.dropbox + "/report.txt", atomically: true, encoding: .utf8)
 
         #expect(after.entityIDs.isEmpty == false)
+    }
+
+    /// 지시서 한 단계. 삭제 대상 선택(`select`)은 그 단계 직전의 상태로 한다.
+    private func apply(_ plan: Plan, at path: String, lines: inout [String]) throws {
+        switch plan.op {
+        case "report":
+            break
+        case "insert":
+            let container = try open(path, schema: plan.schema)
+            let made = try insertRows(container, count: plan.count ?? 1, entity: plan.entity ?? "BibleDrawing", id: plan.id)
+            lines.append("  넣은 행: \(made.joined(separator: ", "))")
+        case "truncateHistory":
+            lines.append("  " + (try truncateHistory(path)))
+        case "deleteSwiftData":
+            guard let id = plan.id else { lines.append("  id 가 없다"); return }
+            lines.append("  " + (try deleteViaSwiftData(path, id: id, entity: plan.entity)))
+        case "delete":
+            let state = try readMirroringState(at: path)
+            let container = try open(path, schema: plan.schema)
+            let removed = try deleteRows(container, state: state, select: plan.select ?? "withoutRecordID", count: plan.count ?? 1, id: plan.id)
+            lines.append("  지운 행(\(plan.id ?? plan.select ?? "withoutRecordID")): \(removed.isEmpty ? "없음" : removed.joined(separator: " / "))")
+        case "migrate":
+            try migrate(path)
+            lines.append("  마이그레이션 플랜으로 열었다 닫음")
+        default:
+            lines.append("  모르는 지시서다: \(plan.op)")
+        }
     }
 
     private func describe(_ state: MirroringState, title: String) -> String {

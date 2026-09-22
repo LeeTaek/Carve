@@ -21,6 +21,8 @@ public struct SettingsFeature {
         @Presents public var path: Path.State? = .iCloud(.initialState)
         /// 광고 개인정보 옵션 항목을 보일지. 동의가 필요한 지역(EEA·영국·스위스 등)에서만 true.
         public var isPrivacyOptionsRequired = false
+        /// 이번 실행의 iCloud 연결이 C14 게이트로 보류됐는가(정책 §12-6 C14 ③ · D2 — 설정 항목으로도 안내한다). 화면이 뜰 때 읽는다.
+        public var isConnectionHeld = false
 
         public static func initialState(path: Path.State?) -> Self {
             var state = Self()
@@ -66,6 +68,7 @@ public struct SettingsFeature {
     }
     
     @Dependency(\.adConsentClient) var adConsentClient
+    @Dependency(\.legacySeparationHoldState) var holdState
 
     public var body: some Reducer<State, Action> {
         Reduce { state, action in
@@ -74,6 +77,7 @@ public struct SettingsFeature {
                 state.isPrivacyOptionsRequired = MainActor.assumeIsolated {
                     adConsentClient.isPrivacyOptionsRequired
                 }
+                state.isConnectionHeld = holdState.isHeld
             case .view(.privacyOptionsTapped):
                 return .run { _ in
                     // 폼을 닫거나 띄우지 못해도 설정 화면 상태는 바뀌지 않는다.

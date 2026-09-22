@@ -159,7 +159,7 @@ public struct LegacySeparationJob: Codable, Equatable, Sendable {
         public var verseContentFingerprint: String?
         /// 분리본을 쓰고 다시 읽어 지문이 맞았다.
         public var preserved: Bool
-        /// `rows/` 아래 파일 이름.
+        /// 그 행이 든 `rows/` 아래 파일 이름(`rows-000.json` — 500행씩 묶는다).
         public var fileName: String
     }
 
@@ -224,12 +224,17 @@ public struct LegacySeparationRecordStore: Sendable {
             .sorted { $0.createdAt < $1.createdAt }
     }
 
-    /// 그 작업의 분리본들. 파일을 하나라도 읽지 못하면 던진다 — 없는 것으로 치지 않는다.
+    /// 그 작업의 분리본들(대상 순서). 파일을 하나라도 읽지 못하거나 지문이 어긋나면 던진다 — 없는 것으로 치지 않는다.
     public func rows(of job: LegacySeparationJob) throws -> [LegacySeparatedRow] {
-        try job.targets.map { target in
-            let file = directory.appendingPathComponent(job.jobID).appendingPathComponent(Self.rowsDirectoryName).appendingPathComponent(target.fileName)
-            let row = try Self.decoder.decode(LegacySeparatedRow.self, from: Data(contentsOf: file))
-            guard LegacySeparatedRow.fingerprint(of: row.columns) == row.contentFingerprint, row.contentFingerprint == target.contentFingerprint else {
+        let folder = directory.appendingPathComponent(job.jobID).appendingPathComponent(Self.rowsDirectoryName)
+        var byFile: [String: [LegacyRowIdentity: LegacySeparatedRow]] = [:]
+        for fileName in Set(job.targets.map(\.fileName)) {
+            let chunk = try Self.decoder.decode([LegacySeparatedRow].self, from: Data(contentsOf: folder.appendingPathComponent(fileName)))
+            byFile[fileName] = Dictionary(chunk.map { ($0.identity, $0) }, uniquingKeysWith: { first, _ in first })
+        }
+        return try job.targets.map { target in
+            guard let row = byFile[target.fileName]?[target.identity],
+                  LegacySeparatedRow.fingerprint(of: row.columns) == row.contentFingerprint, row.contentFingerprint == target.contentFingerprint else {
                 throw Failure.verifyFailed(target.identity)
             }
             return row
@@ -239,6 +244,8 @@ public struct LegacySeparationRecordStore: Sendable {
     // MARK: 쓰기
 
     /// 대상 행들의 분리본을 쓰고 확인한 뒤 작업 기록을 남긴다. 같은 대상 · 같은 내용이면 이미 있는 기록을 그대로 돌려준다(멱등).
+    ///
+    /// 분리본은 `chunkSize` 행씩 한 파일에 묶어 파일마다 한 번 장치까지 내린다 — 행마다 파일을 쓰면 5,000행에 60초가 걸렸다(SEP-6).
     /// - Parameters:
     ///   - targets: 판정에서 「검증된 대응 없음」 이 된 행들.
     ///   - copyURL: 판정에 쓴 **사본** — 행 내용은 여기서 읽는다.
@@ -250,7 +257,7 @@ public struct LegacySeparationRecordStore: Sendable {
         readerVersion: Int,
         now: Date = Date()
     ) throws -> LegacySeparationJob {
-        let rows = try targets.map { try readRow($0, from: copyURL, storeURL: storeURL) }
+        let rows = try readRows(targets, from: copyURL, storeURL: storeURL)
         let storeUUID = (try? Self.storeUUID(of: copyURL)) ?? "-"
         let jobID = Self.jobID(storeUUID: storeUUID, rows: rows)
 
@@ -263,30 +270,35 @@ public struct LegacySeparationRecordStore: Sendable {
         let final = directory.appendingPathComponent(jobID, isDirectory: true)
         try? fileManager.removeItem(at: staging)
         try? fileManager.removeItem(at: final)
+        let rowsFolder = staging.appendingPathComponent(Self.rowsDirectoryName, isDirectory: true)
         do {
-            try fileManager.createDirectory(at: staging.appendingPathComponent(Self.rowsDirectoryName, isDirectory: true), withIntermediateDirectories: true)
+            try fileManager.createDirectory(at: rowsFolder, withIntermediateDirectories: true)
         } catch {
             throw Failure.writeFailed("\(error)")
         }
 
         var recorded: [LegacySeparationJob.Target] = []
-        for row in rows {
-            let fileName = "\(row.identity.entity.rawValue)-\(row.identity.primaryKey).json"
-            let file = staging.appendingPathComponent(Self.rowsDirectoryName).appendingPathComponent(fileName)
+        recorded.reserveCapacity(rows.count)
+        for (index, start) in stride(from: 0, to: rows.count, by: Self.chunkSize).enumerated() {
+            let chunk = Array(rows[start ..< min(start + Self.chunkSize, rows.count)])
+            let fileName = String(format: "rows-%03d.json", index)
+            let file = rowsFolder.appendingPathComponent(fileName)
             do {
-                try DurableFile.write(try Self.encoder.encode(row), to: file)
+                try DurableFile.write(try Self.encoder.encode(chunk), to: file)
             } catch {
                 throw Failure.writeFailed("\(error)")
             }
-            // 보존 확인 — 다시 읽어 지문이 같아야 한다(C14 ① 「보존의 기준」).
-            guard let reread = try? Self.decoder.decode(LegacySeparatedRow.self, from: Data(contentsOf: file)),
-                  reread == row, LegacySeparatedRow.fingerprint(of: reread.columns) == row.contentFingerprint else {
-                throw Failure.verifyFailed(row.identity)
+            // 보존 확인 — 다시 읽어 행마다 지문이 같아야 한다(C14 ① 「보존의 기준」).
+            guard let reread = try? Self.decoder.decode([LegacySeparatedRow].self, from: Data(contentsOf: file)), reread == chunk else {
+                throw Failure.verifyFailed(chunk.first?.identity ?? LegacyRowIdentity(entity: .bibleDrawing, primaryKey: -1))
             }
-            recorded.append(LegacySeparationJob.Target(
-                identity: row.identity, contentFingerprint: row.contentFingerprint, verseContentFingerprint: row.verseContentFingerprint,
-                preserved: true, fileName: fileName
-            ))
+            for row in reread {
+                guard LegacySeparatedRow.fingerprint(of: row.columns) == row.contentFingerprint else { throw Failure.verifyFailed(row.identity) }
+                recorded.append(LegacySeparationJob.Target(
+                    identity: row.identity, contentFingerprint: row.contentFingerprint, verseContentFingerprint: row.verseContentFingerprint,
+                    preserved: true, fileName: fileName
+                ))
+            }
         }
 
         let job = LegacySeparationJob(
@@ -303,6 +315,9 @@ public struct LegacySeparationRecordStore: Sendable {
         }
         return job
     }
+
+    /// 분리본 한 파일에 묶는 행 수.
+    static let chunkSize = 500
 
     private func existingJob(_ jobID: String) throws -> LegacySeparationJob? {
         let file = directory.appendingPathComponent(jobID).appendingPathComponent(Self.jobFileName)
@@ -326,43 +341,58 @@ public struct LegacySeparationRecordStore: Sendable {
         return String(hasher.finalize().map { String(format: "%02x", $0) }.joined().prefix(24))
     }
 
-    // MARK: 행 읽기 (읽기 전용 SQLite)
+    // MARK: 행 읽기 (읽기 전용 SQLite · 연결 하나)
 
-    private func readRow(_ identity: LegacyRowIdentity, from copyURL: URL, storeURL: URL) throws -> LegacySeparatedRow {
+    /// 대상 행을 **연결 하나**로 읽는다(엔티티마다 준비한 질의를 다시 쓴다). 순서는 대상 순서다.
+    private func readRows(_ identities: [LegacyRowIdentity], from copyURL: URL, storeURL: URL) throws -> [LegacySeparatedRow] {
         var handle: OpaquePointer?
         guard sqlite3_open_v2("file:\(copyURL.path)?mode=ro", &handle, SQLITE_OPEN_READONLY | SQLITE_OPEN_URI, nil) == SQLITE_OK, let db = handle else {
             let message = handle.map { String(cString: sqlite3_errmsg($0)) } ?? "open failed"
             sqlite3_close(handle)
-            throw Failure.cannotReadRow(identity, message)
+            throw Failure.cannotReadRow(identities.first ?? LegacyRowIdentity(entity: .bibleDrawing, primaryKey: -1), message)
         }
-        defer { sqlite3_close(db) }
-
-        var statement: OpaquePointer?
-        let query = "SELECT * FROM \(identity.entity.table) WHERE Z_PK = ?"
-        guard sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK, let statement else {
-            throw Failure.cannotReadRow(identity, String(cString: sqlite3_errmsg(db)))
+        var statements: [LegacyEntity: OpaquePointer] = [:]
+        defer {
+            statements.values.forEach { sqlite3_finalize($0) }
+            sqlite3_close(db)
         }
-        defer { sqlite3_finalize(statement) }
-        sqlite3_bind_int64(statement, 1, identity.primaryKey)
-        guard sqlite3_step(statement) == SQLITE_ROW else { throw Failure.cannotReadRow(identity, "행이 없다") }
-
         let support = RawStoreSnapshot.supportDirectory(for: storeURL).appendingPathComponent("_EXTERNAL_DATA", isDirectory: true)
-        var columns: [String: LegacySeparatedRow.Value] = [:]
-        for index in 0 ..< sqlite3_column_count(statement) {
-            let name = String(cString: sqlite3_column_name(statement, index))
-            switch sqlite3_column_type(statement, index) {
-            case SQLITE_INTEGER: columns[name] = .integer(sqlite3_column_int64(statement, index))
-            case SQLITE_FLOAT: columns[name] = .real(sqlite3_column_double(statement, index))
-            case SQLITE_TEXT: columns[name] = .text(String(cString: sqlite3_column_text(statement, index)))
-            case SQLITE_BLOB:
-                let bytes = sqlite3_column_blob(statement, index)
-                let count = Int(sqlite3_column_bytes(statement, index))
-                let raw = bytes.map { Data(bytes: $0, count: count) } ?? Data()
-                columns[name] = .blob(try Self.resolveExternal(raw, column: name, in: support))
-            default: columns[name] = .null
+        var result: [LegacySeparatedRow] = []
+        result.reserveCapacity(identities.count)
+        for identity in identities {
+            let statement: OpaquePointer
+            if let prepared = statements[identity.entity] {
+                statement = prepared
+                sqlite3_reset(statement)
+                sqlite3_clear_bindings(statement)
+            } else {
+                var created: OpaquePointer?
+                guard sqlite3_prepare_v2(db, "SELECT * FROM \(identity.entity.table) WHERE Z_PK = ?", -1, &created, nil) == SQLITE_OK, let created else {
+                    throw Failure.cannotReadRow(identity, String(cString: sqlite3_errmsg(db)))
+                }
+                statements[identity.entity] = created
+                statement = created
             }
+            sqlite3_bind_int64(statement, 1, identity.primaryKey)
+            guard sqlite3_step(statement) == SQLITE_ROW else { throw Failure.cannotReadRow(identity, "행이 없다") }
+            var columns: [String: LegacySeparatedRow.Value] = [:]
+            for index in 0 ..< sqlite3_column_count(statement) {
+                let name = String(cString: sqlite3_column_name(statement, index))
+                switch sqlite3_column_type(statement, index) {
+                case SQLITE_INTEGER: columns[name] = .integer(sqlite3_column_int64(statement, index))
+                case SQLITE_FLOAT: columns[name] = .real(sqlite3_column_double(statement, index))
+                case SQLITE_TEXT: columns[name] = .text(String(cString: sqlite3_column_text(statement, index)))
+                case SQLITE_BLOB:
+                    let bytes = sqlite3_column_blob(statement, index)
+                    let count = Int(sqlite3_column_bytes(statement, index))
+                    let raw = bytes.map { Data(bytes: $0, count: count) } ?? Data()
+                    columns[name] = .blob(try Self.resolveExternal(raw, column: name, in: support))
+                default: columns[name] = .null
+                }
+            }
+            result.append(LegacySeparatedRow(identity: identity, columns: columns, contentFingerprint: LegacySeparatedRow.fingerprint(of: columns)))
         }
-        return LegacySeparatedRow(identity: identity, columns: columns, contentFingerprint: LegacySeparatedRow.fingerprint(of: columns))
+        return result
     }
 
     /// 외부 저장 열의 값 — `0x01` + 값이면 안에 둔 것, `0x02` + 파일 이름 + `NUL` 이면 `_EXTERNAL_DATA` 의 파일이다.

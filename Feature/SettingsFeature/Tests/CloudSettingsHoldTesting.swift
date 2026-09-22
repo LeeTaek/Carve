@@ -77,6 +77,20 @@ struct CloudSettingsHoldTesting {
         #expect(eraser.calls.value == 0)
     }
 
+    @Test("설정 목록은 화면이 뜰 때 보류를 읽는다 — iCloud 항목이 「보류」 로 보인다")
+    func settingsListReadsHold() {
+        // `SettingsFeature.State` 는 Equatable 이 아니라 TestStore 를 쓸 수 없다 — 리듀서를 직접 돌린다.
+        for (hold, expected) in [(Optional(hold), true), (nil, false)] {
+            var state = SettingsFeature.State.initialState
+            withDependencies {
+                $0.legacySeparationHoldState = LegacySeparationHoldState(hold: hold)
+            } operation: {
+                _ = SettingsFeature().reduce(into: &state, action: .view(.onAppear))
+            }
+            #expect(state.isConnectionHeld == expected)
+        }
+    }
+
     @Test("보류 안내는 지금은 이 기기에만 저장된다는 것 · 까닭 · 다시 시도를 말한다")
     func holdCopyExplains() {
         let unlinked = CloudSettingsFeature.holdCopy(hold)

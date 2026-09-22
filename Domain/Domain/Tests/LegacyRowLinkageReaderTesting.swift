@@ -313,9 +313,39 @@ struct LegacyRowLinkageReaderTesting {
         }
     }
 
-    // MARK: 음성 — 어느 것이든 연결 보류
+    // MARK: 도우미
 
-    @Test("검증하지 않은 OS 주 버전이면 저장소를 읽기 전에 「알 수 없음」")
+    private func fingerprints(_ url: URL) -> [String: Data] {
+        var result: [String: Data] = [:]
+        for suffix in ["", "-wal", "-shm"] {
+            let file = URL(fileURLWithPath: url.path + suffix)
+            if let data = try? Data(contentsOf: file) { result[file.lastPathComponent] = data }
+        }
+        return result
+    }
+}
+
+// MARK: - 음성 — 어느 것이든 연결 보류
+
+extension LegacyRowLinkageReaderTesting {
+
+    @Test("검증 밖 OS 라도 legacy 행이 없으면 연결한다 — 분리할 것이 없다(새 설치 · 로그아웃해 비워진 저장소)")
+    func unvalidatedOSWithoutRowsConnects() throws {
+        var elsewhere = reader
+        elsewhere.osMajor = 18
+        try withStore { url in
+            try LinkageFixture.exec(url, "DELETE FROM ZBIBLEDRAWING;")
+            #expect(elsewhere.judge(storeAt: url).verdict == .allLinked)
+        }
+        let directory = try LinkageFixture.makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let fresh = directory.appendingPathComponent("Carve.sqlite")
+        _ = try ModelContainer(for: AppStoreSchema.schema, migrationPlan: DrawingDataMigrationPlan.self, configurations: ModelConfiguration(url: fresh, cloudKitDatabase: .none))
+        let reading = elsewhere.judge(storeAt: fresh)
+        #expect(reading.verdict == .allLinked && !reading.mirroringAttached)
+    }
+
+    @Test("검증하지 않은 OS 주 버전이면 legacy 행이 있을 때 사설 표를 해석하기 전에 「알 수 없음」")
     func unvalidatedOSIsUnknown() throws {
         try withStore { url in
             for pk in 1...3 { try LinkageFixture.link(url, entity: .bibleDrawing, primaryKey: Int64(pk)) }
@@ -324,6 +354,26 @@ struct LegacyRowLinkageReaderTesting {
             elsewhere.osMajor = 18
 
             #expect(reason(elsewhere.judge(storeAt: url)) == .unvalidatedEnvironment(osMajor: 18))
+        }
+    }
+
+    @Test("기본 판독기는 실행 중인 OS 를 따른다 — 검증 범위 밖 OS 에서는 저장소를 읽기 전에 「알 수 없음」")
+    func defaultReaderFollowsTheRunningOS() throws {
+        try withStore { url in
+            for pk in 1...3 { try LinkageFixture.link(url, entity: .bibleDrawing, primaryKey: Int64(pk)) }
+            try LinkageFixture.addIdentityKeys(url)
+            let running = LegacyRowLinkageReader()
+            let major = ProcessInfo.processInfo.operatingSystemVersion.majorVersion
+            #expect(running.osMajor == major)
+
+            let reading = running.judge(storeAt: url)
+
+            if running.validatedOSMajors.contains(major) {
+                #expect(reading.verdict == .allLinked)
+            } else {
+                #expect(reason(reading) == .unvalidatedEnvironment(osMajor: major))
+                #expect(reading.rows.isEmpty)
+            }
         }
     }
 
@@ -358,11 +408,40 @@ struct LegacyRowLinkageReaderTesting {
         }
     }
 
+    @Test("미러링 표가 하나도 없고 legacy 행도 없으면 「모두 대응 있음」 — 새로 설치해 저장소를 처음 만든 실행")
+    func freshStoreWithoutMirroringTablesConnects() throws {
+        let directory = try LinkageFixture.makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("Carve.sqlite")
+        _ = try ModelContainer(for: AppStoreSchema.schema, migrationPlan: DrawingDataMigrationPlan.self, configurations: ModelConfiguration(url: url, cloudKitDatabase: .none))
+
+        let reading = reader.judge(storeAt: url)
+
+        #expect(reading.verdict == .allLinked && !reading.mirroringAttached)
+        #expect(reading.summary.contains("미러링 표 없음"))
+    }
+
+    @Test("미러링 표가 하나도 없는데 legacy 행이 있으면 「알 수 없음」 — 관측한 적 없는 모양")
+    func rowsWithoutMirroringTablesAreUnknown() throws {
+        try withStore { url in
+            try LinkageFixture.exec(url, "DROP TABLE ANSCKRECORDMETADATA; DROP TABLE ANSCKMETADATAENTRY;")
+            #expect(reason(reader.judge(storeAt: url)) == .mirroringNotAttached(legacyRows: 3))
+        }
+    }
+
     @Test("대응 표가 없으면 「알 수 없음」")
     func missingCorrespondenceTableIsUnknown() throws {
         try withStore { url in
             try LinkageFixture.exec(url, "DROP TABLE ANSCKRECORDMETADATA;")
             #expect(reason(reader.judge(storeAt: url)) == .tableMissing("ANSCKRECORDMETADATA"))
+        }
+    }
+
+    @Test("legacy 행이 없으면 미러링 표의 모양이 달라도 연결한다 — 해석할 것이 없다(미래 OS 가 표를 바꿔도 새 설치가 막히지 않게)")
+    func changedMirroringSchemaWithoutRowsConnects() throws {
+        try withStore { url in
+            try LinkageFixture.exec(url, "DELETE FROM ZBIBLEDRAWING; ALTER TABLE ANSCKRECORDMETADATA RENAME COLUMN ZCKRECORDNAME TO ZRECORDNAME;")
+            #expect(reader.judge(storeAt: url).verdict == .allLinked)
         }
     }
 
@@ -483,14 +562,4 @@ struct LegacyRowLinkageReaderTesting {
         }
     }
 
-    // MARK: 도우미
-
-    private func fingerprints(_ url: URL) -> [String: Data] {
-        var result: [String: Data] = [:]
-        for suffix in ["", "-wal", "-shm"] {
-            let file = URL(fileURLWithPath: url.path + suffix)
-            if let data = try? Data(contentsOf: file) { result[file.lastPathComponent] = data }
-        }
-        return result
-    }
 }

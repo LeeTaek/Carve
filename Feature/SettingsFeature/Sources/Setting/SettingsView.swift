@@ -58,7 +58,8 @@ public struct SettingsView: View {
             }
             Section("저장") {
                 NavigationLink(value: SettingsFeature.Path.State.iCloud(.initialState)) {
-                    sidebarRow("iCloud", value: "켬")
+                    // 연결 보류 중에는 「보류」 — 이 실행은 이 기기에만 저장한다(정책 §12-6 C14 ③). 까닭은 iCloud 화면이 말한다.
+                    sidebarRow("iCloud", value: store.isConnectionHeld ? "보류" : "켬")
                 }
                 // 보이지 않게 남은 필기의 지속적인 진입점(정책 §12-6 ④) — 개수는 화면을 열 때 센다.
                 NavigationLink("남은 필기", value: SettingsFeature.Path.State.draftRecovery(.initialState))

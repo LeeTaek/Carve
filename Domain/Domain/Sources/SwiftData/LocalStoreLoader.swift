@@ -128,6 +128,9 @@ enum LocalStoreLoader {
     ///
     /// `.none` 컨테이너는 이 함수 안의 지역 범위에서만 살고, 연결용 컨테이너를 만들기 전에 놓는다(「동시 열기」 규칙).
     private static func loadThroughGate(at url: URL, cloudKitDatabase: ModelConfiguration.CloudKitDatabase, gate: LegacySeparationGate) -> Outcome {
+        // 시작 시간 측정(SEP-6) — 게이트는 매 실행 전체 검사다(D4). 판정 요약과 함께 남긴다.
+        let clock = ContinuousClock()
+        let started = clock.now
         do {
             try migrateWithoutCloudKit(url)
         } catch {
@@ -150,10 +153,12 @@ enum LocalStoreLoader {
             }
         }
 
+        let migrated = clock.now
         let decision = gate.decide(storeURL: url)
+        let timing = "CloudKit 없이 열기 \(milliseconds(migrated - started)) · 판정 · 보존 \(milliseconds(clock.now - migrated))"
         switch decision {
         case .connect(let reading):
-            Log.info("C14 게이트 — 연결", reading.summary)
+            Log.info("C14 게이트 — 연결", reading.summary, timing)
             do {
                 return .ready(try open(url, cloudKitDatabase: cloudKitDatabase))
             } catch {
@@ -161,7 +166,7 @@ enum LocalStoreLoader {
                 return .unavailable(.openFailed)
             }
         case .hold(let hold, let reading):
-            Log.error("C14 게이트 — 연결 보류", "\(hold.reason)", reading.summary)
+            Log.error("C14 게이트 — 연결 보류", "\(hold.reason)", reading.summary, timing)
             do {
                 return .held(try open(url, cloudKitDatabase: .none), hold)
             } catch {
@@ -169,6 +174,11 @@ enum LocalStoreLoader {
                 return .unavailable(.openFailed)
             }
         }
+    }
+
+    private static func milliseconds(_ duration: Duration) -> String {
+        let (seconds, attoseconds) = duration.components
+        return String(format: "%.1fms", Double(seconds) * 1_000 + Double(attoseconds) / 1e15)
     }
 
     /// 앱 스키마 + 마이그레이션 플랜으로 **CloudKit 없이** 열었다 닫는다 — 마이그레이션만 일으킨다(SEP-1 의 열기와 같다).

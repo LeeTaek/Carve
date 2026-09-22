@@ -111,6 +111,85 @@ struct LegacySeparationGateTesting {
         }
     }
 
+    // MARK: 중단 복구 (SEP-3 — 보존 단계까지)
+
+    @Test("분리본을 쓰다 끊겨 남은 .partial 폴더는 다음 실행이 치우고 처음부터 다시 쓴다")
+    func abandonedStagingIsReplaced() throws {
+        try withDirectory { directory, area in
+            let url = try LinkageFixture.makeV3Store(in: directory)
+            let partial = area.separationDirectory.appendingPathComponent("deadbeef.partial/rows", isDirectory: true)
+            try FileManager.default.createDirectory(at: partial, withIntermediateDirectories: true)
+            try Data("{ 잘린".utf8).write(to: partial.appendingPathComponent("rows-000.json"))
+
+            guard case .held(_, let hold) = load(url, area), let jobID = hold.jobID else { Issue.record("보류가 아니다"); return }
+
+            let folders = try FileManager.default.contentsOfDirectory(atPath: area.separationDirectory.path)
+            #expect(folders == [jobID])
+            let records = LegacySeparationRecordStore(area: area)
+            #expect(try records.rows(of: try #require(try records.jobs().first)).count == 3)
+        }
+    }
+
+    @Test("분리본 파일이 손상되면 다음 실행이 알아채고 같은 작업 ID 로 다시 쓴다 — 손상된 사본을 보존으로 치지 않는다")
+    func corruptedCopyIsRewritten() throws {
+        try withDirectory { directory, area in
+            let url = try LinkageFixture.makeV3Store(in: directory)
+            guard case .held(_, let first) = load(url, area), let jobID = first.jobID else { Issue.record("보류가 아니다"); return }
+            let rowsFile = area.separationDirectory.appendingPathComponent(jobID).appendingPathComponent("rows/rows-000.json")
+            var bytes = try Data(contentsOf: rowsFile)
+            bytes[bytes.count / 2] ^= 0x5A
+            try bytes.write(to: rowsFile)
+            let records = LegacySeparationRecordStore(area: area)
+            #expect((try? records.rows(of: try #require(try records.jobs().first))) == nil)
+
+            guard case .held(_, let second) = load(url, area) else { Issue.record("보류가 아니다"); return }
+
+            #expect(second.jobID == jobID)
+            #expect(try records.rows(of: try #require(try records.jobs().first)).count == 3)
+        }
+    }
+
+    @Test("작업 기록이 없는 분리본 폴더는 기록으로 치지 않고, 다음 실행이 온전한 기록을 남긴다")
+    func folderWithoutJobIsIgnoredThenCompleted() throws {
+        try withDirectory { directory, area in
+            let url = try LinkageFixture.makeV3Store(in: directory)
+            guard case .held(_, let first) = load(url, area), let jobID = first.jobID else { Issue.record("보류가 아니다"); return }
+            try FileManager.default.removeItem(at: area.separationDirectory.appendingPathComponent(jobID).appendingPathComponent("job.json"))
+            let records = LegacySeparationRecordStore(area: area)
+            #expect(try records.jobs().isEmpty)
+
+            guard case .held(_, let second) = load(url, area) else { Issue.record("보류가 아니다"); return }
+
+            let jobs = try records.jobs()
+            #expect(second.jobID == jobID && jobs.count == 1)
+        }
+    }
+
+    @Test("500행을 넘으면 분리본을 여러 파일로 나눠 쓰고, 읽을 때 대상 순서대로 모두 돌려준다")
+    func largeTargetSetIsChunked() throws {
+        try withDirectory { directory, area in
+            let url = directory.appendingPathComponent("Carve.sqlite")
+            let container = try ModelContainer(
+                for: Schema(DrawingSchemaV3.models), configurations: ModelConfiguration(url: url, cloudKitDatabase: .none)
+            )
+            let context = ModelContext(container)
+            for verse in 1...1_203 {
+                context.insert(DrawingSchemaV3.BibleDrawing(bibleTitle: LinkageFixture.chapter, verse: verse, lineData: Data("v\(verse)".utf8)))
+            }
+            try context.save()
+            try LinkageFixture.ensureMirroringTables(url)
+
+            guard case .held(_, let hold) = load(url, area), let jobID = hold.jobID else { Issue.record("보류가 아니다"); return }
+
+            let files = try FileManager.default.contentsOfDirectory(atPath: area.separationDirectory.appendingPathComponent(jobID).appendingPathComponent("rows").path).sorted()
+            #expect(files == ["rows-000.json", "rows-001.json", "rows-002.json"])
+            let records = LegacySeparationRecordStore(area: area)
+            let job = try #require(try records.jobs().first)
+            let rows = try records.rows(of: job)
+            #expect(rows.count == 1_203 && rows.map(\.identity) == job.targets.map(\.identity))
+        }
+    }
+
     // MARK: 연결
 
     @Test("모든 행에 대응이 있으면 연결한다 — 기록을 남기지 않는다")
@@ -124,6 +203,33 @@ struct LegacySeparationGateTesting {
 
             guard case .ready = outcome else { Issue.record("연결이 아니다: \(outcome)"); return }
             #expect(try LegacySeparationRecordStore(area: area).jobs().isEmpty)
+        }
+    }
+
+    @Test("저장소가 없는 새 설치는 게이트가 CloudKit 없이 저장소를 만든 뒤에도 연결한다 — 다음 실행도 같다")
+    func freshInstallConnects() throws {
+        try withDirectory { directory, area in
+            let url = directory.appendingPathComponent("Carve.sqlite")
+
+            let first = load(url, area)
+            guard case .ready = first else { Issue.record("새 설치를 연결하지 않았다: \(first)"); return }
+            // 시험은 `.none` 으로 열어 미러링 표가 끝내 생기지 않는다 — 앱은 `.private` 로 열며 표가 생긴다. 표 없이 다시 열어도 연결해야 한다.
+            let second = load(url, area)
+            guard case .ready = second else { Issue.record("두 번째 실행을 연결하지 않았다: \(second)"); return }
+            #expect(!FileManager.default.fileExists(atPath: area.separationDirectory.path))
+        }
+    }
+
+    @Test("검증 밖 OS 의 새 설치도 연결한다 — legacy 행이 없다")
+    func freshInstallConnectsOnUnvalidatedOS() throws {
+        try withDirectory { directory, area in
+            let url = directory.appendingPathComponent("Carve.sqlite")
+            var elsewhere = LegacySeparationGate(area: area)
+            elsewhere.reader.osMajor = 18
+
+            let outcome = LocalStoreLoader.load(at: url, cloudKitDatabase: .none, preservation: area, separationGate: elsewhere)
+
+            guard case .ready = outcome else { Issue.record("검증 밖 OS 의 새 설치를 연결하지 않았다: \(outcome)"); return }
         }
     }
 
@@ -156,6 +262,26 @@ struct LegacySeparationGateTesting {
 
             guard case .held(_, let hold) = outcome, case .preservationFailed = hold.reason else { Issue.record("보존 실패 보류가 아니다: \(outcome)"); return }
             #expect(hold.jobID == nil && !hold.allowsConditionalConsent)
+        }
+    }
+
+    @Test("앱이 쓰는 기본 게이트는 실행 중인 OS 를 따른다 — 검증 범위 밖 OS 면 모두 대응이 있어도 연결하지 않는다")
+    func defaultGateHoldsOnUnvalidatedOS() throws {
+        try withDirectory { directory, area in
+            let url = try LinkageFixture.makeV6Store(in: directory)
+            for pk in 1...3 { try LinkageFixture.link(url, entity: .bibleDrawing, primaryKey: Int64(pk)) }
+            try LinkageFixture.addIdentityKeys(url)
+            let major = ProcessInfo.processInfo.operatingSystemVersion.majorVersion
+
+            let outcome = LocalStoreLoader.load(at: url, cloudKitDatabase: .none, preservation: area, separationGate: LegacySeparationGate(area: area))
+
+            if LegacyRowLinkageReader().validatedOSMajors.contains(major) {
+                guard case .ready = outcome else { Issue.record("검증한 OS 인데 연결하지 않았다: \(outcome)"); return }
+            } else {
+                guard case .held(_, let hold) = outcome else { Issue.record("검증 밖 OS 인데 보류하지 않았다: \(outcome)"); return }
+                #expect(hold.reason == .linkageUnknown(.unvalidatedEnvironment(osMajor: major)))
+                #expect(!FileManager.default.fileExists(atPath: area.separationDirectory.path))
+            }
         }
     }
 
@@ -295,5 +421,131 @@ struct LegacySeparationHoldTesting {
         #expect(LegacySeparationHold(reason: .linkageUnknown(.tableMissing("x"))).allowsConditionalConsent)
         #expect(!LegacySeparationHold(reason: .unlinkedRowsAwaitSeparation(count: 1)).allowsConditionalConsent)
         #expect(!LegacySeparationHold(reason: .preservationFailed("x")).allowsConditionalConsent)
+    }
+}
+
+// MARK: - 마이그레이션과 엔티티 번호
+
+/// 게이트는 **옮긴 뒤의** 사본을 판정한다. 옮기는 동안 엔티티 번호(`Z_ENT`)가 바뀌면 미러링 대응(`ZENTITYID`)이 따라오는지 본다.
+@Suite("C14 — 마이그레이션과 엔티티 번호")
+struct LegacyEntityNumberingTesting {
+
+    @Test("V5 → V6 는 FavoriteVerse 의 Z_ENT 를 3 → 4 로 바꾸고, CloudKit 없이 옮겨도 미러링 대응의 엔티티 번호가 함께 옮겨진다")
+    func v5ToV6RenumbersFavoriteVerse() throws {
+        let directory = try LinkageFixture.makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("Carve.sqlite")
+        do {
+            let container = try ModelContainer(
+                for: Schema(versionedSchema: DrawingSchemaV5.self), configurations: ModelConfiguration(url: url, cloudKitDatabase: .none)
+            )
+            let context = ModelContext(container)
+            context.insert(DrawingSchemaV4.BibleDrawing(bibleTitle: LinkageFixture.chapter, verse: 1, lineData: RealLegacyLineData.data, rowUUID: "row-1"))
+            context.insert(DrawingSchemaV5.FavoriteVerse(
+                chapter: LinkageFixture.chapter, verse: 1, translation: .NKRV, sentence: "태초에", lineData: RealLegacyLineData.data, createdDate: Date(), favoriteID: "fav-1"
+            ))
+            try context.save()
+        }
+        try LinkageFixture.ensureMirroringTables(url)
+        let favoriteBefore = try LinkageFixture.entityID(url, .favoriteVerse)
+        let drawingBefore = try LinkageFixture.entityID(url, .bibleDrawing)
+        try LinkageFixture.link(url, entity: .favoriteVerse, primaryKey: 1)
+        try LinkageFixture.link(url, entity: .bibleDrawing, primaryKey: 1)
+        #expect(LocalStoreLoader.storeKind(at: url) == .known(Schema.Version(5, 0, 0)))
+
+        _ = try ModelContainer(for: AppStoreSchema.schema, migrationPlan: DrawingDataMigrationPlan.self, configurations: ModelConfiguration(url: url, cloudKitDatabase: .none))
+
+        let favoriteAfter = try LinkageFixture.entityID(url, .favoriteVerse)
+        let drawingAfter = try LinkageFixture.entityID(url, .bibleDrawing)
+        let epochAfter = try LinkageFixture.scalar(url, "SELECT Z_ENT FROM Z_PRIMARYKEY WHERE Z_NAME = 'DrawingEraseEpoch'")
+        let staleFavorite = try LinkageFixture.scalar(url, "SELECT count(*) FROM ANSCKRECORDMETADATA WHERE ZENTITYID = \(favoriteBefore)")
+        let movedFavorite = try LinkageFixture.scalar(url, "SELECT count(*) FROM ANSCKRECORDMETADATA WHERE ZENTITYID = \(favoriteAfter)")
+        print("V5→V6 엔티티 번호: FavoriteVerse \(favoriteBefore)→\(favoriteAfter) · BibleDrawing \(drawingBefore)→\(drawingAfter) · DrawingEraseEpoch →\(epochAfter)"
+              + " · 대응 ZENTITYID \(favoriteBefore) 남음 \(staleFavorite) · \(favoriteAfter) 로 옮김 \(movedFavorite)")
+
+        #expect(drawingBefore == drawingAfter)
+        #expect(favoriteBefore != favoriteAfter)
+        #expect(epochAfter == favoriteBefore, "옛 FavoriteVerse 번호를 다른 엔티티가 받는다")
+        // 2026-09-22 관측: 가벼운 마이그레이션은 `ANSCKRECORDMETADATA.ZENTITYID` 도 새 번호로 옮긴다(낡은 번호 0건).
+        #expect(staleFavorite == 0 && movedFavorite == 1, "대응의 엔티티 번호가 새 번호를 따라와야 한다")
+    }
+
+    @Test("V2 → V6 (가벼운 마이그레이션만) 뒤에도 BibleDrawing 의 (엔티티, 기본 키) 대응과 행 ID 가 그대로다")
+    func v2ToV6KeepsCorrespondences() throws {
+        let directory = try LinkageFixture.makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("Carve.sqlite")
+        do {
+            let container = try ModelContainer(
+                for: Schema(versionedSchema: DrawingSchemaV2.self), configurations: ModelConfiguration(url: url, cloudKitDatabase: .none)
+            )
+            let context = ModelContext(container)
+            for verse in 1...3 {
+                context.insert(DrawingSchemaV2.BibleDrawing(bibleTitle: LinkageFixture.chapter, verse: verse, lineData: RealLegacyLineData.data))
+            }
+            try context.save()
+        }
+        try LinkageFixture.ensureMirroringTables(url)
+        for pk in 1...3 { try LinkageFixture.link(url, entity: .bibleDrawing, primaryKey: Int64(pk)) }
+        let before = try pairs(url)
+        #expect(LocalStoreLoader.storeKind(at: url) == .known(Schema.Version(2, 0, 0)))
+
+        _ = try ModelContainer(for: AppStoreSchema.schema, migrationPlan: DrawingDataMigrationPlan.self, configurations: ModelConfiguration(url: url, cloudKitDatabase: .none))
+
+        let after = try pairs(url)
+        print("V2→V6 대응(엔티티 · 기본 키 · 행 ID): 앞 \(before.sorted()) · 뒤 \(after.sorted())")
+        #expect(before == after)
+    }
+
+    @Test("V1 → V6 (행을 새로 만드는 사용자 정의 마이그레이션) 뒤의 대응을 기록한다 — 원본 모델을 판정에 넣을지 가르는 관측")
+    func v1ToV6Correspondences() throws {
+        let directory = try LinkageFixture.makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("Carve.sqlite")
+        do {
+            let container = try ModelContainer(
+                for: Schema(versionedSchema: DrawingSchemaV1.self), configurations: ModelConfiguration(url: url, cloudKitDatabase: .none)
+            )
+            let context = ModelContext(container)
+            for verse in 1...3 {
+                context.insert(DrawingSchemaV1.DrawingVO(bibleTitle: LinkageFixture.chapter, verse: verse, lineData: RealLegacyLineData.data))
+            }
+            try context.save()
+        }
+        try LinkageFixture.ensureMirroringTables(url)
+        let voEntity = try LinkageFixture.scalar(url, "SELECT Z_ENT FROM Z_PRIMARYKEY WHERE Z_NAME = 'DrawingVO'")
+        for pk in 1...3 { try LinkageFixture.linkRaw(url, entityID: voEntity, primaryKey: Int64(pk)) }
+        try LinkageFixture.addIdentityKeys(url)
+        #expect(LocalStoreLoader.storeKind(at: url) == .known(Schema.Version(1, 0, 0)))
+
+        _ = try ModelContainer(for: AppStoreSchema.schema, migrationPlan: DrawingDataMigrationPlan.self, configurations: ModelConfiguration(url: url, cloudKitDatabase: .none))
+
+        let drawingEntity = try LinkageFixture.entityID(url, .bibleDrawing)
+        let rows = try LinkageFixture.scalar(url, "SELECT count(*) FROM ZBIBLEDRAWING")
+        let correspondences = try LinkageFixture.scalar(url, "SELECT count(*) FROM ANSCKRECORDMETADATA")
+        let matching = try LinkageFixture.scalar(
+            url, "SELECT count(*) FROM ANSCKRECORDMETADATA m JOIN ZBIBLEDRAWING d ON m.ZENTITYPK = d.Z_PK WHERE m.ZENTITYID = \(drawingEntity)"
+        )
+        let voLeft = try LinkageFixture.scalar(url, "SELECT count(*) FROM Z_PRIMARYKEY WHERE Z_NAME = 'DrawingVO'")
+        var reader = LegacyRowLinkageReader()
+        reader.osMajor = 26
+        let reading = reader.judge(storeAt: url)
+        print("V1→V6: DrawingVO 번호 \(voEntity) → BibleDrawing 번호 \(drawingEntity) · 행 \(rows) · 대응 \(correspondences)"
+              + " · 대응이 새 행을 가리킴 \(matching) · DrawingVO 등록 남음 \(voLeft) · 판독 \(reading.summary)")
+        // 2026-09-22 관측: 옛 행과 함께 그 대응도 지워지고(0), 새 행은 「검증된 대응 없음」 이다 — 낡은 대응이 새 행을 가리키지 않는다.
+        #expect(rows == 3 && correspondences == 0 && matching == 0 && voLeft == 0)
+        #expect(reading.unlinkedCount == 3)
+    }
+
+    private func pairs(_ url: URL) throws -> Set<String> {
+        var result: Set<String> = []
+        for pk in 1...3 {
+            let id = try LinkageFixture.scalar(url, """
+            SELECT count(*) FROM ANSCKRECORDMETADATA m JOIN ZBIBLEDRAWING d ON m.ZENTITYPK = d.Z_PK
+            WHERE d.Z_PK = \(pk) AND m.ZENTITYID = (SELECT Z_ENT FROM Z_PRIMARYKEY WHERE Z_NAME = 'BibleDrawing')
+            """)
+            result.insert("pk\(pk):\(id)")
+        }
+        return result
     }
 }

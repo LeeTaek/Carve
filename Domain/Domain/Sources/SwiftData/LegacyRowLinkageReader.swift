@@ -12,7 +12,8 @@
 //      ZENTITYID = `Z_PRIMARYKEY.Z_ENT` · ZENTITYPK = 그 엔티티 표의 `Z_PK` (2026-09-21 실제 저장소에서 확인, F34)
 //
 //  **검증한 범위 밖은 「알 수 없음」 이다** — OS 주 버전 · 저장소 모델 버전 · 엔티티(대응 관측이 실제 저장소에서 있었던 것)를 판독기가
-//  들고 있고, 범위 밖이면 행을 읽기 전에 보류로 끝낸다.
+//  들고 있다. 모델은 열기 전에, OS 는 **legacy 행이 있을 때** 사설 표를 해석하기 전에 본다 — 행이 없으면 분리할 것이 없어 연결한다
+//  (2026-09-22: 새 설치 · 검증 밖 OS 의 새 설치가 영영 보류되던 결함을 기기 시험 준비 중에 찾아 고쳤다).
 //
 
 import CarveToolkit
@@ -92,6 +93,8 @@ public enum LegacyLinkageUnknownReason: Error, Hashable, Sendable {
     case identityInconsistent(String)
     /// 대응 관측이 실제 저장소에서 아직 없었던 엔티티에 행 · 대응이 있다.
     case unvalidatedEntity(LegacyEntity)
+    /// 미러링 표가 하나도 없는데(미러링이 붙은 적이 없다) legacy 행이 있다 — 1.3.0 저장소는 계정이 없어도 미러링 표를 갖고 있으므로 관측한 적 없는 모양이다.
+    case mirroringNotAttached(legacyRows: Int)
 }
 
 /// 판독 결과 한 벌.
@@ -120,6 +123,8 @@ public struct LegacyRowLinkageReading: Equatable, Sendable {
     public var metadataKeyCount: Int
     /// 저장소 모델(가려낸 결과).
     public var storeModel: String
+    /// 미러링 표(`ANSCKRECORDMETADATA` · `ANSCKMETADATAENTRY`)가 있는가. 새로 설치해 저장소를 처음 만든 실행에는 없다.
+    public var mirroringAttached: Bool = true
 
     public var linkedCount: Int { rows.values.filter { $0 == .linked }.count }
     public var unlinkedCount: Int { rows.values.filter { $0 == .verifiedUnlinked }.count }
@@ -134,6 +139,7 @@ public struct LegacyRowLinkageReading: Equatable, Sendable {
         var text = "판정 \(verdictText) · 판독기 v\(readerVersion) · 모델 \(storeModel)"
         text += " · 대응 있음 \(linkedCount) · 검증된 대응 없음 \(unlinkedCount) · 업로드 대기 \(needsUploadCount) · 고아 대응 \(orphanCorrespondenceCount)"
         text += " · 메타데이터 키 \(metadataKeyCount)개(계정 식별 \(hasAccountIdentityKeys ? "있음" : "없음"))"
+        if !mirroringAttached { text += " · 미러링 표 없음(붙은 적 없는 저장소)" }
         return text
     }
 
@@ -183,9 +189,6 @@ public struct LegacyRowLinkageReader: Sendable {
 
     /// 이미 떠 둔 **사본**을 판독한다. 사본이라도 쓰지 않는다 — 읽기 전용으로만 연다.
     public func judge(copyAt url: URL) -> LegacyRowLinkageReading {
-        guard validatedOSMajors.contains(osMajor) else {
-            return Self.unknown(.unvalidatedEnvironment(osMajor: osMajor))
-        }
         let kind = LocalStoreLoader.storeKind(at: url)
         guard case .known(let version) = kind, validatedSchemaMajors.contains(version.major) else {
             return Self.unknown(.unvalidatedModel("\(kind)"))
@@ -221,8 +224,9 @@ public struct LegacyRowLinkageReader: Sendable {
         let tables = Set(try sql.strings("SELECT name FROM sqlite_master WHERE type = 'table'", table: "sqlite_master"))
         try require(tables, "Z_PRIMARYKEY", columns: ["Z_ENT", "Z_NAME"], sql)
         try require(tables, "Z_METADATA", columns: ["Z_VERSION"], sql)
-        try require(tables, "ANSCKRECORDMETADATA", columns: Self.correspondenceColumns, sql)
-        try require(tables, "ANSCKMETADATAENTRY", columns: ["ZKEY"], sql)
+        // 미러링 표가 **하나도** 없으면 미러링이 이 저장소에 붙은 적이 없다 — 새로 설치한 실행이 CloudKit 없이 저장소를 처음 만든 경우다.
+        // 표의 모양은 legacy 행이 있을 때만 검사한다(아래) — 행이 없으면 해석할 것이 없다.
+        let mirroringAttached = tables.contains("ANSCKRECORDMETADATA") || tables.contains("ANSCKMETADATAENTRY")
 
         // 엔티티 등록 — 이름 → Z_ENT. 미러링 · 이력 엔티티(16001 ~)도 함께 들어 있다.
         var entityIDs: [String: Int64] = [:]
@@ -247,6 +251,8 @@ public struct LegacyRowLinkageReader: Sendable {
 
         // 행 — 엔티티마다 Z_PK · Z_ENT · business ID 를 읽고, Z_ENT 를 등록값과 맞춰 본 뒤 다시 센다.
         var rowsByEntity: [LegacyEntity: [LegacyRowIdentity]] = [:]
+        // 기본 키 → 행. 대응마다 목록을 훑으면 행 수의 제곱이 된다(SEP-6: 31,102행에서 24초).
+        var rowIndex: [LegacyEntity: [Int64: LegacyRowIdentity]] = [:]
         for (entity, id) in present.sorted(by: { $0.key.rawValue < $1.key.rawValue }) {
             try require(tables, entity.table, columns: ["Z_PK", "Z_ENT", entity.rowIDColumn], sql)
             var identities: [LegacyRowIdentity] = []
@@ -259,7 +265,28 @@ public struct LegacyRowLinkageReader: Sendable {
             let recount = try sql.integers("SELECT count(*) FROM \(entity.table)", table: entity.table).first ?? -1
             guard recount == identities.count else { throw LegacyLinkageUnknownReason.rowCountChanged(entity) }
             rowsByEntity[entity] = identities
+            rowIndex[entity] = Dictionary(identities.map { ($0.primaryKey, $0) }, uniquingKeysWith: { first, _ in first })
         }
+
+        // legacy 행이 없으면 분리할 것이 없다 — 사설 표를 해석할 일이 없으므로 OS · 미러링 표와 무관하게 연결해도 된다.
+        // (새 설치는 게이트가 CloudKit 없이 저장소를 처음 만들어 미러링 표가 없고, 검증 밖 OS 에서도 여기서 끝난다.)
+        let legacyRows = rowsByEntity.values.map(\.count).reduce(0, +)
+        guard legacyRows > 0 else {
+            // 요약용 — 읽지 못해도 판정은 그대로다.
+            let keys = (try? sql.strings("SELECT ZKEY FROM ANSCKMETADATAENTRY WHERE ZKEY IS NOT NULL", table: "ANSCKMETADATAENTRY")) ?? []
+            return LegacyRowLinkageReading(
+                verdict: .allLinked, readerVersion: Self.version, rows: [:], needsUploadCount: 0, orphanCorrespondenceCount: 0,
+                hasAccountIdentityKeys: keys.contains { $0.contains("CKIdentity") }, metadataKeyCount: keys.count, storeModel: model,
+                mirroringAttached: mirroringAttached
+            )
+        }
+        // 행이 있으면 사설 표를 해석해야 한다 — 판독기를 검증한 OS 에서만(범위 밖은 「알 수 없음」).
+        guard validatedOSMajors.contains(osMajor) else { throw LegacyLinkageUnknownReason.unvalidatedEnvironment(osMajor: osMajor) }
+        // 미러링이 붙은 적 없는 저장소에 행이 있다 — 관측한 적 없는 모양이라 보류한다.
+        guard mirroringAttached else { throw LegacyLinkageUnknownReason.mirroringNotAttached(legacyRows: legacyRows) }
+        // 붙은 적이 있으면 두 표 모두 제 모양이어야 한다(한쪽만 없거나 열 이름이 다르면 「알 수 없음」).
+        try require(tables, "ANSCKRECORDMETADATA", columns: Self.correspondenceColumns, sql)
+        try require(tables, "ANSCKMETADATAENTRY", columns: ["ZKEY"], sql)
 
         // 대응 — 미러링이 아는 (엔티티, 기본 키). 레코드 이름이 있어야 대응이다.
         let legacyByID = Dictionary(uniqueKeysWithValues: present.map { ($0.value, $0.key) })
@@ -287,7 +314,7 @@ public struct LegacyRowLinkageReader: Sendable {
                 throw LegacyLinkageUnknownReason.ambiguousCorrespondence(entityID: item.entityID, primaryKey: item.primaryKey)
             }
             if item.needsUpload { needsUpload += 1 }
-            if let row = rowsByEntity[entity]?.first(where: { $0.primaryKey == item.primaryKey }) {
+            if let row = rowIndex[entity]?[item.primaryKey] {
                 linked.insert(row)
             } else {
                 orphans += 1
