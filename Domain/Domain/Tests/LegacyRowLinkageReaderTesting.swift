@@ -89,19 +89,29 @@ enum LinkageFixture {
         CREATE TABLE IF NOT EXISTS ANSCKMETADATAENTRY ( Z_PK INTEGER PRIMARY KEY, Z_ENT INTEGER, Z_OPT INTEGER, ZBOOLVALUENUM INTEGER, ZINTEGERVALUE INTEGER, \
         ZDATEVALUE TIMESTAMP, ZKEY VARCHAR, ZSTRINGVALUE VARCHAR, ZTRANSFORMEDVALUE BLOB );
         INSERT OR IGNORE INTO Z_PRIMARYKEY (Z_ENT, Z_NAME, Z_SUPER, Z_MAX) VALUES (17009, 'NSCKMetadataEntry', 0, 0), (17012, 'NSCKRecordMetadata', 0, 0);
-        INSERT INTO ANSCKMETADATAENTRY (Z_ENT, Z_OPT, ZKEY) SELECT 17009, 1, key FROM (SELECT 'PFCloudKitMetadataClientVersionHashesKey' AS key \
-        UNION ALL SELECT 'PFCloudKitMetadataFrameworkVersionKey' UNION ALL SELECT 'PFCloudKitMetadataModelVersionHashesKey' \
-        UNION ALL SELECT 'PFCloudKitMetadataNeedsMetadataMigrationKey') WHERE NOT EXISTS (SELECT 1 FROM ANSCKMETADATAENTRY);
+        INSERT INTO ANSCKMETADATAENTRY (Z_ENT, Z_OPT, ZTRANSFORMEDVALUE, ZKEY) SELECT 17009, 1, X'01', 'PFCloudKitMetadataClientVersionHashesKey' \
+        WHERE NOT EXISTS (SELECT 1 FROM ANSCKMETADATAENTRY WHERE ZKEY = 'PFCloudKitMetadataClientVersionHashesKey');
+        INSERT INTO ANSCKMETADATAENTRY (Z_ENT, Z_OPT, ZINTEGERVALUE, ZKEY) SELECT 17009, 1, 1, 'PFCloudKitMetadataFrameworkVersionKey' \
+        WHERE NOT EXISTS (SELECT 1 FROM ANSCKMETADATAENTRY WHERE ZKEY = 'PFCloudKitMetadataFrameworkVersionKey');
+        INSERT INTO ANSCKMETADATAENTRY (Z_ENT, Z_OPT, ZTRANSFORMEDVALUE, ZKEY) SELECT 17009, 1, X'01', 'PFCloudKitMetadataModelVersionHashesKey' \
+        WHERE NOT EXISTS (SELECT 1 FROM ANSCKMETADATAENTRY WHERE ZKEY = 'PFCloudKitMetadataModelVersionHashesKey');
+        INSERT INTO ANSCKMETADATAENTRY (Z_ENT, Z_OPT, ZBOOLVALUENUM, ZKEY) SELECT 17009, 1, 0, 'PFCloudKitMetadataNeedsMetadataMigrationKey' \
+        WHERE NOT EXISTS (SELECT 1 FROM ANSCKMETADATAENTRY WHERE ZKEY = 'PFCloudKitMetadataNeedsMetadataMigrationKey');
         """)
     }
 
     /// 계정 식별 키 3개를 **이름만** 붙인다(F33). 로그인한 적 있는 저장소의 모양이다.
     static func addIdentityKeys(_ url: URL) throws {
         try exec(url, """
-        INSERT INTO ANSCKMETADATAENTRY (Z_ENT, Z_OPT, ZKEY) VALUES
-        (17009, 1, 'NSCloudKitMirroringDelegateCKIdentityRecordNameDefaultsKey'),
-        (17009, 1, 'NSCloudKitMirroringDelegateCheckedCKIdentityDefaultsKey'),
-        (17009, 1, 'NSCloudKitMirroringDelegateLastHistoryTokenKey');
+        INSERT INTO ANSCKMETADATAENTRY (Z_ENT, Z_OPT, ZSTRINGVALUE, ZKEY)
+        SELECT 17009, 1, 'fixture-user-record', 'NSCloudKitMirroringDelegateCKIdentityRecordNameDefaultsKey'
+        WHERE NOT EXISTS (SELECT 1 FROM ANSCKMETADATAENTRY WHERE ZKEY = 'NSCloudKitMirroringDelegateCKIdentityRecordNameDefaultsKey');
+        INSERT INTO ANSCKMETADATAENTRY (Z_ENT, Z_OPT, ZBOOLVALUENUM, ZKEY)
+        SELECT 17009, 1, 1, 'NSCloudKitMirroringDelegateCheckedCKIdentityDefaultsKey'
+        WHERE NOT EXISTS (SELECT 1 FROM ANSCKMETADATAENTRY WHERE ZKEY = 'NSCloudKitMirroringDelegateCheckedCKIdentityDefaultsKey');
+        INSERT INTO ANSCKMETADATAENTRY (Z_ENT, Z_OPT, ZTRANSFORMEDVALUE, ZKEY)
+        SELECT 17009, 1, X'01', 'NSCloudKitMirroringDelegateLastHistoryTokenKey'
+        WHERE NOT EXISTS (SELECT 1 FROM ANSCKMETADATAENTRY WHERE ZKEY = 'NSCloudKitMirroringDelegateLastHistoryTokenKey');
         """)
     }
 
@@ -227,11 +237,27 @@ struct LegacyRowLinkageReaderTesting {
     @Test("로그인한 적 없는 저장소(식별 키 없음 · 대응 0)는 모든 행이 「검증된 대응 없음」")
     func neverSignedInStoreIsVerifiedUnlinked() throws {
         try withStore { url in
+        let reading = reader.judge(storeAt: url)
+
+        guard case .hasVerifiedUnlinked(let unlinked) = reading.verdict else { Issue.record("판정이 다르다: \(reading.summary)"); return }
+        #expect(unlinked.map(\.primaryKey) == [1, 2, 3])
+        #expect(!reading.hasAccountIdentityKeys && reading.metadataKeyCount == 4)
+        #expect(reading.metadataEntryCount == 4 && reading.duplicateMetadataKeyCount == 0)
+        #expect(Set(reading.metadataKeys) == LegacyRowLinkageReader.unaccountedV3MetadataKeys)
+        #expect(reading.metadataValueProfileComplete && reading.metadataNeedsMigration == false)
+        }
+    }
+
+    @Test("실제 iOS 18 V3에서 새로 보인 migration marker 는 지원하지 않는 metadata 모양으로 남는다")
+    func migrationMarkerIsRecordedAsUnrecognizedMetadata() throws {
+        try withStore { url in
+            try LinkageFixture.exec(url, "INSERT INTO ANSCKMETADATAENTRY (Z_ENT, Z_OPT, ZBOOLVALUENUM, ZKEY) VALUES (17009, 1, 1, 'PFCloudKitMetadataModelMigratorMigrationBeganCommitKey');")
+
             let reading = reader.judge(storeAt: url)
 
-            guard case .hasVerifiedUnlinked(let unlinked) = reading.verdict else { Issue.record("판정이 다르다: \(reading.summary)"); return }
-            #expect(unlinked.map(\.primaryKey) == [1, 2, 3])
-            #expect(!reading.hasAccountIdentityKeys && reading.metadataKeyCount == 4)
+            #expect(reading.unlinkedCount == 3)
+            #expect(!reading.metadataValueProfileComplete)
+            #expect(!Set(reading.metadataKeys).isSubset(of: LegacyRowLinkageReader.unaccountedV3MetadataKeys))
         }
     }
 
@@ -316,7 +342,7 @@ struct LegacyRowLinkageReaderTesting {
     @Test("기본 검증 집합은 legacy 3종 전부다(v2, F51) — 장 전체 필기 · 즐겨찾기의 대응 없는 행도 「검증된 대응 없음」 으로 판정한다")
     func defaultValidatedSetCoversAllLegacyEntities() throws {
         #expect(LegacyRowLinkageReader().validatedEntities == Set(LegacyEntity.allCases))
-        #expect(LegacyRowLinkageReader.version == 2)
+        #expect(LegacyRowLinkageReader.version == 4)
         try withStore(page: true, favorite: true) { url in
             for pk in 1...3 { try LinkageFixture.link(url, entity: .bibleDrawing, primaryKey: Int64(pk)) }
             try LinkageFixture.addIdentityKeys(url)
@@ -361,15 +387,31 @@ extension LegacyRowLinkageReaderTesting {
         #expect(reading.verdict == .allLinked && !reading.mirroringAttached)
     }
 
-    @Test("검증하지 않은 OS 주 버전이면 legacy 행이 있을 때 사설 표를 해석하기 전에 「알 수 없음」")
+    @Test("검증하지 않은 iOS 17 주 버전이면 legacy 행이 있을 때 사설 표를 해석하기 전에 「알 수 없음」")
     func unvalidatedOSIsUnknown() throws {
         try withStore { url in
             for pk in 1...3 { try LinkageFixture.link(url, entity: .bibleDrawing, primaryKey: Int64(pk)) }
             try LinkageFixture.addIdentityKeys(url)
             var elsewhere = reader
-            elsewhere.osMajor = 18
+            elsewhere.osMajor = 17
 
-            #expect(reason(elsewhere.judge(storeAt: url)) == .unvalidatedEnvironment(osMajor: 18))
+            #expect(reason(elsewhere.judge(storeAt: url)) == .unvalidatedEnvironment(osMajor: 17))
+        }
+    }
+
+    @Test("iOS 18의 V3 migration 표식 의미가 미확인이라 보류하고 미지 OS 19도 보류한다")
+    func unverifiedOlderOSIsEvidenceBounded() throws {
+        try withStore { url in
+            for pk in 1...3 { try LinkageFixture.link(url, entity: .bibleDrawing, primaryKey: Int64(pk)) }
+            try LinkageFixture.addIdentityKeys(url)
+
+            var ios18 = reader
+            ios18.osMajor = 18
+            #expect(reason(ios18.judge(storeAt: url)) == .unvalidatedEnvironment(osMajor: 18))
+
+            var ios19 = reader
+            ios19.osMajor = 19
+            #expect(reason(ios19.judge(storeAt: url)) == .unvalidatedEnvironment(osMajor: 19))
         }
     }
 

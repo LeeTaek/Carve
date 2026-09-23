@@ -28,6 +28,11 @@ struct DrawingEditEnvironmentTesting {
         }
     }
 
+    private struct StaticOwnershipProof: StoreOwnershipProofClient {
+        let value: AccountScope?
+        func ownership(for scope: AccountScope) async -> AccountScope? { value == scope ? value : nil }
+    }
+
     private func withStateStore(_ body: (FileEraseStateStore) async throws -> Void) async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("edit-env-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -54,6 +59,9 @@ struct DrawingEditEnvironmentTesting {
             let token = try #require(current.serverWork)
             #expect(current.accountBasis == .confirmed(token))
             #expect(current.knowledge?.received == ["E1"])
+            // 계정 확인과 서버 작업 표만으로는 기기 저장소 소유를 인정하지 않는다.
+            #expect(current.storeOwnership == nil)
+            #expect(SyncedWriteBlock.check(current) == .ownershipUnverified)
             #expect(await environment.isCurrent(token))
         }
     }
@@ -208,6 +216,34 @@ struct DrawingEditEnvironmentTesting {
             await environment.start()
 
             #expect(await environment.current().storeOwnership == nil)
+        }
+    }
+
+    @Test("로그인 확인 뒤에도 별도 저장소 근거가 일치할 때만 쓰기를 연다")
+    func confirmedAccountNeedsMatchingStoreProof() async throws {
+        try await withStateStore { store in
+            let proof = scope("_a")
+            let verified = LiveDrawingEditEnvironment(
+                identity: SequencedIdentityClient([.identified(userRecordName: "_a")]),
+                containerID: container, stateStore: store, ownershipProof: StaticOwnershipProof(value: proof),
+                notificationCenter: NotificationCenter()
+            )
+            await verified.start()
+            let owned = await verified.current()
+            #expect(owned.storeOwnership == proof)
+            #expect(!owned.ownershipInjected)
+            #expect(SyncedWriteBlock.check(owned) == nil)
+
+            let unrelated = LiveDrawingEditEnvironment(
+                identity: SequencedIdentityClient([.identified(userRecordName: "_a")]),
+                containerID: container, stateStore: store, ownershipProof: StaticOwnershipProof(value: scope("_b")),
+                notificationCenter: NotificationCenter()
+            )
+            await unrelated.start()
+            let blocked = await unrelated.current()
+            #expect(blocked.accountState == .confirmed(proof))
+            #expect(blocked.storeOwnership == nil)
+            #expect(SyncedWriteBlock.check(blocked) == .ownershipUnverified)
         }
     }
 

@@ -124,6 +124,36 @@ enum LocalStoreLoader {
         }
     }
 
+    /// 2.0.0 출시 경로: 원시 사본 → 로컬 마이그레이션 → CloudKit 연결.
+    /// 1.3.0 무계정 필사는 미러링 저장소에 그대로 두어 첫 로그인 계정으로 전송한다.
+    /// C14 사설 대응 판독·분리·삭제는 출시 조건이 아니다. 새 무계정 초안은 별도 파일에 있고 여기서 가져오지 않는다.
+    /// 보존 또는 마이그레이션 실패 시 연결하지 않으며, 연결용 열기 실패도 빈 저장소로 대체하지 않는다.
+    static func loadForRelease(
+        at url: URL,
+        cloudKitDatabase: ModelConfiguration.CloudKitDatabase,
+        preservation: PreservationArea
+    ) -> Outcome {
+        if let stopped = prepareForRelease(at: url, preservation: preservation) {
+            return stopped
+        }
+        do {
+            return .ready(try open(url, cloudKitDatabase: cloudKitDatabase))
+        } catch {
+            Log.error("2.0.0 보존·마이그레이션 뒤 연결용 저장소를 열지 못했다", "\(error)")
+            return .unavailable(.openFailed)
+        }
+    }
+
+    /// 원시 사본과 로컬 마이그레이션만 수행한다. nil 이면 연결 가능, 그 밖은 재실행 또는 실패 처리다.
+    private static func prepareForRelease(at url: URL, preservation: PreservationArea) -> Outcome? {
+        switch load(at: url, cloudKitDatabase: .none, preservation: preservation) {
+        case .ready:
+            return nil
+        case let outcome:
+            return outcome
+        }
+    }
+
     /// C14 ① 의 순서 — ② CloudKit 없이 열어 마이그레이션 → ③ 판정 → ④ 보존 · 기록 → ⑦ 연결(또는 보류).
     ///
     /// `.none` 컨테이너는 이 함수 안의 지역 범위에서만 살고, 연결용 컨테이너를 만들기 전에 놓는다(「동시 열기」 규칙).

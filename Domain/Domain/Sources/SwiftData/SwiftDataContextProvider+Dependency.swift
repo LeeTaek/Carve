@@ -32,9 +32,9 @@ extension ModelContainer: @retroactive DependencyKey {
         @Dependency(\.legacySeparationHoldState) var holdState
         let url = URL.applicationSupportDirectory.appending(path: containerId.localDBPath)
         let preservation = PreservationArea.live(localDBPath: containerId.localDBPath)
-        // C14 게이트 — 연결하는 모든 실행이 지난다(D4). 「모두 대응 있음」 일 때만 `.private` 로 연다.
-        let gate = LegacySeparationGate(area: preservation)
-        switch LocalStoreLoader.load(at: url, cloudKitDatabase: .private(containerId.id), preservation: preservation, separationGate: gate) {
+        // 2.0.0 출시 결정: 옛 무계정 필사는 보존·마이그레이션 뒤 첫 로그인 계정에 자동 전송한다.
+        // 새 무계정 초안의 귀속 및 기존 쓰기 차단은 DrawingEditEnvironment 에서 계속 다룬다.
+        switch LocalStoreLoader.loadForRelease(at: url, cloudKitDatabase: .private(containerId.id), preservation: preservation) {
         case .ready(let container):
             return container
         case .held(let container, let hold):
@@ -111,7 +111,6 @@ public extension DependencyValues {
         set { self[PersistentCloudKitContainer.self] = newValue }
     }
 }
-
 
 
 

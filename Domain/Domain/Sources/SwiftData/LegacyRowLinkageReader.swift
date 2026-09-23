@@ -113,6 +113,26 @@ public struct LegacyRowLinkageReading: Equatable, Sendable {
     public var readerVersion: Int
     /// 행별 판정. 「알 수 없음」 으로 끝났으면 비어 있을 수 있다.
     public var rows: [LegacyRowIdentity: LegacyRowLinkage]
+    /// 미러링 표가 알고 있는 레코드 이름. 호출부의 서버 조회에만 쓰며 요약·로그에는 넣지 않는다.
+    public var mirroredRecordNames: [String] = []
+    /// 레코드 이름이 비어 있는 미러링 대응 수.
+    public var missingRecordNameCount = 0
+    /// 서버 업로드·삭제 또는 로컬 삭제가 아직 끝나지 않은 대응 수.
+    public var unsettledRecordCount = 0
+    /// 저장 모델 행과 CloudKit 대응 수를 교차 확인할 때 쓴다.
+    public var localModelRowCount = 0
+    public var recordMetadataCount = 0
+    /// 저장소 메타데이터의 키 이름만 보관한다. 값은 계정 식별을 포함할 수 있어 읽기·기록하지 않는다.
+    public var metadataKeys: [String] = []
+    /// 키가 NULL 이거나 중복된 항목을 포함한 메타데이터 전체 행 수.
+    public var metadataEntryCount = 0
+    public var duplicateMetadataKeyCount = 0
+    /// 알려진 metadata key 각각이 예상된 비어 있지 않은 SQLite 값 열에 들어 있는지.
+    public var metadataValueProfileComplete = false
+    /// CloudKit 이 Core Data metadata migration 을 요청하는지. 결측·중복·형식 오류면 nil.
+    public var metadataNeedsMigration: Bool?
+    /// 저장소가 현재 iCloud identity 를 확인했는지. 결측·중복·형식 오류면 nil.
+    public var metadataIdentityChecked: Bool?
     /// 대응은 있지만 아직 올리지 않은 행 수(`ZNEEDSUPLOAD`).
     public var needsUploadCount: Int
     /// 행은 없는데 대응만 남은 항목 수(F37 의 고아). 판정을 바꾸지 않고 기록만 한다.
@@ -125,6 +145,50 @@ public struct LegacyRowLinkageReading: Equatable, Sendable {
     public var storeModel: String
     /// 미러링 표(`ANSCKRECORDMETADATA` · `ANSCKMETADATAENTRY`)가 있는가. 새로 설치해 저장소를 처음 만든 실행에는 없다.
     public var mirroringAttached: Bool = true
+
+    public init(
+        verdict: Verdict,
+        readerVersion: Int,
+        rows: [LegacyRowIdentity: LegacyRowLinkage],
+        needsUploadCount: Int,
+        orphanCorrespondenceCount: Int,
+        hasAccountIdentityKeys: Bool,
+        metadataKeyCount: Int,
+        storeModel: String,
+        mirroringAttached: Bool = true,
+        mirroredRecordNames: [String] = [],
+        missingRecordNameCount: Int = 0,
+        unsettledRecordCount: Int = 0,
+        localModelRowCount: Int = 0,
+        recordMetadataCount: Int = 0,
+        metadataKeys: [String] = [],
+        metadataEntryCount: Int = 0,
+        duplicateMetadataKeyCount: Int = 0,
+        metadataValueProfileComplete: Bool = false,
+        metadataNeedsMigration: Bool? = nil,
+        metadataIdentityChecked: Bool? = nil
+    ) {
+        self.verdict = verdict
+        self.readerVersion = readerVersion
+        self.rows = rows
+        self.needsUploadCount = needsUploadCount
+        self.orphanCorrespondenceCount = orphanCorrespondenceCount
+        self.hasAccountIdentityKeys = hasAccountIdentityKeys
+        self.metadataKeyCount = metadataKeyCount
+        self.storeModel = storeModel
+        self.mirroringAttached = mirroringAttached
+        self.mirroredRecordNames = mirroredRecordNames
+        self.missingRecordNameCount = missingRecordNameCount
+        self.unsettledRecordCount = unsettledRecordCount
+        self.localModelRowCount = localModelRowCount
+        self.recordMetadataCount = recordMetadataCount
+        self.metadataKeys = metadataKeys.sorted()
+        self.metadataEntryCount = metadataEntryCount
+        self.duplicateMetadataKeyCount = duplicateMetadataKeyCount
+        self.metadataValueProfileComplete = metadataValueProfileComplete
+        self.metadataNeedsMigration = metadataNeedsMigration
+        self.metadataIdentityChecked = metadataIdentityChecked
+    }
 
     public var linkedCount: Int { rows.values.filter { $0 == .linked }.count }
     public var unlinkedCount: Int { rows.values.filter { $0 == .verifiedUnlinked }.count }
@@ -152,13 +216,17 @@ public struct LegacyRowLinkageReading: Equatable, Sendable {
     }
 }
 
-/// C14 ② 의 판독기. 값(`validated…`)이 곧 검증 범위다 — 넓히려면 실제 저장소 관측(테스트 계획 §5-1)을 먼저 기록한다.
+/// C14 ② 의 판독기. OS 주 버전과 저장소 모양을 모두 검증 범위로 제한한다.
 public struct LegacyRowLinkageReader: Sendable {
     /// 판독기 자체의 버전. 읽는 표 · 열 · 규칙 · 검증 범위가 바뀌면 올린다.
     /// v2(2026-09-22): 검증 엔티티에 `BiblePageDrawing` · `FavoriteVerse` 를 더했다(테스트 계획 F51).
-    public static let version = 2
+    /// v3(2026-09-23): 제한 metadata profile 을 추가했다.
+    /// v4(2026-09-23): 검증 OS 를 26으로 되돌리고 metadata key · 값 형식을 모두 확인한다.
+    public static let version = 4
 
-    /// 판독기를 검증한 OS 주 버전. SEP-0 ~ SEP-2 는 iOS 26 시뮬레이터에서 수행했다(2026-09-21).
+    /// 사설 미러링 표를 판독한 OS 주 버전. iOS 18.6의 실제 1.3.0 V3 저장소에 의미가 확인되지 않은
+    /// `PFCloudKitMetadataModelMigratorMigrationBeganCommitKey`가 나타나, 18 판독 허용은 보류한다.
+    /// iOS 17 런타임은 없고 19~25도 검증하지 않았다.
     public var validatedOSMajors: Set<Int> = [26]
     /// 판독기를 검증한 저장소 스키마 주 버전 — 1.3.0 의 V3(마이그레이션 전)와 현재 V6(마이그레이션 뒤). SEP-1 F39.
     public var validatedSchemaMajors: Set<Int> = [3, 6]
@@ -168,6 +236,32 @@ public struct LegacyRowLinkageReader: Sendable {
     public var validatedEntities: Set<LegacyEntity> = [.bibleDrawing, .biblePageDrawing, .favoriteVerse]
     /// 지금 OS 주 버전. 시험이 바꾼다.
     public var osMajor: Int = ProcessInfo.processInfo.operatingSystemVersion.majorVersion
+
+    /// 실제 무계정 V3 표본(F44)에서 관측한 기본 metadata key 집합. 그 밖의 키가 있으면 첫 계정에 자동 귀속하지 않는다.
+    static let unaccountedV3MetadataKeys: Set<String> = [
+        "PFCloudKitMetadataClientVersionHashesKey",
+        "PFCloudKitMetadataFrameworkVersionKey",
+        "PFCloudKitMetadataModelVersionHashesKey",
+        "PFCloudKitMetadataNeedsMetadataMigrationKey"
+    ]
+
+    /// 현재 private CloudKit 저장소에서 실제 관측한 metadata key 집합(iOS 26.2).
+    /// 미지 키, 누락, 중복 또는 미완료 Core Data metadata migration 은 소유 증명에 쓰지 않는다.
+    static let linkedPrivateStoreMetadataKeys: Set<String> = unaccountedV3MetadataKeys.union([
+        "NSCloudKitMirroringDelegateCKIdentityRecordNameDefaultsKey",
+        "NSCloudKitMirroringDelegateCheckedCKIdentityDefaultsKey",
+        "NSCloudKitMirroringDelegateLastHistoryTokenKey"
+    ])
+
+    private static let metadataValueColumnByKey: [String: Int32] = [
+        "PFCloudKitMetadataClientVersionHashesKey": 5,       // ZTRANSFORMEDVALUE
+        "PFCloudKitMetadataFrameworkVersionKey": 2,          // ZINTEGERVALUE
+        "PFCloudKitMetadataModelVersionHashesKey": 5,        // ZTRANSFORMEDVALUE
+        "PFCloudKitMetadataNeedsMetadataMigrationKey": 1,    // ZBOOLVALUENUM
+        "NSCloudKitMirroringDelegateCKIdentityRecordNameDefaultsKey": 4, // ZSTRINGVALUE
+        "NSCloudKitMirroringDelegateCheckedCKIdentityDefaultsKey": 1,    // ZBOOLVALUENUM
+        "NSCloudKitMirroringDelegateLastHistoryTokenKey": 5             // ZTRANSFORMEDVALUE
+    ]
 
     public init() {}
 
@@ -213,6 +307,26 @@ public struct LegacyRowLinkageReader: Sendable {
         } catch {
             return Self.unknown(.queryFailed(table: "-", message: "\(error)"), model: model)
         }
+    }
+
+    /// 현재 확인한 계정의 CloudKit 레코드 이름과 저장소의 미러링 계정 키가 같은지 비교한다.
+    /// 값 원문은 호출자에게 돌려주거나 기록하지 않는다. 원본 대신 이미 만든 읽기 전용 사본에만 사용한다.
+    func accountIdentityMatches(copyAt url: URL, userRecordName: String) -> Bool {
+        var handle: OpaquePointer?
+        let uri = "file:\(url.path)?mode=ro"
+        guard sqlite3_open_v2(uri, &handle, SQLITE_OPEN_READONLY | SQLITE_OPEN_URI, nil) == SQLITE_OK, let db = handle else {
+            sqlite3_close(handle)
+            return false
+        }
+        defer { sqlite3_close(db) }
+        let query = "SELECT ZSTRINGVALUE FROM ANSCKMETADATAENTRY WHERE ZKEY = 'NSCloudKitMirroringDelegateCKIdentityRecordNameDefaultsKey'"
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK, let statement else { return false }
+        defer { sqlite3_finalize(statement) }
+        guard sqlite3_step(statement) == SQLITE_ROW, let value = sqlite3_column_text(statement, 0) else { return false }
+        let matches = String(cString: value) == userRecordName
+        // 중복된 소유 키는 모호한 저장소 상태다. 첫 값만 보고 소유를 인정하지 않는다.
+        return matches && sqlite3_step(statement) == SQLITE_DONE
     }
 
     // MARK: - 판독
@@ -274,12 +388,46 @@ public struct LegacyRowLinkageReader: Sendable {
         // (새 설치는 게이트가 CloudKit 없이 저장소를 처음 만들어 미러링 표가 없고, 검증 밖 OS 에서도 여기서 끝난다.)
         let legacyRows = rowsByEntity.values.map(\.count).reduce(0, +)
         guard legacyRows > 0 else {
-            // 요약용 — 읽지 못해도 판정은 그대로다.
-            let keys = (try? sql.strings("SELECT ZKEY FROM ANSCKMETADATAENTRY WHERE ZKEY IS NOT NULL", table: "ANSCKMETADATAENTRY")) ?? []
+            let localCount = try applicationModelRowCount(tables: tables, sql: sql)
+            guard mirroringAttached else {
+                return LegacyRowLinkageReading(
+                    verdict: .allLinked, readerVersion: Self.version, rows: [:], needsUploadCount: 0,
+                    orphanCorrespondenceCount: 0, hasAccountIdentityKeys: false, metadataKeyCount: 0,
+                    storeModel: model, mirroringAttached: false, localModelRowCount: localCount
+                )
+            }
+            // 분리할 legacy 행이 없으면 미러링 사설 표의 모양을 게이트 조건으로 삼지 않는다(C14).
+            // 소유 증명은 이 부가 수치가 완전할 때만 통과하므로, 알 수 없는 새 스키마를 연결 판독과 혼동하지 않는다.
+            var mirror: MirrorRows?
+            var keys: [String] = []
+            var metadataEntryCount = 0
+            var metadataProfile = MetadataValueProfile()
+            do {
+                try require(tables, "ANSCKRECORDMETADATA", columns: Self.correspondenceColumns, sql)
+                try require(tables, "ANSCKMETADATAENTRY", columns: Self.metadataColumns, sql)
+                mirror = try readMirrorRows(sql)
+                keys = try sql.strings("SELECT ZKEY FROM ANSCKMETADATAENTRY WHERE ZKEY IS NOT NULL", table: "ANSCKMETADATAENTRY")
+                metadataEntryCount = Int(try sql.integers("SELECT count(*) FROM ANSCKMETADATAENTRY", table: "ANSCKMETADATAENTRY").first ?? -1)
+                metadataProfile = try readMetadataValueProfile(sql)
+            } catch {
+                // 빈 legacy 저장소는 연결 가능하다. 누락된 수치는 기존 로그인 저장소 소유 증명을 실패 닫힘으로 만든다.
+                mirror = nil
+                keys = []
+                metadataEntryCount = 0
+                metadataProfile = MetadataValueProfile()
+            }
             return LegacyRowLinkageReading(
-                verdict: .allLinked, readerVersion: Self.version, rows: [:], needsUploadCount: 0, orphanCorrespondenceCount: 0,
-                hasAccountIdentityKeys: keys.contains { $0.contains("CKIdentity") }, metadataKeyCount: keys.count, storeModel: model,
-                mirroringAttached: mirroringAttached
+                verdict: .allLinked, readerVersion: Self.version, rows: [:], needsUploadCount: mirror?.needsUpload ?? 0,
+                orphanCorrespondenceCount: 0, hasAccountIdentityKeys: keys.contains { $0.contains("CKIdentity") },
+                metadataKeyCount: keys.count, storeModel: model,
+                mirroringAttached: mirroringAttached,
+                mirroredRecordNames: mirror?.recordNames ?? [], missingRecordNameCount: mirror?.missingRecordNames ?? 0,
+                unsettledRecordCount: mirror?.unsettled ?? 0, localModelRowCount: localCount, recordMetadataCount: mirror?.count ?? 0,
+                metadataKeys: keys, metadataEntryCount: metadataEntryCount,
+                duplicateMetadataKeyCount: keys.count - Set(keys).count,
+                metadataValueProfileComplete: metadataProfile.isComplete,
+                metadataNeedsMigration: metadataProfile.needsMigration,
+                metadataIdentityChecked: metadataProfile.identityChecked
             )
         }
         // 행이 있으면 사설 표를 해석해야 한다 — 판독기를 검증한 OS 에서만(범위 밖은 「알 수 없음」).
@@ -288,21 +436,13 @@ public struct LegacyRowLinkageReader: Sendable {
         guard mirroringAttached else { throw LegacyLinkageUnknownReason.mirroringNotAttached(legacyRows: legacyRows) }
         // 붙은 적이 있으면 두 표 모두 제 모양이어야 한다(한쪽만 없거나 열 이름이 다르면 「알 수 없음」).
         try require(tables, "ANSCKRECORDMETADATA", columns: Self.correspondenceColumns, sql)
-        try require(tables, "ANSCKMETADATAENTRY", columns: ["ZKEY"], sql)
+        try require(tables, "ANSCKMETADATAENTRY", columns: Self.metadataColumns, sql)
 
         // 대응 — 미러링이 아는 (엔티티, 기본 키). 레코드 이름이 있어야 대응이다.
         let legacyByID = Dictionary(uniqueKeysWithValues: present.map { ($0.value, $0.key) })
-        var correspondences: [Correspondence] = []
+        let mirror = try readMirrorRows(sql)
+        let correspondences = mirror.correspondences
         var seen: Set<PairKey> = []
-        var needsUpload = 0
-        try sql.rows("SELECT \(Self.correspondenceColumns.joined(separator: ", ")) FROM ANSCKRECORDMETADATA", table: "ANSCKRECORDMETADATA") { statement in
-            correspondences.append(Correspondence(
-                entityID: sqlite3_column_int64(statement, 0),
-                primaryKey: sqlite3_column_int64(statement, 1),
-                hasRecordName: (sql.text(statement, 2)?.isEmpty == false),
-                needsUpload: sqlite3_column_int64(statement, 3) != 0
-            ))
-        }
         var linked: Set<LegacyRowIdentity> = []
         var orphans = 0
         for item in correspondences {
@@ -315,7 +455,6 @@ public struct LegacyRowLinkageReader: Sendable {
             guard item.hasRecordName else {
                 throw LegacyLinkageUnknownReason.ambiguousCorrespondence(entityID: item.entityID, primaryKey: item.primaryKey)
             }
-            if item.needsUpload { needsUpload += 1 }
             if let row = rowIndex[entity]?[item.primaryKey] {
                 linked.insert(row)
             } else {
@@ -325,6 +464,8 @@ public struct LegacyRowLinkageReader: Sendable {
 
         // 저장소 계정 식별과의 교차 확인 — 키 이름만 본다(F33).
         let keys = try sql.strings("SELECT ZKEY FROM ANSCKMETADATAENTRY WHERE ZKEY IS NOT NULL", table: "ANSCKMETADATAENTRY")
+        let metadataEntryCount = Int(try sql.integers("SELECT count(*) FROM ANSCKMETADATAENTRY", table: "ANSCKMETADATAENTRY").first ?? -1)
+        let metadataProfile = try readMetadataValueProfile(sql)
         let hasIdentity = keys.contains { $0.contains("CKIdentity") }
         let legacyCorrespondences = correspondences.filter { legacyByID[$0.entityID] != nil }.count
         if !hasIdentity, legacyCorrespondences > 0 {
@@ -354,23 +495,128 @@ public struct LegacyRowLinkageReader: Sendable {
             verdict: unlinked.isEmpty ? .allLinked : .hasVerifiedUnlinked(unlinked),
             readerVersion: Self.version,
             rows: rows,
-            needsUploadCount: needsUpload,
+            needsUploadCount: mirror.needsUpload,
             orphanCorrespondenceCount: orphans,
             hasAccountIdentityKeys: hasIdentity,
             metadataKeyCount: keys.count,
-            storeModel: model
+            storeModel: model,
+            mirroredRecordNames: mirror.recordNames,
+            missingRecordNameCount: mirror.missingRecordNames,
+            unsettledRecordCount: mirror.unsettled,
+            localModelRowCount: try applicationModelRowCount(tables: tables, sql: sql),
+            recordMetadataCount: mirror.count,
+            metadataKeys: keys,
+            metadataEntryCount: metadataEntryCount,
+            duplicateMetadataKeyCount: keys.count - Set(keys).count,
+            metadataValueProfileComplete: metadataProfile.isComplete,
+            metadataNeedsMigration: metadataProfile.needsMigration,
+            metadataIdentityChecked: metadataProfile.identityChecked
         )
     }
 
     // MARK: - 도우미
 
     private static let correspondenceColumns = ["ZENTITYID", "ZENTITYPK", "ZCKRECORDNAME", "ZNEEDSUPLOAD", "ZNEEDSCLOUDDELETE", "ZNEEDSLOCALDELETE"]
+    private static let metadataColumns = ["ZKEY", "ZBOOLVALUENUM", "ZINTEGERVALUE", "ZDATEVALUE", "ZSTRINGVALUE", "ZTRANSFORMEDVALUE"]
+
+    private struct MetadataValueProfile {
+        var isComplete = false
+        var needsMigration: Bool?
+        var identityChecked: Bool?
+    }
+
+    /// 값 원문은 읽지 않고, 각 key 에 값이 예상된 열에 정확히 하나 있는지만 확인한다.
+    private func readMetadataValueProfile(_ sql: SQLiteReadOnly) throws -> MetadataValueProfile {
+        var complete = true
+        var seen: Set<String> = []
+        var needsMigration: Bool?
+        var identityChecked: Bool?
+        try sql.rows(
+            "SELECT ZKEY, ZBOOLVALUENUM, ZINTEGERVALUE, ZDATEVALUE, ZSTRINGVALUE, ZTRANSFORMEDVALUE FROM ANSCKMETADATAENTRY",
+            table: "ANSCKMETADATAENTRY"
+        ) { statement in
+            guard let key = sql.text(statement, 0), let expectedColumn = Self.metadataValueColumnByKey[key], seen.insert(key).inserted else {
+                complete = false
+                return
+            }
+            for column in Int32(1)...5 where column != expectedColumn && sqlite3_column_type(statement, column) != SQLITE_NULL {
+                complete = false
+            }
+            switch expectedColumn {
+            case 1:
+                guard sqlite3_column_type(statement, expectedColumn) == SQLITE_INTEGER else { complete = false; return }
+                let value = sqlite3_column_int64(statement, expectedColumn)
+                guard value == 0 || value == 1 else { complete = false; return }
+                if key == "PFCloudKitMetadataNeedsMetadataMigrationKey" { needsMigration = value == 1 }
+                if key == "NSCloudKitMirroringDelegateCheckedCKIdentityDefaultsKey" { identityChecked = value == 1 }
+            case 2:
+                guard sqlite3_column_type(statement, expectedColumn) == SQLITE_INTEGER,
+                      sqlite3_column_int64(statement, expectedColumn) > 0 else { complete = false; return }
+            case 4:
+                guard sqlite3_column_type(statement, expectedColumn) == SQLITE_TEXT,
+                      (sql.text(statement, expectedColumn)?.isEmpty == false) else { complete = false; return }
+            case 5:
+                guard sqlite3_column_type(statement, expectedColumn) == SQLITE_BLOB,
+                      sqlite3_column_bytes(statement, expectedColumn) > 0 else { complete = false; return }
+            default:
+                complete = false
+            }
+        }
+        return MetadataValueProfile(isComplete: complete, needsMigration: needsMigration, identityChecked: identityChecked)
+    }
 
     private struct Correspondence {
         var entityID: Int64
         var primaryKey: Int64
+        var recordName: String?
         var hasRecordName: Bool
-        var needsUpload: Bool
+    }
+
+    private struct MirrorRows {
+        var correspondences: [Correspondence]
+        var recordNames: [String]
+        var missingRecordNames: Int
+        var needsUpload: Int
+        var unsettled: Int
+
+        var count: Int { correspondences.count }
+    }
+
+    private func readMirrorRows(_ sql: SQLiteReadOnly) throws -> MirrorRows {
+        var correspondences: [Correspondence] = []
+        var missingRecordNames = 0
+        var needsUpload = 0
+        var unsettled = 0
+        try sql.rows("SELECT \(Self.correspondenceColumns.joined(separator: ", ")) FROM ANSCKRECORDMETADATA", table: "ANSCKRECORDMETADATA") { statement in
+            let recordName = sql.text(statement, 2)
+            let needsUploadRow = sqlite3_column_int64(statement, 3) != 0
+            let needsCloudDelete = sqlite3_column_int64(statement, 4) != 0
+            let needsLocalDelete = sqlite3_column_int64(statement, 5) != 0
+            if recordName?.isEmpty != false { missingRecordNames += 1 }
+            if needsUploadRow { needsUpload += 1 }
+            if needsUploadRow || needsCloudDelete || needsLocalDelete { unsettled += 1 }
+            correspondences.append(Correspondence(
+                entityID: sqlite3_column_int64(statement, 0),
+                primaryKey: sqlite3_column_int64(statement, 1),
+                recordName: recordName,
+                hasRecordName: (recordName?.isEmpty == false)
+            ))
+        }
+        return MirrorRows(
+            correspondences: correspondences,
+            recordNames: correspondences.compactMap(\.recordName).filter { !$0.isEmpty }.sorted(),
+            missingRecordNames: missingRecordNames,
+            needsUpload: needsUpload,
+            unsettled: unsettled
+        )
+    }
+
+    private func applicationModelRowCount(tables: Set<String>, sql: SQLiteReadOnly) throws -> Int {
+        let modelTables = ["ZBIBLEDRAWING", "ZBIBLEPAGEDRAWING", "ZFAVORITEVERSE", "ZVERSEDRAWINGVERSION", "ZDRAWINGERASEEPOCH", "ZDRAWINGVO"]
+        return try modelTables.reduce(into: 0) { total, table in
+            guard tables.contains(table) else { return }
+            total += Int(try sql.integers("SELECT count(*) FROM \(table)", table: table).first ?? 0)
+        }
     }
 
     private struct PairKey: Hashable {
@@ -392,7 +638,9 @@ public struct LegacyRowLinkageReader: Sendable {
     private static func unknown(_ reason: LegacyLinkageUnknownReason, model: String = "-") -> LegacyRowLinkageReading {
         LegacyRowLinkageReading(
             verdict: .unknown(reason), readerVersion: version, rows: [:], needsUploadCount: 0, orphanCorrespondenceCount: 0,
-            hasAccountIdentityKeys: false, metadataKeyCount: 0, storeModel: model
+            hasAccountIdentityKeys: false, metadataKeyCount: 0, storeModel: model,
+            mirroredRecordNames: [], missingRecordNameCount: 0, unsettledRecordCount: 0,
+            localModelRowCount: 0, recordMetadataCount: 0
         )
     }
 

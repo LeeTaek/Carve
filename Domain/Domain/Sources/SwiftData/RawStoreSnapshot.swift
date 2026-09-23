@@ -96,7 +96,7 @@ enum RawStoreSnapshot {
         var externalReferences: Int
     }
 
-    private static let manifestName = "manifest.json"
+    static let manifestName = "manifest.json"
     private static let partialSuffix = ".partial"
     /// 복사 중 원본이 바뀌었을 때 다시 뜨는 횟수와 간격. 시작 경로이므로 짧게 둔다.
     private static let maxRetriesOnChange = 3
@@ -158,6 +158,19 @@ enum RawStoreSnapshot {
             storeURL.deletingLastPathComponent().appendingPathComponent(storeURL.lastPathComponent + $0)
         }
         return candidates.filter { fileManager.fileExists(atPath: $0.path) }
+    }
+
+    /// 매니페스트의 파일 크기·지문을 다시 확인한 완료 원시 사본. 소유 확인은 자료를 읽기만 한다.
+    static func completedSnapshotStores(in area: PreservationArea, fileManager: FileManager = .default) -> [URL] {
+        guard let children = try? fileManager.contentsOfDirectory(at: area.rawSnapshotsDirectory, includingPropertiesForKeys: nil) else {
+            return []
+        }
+        return children
+            .filter { !$0.lastPathComponent.hasSuffix(partialSuffix) }
+            .filter { RawStoreSnapshotIntegrity.validatesSnapshot(at: $0, area: area, fileManager: fileManager) }
+            .sorted { $0.lastPathComponent < $1.lastPathComponent }
+            .map { $0.appendingPathComponent(area.storeFileName) }
+            .filter { fileManager.fileExists(atPath: $0.path) }
     }
 
     /// 외부 저장 폴더. `Carve.sqlite` 면 `.Carve_SUPPORT` 다.
@@ -344,7 +357,7 @@ enum RawStoreSnapshot {
         (try fileManager.attributesOfItem(atPath: url.path)[.size] as? Int) ?? 0
     }
 
-    private static func sha256(of url: URL) throws -> String {
+    static func sha256(of url: URL) throws -> String {
         let handle = try FileHandle(forReadingFrom: url)
         defer { try? handle.close() }
         var hasher = SHA256()
@@ -376,5 +389,55 @@ enum RawStoreSnapshot {
     private static func text(_ statement: OpaquePointer, _ column: Int32) -> String? {
         guard let value = sqlite3_column_text(statement, column) else { return nil }
         return String(cString: value)
+    }
+}
+
+private enum RawStoreSnapshotIntegrity {
+    /// 매니페스트는 사본을 만든 뒤 바뀌지 않아야 한다. 손상·불완전·예상 밖 파일이 있으면 소유 증거로 쓰지 않는다.
+    static func validatesSnapshot(at directory: URL, area: PreservationArea, fileManager: FileManager) -> Bool {
+        let manifestURL = directory.appendingPathComponent(RawStoreSnapshot.manifestName)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        guard
+            let data = try? Data(contentsOf: manifestURL),
+            let manifest = try? decoder.decode(RawStoreSnapshot.Manifest.self, from: data),
+            manifest.formatVersion == RawStoreSnapshot.formatVersion,
+            manifest.snapshotID == directory.lastPathComponent,
+            manifest.storeFileName == area.storeFileName,
+            manifest.files.contains(where: { $0.path == area.storeFileName })
+        else { return false }
+
+        let rootPath = directory.standardizedFileURL.path + "/"
+        var expectedPaths: Set<String> = []
+        for entry in manifest.files {
+            guard
+                !entry.path.isEmpty,
+                !entry.path.hasPrefix("/"),
+                !entry.path.split(separator: "/").contains(".."),
+                expectedPaths.insert(entry.path).inserted
+            else { return false }
+
+            let file = directory.appendingPathComponent(entry.path).standardizedFileURL
+            guard file.path.hasPrefix(rootPath),
+                  let attributes = try? fileManager.attributesOfItem(atPath: file.path),
+                  attributes[.type] as? FileAttributeType == .typeRegular,
+                  (attributes[.size] as? NSNumber)?.intValue == entry.bytes,
+                  (try? RawStoreSnapshot.sha256(of: file)) == entry.sha256 else { return false }
+        }
+
+        guard let enumerator = fileManager.enumerator(
+            at: directory,
+            includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey]
+        ) else { return false }
+        var actualPaths: Set<String> = []
+        for case let file as URL in enumerator {
+            guard let values = try? file.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey]) else { return false }
+            if values.isSymbolicLink == true { return false }
+            guard values.isRegularFile == true, file.lastPathComponent != RawStoreSnapshot.manifestName else { continue }
+            let standardizedPath = file.standardizedFileURL.path
+            guard standardizedPath.hasPrefix(rootPath) else { return false }
+            actualPaths.insert(String(standardizedPath.dropFirst(rootPath.count)))
+        }
+        return actualPaths == expectedPaths
     }
 }

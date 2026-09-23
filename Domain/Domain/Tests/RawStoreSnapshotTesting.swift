@@ -89,6 +89,28 @@ struct RawStoreSnapshotTesting {
         }
     }
 
+    @Test("소유 증거로 읽는 완료 사본은 매니페스트의 모든 파일 지문이 맞아야 한다")
+    func completedSnapshotsRequireMatchingManifest() async throws {
+        try await withDirectory { directory in
+            let url = V4StoreHarness.storeURL(in: directory)
+            try seedStore(at: url)
+            let area = area(in: directory)
+            guard case .success(.created(let snapshot)) = RawStoreSnapshot.takeIfNeeded(storeURL: url, area: area) else {
+                Issue.record("원시 사본을 만들지 못했다")
+                return
+            }
+
+            #expect(RawStoreSnapshot.completedSnapshotStores(in: area).count == 1)
+
+            let storeCopy = snapshot.appendingPathComponent(area.storeFileName)
+            var changedBytes = try Data(contentsOf: storeCopy)
+            changedBytes[changedBytes.startIndex] ^= 1
+            try changedBytes.write(to: storeCopy)
+
+            #expect(RawStoreSnapshot.completedSnapshotStores(in: area).isEmpty)
+        }
+    }
+
     /// 이미 새 모델로 연 저장소를 "원본" 으로 다시 뜨면 원본이 덮인다.
     @Test("한 번 뜨면 다시 뜨지 않는다")
     func takesOnlyOnce() async throws {
@@ -238,7 +260,11 @@ struct RawStoreSnapshotTesting {
             _ = RawStoreSnapshot.takeIfNeeded(storeURL: url, area: area)
             try #require(snapshotFolders(in: area).count == 1)
             let harness = try RepositoryHarness()
-            let writer = LocalPreservationWriter(area: area, eraseState: EraseStateArea(root: directory.appendingPathComponent("EraseState", isDirectory: true), storeFileName: "Carve.sqlite"))
+            let eraseArea = EraseStateArea(
+                root: directory.appendingPathComponent("EraseState", isDirectory: true),
+                storeFileName: "Carve.sqlite"
+            )
+            let writer = LocalPreservationWriter(area: area, eraseState: eraseArea)
             let eraser = SwiftDataDrawingDataEraser(actor: harness.actor, localPreservation: { writer })
 
             #expect(await eraser.eraseAll() == .completed)
@@ -255,7 +281,11 @@ struct RawStoreSnapshotTesting {
             try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: area.root.path)
             defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: area.root.path) }
             let harness = try RepositoryHarness()
-            let writer = LocalPreservationWriter(area: area, eraseState: EraseStateArea(root: directory.appendingPathComponent("EraseState", isDirectory: true), storeFileName: "Carve.sqlite"))
+            let eraseArea = EraseStateArea(
+                root: directory.appendingPathComponent("EraseState", isDirectory: true),
+                storeFileName: "Carve.sqlite"
+            )
+            let writer = LocalPreservationWriter(area: area, eraseState: eraseArea)
             let eraser = SwiftDataDrawingDataEraser(actor: harness.actor, localPreservation: { writer })
 
             #expect(await eraser.eraseAll() == .partiallyFailed)

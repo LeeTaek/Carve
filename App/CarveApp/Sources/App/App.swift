@@ -62,6 +62,12 @@ struct CarveApp: App {
             containerID: containerID.id,
             stateStore: FileEraseStateStore(area: .live(localDBPath: containerID.localDBPath)),
             localPreservation: localPreservation,
+            ownershipProof: CloudKitStoreOwnershipProofClient(
+                identity: CloudKitAccountIdentityClient(containerID: containerID.id),
+                containerID: containerID.id,
+                storeURL: URL.applicationSupportDirectory.appending(path: containerID.localDBPath),
+                preservation: PreservationArea.live(localDBPath: containerID.localDBPath)
+            ),
             injectsOwnership: Self.injectsStoreOwnership(containerID: containerID)
         )
         self.drawingEditEnvironment = drawingEditEnvironment

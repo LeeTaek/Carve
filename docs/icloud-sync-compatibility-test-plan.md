@@ -1,10 +1,84 @@
 # iCloud 구·신 버전 호환성 및 복구 테스트 계획
 
+> **최신 출시 판정(2026-09-23):** 2.0.0의 필사 이전·첫 로그인 동기화 기준은 [출시 범위 문서](./release-2.0.0-migration-sync-scope.md)를 따른다. 아래 SEP 시험은 C14 분리 설계의 관측 기록이며, 새 기준의 실제 1.3.0 업데이트·첫 로그인·다른 iPad 수신 시험을 대신하지 않는다.
+
 작성: 2026-09-16 · 갱신: 2026-09-18 · 목표: 2.0.0 · 상태: **선행(OLD 빌드)·단계 L 완료 · 단계 A 는 CK-A0~A3 · CK-A4b · CK-A4c(온라인 충돌 — 1.3.0↔2.0.0 · 2.0.0 끼리) · CK-A5(R27) 수행(시뮬레이터 2대 · 샌드박스 계정 · dev 컨테이너, §5-1) · 모르는 레코드 타입 예비 시험 FAV-P0 예비 통과 · 후보 엔티티 호환성 ENT-P1 통과 · 오프라인 CK-A4 미수행(§6) · 단계 B 미수행(NEW 후보 미구현) · 단계 C 미수행(계정 없이 가능한 케이스 있음) · 단계 D 는 2.1 로 이관 · 추가 확인 항목 MIG-F1 1차 수정 수행(시뮬레이터 · 단위 테스트, 실기기 미확인) · 리뷰 반영 진행 중**
 
 > **2026-09-16 범위 변경** — 필사 백업 기능이 **2.1** 로 이관됐다. 단계 D 는 그때 수행하고, 2.0.0 출시 판정은 단계 A~C 로 한다.
 
-이 문서는 [동기화·백업 설계](./icloud-sync-and-backup-policy.md)의 실행 계획이다. 구현은 다음 세션에서 수행한다. 테스트 코드·스키마·기기 데이터는 이 문서 작성으로 변경하지 않았다. 기존 [호환성 결정](./data-compatibility-decision.md)의 U4·R27·R28을 통과로 바꾸지 않는다.
+## 5-2. 2.0.0 출시 후보 구현·검증 결과 (2026-09-23)
+
+이번 후보는 `codex/2-0-0-migration-sync-release` 브랜치의 별도 worktree에서 검증했다. Xcode 26.3 (17C529), iPad mini (A17 Pro) · iOS 26.2를 사용했다. 세 테스트 scheme 각각에서 `build-for-testing` 성공을 확인한 뒤 같은 DerivedData 산출물로 `test-without-building`을 실행했다.
+
+코드 리뷰에서 확인한 차단 사유는 배포 `DrawingEditEnvironment.storeOwnership`에 값을 공급하는 구현이 없어, 계정 확인이 끝나도 캔버스 필사가 초안에만 남고 즐겨찾기·위젯 보관·이력 복원 같은 동기화 저장소 쓰기가 차단된다는 점이었다. `CloudKitStoreOwnershipProofClient`를 앱의 live 환경에 연결했다. 계정 확인만으로는 소유를 인정하지 않는다. 다음 중 하나가 별도로 입증되고, 확인 세대가 계속 유효할 때만 저장소 범위를 준다.
+
+- 원래 저장소 파일이 없었다는 `raw-not-needed` 기록과 빈 앱 모델 행 수.
+- 보존된 업데이트 전 V3 사본이 계정 미연결·미러링 대응 없는 1.3.0 legacy 필사임을 판독한 결과.
+- 기존 미러링 저장소의 계정 식별이 현재 확인 계정과 정확히 같고, 모든 로컬 모델 행과 안정된 CloudKit 레코드가 일대일이며 현재 계정 private DB에서도 모두 조회된 결과.
+
+성공한 소유 범위는 CloudKit 저장소 바깥의 내구성 표식에 해시된 계정 범위로 한 번 기록하고 다른 계정으로 바꾸지 않는다. 표식 손상, 미러링 정보 불완전, 네트워크 조회 실패, 다른 계정, K 읽기 실패, 계정 확인 세대 변경은 실패 닫힘이다. 전체 로컬 삭제 뒤에도 소유자는 다시 바인딩하지 않는다. 필사 저장 외에 즐겨찾기 추가·해제·실행 취소, 위젯 보관, 이력 복원, N-Canvas 쓰기는 모두 같은 `SyncedWriteBlock` 판정을 거친다. 계정·서버 작업 표·K·세대 차단은 유지했다. C14의 행별 분리·삭제 코드는 보존했고 2.0.0 시작 경로는 원시 사본 후 로컬 마이그레이션·CloudKit 연결로 바꿨다.
+
+직접 쓰기 경로는 `SyncedWriteBlock` 사용처와 기존 Feature 저장 차단 시험으로 확인했다. 실제 private DB 왕복은 즐겨찾기 추가·해제에서 확인했다. 위젯 보관·이력 복원·N-Canvas의 별도 UI 동작은 이번 시험 계정에서 직접 실행하지 않았으며, 이 경로별 라이브 서버 확인은 남아 있다.
+
+2.0.0에서 로그아웃 상태로 새로 쓴 필사는 기존 비동기화 초안 파일에 남는다. 그 편집 문맥은 로그인하면 계정 변경으로 끝나며, 해당 초안을 새 계정 저장소에 자동 채택하지 않는다. 옛 1.3.0 V3 표본만 첫 로그인 귀속 예외다.
+
+자동 검증 결과:
+
+- 출시 경로 단위 시험 5개 통과, 소유·C14 판독기 관련 Domain 집중 시험 46개 통과.
+- `DomainTest` 전체 445개 통과. 기준선 441개에 신규 시험 4개를 포함했다. 실제 sep 표본·지시서가 이 worktree에 없는 기존 probe 4개는 known issue로 보고됐으며 시험 실행은 성공했다. **아래 지원 OS 후속 재검증에서 이 수를 갱신했다.**
+- `SettingsFeatureTest` 54개, `CarveFeatureTest` 457개 통과. 전체 Feature 회귀에는 즐겨찾기·위젯 보관·복원·삭제 경로의 저장 차단 시험이 포함됐다.
+- `CarveApp` iPad simulator 빌드와 변경 Swift 파일 SwiftLint 통과. `git diff --check`도 통과했다.
+- iPadOS 18.6 `Carve-SEP-ios18`에서 `build-for-testing` 뒤 같은 산출물로 V3 마이그레이션·legacy 판독 시험 34개 통과했다. 당시 production reader는 iOS 26만 허용했다. **지원 OS 후속 결과는 아래 표를 따른다.**
+
+### 지원 OS 판독 후속 (2026-09-23)
+
+첫 로그인 예외는 업데이트 전 원시 사본의 매니페스트·전체 파일 지문 검증, V3 스키마, 무계정 metadata key 네 개의 정확한 집합과 예상 값 형식, migration 미요청, 계정 식별·CloudKit 대응·대기 작업 부재, 전체 로컬 행 수 일치를 모두 요구한다. 기존 로그인 저장소는 iOS 26.2에서 관측한 private metadata key 일곱 개의 정확한 집합·예상 값 형식, migration 미요청, identity 확인 완료, 현재 계정과의 identity 일치, private DB 내 모든 대응 레코드 조회를 요구한다. NULL·중복·미지 key, 예상 열이 아닌 값, migration 요청, identity 불일치, 서버 오류는 실패 닫힘이다.
+
+기존 `Carve-ACC-dut`의 업데이트 전 원시 V3 사본은 앱을 실행하지 않고 SQLite 읽기 전용으로 확인했다. `integrity_check=ok`, metadata 행 4개, 무계정 key 네 개가 각 1회, 미러링 대응 행 0개였다. 이 사본의 metadata 값은 읽지 않았다. 별도 임시 iOS 18.6 simulator에서 출시본 1.3.0을 실행하고 Genesis 1:3에 synthetic V3 행을 처음 저장한 뒤, 키 이름·키별 SQLite 값 형식과 두 boolean 상태만 요약했다. 이때 정확한 무계정 네 key 외에 `PFCloudKitMetadataModelMigratorMigrationBeganCommitKey`가 나타났고 해당 필드의 정수 boolean 상태는 `true`였다. 이 private Core Data key의 의미는 확인할 근거가 없어, iOS 18의 이 profile은 첫 로그인·기존 계정 proof 모두에서 거절한다. 계정·이메일 값은 쿼리하거나 기록하지 않았다. DUT·B의 Genesis 1:1·1:2 표본은 수정하지 않았다.
+
+현재 Xcode는 **26.3 (17C529)** 이다. sandbox 안의 CoreSimulatorService 열거는 실패했으나 승인된 CLI 재실행으로 현재 runtime을 확인했다: 16.4, 18.3.1, 18.6, 26.2. iOS 17.x·19~25는 설치되어 있지 않다. iPadOS 16.4는 최소 배포 타깃 17.0보다 낮다. 현재 iPad 시뮬레이터에는 별도 `Carve-Ownership-iOS18-6` 및 `Carve-SEP-ios18`(18.6), `Carve-ACC-dut`·`Carve-ACC-B`(26.2)가 보인다. ACC 두 기기는 기존 계정 세션을 유지하며 건드리지 않았다.
+
+| OS | iPad simulator | `build-for-testing` | 같은 산출물 `test-without-building` | 결과·범위 |
+|---|---|---:|---:|---|
+| iPadOS 18.3.1 | iPad mini (A17 Pro) | 선행 실행 성공 | 선행 실행 성공 | 당시 규칙의 집중 66/66 통과(test double); 현재 허용 OS 아님 |
+| iPadOS 18.6 | iPad mini (A17 Pro), `Carve-Ownership-iOS18-6` | 선행 실행 성공 | 선행 실행 성공 | 당시 규칙의 집중 66/66 통과(test double); 실제 1.3.0 V3 저장소에서 미지 migration marker를 관측해 현재 proof는 fail-closed; 타깃 빌드 선행 성공 |
+| iPadOS 26.2 | iPad mini (A17 Pro) | 선행 실행 성공 | 선행 실행 성공 | 선행 회귀 Domain 452건(통과 448·선언된 expected failure 4·실패 0), SettingsFeature 54/54, CarveFeature 457/457; 타깃 빌드 선행 성공. strict metadata profile 적용 뒤 live CloudKit proof는 미실행 |
+| iPadOS 17.x | 현재 runtime 목록에 없음 | 미실행 | 미실행 | 최소 지원 OS 차단. Xcode 26.3과 호환되는 iPadOS 17 iPad runtime 또는 iOS 17을 실행하는 실기기가 필요 |
+| iPadOS 19~25 | 현재 runtime 목록에 없음 | 미실행 | 미실행 | reader 검증도 없음. 해당 OS runtime과 iPad simulator가 필요하며, OS별 V3·private-store metadata profile 관측 뒤에만 허용 검토 |
+
+새 규칙 뒤 iOS 18.6에서 `DomainTest`의 reader·ownership proof·edit environment·snapshot·migration-release 다섯 suite를 선택해 `build-for-testing`했다: 성공. 같은 산출물의 `test-without-building`은 67개 테스트/5 suite 실행 뒤 3 issue로 실패했다. `productionClientClaimsVerifiedLegacySnapshot`이 fixture의 실 metadata profile 판정으로 claim하지 못했고, reader 버전을 3으로 기대하던 assertion도 실패했다. 그 뒤 테스트 코드를 보완했다(버전 기대값 4, metadata profile 상태를 직접 확인하는 assertion). **보완된 test source는 아직 재빌드·재실행하지 않았다.** 로그는 `/private/tmp/carve-migration-sync-release-followup-ios18-build.log` 및 `/private/tmp/carve-migration-sync-release-followup-ios18-tests.log`; DerivedData는 `/private/tmp/carve-migration-sync-release-followup-ios18-derived`다. 그러므로 새 strict rule은 아직 테스트 통과로 기록할 수 없다.
+
+앞선 iOS 18 시험의 `CloudAccountIdentityClient`와 private-record lookup은 test double이므로 실제 로그인·private DB·CloudKit 왕복 증거가 아니다. `Carve-Ownership-iOS18-6`은 현재 계정이 없는 상태로 두며 iCloud 로그인은 요청하지 않는다. 의미가 확인되지 않은 migration marker가 존재하므로 현재 구현으로 로그인시키면 의도된 첫 로그인 claim은 거절될 것이다. iOS 26.2의 이전 회귀·왕복 결과도 strict metadata profile 변경 뒤의 재검증과 구분한다.
+
+추후 Apple의 공개 문서나 검증 가능한 OS별 관측으로 migration marker가 완료 상태를 나타내는지와 계정 귀속에 안전하게 쓸 수 있는 조건이 확인된 뒤에만 별도 프로필을 설계한다. 그때의 로그인 실험은 사용자가 `Carve-Ownership-iOS18-6`의 **설정 > Apple 계정 > 로그인**에서 DUT·B와 같은 sandbox 계정을 선택해야 한다. 이 조작은 Development private DB에 Genesis 1:3 합성 표식을 만들고, 같은 계정의 DUT·B를 재실행할 경우 해당 새 표식이 전파될 수 있다. 현재는 그 단계에 도달하지 않는다. 자격 증명을 에이전트에 입력하지 않는다.
+
+**판정:** 허용 OS는 iOS 26뿐이다. iOS 18 metadata migration marker 의미가 미확인이고 iOS 17 runtime·실제 최소 지원 경로도 확인되지 않았다. iOS 19~25 역시 runtime·profile 근거가 없다. 2.0.0 출시 판정은 **NO-GO**다.
+
+실제 필기 표본과 업데이트 전후 증거는 앞 절차의 관측을 이어 썼다. 사용자가 `Carve-ACC-dut`에서 로그아웃한 뒤 1.3.0 V3로 창세기 1장 1절 지그재그(27점, bounds x=36 y=23 w=86 h=27), 2절 고리(37점, bounds x=33 y=14 w=40 h=47)를 작성했다. V3 업데이트 전 `BibleDrawing`은 2행이며 SQLite blob은 655B·795B였다. 업데이트 후 로컬 V6 표본의 실제 필기 payload는 654B·794B, SHA-256 앞 16자리 `3a267e075d4d23e7`·`4f38e8eb0d805fa2`, 미러링 대응은 0건이었다. 두 획의 PencilKit 내용·좌표·화면 표시가 업데이트 전후 같았고, 원시 사본도 같은 지문을 가졌다.
+
+이 표본은 로그아웃한 1.3.0 설치의 업데이트 경로다. **1.3.0에서 이미 iCloud에 로그인해 둔 상태로 2.0.0을 덮어 설치하는 별도 경로는 실행하지 않았다.** 출시 범위가 요구한 로그인 상태 업데이트 분기는 아직 미검증이다.
+
+자동 회귀·후보 덮어 설치·미로그인 실행 뒤에도 DUT 저장소는 2행, 같은 내용·레이아웃 지문, 미러링 대응 0건이었다. 복사본은 `/private/tmp/carve-release-sync-evidence/snaps/dut-before-login`, `dut-after-automated-tests`, `dut-after-candidate-install`, `dut-after-final-candidate-launch`에 두었다. 최종 실행 화면(`/private/tmp/carve-release-sync-evidence/dut-after-final-candidate.png`)에서도 두 획이 표시됐다. 로그인 직후 DUT는 2행 그대로였고 미러링 표가 아직 없었다(`dut-after-account-login-pre-probe`). 앱을 재실행한 뒤 CloudKit에서 기존 행 15개를 받고 실제 표본 두 행에 대응이 생겨 총 17행·매핑 17건·업로드 대기 0건이 됐다(`dut-after-account-login-relaunch`).
+
+로그인 전 서버 probe는 60초 내 완료되지 않아 서버 기준선은 얻지 못했다. 당시 B 로컬 13행을 서버 행 수로 간주하지 않는다. 이후 사용자가 두 시뮬레이터를 같은 시험 계정에 로그인시켰다. DUT 재실행 뒤 private DB probe는 `CD_BibleDrawing` 17개를 읽었고, Genesis 1:1은 654B / `3a267e075d4d23e7`, 1:2는 794B / `4f38e8eb0d805fa2`로 DUT 로컬 표본 payload와 각각 일치했다. B는 DUT export 전 15행에서 B 앱 재실행·probe 뒤 17행·매핑 17건으로 늘었으며 같은 두 payload 지문을 보유했다. 스냅숏은 `b-after-account-login-pre-probe`, `b-after-dut-server-export-before-probe`, `b-after-dut-first-export-and-b-probe`다. B 화면 캡처(`/private/tmp/carve-release-sync-evidence/b-after-dut-first-export.png`)에서도 1:1 지그재그와 1:2 고리가 보였다. AdMob 안내창은 본문 일부를 덮었지만 필기 획은 가리지 않았다. 서버 로그는 `0923-105645-probe-after-dut-login-first-export.log`와 B 조회용 probe 로그이며 계정 식별 원문은 문서에 기록하지 않았다.
+
+첫 로그인 옛 필사의 서버 전송과 같은 계정 다른 iPad 수신 관문은 iOS 26.2 시뮬레이터에서 통과했다. 사용자가 두 시뮬레이터를 같은 시험 계정에 직접 로그인시켰다. DUT는 설정에서 돌아온 실행 중에는 전송하지 않았고, 앱 재실행 뒤 CloudKit 연결이 붙어 첫 export가 완료됐다. 서버 payload bytes 지문·B 저장소·화면이 일치했다.
+
+일반 저장의 첫 방향도 확인했다. DUT에서 Genesis 1:7에 새 행을 만들었고 B는 다른 시점에 앱을 재실행한 뒤 같은 payload를 받았다. 로컬·서버·B의 payload는 모두 840B / `d4b13df878550d24`, 레이아웃 지문은 `933cf04e6b43b1a7`이었다. 이어 B에 후보 앱을 기존 컨테이너를 유지한 채 덮어 설치했고, 18개 행과 18개 매핑이 보존됐다. 후보 소유 ledger는 현재 계정 private DB 전체 레코드 조회에 근거해 `currentPrivateCloudRecords`로 기록됐다. 계정 식별 값은 관측·보고하지 않았다.
+
+B에서 보고된 1:7 추가 획은 후보 설치 전 만든 미확인 초안이 이미 있는 절에 그린 것이었다. 화면에는 추가 획이 보였으나 canonical 행 지문과 초안 revision은 바뀌지 않아 저장·수정으로 인정하지 않았다. 기존 초안은 저장소 소유 근거가 없으므로 후보가 자동 업로드하지 않는다. 이 동작은 2.0.0 로그인 없는 신규 초안을 자동 귀속하지 않는 안전 규칙을 유지한다.
+
+빈 절 Genesis 1:8의 일반 생성·전송은 통과했다. B의 새 행은 19행·19매핑 중 하나였고, 서버 private DB에는 `isPresent=1`, 965B / `261787e7b7ead104`로 있었다. 앱 재실행 뒤 DUT가 같은 rowUUID·payload를 받아 19행·19매핑, 업로드 대기 0건이 됐다. 서버 probe는 B에서, 일정 시간 뒤 fetch probe는 DUT에서 각각 실행했다. 저장소 사본은 `b-after-1-8-create-before-probe`, `b-after-1-8-server-export`, `dut-before-1-8-receive`, `dut-after-1-8-delayed-receive`이며 화면 캡처는 `/private/tmp/carve-release-sync-evidence/b-after-1-8-export.png`, `/private/tmp/carve-release-sync-evidence/dut-after-1-8-delayed-receive-settled.png`다.
+
+역방향 수정과 지연 payload 수신은 통과했다. DUT에서 1:8에 두 번째 획을 더한 뒤 payload가 965B / `261787e7b7ead104`에서 1802B / `de5df55aa6147ab5`로 바뀌었고 layout metadata 지문은 `2bfaf8b7d683127c`였다. DUT의 재실행 probe는 private DB에 같은 payload와 metadata, `isPresent=1`을 확인했다. 30초 넘게 열린 B의 로컬 사본은 이전 965B payload였고, B 앱 재실행 후에는 1802B payload를 받았다. B의 local layout metadata 지문은 `2cd2d9d9c1ba25ca`로 서버·DUT와 달랐지만, 사용자가 B에서 Genesis 1:8을 확인해 두 획과 좌표가 맞게 표시됨을 확인했다(`/private/tmp/carve-release-sync-evidence/b-1-8-after-reverse-receive-visible.png`). 즐겨찾기 추가·해제와 일반 필사 지우기 왕복도 통과했다. 이 문장은 2026-09-22 당시 남은 확인 범위다. 2026-09-23 후속 검증에서 iOS 18의 제한된 V3 증거 판독을 추가했지만, iOS 18 실제 로그인 소유 증명·왕복과 로그인된 1.3.0 업데이트는 여전히 미검증이다. iOS 17과 설치 런타임이 없는 iOS 19~25는 계속 fail closed다.
+
+즐겨찾기 추가·해제의 실제 저장 경로도 확인했다. B에서 Genesis 1:8을 즐겨찾기에 넣은 뒤 로컬은 즐겨찾기 1건·매핑 20건·대기 0건이었고, private DB probe는 Genesis 1:8 `CD_FavoriteVerse`를 포함한 활성 레코드 20건을 읽었다. 30초 뒤 DUT도 즐겨찾기 1건을 수신했다. B에서 즐겨찾기를 해제하자 로컬은 즐겨찾기 0건·매핑 19건이 됐고 서버는 그 레코드의 삭제 tombstone을 반환하며 활성 레코드 수가 19건으로 줄었다. 다음 30초 지연 수신 뒤 DUT도 즐겨찾기 0건·매핑 19건이 됐고 1:8 필사 payload는 1802B / `de5df55aa6147ab5` 그대로였다. 증거 사본은 `b-after-favorite-add-before-probe`, `dut-after-favorite-add-delayed-receive`, `b-after-favorite-remove-before-probe`, `dut-after-favorite-remove-delayed-receive`; server logs는 `logs/probe-favorite-add-after-export-run.txt`와 `logs/probe-favorite-remove-after-export-run.txt`다.
+
+일반 「지우기」도 검증했다. B에서 1:8을 지운 뒤 서버에는 payload 없는 현재 행(`isPresent=1`)과 지워진 1802B payload 행(`isPresent=0`)이 남았다. 30초 뒤 DUT는 같은 상태를 20행·20매핑·대기 0건으로 받았고, 사용자는 1:8 화면이 비어 있음을 확인했다. 원래 1:1·1:2 표본도 표시됐다. 증거 사본은 `b-after-1-8-erase-before-probe`, `dut-after-1-8-erase-delayed-receive`; server logs는 `logs/probe-erase-1-8-server-export-run.txt`와 `logs/probe-erase-1-8-delayed-receive-run.txt`다. 남은 필수 실측 분기는 로그인 상태의 1.3.0 덮어쓰기다. 전체 출시 판정은 supported OS coverage 문제도 해결될 때까지 보류한다.
+
+동시 두 iPad의 같은 절 편집을 양쪽 모두 보존하는 충돌 해결과 1.3.0·2.0.0 혼용 편집은 이번 출시 범위 밖의 알려진 제한으로 남긴다. 이 제한을 안전성 통과로 해석하지 않는다.
+
+이 문서는 [동기화·백업 설계](./icloud-sync-and-backup-policy.md)의 실행 계획이다. 이번 후보 구현과 시험 결과는 §5-2에 기록했다. 기존 [호환성 결정](./data-compatibility-decision.md)의 U4·R27·R28을 통과로 바꾸지 않는다.
 
 ## 1. 검증 질문과 판정 원칙
 
@@ -301,6 +375,8 @@ OLD의 실제 전체 삭제가 특정 모델 삭제인지 컨테이너·존 삭�
 - **사후:** 서버 · 초안 · 저장소 대조와 표본을 보관한 뒤 두 시뮬레이터의 앱 데이터를 지우고 주입 없는 빌드를 설치한다. dev 컨테이너의 샌드박스 계정 데이터는 폐기 가능한 시험 데이터다. 설치 · 삭제는 사용자 확인 뒤에 한다.
 
 ### 3-3. SEP — 분리 판정과 삭제 전파 실험 설계 (2026-09-21, 결정 2 검토 반영)
+
+**현재 적용 범위:** 이 절은 분리·삭제 설계를 검토할 때의 실험 계획으로 보존한다. 2.0.0 출시 필수 시험은 [출시 범위 문서](./release-2.0.0-migration-sync-scope.md)의 네 판정 행이다. F44~F57이 모두 맞더라도 실제 1.3.0 필기의 업데이트 보존·첫 로그인 전송이 증명되는 것은 아니다.
 
 **왜:** 정책 §12-6 C14(1.3.0 무계정 legacy 행 분리)의 판정은 **"미러링 레코드 대응이 없는 행은 지워도 서버로 전파되지 않는다"** 에 기댄다. 이것은 아직 **검증 가설**이다 — F25 · F30 은 계정 전환 · 로그아웃 관측이지 행별 대응의 수명이나 삭제 전파를 증명하지 않는다. **SEP-0 ~ SEP-2 가 통과하기 전에는 파괴적 분리(행 삭제)를 구현하지 않는다.**
 
