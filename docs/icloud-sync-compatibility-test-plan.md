@@ -2108,3 +2108,46 @@ clone에서 앱을 한 번 실행한 뒤 원본 DB의 `ANSCKEVENT`가 7건에서
 별도 pending/local-only export gate의 조사 결과, online 상태에서 합성 행을 쓰고 곧바로 update하는 방식은 Core Data export가 먼저 끝날 수 있어 재현성이 없다. 실행 전 Xcode 27 Device Conditions가 선택 simulator에 100% 양방향 network loss를 설정할 수 있는지 확인하고, Core Data network error 및 `ZNEEDSUPLOAD=1`을 동시에 보아야 한다. 이후에만 같은 simulator에서 old app의 오프라인 합성 행 → Xcode 27 Debug 덮어 설치 → pending 유지 → 네트워크 복구 뒤 Development export·peer receive 순서로 진행한다. 새 simulator의 같은 ACC sandbox 로그인과, CloudKit Console User token을 통한 독립 Development server baseline/final query가 필요하다. 현재 historical artifact에는 Development CloudKit entitlement가 없고 token도 준비되지 않아 이 gate는 실행하지 않았다. 이 절차 설계는 시뮬레이터·계정·CloudKit 데이터에 접근하지 않았다.
 
 이번 단계에서 완료된 것은 문서 밖 환경·아티팩트 사전 점검과 원본 app-local snapshot 복구뿐이다. 테스트는 미실행이며 기존 Xcode 27 통과 결과를 새 gate의 통과로 확대하지 않는다. iOS 18 marker/ownership, iOS 17.0 직접 회귀, Development server inventory, pending export update, Production CloudKit, Distribution 서명 Archive/export·TestFlight 및 물리 후보 smoke는 미완료여서 출시 **NO-GO**를 유지한다.
+
+### Xcode 27 직접 V3 로컬 마이그레이션 회귀 (2026-09-25)
+
+테스트 시작 전 tracked worktree는 clean이었다. 기본 선택 Xcode는 `/Applications/Xcode.app/Contents/Developer`의 `27.0 (27A266a)`, macOS `27.2`, Swift `6.4 (6.4.0.34.1)`, Tuist `4.208.0`이다. `Carve-Workspace`의 Debug scheme에서 iPad mini (A17 Pro), iOS `18.6 (22G86)`, UDID `7E95B700-3976-42D7-BF85-BCAF028B7605`를 사용했다. SDK는 iOS Simulator `27.0`이다. 모든 명령은 CLI `xcodebuild test`, `-parallel-testing-enabled NO`로 실행했다. Xcode 27 전체 회귀를 대신하려는 시험이 아니라 V3 local migration 경로에 집중한 추가 증거다.
+
+| suite | 결과 | 목적 |
+|---|---:|---|
+| `DomainTest/LegacyRowLinkageReaderTesting` | 31/31 | iOS 18.6의 미지원 migration marker를 fail-closed로 유지 |
+| `DomainTest/DrawingStoreOwnershipProofTesting` | 6/6 | 지원되지 않는 OS에서 ownership proof가 열리지 않는지 확인 |
+| `DomainTest/MigrationSyncReleaseTesting` | 5/5 | 무계정 V3 행·별도 초안·보존 실패 경계를 확인 |
+| `CarveFeatureTest/LegacyStoreMigrationTesting` | 3/3 | V3 임시 store → 현재 schema → repository → legacy 필기 합성·편집 왕복 |
+| `DomainTest/DrawingSchemaV4MigrationTesting` + `CarveFeatureTest/DrawingCodecLegacyMigrationTesting` | 14/14 | V3→V4 행·blob 보존과 legacy 좌표 배치 확인 |
+
+다섯 실행 묶음은 총 **59/59 통과**, failed·skip·expected failure 0, `xcodebuild` 종료 코드 0이다. 실제 V3 end-to-end suite의 xcresult는 `Passed`, 3/3이고 runtimeWarnings 0이다. 인접 두 suite는 11+3으로 14/14이며 xcresult runtimeWarnings 0이다. 앞서 실행한 첫 세 suite 로그·결과와 두 migration 실행 전체 로그·종료 파일은 각각 `/private/tmp/carve-x27-marker-focused-20260925/`와 `/private/tmp/carve-x27-legacy-store-migration-20260925/`에 있다.
+
+직접 migration suite는 테스트 전용 임시 SQLite에 synthetic V3 행과 PencilKit blob을 만들고 제거한다. `CarveFeatureTest`는 CarveApp이 아닌 unit-test target이며 앱을 설치·실행하지 않았다. ACC 저장소, iCloud 로그인, CloudKit 서버, 네트워크 데이터는 사용하지 않았다. 따라서 이 결과는 실제 1.3.0 앱 번들 업데이트·iOS 18 marker 해석·계정 소유 proof를 통과시킨 것이 아니다.
+
+V3 store를 여는 두 migration suite의 전체 로그에는 CoreData가 `NSManagedObjectModel` checksum을 아직 editable인 시점에 조회했다는 `[error]` 진단이 반복된다. 두 xcresult summary는 runtimeWarnings 0이고 관련 테스트는 통과했지만, 이 진단의 기원·제품 영향은 이번 실행에서 따로 분류하지 않았다. 경고를 무시 가능한 것으로 승격하지 않고 후속 분석 항목으로 남긴다. 전체 로그의 Swift/TCA deprecated warning 및 AppIntents metadata skip은 별도로 출력됐으며 빌드·시험 실패는 없었다.
+
+대표 실행 명령은 다음과 같다. 다른 두 `DomainTest` suite도 같은 workspace, scheme, destination, configuration, parallelism으로 각각 `-only-testing`을 지정했다.
+
+```bash
+xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configuration Debug \
+  -destination 'platform=iOS Simulator,id=7E95B700-3976-42D7-BF85-BCAF028B7605' \
+  -parallel-testing-enabled NO \
+  -derivedDataPath /private/tmp/carve-x27-legacy-store-migration-20260925/DerivedData \
+  -resultBundlePath /private/tmp/carve-x27-legacy-store-migration-20260925/LegacyStoreMigrationTesting.xcresult \
+  -only-testing:CarveFeatureTest/LegacyStoreMigrationTesting
+# 3/3 passed, exit 0; 전체 로그 xcodebuild.log, 종료 코드 xcodebuild.exit
+
+xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configuration Debug \
+  -destination 'platform=iOS Simulator,id=7E95B700-3976-42D7-BF85-BCAF028B7605' \
+  -parallel-testing-enabled NO \
+  -derivedDataPath /private/tmp/carve-x27-legacy-store-migration-20260925/DerivedData \
+  -resultBundlePath /private/tmp/carve-x27-legacy-store-migration-20260925/AdjacentMigrationSuites.xcresult \
+  -only-testing:DomainTest/DrawingSchemaV4MigrationTesting \
+  -only-testing:CarveFeatureTest/DrawingCodecLegacyMigrationTesting
+# 14/14 passed, exit 0; 전체 로그 adjacent-suites.log, 종료 코드 adjacent-suites.exit
+```
+
+직접 simulator 앱 업데이트는 별도 전용 기기에서 아직 실행하지 않았다. Carve 시작 시 Firebase Analytics가 설정되고 저장소에 수집 중단 launch switch가 없으며, `simctl`에도 per-simulator 네트워크 차단 옵션이 없다. 전용 `Carve-X27-V3-Migration-Airplane-20260925`에서만 Airplane Mode를 켜고 오프라인 여부를 확인해도 되는지 사용자 확인을 기다린다. 승인이 없으면 앱 install/launch를 시작하지 않는다.
+
+이 focused 결과는 기존 Xcode 27 전체 회귀와 합쳐 새로운 full regression 판정을 만들지 않는다. iOS 18 marker 의미 및 live ownership proof, iOS 17.0 직접 회귀, independent Development server inventory, pending export update, Production CloudKit, Xcode 27 Distribution 서명 Archive/export·TestFlight 및 해당 후보의 실기기 smoke는 미완료다. 26.3/26.6 빌드나 과거 TestFlight 결과로 바꾸지 않고 출시 판정은 **NO-GO**다.
