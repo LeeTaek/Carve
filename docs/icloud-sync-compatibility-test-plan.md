@@ -1693,6 +1693,8 @@ iPadOS 26.4·26.5 결과 bundle도 `Passed`, unexpected failure 0, `runtimeWarni
 
 앱 실행 전 원본 SQLite, `-wal`, `-shm`, Preservation, EraseState를 `/private/tmp/carve-2.0.0-acc-proof-20260925/pre-local/`에 복사했다. 원본 store는 V6, `integrity_check=ok`, `BibleDrawing` 12행, record metadata 12행, nonempty·unique CK record name 12개, upload/cloud-delete/local-delete pending은 각각 0이었다. Genesis 1:1 및 1:2의 row UUID 해시, line/layout byte 수와 SHA-256은 복제 전 snapshot과 앱 실행 뒤 복제본에서 같았다(1:1 line 1340B, 1:2 line 1220B). 복제본도 무결성 `ok`, 12행·12 metadata, pending 0이며 StoreOwnership marker는 없었다. ACC-B 원본의 DB 본문과 WAL 해시는 snapshot과 같았다. 다만 한 번 `simctl get_app_container`가 clone 호출에도 원본 경로를 반환했고, 그 경로를 읽기 전용 SQLite로 확인하는 동안 원본 `-shm`가 바뀌었다. SQLite의 읽기 전용 open도 `-shm`를 갱신할 수 있다는 F35 관측과 맞으며, DB/WAL 및 표본 payload는 바뀌지 않았다. 원본 simulator는 계속 종료 상태다.
 
+로컬-only strict profile 재확인에서는 `ANSCKMETADATAENTRY`가 예상 metadata key 7개를 중복 없이 모두 가지고 있었고 값 형식 profile 완전, `needsMigration=false`, 저장소 내부 `identityChecked=true`였다. 이 flag는 저장소 내부 값만 확인한 것이며 현재 iCloud 계정 identity와 일치한다는 뜻은 아니다. 세 legacy entity를 합쳐 12행 모두 대응 12개, 이름 존재·유일성 12개, orphan 0, pending 0이었다. 계정 상태와 CloudKit fetch가 준비되지 않아 이 로컬 결과만으로 ownership marker를 만들거나 소유를 인정하지 않았다.
+
 ```bash
 xcodebuild build -workspace Carve.xcworkspace -scheme CarveApp -configuration Debug \
   -destination 'platform=iOS Simulator,id=DDE9B05A-B684-486E-A8A2-AFFCED4BA600' \
