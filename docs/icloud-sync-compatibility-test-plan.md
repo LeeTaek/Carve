@@ -2059,6 +2059,8 @@ xcrun cktool query-records \
 
 사용자가 `Carve-X27-FirstLogin-20260925` (iPadOS 26.5, UDID `7284FDE5-6F95-4CC6-8EE6-75A794009F0F`)에 iCloud 계정을 로그인하고 User token을 등록했다고 알린 뒤 같은 private-zone `CD_BibleDrawing` read-only inventory query를 실행했다. 기본 sandbox 실행은 Keychain 접근 때문에 실패했지만 권한 있는 CLI 호출은 exit 0으로 끝나 token authorization을 통과했다. 응답은 `records: []`였다. 로그 `/private/tmp/carve-x27-cloudkit-31-inventory-20260925/remote-query-after-icloud-account-login.log`, exit `/private/tmp/carve-x27-cloudkit-31-inventory-20260925/remote-query-after-icloud-account-login.exit`에 있다. 이는 해당 User token·Development container·private zone·record type 조합에서 레코드가 반환되지 않았다는 뜻이다. Genesis 1:31 업로드 당시 실제 iCloud identity·환경·zone이 현재 쿼리와 같았는지 미확인이라, 표본이 업로드되지 않았거나 CloudKit 데이터가 없다고 확대 해석하지 않는다. 이번 실행은 record ID 목록을 받지 못했으며 CloudKit 데이터 변경은 없었다.
 
+zone mismatch 가능성만 확인하기 위해 같은 `CD_BibleDrawing` record type을 Development private DB의 `_defaultZone`에서도 조회했다. 이 query도 exit 0, `records: []`였으며 결과·종료 코드는 `/private/tmp/carve-x27-cloudkit-31-inventory-20260925/remote-query-default-zone-after-icloud-account-login.log`와 `.exit`에 있다. 확인 범위는 두 zone의 해당 record type뿐이다. 다른 record type·환경·사용자·production DB는 조회하지 않았다.
+
 ### 남은 게이트 사전 점검 및 22B 전후 snapshot 비교 (2026-09-25)
 
 이번 점검 전 `git status --short --branch`와 문서 diff를 확인했다. 브랜치는 `codex/2-0-0-migration-sync-release`이며 기존 미커밋 변경은 없었다. Xcode 27/macOS 27.2 기준은 그대로 두고 환경을 다시 조회했다.
