@@ -1685,7 +1685,7 @@ iPadOS 26.4·26.5 결과 bundle도 `Passed`, unexpected failure 0, `runtimeWarni
 
 시작 중 앱 UI는 “iCloud에 저장된 필사를 확인”하고 “아직 기존 필사를 받고 있어요”라고 표시했다. 이 simulator에 iCloud 계정을 로그인하지 않았고 기존 ACC 기기·데이터를 사용하지 않았다. 앱 시작 자체에서 백그라운드 CloudKit/network read가 발생했는지는 별도로 계측하지 않았으므로 서버와 통신이 전혀 없었다고 단정하지 않는다. 사용자가 CloudKit에 로그인하거나 필기를 쓰는 조작, 의도적인 서버 상태 변경은 하지 않았다. 이 확인은 **수동 UI startup 및 인접 장 이동 smoke만 통과**한 것이며 자동 테스트, 계정 동기화, CloudKit ownership proof, 저장·복원 검증은 아니다. Device Hub 화면만 사용했고 Xcode MCP는 쓰지 않았다.
 
-### Xcode 27 기존 private CloudKit ownership proof 사전 실행 (2026-09-25, 계정 확인에서 차단)
+### Xcode 27 기존 private CloudKit ownership proof 사전 실행 (2026-09-25, 첫 시도 계정 확인에서 차단)
 
 현행 환경은 macOS `27.2 (26B5086k)`, 기본 선택 Xcode `27.0 (27A266a)`, Swift `6.4 (swiftlang-6.4.0.34.1)`, Tuist `4.208.0`이다. `xcode-select -p`는 `/Applications/Xcode.app/Contents/Developer`를 가리킨다. 대상은 ownership reader 허용 범위 `[26]`에 속하는 iPadOS 26.5 (`23F77`)이며, iPhone destination은 사용하지 않았다.
 
@@ -1711,4 +1711,28 @@ SIMCTL_CHILD_CARVE_CK_PROBE_LABEL=baseline \
 
 앱이 시작된 뒤 CloudKit 로그는 account status `Temporarily Unavailable`, `hasValidCredentials=false`를 보였다. Core Data CloudKit setup은 `NSCocoaErrorDomain 134400` / `CKAccountStatusTemporarilyUnavailable`로 실패했다. 현재 계정 identity를 검증하거나 기존 private DB 레코드를 조회하지 못했고, fail-closed 소유 marker는 생성되지 않았다. clone의 후속 local store 검증에서 Genesis 1:1·1:2 payload 지문과 모든 pending count가 실행 전과 같았다. 로그인 상태가 준비되지 않아 서버 전후 inventory 및 production ownership proof는 미실행/미판정이다.
 
-빌드 전체 로그·exit는 `/private/tmp/carve-2.0.0-acc-proof-20260925/build.log`·`build.exit`이다. 전체 launch/app 로그는 account identifier 필드를 가린 `/private/tmp/carve-2.0.0-acc-proof-20260925/app.log`에 있고, launch 결과는 `launch-baseline.log`·`launch-baseline.exit`, 읽기 전용 CloudKit 요약은 위 JSON이다. 이 시도에서는 자동 테스트나 Device Hub 수동 조작을 하지 않았다. 자동 테스트는 기존 Xcode 27 iPadOS 26.5 전체 회귀(999 passed · 4 expected failures · 5 skips · unexpected failure 0)와 별도다. 계정 로그인·레코드 조회가 가능한 동일 ACC sandbox account 세션을 사용자가 복제 simulator에 준비한 뒤 이 게이트를 이어간다. 계정 전환은 하지 않고, auto-review가 구체 작업을 거절하면 우회하지 않는다. 출시 판정은 **NO-GO** 유지다.
+빌드 전체 로그·exit는 `/private/tmp/carve-2.0.0-acc-proof-20260925/build.log`·`build.exit`이다. 첫 launch/app 로그는 account identifier 필드를 가린 `/private/tmp/carve-2.0.0-acc-proof-20260925/app.log`에 있고, launch 결과는 `launch-baseline.log`·`launch-baseline.exit`, 읽기 전용 CloudKit 요약은 위 JSON이다. 첫 시도에서는 자동 테스트나 Device Hub 수동 조작을 하지 않았다. 자동 테스트는 기존 Xcode 27 iPadOS 26.5 전체 회귀(999 passed · 4 expected failures · 5 skips · unexpected failure 0)와 별도다. 사용자가 같은 ACC sandbox account를 복제 simulator에 로그인한 뒤 이어서 확인한 결과는 다음 절에 기록한다. 계정 전환이나 auto-review 우회는 하지 않았다. 출시 판정은 **NO-GO** 유지다.
+
+### Xcode 27 기존 private CloudKit ownership proof — 로그인 후 재개 (2026-09-25)
+
+첫 시도 뒤 사용자가 `Carve-ACC-Xcode27-Proof-20260925`와 Xcode 27에 기존 ACC와 같은 sandbox account로 로그인했다. 계정 전환은 없었다. 원본 `Carve-ACC-B`는 계속 종료 상태로 보존하고, 기존 복제본에서만 Debug 앱을 재실행했다. 실행 대상은 iPadOS 26.5 (23F77), Xcode 27.0 (27A266a), Swift 6.4 (`swiftlang-6.4.0.34.1`), macOS 27.2 (26B5086k), Tuist 4.208.0이다.
+
+로그인 뒤 앱 실행과 함께 같은 private zone의 inventory를 다시 수집했다. CloudKit probe는 앱 entitlements의 `iCloud.Carve.SwiftData.iCloud.dev`와 `com.apple.coredata.cloudkit.zone`을 사용하며, `desiredKeys=[]`, `readOnly=true`로 필드/payload 없이 record name·change tag 지문만 읽는다. 앱 시작 로그에서는 첫 시도의 `Temporarily Unavailable`/134400이 다시 나오지 않았다. Core Data가 원격 레코드를 가져왔고 clone의 drawing/record metadata 행 수는 12에서 20으로 늘었다. 앱 로그에는 `Found 0 objects needing export`와 `madeChanges: 0`이 기록됐다.
+
+로그인 후 완료 inventory는 20개 `CD_BibleDrawing`, record error 0, SHA-256 `8473c94c3afe622ecde121a07b7189512f9384d27d531fbc605948804ea791d3`였다. 앱을 다시 시작한 뒤 두 번째 읽기 전용 inventory도 20개·오류 0·같은 지문으로 완료됐다. 따라서 확인 가능한 범위에서 두 완료 조회 사이 서버 record inventory 변화는 없었다. 첫 12개에서 20개로의 로컬 증가는 clone의 CloudKit import 결과다. probe는 CloudKit write API를 호출하지 않았다.
+
+재실행 후 clone store는 `integrity_check=ok`, `BibleDrawing` 20행, `ANSCKRECORDMETADATA` 20행이었다. 로컬 record name은 원문을 출력하지 않고 SHA-256으로 변환해 비교했으며, 20개 전부가 remote record name hash 집합과 일치했다(로컬 누락 0, 서버 추가 0). upload·cloud-delete·local-delete pending은 모두 0이었다. Genesis 1:1(1340B)·1:2(1220B)의 present payload 지문은 앱 실행 전 clone snapshot과 같았다. `StoreOwnership/Carve.dev.sqlite.json`은 `formatVersion=1`, `proof=currentPrivateCloudRecords`로 생성됐으며 owner 값은 읽거나 기록하지 않았다. 이 표식은 앱의 기존 private-store 판정이 현재 계정 일치·strict local profile·전체 private record 조회를 통과했음을 나타낸다. 허용 OS 범위는 여전히 `[26]`이다.
+
+주요 명령과 증거 경로:
+
+```bash
+SIMCTL_CHILD_DYLD_INSERT_LIBRARIES=/private/tmp/carve-2.0.0-acc-proof-20260925/libCarveCloudKitReadOnlyProbe.dylib \
+SIMCTL_CHILD_CARVE_CK_PROBE_LABEL=post-login-baseline \
+  xcrun simctl launch --terminate-running-process E73A3120-C87C-4017-BF59-BA227BFCD580 kr.co.carve.leetaek
+
+SIMCTL_CHILD_DYLD_INSERT_LIBRARIES=/private/tmp/carve-2.0.0-acc-proof-20260925/libCarveCloudKitReadOnlyProbe.dylib \
+SIMCTL_CHILD_CARVE_CK_PROBE_LABEL=post-proof \
+  xcrun simctl launch --terminate-running-process E73A3120-C87C-4017-BF59-BA227BFCD580 kr.co.carve.leetaek
+```
+
+두 launch는 exit 0이다. baseline·최종 JSON은 clone app container의 `tmp/carve-cloudkit-post-login-baseline.json` 및 `tmp/carve-cloudkit-post-proof.json`, 마지막 로그는 identifier 필드를 가린 `/private/tmp/carve-2.0.0-acc-proof-20260925/app-after-login.log`에 있다. 민감한 원본 로그는 같은 디렉터리의 `.private-raw.log`로 남아 파일 모드 600이다. 이 실행에서는 자동 회귀를 재실행하거나 Device Hub를 사용하지 않았다. Xcode 27 iPadOS 26.5 전체 회귀(999 passed · 4 expected failures · 5 skips · unexpected failure 0)는 별도 CLI 결과다. 이 성공은 iOS 26.5의 기존 store + ACC sandbox private CloudKit ownership 경로에 한정되며 iOS 18 marker, 로그인 상태 1.3.0 업데이트, iOS 17, production CloudKit, Archive·배포 서명·TestFlight를 통과시키지 않는다. 출시 판정은 **NO-GO** 유지다.
