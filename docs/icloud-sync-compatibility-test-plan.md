@@ -1941,3 +1941,50 @@ xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configurat
 ```
 
 환경은 macOS 27.2, Xcode 27.0 (27A266a), Swift 6.4, Tuist 4.208.0이다. `xcresulttool get test-results summary`에서 `Passed`, 9 passed, failed/skip/expected failure 0, runtime warning 없음과 목적 simulator를 확인했다. 특히 `undecodableRowIsNotOverwritten`는 synthetic decode 실패 행을 활성 행에서 제외하고 다음 편집에 새 row를 만들어 원본 식별 행을 덮지 않는 테스트다. 전체 suite 로그와 종료 코드는 `suite.log`·`suite.exit`, 0건 시도의 로그·종료 코드는 `test.log`·`test.exit`이며 디렉터리는 `/private/tmp/carve-x27-undecodable-row-focus-20260925/`다. 계정 clone이나 CloudKit을 사용하지 않았다. 이 결과는 fail-safe 회귀만 입증하며 Genesis 1:10–12 실제 22B payload의 플랫폼별 decode 원인이나 표시·복구 결과를 설명하지 않는다.
+
+### Genesis 1:10–12 22B payload 직접 PencilKit 재확인 (2026-09-25)
+
+첫 로그인 시 `candidate-carveapp-full.log`의 `ChapterCanvasFeature` 로그는 verses `[10, 11, 12]`를 undecodable로 표시했다. 이 현상이 원시 `PKDrawing(data:)` 입력에서 재현되는지 확인하기 위해, ACC clone은 수정하지 않고 앞서 보존된 `post-first-login-store/Carve.dev.sqlite`의 **복사본**에서 여덟 `ZLINEDATA` 값을 읽었다. 10절 4행, 11절 3행, 12절 1행이 모두 22B였고 여덟 값의 SHA-256은 `fd34c90bb64fe7516efce8a76fe2ece33b9821935183664dfda18c84b31c1d2f`로 같았다. 원본 DB·행·CloudKit 레코드는 이 검사에서 쓰지 않았다.
+
+작은 iPad-only Tuist 앱을 `/private/tmp/carve-x27-22b-decode-audit-20260925/harness`에 만들고 같은 payload 파일을 앱 리소스로 포함했다. 앱은 각 값을 `PKDrawing(data:)`로 열고 byte count, SHA-256, stroke count 또는 NSError domain/code만 임시 Documents 파일에 남겼다. 앱에 CloudKit entitlement나 네트워크 동작은 없었다. macOS 호스트, iPadOS 26.5 새 iPad mini (A17 Pro) simulator, iPadOS 27.0 iPad mini (A17 Pro) simulator에서 각 3개 verse payload가 모두 **decode 성공·0 strokes**였다. 따라서 현재 확인된 직접 PencilKit 호출에서는 플랫폼별 decode 실패가 재현되지 않았고, 이 표본은 세 런타임에서 유효한 빈 drawing으로 해석됐다.
+
+실행 환경은 macOS `27.2 (26B5086k)`, 선택된 Xcode `27.0 (27A266a)`, Swift `6.4 (swiftlang-6.4.0.34.1)`, Tuist `4.208.0`, iOS Simulator SDK `27.0`이다. iPadOS 26.5 runtime은 `23F77`, iPadOS 27.0 대상은 `24A434`였다. Tuist 생성은 기본 세션 경로와 Swift module cache 권한 문제로 첫 시도들이 실패했다. 공유 설정을 변경하지 않고, 임시 Tuist state와 `.mise.toml`의 일회성 trust 경로를 지정해 생성했다. CoreSimulator의 user log/device set 접근은 sandbox에서 실패해 분리된 26.5 simulator의 생성·부팅·설치·실행과 27.0 simulator 실행은 권한 상승으로 수행했다.
+
+```bash
+XDG_STATE_HOME=/private/tmp/carve-x27-22b-decode-audit-20260925/tuist-state \
+MISE_TRUSTED_CONFIG_PATHS=/Users/leetaek/Carve/.mise.toml \
+MISE_DATA_DIR=/Users/leetaek/.local/share/mise \
+mise x -- tuist generate \
+  --path /private/tmp/carve-x27-22b-decode-audit-20260925/harness --no-open
+# exit 0
+
+xcodebuild -project /private/tmp/carve-x27-22b-decode-audit-20260925/harness/CarveDrawingDecodeProbe.xcodeproj \
+  -scheme CarveDrawingDecodeProbe -configuration Debug -sdk iphonesimulator \
+  -destination 'generic/platform=iOS Simulator' \
+  -derivedDataPath /private/tmp/carve-x27-22b-decode-audit-20260925/DerivedData build
+# BUILD SUCCEEDED, exit 0
+
+swift -module-cache-path /private/tmp/carve-x27-22b-decode-audit-20260925/clang-module-cache \
+  /private/tmp/carve-x27-22b-decode-audit-20260925/macOS-decode.swift
+# macOS 27.2: verse 10–12 각각 bytes=22, 위 SHA-256, decode=success, strokes=0, exit 0
+
+xcrun simctl create Carve-22B-Decode-20260925 \
+  com.apple.CoreSimulator.SimDeviceType.iPad-mini-A17-Pro \
+  com.apple.CoreSimulator.SimRuntime.iOS-26-5
+# D4E5AA55-2C2D-4E04-AE73-51D6D14E5105; iPad 전용 임시 simulator
+xcrun simctl boot D4E5AA55-2C2D-4E04-AE73-51D6D14E5105
+xcrun simctl bootstatus D4E5AA55-2C2D-4E04-AE73-51D6D14E5105 -b
+xcrun simctl install D4E5AA55-2C2D-4E04-AE73-51D6D14E5105 \
+  /private/tmp/carve-x27-22b-decode-audit-20260925/DerivedData/Build/Products/Debug-iphonesimulator/CarveDrawingDecodeProbe.app
+xcrun simctl launch D4E5AA55-2C2D-4E04-AE73-51D6D14E5105 kr.co.carve.pencilkitdecodeprobe
+# iPad mini (A17 Pro), iPadOS 26.5 (23F77): 3/3 decode success, strokes=0
+
+xcrun simctl boot C72A6CC6-4E3C-4822-BED1-9D76F8542D6B
+xcrun simctl bootstatus C72A6CC6-4E3C-4822-BED1-9D76F8542D6B -b
+xcrun simctl install C72A6CC6-4E3C-4822-BED1-9D76F8542D6B \
+  /private/tmp/carve-x27-22b-decode-audit-20260925/DerivedData/Build/Products/Debug-iphonesimulator/CarveDrawingDecodeProbe.app
+xcrun simctl launch C72A6CC6-4E3C-4822-BED1-9D76F8542D6B kr.co.carve.pencilkitdecodeprobe
+# iPad mini (A17 Pro), iPadOS 27.0 (24A434): 3/3 decode success, strokes=0
+```
+
+전체 Tuist·build·host decode·simulator boot/install/launch 기록과 결과는 `/private/tmp/carve-x27-22b-decode-audit-20260925/`에 있다. `harness/Project.swift`, `harness/Sources/ProbeApp.swift`, `macOS-decode.swift`, `ios-simulator-build.log`, `macOS-decode.log`, `ios26.5-decode.log`, `ios27.0-decode.log`, 각 `sim-*.log` 및 `tuist-generate-elevated.log`를 보존했다. 신규 26.5 simulator는 삭제했고, 기존 27.0 test simulator에서는 probe 앱만 제거한 뒤 shutdown했다. 직접 재현은 `DrawingCodec.compose`를 호출하지 않은 원시 PencilKit API 검사이지 Carve 앱의 화면 검증이나 CloudKit 시험이 아니다. 따라서 이전 앱 로그의 undecodable 경고와 이후 직접 API 성공 사이의 불일치는 남는다. 실행 중 앱이 선택한 snapshot과 저장 후 DB payload가 같은 값이었는지, 해당 compose 시점의 앱 상태가 무엇이었는지는 관측하지 못했다. 실제 DrawingCodec 통합·표시 결과를 성공으로 간주하지 않으며 데이터 변경이나 자동 회귀를 수행하지 않았다. Xcode Cloud/TestFlight·Production CloudKit·서명 게이트에는 영향이 없으므로 전체 출시 판정은 **NO-GO**다.
