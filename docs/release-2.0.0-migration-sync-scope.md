@@ -5,7 +5,7 @@
 ## 이번 출시에서 보장할 것
 
 1. **1.3.0 → 2.0.0 업데이트 때 기존 필사를 잃지 않는다.** 실제 출시본 1.3.0(`49f2dc27`, V3)으로 만든 저장소를 사용한다. 로그인 상태와 무계정 상태를 각각 확인하고, `BibleDrawing`과 실제 표본에 있는 `BiblePageDrawing`의 행 수뿐 아니라 필기 내용·좌표·화면 표시를 업데이트 전후에 대조한다. 기존 데이터가 있는 사용자를 빈 새 설치로 잘못 취급하거나, 마이그레이션 실패 뒤 빈 저장소에서 편집하게 해서는 안 된다.
-2. **1.3.0에서 계정 없이 작성한 옛 필사는 2.0.0에서 iCloud 로그인 후 전송된다.** 업데이트 직후 로컬 표시가 유지되고, 첫 로그인 뒤 서버에 올라가며, 같은 계정의 다른 iPad에도 같은 내용이 나타나는지 확인한다. 서버 이벤트 성공·행 개수만으로 통과시키지 않는다. 로그인 전후 앱 실행 중과 재실행 경로를 모두 본다. 현재 C14 게이트는 이 경로에서 연결을 보류하므로 **구현 변경과 재검증이 필요하다**.
+2. **1.3.0에서 계정 없이 작성한 옛 필사는 2.0.0에서 iCloud 로그인 후 전송된다.** 업데이트 직후 로컬 표시가 유지되고, 첫 로그인 뒤 서버에 올라가며, 같은 계정의 다른 iPad에도 같은 내용이 나타나는지 확인한다. 서버 이벤트 성공·행 개수만으로 통과시키지 않는다. 로그인 전후 앱 실행 중과 재실행 경로를 모두 본다. 후보에는 strict metadata proof와 첫 로그인 분기가 구현됐고, iPadOS 26.2의 앞선 후보 시험에서 왕복을 확인했다. strict profile 변경 뒤 실제 CloudKit proof를 다시 실행해야 한다. iOS 18.6의 실제 1.3.0 표본에는 의미가 확인되지 않은 metadata marker가 있어 그 OS에서는 여전히 fail-closed다.
 
 이 선택은 1.3.0 무계정 필사를 **처음 로그인한 iCloud 계정에 자동 귀속**시킨다. 본인이 아닌 계정으로 로그인하면 그 계정에 전송될 수 있다. 계정 변경·로그아웃 중 SwiftData/CloudKit이 로컬 저장소를 비우는 경로도 있어, 위 두 흐름에서 필사가 사라지지 않는지 확인해야 한다. 1.3.0 무계정 저장소를 이미 로그인된 시뮬레이터에 이식해 연결한 F40은 자동 귀속의 가능성을 보여 주지만, 실제 사용자 순서와 실제 PencilKit 필기 내용의 최종 검증은 아니다.
 
@@ -25,9 +25,9 @@
 
 지원 OS의 실제 출시 경로도 확인한다. 앱의 기본 배포 타깃은 iOS 17.0이지만 legacy 저장소 소유 proof의 허용 OS는 현재 iOS 26뿐이다. 첫 로그인 예외는 보존된 V3 사본의 매니페스트·파일 지문, 정확한 무계정 metadata key 네 개와 올바른 값 형식, migration 미요청, 계정 식별·CloudKit 대응·대기 작업 부재, 로컬 행 수 일치를 모두 요구한다. 기존 로그인 저장소는 iOS 26.2에서 관측한 정확한 private metadata key 집합·값 형식, migration 미요청, identity 확인 완료, 계정 일치와 private DB 전체 레코드 조회를 요구한다. 미지 키·누락·중복·값 형식 오류는 모두 거절한다.
 
-iOS 18.6의 실제 1.3.0 V3 표본은 첫 저장 뒤 추가 metadata key `PFCloudKitMetadataModelMigratorMigrationBeganCommitKey`를 만들고, 해당 값의 SQLite 형식은 정수 boolean `true`였다. 이 private key의 완료·진행 의미는 공개 문서나 현재 증거로 확인되지 않았다. 첫 로그인 profile의 정확한 네 키 조건은 이 표본을 거절하며, 기존 private profile도 미지 키를 거절한다. 따라서 iOS 18은 허용하지 않고 fail-closed로 유지한다. 시험용 `Carve-Ownership-iOS18-6`에는 synthetic Genesis 1:3 V3 행만 두었고 iCloud 로그인을 하지 않았다. Genesis 1:1·1:2의 기존 `Carve-ACC-dut`·`Carve-ACC-B` 표본은 읽기 전후 보존됐고 변경하지 않았다.
+iOS 18.6의 실제 1.3.0 V3 표본은 첫 저장 뒤 추가 metadata key `PFCloudKitMetadataModelMigratorMigrationBeganCommitKey`를 만들고, 해당 값의 SQLite 형식은 정수 boolean `true`였다. 이 private key의 완료·진행 의미는 공개 문서나 현재 증거로 확인되지 않았다. Apple 공개 Core Data/CloudKit 자료와 Xcode 26.3 Core Data simulator SDK headers에서도 정확한 key 정의를 찾지 못했다([Apple TN3163](https://developer.apple.com/documentation/technotes/tn3163-understanding-the-synchronization-of-nspersistentcloudkitcontainer)). 첫 로그인 profile의 정확한 네 키 조건은 이 표본을 거절하며, 기존 private profile도 미지 키를 거절한다. 따라서 iOS 18은 허용하지 않고 fail-closed로 유지한다. 시험용 `Carve-Ownership-iOS18-6`에는 synthetic Genesis 1:3 V3 행만 두었고 iCloud 로그인을 하지 않았다. Genesis 1:1·1:2의 기존 `Carve-ACC-dut`·`Carve-ACC-B` 표본은 읽기 전후 보존됐고 변경하지 않았다.
 
-iOS 18.3.1·18.6의 앞선 집중 시험은 identity와 CloudKit 조회를 test double로 대체한 단위 검증이며 실제 소유 proof가 아니다. iOS 18.6·26.2에서 `CarveApp` 타깃 빌드는 성공했다. iOS 17 runtime과 iOS 19~25 runtime은 이 머신에서 사용할 수 없었고, iOS 17 최소 지원 경로는 검증하지 못했다. **소유 proof를 iOS 17~25에서 안전하게 열 근거가 없고 iOS 17 로그인 동기화가 미검증이므로 전체 출시 판정은 NO-GO다.**
+iOS 18.3.1·18.6의 앞선 집중 시험은 identity와 CloudKit 조회를 test double로 대체한 단위 검증이며 실제 소유 proof가 아니다. iOS 18.6·26.2에서 `CarveApp` 타깃 빌드는 성공했다. **2026-09-25 환경 확인:** 현재 Mac은 macOS 27.2 / Xcode 27.0을 기본 선택하고 Device Hub가 실행 중이다. 기본 Xcode 27에서 `simctl` 목록 조회가 가능하며 iOS 17.5·18.6·26.2·26.4·26.5·27.0 runtime이 있다. Xcode 26.3을 지정한 runtime 조회는 sandbox에서 실패했지만 권한을 높여 재실행하자 성공했다. migration 수정 후 iPad mini (6th generation) iOS 17.5 전체 회귀는 998 통과·0 실패·6 skip·4 expected failure였고, 미사용 prototype 이동 후 Xcode 26.3 파일 제외 없는 전체 회귀는 iPadOS 17.5에서 998 통과, iPadOS 18.6·26.2에서 각각 999 통과·실패 0을 얻었다(각 4 expected failure 포함, 새 결과 총 1008). V1 custom migration은 source context에서 destination model을 생성하던 문제를 DTO 전달로 고쳤고, 확인된 V2 이상 저장소는 iOS 17의 134504 회피를 위해 V2 시작 plan으로 연다. iOS 17.0은 직접 시험하지 않았고 iOS 19~25 runtime도 현재 목록에 없다. **Xcode 27 후속 검증**은 Tuist workspace를 재생성한 뒤 Debug iPad simulator build와 iPadOS 17.5(998 통과·4 expected failure·6 skip), iPadOS 18.6·26.2·26.4·26.5(각 999 통과·4 expected failure·5 skip), iPadOS 27.0(998 통과·4 expected failure·6 skip)의 전체 회귀를 모두 통과했다. 각 결과는 총 1008건이며 unexpected failure 0이다. 17.5 로그에만 임시 SQLite fixture unlink/open-FD 경고가 보였고 xcresult failure/runtime warning은 없었다. 최초 F60 generic-project의 XCFramework 서명 단계 실패는 workspace 빌드에서 재현되지 않았다. 개별 `-project CarveApp`의 SwiftPM 모듈 오류와 읽기 전용 artifact 서명 상태 이상은 별개 관측이며 인과관계는 미확정이다. **소유 proof 허용 OS는 여전히 iOS 26뿐이고, iOS 18 metadata marker·live account proof 미확인 때문에 전체 출시 판정은 NO-GO다.**
 
 ## 출시 게이트와 이번 후보의 결과
 
@@ -35,7 +35,7 @@ iOS 18.3.1·18.6의 앞선 집중 시험은 identity와 CloudKit 조회를 test 
 
 즐겨찾기·위젯 보관·이력 복원·N-Canvas 경로는 공통 소유 차단과 자동 시험에서 확인했다. 실제 CloudKit 왕복은 즐겨찾기와 일반 필사에서 관측했으며, 위젯 보관·이력 복원·N-Canvas UI의 별도 라이브 서버 실행은 이번 시험에서 하지 않았다.
 
-Xcode 26.3 / iPadOS 26.2 회귀는 Domain 452개(448 통과·선언된 expected failure 4개·실패 0), SettingsFeature 54개, CarveFeature 457개가 통과했다. 각 scheme의 `build-for-testing` 성공 후 같은 산출물로 `test-without-building`을 실행했다. iPadOS 18.3.1·18.6의 앞선 집중 시험 66개는 당시 reader가 허용한 규칙에 대한 결과로, 이번 fail-closed 변경 뒤 재실행 결과와 구분한다. 그 시험의 계정 identity와 CloudKit record lookup은 test double이므로 실제 private DB 로그인·왕복 증거가 아니다. `CarveApp` 시뮬레이터 타깃은 iPadOS 18.6·26.2에서 빌드됐다. 전체 build lint 단계의 다른 파일 경고 4건은 남았지만 변경 Swift 파일 lint는 통과했다. iOS 17 런타임 부재와 iOS 18 metadata marker 의미 미확인, 실제 iOS 18 계정 왕복 미실행은 남은 출시 차단이다.
+Xcode 26.3 / iPadOS 26.2 회귀는 Domain 452개(448 통과·선언된 expected failure 4개·실패 0), SettingsFeature 54개, CarveFeature 457개가 통과했다. 각 scheme의 `build-for-testing` 성공 후 같은 산출물로 `test-without-building`을 실행했다. iPadOS 18.3.1·18.6의 앞선 집중 시험 66개는 당시 reader가 허용한 규칙에 대한 결과다. 최신 strict-profile 소스의 지원 OS별 결과는 아래 추가 검증을 따른다. 앞선 test double 결과는 실제 private DB 로그인·왕복 증거가 아니다. `CarveApp` 시뮬레이터 타깃은 iPadOS 18.6·26.2에서 빌드됐다. 전체 build lint 단계의 다른 파일 경고 4건은 남았지만 변경 Swift 파일 lint는 통과했다. iPadOS 17.5 전체 회귀의 세 migration 실패는 수정 후 0 failed 전체 회귀와 OS별 집중 migration 회귀로 닫았다. iOS 18 metadata marker 의미와 실제 iOS 18 계정 왕복 미실행은 남은 출시 차단이다.
 
 `Carve-ACC-dut`에는 사용자가 1.3.0에서 그린 창세기 1장 필기 두 행이 남아 있었다. 후보 덮어 설치 전·후·로그아웃 상태 실행에서도 내용 지문은 같았고, 실제 획·좌표·화면 표시가 유지됐다. 전후 사본은 `/private/tmp/carve-release-sync-evidence/snaps/dut-before-login`, `dut-after-candidate-install`, `dut-after-final-candidate-launch`에 있고 실행 화면은 `/private/tmp/carve-release-sync-evidence/dut-after-final-candidate.png`다. 로그인 직후 DUT 저장소는 2행·매핑 0건이었으나, 후보 앱 재실행 뒤 B 계정의 기존 레코드 15개를 수신하고 표본 두 행에 매핑이 생겨 총 17행·매핑 17건·업로드 대기 0건이 됐다. 시험 사본은 `dut-after-account-login-pre-probe`, `dut-after-account-login-relaunch`다.
 
@@ -57,10 +57,38 @@ B의 후보 설치 전 1:7 편집은 화면에 획이 보였지만 canonical 행
 
 ## 2026-09-23 후보 상태
 
-소유 proof의 규칙, 전체 회귀, 표본·서버 관측 상태는 위 최신 게이트 기록과 호환성 시험 계획 §5-2를 따른다. 첫 로그인 전송, 같은 계정 다른 iPad 수신, 일반 1:8 생성·수정·지우기의 서버 저장과 양방향 수신, B의 표시·좌표 확인, 즐겨찾기 추가·해제 동기화는 iOS 26.2에서 과거 후보 기준으로 통과했다. metadata 값 형식까지 엄격히 보는 reader/proof 변경 뒤에는 live CloudKit 소유 판정을 재실행하지 않았다. iOS 17.0의 실제 경로, iOS 18의 migration marker 의미와 계정 왕복, 로그인 상태의 1.3.0 덮어쓰기 분기는 남아 있다.
+소유 proof의 규칙, 전체 회귀, 표본·서버 관측 상태는 위 최신 게이트 기록과 호환성 시험 계획 §5-2를 따른다. 첫 로그인 전송, 같은 계정 다른 iPad 수신, 일반 1:8 생성·수정·지우기의 서버 저장과 양방향 수신, B의 표시·좌표 확인, 즐겨찾기 추가·해제 동기화는 iOS 26.2에서 과거 후보 기준으로 통과했다. metadata 값 형식까지 엄격히 보는 reader/proof 변경 뒤에는 live CloudKit 소유 판정을 재실행하지 않았다. iOS 17.5 자동 회귀는 migration 수정 뒤 실패 0으로 통과했지만, iOS 17.0 및 OS 17의 소유 proof·실제 CloudKit 경로, iOS 18의 migration marker 의미와 계정 왕복, 로그인 상태의 1.3.0 덮어쓰기 분기는 남아 있다.
 
 즐겨찾기 추가 경로는 2026-09-23 B에서 Genesis 1:8을 선택해 확인했다. B 사본은 필사 19행·즐겨찾기 1건·매핑 20건·대기 0건이었고, private DB probe는 전체 20레코드 중 Genesis 1:8 `CD_FavoriteVerse`를 확인했다. 30초 뒤 DUT는 같은 장·절의 즐겨찾기 1건을 받아 필사 19행·매핑 20건·대기 0건이었다. 사본 `b-after-favorite-add-before-probe`, `dut-after-favorite-add-delayed-receive`; probe 결과 `logs/probe-favorite-add-after-export-run.txt`.
 
 이어 B에서 1:8 즐겨찾기를 해제했다. B 사본은 필사 19행·즐겨찾기 0건·매핑 19건·대기 0건이었고, 서버 probe에서 해당 `CD_FavoriteVerse` 삭제 tombstone을 확인해 활성 레코드는 19건으로 돌아왔다. 30초 뒤 DUT도 즐겨찾기 0건·필사 19행·매핑 19건·대기 0건을 받았으며 1:8 필사 payload는 1802B / `de5df55aa6147ab5`로 유지됐다. 사본 `b-after-favorite-remove-before-probe`, `dut-after-favorite-remove-delayed-receive`; probe `logs/probe-favorite-remove-after-export-run.txt`.
 
 일반 삭제도 B에서 Genesis 1:8의 표준 「지우기」 경로로 실행했다. 지우기 직전 1:8 현재 행은 `isPresent=1`, 1802B / `de5df55aa6147ab5`였다. 이후 로컬·서버에는 현재 행(`isPresent=1`, 필기 payload 없음)과 이전 1802B 행(`isPresent=0`)이 각각 남았다. B는 필사 20행·매핑 20건·업로드 대기 0건, probe의 활성 서버 레코드는 20건이었다. 30초 뒤 DUT에도 같은 두 1:8 상태가 매핑 20건·대기 0건으로 수신됐다. 사용자는 DUT에서 1:8 필기 영역이 비었음을 확인했고, 상단 캡처에서는 원래 1:1·1:2 표본이 유지됐다(`/private/tmp/carve-release-sync-evidence/dut-after-1-8-erase-delayed-receive.png`). 사본 `b-after-1-8-erase-before-probe`, `dut-after-1-8-erase-delayed-receive`; probe `logs/probe-erase-1-8-server-export-run.txt`와 `logs/probe-erase-1-8-delayed-receive-run.txt`.
+
+## 2026-09-23~24 출시 기준 재검증
+
+Xcode 26.3에서 전체 `Carve-Workspace` 회귀를 iPad mini (A17 Pro) iPadOS 18.6, iPad mini iPadOS 26.2, iPad Air 11-inch (M3) iPadOS 26.2로 실행했다. 각 결과는 **997 passed · 4 expected failures · 5 skipped · 0 failed (총 1006)**다. 건너뛴 5개는 실기기 전용 UI 테스트다. iPadOS 18.6·26.2의 strict migration/ownership 집중 suite는 각각 67/67 통과했다. 새로운 blank/no-account simulator에서 18.6 mini와 26.2 Air가 앱을 크래시 없이 FirstRunGuide까지 표시하는 것도 확인했다. 시작 버튼 이후의 실제 필사 편집·저장은 확인하지 않았다.
+
+`CarveApp` Release configuration은 iPad simulator 대상으로 컴파일됐고 앱 메타데이터는 2.0.0 (build 1)이었다. `CODE_SIGNING_ALLOWED=NO`인 compile이므로 archive, 배포 서명·entitlement, TestFlight 증거가 아니다. 이 작업 디렉터리의 미추적 `LegacyRowCorrespondence.swift`는 `LegacyJudgementDoubt: Error` 미준수와 `Int64`/`Int` 타입 불일치로 컴파일되지 않아 파일 자체를 보존하고 모든 검증 빌드에서만 제외했다. 그 파일을 release 변경에 포함한다면 오류를 고친 뒤 제외 없이 다시 검증해야 한다.
+
+**2026-09-24 이전 후보 재실행:** 같은 Xcode 26.3 기준으로 iPad mini (A17 Pro) iPadOS 18.6·26.2에서 전체 `Carve-Workspace` 회귀를 다시 빌드·실행해 각각 **997 passed · 4 expected failures · 5 skipped · 0 failed (총 1006)**를 얻었다. 26.2 mini의 migration/ownership 관련 집중 다섯 suite도 67/67 통과했다. Air 결과와 blank/no-account 시작 smoke는 9/23의 기록이며 9/24에 다시 실행하지 않았다. 이 실행에서는 미완성 미추적 `LegacyRowCorrespondence.swift`를 제외했다. 다음의 최신 후보 재검증과 혼동하지 않도록 이 결과는 당시 상태로 보존한다.
+
+strict-profile 변경 뒤의 live CloudKit proof는 아직 미실행이다. 기존 ACC simulator를 복제해 앱 실행을 시도하려 했지만, 자동 승인 검토가 기존 필기의 Development private CloudKit DB 전송 및 서버 상태 변경 가능성을 이유로 clone 실행을 거절했다. 앱은 실행하지 않았고 원본 ACC 기기는 수정하지 않았으며 임시 clone은 제거했다. 다른 실행 경로로 우회하지 않았다. 현재 전체 판정은 **NO-GO**이며, live proof를 재개하려면 기존 필기 표본·시험 계정·Development private DB를 대상으로 보내고 변경할 수 있다는 명시적 승인이 필요하다. 별도 synthetic 표본과 시험 계정으로 재설계하는 선택지도 있다.
+
+## 2026-09-23 후속 strict-profile 검증
+
+첫 후속 검증 환경은 macOS 27.2에서 Xcode 26.3 (17C529)을 선택했으며, 그때의 runtime 목록에는 iPadOS 26.2·26.4·26.5·27.0만 있어 iOS 18.6은 사용할 수 없었다. 일반 iPad mini (A17 Pro) · iPadOS 26.2에서 reader·ownership proof·edit environment·snapshot·migration-release 다섯 Domain suite의 `build-for-testing` 후 동일 DerivedData로 67/67 통과(실패·건너뜀 0), `CarveApp` iPad simulator 빌드도 성공했다.
+
+이 당시 검증에서는 `Carve-ACC-dut`·`Carve-ACC-B`와 실제 CloudKit 계정을 사용하지 않았다. 첫 빌드에서 당시 checkout의 미추적 `LegacyRowCorrespondence.swift` 컴파일 오류가 발견되어 파일을 보존하고 빌드에서만 제외했다. fixture의 raw SQLite 작업에서 서로 다른 테스트가 일시 잠금을 보인 뒤 `LinkageFixture.exec`에 5초 busy timeout을 둔 최종 실행은 통과했다. 자세한 로그·결과 경로와 iOS 18.6 미실행 사유는 [호환성 시험 계획 §5-2 지원 OS 판독 후속](./icloud-sync-compatibility-test-plan.md#지원-os-판독-후속-2026-09-23)을 따른다.
+
+### iPadOS 18.6 후속 검증
+
+사용자가 iOS 18.6 runtime을 설치한 뒤 Xcode 26.3 (17C529), macOS 27.2, iPad mini (A17 Pro), build 22G86에서 최신 소스를 검증했다. 집중 다섯 suite를 새 `build-for-testing` 후 같은 DerivedData로 실행해 67/67 통과(실패·건너뜀 0)했다. Domain 전체는 449 통과·4 expected failure·실패 0·건너뜀 0, SettingsFeature 54/54, CarveFeature 457/457도 각각 빌드 성공 뒤 같은 산출물 실행으로 통과했다. `Carve-Workspace` 앱 simulator 빌드도 성공했다.
+
+최초 iOS 18.6 실행의 다섯 assertion 실패는 테스트가 검증 OS 제한 없이 성공 경로를 기대한 탓이었다. iOS 18에서 reader가 unknown을 반환하고 소유 표식을 만들지 않는 것은 현재 production allowlist `[26]`의 의도된 fail-closed 동작이다. 테스트를 OS-aware로 바꿔 검증 OS의 V3 성공 경로와 범위 밖 OS의 거부 경로를 각각 확인했다. product allowlist는 바꾸지 않았다. 실제 1.3.0 표본의 `PFCloudKitMetadataModelMigratorMigrationBeganCommitKey` 의미는 여전히 미확인이며 허용하지 않았다.
+
+실행은 일반 iOS 18.6 iPad mini simulator에서 했다. `Carve-Ownership-iOS18-6`, `Carve-ACC-dut`, `Carve-ACC-B`와 CloudKit 계정은 사용하지 않았다. 이 당시 빌드에서만 checkout에 있던 미추적 `LegacyRowCorrespondence.swift`를 제외했다. 결과 경로는 호환성 시험 계획 §5-2에 기록했다.
+
+**2026-09-24 후보 소스 후속:** 역할이 겹치고 호출되지 않는 미완성 `LegacyRowCorrespondence.swift` 초안을 `/private/tmp/carve-legacy-row-correspondence-draft-20260924.swift`로 옮겨 source 경로에서 제외했다. 새 DerivedData에서 `EXCLUDED_SOURCE_FILE_NAMES` 없이 전체 회귀를 실행해 iPadOS 17.5는 998 통과·실패 0·6 skip·4 expected failure, 18.6·26.2는 각각 999 통과·실패 0·5 skip·4 expected failure (각 총 1008)를 확인했다. 세 xcresult 경로와 범위는 [호환성 시험 계획 §5-2](./icloud-sync-compatibility-test-plan.md#미완성-초안-이동-후-파일-제외-없는-회귀-2026-09-24)에 있다. Apple 공개 문서와 Xcode 26.3 SDK headers에서 iOS 18 private metadata migration marker의 의미를 확인할 근거를 찾지 못해 reader allowlist `[26]`을 그대로 유지한다.
+
+남은 출시 차단은 iOS 17.0 직접 시험과 소유 proof, iOS 18의 migration marker 의미와 계정 동기화 proof, iOS 19~25 profile, strict-profile 변경 뒤의 live CloudKit proof, 로그인 상태 1.3.0 업데이트 분기다. 이들 게이트가 해소되지 않아 2.0.0 출시 판정은 계속 **NO-GO**다.

@@ -21,33 +21,32 @@
 
 ## 툴체인 제약 ★ 먼저 읽을 것
 
-**기준 툴체인은 Xcode 26.3 (17C529 / Swift 6.2.4) 이다.** 이것만 실제로 검증했다.
+**현행 작업 및 출시 후보의 주 검증 대상은 현재 호스트의 Xcode 27.0 / macOS 27.2다.** 기본 선택과 다른 Xcode를 임의로 바꾸지 말고, 실행 때 선택된 툴체인을 기록한다. Device Hub는 기기 확인·수동 스모크에 사용하며 컴파일러나 CLI 테스트를 대체하지 않는다.
 
 | 버전 | 결과 |
 |---|---|
-| **Xcode 26.3** | ✅ 검증됨 (Swift 6.2.4). 2026-09-09 TCA 1.26.2 로 회귀 312 통과·앱 빌드 성공 |
+| **Xcode 27.0** | 🎯 현행 주 검증·출시 후보 자격 확인 대상 (macOS 27.2). Tuist workspace Debug iPad simulator build와 전체 회귀가 iPadOS 17.5에서 998 통과·18.6/26.2/26.4/26.5에서 각각 999 통과·27.0에서 998 통과(각 총 1008, expected failure·skip 포함)했다. 초기 F60의 XCFramework 서명 실패는 재현되지 않았다. iOS 27 SwiftData error mapping은 확인된 1.0.x metadata에만 대응하도록 수정했다. iOS 17.5 로그의 임시 fixture SQLite 경고는 테스트 실패/runtime warning이 아니며 정리 시점 후속 분석이 남았다. live CloudKit proof와 서명 Archive·TestFlight는 미완료 |
+| **Xcode 26.3** | 🧪 알려진 회귀 비교 기준 (17C529 / Swift 6.2.4). **2026-09-24 파일 제외 없는 전체 `Carve-Workspace` 회귀:** iPadOS 17.5는 998 통과·실패 0·6 skip·4 expected failure, iPadOS 18.6·26.2는 각각 999 통과·실패 0·5 skip·4 expected failure (각 총 1008). 이 결과는 Xcode 26.3에서만 얻은 과거 기준선이며 Xcode 27 검증을 대신하지 않는다. V1 migration 수정과 미완성 초안 이동 기록은 호환성 시험 계획에 있다 |
 | Xcode 26.6 | ⚠️ **미확인**. 과거 TCA **1.20.2** 에서 Swift 6.3.3 컴파일 실패했으나(`WritableKeyPath<Root, BindingState<Value>>` 의 `Sendable` 미충족) 그 핀은 더 이상 쓰지 않는다. 1.23.2 가 "Xcode 26.4 support" 를 넣었으므로 재확인 필요 |
-| Xcode 27.x | ⚠️ **미확인**. TCA 몫의 배포 타깃 문제는 1.24.0 의 iOS 13 → 16 상향으로 해소됐다. `swift-syntax`(macOS 10.15) · `google-mobile-ads`(iOS 13) 는 그대로 남아 있고 확인하지 않았다 |
 
-26.6 · 27.x 의 ❌ 는 TCA 1.20.2 시절 관측이다. **1.26.2 로 올린 뒤 다시 재보지 않았으므로
-"실패" 로도 "동작" 으로도 단정하지 않는다.** 확인하려면 해당 Xcode 를 설치하고 실제로 돌려본 뒤
-이 표를 갱신한다. 무관한 패키지의 배포 타깃을 일괄 변경해 통과시키지 않는다.
+Xcode 26.6은 미확인이다. TCA 1.20.2 + Swift 6.3.3에서 난 컴파일 오류는 과거 관측이며 현재 의존성의 결과로 일반화하지 않는다. Xcode 27.0 최초 generic-project F60 기록은 Swift 소스 컴파일 전 XCFramework 서명 실패였지만, 생성 workspace 재검증에서는 해당 단계가 통과했고 앱 컴파일·iPadOS 17.5/18.6/26.2/26.4/26.5/27.0 전체 회귀도 통과했다. iOS 27 SwiftData의 `.unknownDataStoreSchema` 분기 수정은 로컬 회귀 결과이며 live CloudKit proof·배포 자격을 대신하지 않는다. 경위는 [호환성 시험 계획](docs/icloud-sync-compatibility-test-plan.md)과 [핸드오프](docs/release-2.0.0-migration-sync-handoff.md)에 기록한다.
 경위는 [로드맵 §4 TECH-0](docs/release-2.0.0-roadmap.md) 에 있다.
 
-**Xcode 앱의 경로는 머신마다 다르다.** 아래 우회는 **macOS 27 beta 머신 전용**이다.
+**현재 환경 스냅샷 (2026-09-24):** 이 Mac은 macOS 27.2 (26B5086k), 기본 Xcode 27.0 (27A266a)이며 `xcode-select -p`는 `/Applications/Xcode.app/Contents/Developer`를 가리킨다. Tuist 4.208.0은 `.mise.toml`로 고정돼 있다. Device Hub가 실행 중이고, 기본 Xcode 27 선택 상태에서는 이 세션의 `xcrun simctl list runtimes`와 `list devices available`이 성공했다. Xcode 26.3을 `DEVELOPER_DIR`로 지정한 sandbox 호출은 CoreSimulatorService 연결·로그 경로 권한 오류를 냈고, 권한을 높여 재확인하자 런타임 목록 조회가 성공했다. 확인한 runtime은 iOS 17.5·18.6·26.2·26.4·26.5·27.0이며 iOS 19~25는 현재 목록에 없다. iPad mini (6th generation) iOS 17.5 simulator (UDID `0347221E-08F5-48C9-9F8E-6D7995C25D9F`)에서 Xcode 26.3 전체 회귀를 수행했다. Device Hub에는 iPadOS 27.2 실기기가 보이고, 검사 당시 iPad (A16) iPadOS 18.6 simulator가 선택돼 있었다. 기기 상태는 검사 시점의 스냅샷이며 작업마다 다시 확인한다.
 
-| 머신 | 상태 |
-|---|---|
-| macOS 27 beta | Xcode GUI 실행이 막히고 `xcode-select` 가 Command Line Tools 를 가리킬 수 있다. `DEVELOPER_DIR` 로 우회한다 — GUI 게이팅은 앱 번들 안의 CLI 바이너리(`xcodebuild` / `simctl` / `devicectl` / `xctrace`)에 적용되지 않는다 |
-| macOS 26.3 (26.3 / 17C529 가 `/Applications/Xcode.app`) | `xcode-select` 가 이미 올바른 곳을 가리킨다. 우회 불필요 |
-
-**경로를 하드코딩하지 말고 먼저 확인한다** — `Xcode-26.3.0.app` 이 없는 머신에서 그대로 쓰면
-`missing DEVELOPER_DIR path` 로 모든 명령이 죽는다.
+Xcode 26.3도 현재 Mac에 `/Applications/Xcode-26.3.0.app/Contents/Developer`로 설치돼 있다. 다른 Mac에서는 경로를 추측하지 말고 아래 명령으로 실제 위치와 버전을 확인한다. 기본 선택된 Xcode 27을 주 검증 대상으로 사용한다. Xcode 26.3과 비교할 때만 실제 경로를 확인한 뒤 `DEVELOPER_DIR`를 명시하고, 결과를 별도 툴체인 결과로 기록한다.
 
 ```bash
-xcode-select -p                       # 이미 26.3 을 가리키면 아래는 불필요
-xcodebuild -version                   # Xcode 26.3 / Build 17C529 확인
-export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer   # 필요할 때만
+xcode-select -p
+xcodebuild -version
+mise x -- tuist version
+xcrun simctl list runtimes
+find /Applications -maxdepth 1 -name 'Xcode*.app' -print
+```
+
+```bash
+# 알려진 과거 회귀 기준과 비교할 때만 사용한다. 경로는 실행 전에 확인한다.
+DEVELOPER_DIR=/Applications/Xcode-26.3.0.app/Contents/Developer xcodebuild -version
 ```
 
 **tuist 는 `.mise.toml` 로 4.208.0 에 고정돼 있다.** `PATH` 기본값과 다르므로 반드시
@@ -56,8 +55,7 @@ export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer   # 필요할 �
 ## 공통 명령어
 
 ```bash
-# xcode-select 가 26.3 을 가리키지 않을 때만 (위 표 참고)
-# export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+# 기본 선택된 Xcode 27에서 우선 검증한다. 실행한 Xcode·Swift·runtime을 결과에 기록한다.
 
 mise x -- tuist generate --no-open        # ★ .xcodeproj 는 gitignore — 클론·브랜치 전환 후 반드시 먼저
 xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace \
@@ -111,14 +109,13 @@ mise x -- swiftlint lint --quiet --config .swiftlint.yml <파일들>
 
 설계 §18-3 의 절차를 이 머신에서 재현할 때 (Phase 2 에서 확인):
 
-- **`vmmap` 은 권한 오류로 실패한다** (`Failed to get DYLD info for task`). 같은 physical footprint 는
-  `/usr/bin/footprint <pid>` 로 읽는다. CPU 는 §18-3 그대로 `ps -o time=` 델타.
+- **Phase 2 측정 Mac에서는 `vmmap` 이 권한 오류로 실패했다** (`Failed to get DYLD info for task`). 같은 physical footprint 는
+  `/usr/bin/footprint <pid>` 로 읽는다. CPU 는 §18-3 그대로 `ps -o time=` 델타. Mac이 바뀌면 권한 오류가 재현되는지 다시 확인한다.
 - **`Log.debug` / `Log.info` 는 `log show` 에 남지 않는다.** 앱을 띄우기 **전에**
   `xcrun simctl spawn <UDID> log stream --level debug --predicate 'subsystem == "kr.co.carve.leetaek"'`
   를 붙여야 보인다. `PKCanvasView` 생성 1회당 `com.apple.pencilkit` 의 `isGenerationToolEnabled` 가 **1줄** 찍힌다
   (단일 Canvas 실행에서 정확히 1줄로 확인 — rev.15 문서의 "3줄" 은 정정). 캔버스 생성 횟수는 이 줄 수로 센다.
-- **터치 주입은 불가하다.** MCP 시뮬레이터 제어는 `xcode-select` 가 CLT 를 가리켜 막혀 있고(S4 §20-4 와 같음),
-  호스트 쪽 도구(cliclick · Quartz)도 없다. 시스템 설정을 바꾸지 말고 **Debug 전용 실행 인자 시나리오**를 쓴다:
+- **터치 자동화는 경로에 따라 다르다.** Phase 2의 이전 Mac에서는 `xcode-select`가 CLT를 가리켜 시뮬레이터 제어가 막혔고 `touch_path`도 동작하지 않았다(S4 §20-4). 현재 macOS 27.2 / Xcode 27.0 Mac에서는 Device Hub가 열리고 `simctl` 목록 조회가 된다. F59에서 별도 iPadOS 18.6 simulator의 `손가락 필사 허용`을 켠 뒤 Device Hub 포인터 드래그가 저장되는 것은 확인했지만, 이 결과는 Apple Pencil 입력이나 일반 터치 자동화 성공을 뜻하지 않는다. 업데이트·CloudKit 표본이 든 simulator는 만지지 말고, 안전한 synthetic 표본과 Debug 전용 실행 인자 시나리오를 쓴다:
   `-ChapterLayoutAutoScroll`(11단계 스크롤) · `-ChapterLayoutAutoNext`(다음 장) · `-ChapterLayoutOverlay`(레이아웃 오버레이·HUD) ·
   `-SingleCanvas`(단일 Canvas 경로 강제 — Phase 3 flag `singleCanvasEnabled` 와 같은 효과, 기본은 단일 Canvas. 앱 안에서는 **설정 > 필사 캔버스** 토글, 키는 Domain `SingleCanvasFlag`).
 - **표시 진단 인자(Debug 전용, 주로 실기기).** `-CanvasDisplayProbe`(읽기 전용 상태·drawing 샘플링) · `-CanvasDisplayExperiments`(원격 실험 명령 수신) ·
