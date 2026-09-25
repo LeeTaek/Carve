@@ -1675,7 +1675,7 @@ xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configurat
 
 iPadOS 26.4·26.5 결과 bundle도 `Passed`, unexpected failure 0, `runtimeWarnings` 없음이다. 26.4 최종 로그·exit는 `ios26.4/retry.log`·`retry.exit`·`retry.xcresult`에 있다. 앞선 sandbox service 조회는 exit 66, service 접근 뒤 첫 빌드 호출은 기존 `full.xcresult` 경로 충돌(exit 64)로 테스트를 시작하지 못했다. 그 경로를 보존하고 최종 검증은 별도 `retry.xcresult`로 수행했다. 26.5 로그·exit·xcresult는 `ios26.5/full.log`·`full.exit`·`full.xcresult`다. 두 runtime의 테스트는 Xcode 27 CLI로 수행했고 ACC·iCloud 로그인·CloudKit 서버 변경은 없었다.
 
-초기 검증 시점에는 CUA가 호스트 Mac 잠금 상태를 반환해 Device Hub 스모크를 하지 못했다. 2026-09-24 잠금 해제 뒤 수행한 수동 확인은 아래 별도 기록에 있다. 이는 자동 CLI build/test와 별도다. ACC simulator/데이터를 사용하지 않았고, CloudKit 계정 로그인·필기 입력·의도적인 서버 상태 변경은 하지 않았다. 앱 시작 화면은 기존 iCloud 필사를 받고 있다고 표시했으므로 백그라운드 네트워크 읽기 여부는 검증하지 않았으며 이 결과를 CloudKit proof로 세지 않는다. Release Archive·배포 서명·TestFlight도 확인하지 않았다. 현재도 출시 판정은 **NO-GO**다: iOS 18 migration marker 의미와 live ownership proof, 로그인 상태 1.3.0 업데이트, iOS 17.0 직접 시험 및 배포 archive/TestFlight가 남아 있다.
+초기 검증 시점에는 CUA가 호스트 Mac 잠금 상태를 반환해 Device Hub 스모크를 하지 못했다. 2026-09-24 잠금 해제 뒤 수행한 수동 확인은 아래 별도 기록에 있다. 이는 자동 CLI build/test와 별도다. ACC simulator/데이터를 사용하지 않았고, CloudKit 계정 로그인·필기 입력·의도적인 서버 상태 변경은 하지 않았다. 앱 시작 화면은 기존 iCloud 필사를 받고 있다고 표시했으므로 백그라운드 네트워크 읽기 여부는 검증하지 않았으며 이 결과를 CloudKit proof로 세지 않는다. Release Archive·배포 서명·TestFlight도 확인하지 않았다. 당시 출시 판정은 **NO-GO**였다. 이후 Xcode 27 iPadOS 26.5 ACC sandbox clone에서 기존 private-store ownership proof를 통과했으며, 전체 현행 게이트와 제한은 이 절 뒤의 2026-09-25 기록을 따른다. iOS 18 migration marker·계정 왕복, 로그인 상태 1.3.0 업데이트, iOS 17.0 직접 시험, production CloudKit 및 배포 archive/TestFlight는 여전히 남아 있어 출시 판정은 **NO-GO**다.
 
 #### Device Hub 수동 UI smoke (2026-09-24, 자동 테스트와 별도)
 

@@ -13,7 +13,7 @@
 - 앱 메타데이터는 2.0.0 (build 1)이다. 서명 없는 Release 시뮬레이터 빌드와 전체 회귀 결과가 있지만 배포 Archive·TestFlight 검증은 남았다.
 - 파일 제외 없는 전체 회귀의 Xcode 26.3 기록은 비교용으로 유지한다. **Xcode 27.0 / macOS 27.2에서는 Tuist workspace iPad simulator Debug build와 iPadOS 17.5(998 통과·4 expected failure·6 skip), 18.6·26.2·26.4·26.5(각 999 통과·4 expected failure·5 skip), 27.0(998 통과·4 expected failure·6 skip) 전체 회귀가 통과했다.** 여섯 runtime 모두 총 1008건, unexpected failure 0이다. 17.5 전체 로그에는 임시 migration/store fixture의 SQLite unlink/open-FD 경고가 있으나 xcresult에는 failure/runtime warning이 없다. 최초 iPadOS 27.0 전체 실행에서 보인 SwiftData 네 실패는 새 `unknownDataStoreSchema` 오류를 확인된 1.0.x metadata shape에 한해 처리한 뒤 해결됐다. 첫 수정 후 전체 run의 SQLite fixture 잠금 한 건은 reader suite 31/31과 후속 전체 회귀에서 재현되지 않았다. 기존 F60 XCFramework `ProcessXCFramework` 실패도 workspace 빌드에서 재현되지 않았다. 2026-09-25에는 Xcode 27 iPadOS 26.5 ACC sandbox clone에서 기존 private-store ownership proof가 통과했다(20/20 record name hash 일치, pending 0, 동일 inventory 재조회); 이는 production CloudKit proof가 아니다. **출시 판정은 여전히 NO-GO**다. iOS 18 migration marker·로그인 상태 1.3.0 업데이트, iOS 17 ownership·iOS 17.0 직접 시험, 배포 Archive·TestFlight가 남았다. 312는 TCA 업데이트 당시의 **과거 기준선**이다.
 
-### 2026-09-24 기준 출시 상태
+### 2026-09-25 기준 출시 상태
 
 | 판정 | 현재 상태 | 다음 확인 |
 |---|---|---|
