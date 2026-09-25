@@ -1878,4 +1878,23 @@ Archive의 bundle/version은 `kr.co.carve.leetaek`, 2.0.0 (1)이고 서명 검�
 
 Device Hub에서 연결된 iPad mini (A17 Pro) iPadOS `27.2`를 확인했다. 설치된 `새기다`는 TestFlight `2.0.0 (220)`이며 TestFlight의 테스트 안내 화면이 표시됐다. 현재 Xcode 27 로컬 Archive는 `2.0.0 (1)` Apple Development 서명이고 별도 Development profile을 사용한다. TestFlight 안내의 `계속`을 누르지 않았고, 현재 설치 앱을 대체하거나 실행 상태에서 계정·필기·동기화를 조작하지 않았다. Home으로 돌아왔으며 Device Hub 화면 관찰은 자동 테스트가 아니다.
 
-따라서 물리 iPad에서 Xcode 27 후보 기능 스모크는 아직 수행하지 않았다. 현재 TestFlight 설치본을 Development 서명 후보로 덮어 설치하면 로컬 앱 컨테이너와 CloudKit 환경이 달라질 수 있다. 전용 물리 테스트 기기 또는 현재 TestFlight 설치본을 교체할지에 대한 명확한 사용자 결정을 받은 뒤 진행한다. TestFlight `2.0.0 (220)` 화면 관찰은 Xcode 27 `2.0.0 (1)` 후보 검증으로 세지 않는다.
+물리 iPad에서 Xcode 27 후보 기능 스모크는 아직 수행하지 않았다. 사용자는 TestFlight 설치본 교체를 승인했지만, 설치 전 서명·CloudKit 환경 사전 점검에서 별도 blocker가 확인됐다. TestFlight `2.0.0 (220)` 화면 관찰은 Xcode 27 후보 검증으로 세지 않는다.
+
+### 물리 iPad 후보 설치 사전 점검 후속 (2026-09-25)
+
+사용자의 TestFlight 설치본 교체 승인을 받은 뒤 `devicectl`로 기기를 읽기 전용 확인했다. 기기는 unlocked, Developer Mode enabled, iPadOS `27.2`이며 연결 transport는 `localNetwork`였다. 설치 앱은 `kr.co.carve.leetaek` `2.0.0 (220)`이었다. Release Archive의 Development profile에는 물리 iPad UDID가 포함돼 있었다. 그러나 Release 구성은 `iCloud.Carve.SwiftData.iCloud` 컨테이너 ID를 사용하고 signed app에서 `com.apple.developer.icloud-container-environment`가 빠져 있다. 따라서 실행 시 Development/Production CloudKit 환경을 이 산출물만으로 단정할 수 없어 Release Archive를 설치·실행하지 않았다.
+
+Production 컨테이너에 접근하지 않는 물리 UI 확인 가능성을 보기 위해 기존 설정을 바꾸지 않고 macOS 27.2 / Xcode 27.0 (27A266a) / Swift 6.4 / iPhoneOS 27.0 SDK에서 기본 Debug 구성을 generic iOS destination으로 빌드했다(시뮬레이터 runtime은 사용하지 않음). Debug 앱 Info.plist는 명시적으로 `iCloud.Carve.SwiftData.iCloud.dev`를 가리켰고, signed app에는 CloudKit service와 두 container ID가 있었으나 environment entitlement는 역시 없었다. Debug provisioning profile은 `get-task-allow=true`, Development·Production environment 허용, 해당 물리 iPad 포함으로 확인됐다. 전체 로그는 `/private/tmp/carve-x27-physical-debug-smoke-20260925/build.log`, 종료 코드는 `build.exit`이며 빌드는 exit 0이다.
+
+```bash
+xcodebuild build -workspace Carve.xcworkspace -scheme CarveApp -configuration Debug \
+  -destination 'generic/platform=iOS' \
+  -derivedDataPath /private/tmp/carve-x27-physical-debug-smoke-20260925/DerivedData
+# BUILD SUCCEEDED (exit 0)
+
+codesign --verify --deep --strict \
+  /private/tmp/carve-x27-physical-debug-smoke-20260925/DerivedData/Build/Products/Debug-iphoneos/CarveApp.app
+# CSSMERR_TP_NOT_TRUSTED (exit 1)
+```
+
+Debug 앱의 엄격한 서명 검증은 `CSSMERR_TP_NOT_TRUSTED`로 실패했고 상세 서명 표시에서 Authority를 확인할 수 없었다. 서명 검증 완화·우회, profile/identity 갱신, 서명 설정 변경은 하지 않았다. 따라서 승인된 교체는 실행하지 않았고 물리 iPad의 TestFlight 앱은 그대로 남아 있다. 앱을 설치·실행·로그인하지 않아 이 기기에서 앱 컨테이너와 CloudKit 상태 변경도 없었다. 물리 smoke 재개 조건은 기기에서 엄격한 검증을 통과하는 Xcode 27 서명 산출물과 실행 환경이 개발 CloudKit으로 한정됐다는 확인이다. 이 Debug 빌드는 Release 후보 smoke나 자동 테스트 결과로 세지 않는다.
