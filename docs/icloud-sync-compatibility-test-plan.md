@@ -1916,6 +1916,8 @@ xcrun devicectl device info apps \
 
 이는 Xcode Cloud 배포 파이프라인 자체의 실패가 아니다. build 220은 Xcode 26.6으로 생성된 기존 TestFlight 앱이고 Xcode 27 후보의 빌드·서명·수동 smoke를 증명하지 않는다. 앞서 실패한 `CSSMERR_TP_NOT_TRUSTED`는 로컬 Xcode 27 Debug 기기용 산출물의 서명 확인 결과이며 Xcode Cloud build 220과는 다른 산출물·실행 환경이다. 이번 Cloud report 조회 중 기기에 앱을 설치·실행하거나 CloudKit을 변경하지 않았다. 따라서 Xcode 27용 물리 후보 smoke는 계속 미실행이고, 로컬 Xcode 27 Development 산출물의 서명 신뢰 및 CloudKit environment blocker도 그대로다.
 
+후속으로 Xcode Cloud Report를 다시 열어도 build 220의 상태는 `Running (3days 22hr 5min)`이고 `TestFlight Internal Testing - iOS`는 `Running… / In Progress`였다. 이는 사용자가 확인한 TestFlight 배포나 기기 설치를 부정하는 실패 신호로 기록하지 않는다. Apple의 workflow reference는 각 workflow에서 임시 빌드 환경의 Xcode·macOS 버전을 선택하도록 설명한다. 따라서 Xcode Cloud→TestFlight 성공은 유효한 배포 이력이지만, 보고서상 Xcode `26.6` 결과를 Xcode `27.0` 후보 자격으로 대체할 수 없다. [Apple Xcode Cloud workflow reference](https://developer.apple.com/documentation/xcode/xcode-cloud-workflow-reference). 이번 상태 재확인도 읽기 전용이며 workflow 설정·빌드·TestFlight 상태를 변경하지 않았다.
+
 ### Xcode 27 디코드 실패 행 비덮어쓰기 focused 회귀 (2026-09-25)
 
 Genesis 1:10–12의 플랫폼별 PencilKit decode 차이와 직접 관련된 fail-safe를, ACC clone이 아닌 일반 iPadOS 26.5 simulator에서 확인했다. 이 suite는 synthetic 입력만 쓰고 CloudKit client를 사용하지 않는다. 첫 method-level `-only-testing` 호출은 종료 코드 0이었지만 Swift Testing의 실제 선택 결과가 **0 tests**여서 통과 근거에서 제외했다. 두 번째 suite-level filter는 결과 번들의 실제 수를 확인해 9/9로 기록했다.
@@ -1991,9 +1993,9 @@ xcrun simctl launch C72A6CC6-4E3C-4822-BED1-9D76F8542D6B kr.co.carve.pencilkitde
 
 ### 동일 22B payload의 `DrawingCodec.compose` focused 확인 (2026-09-25)
 
-위 raw PencilKit 검사와 앱 로그 사이를 좁히기 위해, 보존된 `verse-10.bin`을 읽는 임시 테스트 하나를 기존 `DrawingCodecTesting` suite에 추가해 Xcode 27 iPadOS 26.5 simulator에서 실행했다. 테스트는 입력 bytes를 쓰지 않고 `DrawingCodec.compose`가 `undecodableVerses`를 비우는지, 해당 row를 `activeRowIDs`에 유지하는지, 결과 drawing이 0 strokes인지 확인했다. **suite 13/13 통과, xcodebuild exit 0**이다. 임시 테스트 코드는 실행 직후 제거했고, 원본 테스트 파일 backup과 현재 파일의 차이가 없으며 저장소에 코드 변경을 남기지 않았다. 기존 `Carve-ACC-*` clone이나 CloudKit client를 사용하지 않았다.
+위 raw PencilKit 검사와 앱 로그 사이를 좁히기 위해, 보존된 `verse-10.bin`을 읽는 임시 테스트 하나를 기존 `DrawingCodecTesting` suite에 추가해 Xcode 27에서 iPadOS 17.5·18.6·26.5·27.0 simulator로 각각 실행했다. 각 목적지는 일반 iPad mini simulator였고 ACC/오프라인 migration clone을 쓰지 않았다. 테스트는 입력 bytes를 외부 저장소에 쓰지 않고 `DrawingCodec.compose`가 `undecodableVerses`를 비우는지, 해당 row를 `activeRowIDs`에 유지하는지, 결과 drawing이 0 strokes인지 확인했다. 네 runtime 모두 **각 13/13 통과, xcodebuild exit 0**이다. 임시 테스트 코드는 실행 직후 제거했고, 원본 테스트 파일 backup과 현재 파일의 차이가 없으며 저장소에 코드 변경을 남기지 않았다. CloudKit client를 호출하지 않았다.
 
-실행 환경은 macOS `27.2 (26B5086k)`, 기본 선택 Xcode `27.0 (27A266a)`, Swift `6.4 (6.4.0.34.1)`, Tuist `4.208.0`, iOS Simulator SDK `27.0`이며 대상은 iPad mini (A17 Pro) iPadOS `26.5 (23F77)`다. `xcode-select -p`, `xcodebuild -version`, `swift --version`, `mise x -- tuist version`, `xcrun simctl list runtimes`, `xcrun simctl list devices available`를 확인했다. Tuist version은 읽기 전용 확인도 `/private/tmp/carve-x27-compose-probe-20260925/state`의 임시 XDG 상태 경로로 실행했다.
+실행 환경은 macOS `27.2 (26B5086k)`, 기본 선택 Xcode `27.0 (27A266a)`, Swift `6.4 (6.4.0.34.1)`, Tuist `4.208.0`, iOS Simulator SDK `27.0`이다. 네 대상은 iPad mini (6th generation) iPadOS `17.5 (21F79)`, iPad mini (A17 Pro) iPadOS `18.6 (22G86)`, iPad mini (A17 Pro) iPadOS `26.5 (23F77)`, iPad mini (A17 Pro) iPadOS `27.0 (24A434)`다. `xcode-select -p`, `xcodebuild -version`, `swift --version`, `mise x -- tuist version`, `xcrun simctl list runtimes`, `xcrun simctl list devices available`를 확인했다. Tuist version은 읽기 전용 확인도 `/private/tmp/carve-x27-compose-probe-20260925/state`의 임시 XDG 상태 경로로 실행했다.
 
 ```bash
 XDG_STATE_HOME=/private/tmp/carve-x27-compose-probe-20260925/state \
@@ -2002,14 +2004,34 @@ mise x -- tuist generate --no-open
 # 권한 상승 실행, exit 0; tuist-generate-elevated.log / tuist-generate-elevated.exit
 
 xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configuration Debug \
+  -destination 'platform=iOS Simulator,id=0347221E-08F5-48C9-9F8E-6D7995C25D9F' \
+  -derivedDataPath /private/tmp/carve-x27-compose-probe-20260925/WorkspaceDerivedData \
+  -resultBundlePath /private/tmp/carve-x27-compose-probe-20260925/compose-22b-ios17.5.xcresult \
+  -parallel-testing-enabled NO -only-testing:CarveFeatureTest/DrawingCodecTesting
+# iPad mini (6th generation), iPadOS 17.5 (21F79): 13/13, exit 0
+
+xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configuration Debug \
+  -destination 'platform=iOS Simulator,id=7E95B700-3976-42D7-BF85-BCAF028B7605' \
+  -derivedDataPath /private/tmp/carve-x27-compose-probe-20260925/WorkspaceDerivedData \
+  -resultBundlePath /private/tmp/carve-x27-compose-probe-20260925/compose-22b-ios18.6.xcresult \
+  -parallel-testing-enabled NO -only-testing:CarveFeatureTest/DrawingCodecTesting
+# iPad mini (A17 Pro), iPadOS 18.6 (22G86): 13/13, exit 0
+
+xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configuration Debug \
   -destination 'platform=iOS Simulator,id=589A8DAB-2D5C-45FC-B76B-C4260FB87C67' \
   -derivedDataPath /private/tmp/carve-x27-compose-probe-20260925/WorkspaceDerivedData \
   -resultBundlePath /private/tmp/carve-x27-compose-probe-20260925/compose-22b-workspace.xcresult \
-  -parallel-testing-enabled NO \
-  -only-testing:CarveFeatureTest/DrawingCodecTesting
-# iPad mini (A17 Pro), iPadOS 26.5 (23F77): Swift Testing 13/13 통과, exit 0
+  -parallel-testing-enabled NO -only-testing:CarveFeatureTest/DrawingCodecTesting
+# iPad mini (A17 Pro), iPadOS 26.5 (23F77): 13/13, exit 0
+
+xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configuration Debug \
+  -destination 'platform=iOS Simulator,id=C72A6CC6-4E3C-4822-BED1-9D76F8542D6B' \
+  -derivedDataPath /private/tmp/carve-x27-compose-probe-20260925/WorkspaceDerivedData \
+  -resultBundlePath /private/tmp/carve-x27-compose-probe-20260925/compose-22b-ios27.0.xcresult \
+  -parallel-testing-enabled NO -only-testing:CarveFeatureTest/DrawingCodecTesting
+# iPad mini (A17 Pro), iPadOS 27.0 (24A434): 13/13, exit 0
 ```
 
 단독 `CarveFeature.xcodeproj`로 같은 suite를 먼저 실행한 시도는 `Dependencies`, `PerceptionCore`, `IssueReporting`, `ConcurrencyExtras`, `CustomDump`, `IdentifiedCollections` 모듈 해석 오류로 테스트 전 build 단계에서 중단됐다. 이를 test 실패로 세지 않았고, Tuist workspace 경로로 다시 실행했다. sandbox에서는 workspace listing 중 CoreSimulator/Xcode 사용자 로그 경로 접근이 막혀 exit 66이었으며 권한 상승 read-only `xcodebuild -list -workspace Carve.xcworkspace`는 exit 0으로 scheme을 확인했다. 전체 생성·실패 시도·성공 실행 로그와 exit 파일은 `/private/tmp/carve-x27-compose-probe-20260925/`에 보존했다.
 
-같은 22B payload가 iPadOS 26.5의 `PKDrawing(data:)`와 `DrawingCodec.compose` 양쪽에서 성공한다는 범위는 확인했지만, 최초 앱 경고가 발생한 시점에 SwiftData repository가 넘긴 `snapshot.lineData`가 이 보존 snapshot과 동일했는지는 보지 못했다. 앱 내부 합성 입력의 byte count/hash와 결과를 읽기 전용 clone 실행에서 관찰하기 전에는 최초 warning의 원인을 확정하거나 사용자 화면 영향을 닫지 않는다. 이 확인은 iOS 18 marker, iOS 17.0, Production CloudKit, Distribution 서명·TestFlight 게이트를 대체하지 않아 출시 판정은 계속 **NO-GO**다.
+동일 22B payload의 `PKDrawing(data:)`와 `DrawingCodec.compose`는 iPadOS 17.5·18.6·26.5·27.0에서 모두 성공했다. 최초 앱 경고가 발생한 시점에 SwiftData repository가 넘긴 `snapshot.lineData`가 이 보존 snapshot과 동일했는지는 보지 못했다. 앱 내부 합성 입력의 byte count/hash와 결과를 읽기 전용 clone 실행에서 관찰하기 전에는 최초 warning 원인을 확정하거나 사용자 화면 영향을 닫지 않는다. 이 확인은 iOS 18 marker, iOS 17.0 ownership proof, Production CloudKit, Distribution 서명·TestFlight 게이트를 대체하지 않아 출시 판정은 계속 **NO-GO**다.
