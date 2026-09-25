@@ -301,3 +301,17 @@ Xcode 27 계정 상태 갱신 후 물리 iPad 연결과 서명을 재확인했�
 - **최종 Xcode Cloud/TestFlight 후보와 물리 iPad 핵심 smoke: BLOCKED.** 기존 TestFlight 2.0.0 (220)은 Xcode 26.6 산출물이다. 확인된 Xcode Cloud 보고서에도 Xcode 27 후보는 없다. Xcode 27 Distribution·Production CloudKit environment 서명이 확인된 후보, Production schema 비교, TestFlight 후보의 필기·필사 저장·재실행·동기화 smoke는 미완료다. 로컬 Apple Distribution identity 부재를 Cloud 배포의 별도 차단 근거로 삼지 않았다.
 
 이번 직접 실기능 확인으로 소유 proof 차단이나 새 metadata 프로필을 해결하지 못했다. 새로 수행한 작업은 iOS 17.5 simulator 로그인 import 상태 관찰과 기록이며, 코드·dependency·CI·signing·build setting·Production schema는 변경하지 않았다. 앱은 계정이 로그인된 해당 simulator에 1.3.0 상태로 남아 있다. 사용자에게 이 Development 계정에 historical V3 표본이 있어야 하는지, 아니면 표본이 있는 다른 정확한 simulator/기기를 제공할 수 있는지 확인을 요청했다. 현재 전체 배포 판정은 **NO-GO**다.
+
+### Xcode Cloud 후보 실행 전 build number 확인 필요 (2026-09-25)
+
+확인된 기존 Cloud 보고서는 `DevelopBranch` build `220`, Xcode `26.6 (17F113)`, macOS `26.3 (25D125)`, 앱 `2.0.0 (220)`이다. Build/Test/Archive 완료 후 TestFlight internal testing 중인 상태였다. 보고서에 commit SHA, Cloud 서명 identity/profile, signed CloudKit container/environment 또는 Production schema inventory는 없어 검증되지 않았다. 현재 workflow의 Xcode selector와 automatic build increment도 확인되지 않았으며 저장소에는 workflow 설정 파일이 없다. 세부 보고서 UI를 읽기 위한 시도는 시간 초과로 완료되지 않았고 report export/log도 없다.
+
+저장소 pre-xcodebuild script는 `.last_version`이 없으면 current `MARKETING_VERSION=2.0.0`을 빈 값과 다른 새 버전으로 판정하고 `TARGET_BUILD_NUMBER=1`로 설정한 후 App Store Connect 조회를 생략한다. `.last_version`은 `.gitignore`에서 제외되고 `ci_post_clone.sh`에도 복구 로직이 없다. 따라서 Cloud workflow의 auto-increment가 보정하는지 모르는 현재 상태에서 build를 trigger하면 기존 220 뒤에 1을 업로드할 위험이 있다. 이 위험은 로컬 Apple Distribution certificate 부재와 별개다.
+
+현재 workflow의 Xcode 27 선택 여부와 자동 build number 증분·실제 pre-xcodebuild 로그를 read-only로 확인하기 전까지 push/trigger를 하지 않는다. 이 상태에서 최소 변경은 승인하지 않았고 CI/script, signing, build setting을 수정하지 않았다. command/script evidence 및 기존 report의 확인·미확인 항목은 [호환성 시험 계획의 Cloud build 220 audit](./icloud-sync-compatibility-test-plan.md#2026-09-25-xcode-cloud-build-220-및-후보-생성-경로-read-only-확인)에 있다.
+
+### Historical V3 snapshot 재사용 조건 및 pending-export 중단 권한 (2026-09-25)
+
+기존 historical 1.3.0 cloud-backed V3 보존 snapshot을 찾았다. 별도 `Carve-X27-ACC-Xcode27-LoginUpdate-20260925`의 Preservation 원본은 무결성 `ok`, drawing 20행·표시 대상 14행·CloudKit record metadata 20행이다. 이 snapshot의 private CloudKit identity와 사용자가 로그인한 iOS 17.5 target의 identity는 값을 노출하지 않은 내부 비교에서 달랐다. 현재 계정에 섞으면 안 되므로 복사·업로드하지 않았다. 정확히 같은 Development identity를 iOS 17.5 전용 target에서 사용하거나 다른 historical source를 지정해야 계정 소유·첫 로그인 분기를 시험할 수 있다. 경로와 read-only 검사 결과는 [시험 계획의 표본 identity 대조](./icloud-sync-compatibility-test-plan.md#2026-09-25-보존된-historical-v3-표본과-시험-계정-identity-대조)에 있다.
+
+사용자는 pending export 업데이트 재현을 위해 약 5분 Mac 전체 네트워크 중단을 승인했다. 다만 네트워크 변경은 수행하지 않았다. 읽기 전용 확인에서 기본 경로는 Wi-Fi였고, `sudo -n -l`은 관리자 암호를 요구했다. secure system authorization 또는 사용자의 수동 Wi-Fi 조작 없이 자동으로 끊었다 복구하는 권한은 현재 사용할 수 없다. 따라서 pending export/update는 아직 BLOCKED이며 비밀번호를 채팅으로 요청하지 않는다. 네트워크 복구·사용자 작업은 시험 sample과 권한 방식이 정해진 뒤 정확히 안내한다.

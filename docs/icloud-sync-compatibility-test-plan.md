@@ -2285,3 +2285,19 @@ destination은 iPad mini (A17 Pro), iPadOS `18.6 (22G86)`이며 Xcode 27.0의 iO
 이 세션에서 실제 historical V3 필기가 앱으로 들어오지 않았으므로 importer setup 성공을 필사 수신으로 세지 않는다. 실제 표본의 화면 표시, 좌표·내용, 앱 재실행 후 보존, 첫 로그인 업로드는 여전히 미검증이다. 이전 별도 계정 없는 synthetic V3 fixture에서 확인한 298-byte 보존 결과와도 다른 시험이다. 빈 저장소를 업데이트해 무유실 성공으로 잘못 판정하지 않도록 1.3.0 상태를 유지했다.
 
 현재 `LegacyRowLinkageReader.validatedOSMajors`는 `[26]`이며, iOS 18 표본에서 확인된 `PFCloudKitMetadataModelMigratorMigrationBeganCommitKey`의 의미도 미확인이다. 사용자는 지원 보장 유지와 근거가 마련될 때까지 NO-GO를 선택했다. OS/metadata allowlist나 쓰기 안전장치는 변경하지 않았다. 실제 V3 행이 없는 이 계정은 ownership proof blocker를 닫지 않으며, 필수 release gate는 계속 **NO-GO**다.
+
+## 2026-09-25 Xcode Cloud build 220 및 후보 생성 경로 read-only 확인
+
+기존 Xcode Cloud 보고서에서 확인 가능한 값은 workflow `DevelopBranch`, build `220`, Xcode `26.6 (17F113)`, macOS `26.3 (25D125)`, 앱 `2.0.0 (220)`이다. Build·Test·Archive는 완료됐고 당시 TestFlight internal testing은 진행 중이었다. 보고서에 소스 commit SHA, Cloud 서명 identity/profile, 해당 archive의 CloudKit container/environment, Production schema inventory는 남아 있지 않아 검증된 값으로 채우지 않았다. 현재 workflow의 Xcode selector와 자동 build number 증분 설정도 보고서에서 확인되지 않았다. 저장소에는 Xcode Cloud workflow 설정 파일이 없다.
+
+후보를 trigger하지 않고 `ci_scripts/ci_pre_xcodebuild.sh`, `.gitignore`, `ci_scripts/ci_post_clone.sh`를 읽기 전용으로 확인했다. `.last_version`은 ignore 대상이며 checkout에 없다. pre-xcodebuild script는 이 파일이 비었을 때 `MARKETING_VERSION=2.0.0`을 version change로 보고 `TARGET_BUILD_NUMBER=1`을 설정한 뒤 `RESET_VERSION_FLAG=true`로 App Store Connect 최신 build 조회를 건너뛴다. `ci_post_clone.sh`에는 `.last_version`을 복구하거나 초기화하는 코드가 없다. 따라서 Cloud workflow의 자동 증분 기능이 덮는지 확인하기 전에 trigger하면 이미 존재하는 TestFlight build 220 뒤에 build 1을 업로드하려고 할 위험을 배제할 수 없다.
+
+읽기 전용 점검에서는 push, build trigger, workflow·CI·signing 변경, TestFlight 배포를 하지 않았다. 현재 증거는 기존 Cloud report 요약과 repository script inspection뿐이며 Xcode Cloud detailed report를 내보낸 별도 로그는 없다. 현 설정에서 Xcode 27 후보를 안전하게 만들 수 있는지는 미확인이다. 최소 진행 조건은 workflow의 Xcode selector와 자동 증분 설정, 실제 pre-xcodebuild environment/log 및 ASC의 2.0.0 다음 build number를 확인하는 것이다. 현재 Apple Distribution identity 부재만으로 Cloud 배포를 차단 판정하지 않는다.
+
+## 2026-09-25 보존된 historical V3 표본과 시험 계정 identity 대조
+
+`Carve-X27-ACC-Xcode27-LoginUpdate-20260925` simulator의 기존 2.0.0 앱 컨테이너에 보존된 V3 snapshot을 읽기 전용으로 확인했다. snapshot은 `Library/Application Support/Preservation/Carve.dev.sqlite/raw/1790306211-394F9AD7/Carve.dev.sqlite`; `PRAGMA quick_check=ok`, V3 drawing 20행(그중 `ZISPRESENT=1` 14행), CloudKit record metadata 20행이며 외부 payload 디렉터리도 존재한다. 이 snapshot은 앞서 기록된 historical 1.3.0 CloudKit-backed 업데이트 표본의 보존본이며 현재 2.0.0 컨테이너에 있는 21행과 동일 자료가 아니다.
+
+사용자가 로그인한 iOS 17.5 target store와 snapshot의 `NSCloudKitMirroringDelegateCKIdentityRecordNameDefaultsKey`는 값을 출력하지 않고 내부에서만 비교했다. 두 키는 모두 있었지만 **같은 CloudKit identity가 아니었다**. 그래서 이 표본을 현재 target account로 복사·업로드하지 않았다. 현재 target 계정에서 1.3.0 앱은 import 뒤 0 drawing row였던 관측과도 일치한다. 화면·좌표·업데이트 보존을 이 20행으로 시험하려면 같은 V3 source identity에 연결된 Development 시험 계정이 정확한 iOS 17.5 simulator에서 필요하다. 값·토큰·계정 식별자는 출력하거나 문서에 저장하지 않았다.
+
+pending export update를 위해 사용자가 Mac 전체 연결을 약 5분 끊는 데 동의했다. 복구 준비용 read-only 조회에서 기본 route는 Wi-Fi `en0`였고 `USB 10/100/1000 LAN`·`iPad USB`에는 IP route가 없었다. `sudo -n -l`은 관리자 암호가 필요하다고 반환했다. networksetup·route 조회 외에는 어떤 네트워크 설정도 바꾸지 않았고, 이 환경에서는 아직 중단/자동복구를 시작할 수 없었다. 시험용 pending note가 준비되고 안전한 복구 경로가 확인되기 전에는 네트워크를 변경하지 않는다.
