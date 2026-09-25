@@ -1756,4 +1756,20 @@ xcrun simctl launch --terminate-running-process 9078BCF2-5F9C-40F9-A265-3F0600BC
 
 2.0.0 실행 후 SQLite `integrity_check=ok`, `BibleDrawing` 1행이었다. iOS 17.x→2.0 스키마 migration 열 `ZROWUUID`와 `ZLAYOUTMETADATADATA`가 생겼고, Genesis 1:1 `ZLINEDATA`는 298B이며 입력 snapshot과 SHA-256이 같았다. `Library/Application Support/Preservation/.../Carve.dev.sqlite` 원본 사본의 SHA-256도 입력 파일과 같아 보존 snapshot을 확인했다. 앱이 만든 metadata key는 다섯 개로 늘었고 새 키 `PFCloudKitMetadataModelMigratorMigrationBeganCommitKey`가 있었다. 이 private marker의 의미는 확인되지 않았으며 iOS 18 ownership 허용 근거로 쓰지 않는다. 앱 로그의 Core Data CloudKit setup은 `NSCocoaErrorDomain 134400` / `CKAccountStatusNoAccount`로 중단됐다. record metadata·pending 작업은 0, `StoreOwnership` marker는 없었다. 이는 이 합성 단일 행의 **로컬 migration·payload 보존 통과**만 뜻한다. 계정 proof·CloudKit import/export·서버 변경 여부는 시험하지 않았다.
 
-새 실행의 전체 로그와 exit는 `/private/tmp/carve-1.3.0-artifact-20260925.hYLOHD/` 아래 `generate-final.log`·`.exit`, `install.log`·`.exit`, `xcodebuild.log`·`.exit`, `install-2.0.log`·`.exit`, `launch-2.0.log`·`.exit`, `app-log-show.log`·`app-log-show.raw.log`·`app-log-show.exit`에 있다. 원본 simulator 로그는 mode 600이다. 입력 사본은 `legacy-before-update.sqlite`, 결과 앱 저장소 사본은 `post-update-support/`다. 전체 회귀를 새로 실행하지 않았다. Device Hub에서 새 계정 없는 simulator에 설치된 2.0.0 앱을 열어 Genesis 1장을 확인하고 1→2→1장 이동을 수동 확인했다. 다만 1장 복귀 화면 캡처에서는 Genesis 1:1 필사 영역에 획이 보이지 않아 SQLite의 298B payload 보존을 화면 표시 보존으로 승격하지 않는다. 2026-09-24 F59의 Xcode 26.3 앱에서는 같은 snapshot의 필기가 보였다는 기록과 결과가 다르지만, 앱 산출물·실행 조건이 달라 Xcode 27 원인으로 단정하지 않는다. 이 수동 화면 결과는 자동 CLI migration·회귀 결과와 분리한다. 따라서 iOS 18의 화면 보존·marker 의미·로그인 update·ownership proof, iOS 17 proof, production CloudKit 및 배포 Archive·서명·TestFlight는 계속 NO-GO 게이트다.
+새 실행의 초기 전체 로그와 exit는 `/private/tmp/carve-1.3.0-artifact-20260925.hYLOHD/` 아래에 기록됐으나 2026-09-25 후속 점검 시 이 임시 디렉터리는 이미 없어 원본 파일을 재열 수 없었다. 저장소에는 당시 exit·결과가 위 문단과 이 문서의 실행 기록에 보존돼 있다. 당시 Device Hub 최초 화면 관찰은 필사 획이 보이지 않는다고 기록했지만, 이것은 확대 전·일시 오버레이를 열린 화면의 관찰이었다.
+
+#### 2026-09-25 후속 read-only CanvasDisplayProbe 및 Device Hub 재확인
+
+기존 no-account 시뮬레이터 `Carve-X27-iOS18.6-V3-Offline-20260925`에서 앱에 `-CanvasDisplayProbe`만 전달해 읽기 전용 캔버스 상태를 다시 관찰했다. `-CanvasDisplayExperiments`는 전달하지 않았고, 필기 입력·절 메뉴·CloudKit write는 실행하지 않았다.
+
+```bash
+xcrun simctl launch --terminate-running-process --console \
+  9078BCF2-5F9C-40F9-A265-3F0600BC3A0D kr.co.carve.leetaek -CanvasDisplayProbe
+xcrun simctl terminate 9078BCF2-5F9C-40F9-A265-3F0600BC3A0D kr.co.carve.leetaek
+```
+
+probe 로그 `/private/tmp/carve-x27-v3-display-probe-20260925/probe-console.raw.log`와 launch/terminate 로그·exit 파일은 확인 시 존재했고 파일 mode는 600이었다. launch와 terminate는 각각 exit 0이다.
+
+첫 fetch 전 sample은 `expected=n0`, `canvas=n0`였고, fetch 완료 sample은 `expected=n1:(433.0, 145.0, 49.0, 4.0)`, `canvas=n1:(433.0, 145.0, 49.0, 4.0)`, `storeDiff=0`, `deliveredDiff=0`, `screenInk=(433.0, 287.0, 49.0, 4.0)`였다. 실제 canvas가 store의 한 획을 받아 동일 경계로 적용했고 화면 변환에서도 non-empty 영역을 보고했다. 기존 SQLite 행도 `drawingVersion=1`, payload 298B, 기존 SHA-256과 일치했다. Device Hub에서 일시 오버레이를 닫고 화면을 확대하자 Genesis 1:1 오른쪽 필사 영역에 작은 획이 보였다. 창세기 1→2→1 이동 뒤 확인한 이 수동 화면 관찰은 자동 CLI 테스트 결과와 구분한다.
+
+이에 따라 최초 “화면에 획이 보이지 않음” 관찰은 표시 결함 판정에서 철회한다. 이 한 개의 synthetic no-account iOS 18.6 표본에서 로컬 payload 보존, fetch 후 canvas 적용, 확대 화면 표시와 장 이동 뒤 표시를 확인했다. 이는 로그인 상태 1.3.0 업데이트, 좌표 기준 legacy 비교, iOS 18 migration marker 의미, ownership proof 또는 CloudKit 동기화 자격을 증명하지 않는다. iOS 18 marker 의미·계정 proof, 로그인 상태 1.3.0 업데이트, iOS 17 proof/직접 회귀, production CloudKit, Archive·배포 서명·TestFlight는 계속 NO-GO다.
