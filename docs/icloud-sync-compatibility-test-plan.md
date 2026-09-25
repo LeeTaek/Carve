@@ -2035,3 +2035,22 @@ xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configurat
 단독 `CarveFeature.xcodeproj`로 같은 suite를 먼저 실행한 시도는 `Dependencies`, `PerceptionCore`, `IssueReporting`, `ConcurrencyExtras`, `CustomDump`, `IdentifiedCollections` 모듈 해석 오류로 테스트 전 build 단계에서 중단됐다. 이를 test 실패로 세지 않았고, Tuist workspace 경로로 다시 실행했다. sandbox에서는 workspace listing 중 CoreSimulator/Xcode 사용자 로그 경로 접근이 막혀 exit 66이었으며 권한 상승 read-only `xcodebuild -list -workspace Carve.xcworkspace`는 exit 0으로 scheme을 확인했다. 전체 생성·실패 시도·성공 실행 로그와 exit 파일은 `/private/tmp/carve-x27-compose-probe-20260925/`에 보존했다.
 
 동일 22B payload의 `PKDrawing(data:)`와 `DrawingCodec.compose`는 iPadOS 17.5·18.6·26.5·27.0에서 모두 성공했다. 최초 앱 경고가 발생한 시점에 SwiftData repository가 넘긴 `snapshot.lineData`가 이 보존 snapshot과 동일했는지는 보지 못했다. 앱 내부 합성 입력의 byte count/hash와 결과를 읽기 전용 clone 실행에서 관찰하기 전에는 최초 warning 원인을 확정하거나 사용자 화면 영향을 닫지 않는다. 이 확인은 iOS 18 marker, iOS 17.0 ownership proof, Production CloudKit, Distribution 서명·TestFlight 게이트를 대체하지 않아 출시 판정은 계속 **NO-GO**다.
+
+### Genesis 1:31 synthetic row의 Development CloudKit 독립 inventory 시도 (2026-09-25)
+
+첫 로그인 synthetic 검증에서 업로드·peer 수신은 확인했지만 독립 Development server inventory와 row-name hash를 수집하지 못했다. 이를 읽기 전용 `cktool` query로 보완하려 했으나 두 번 모두 요청 전 로컬 keychain token 조회에서 멈췄다. 기존 ACC/Xcode iCloud 로그인만으로 `cktool` 사용자 token은 생성되지 않았다.
+
+```bash
+xcrun cktool query-records \
+  --team-id H4MSW7FUBB \
+  --container-id iCloud.Carve.SwiftData.iCloud.dev \
+  --environment development \
+  --database-type private \
+  --zone-name com.apple.coredata.cloudkit.zone \
+  --record-type CD_BibleDrawing \
+  --requested-fields ___recordID \
+  --limit 200
+# Error: Could not read token from keychain with status: -50
+```
+
+서버에 query가 도달하거나 레코드 응답을 받은 것이 아니다. CloudKit 데이터의 생성·수정·삭제는 없었다. 첫 결과는 `/private/tmp/carve-x27-cloudkit-31-inventory-20260925/remote-query.log`, 사용자 token 준비를 기다린 뒤 재시도한 결과는 `remote-query-after-token-request.log`와 `.exit`에 있다. token 확인 뒤 필요한 단계는 사용자가 CloudKit Console에서 같은 sandbox 계정의 User token을 만들고 `xcrun cktool save-token --type user --method keychain`의 terminal prompt에 직접 입력하는 것이다. token 원문은 chat·로그에 붙이지 않는다. 절차는 [Apple cktool guide](https://developer.apple.com/icloud/ck-tool/)에 있다. token이 저장되면 해당 Development private-zone query를 재개하며 Production database는 조회하지 않는다.
