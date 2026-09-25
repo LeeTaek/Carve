@@ -1898,3 +1898,29 @@ codesign --verify --deep --strict \
 ```
 
 Debug 앱의 엄격한 서명 검증은 `CSSMERR_TP_NOT_TRUSTED`로 실패했고 상세 서명 표시에서 Authority를 확인할 수 없었다. 서명 검증 완화·우회, profile/identity 갱신, 서명 설정 변경은 하지 않았다. 따라서 승인된 교체는 실행하지 않았고 물리 iPad의 TestFlight 앱은 그대로 남아 있다. 앱을 설치·실행·로그인하지 않아 이 기기에서 앱 컨테이너와 CloudKit 상태 변경도 없었다. 물리 smoke 재개 조건은 기기에서 엄격한 검증을 통과하는 Xcode 27 서명 산출물과 실행 환경이 개발 CloudKit으로 한정됐다는 확인이다. 이 Debug 빌드는 Release 후보 smoke나 자동 테스트 결과로 세지 않는다.
+
+### Xcode 27 디코드 실패 행 비덮어쓰기 focused 회귀 (2026-09-25)
+
+Genesis 1:10–12의 플랫폼별 PencilKit decode 차이와 직접 관련된 fail-safe를, ACC clone이 아닌 일반 iPadOS 26.5 simulator에서 확인했다. 이 suite는 synthetic 입력만 쓰고 CloudKit client를 사용하지 않는다. 첫 method-level `-only-testing` 호출은 종료 코드 0이었지만 Swift Testing의 실제 선택 결과가 **0 tests**여서 통과 근거에서 제외했다. 두 번째 suite-level filter는 결과 번들의 실제 수를 확인해 9/9로 기록했다.
+
+```bash
+xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configuration Debug \
+  -destination 'platform=iOS Simulator,id=589A8DAB-2D5C-45FC-B76B-C4260FB87C67' \
+  -derivedDataPath /private/tmp/carve-x27-undecodable-row-focus-20260925/DerivedData \
+  -resultBundlePath /private/tmp/carve-x27-undecodable-row-focus-20260925/UndecodableRow.xcresult \
+  -only-testing:CarveFeatureTest/SingleCanvasRollbackTesting/undecodableRowIsNotOverwritten \
+  -parallel-testing-enabled NO
+# exit 0, 실제 선택 0 tests — 무효 시도, 결과 bundle은 보존
+```
+
+```bash
+xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configuration Debug \
+  -destination 'platform=iOS Simulator,id=589A8DAB-2D5C-45FC-B76B-C4260FB87C67' \
+  -derivedDataPath /private/tmp/carve-x27-undecodable-row-focus-20260925/DerivedData \
+  -resultBundlePath /private/tmp/carve-x27-undecodable-row-focus-20260925/SingleCanvasRollbackSuite.xcresult \
+  -only-testing:CarveFeatureTest/SingleCanvasRollbackTesting \
+  -parallel-testing-enabled NO
+# iPad mini (A17 Pro), iPadOS 26.5 (23F77): 9 passed, 0 failed, 0 skipped (exit 0)
+```
+
+환경은 macOS 27.2, Xcode 27.0 (27A266a), Swift 6.4, Tuist 4.208.0이다. `xcresulttool get test-results summary`에서 `Passed`, 9 passed, failed/skip/expected failure 0, runtime warning 없음과 목적 simulator를 확인했다. 특히 `undecodableRowIsNotOverwritten`는 synthetic decode 실패 행을 활성 행에서 제외하고 다음 편집에 새 row를 만들어 원본 식별 행을 덮지 않는 테스트다. 전체 suite 로그와 종료 코드는 `suite.log`·`suite.exit`, 0건 시도의 로그·종료 코드는 `test.log`·`test.exit`이며 디렉터리는 `/private/tmp/carve-x27-undecodable-row-focus-20260925/`다. 계정 clone이나 CloudKit을 사용하지 않았다. 이 결과는 fail-safe 회귀만 입증하며 Genesis 1:10–12 실제 22B payload의 플랫폼별 decode 원인이나 표시·복구 결과를 설명하지 않는다.
