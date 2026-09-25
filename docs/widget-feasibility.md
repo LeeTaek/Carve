@@ -189,7 +189,7 @@ CarveApp[34696] [kr.co.carve.leetaek:WidgetSpike] WIDGET-0 openURL:
 
 ### 도구에서 막힌 것 (기록)
 
-- **SpringBoard 의 접근성 트리를 XcodeBuildMCP `snapshot_ui` 로 읽지 못했다.** 앱 안에서는 정상인데 홈 화면만 빈 트리로 돌아왔고, SpringBoard 재시작·기기 재부팅·`simctl erase` 로도 복구되지 않았다. **좌표 기반 입력**(iOS Simulator 제어 도구의 `tap` — device point)으로 우회해 위젯 추가를 끝냈다. AGENTS.md 의 "터치 주입은 불가하다"는 항목은 이 머신에서 **더 이상 사실이 아니다**(`xcode-select` 가 Xcode 26.3 을 가리킴). 다만 요소 기반 자동화는 홈 화면에서 신뢰할 수 없다.
+- **WIDGET-0 당시 SpringBoard 의 접근성 트리를 XcodeBuildMCP `snapshot_ui` 로 읽지 못했다.** 앱 안에서는 정상인데 홈 화면만 빈 트리로 돌아왔고, SpringBoard 재시작·기기 재부팅·`simctl erase` 로도 복구되지 않았다. **좌표 기반 입력**(iOS Simulator 제어 도구의 `tap` — device point)으로 우회해 위젯 추가를 끝냈다. 이 결과는 당시 Xcode 26.3을 선택한 Mac의 터치 주입 경로에 대한 관측이다. 현재 호스트는 2026-09-24 기준 macOS 27.2 / Xcode 27.0 / Device Hub이며 `simctl` 목록 조회가 가능하다([AGENTS.md 환경 스냅샷](../AGENTS.md)). Device Hub의 임의 탭·드래그 자동화는 별도로 검증하지 않았고, 요소 기반 자동화는 홈 화면에서 신뢰할 수 없다.
 - 위젯을 홈 화면에 올리는 CLI 는 없다. `simctl` 에 해당 명령이 없어 UI 조작이 필요하다.
 - **entitlement 파일을 바꾼 뒤에는 클린 빌드가 필요하다.** 스파이크를 되돌린 직후 같은 DerivedData 로 테스트를 돌리니 `Entitlements file "Carve.entitlements" was modified during the build, which is not supported` 로 빌드가 실패했다. `xcodebuild clean` 후 통과했다. WIDGET 이 App Group 을 추가할 때 같은 곳에서 막힐 수 있다 — 코드 문제로 오진하지 않는다.
 

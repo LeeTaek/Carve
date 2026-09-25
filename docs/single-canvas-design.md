@@ -1133,8 +1133,8 @@ D9 에서 이 시차를 결함으로 오독했습니다 (E-4). 경위는 런북 
 | 항목 | 값 |
 |---|---|
 | tuist | `PATH` 기본값(4.44.3)과 다르므로 반드시 `mise x -- tuist …` |
-| iPad 시뮬레이터 런타임 | iOS 26.2 하나뿐. iOS 17/18 iPad 런타임 없음 → "저사양 iOS 17 iPad" 리스크는 시뮬레이터로 보완 불가 |
-| 툴체인 | **Xcode 26.3 이 아니면 빌드되지 않음** — TCA 1.20.2 가 Swift 6.3.3 에서 컴파일 실패 (AGENTS.md) |
+| iPad 시뮬레이터 런타임 | **이 S0 측정 당시** iOS 26.2 하나뿐이었다. 이후 2026-09-24 별도 Mac에서 iOS 17.5·18.6·26.2·26.4·26.5·27.0 runtime을 확인했다. iPad mini (6th generation) iOS 17.5 전체 회귀는 legacy migration 수정 후 998 통과·0 실패·6 skip·4 expected failure로 통과했다. iOS 17.0 및 실기기 경로는 미검증 (현재 목록은 AGENTS.md) |
+| 툴체인 | **역사적 관측:** 당시 TCA 1.20.2 는 Swift 6.3.3 컴파일에 실패했다. TCA는 이후 1.26.2로 바뀌었다. Xcode 27.0 최초 generic-project F60은 XCFramework 서명 확인 단계에서 중단됐지만, Tuist workspace를 다시 생성한 후 Debug iPad simulator build와 여섯 runtime 전체 회귀가 통과해 그 실패는 재현되지 않았다. Xcode 26.3은 과거 전체 회귀 비교 기준으로만 보존한다. live CloudKit proof와 배포 Archive·TestFlight는 별도 미검증이다(AGENTS.md · 로드맵 §4 TECH-0) |
 
 ### 18-2. S0-2 — 테스트 기준선
 
@@ -1145,7 +1145,7 @@ rev.8 시점 **57/57** (DomainTest 31 · CarveFeatureTest 8 · CarveToolkitTest 
 **측정 방법 (재측정 시 그대로 반복)**
 
 ```
-메모리  /usr/bin/footprint <pid>   (vmmap 은 이 머신에서 권한 오류 — 같은 Physical footprint 지표. ps RSS 는 부적합)
+메모리  /usr/bin/footprint <pid>   (이 기록의 측정 Mac에서는 vmmap 권한 오류 — 같은 Physical footprint 지표. ps RSS 는 부적합; 다른 Mac에서는 다시 확인)
 CPU     ps -o time= 누적 CPU time 델타, 0.25 s 샘플링
 장 지정  simctl uninstall 로 컨테이너를 비운 뒤 설치 → defaults write … title -data <BibleChapter JSON hex> → 로그 "ChapterLayout 완성" 으로 확인
         (앱이 한 번 장을 바꾸면 Saved Application State 가 시드를 무시한다)
@@ -1308,7 +1308,7 @@ Debug 전용, 파일 단위 `#if DEBUG`. `Feature/CarveFeature/Sources/Debug/Can
 | `-CanvasScrollSpikeMode A` / `B` · `-CanvasScrollSpikeAuto` · `-CanvasScrollSpikeJump <pt>` | 모드 · 8개 시나리오 무인 · 지정 offset 정지 |
 | `-CanvasScrollSpikeLeftHanded` · `-CanvasScrollSpikeNarrow` · `-CanvasScrollSpikeAnyInput` · `-CanvasScrollSpikeNormalizeA` | 기준 4 · 3 · 정책 · A 정규화 |
 
-**환경 제약 2건 (고치지 않음):** 시뮬레이터 터치 주입 도구가 `xcode-select` 설정 때문에 사용 불가 — 해소하려면 `sudo xcode-select` 로 시스템 설정을 바꿔야 해서 하지 않았습니다 (fling · 탭/롱프레스 미검증) · `vmmap` 권한 오류 (A/B 상대 메모리 미측정). 결과는 §11.
+**이 실험 당시의 환경 제약 2건:** 당시 `xcode-select`가 가리킨 도구 때문에 시뮬레이터 터치 주입을 쓸 수 없어 시스템 설정을 바꾸지 않았다(fling · 탭/롱프레스 미검증) · 해당 Mac에서 `vmmap` 권한 오류가 나 A/B 상대 메모리를 측정하지 못했다. 이는 현재 Mac의 일반 제약으로 단정하지 않는다. 2026-09-24 현재 별도 Mac의 기본 Xcode는 27.0이고 `simctl` 목록 조회와 Device Hub 사용이 확인됐다. 실제 입력·메모리 측정 가능 여부는 기기와 명령별로 다시 검증한다. 결과는 §11.
 
 ### 20-5. `b68b6101` — Phase 1 V4 additive schema
 
