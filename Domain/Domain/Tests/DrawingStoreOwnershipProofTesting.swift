@@ -145,7 +145,7 @@ struct DrawingStoreOwnershipProofTesting {
         #expect(stored == accountA)
     }
 
-    @Test("실제 proof client는 무계정 V3 사본의 무결성과 정확한 메타데이터 모양 뒤에만 소유를 기록한다")
+    @Test("실제 proof client는 검증된 OS에서만 무계정 V3 소유를 기록한다")
     func productionClientClaimsVerifiedLegacySnapshot() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("ownership-v3-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -157,10 +157,8 @@ struct DrawingStoreOwnershipProofTesting {
             Issue.record("업데이트 전 V3 원시 사본이 만들어지지 않았다")
             return
         }
-        let reading = LegacyRowLinkageReader().judge(storeAt: storeURL)
-        #expect(reading.metadataValueProfileComplete)
-        #expect(reading.metadataNeedsMigration == false)
-        #expect(Set(reading.metadataKeys) == LegacyRowLinkageReader.unaccountedV3MetadataKeys)
+        let reader = LegacyRowLinkageReader()
+        let reading = reader.judge(storeAt: storeURL)
         let account = scope("_a")
         let ownershipArea = StoreOwnershipArea(root: root.appendingPathComponent("Owners", isDirectory: true), fileName: "owner.json")
         let client = CloudKitStoreOwnershipProofClient(
@@ -172,6 +170,16 @@ struct DrawingStoreOwnershipProofTesting {
             privateRecordLookup: NoStoreRecordLookup()
         )
 
+        guard reader.validatedOSMajors.contains(reader.osMajor) else {
+            #expect(reading.isUnknown)
+            #expect(await client.ownership(for: account) == nil)
+            #expect(await StoreOwnershipLedger(area: ownershipArea).read().isAbsent)
+            return
+        }
+
+        #expect(reading.metadataValueProfileComplete)
+        #expect(reading.metadataNeedsMigration == false)
+        #expect(Set(reading.metadataKeys) == LegacyRowLinkageReader.unaccountedV3MetadataKeys)
         #expect(await client.ownership(for: account) == account)
         guard case .owner(let recorded) = await StoreOwnershipLedger(area: ownershipArea).read() else {
             Issue.record("검증을 마친 소유 표식이 없다")

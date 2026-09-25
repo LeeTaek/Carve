@@ -154,6 +154,7 @@ enum LinkageFixture {
             throw FixtureError.open(String(cString: sqlite3_errmsg(handle)))
         }
         defer { sqlite3_close(db) }
+        sqlite3_busy_timeout(db, 5_000)
         var message: UnsafeMutablePointer<CChar>?
         guard sqlite3_exec(db, sql, nil, nil, &message) == SQLITE_OK else {
             let text = message.map { String(cString: $0) } ?? "?"
@@ -251,7 +252,11 @@ struct LegacyRowLinkageReaderTesting {
     @Test("실제 iOS 18 V3에서 새로 보인 migration marker 는 지원하지 않는 metadata 모양으로 남는다")
     func migrationMarkerIsRecordedAsUnrecognizedMetadata() throws {
         try withStore { url in
-            try LinkageFixture.exec(url, "INSERT INTO ANSCKMETADATAENTRY (Z_ENT, Z_OPT, ZBOOLVALUENUM, ZKEY) VALUES (17009, 1, 1, 'PFCloudKitMetadataModelMigratorMigrationBeganCommitKey');")
+            try LinkageFixture.exec(url, """
+                INSERT INTO ANSCKMETADATAENTRY
+                    (Z_ENT, Z_OPT, ZBOOLVALUENUM, ZKEY)
+                VALUES (17009, 1, 1, 'PFCloudKitMetadataModelMigratorMigrationBeganCommitKey');
+                """)
 
             let reading = reader.judge(storeAt: url)
 
