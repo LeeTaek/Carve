@@ -1736,3 +1736,24 @@ SIMCTL_CHILD_CARVE_CK_PROBE_LABEL=post-proof \
 ```
 
 두 launch는 exit 0이다. baseline·최종 JSON은 clone app container의 `tmp/carve-cloudkit-post-login-baseline.json` 및 `tmp/carve-cloudkit-post-proof.json`, 마지막 로그는 identifier 필드를 가린 `/private/tmp/carve-2.0.0-acc-proof-20260925/app-after-login.log`에 있다. 민감한 원본 로그는 같은 디렉터리의 `.private-raw.log`로 남아 파일 모드 600이다. 이 실행에서는 자동 회귀를 재실행하거나 Device Hub를 사용하지 않았다. Xcode 27 iPadOS 26.5 전체 회귀(999 passed · 4 expected failures · 5 skips · unexpected failure 0)는 별도 CLI 결과다. 이 성공은 iOS 26.5의 기존 store + ACC sandbox private CloudKit ownership 경로에 한정되며 iOS 18 marker, 로그인 상태 1.3.0 업데이트, iOS 17, production CloudKit, Archive·배포 서명·TestFlight를 통과시키지 않는다. 출시 판정은 **NO-GO** 유지다.
+
+### Xcode 27 iPadOS 18.6 1.3.0 → 2.0.0 계정 없는 V3 migration probe (2026-09-25)
+
+환경은 macOS `27.2 (26B5086k)`, 기본 Xcode `27.0 (27A266a)`, Swift `6.4 (swiftlang-6.4.0.34.1)`, 현재 checkout Tuist `4.208.0`이다. 대상은 새 iPad mini (A17 Pro) iOS 18.6 simulator `Carve-X27-iOS18.6-V3-Offline-20260925` (`9078BCF2-5F9C-40F9-A265-3F0600BC3A0D`)이며 ACC/F59 원본 simulator를 사용하지 않았다. 이 실행에서는 simulator에 iCloud 계정을 추가하지 않았다.
+
+정확한 1.3.0 소스 commit `49f2dc2791c632627257d28f33278d43e7df8cc9`에서 Tuist `4.39.0`으로 프로젝트를 생성했다. 고정된 29개 package pin을 임시 cache에 설치했고 `Tuist/Package.resolved` SHA-256은 전후 `e9c594efdef65c60c2002f6948764d14a8a76cc4076fb4a75156f401d6d4e628`로 같았다. Xcode 27로 historical 1.3.0 앱을 다시 빌드한 시도는 exit 65로 실패했다. Firebase·GoogleUtilities 계열 등의 iOS 12/13 및 SwiftSyntax 계열의 macOS 10.15 deployment target을 Xcode 27 SDK가 지원하는 최솟값(iOS 15/macOS 12)보다 낮다고 거절했다. 로그에 Swift compile task가 없어 자사 Swift 소스 컴파일 전 빌드 계획 단계에서 멈췄다. 의존성 버전이나 deployment target/build setting을 바꾸지 않았다. 시작 앱은 `Carve-2.0.0-test-legacy` (`0A956010-5DAA-44BC-BA22-5BAE53FF6D82`)에 이미 설치돼 있던 1.3.0(1) simulator bundle을 임시 디렉터리로 복사해 사용했고, 복사본의 `codesign --verify --deep --strict`는 통과했다. 따라서 이 과거 앱 bundle 자체를 Xcode 27에서 새로 빌드한 결과로 취급하지 않는다.
+
+재빌드 시도 명령은 다음과 같다. 사용한 2.0.0(1) 앱은 이전 Xcode 27 workspace build 산출물 `/private/tmp/carve-2.0.0-acc-proof-20260925/DerivedData/Build/Products/Debug-iphonesimulator/CarveApp.app`이며, 해당 `build.exit`는 0이다. 이 후보 앱의 소스는 이 probe 전후 바뀌지 않았다.
+
+```bash
+xcodebuild build -workspace Carve.xcworkspace -scheme CarveApp -configuration Debug \
+  -destination 'platform=iOS Simulator,id=7E95B700-3976-42D7-BF85-BCAF028B7605' \
+  -derivedDataPath /private/tmp/carve-1.3.0-artifact-20260925.hYLOHD/DerivedData
+xcrun simctl launch --terminate-running-process 9078BCF2-5F9C-40F9-A265-3F0600BC3A0D kr.co.carve.leetaek
+```
+
+입력은 F59에서 보존한 계정 없는 V3 synthetic 표본 `/private/tmp/carve-2.0-live-proof-20260924/legacy-ios18.6-pointer-sample-before-2.0.sqlite`의 별도 복사본이다. 원본 및 F59 simulator는 변경하지 않았다. 복사본은 무결성 `ok`, Genesis 1:1 한 행, `ZLINEDATA` 298B / SHA-256 `07876e8b1910039124914f5c44b9619a90b8ad488a08500bdfa6abc07762c3d6`, `ANSCKMETADATAENTRY` 네 개, `ANSCKRECORDMETADATA` 0행이었다. 해당 표본의 기존 1.3.0(1) 앱을 새 simulator에 설치하고 store를 심은 뒤 Xcode 27 빌드 2.0.0 앱을 같은 bundle ID로 설치·실행했다. install과 launch는 각각 exit 0이다.
+
+2.0.0 실행 후 SQLite `integrity_check=ok`, `BibleDrawing` 1행이었다. iOS 17.x→2.0 스키마 migration 열 `ZROWUUID`와 `ZLAYOUTMETADATADATA`가 생겼고, Genesis 1:1 `ZLINEDATA`는 298B이며 입력 snapshot과 SHA-256이 같았다. `Library/Application Support/Preservation/.../Carve.dev.sqlite` 원본 사본의 SHA-256도 입력 파일과 같아 보존 snapshot을 확인했다. 앱이 만든 metadata key는 다섯 개로 늘었고 새 키 `PFCloudKitMetadataModelMigratorMigrationBeganCommitKey`가 있었다. 이 private marker의 의미는 확인되지 않았으며 iOS 18 ownership 허용 근거로 쓰지 않는다. 앱 로그의 Core Data CloudKit setup은 `NSCocoaErrorDomain 134400` / `CKAccountStatusNoAccount`로 중단됐다. record metadata·pending 작업은 0, `StoreOwnership` marker는 없었다. 이는 이 합성 단일 행의 **로컬 migration·payload 보존 통과**만 뜻한다. 계정 proof·CloudKit import/export·서버 변경 여부는 시험하지 않았다.
+
+새 실행의 전체 로그와 exit는 `/private/tmp/carve-1.3.0-artifact-20260925.hYLOHD/` 아래 `generate-final.log`·`.exit`, `install.log`·`.exit`, `xcodebuild.log`·`.exit`, `install-2.0.log`·`.exit`, `launch-2.0.log`·`.exit`, `app-log-show.log`·`app-log-show.raw.log`·`app-log-show.exit`에 있다. 원본 simulator 로그는 mode 600이다. 입력 사본은 `legacy-before-update.sqlite`, 결과 앱 저장소 사본은 `post-update-support/`다. 전체 회귀를 새로 실행하지 않았다. Device Hub에서 새 계정 없는 simulator에 설치된 2.0.0 앱을 열어 Genesis 1장을 확인하고 1→2→1장 이동을 수동 확인했다. 다만 1장 복귀 화면 캡처에서는 Genesis 1:1 필사 영역에 획이 보이지 않아 SQLite의 298B payload 보존을 화면 표시 보존으로 승격하지 않는다. 2026-09-24 F59의 Xcode 26.3 앱에서는 같은 snapshot의 필기가 보였다는 기록과 결과가 다르지만, 앱 산출물·실행 조건이 달라 Xcode 27 원인으로 단정하지 않는다. 이 수동 화면 결과는 자동 CLI migration·회귀 결과와 분리한다. 따라서 iOS 18의 화면 보존·marker 의미·로그인 update·ownership proof, iOS 17 proof, production CloudKit 및 배포 Archive·서명·TestFlight는 계속 NO-GO 게이트다.
