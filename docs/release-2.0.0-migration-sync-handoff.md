@@ -14,6 +14,8 @@
 
 같은 날 Device Hub에서 물리 iPad mini (A17 Pro) iPadOS 27.2를 확인했다. 설치 앱은 TestFlight `2.0.0 (220)`이었다. 사용자는 교체를 승인했지만, 사전 점검에서 Release 구성의 signed app CloudKit environment가 불명확했고, 같은 소스의 Debug 기기 빌드는 `codesign --verify --deep --strict`에서 `CSSMERR_TP_NOT_TRUSTED`로 실패했다. 서명 검증 우회나 profile/설정 변경을 하지 않아 앱을 설치·실행하지 않았다. TestFlight 앱과 기기 데이터는 그대로이고 물리 후보 smoke는 미실행이다. 상세 명령·로그 및 blocker는 [호환성 시험 계획](./icloud-sync-compatibility-test-plan.md#물리-ipad-후보-설치-사전-점검-후속-2026-09-25)에 있다. Device Hub 관찰은 자동 테스트 결과에 포함하지 않는다.
 
+2026-09-25 Xcode 27의 Xcode Cloud Report Navigator에서 `DevelopBranch` build 220의 기존 결과를 읽기 전용으로 확인했다. 이 run은 Xcode `26.6 (17F113)` / macOS `26.3 (25D125)`이며 Build·Test·Archive는 완료, TestFlight Internal Testing 단계는 조회 시 `Running… / In Progress`로 표시됐다. 물리 기기에 실제 설치된 `2.0.0 (220)`은 사용자가 말한 기존 TestFlight 배포와 일치한다. 따라서 기존 Xcode Cloud 배포 성공과 로컬 Xcode 27 Debug 서명 오류는 별개다. 다만 build 220은 Xcode 27 검증이 아니며, 현재 Xcode Cloud 화면만으로 TestFlight 단계의 종료 상태도 확정하지 않는다. Xcode 27 후보의 배포 서명·Production entitlement·기기 smoke는 미완료다. 상세는 [호환성 시험 계획](./icloud-sync-compatibility-test-plan.md#xcode-cloud-testflight-build-220의-툴체인-확인-2026-09-25)에 있다.
+
 iOS 18.6에서 실제 1.3.0을 실행해 만든 V3 저장소는 기본 무계정 metadata 네 key 외에 `PFCloudKitMetadataModelMigratorMigrationBeganCommitKey`가 하나 더 있다. 값은 정수 boolean `true`였다. 이 private Core Data 키의 의미를 확인할 공개 근거가 없어, iOS 18을 안전하게 허용할 수 없다. 현재 정확한 key profile 규칙은 이 표본을 거절한다. `Carve-Ownership-iOS18-6`에는 계정 로그인을 하지 않았다.
 
 ## 코드 상태

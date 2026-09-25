@@ -1899,6 +1899,23 @@ codesign --verify --deep --strict \
 
 Debug 앱의 엄격한 서명 검증은 `CSSMERR_TP_NOT_TRUSTED`로 실패했고 상세 서명 표시에서 Authority를 확인할 수 없었다. 서명 검증 완화·우회, profile/identity 갱신, 서명 설정 변경은 하지 않았다. 따라서 승인된 교체는 실행하지 않았고 물리 iPad의 TestFlight 앱은 그대로 남아 있다. 앱을 설치·실행·로그인하지 않아 이 기기에서 앱 컨테이너와 CloudKit 상태 변경도 없었다. 물리 smoke 재개 조건은 기기에서 엄격한 검증을 통과하는 Xcode 27 서명 산출물과 실행 환경이 개발 CloudKit으로 한정됐다는 확인이다. 이 Debug 빌드는 Release 후보 smoke나 자동 테스트 결과로 세지 않는다.
 
+### Xcode Cloud TestFlight build 220의 툴체인 확인 (2026-09-25)
+
+사용자가 기존 Xcode Cloud→TestFlight 배포가 성공했다고 알려 주어 Xcode 27의 Report Navigator에서 기존 결과를 읽기 전용으로 확인했다. `DevelopBranch` workflow의 build `220`은 2026-09-21에 시작했고, Overview에 Xcode `26.6 (17F113)` 및 macOS Tahoe `26.3 (25D125)`가 표시됐다. Build, Test, Archive 작업은 완료로 표시됐으며 각각 30, 115, 30 issues 배지가 있었다. `TestFlight Internal Testing - iOS` 작업은 이 화면을 확인한 시점에 `Running… / In Progress`였다. 별도 `devicectl device info apps` 조회에서 물리 iPad mini (A17 Pro), iPadOS 27.2의 설치 앱이 `2.0.0 (220)`임을 확인했다. 사용자가 TestFlight 배포 성공을 확인했고 해당 빌드가 설치돼 있으나, Xcode Cloud Report의 작업 상태가 종료 상태는 아니어서 UI가 보여 준 실행 단계도 그대로 기록한다.
+
+```bash
+xcrun devicectl device info apps \
+  --device 00008130-000C24A60C92001C \
+  --bundle-id kr.co.carve.leetaek \
+  --json-output /private/tmp/carve-x27-testflight-cloud-check-20260925/device-apps.json \
+  --log-output /private/tmp/carve-x27-testflight-cloud-check-20260925/device-apps.log
+# exit 0; 새기다 2.0.0 (220)
+```
+
+일반 sandbox 호출은 CoreDeviceService 초기화 timeout으로 실패했고 위의 읽기 전용 조회는 권한 상승 후 exit 0으로 끝났다. JSON 결과와 진단 로그는 위 경로에 보존했다.
+
+이는 Xcode Cloud 배포 파이프라인 자체의 실패가 아니다. build 220은 Xcode 26.6으로 생성된 기존 TestFlight 앱이고 Xcode 27 후보의 빌드·서명·수동 smoke를 증명하지 않는다. 앞서 실패한 `CSSMERR_TP_NOT_TRUSTED`는 로컬 Xcode 27 Debug 기기용 산출물의 서명 확인 결과이며 Xcode Cloud build 220과는 다른 산출물·실행 환경이다. 이번 Cloud report 조회 중 기기에 앱을 설치·실행하거나 CloudKit을 변경하지 않았다. 따라서 Xcode 27용 물리 후보 smoke는 계속 미실행이고, 로컬 Xcode 27 Development 산출물의 서명 신뢰 및 CloudKit environment blocker도 그대로다.
+
 ### Xcode 27 디코드 실패 행 비덮어쓰기 focused 회귀 (2026-09-25)
 
 Genesis 1:10–12의 플랫폼별 PencilKit decode 차이와 직접 관련된 fail-safe를, ACC clone이 아닌 일반 iPadOS 26.5 simulator에서 확인했다. 이 suite는 synthetic 입력만 쓰고 CloudKit client를 사용하지 않는다. 첫 method-level `-only-testing` 호출은 종료 코드 0이었지만 Swift Testing의 실제 선택 결과가 **0 tests**여서 통과 근거에서 제외했다. 두 번째 suite-level filter는 결과 번들의 실제 수를 확인해 9/9로 기록했다.
