@@ -249,8 +249,8 @@ struct LegacyRowLinkageReaderTesting {
         }
     }
 
-    @Test("실제 iOS 18 V3에서 새로 보인 migration marker 는 지원하지 않는 metadata 모양으로 남는다")
-    func migrationMarkerIsRecordedAsUnrecognizedMetadata() throws {
+    @Test("관측된 migrator marker는 정확한 정수 boolean true 값만 제한 profile로 판독한다")
+    func migrationMarkerRequiresObservedValueShape() throws {
         try withStore { url in
             try LinkageFixture.exec(url, """
                 INSERT INTO ANSCKMETADATAENTRY
@@ -261,8 +261,37 @@ struct LegacyRowLinkageReaderTesting {
             let reading = reader.judge(storeAt: url)
 
             #expect(reading.unlinkedCount == 3)
+            #expect(reading.metadataValueProfileComplete)
+            #expect(reading.migrationBeganCommitMarker == true)
+            #expect(LegacyRowLinkageReader.observedUnaccountedV3MetadataProfiles.contains(Set(reading.metadataKeys)))
+            #expect(reading.metadataNeedsMigration == false)
+        }
+        try withStore { url in
+            try LinkageFixture.exec(url, """
+                INSERT INTO ANSCKMETADATAENTRY
+                    (Z_ENT, Z_OPT, ZBOOLVALUENUM, ZKEY)
+                VALUES (17009, 1, 0, 'PFCloudKitMetadataModelMigratorMigrationBeganCommitKey');
+                """)
+            let reading = reader.judge(storeAt: url)
             #expect(!reading.metadataValueProfileComplete)
-            #expect(!Set(reading.metadataKeys).isSubset(of: LegacyRowLinkageReader.unaccountedV3MetadataKeys))
+            #expect(reading.migrationBeganCommitMarker == nil)
+        }
+    }
+
+    @Test("동일한 strict V3 profile은 iPadOS 17·18에서도 판독하고 미검증 OS는 거절한다")
+    func supportedOSProfilesRemainStrict() throws {
+        try withStore { url in
+            for major in [17, 18] {
+                var osReader = reader
+                osReader.osMajor = major
+                let reading = osReader.judge(storeAt: url)
+                #expect(reading.unlinkedCount == 3)
+                #expect(reading.metadataValueProfileComplete)
+                #expect(reading.metadataNeedsMigration == false)
+            }
+            var unknownOS = reader
+            unknownOS.osMajor = 19
+            #expect(reason(unknownOS.judge(storeAt: url)) == .unvalidatedEnvironment(osMajor: 19))
         }
     }
 
@@ -347,7 +376,7 @@ struct LegacyRowLinkageReaderTesting {
     @Test("기본 검증 집합은 legacy 3종 전부다(v2, F51) — 장 전체 필기 · 즐겨찾기의 대응 없는 행도 「검증된 대응 없음」 으로 판정한다")
     func defaultValidatedSetCoversAllLegacyEntities() throws {
         #expect(LegacyRowLinkageReader().validatedEntities == Set(LegacyEntity.allCases))
-        #expect(LegacyRowLinkageReader.version == 4)
+        #expect(LegacyRowLinkageReader.version == 5)
         try withStore(page: true, favorite: true) { url in
             for pk in 1...3 { try LinkageFixture.link(url, entity: .bibleDrawing, primaryKey: Int64(pk)) }
             try LinkageFixture.addIdentityKeys(url)
@@ -392,27 +421,16 @@ extension LegacyRowLinkageReaderTesting {
         #expect(reading.verdict == .allLinked && !reading.mirroringAttached)
     }
 
-    @Test("검증하지 않은 iOS 17 주 버전이면 legacy 행이 있을 때 사설 표를 해석하기 전에 「알 수 없음」")
-    func unvalidatedOSIsUnknown() throws {
+    @Test("iPadOS 17·18의 엄격한 linked metadata profile을 읽고 미지 OS 19는 보류한다")
+    func supportedOSLinkedProfilesAreRead() throws {
         try withStore { url in
             for pk in 1...3 { try LinkageFixture.link(url, entity: .bibleDrawing, primaryKey: Int64(pk)) }
             try LinkageFixture.addIdentityKeys(url)
-            var elsewhere = reader
-            elsewhere.osMajor = 17
-
-            #expect(reason(elsewhere.judge(storeAt: url)) == .unvalidatedEnvironment(osMajor: 17))
-        }
-    }
-
-    @Test("iOS 18의 V3 migration 표식 의미가 미확인이라 보류하고 미지 OS 19도 보류한다")
-    func unverifiedOlderOSIsEvidenceBounded() throws {
-        try withStore { url in
-            for pk in 1...3 { try LinkageFixture.link(url, entity: .bibleDrawing, primaryKey: Int64(pk)) }
-            try LinkageFixture.addIdentityKeys(url)
-
-            var ios18 = reader
-            ios18.osMajor = 18
-            #expect(reason(ios18.judge(storeAt: url)) == .unvalidatedEnvironment(osMajor: 18))
+            for major in [17, 18] {
+                var osReader = reader
+                osReader.osMajor = major
+                #expect(osReader.judge(storeAt: url).verdict == .allLinked)
+            }
 
             var ios19 = reader
             ios19.osMajor = 19

@@ -2305,3 +2305,45 @@ Cloud 후보를 trigger하지 않고 현재 checkout과 build 220 commit의 `ci_
 현재 iOS 17.5 시험 기기의 계정은 사용자가 CloudKit `userToken`을 등록한 계정이다. 사용자가 다른 계정으로 바꿀지 물었으나, 이번 시험에서는 계정을 그대로 두는 것이 맞다고 판단했다. 보존된 20행 표본은 이미 계정 식별 metadata와 CloudKit 레코드 대응을 가진 linked store이므로, source identity로 계정을 바꿔도 무계정 V3 첫 로그인 시험이 되지 않고 등록된 token으로 서버 payload를 대조할 수도 없다. 대체 무계정 historical V3 위치는 아직 지정되지 않았다. 계정 변경이나 해당 linked 표본 사용은 하지 않았다.
 
 pending export update를 위해 사용자가 Mac 전체 연결을 약 5분 끊는 데 동의했다. 복구 준비용 read-only 조회에서 기본 route는 Wi-Fi `en0`였고 `USB 10/100/1000 LAN`·`iPad USB`에는 IP route가 없었다. `sudo -n -l`은 관리자 암호가 필요하다고 반환했다. networksetup·route 조회 외에는 어떤 네트워크 설정도 바꾸지 않았고, 이 환경에서는 아직 중단/자동복구를 시작할 수 없었다. 시험용 pending note가 준비되고 안전한 복구 경로가 확인되기 전에는 네트워크를 변경하지 않는다.
+
+## 2026-09-26 iPadOS 17·18 metadata profile 수정 및 18.6 local launch
+
+### 증거 범위와 표본
+
+이 항목은 기존 기록의 현재 상태 오인 방지를 위해 추가한다. 2026-09-25 보존 사본의 manifest는 `/private/tmp/carve-x27-ios18-marker-offline-20260925/original-app-data-pre-shutdown/Library/Application Support/Preservation/Carve.dev.sqlite/raw/1790300928-5DA2776C/Carve.dev.sqlite`이며 SHA-256 `8f5ae897cef55544b61d5dc458089313b4dacfca562113f92ec6defdb3ed70cf`, size 208896, externalReferences 0이다. 원본은 직접 열지 않고 사본에서만 읽었다. `integrity_check=ok`, V3 1 drawing row / payload 298 bytes, metadata 5개(기존 네 key와 `PFCloudKitMetadataModelMigratorMigrationBeganCommitKey`), `NeedsMetadataMigration=false`, record metadata 0, export/import operation 0이었다. marker 열은 SQLite integer boolean 1이다. manifest와 probe summary에 기록된 source OS 18.6 / no-account 조건 외에 marker가 migration 진행인지 완료인지 입증하는 전후 서버 대응은 없다. 이름과 true 값만으로 뜻을 정하지 않는다.
+
+`/private/tmp/carve-x27-ios18-marker-offline-20260925/probe-summary.txt`는 앞선 probe에서 source와 clone 모두 계정 없음, marker 1, 8개 CloudKit event 실패(no account), record metadata와 export/import operation 없음이라고 기록한다. 단, clone 실행이 source UDID를 대상으로 해 source event 수를 7→8로 바꾼 사고가 있었으므로 해당 clone은 독립 표본이 아니며 추가 source 변경 근거로 쓰지 않는다. 별도 보존 사본은 위 manifest로 파일/지문이 연결되며 event 수가 다를 수 있다. 문서가 언급하는 historical iOS 18.6 앱 bundle 파일은 이번 경로 조사에서 찾지 못했다. 따라서 이번 live local launch는 historical binary 실행이 아니라 보존된 V3 bytes로 만든 synthetic identity의 Xcode 27 `2.0.0 (1)` 앱 시험이다.
+
+### 구현과 좁은 CLI 회귀
+
+`LegacyRowLinkageReader`는 version 5로 올리고 strict metadata profile 두 종류(기존 V3와 정확히 추가 marker를 가진 관측 profile, linked profile의 대응 profile)를 둔다. marker는 metadata entry key 집합, 중복 여부, 예상된 SQLite boolean 열, 정수 `1`까지 정확히 일치해야 한다. 의미는 소유 proof에서 참조하지 않는다. reader OS 판독은 17·18·26만 허용하고 그 밖은 거절한다. first-login proof는 모든 local row가 완전한 unlinked V3, linked/account metadata와 record metadata가 없음, 보존/migration 값 정상, exact profile을 요구한다. 기존 로그인 proof는 local row/record metadata/record name 완전 대응, 중복·고아 없음, identity key 확인, 현재 `CKCurrentUserDefaultName` identity 일치와 모든 record name의 현재 private DB 조회 성공을 요구한다. 정상 pending upload/unsettled 상태 그 자체는 장기 차단으로 사용하지 않지만 서버에서 record가 아직 확인되지 않으면 통과하지 않는다. 로그인 사실만으로 행을 모두 소유 처리하지 않는다.
+
+기본 선택 환경은 macOS 27.2, Xcode 27.0 (`27A266a`), Swift 6.4, Tuist 4.208.0이다. Tuist는 `mise x -- tuist generate --no-open`으로 workspace를 생성했다. 자동 테스트는 iPad destination만 사용했다.
+
+```bash
+xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace \
+  -destination 'platform=iOS Simulator,name=Carve-X27-Ownership-Migration-iOS18.6-20260925,OS=18.6' \
+  -only-testing:DomainTest/LegacyRowLinkageReaderTesting \
+  -only-testing:DomainTest/DrawingStoreOwnershipProofTesting \
+  -only-testing:DomainTest/DrawingEditEnvironmentTesting \
+  -resultBundlePath /private/tmp/carve-x27-ownership-reader-v5-ios18.6-20260926-final.xcresult
+# 51 tests / 3 suites passed; log: /private/tmp/carve-x27-ownership-reader-v5-ios18.6-20260926-final.log
+
+xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace \
+  -destination 'platform=iOS Simulator,id=0347221E-08F5-48C9-9F8E-6D7995C25D9F' \
+  -only-testing:DomainTest/LegacyRowLinkageReaderTesting \
+  -only-testing:DomainTest/DrawingStoreOwnershipProofTesting \
+  -only-testing:DomainTest/DrawingEditEnvironmentTesting \
+  -resultBundlePath /private/tmp/carve-x27-ownership-reader-v5-ios17.5-20260926.xcresult
+# 51 tests / 3 suites passed; log: /private/tmp/carve-x27-ownership-reader-v5-ios17.5-20260926.log
+```
+
+두 simulator fixture test는 synthetic SQLite와 test double이므로 actual CloudKit ownership proof를 증명하지 않는다. 변경 네 Swift 파일의 SwiftLint는 exit 0이고 기존 `LegacyRowLinkageReader.swift` function body 156/150, type body 378/300 경고 두 개가 남았다. `git diff --check`는 통과했다. 기록된 Xcode 27 전체 회귀 결과를 반복 빌드로 대체하지 않았다.
+
+### 독립 iPadOS 18.6 no-account app launch
+
+독립 생성 기기는 `Carve-2.0.0-Ownership-iOS18.6-20260926`, UDID `A522DEEB-AA58-4ADF-B186-FB94E07C45AF`, iPad mini (A17 Pro), iPadOS 18.6이다. source preservation 사본을 복사한 시험 전용 seed는 충돌 없는 synthetic Revelation 22:21 row identity를 사용했고 payload bytes는 298B 그대로였다. 기기는 clone이 아니며 원본 앱 컨테이너를 공유하지 않는다. Dev build는 bundle `kr.co.carve.leetaek`, `2.0.0 (1)`이고 Debug configuration의 CloudKit container는 Development `iCloud.Carve.SwiftData.iCloud.dev`다. Production을 변경하지 않았다.
+
+기록 명령은 `xcrun simctl launch A522DEEB-AA58-4ADF-B186-FB94E07C45AF kr.co.carve.leetaek -UITestChapter '{"title":"66-22Revelation.txt","chapter":22}'`이다. 앱은 실제 실행됐다. 실행 직후 앱 컨테이너 저장소에서 read-only `PRAGMA integrity_check=ok`, ZBIBLEDRAWING row 1 (`chapter=22`, `verse=21`, `ZISPRESENT=1`, line data 298B), marker bool 1, record metadata/export/import operation 각 0을 확인했다. 앱 로그 `/private/tmp/carve-x27-ownership-v5-ios18.6-live-20260926/noaccount.log`에는 iCloud account unavailable이 기록됐다. 화면 `/private/tmp/carve-x27-ownership-v5-ios18.6-live-20260926/noaccount.png`는 필기 화면과 필기 텍스트를 보였지만 first-run guide와 AdMob dialog가 겹쳐 정확한 stroke 표시 증거로는 세지 않는다. CUA native UI 연결 timeout으로 이를 닫거나 로그인 화면으로 이동하지 못했다. 사용자가 직접 인증을 하기로 했으며 이 기록 시점까지 로그인, Development export, 독립 peer 수신은 미실행이다.
+
+따라서 코드·합성 fixture reader 회귀와 OS 18.6 local launch/저장소 보존은 확인했지만, iPadOS 18 사용자의 실제 로그인 proof, no-account V3 first-login upload, peer receive, 화면 좌표 비교, 계정 불일치/확인 불가의 live 경로는 검증 완료로 간주하지 않는다. 출시 gate는 계속 **NO-GO**다.

@@ -1,8 +1,10 @@
 # Carve 2.0.0 iCloud 동기화 인계
 
-작성: 2026-09-23 · 실험 기록 추가: 2026-09-25 · 당시 작업 브랜치: `codex/2-0-0-migration-sync-release` (현재 checkout은 별도 확인)
+작성: 2026-09-23 · 실험 기록 추가: 2026-09-26 · 당시 작업 브랜치: `codex/2-0-0-migration-sync-release` (현재 checkout은 별도 확인)
 
 ## 현재 판정
+
+2026-09-26 코드 상태: `LegacyRowLinkageReader.version == 5`, `validatedOSMajors == [17, 18, 26]`. 다음 본문의 2026-09-25 당시 `[26]` 및 iOS 18 fail-closed 문장은 역사적 상태다. 실제 관측된 추가 migrator metadata key는 정확한 profile variant와 정수 boolean `true` 형식으로만 받아들이며, key의 의미를 완료·진행으로 해석하지 않는다. 소유권은 계속 행 대응·현재 계정 identity·private CloudKit record 확인으로 판정한다. 좁은 reader/proof/environment suites는 iPadOS 17.5·18.6에서 각각 51/51 통과했다. 18.6의 독립 합성 V3 실행은 로컬 필기 payload와 marker 보존 및 계정 없는 상태에서 CloudKit 접근 불가 로그를 확인했으나 UI 표시 확인, 사용자 로그인, first-login export와 peer 수신은 아직 확인하지 못했다. 그러므로 현재 코드 수정만으로 출시 gate를 닫지 않으며 판정은 **NO-GO**다. 최신 시험 증거는 호환성 시험 계획의 2026-09-26 항목을 참조한다.
 
 출시 판정은 **NO-GO**다. production 저장소 소유 증명 공급자는 연결했고 증거가 맞지 않거나 읽히지 않으면 계속 fail-closed 한다. 현재 `LegacyRowLinkageReader.validatedOSMajors`는 `[26]`이다. **현행 주 검증·출시 후보 자격 확인 대상은 macOS 27.2 / Xcode 27.0이며, Device Hub는 기기 확인·수동 스모크에 사용한다.** Xcode 27에서 Tuist workspace Debug iPad simulator 빌드가 통과했고, iPadOS 17.5 전체 회귀는 **998 passed · 4 expected failures · 6 skips**, 18.6·26.2·26.4·26.5는 각각 **999 passed · 4 expected failures · 5 skips**, 27.0은 **998 passed · 4 expected failures · 6 skips**로 설치된 여섯 runtime 모두 총 1008건·예기치 않은 실패 0이다. 17.5 로그에는 임시 migration/store fixture 관련 SQLite 경고가 있으나 xcresult failure/runtime warning은 없고 정리 시점 원인은 미확정이다. 최초 F60의 XCFramework `ProcessXCFramework` 실패는 재현되지 않았다. iOS 27 SwiftData 네 실패는 새 `unknownDataStoreSchema` 오류를 확인된 1.0.x metadata shape에 한해 처리한 뒤 해결됐다. 첫 수정 후 전체 실행에서 reader fixture의 SQLite 잠금이 한 번 발생했으나 reader suite 단독 31/31과 후속 전체 회귀에서 재현되지 않았다. 개별 `-project CarveApp` 명령의 SwiftPM 모듈 의존성 오류와 읽기 전용 artifact 서명 이상은 확인했으나 서로의 인과관계는 미확정이다. Device Hub에서 새 iPadOS 27.0 simulator의 창세기 1장 reader 표시와 1장→2장→1장 수동 이동을 확인했지만, 앱 시작 때 iCloud 필사 수신 대기 상태를 표시했으므로 CloudKit 검증으로 세지 않는다. Xcode 26.3 결과는 비교 기준으로 보존하며 Xcode 27 검증으로 대신하지 않는다. iOS 19~25 runtime은 현재 목록에 없다.
 

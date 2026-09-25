@@ -127,9 +127,10 @@ enum StoreOwnershipClaimRule {
             && reading.localModelRowCount == rows.count && reading.recordMetadataCount == 0
             && reading.mirroringAttached && !reading.hasAccountIdentityKeys
             && reading.metadataEntryCount == reading.metadataKeyCount
-            && reading.metadataKeyCount == LegacyRowLinkageReader.unaccountedV3MetadataKeys.count
             && reading.duplicateMetadataKeyCount == 0
-            && Set(reading.metadataKeys) == LegacyRowLinkageReader.unaccountedV3MetadataKeys
+            && LegacyRowLinkageReader.observedUnaccountedV3MetadataProfiles.contains(Set(reading.metadataKeys))
+            && reading.metadataKeyCount == reading.metadataKeys.count
+            && reading.migrationBeganCommitMarker == (Set(reading.metadataKeys).contains(LegacyRowLinkageReader.migrationBeganCommitKey) ? Optional(true) : nil)
             && reading.metadataValueProfileComplete && reading.metadataNeedsMigration == false
     }
 
@@ -146,12 +147,13 @@ enum StoreOwnershipClaimRule {
             && reading.recordMetadataCount == reading.mirroredRecordNames.count
             && Set(reading.mirroredRecordNames).count == reading.mirroredRecordNames.count
             && reading.linkedCount == reading.rows.count
-            && !reading.mirroredRecordNames.isEmpty && reading.missingRecordNameCount == 0 && reading.unsettledRecordCount == 0
-            && reading.needsUploadCount == 0 && reading.orphanCorrespondenceCount == 0 && reading.hasAccountIdentityKeys
+            && !reading.mirroredRecordNames.isEmpty && reading.missingRecordNameCount == 0
+            && reading.orphanCorrespondenceCount == 0 && reading.hasAccountIdentityKeys
             && reading.metadataEntryCount == reading.metadataKeyCount && reading.duplicateMetadataKeyCount == 0
             && reading.metadataValueProfileComplete && reading.metadataNeedsMigration == false && reading.metadataIdentityChecked == true
-            && reading.metadataKeyCount == LegacyRowLinkageReader.linkedPrivateStoreMetadataKeys.count
-            && Set(reading.metadataKeys) == LegacyRowLinkageReader.linkedPrivateStoreMetadataKeys
+            && LegacyRowLinkageReader.observedLinkedPrivateMetadataProfiles.contains(Set(reading.metadataKeys))
+            && reading.metadataKeyCount == reading.metadataKeys.count
+            && reading.migrationBeganCommitMarker == (Set(reading.metadataKeys).contains(LegacyRowLinkageReader.migrationBeganCommitKey) ? Optional(true) : nil)
             && reading.metadataKeys.filter { $0 == "NSCloudKitMirroringDelegateCKIdentityRecordNameDefaultsKey" }.count == 1
     }
 }

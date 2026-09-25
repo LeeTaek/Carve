@@ -133,6 +133,7 @@ public struct LegacyRowLinkageReading: Equatable, Sendable {
     public var metadataNeedsMigration: Bool?
     /// 저장소가 현재 iCloud identity 를 확인했는지. 결측·중복·형식 오류면 nil.
     public var metadataIdentityChecked: Bool?
+    public var migrationBeganCommitMarker: Bool?
     /// 대응은 있지만 아직 올리지 않은 행 수(`ZNEEDSUPLOAD`).
     public var needsUploadCount: Int
     /// 행은 없는데 대응만 남은 항목 수(F37 의 고아). 판정을 바꾸지 않고 기록만 한다.
@@ -166,7 +167,8 @@ public struct LegacyRowLinkageReading: Equatable, Sendable {
         duplicateMetadataKeyCount: Int = 0,
         metadataValueProfileComplete: Bool = false,
         metadataNeedsMigration: Bool? = nil,
-        metadataIdentityChecked: Bool? = nil
+        metadataIdentityChecked: Bool? = nil,
+        migrationBeganCommitMarker: Bool? = nil
     ) {
         self.verdict = verdict
         self.readerVersion = readerVersion
@@ -188,6 +190,7 @@ public struct LegacyRowLinkageReading: Equatable, Sendable {
         self.metadataValueProfileComplete = metadataValueProfileComplete
         self.metadataNeedsMigration = metadataNeedsMigration
         self.metadataIdentityChecked = metadataIdentityChecked
+        self.migrationBeganCommitMarker = migrationBeganCommitMarker
     }
 
     public var linkedCount: Int { rows.values.filter { $0 == .linked }.count }
@@ -221,13 +224,12 @@ public struct LegacyRowLinkageReader: Sendable {
     /// 판독기 자체의 버전. 읽는 표 · 열 · 규칙 · 검증 범위가 바뀌면 올린다.
     /// v2(2026-09-22): 검증 엔티티에 `BiblePageDrawing` · `FavoriteVerse` 를 더했다(테스트 계획 F51).
     /// v3(2026-09-23): 제한 metadata profile 을 추가했다.
-    /// v4(2026-09-23): 검증 OS 를 26으로 되돌리고 metadata key · 값 형식을 모두 확인한다.
-    public static let version = 4
+    /// v5(2026-09-26): iPadOS 17·18의 확인된 V3 metadata profile과 18.6 migrator marker 형식을 판독한다.
+    public static let version = 5
 
-    /// 사설 미러링 표를 판독한 OS 주 버전. iOS 18.6의 실제 1.3.0 V3 저장소에 의미가 확인되지 않은
-    /// `PFCloudKitMetadataModelMigratorMigrationBeganCommitKey`가 나타나, 18 판독 허용은 보류한다.
-    /// iOS 17 런타임은 없고 19~25도 검증하지 않았다.
-    public var validatedOSMajors: Set<Int> = [26]
+    /// private mirror schema/profile을 확인한 OS 주 버전. 17·18은 strict metadata, account/record/pending proof를 모두 거친다.
+    /// 19~25는 검사하지 않았다.
+    public var validatedOSMajors: Set<Int> = [17, 18, 26]
     /// 판독기를 검증한 저장소 스키마 주 버전 — 1.3.0 의 V3(마이그레이션 전)와 현재 V6(마이그레이션 뒤). SEP-1 F39.
     public var validatedSchemaMajors: Set<Int> = [3, 6]
     /// `ZENTITYID = Z_ENT` 를 **실제 미러링 저장소에서 관측한** 엔티티. 관측이 없는 엔티티에 행 · 대응이 있으면 「알 수 없음」 이다.
@@ -245,6 +247,11 @@ public struct LegacyRowLinkageReader: Sendable {
         "PFCloudKitMetadataNeedsMetadataMigrationKey"
     ]
 
+    /// iPadOS 18.6 실 V3 표본과 2.0 migration 전후 사본에서 관측했다.
+    /// 이 private key의 의미는 미확정이다. 완료 표식으로 해석하지 않으며, 구조적으로 정확한 값만
+    /// 별도 metadata profile로 인정한다. 소유권은 계속 V3 무대응 행 또는 linked-store의 계정·서버 proof로 판정한다.
+    static let migrationBeganCommitKey = "PFCloudKitMetadataModelMigratorMigrationBeganCommitKey"
+
     /// 현재 private CloudKit 저장소에서 실제 관측한 metadata key 집합(iOS 26.2).
     /// 미지 키, 누락, 중복 또는 미완료 Core Data metadata migration 은 소유 증명에 쓰지 않는다.
     static let linkedPrivateStoreMetadataKeys: Set<String> = unaccountedV3MetadataKeys.union([
@@ -253,11 +260,21 @@ public struct LegacyRowLinkageReader: Sendable {
         "NSCloudKitMirroringDelegateLastHistoryTokenKey"
     ])
 
+    static let observedUnaccountedV3MetadataProfiles = [
+        unaccountedV3MetadataKeys,
+        unaccountedV3MetadataKeys.union([migrationBeganCommitKey])
+    ]
+    static let observedLinkedPrivateMetadataProfiles = [
+        linkedPrivateStoreMetadataKeys,
+        linkedPrivateStoreMetadataKeys.union([migrationBeganCommitKey])
+    ]
+
     private static let metadataValueColumnByKey: [String: Int32] = [
         "PFCloudKitMetadataClientVersionHashesKey": 5,       // ZTRANSFORMEDVALUE
         "PFCloudKitMetadataFrameworkVersionKey": 2,          // ZINTEGERVALUE
         "PFCloudKitMetadataModelVersionHashesKey": 5,        // ZTRANSFORMEDVALUE
         "PFCloudKitMetadataNeedsMetadataMigrationKey": 1,    // ZBOOLVALUENUM
+        migrationBeganCommitKey: 1,                           // SQLite integer boolean; only observed true is structurally accepted
         "NSCloudKitMirroringDelegateCKIdentityRecordNameDefaultsKey": 4, // ZSTRINGVALUE
         "NSCloudKitMirroringDelegateCheckedCKIdentityDefaultsKey": 1,    // ZBOOLVALUENUM
         "NSCloudKitMirroringDelegateLastHistoryTokenKey": 5             // ZTRANSFORMEDVALUE
@@ -427,7 +444,8 @@ public struct LegacyRowLinkageReader: Sendable {
                 duplicateMetadataKeyCount: keys.count - Set(keys).count,
                 metadataValueProfileComplete: metadataProfile.isComplete,
                 metadataNeedsMigration: metadataProfile.needsMigration,
-                metadataIdentityChecked: metadataProfile.identityChecked
+                metadataIdentityChecked: metadataProfile.identityChecked,
+                migrationBeganCommitMarker: metadataProfile.migrationBeganCommitMarker
             )
         }
         // 행이 있으면 사설 표를 해석해야 한다 — 판독기를 검증한 OS 에서만(범위 밖은 「알 수 없음」).
@@ -510,7 +528,8 @@ public struct LegacyRowLinkageReader: Sendable {
             duplicateMetadataKeyCount: keys.count - Set(keys).count,
             metadataValueProfileComplete: metadataProfile.isComplete,
             metadataNeedsMigration: metadataProfile.needsMigration,
-            metadataIdentityChecked: metadataProfile.identityChecked
+            metadataIdentityChecked: metadataProfile.identityChecked,
+            migrationBeganCommitMarker: metadataProfile.migrationBeganCommitMarker
         )
     }
 
@@ -523,6 +542,7 @@ public struct LegacyRowLinkageReader: Sendable {
         var isComplete = false
         var needsMigration: Bool?
         var identityChecked: Bool?
+        var migrationBeganCommitMarker: Bool?
     }
 
     /// 값 원문은 읽지 않고, 각 key 에 값이 예상된 열에 정확히 하나 있는지만 확인한다.
@@ -531,6 +551,7 @@ public struct LegacyRowLinkageReader: Sendable {
         var seen: Set<String> = []
         var needsMigration: Bool?
         var identityChecked: Bool?
+        var migrationBeganCommitMarker: Bool?
         try sql.rows(
             "SELECT ZKEY, ZBOOLVALUENUM, ZINTEGERVALUE, ZDATEVALUE, ZSTRINGVALUE, ZTRANSFORMEDVALUE FROM ANSCKMETADATAENTRY",
             table: "ANSCKMETADATAENTRY"
@@ -549,6 +570,11 @@ public struct LegacyRowLinkageReader: Sendable {
                 guard value == 0 || value == 1 else { complete = false; return }
                 if key == "PFCloudKitMetadataNeedsMetadataMigrationKey" { needsMigration = value == 1 }
                 if key == "NSCloudKitMirroringDelegateCheckedCKIdentityDefaultsKey" { identityChecked = value == 1 }
+                if key == Self.migrationBeganCommitKey {
+                    // 의미는 해석하지 않는다. 관측된 자료형·값(true)만 허용하고 false/다른 값은 보류한다.
+                    guard value == 1 else { complete = false; return }
+                    migrationBeganCommitMarker = true
+                }
             case 2:
                 guard sqlite3_column_type(statement, expectedColumn) == SQLITE_INTEGER,
                       sqlite3_column_int64(statement, expectedColumn) > 0 else { complete = false; return }
@@ -562,7 +588,10 @@ public struct LegacyRowLinkageReader: Sendable {
                 complete = false
             }
         }
-        return MetadataValueProfile(isComplete: complete, needsMigration: needsMigration, identityChecked: identityChecked)
+        return MetadataValueProfile(
+            isComplete: complete, needsMigration: needsMigration, identityChecked: identityChecked,
+            migrationBeganCommitMarker: migrationBeganCommitMarker
+        )
     }
 
     private struct Correspondence {

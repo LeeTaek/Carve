@@ -86,7 +86,9 @@ struct DrawingStoreOwnershipProofTesting {
         migratorMarker.metadataKeys.append("PFCloudKitMetadataModelMigratorMigrationBeganCommitKey")
         migratorMarker.metadataKeyCount += 1
         migratorMarker.metadataEntryCount += 1
-        migratorMarker.metadataValueProfileComplete = false
+        migratorMarker.migrationBeganCommitMarker = true
+        #expect(StoreOwnershipClaimRule.firstLoginLegacyV3(migratorMarker))
+        migratorMarker.migrationBeganCommitMarker = false
         #expect(!StoreOwnershipClaimRule.firstLoginLegacyV3(migratorMarker))
 
         var migrating = unlinkedV3()
@@ -97,16 +99,19 @@ struct DrawingStoreOwnershipProofTesting {
     @Test("기존 로그인 저장소는 현재 계정과의 미러링 일치와 서버 레코드 확인을 모두 요구한다")
     func existingStoreRequiresCloudProof() {
         let reading = linkedStore()
-        let supportedOS: Set<Int> = [26]
+        let supportedOS: Set<Int> = [17, 18, 26]
         #expect(StoreOwnershipClaimRule.existingPrivateStore(reading, osMajor: 26, validatedOSMajors: supportedOS, identityMatches: true, allRecordsExist: true))
-        #expect(!StoreOwnershipClaimRule.existingPrivateStore(reading, osMajor: 18, validatedOSMajors: supportedOS, identityMatches: true, allRecordsExist: true))
+        #expect(StoreOwnershipClaimRule.existingPrivateStore(reading, osMajor: 17, validatedOSMajors: supportedOS, identityMatches: true, allRecordsExist: true))
+        #expect(StoreOwnershipClaimRule.existingPrivateStore(reading, osMajor: 18, validatedOSMajors: supportedOS, identityMatches: true, allRecordsExist: true))
+        #expect(!StoreOwnershipClaimRule.existingPrivateStore(reading, osMajor: 19, validatedOSMajors: supportedOS, identityMatches: true, allRecordsExist: true))
         #expect(!StoreOwnershipClaimRule.existingPrivateStore(reading, osMajor: 26, validatedOSMajors: supportedOS, identityMatches: false, allRecordsExist: true))
         #expect(!StoreOwnershipClaimRule.existingPrivateStore(reading, osMajor: 26, validatedOSMajors: supportedOS, identityMatches: true, allRecordsExist: false))
 
         var pending = reading
         pending.needsUploadCount = 1
         pending.unsettledRecordCount = 1
-        #expect(!StoreOwnershipClaimRule.existingPrivateStore(pending, osMajor: 26, validatedOSMajors: supportedOS, identityMatches: true, allRecordsExist: true))
+        #expect(StoreOwnershipClaimRule.existingPrivateStore(pending, osMajor: 26, validatedOSMajors: supportedOS, identityMatches: true, allRecordsExist: true))
+        #expect(!StoreOwnershipClaimRule.existingPrivateStore(pending, osMajor: 26, validatedOSMajors: supportedOS, identityMatches: true, allRecordsExist: false))
 
         var incompleteMetadata = reading
         incompleteMetadata.metadataEntryCount += 1
@@ -116,8 +121,10 @@ struct DrawingStoreOwnershipProofTesting {
         migratorMarker.metadataKeys.append("PFCloudKitMetadataModelMigratorMigrationBeganCommitKey")
         migratorMarker.metadataKeyCount += 1
         migratorMarker.metadataEntryCount += 1
-        migratorMarker.metadataValueProfileComplete = false
-        #expect(!StoreOwnershipClaimRule.existingPrivateStore(migratorMarker, osMajor: 26, validatedOSMajors: supportedOS, identityMatches: true, allRecordsExist: true))
+        migratorMarker.migrationBeganCommitMarker = true
+        #expect(StoreOwnershipClaimRule.existingPrivateStore(migratorMarker, osMajor: 18, validatedOSMajors: [17, 18, 26], identityMatches: true, allRecordsExist: true))
+        migratorMarker.migrationBeganCommitMarker = false
+        #expect(!StoreOwnershipClaimRule.existingPrivateStore(migratorMarker, osMajor: 18, validatedOSMajors: [17, 18, 26], identityMatches: true, allRecordsExist: true))
 
         var migrating = reading
         migrating.metadataNeedsMigration = true
