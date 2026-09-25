@@ -2167,3 +2167,73 @@ xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configurat
 기존 21행을 새 계정과 섞지 않고 독립 검증하기 위해 빈 iPad mini (A17 Pro), iPadOS 26.5 simulator `Carve-X27-CloudKit-CurrentIdentity-20260925` (UDID `D0E83844-A29A-4031-B174-9663A138CEEA`)를 생성했다. 첫 부팅 OS data migration 완료를 기다린 뒤 기존 Xcode 27 Debug 앱 `2.0.0 (1)`을 설치했고 `simctl appinfo`로 bundle/version을 확인했다. Settings만 열었으며 Carve 앱은 실행하지 않았다. 사용자가 이 새 simulator에 기존 개발자 iCloud 계정으로 로그인하는 단계가 남아 있다. 다음에는 이 빈 store에서 synthetic Genesis 1:31 행 하나를 만들고 local pending/export 완료와 peer/server read-only inventory를 분리해 확인한다. 기존 simulator의 21행을 복사·삭제·재전송하지 않는다.
 
 추가로 시도한 `xcrun cktool export-schema`는 user token만으로 schema 조회를 허용하지 않고 `No management token found`로 exit 64를 반환했다. schema export는 하지 못했다. 이번 단계에서는 앱 빌드·테스트를 실행하지 않았고 CloudKit 데이터 변경도 없었다. 두 zone query 결과는 server inventory 완료로 인정하지 않는다. iOS 18 marker/ownership, iOS 17.0 직접 회귀, Development CloudKit first-login 독립 inventory, pending export update, Production CloudKit, Distribution 서명 Archive/export·TestFlight와 물리 후보 smoke는 미완료여서 출시 판정 **NO-GO**를 유지한다.
+
+### Xcode 27 current-identity Development first-login 및 server payload 대조 (2026-09-25)
+
+2026-09-25 재확인 환경은 macOS `27.2 (26B5086k)`, `xcode-select -p` `/Applications/Xcode.app/Contents/Developer`, Xcode `27.0 (27A266a)`, Swift `6.4 (swiftlang-6.4.0.34.1)`, Tuist `mise x -- tuist version` `4.208.0`이다. 샌드박스에서 Tuist 사용자 session 경로 권한 오류가 한 번 발생해 같은 `mise x -- tuist version`을 권한 있는 CLI로 재확인했다. `xcrun simctl list runtimes`와 `list devices available`도 권한 있는 CLI에서 성공했다. 확인된 iOS runtime은 17.5, 18.6, 26.2, 26.4, 26.5, 27.0이며 iOS 27.0은 build `24A5370g`와 `24A434` 두 항목이다. 이번 업로드 source는 iPad mini (A17 Pro), iPadOS `26.5 (23F77)`이고 iPhone destination은 사용하지 않았다.
+
+새 current-identity source simulator `Carve-X27-CloudKit-CurrentIdentity-20260925` (`D0E83844-A29A-4031-B174-9663A138CEEA`)에서 Tuist workspace를 생성한 뒤 Xcode 27 Debug `CarveApp` `2.0.0 (1)`을 build·install했다. Debug 앱 `Info.plist`의 `CLOUDKIT_CONTAINER_ID`는 `iCloud.Carve.SwiftData.iCloud.dev`이고 일반 simulator signing/entitlement 경로를 사용했다. signature 우회, build setting·dependency 변경은 없었다.
+
+```bash
+mise x -- tuist generate --no-open
+# exit 0
+
+xcodebuild -workspace Carve.xcworkspace -scheme CarveApp -configuration Debug \
+  -destination 'platform=iOS Simulator,id=D0E83844-A29A-4031-B174-9663A138CEEA' \
+  -derivedDataPath /private/tmp/carve-x27-cloudkit-current-identity-20260925/DerivedData build
+# exit 0; 전체 로그 /private/tmp/carve-x27-cloudkit-current-identity-20260925/xcodebuild-build.log
+
+xcrun simctl launch D0E83844-A29A-4031-B174-9663A138CEEA kr.co.carve.leetaek \
+  -UITestChapter '{"title":"1-01Genesis.txt","chapter":1}'
+# 수동 UI smoke 시작용 launch; 앱 로그 /private/tmp/carve-x27-cloudkit-current-identity-20260925/carve-log-stream.log
+```
+
+사용자가 이 source simulator에 로그인한 뒤 합성 Genesis 1:31 필기 한 획을 Simulator UI에서 입력했다. 이는 수동 UI smoke이며 `xcodebuild test` 자동화 결과가 아니다. 자동 테스트는 이번 proof에서 새로 실행하지 않았다. Genesis 1:5로 잘못 잡힌 앞선 UI 드래그는 즉시 Undo했다. 읽기 전용 확인에서 이 절의 local `ZLINEDATA`는 `NULL`로 남았지만 빈 Core Data 행과 CloudKit metadata가 생겼고 Development inventory에도 빈 verse 5 record가 보여, 이를 payload가 있는 필기로 세지 않는다.
+
+서버 query 전 baseline은 Development private DB의 Core Data custom zone `com.apple.coredata.cloudkit.zone`과 `_defaultZone` 모두 `CD_BibleDrawing` `records: []`, exit 0이었다. Genesis 1:31 입력 뒤 `NSPersistentCloudKitContainerEvent` Export 성공이 앱 log에 기록됐다. `Carve.dev.sqlite`의 read-only 검사에서는 integrity `ok`, verse 31 drawing metadata `ZNEEDSUPLOAD=0`, last exported transaction `3`, export operation 0건이며 metadata record name `7FA1F4D1-EBDE-4DD1-8687-5CD801914172`였다.
+
+같은 개발자 iCloud identity의 CloudKit Console User token을 Keychain에서 읽는 `cktool` query를 Development·private·`CD_BibleDrawing`에 한정해 실행했다. custom zone query와 전체 field query는 exit 0이고 두 record를 반환했다. verse 31 server record `7FA1F4D1-EBDE-4DD1-8687-5CD801914172`의 `CD_titleName=1-01Genesis.txt`, `CD_titleChapter=1`, `CD_verse=31`, `CD_isPresent=1`, `CD_drawingVersion=3`, `CD_lineData` 321 bytes다. 이 record name은 local CloudKit metadata와 같다. local SQLite의 `.externalStorage` 원시 `ZLINEDATA` blob은 322 bytes이고 첫 byte가 `0x01`이었다. 그 한 byte 뒤의 321 bytes는 server `CD_lineData`와 바이트 단위로 같고 SHA-256은 양쪽 모두 `dba2e45b2762abd627907d43e6b1a53a6b678ba03d46a5f619b79a30e28496de`다. `_defaultZone` query는 exit 0, `records: []`였다. 이번 조회는 Development private zone과 record type에 한정하며 Production DB는 조회하지 않았다.
+
+전체 build·app log·baseline 및 post-upload query와 exit 파일은 `/private/tmp/carve-x27-cloudkit-current-identity-20260925/`에 있다 (`post-sample-custom-zone.log`, `post-sample-custom-zone-full-fields.log`, `post-sample-custom-zone.exit`, `post-sample-default-zone.log`, `post-sample-default-zone.exit`, local/server `verse31-lineData` 비교 파일). 원문 User token은 출력·저장하지 않았다. 합성 verse 31 sample과 Undo 뒤 남은 빈 verse 5 test row는 Development sandbox에 유지되며 삭제하지 않았다.
+
+새 record의 independent peer 수신은 별도 신규 simulator에서 확인했다. 기존 `Carve-ACC-Xcode27-LoginUpdate-20260925`는 verse 31의 다른 record ID를 이미 포함하고 있어 이번 record의 baseline peer로 사용하지 않았다. 현재 source를 `simctl clone`한 임시 장치는 `get_app_container`가 source app container 경로를 그대로 반환해 격리 peer로 인정하지 않았고 앱을 삭제·실행하지 않았다. 대신 신규 iPad mini (A17 Pro), iPadOS 26.5 `Carve-X27-CloudKit-Peer-CurrentIdentity-20260925` (`99987218-4E3C-471F-8000-7BFACC072452`)를 만들고 같은 Xcode 27 Debug `2.0.0 (1)`을 설치했다. 사용자가 source와 같은 개발자 iCloud 계정으로 로그인한 뒤 앱을 실행했다. 앱 실행 직전 CoreData store는 없었다. 앱 log의 CloudKit Setup은 success, 이어진 Import는 `succeeded: YES`; fetch count는 2였다. peer store는 integrity `ok`, drawing·record metadata 각 2행, import/export operation 0, Genesis 1:31의 record name `7FA1F4D1-EBDE-4DD1-8687-5CD801914172`, `ZNEEDSUPLOAD=0`이다. peer `.externalStorage` raw blob에서 첫 `0x01`을 제외한 payload는 서버와 동일 321 bytes이며 SHA-256 `dba2e45b2762abd627907d43e6b1a53a6b678ba03d46a5f619b79a30e28496de`로 일치했다. peer Import 뒤 Development server query는 exit 0, 동일 record 2개와 동일 record IDs를 반환해 추가·중복 레코드가 없었다. 완료된 peer 앱의 Genesis 1:31 화면에서도 수신 표본을 수동으로 관찰했다. 이는 Simulator UI 관찰이며 자동 테스트와 분리한다. peer app/launch/event 로그 및 post-import server query는 `/private/tmp/carve-x27-cloudkit-current-identity-20260925/`에 보존했다.
+
+이에 따라 새 current-identity synthetic row의 first-login Development export, independent server record/payload 일치, 독립 iPadOS 26.5 peer simulator import까지 확인했다. 물리 iPad 수신, iOS 18 marker/ownership, iOS 17 ownership·17.0 직접 회귀, pending export update, Production CloudKit, Distribution 서명 Archive/export·Xcode 27 TestFlight는 미완료다. 자동 전체 회귀의 기존 Xcode 27 결과는 별도 기준으로 유지하고, 출시 판정은 **NO-GO**다.
+
+### Xcode 27 ownership/migration focused CLI 재실행 (2026-09-25)
+
+CloudKit peer proof와 별도로, 새 빈 iPad mini (A17 Pro) simulator `Carve-X27-Focused-Sync-Tests-20260925` (`9513D5AF-A266-4178-B3F9-19EC89A13BE8`), iPadOS `26.5 (23F77)`에서 관련 두 suite를 다시 실행했다. 환경은 macOS `27.2 (26B5086k)`, Xcode `27.0 (27A266a)`, Swift `6.4 (swiftlang-6.4.0.34.1)`이며 iPhone destination은 사용하지 않았다.
+
+```bash
+xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configuration Debug \
+  -destination 'platform=iOS Simulator,id=9513D5AF-A266-4178-B3F9-19EC89A13BE8' \
+  -parallel-testing-enabled NO \
+  -derivedDataPath /private/tmp/carve-x27-focused-sync-tests-20260925/DerivedData \
+  -resultBundlePath /private/tmp/carve-x27-focused-sync-tests-20260925/OwnershipAndMigration.xcresult \
+  -only-testing:DomainTest/DrawingStoreOwnershipProofTesting \
+  -only-testing:DomainTest/MigrationSyncReleaseTesting
+# exit 0 — 11 passed, 0 failed, 0 skipped, 0 expected failures
+```
+
+`xcresulttool get test-results summary`도 `Passed`, 11/11, runtimeWarnings 0을 반환했다. 전체 로그는 `/private/tmp/carve-x27-focused-sync-tests-20260925/xcodebuild-test.log`, 종료 코드는 `xcodebuild-test.exit`, xcresult는 위 경로에 있다. fail-closed 입력을 검증하는 두 테스트가 의도한 보존 실패 경로를 지나는 중 진단용 CoreData/SQLite error 로그를 출력했지만 해당 테스트들은 통과했고 xcresult runtime warning은 없었다.
+
+첫 시도는 기존 iPad mini (A17 Pro), iPadOS 26.5 UDID `589A8DAB-2D5C-45FC-B76B-C4260FB87C67`를 destination으로 지정했으나 Xcode가 요청 destination을 available로 찾지 못해 exit 70으로 테스트 시작 전에 끝났다. 당시 Xcode 오류는 같은 UDID를 compatible 목록에 함께 표시했다. 이 첫 시도의 전체 로그는 `/private/tmp/carve-x27-cloudkit-peer-focused-20260925/xcodebuild-test.log`다. 보호 계정/필기 데이터가 있는 simulator를 선택하지 않고 새 빈 iPadOS 26.5 simulator에서 재시도해 통과했다. 이 두 synthetic/local suite 결과는 live CloudKit marker 의미, 실제 store migration의 모든 OS, 물리 iPad, Production CloudKit 또는 배포 서명 증거를 대신하지 않으며 출시 판정 **NO-GO**를 유지한다.
+
+### Xcode 27 physical iPad Debug artifact 재확인 (2026-09-25)
+
+사용자가 같은 iCloud developer 계정으로 Xcode 27 로그인까지 완료한 뒤 연결된 물리 iPad mini (A17 Pro), iPadOS 27.2를 다시 확인했다. `security find-identity -v -p codesigning`은 Apple Development identity 1개를 반환했고, 기기는 USB(`Transport Type: wired`) 연결·Developer Mode enabled였다. Apple Distribution identity와 이 bundle의 App Store provisioning profile은 없다. 이 변화로 앞서 기록한 `CSSMERR_TP_NOT_TRUSTED`는 재현되지 않았다.
+
+```bash
+xcodebuild -workspace Carve.xcworkspace -scheme CarveApp -configuration Debug \
+  -destination 'platform=iOS,id=00008130-000C24A60C92001C' \
+  -derivedDataPath /private/tmp/carve-x27-physical-smoke-20260925/DerivedData build
+# BUILD SUCCEEDED, exit 0
+
+codesign --verify --deep --strict \
+  /private/tmp/carve-x27-physical-smoke-20260925/DerivedData/Build/Products/Debug-iphoneos/CarveApp.app
+# valid on disk; satisfies its Designated Requirement; exit 0
+```
+
+이 산출물은 `kr.co.carve.leetaek` `2.0.0 (1)`이고 `Info.plist`의 `CLOUDKIT_CONTAINER_ID`는 `iCloud.Carve.SwiftData.iCloud.dev`다. signed entitlements에는 CloudKit service와 두 container ID가 있으나 `com.apple.developer.icloud-container-environment`는 없다. embedded Development profile은 `get-task-allow=true`이며 해당 environment 값을 `Development`와 `Production` 모두 허용한다. Apple 문서에 따르면 CloudKit은 이 entitlement로 런타임의 Development/Production 환경을 선택한다([CKContainer — Development 환경 테스트](https://developer.apple.com/documentation/cloudkit/ckcontainer)). 따라서 container ID만으로 CloudKit Development environment가 고정됐다고 추정하지 않는다. 같은 bundle ID로 설치하면 기존 TestFlight 앱과 설치본이 교체될 수 있고, 현재 서명 결과로는 이 기기에서 Production environment 접근을 배제할 수 없어 설치·실행하지 않았다. 읽기 전용 재확인에서 기존 TestFlight `2.0.0 (220)`은 그대로 설치돼 있었다. 물리 iPad 앱·데이터는 이번 작업에서 변경하지 않았다.
+
+전체 build log/exit, strict codesign 결과, signed entitlement·profile 검사는 `/private/tmp/carve-x27-physical-smoke-20260925/`에 있다. 이 physical Debug build·서명 검증은 자동 테스트와 분리하며, Release Distribution/Production 환경, TestFlight 후보 및 물리 CloudKit peer smoke의 증거로 세지 않는다. Development-only environment가 서명으로 확인되는 후보 없이는 해당 smoke를 진행하지 않는다.
