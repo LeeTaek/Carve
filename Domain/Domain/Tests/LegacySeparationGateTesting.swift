@@ -474,7 +474,11 @@ struct LegacyEntityNumberingTesting {
         try LinkageFixture.link(url, entity: .bibleDrawing, primaryKey: 1)
         #expect(LocalStoreLoader.storeKind(at: url) == .known(Schema.Version(5, 0, 0)))
 
-        _ = try ModelContainer(for: AppStoreSchema.schema, migrationPlan: DrawingDataMigrationPlan.self, configurations: ModelConfiguration(url: url, cloudKitDatabase: .none))
+        let outcome = LocalStoreLoader.load(at: url, cloudKitDatabase: .none)
+        guard case .ready = outcome else {
+            Issue.record("V5 저장소를 앱 로더가 열지 못했다: \(outcome)")
+            return
+        }
 
         let favoriteAfter = try LinkageFixture.entityID(url, .favoriteVerse)
         let drawingAfter = try LinkageFixture.entityID(url, .bibleDrawing)
@@ -511,11 +515,73 @@ struct LegacyEntityNumberingTesting {
         let before = try pairs(url)
         #expect(LocalStoreLoader.storeKind(at: url) == .known(Schema.Version(2, 0, 0)))
 
-        _ = try ModelContainer(for: AppStoreSchema.schema, migrationPlan: DrawingDataMigrationPlan.self, configurations: ModelConfiguration(url: url, cloudKitDatabase: .none))
+        let outcome = LocalStoreLoader.load(at: url, cloudKitDatabase: .none)
+        guard case .ready = outcome else {
+            Issue.record("V2 저장소를 앱 로더가 열지 못했다: \(outcome)")
+            return
+        }
 
         let after = try pairs(url)
         print("V2→V6 대응(엔티티 · 기본 키 · 행 ID): 앞 \(before.sorted()) · 뒤 \(after.sorted())")
         #expect(before == after)
+    }
+
+    @Test("V2 저장소는 미러링 대응 표가 없어도 V6 로 옮길 수 있다")
+    func versionedV2StoreMigratesWithoutCloudKitMetadata() throws {
+        let directory = try LinkageFixture.makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("Carve.sqlite")
+        do {
+            let container = try ModelContainer(
+                for: Schema(versionedSchema: DrawingSchemaV2.self),
+                configurations: ModelConfiguration(url: url, cloudKitDatabase: .none)
+            )
+            let context = ModelContext(container)
+            for verse in 1...3 {
+                context.insert(DrawingSchemaV2.BibleDrawing(
+                    bibleTitle: LinkageFixture.chapter,
+                    verse: verse,
+                    lineData: RealLegacyLineData.data
+                ))
+            }
+            try context.save()
+        }
+
+        let outcome = LocalStoreLoader.load(at: url, cloudKitDatabase: .none)
+        guard case let .ready(container) = outcome else {
+            Issue.record("V2 저장소를 앱 로더가 열지 못했다: \(outcome)")
+            return
+        }
+        let context = ModelContext(container)
+        #expect(try context.fetchCount(FetchDescriptor<BibleDrawing>()) == 3)
+    }
+
+    @Test("V2부터 시작하는 migration plan은 V6까지 옮길 수 있다")
+    func versionedV2StoreMigratesWithSuffixPlan() throws {
+        let directory = try LinkageFixture.makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("Carve.sqlite")
+        do {
+            let container = try ModelContainer(
+                for: Schema(versionedSchema: DrawingSchemaV2.self),
+                configurations: ModelConfiguration(url: url, cloudKitDatabase: .none)
+            )
+            let context = ModelContext(container)
+            context.insert(DrawingSchemaV2.BibleDrawing(
+                bibleTitle: LinkageFixture.chapter,
+                verse: 1,
+                lineData: RealLegacyLineData.data
+            ))
+            try context.save()
+        }
+
+        let container = try ModelContainer(
+            for: AppStoreSchema.schema,
+            migrationPlan: DrawingDataMigrationPlanFromV2.self,
+            configurations: ModelConfiguration(url: url, cloudKitDatabase: .none)
+        )
+        let context = ModelContext(container)
+        #expect(try context.fetchCount(FetchDescriptor<BibleDrawing>()) == 1)
     }
 
     @Test("V1 → V6 (행을 새로 만드는 사용자 정의 마이그레이션) 뒤의 대응을 기록한다 — 원본 모델을 판정에 넣을지 가르는 관측")

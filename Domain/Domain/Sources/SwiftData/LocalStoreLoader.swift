@@ -217,9 +217,16 @@ enum LocalStoreLoader {
     }
 
     private static func open(_ url: URL, cloudKitDatabase: ModelConfiguration.CloudKitDatabase) throws -> ModelContainer {
-        try ModelContainer(
+        let kind = storeKind(at: url)
+        let migrationPlan: any SchemaMigrationPlan.Type
+        if case .known(let version) = kind, version != Schema.Version(1, 0, 0) {
+            migrationPlan = DrawingDataMigrationPlanFromV2.self
+        } else {
+            migrationPlan = DrawingDataMigrationPlan.self
+        }
+        return try ModelContainer(
             for: appSchema,
-            migrationPlan: DrawingDataMigrationPlan.self,
+            migrationPlan: migrationPlan,
             configurations: ModelConfiguration(url: url, cloudKitDatabase: cloudKitDatabase)
         )
     }
@@ -235,22 +242,32 @@ enum LocalStoreLoader {
     /// 앱 스키마로 열지 못한 저장소를 가려 처리 방식을 정한다.
     private static func classify(_ url: URL, loadError: Error) -> Plan {
         let kind = storeKind(at: url)
-        let isLoadIssue = (loadError as? SwiftDataError) == .loadIssueModelContainer
+        let isLegacySchemaMismatch = Self.isLegacySchemaMismatch(loadError)
         Log.error("로컬 저장소를 앱 스키마로 열지 못했다", "\(kind)", "\(loadError)")
-        return plan(for: kind, isLoadIssue: isLoadIssue)
+        return plan(for: kind, isLegacySchemaMismatch: isLegacySchemaMismatch)
+    }
+
+    /// SwiftData가 스키마 불일치를 보고하는 오류는 OS에 따라 다르다.
+    /// iOS 27부터 `unknownDataStoreSchema`가 추가됐지만, 폴백 허용 여부는 아래에서
+    /// metadata 해시로 정확히 확인한 1.0.x 저장소에만 적용한다.
+    private static func isLegacySchemaMismatch(_ error: Error) -> Bool {
+        guard let swiftDataError = error as? SwiftDataError else { return false }
+        if swiftDataError == .loadIssueModelContainer { return true }
+        if #available(iOS 27, *), swiftDataError == .unknownDataStoreSchema { return true }
+        return false
     }
 
     /// 열지 못한 저장소를 어떻게 다룰지. 순수 함수라 테스트로 고정한다.
     ///
     /// | 저장소 | 처리 |
     /// |---|---|
-    /// | 확인된 1.0.x 모양 (`loadIssueModelContainer` 일 때만) | V1 폴백 — 이전 구현의 조건을 좁힌 것이다 |
+    /// | 확인된 1.0.x 모양 (OS가 보고한 스키마 불일치일 때만) | V1 폴백 — 이전 구현의 조건을 좁힌 것이다 |
     /// | 아는 버전 · 파일 없음 | 막기(`openFailed`) |
     /// | 모르는 모델 | 막기(`unknownVersion`) — **V1 폴백이 필사를 지우던 경우다** |
     /// | 메타데이터를 읽지 못함 | 막기(`unreadable`) |
-    static func plan(for kind: StoreKind, isLoadIssue: Bool) -> Plan {
+    static func plan(for kind: StoreKind, isLegacySchemaMismatch: Bool) -> Plan {
         switch kind {
-        case .unversionedLegacy: isLoadIssue ? .fallbackToV1 : .block(.openFailed)
+        case .unversionedLegacy: isLegacySchemaMismatch ? .fallbackToV1 : .block(.openFailed)
         case .known, .missing: .block(.openFailed)
         case .unknown: .block(.unknownVersion)
         case .unreadable: .block(.unreadable)
