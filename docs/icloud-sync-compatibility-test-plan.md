@@ -1773,3 +1773,45 @@ probe 로그 `/private/tmp/carve-x27-v3-display-probe-20260925/probe-console.raw
 첫 fetch 전 sample은 `expected=n0`, `canvas=n0`였고, fetch 완료 sample은 `expected=n1:(433.0, 145.0, 49.0, 4.0)`, `canvas=n1:(433.0, 145.0, 49.0, 4.0)`, `storeDiff=0`, `deliveredDiff=0`, `screenInk=(433.0, 287.0, 49.0, 4.0)`였다. 실제 canvas가 store의 한 획을 받아 동일 경계로 적용했고 화면 변환에서도 non-empty 영역을 보고했다. 기존 SQLite 행도 `drawingVersion=1`, payload 298B, 기존 SHA-256과 일치했다. Device Hub에서 일시 오버레이를 닫고 화면을 확대하자 Genesis 1:1 오른쪽 필사 영역에 작은 획이 보였다. 창세기 1→2→1 이동 뒤 확인한 이 수동 화면 관찰은 자동 CLI 테스트 결과와 구분한다.
 
 이에 따라 최초 “화면에 획이 보이지 않음” 관찰은 표시 결함 판정에서 철회한다. 이 한 개의 synthetic no-account iOS 18.6 표본에서 로컬 payload 보존, fetch 후 canvas 적용, 확대 화면 표시와 장 이동 뒤 표시를 확인했다. 이는 로그인 상태 1.3.0 업데이트, 좌표 기준 legacy 비교, iOS 18 migration marker 의미, ownership proof 또는 CloudKit 동기화 자격을 증명하지 않는다. iOS 18 marker 의미·계정 proof, 로그인 상태 1.3.0 업데이트, iOS 17 proof/직접 회귀, production CloudKit, Archive·배포 서명·TestFlight는 계속 NO-GO다.
+
+### Xcode 27 iPadOS 26.5 로그인 상태 1.3.0 → 2.0.0 기존 store 승격 (2026-09-25)
+
+실행 환경은 macOS `27.2 (26B5086k)`, 기본 Xcode `27.0 (27A266a)`, Swift `6.4 (swiftlang-6.4.0.34.1)`, Tuist `4.208.0`이다. Xcode 27의 iOS Simulator SDK `27.0`으로 빌드했고, 자동 테스트는 iPad mini (A17 Pro) iPadOS `26.5 (23F77)` (`589A8DAB-2D5C-45FC-B76B-C4260FB87C67`)를 사용했다. 이 테스트 destination은 ACC clone과 별도이며 iPhone destination은 사용하지 않았다. checkout에 Tuist workspace가 있으므로 재생성하지 않았다.
+
+먼저 Xcode 27 후보 앱을 CLI로 빌드했다. 변경된 서명·빌드 설정은 없었다.
+
+```bash
+xcodebuild build -workspace Carve.xcworkspace -scheme CarveApp -configuration Debug \
+  -destination 'platform=iOS Simulator,id=589A8DAB-2D5C-45FC-B76B-C4260FB87C67' \
+  -derivedDataPath /private/tmp/carve-x27-acc-login-update-20260925/DerivedData
+# BUILD SUCCEEDED, exit 0
+```
+
+전체 빌드 로그·종료 코드는 `/private/tmp/carve-x27-acc-login-update-20260925/build.log`·`build.exit`다. 생성된 simulator 앱의 bundle version은 2.0.0 (1)이며 `codesign --verify --deep --strict`가 통과했다. 로그에는 File Length와 Sendable 관련 비치명적 경고가 있었고 빌드는 성공했다. 이는 simulator 산출물 검사이고 배포 서명·Archive 증거가 아니다.
+
+기존 로그인 proof source `Carve-ACC-Xcode27-Proof-20260925` (`E73A3120-C87C-4017-BF59-BA227BFCD580`)를 종료 상태로 보존하고 같은 기기의 별도 복제본 `Carve-ACC-Xcode27-LoginUpdate-20260925` (`6C59D527-24D2-4519-AD43-2AC988C14F54`)에서만 설치·실행했다. clone과 source의 private CloudKit identity 지문은 일치했다. `Carve-ACC-dut`는 identity 지문이 달라 이번 시험에서 제외했다. 원본 ACC-B와 해당 기기의 데이터는 변경하지 않았다.
+
+legacy 입력 앱은 기존 `Carve-2.0.0-test-legacy` simulator에서 복사한 historical 1.3.0 (1) bundle(`/Users/leetaek/Library/Developer/CoreSimulator/Devices/0A956010-5DAA-44BC-BA22-5BAE53FF6D82/data/Containers/Bundle/Application/B90495D8-3A9B-4E2B-A035-F4D6D54799D2/CarveApp.app`)이다. 이 bundle의 읽기 전용 strict signature 확인은 통과했으나 Xcode 27에서 다시 빌드한 것은 아니다. 정확한 1.3.0 소스의 Xcode 27 재빌드는 이전 기록처럼 dependency deployment target 검증 단계에서 중단됐고, 그 설정은 바꾸지 않았다.
+
+clone의 기존 2.0.0 앱 컨테이너를 제거한 뒤 위 1.3.0 bundle을 설치·실행했다. 동일 계정 private store에서 기존 레코드 20개가 local V3 store로 들어왔고 `BibleDrawing`/`ANSCKRECORDMETADATA` 각각 20행, pending export 0, 무결성 `ok`를 확인했다. payload multiset·CloudKit record-name hash 집합·계정 identity 지문은 source proof clone과 일치했다. 그 다음 새 Xcode 27 2.0.0 산출물을 같은 clone에 설치·실행했다. 실행 뒤 무결성은 `ok`, drawing/record metadata는 각각 20행, pending export 0, V4 `ZROWUUID` 열과 새 `currentPrivateCloudRecords` ownership marker가 확인됐다. payload multiset, record-name hash 집합, marker의 owner scope는 source와 같았다. identity 원문이나 account identifier는 저장·출력하지 않았다. 이 upgrade 실행 뒤 별도 read-only server inventory를 재수집하지 않았으므로 서버의 독립적인 전후 inventory 불변성까지 주장하지 않는다.
+
+Device Hub 수동 확인은 자동 CLI 테스트와 별도다. 잠금 해제 뒤 clone을 선택했을 때 2.0.0이 창세기 1장 reader와 기존 필기 몇 개를 표시했다. 첫 실행 안내와 AdMob 검증 팝오버가 겹쳐 있었으며 이를 닫거나 필기·절 메뉴·장 이동을 조작하지 않고 화면만 관찰했다. 수동 확인은 기존 필기가 보이는 상태를 관찰한 것이며 자동 테스트 또는 CloudKit 서버 proof로 세지 않는다.
+
+새 후보로 가장 좁은 두 Domain suite를 실행했다.
+
+```bash
+xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configuration Debug \
+  -destination 'platform=iOS Simulator,id=589A8DAB-2D5C-45FC-B76B-C4260FB87C67' \
+  -derivedDataPath /private/tmp/carve-x27-acc-login-update-20260925/DerivedData \
+  -resultBundlePath /private/tmp/carve-x27-acc-login-update-20260925/ownership-focused-retry.xcresult \
+  -parallel-testing-enabled NO \
+  -only-testing:DomainTest/LegacyRowLinkageReaderTesting \
+  -only-testing:DomainTest/DrawingStoreOwnershipProofTesting
+# 37 passed, 0 failed, 0 skipped; xcresult Passed, exit 0
+```
+
+제한된 sandbox에서 같은 테스트를 처음 호출했을 때 CoreSimulatorService의 log/runtime 조회 권한 오류와 workspace 읽기 오류로 테스트 시작 전 exit 66이 났다. 해당 원본 로그·exit는 `/private/tmp/carve-x27-acc-login-update-20260925/ownership-focused.log`·`ownership-focused.exit`에 보존했다. 더 넓은 CLI 권한으로 별도 `ownership-focused-retry.*` 경로에 재시도했고, `/private/tmp/carve-x27-acc-login-update-20260925/ownership-focused-retry.log`·`ownership-focused-retry.exit`·`ownership-focused-retry.xcresult`에 성공 실행 전체 로그·exit·결과 bundle을 보존했다. 재시도는 37 통과, 실패 0, skip 0이다.
+
+또한 Xcode 27 iOS Simulator 27.0 SDK의 CoreData simulator SDK 파일에서 `PFCloudKitMetadataModelMigratorMigrationBeganCommitKey` 문자열을 읽기 전용 검색했지만 정의를 찾지 못했다. 이는 private marker의 의미를 확인하지 못한 상태를 바꾸지 않으며 iOS 18 허용 근거가 아니다.
+
+이번 결과는 **iOS 26.5 same-account, 기존 CloudKit-backed V3 store에서 1.3.0 실행 뒤 2.0.0으로 업데이트하는 한 복제 경로**를 확인한다. 미업로드 local-only 필기·pending export가 있는 로그인 전환, 무계정 V3의 첫 로그인 upload와 다른 기기 수신, iOS 18 marker 허용, iOS 17 ownership/직접 iOS 17.0 회귀, production CloudKit, 서명 Archive·배포 entitlement·TestFlight는 미완료다. 계정·시뮬레이터를 사용한 경험은 해당 경로로만 제한하며 전체 출시 판정은 **NO-GO**다.
