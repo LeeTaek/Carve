@@ -1873,3 +1873,9 @@ codesign --verify --deep --strict \
 Archive의 bundle/version은 `kr.co.carve.leetaek`, 2.0.0 (1)이고 서명 검증은 통과했다. 단, 서명 클래스는 Apple Development이며 embedded profile은 `get-task-allow=true`인 Development profile이다. 현재 로컬에는 이 bundle의 Development profile만 있고 Apple Distribution identity 및 App Store profile은 없다. 서명된 app에는 CloudKit entitlement가 있으나 `com.apple.developer.icloud-container-environment`는 설정·서명 결과 모두에 없었다. 따라서 이 Archive는 Release 구성의 generic iOS 컴파일과 Development 서명만 증명하며 App Store 배포 서명·Production CloudKit entitlement·TestFlight 적격성을 증명하지 않는다. `xcodebuild -exportArchive`와 TestFlight upload는 실행하지 않았다. 설정·의존성·서명 프로필은 바꾸지 않았다.
 
 전체 Archive 로그는 `/private/tmp/carve-x27-release-archive-20260925/archive.log`, 읽기 전용 Archive build settings는 `/private/tmp/carve-x27-release-archive-preflight-20260925-show-archive-settings.log`, Tuist 생성 로그는 `/private/tmp/carve-x27-release-archive-preflight-20260925-tuist-generate-elevated.log`다. 서명 inventory는 로컬에서 값 노출 없이 분류했다. 빌드는 성공했으나 Sendable closure, N-Canvas 전용 `undoManager` deprecated use, SwiftLint 파일/타입 길이 경고가 로그에 남았다. 이 로컬 Development Archive 이후에도 배포 서명·entitlement·TestFlight는 NO-GO 게이트다.
+
+### Device Hub 물리 iPad Xcode 27 후보 접근성 확인 (2026-09-25)
+
+Device Hub에서 연결된 iPad mini (A17 Pro) iPadOS `27.2`를 확인했다. 설치된 `새기다`는 TestFlight `2.0.0 (220)`이며 TestFlight의 테스트 안내 화면이 표시됐다. 현재 Xcode 27 로컬 Archive는 `2.0.0 (1)` Apple Development 서명이고 별도 Development profile을 사용한다. TestFlight 안내의 `계속`을 누르지 않았고, 현재 설치 앱을 대체하거나 실행 상태에서 계정·필기·동기화를 조작하지 않았다. Home으로 돌아왔으며 Device Hub 화면 관찰은 자동 테스트가 아니다.
+
+따라서 물리 iPad에서 Xcode 27 후보 기능 스모크는 아직 수행하지 않았다. 현재 TestFlight 설치본을 Development 서명 후보로 덮어 설치하면 로컬 앱 컨테이너와 CloudKit 환경이 달라질 수 있다. 전용 물리 테스트 기기 또는 현재 TestFlight 설치본을 교체할지에 대한 명확한 사용자 결정을 받은 뒤 진행한다. TestFlight `2.0.0 (220)` 화면 관찰은 Xcode 27 `2.0.0 (1)` 후보 검증으로 세지 않는다.
