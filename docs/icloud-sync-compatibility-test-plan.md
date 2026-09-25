@@ -1815,3 +1815,32 @@ xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configurat
 또한 Xcode 27 iOS Simulator 27.0 SDK의 CoreData simulator SDK 파일에서 `PFCloudKitMetadataModelMigratorMigrationBeganCommitKey` 문자열을 읽기 전용 검색했지만 정의를 찾지 못했다. 이는 private marker의 의미를 확인하지 못한 상태를 바꾸지 않으며 iOS 18 허용 근거가 아니다.
 
 이번 결과는 **iOS 26.5 same-account, 기존 CloudKit-backed V3 store에서 1.3.0 실행 뒤 2.0.0으로 업데이트하는 한 복제 경로**를 확인한다. 미업로드 local-only 필기·pending export가 있는 로그인 전환, 무계정 V3의 첫 로그인 upload와 다른 기기 수신, iOS 18 marker 허용, iOS 17 ownership/직접 iOS 17.0 회귀, production CloudKit, 서명 Archive·배포 entitlement·TestFlight는 미완료다. 계정·시뮬레이터를 사용한 경험은 해당 경로로만 제한하며 전체 출시 판정은 **NO-GO**다.
+
+### Xcode 27 iPadOS 26.5 무계정 V3 첫 로그인 업로드·peer 수신 (2026-09-25)
+
+실행 환경을 다시 확인했다. `xcode-select -p`는 `/Applications/Xcode.app/Contents/Developer`, `xcodebuild -version`은 Xcode `27.0 (27A266a)`, Swift는 `6.4 (swiftlang-6.4.0.34.1)`, Tuist는 `mise x -- tuist version` 결과 `4.208.0`이다. 첫 sandbox Tuist 조회는 user state session 권한 오류로 실패해 같은 표준 명령을 권한을 높여 재시도했다. iOS 17.5·18.6·26.2·26.4·26.5·27.0 runtime이 있으며 이번 대상은 iPad mini (A17 Pro) iPadOS `26.5 (23F77)`다. iPhone destination을 사용하지 않았다.
+
+대상 `Carve-X27-FirstLogin-20260925` (`7284FDE5-6F95-4CC6-8EE6-75A794009F0F`)은 새 계정 없는 simulator에서 historical 1.3.0 (1) 앱으로 synthetic Genesis 1:31 필기를 저장하고 Xcode 27 2.0.0 (1) 앱으로 덮어 업데이트한 동일 기기다. historical 앱 bundle은 이미 존재하던 1.3.0 simulator 산출물이며 Xcode 27에서 재빌드하지 않았다. 로그인 전 2.0.0 local store는 V4 `ZROWUUID`를 갖고 integrity `ok`, Genesis 1:31 한 행, drawing/record metadata 미생성, pending export 0이었다. 입력 payload는 300B, SHA-256 `2174feb6c509e187417d9aa41400618b86c12e07cb4f39f729d98d71c87c3558`이다. 원본·로그인 전후 snapshot은 `/private/tmp/carve-x27-first-login-preflight-20260925/` 아래에 둔다.
+
+사용자가 이 simulator의 설정에서 기존 ACC와 같은 sandbox Apple 계정으로 직접 로그인했고 계정 전환은 없었다. Xcode 27에도 같은 계정이 로그인된 상태였다. 비밀번호·계정 식별 원문은 문서에 기록하지 않았다. 로그인 뒤 앱을 CLI로 실행했다.
+
+```bash
+xcrun simctl launch --terminate-running-process 7284FDE5-6F95-4CC6-8EE6-75A794009F0F kr.co.carve.leetaek
+# exit 0; /private/tmp/carve-x27-first-login-preflight-20260925/candidate-first-login-launch.log(.exit)
+
+xcrun simctl spawn 7284FDE5-6F95-4CC6-8EE6-75A794009F0F log show --last 10m --style compact \
+  --predicate 'process == "CarveApp"'
+# 앱 프로세스 전체 로그: /private/tmp/carve-x27-first-login-preflight-20260925/candidate-carveapp-full.log
+```
+
+Core Data가 private Development container 연결을 성공했다. 시작 중 export 재요청 2건은 이미 대기 중인 요청과 겹쳐 `134417`으로 취소됐으나, 뒤이어 원격 import가 `success=1, madeChanges=1`, synthetic local row export가 `success=1, madeChanges=1`, 후속 export가 `success=1, madeChanges=0`으로 끝났다. 앱 실행 뒤 store는 drawing 21행·record metadata 21행, `ZROWUUID` 존재, `integrity_check=ok`였다. Genesis 1:31 payload는 300B와 위 SHA-256 그대로다. 이 row metadata의 upload·cloud-delete·local-delete pending 합계는 각각 0이며 StoreOwnership marker의 비민감 필드는 `formatVersion=1`, `proof=firstLoginFromUnaccountedV3`였다. 전체 로그인 후 SQLite 복사본은 `post-first-login-store/`다.
+
+독립 peer `Carve-ACC-Xcode27-LoginUpdate-20260925` (`6C59D527-24D2-4519-AD43-2AC988C14F54`)은 같은 계정의 iPadOS 26.5 simulator clone이다. 앱 실행 전 보존한 store는 drawing/metadata 각 20행이고 Genesis 1:31 row는 없었으며 기존 `currentPrivateCloudRecords` marker와 integrity `ok`를 확인했다. CLI로 2.0.0 앱을 실행한 뒤 보존한 store는 drawing/metadata 각 21행, Genesis 1:31 row 한 개와 동일한 300B payload SHA-256, row metadata pending 세 종류 모두 0, integrity `ok`였다. Device Hub 관찰 뒤 다시 보존한 사본에서도 21행·payload 지문·pending 0이 같았다. 이 전후 차이는 peer의 기존 로컬 store에는 없던 sample이 첫 기기 export 뒤 peer의 CloudKit 연동 store에 수신된 것을 확인한다. 사본은 `peer-before-receive-store/`, `peer-after-receive-store/`, `peer-post-observation-store/`다.
+
+read-only CloudKit probe artifact가 `/private/tmp`에서 사라져 이 실행의 업로드 직후 remote-zone inventory/hash를 직접 다시 읽지는 못했다. 따라서 새 레코드의 원격 필드 자체를 독립 조회했다고 주장하지 않는다. 다만 첫 기기의 성공 export와 peer의 사전 부재·사후 동일 payload 수신으로 이 synthetic 한 행의 Development private CloudKit 첫 로그인 전송·다른 simulator 수신은 확인했다. 원본 `Carve-ACC-B` simulator는 종료 상태로 보존했다. 두 simulator clone은 같은 Development private DB를 공유하므로 sandbox 서버에는 synthetic Genesis 1:31 테스트 row가 존재한다. 이번 작업에서는 이를 삭제하지 않았다.
+
+Device Hub 결과는 자동 결과와 분리한다. 로그인 전 첫 기기에서 2.0.0 Genesis 1:31 sample이 남은 것을 시각적으로 확인했다. 로그인 후 peer Device Hub에서는 Genesis 1장 reader와 다른 절의 기존 획을 보았지만 31절 위치는 화면에 나오지 않아 그 절의 peer UI 표시는 확인하지 않았다. 본문 영역에서 스크롤을 시도했지만 화면 이동은 없었고, 절 메뉴·장 이동·필기 입력은 하지 않았다. Device Hub 관찰 뒤 store 재확인에서도 데이터 변경은 없었다. 이 로그인 왕복 자체에는 `xcodebuild test`를 실행하지 않았다. 같은 후보의 좁은 `LegacyRowLinkageReaderTesting` + `DrawingStoreOwnershipProofTesting` CLI 회귀는 직전 기록대로 37/37 통과이며, Xcode 27 여섯 runtime 전체 회귀도 별도 기록대로 통과했다.
+
+첫 로그인 과정에서 기존 remote row로 보이는 `1-01Genesis.txt.1`, verses `[10, 11, 12]`에 대해 single-canvas decode 실패가 앱 로그에 남았다. 로그인 전 local store에는 Genesis 1:31 synthetic 행만 있었고, 이후 20 remote drawing을 import했으므로 이 경고는 테스트 sample과 다른 기존 CloudKit row로 판단한다. 앱은 해당 행을 표시·활성 편집에서 제외하고 다음 편집을 새 행으로 분리한다고 기록했다. 이 시험에서 그 row를 편집하거나 덮어쓰지 않았다. 내용/원인은 미확인으로 남겨 별도 데이터 표시·복구 점검이 필요하다. 앱 전용 전체 로그는 `/private/tmp/carve-x27-first-login-preflight-20260925/candidate-carveapp-full.log`, peer launch 결과는 `peer-first-receive-launch.log`·`.exit`다.
+
+이번 결과는 iOS 26.5에서 만든 **한 개의 synthetic, 무계정 1.3.0 V3 행**의 Xcode 27 2.0.0 first-login export 및 다른 simulator 수신 경로를 확인한 것이다. historical 1.3.0 bundle을 Xcode 27에서 재빌드한 검증, peer physical iPad 표시, 새 sample의 독립 read-only server inventory, iOS 18 marker 의미/allowlist, iOS 17 ownership·iOS 17.0 직접 회귀, widget/history/N-Canvas 왕복, production CloudKit, signed Archive·배포 entitlement·TestFlight는 여전히 미완료다. 전체 출시 판정은 **NO-GO**다.
