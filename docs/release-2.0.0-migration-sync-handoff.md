@@ -6,6 +6,8 @@
 
 출시 판정은 **NO-GO**다. production 저장소 소유 증명 공급자는 연결했고 증거가 맞지 않거나 읽히지 않으면 계속 fail-closed 한다. 현재 `LegacyRowLinkageReader.validatedOSMajors`는 `[26]`이다. **현행 주 검증·출시 후보 자격 확인 대상은 macOS 27.2 / Xcode 27.0이며, Device Hub는 기기 확인·수동 스모크에 사용한다.** Xcode 27에서 Tuist workspace Debug iPad simulator 빌드가 통과했고, iPadOS 17.5 전체 회귀는 **998 passed · 4 expected failures · 6 skips**, 18.6·26.2·26.4·26.5는 각각 **999 passed · 4 expected failures · 5 skips**, 27.0은 **998 passed · 4 expected failures · 6 skips**로 설치된 여섯 runtime 모두 총 1008건·예기치 않은 실패 0이다. 17.5 로그에는 임시 migration/store fixture 관련 SQLite 경고가 있으나 xcresult failure/runtime warning은 없고 정리 시점 원인은 미확정이다. 최초 F60의 XCFramework `ProcessXCFramework` 실패는 재현되지 않았다. iOS 27 SwiftData 네 실패는 새 `unknownDataStoreSchema` 오류를 확인된 1.0.x metadata shape에 한해 처리한 뒤 해결됐다. 첫 수정 후 전체 실행에서 reader fixture의 SQLite 잠금이 한 번 발생했으나 reader suite 단독 31/31과 후속 전체 회귀에서 재현되지 않았다. 개별 `-project CarveApp` 명령의 SwiftPM 모듈 의존성 오류와 읽기 전용 artifact 서명 이상은 확인했으나 서로의 인과관계는 미확정이다. Device Hub에서 새 iPadOS 27.0 simulator의 창세기 1장 reader 표시와 1장→2장→1장 수동 이동을 확인했지만, 앱 시작 때 iCloud 필사 수신 대기 상태를 표시했으므로 CloudKit 검증으로 세지 않는다. Xcode 26.3 결과는 비교 기준으로 보존하며 Xcode 27 검증으로 대신하지 않는다. iOS 19~25 runtime은 현재 목록에 없다.
 
+2026-09-25 Xcode 27 iPadOS 26.5 기존 private store proof 사전 실행은 계정 상태 확인에서 막혔다. 사용자는 ACC 변경을 허용했으며 ACC-B의 종료 복제본에 최신 Debug 앱을 설치했다. 필드 없는 private-zone inventory fetch는 120초 timeout, 앱 CloudKit 계정 상태는 `Temporarily Unavailable`/`hasValidCredentials=false`, Core Data setup은 134400이었다. 원본 DB/WAL과 Genesis 1:1·1:2 복제 표본은 보존됐고, ownership marker와 server inventory proof는 미생성/미확인이다. 다음 조건은 사용자가 같은 ACC sandbox account를 복제 simulator에 로그인해 유효한 세션을 준비하는 것이다. 상세 명령·경로는 [호환성 시험 계획](./icloud-sync-compatibility-test-plan.md)을 참조한다.
+
 iOS 18.6에서 실제 1.3.0을 실행해 만든 V3 저장소는 기본 무계정 metadata 네 key 외에 `PFCloudKitMetadataModelMigratorMigrationBeganCommitKey`가 하나 더 있다. 값은 정수 boolean `true`였다. 이 private Core Data 키의 의미를 확인할 공개 근거가 없어, iOS 18을 안전하게 허용할 수 없다. 현재 정확한 key profile 규칙은 이 표본을 거절한다. `Carve-Ownership-iOS18-6`에는 계정 로그인을 하지 않았다.
 
 ## 코드 상태
@@ -15,7 +17,7 @@ iOS 18.6에서 실제 1.3.0을 실행해 만든 V3 저장소는 기본 무계정
 - 기존 private 저장소는 현재 계정 identity 일치, 로컬 행·미러링 레코드 일대일성, 대기 작업 없음, private DB 전체 레코드 조회를 요구한다.
 - reader v4는 metadata key 집합과 각 SQLite 값 열의 형식·비어 있지 않음, metadata migration 미요청, identity 확인 상태를 함께 판정한다. 추가·누락·중복·NULL·잘못된 형식은 소유 proof에서 거절한다.
 - `SyncedWriteBlock` 경로가 필사 외 즐겨찾기·위젯 보관·이력 복원·N-Canvas 직접 쓰기도 막는 기존 규칙을 유지한다. 계정 변경 차단, server-work 표, 삭제 기준점 K, 원본 보존, 마이그레이션 실패 차단, 무계정 신규 로컬 초안의 자동 업로드 금지도 유지한다.
-- 기존 `Carve-ACC-dut` Genesis 1:1·1:2 표본과 `Carve-ACC-B` 상태는 보존했다. 이번 후속 실험에서 이 두 simulator 앱을 실행·변경하지 않았다.
+- 사용자 승인 전 실험에서는 기존 `Carve-ACC-dut` Genesis 1:1·1:2와 `Carve-ACC-B`를 사용하지 않았다. 2026-09-25 후속 실행은 ACC-B 원본을 종료 상태로 둔 채 clone에서만 앱을 실행했다. 원본 DB/WAL은 snapshot과 같은 해시다. 읽기 전용 SQLite 검사 중 `-shm`가 갱신될 수 있어 sidecar에 관한 상세는 호환성 시험 계획에 기록했다.
 
 ## 실제 iOS 18.6 관측
 
@@ -208,10 +210,10 @@ xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configurat
 Xcode 27 workspace build와 iPadOS 17.5·18.6·26.2·26.4·26.5·27.0 전체 자동 회귀는 통과했다. SwiftData 오류 분기 수정 뒤 iPadOS 27.0 전체 회귀 결과는 998 통과·4 expected failure·6 skip·unexpected failure 0이다. 이후 진행은 CloudKit 소유 proof, iOS 18 marker 근거, iOS 17.0 직접 회귀, 보유 iPad의 안전한 기능 smoke, 서명된 Archive·배포 entitlement·TestFlight 게이트다. `-project CarveApp` generic 빌드의 모듈 해석 실패와 XCFramework read-only signature 이상은 workspace 빌드에서 재현되지 않은 `ProcessXCFramework` 실패의 원인으로 단정하지 않는다. Xcode 26.3 과거 통과는 현행 기준 통과로 바꾸어 쓰지 않는다. Device Hub 수동 스모크는 새 iPadOS 27.0 simulator에서 창세기 1장 reader 표시, 1장→2장→1장 이동까지 확인했으며 자동 build/test는 계속 CLI로 수행했다. 앱 시작 시 기존 iCloud 필사 수신 대기 표시가 있었고 백그라운드 네트워크 읽기는 조사하지 않았으므로 이 스모크를 CloudKit proof로 확대하지 않는다.
 
 1. reader allowlist `[26]`을 유지한다. iOS 18.6 test와 앱 빌드는 통과했지만 실제 1.3.0의 `PFCloudKitMetadataModelMigratorMigrationBeganCommitKey` 의미를 확인하지 못했고 live iOS 18 proof도 하지 않았다. 허용 근거 없이 marker를 allowlist에 추가하지 않는다.
-2. strict profile 변경 뒤 실제 private CloudKit 소유 proof가 남았다. 계정 기기를 재실행하기 전 local store·서버 snapshot, 계정 세션 상태, Genesis 1:1·1:2 보존을 검토한다. 계정 전환·로그아웃·로그인 조작은 하지 않는다.
+2. strict profile 변경 뒤 실제 private CloudKit 소유 proof가 남았다. 2026-09-25 ACC 데이터 변경 승인을 받았지만 clone의 세션은 `Temporarily Unavailable`이었다. 사용자가 같은 ACC sandbox account를 복제 simulator에 로그인한 뒤 local store·서버 inventory·Genesis 1:1·1:2를 재확인한다. 계정 전환은 하지 않는다.
 3. iOS 17.5 runtime과 iPad mini (6th generation)는 확보했고 migration 수정 후 전체 회귀가 0 failed로 통과했다. 다음은 iOS 17.0 직접 회귀와, 별도 증거가 있는 경우에만 ownership proof의 OS allowlist `[26]` 확장 여부 및 iOS 17 CloudKit proof를 검토하는 것이다. iOS 19~25는 아직 직접 시험하지 않았다.
 4. 위젯 보관·이력 복원·N-Canvas의 별도 CloudKit 왕복과 로그인 상태 1.3.0 덮어쓰기 분기는 미검증이다. 기존 C14 F44~F57 기록은 출시 완료 근거로 승격하지 않는다.
-5. 기존 ACC 기기로 live proof를 진행하기 전에, 앱을 실행하면 기존 handwriting payload가 Development private CloudKit DB로 전송되고 서버 상태가 바뀔 수 있음을 사용자에게 알리고 명시적 승인을 받는다. auto-review 거절을 다른 방식으로 우회하지 않는다. 승인 전까지 해당 proof는 미실행으로 두고 `Carve-Ownership-iOS18-6`의 계정 없는 synthetic 표본과 Genesis 1:1·1:2 표본을 보존한다.
+5. 사용자는 2026-09-25 ACC 데이터 변경을 명시적으로 승인했다. 복제본도 Development private DB를 공유할 수 있다. 세션 복구 뒤에도 전후 inventory를 기록하고, 계정 전환이나 auto-review 우회는 하지 않는다. `Carve-Ownership-iOS18-6`의 계정 없는 synthetic 표본과 원본 Genesis 1:1·1:2 표본은 보존한다.
 
 추가 로그·문서·프롬프트에 iCloud 계정 식별 원문, 이메일, 토큰 또는 비밀정보를 적지 않는다. 앱 설치·계정 로그인 조작이 필요해지면 실행하지 말고 사용자에게 단계와 예상 데이터 영향을 설명한다. 계정less iOS 18.6 sample은 현재 상태를 보존한다.
 

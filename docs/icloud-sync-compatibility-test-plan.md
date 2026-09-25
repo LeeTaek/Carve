@@ -1684,3 +1684,29 @@ iPadOS 26.4·26.5 결과 bundle도 `Passed`, unexpected failure 0, `runtimeWarni
 후속 수동 확인에서 Device Hub의 `nextChapter` 버튼을 눌러 창세기 2장으로 이동한 뒤 이전 장 버튼으로 창세기 1장에 복귀했다. 양쪽 장 제목과 본문이 표시되는 것을 접근성 트리에서 확인했다. 본문 이동 확인만 했으며 필기나 절 메뉴를 조작하지 않았다. Device Hub 창과 simulator 명칭은 기존 startup smoke와 같고 자동화 테스트 결과에는 포함하지 않는다.
 
 시작 중 앱 UI는 “iCloud에 저장된 필사를 확인”하고 “아직 기존 필사를 받고 있어요”라고 표시했다. 이 simulator에 iCloud 계정을 로그인하지 않았고 기존 ACC 기기·데이터를 사용하지 않았다. 앱 시작 자체에서 백그라운드 CloudKit/network read가 발생했는지는 별도로 계측하지 않았으므로 서버와 통신이 전혀 없었다고 단정하지 않는다. 사용자가 CloudKit에 로그인하거나 필기를 쓰는 조작, 의도적인 서버 상태 변경은 하지 않았다. 이 확인은 **수동 UI startup 및 인접 장 이동 smoke만 통과**한 것이며 자동 테스트, 계정 동기화, CloudKit ownership proof, 저장·복원 검증은 아니다. Device Hub 화면만 사용했고 Xcode MCP는 쓰지 않았다.
+
+### Xcode 27 기존 private CloudKit ownership proof 사전 실행 (2026-09-25, 계정 확인에서 차단)
+
+현행 환경은 macOS `27.2 (26B5086k)`, 기본 선택 Xcode `27.0 (27A266a)`, Swift `6.4 (swiftlang-6.4.0.34.1)`, Tuist `4.208.0`이다. `xcode-select -p`는 `/Applications/Xcode.app/Contents/Developer`를 가리킨다. 대상은 ownership reader 허용 범위 `[26]`에 속하는 iPadOS 26.5 (`23F77`)이며, iPhone destination은 사용하지 않았다.
+
+사용자가 2026-09-25 기존 ACC 데이터 변경을 허용했다. 원본 `Carve-ACC-B` (`DB142B76-153A-462E-AC54-4A9B3BDF6D9F`)는 종료 상태로 두고 `xcrun simctl clone`으로 `Carve-ACC-Xcode27-Proof-20260925` (`E73A3120-C87C-4017-BF59-BA227BFCD580`)를 만들었다. 복제는 같은 sandbox 계정과 Development private DB를 공유할 수 있으므로 서버 격리가 아니다. 계정 전환이나 로그인 조작은 하지 않았다.
+
+앱 실행 전 원본 SQLite, `-wal`, `-shm`, Preservation, EraseState를 `/private/tmp/carve-2.0.0-acc-proof-20260925/pre-local/`에 복사했다. 원본 store는 V6, `integrity_check=ok`, `BibleDrawing` 12행, record metadata 12행, nonempty·unique CK record name 12개, upload/cloud-delete/local-delete pending은 각각 0이었다. Genesis 1:1 및 1:2의 row UUID 해시, line/layout byte 수와 SHA-256은 복제 전 snapshot과 앱 실행 뒤 복제본에서 같았다(1:1 line 1340B, 1:2 line 1220B). 복제본도 무결성 `ok`, 12행·12 metadata, pending 0이며 StoreOwnership marker는 없었다. ACC-B 원본의 DB 본문과 WAL 해시는 snapshot과 같았다. 다만 한 번 `simctl get_app_container`가 clone 호출에도 원본 경로를 반환했고, 그 경로를 읽기 전용 SQLite로 확인하는 동안 원본 `-shm`가 바뀌었다. SQLite의 읽기 전용 open도 `-shm`를 갱신할 수 있다는 F35 관측과 맞으며, DB/WAL 및 표본 payload는 바뀌지 않았다. 원본 simulator는 계속 종료 상태다.
+
+```bash
+xcodebuild build -workspace Carve.xcworkspace -scheme CarveApp -configuration Debug \
+  -destination 'platform=iOS Simulator,id=DDE9B05A-B684-486E-A8A2-AFFCED4BA600' \
+  -derivedDataPath /private/tmp/carve-2.0.0-acc-proof-20260925/DerivedData
+# BUILD SUCCEEDED, exit 0; build.log, build.exit
+
+SIMCTL_CHILD_DYLD_INSERT_LIBRARIES=/private/tmp/carve-2.0.0-acc-proof-20260925/libCarveCloudKitReadOnlyProbe.dylib \
+SIMCTL_CHILD_CARVE_CK_PROBE_LABEL=baseline \
+  xcrun simctl launch E73A3120-C87C-4017-BF59-BA227BFCD580 kr.co.carve.leetaek
+# launch exit 0; launch-baseline.log, launch-baseline.exit
+```
+
+임시 probe는 앱의 entitlements로 `iCloud.Carve.SwiftData.iCloud.dev` private zone `com.apple.coredata.cloudkit.zone`을 조회하고 `desiredKeys=[]`로 필드/payload를 요청하지 않는다. CloudKit write API는 호출하지 않는다. baseline 작업은 120초 동안 끝나지 않아 취소됐고 JSON은 `status=timeout`, `recordCount=0`이다. 이 0건은 zone이 비었다는 증거가 아니며 inventory baseline 확보 실패다. 요약은 복제 앱의 `tmp/carve-cloudkit-baseline.json`이다.
+
+앱이 시작된 뒤 CloudKit 로그는 account status `Temporarily Unavailable`, `hasValidCredentials=false`를 보였다. Core Data CloudKit setup은 `NSCocoaErrorDomain 134400` / `CKAccountStatusTemporarilyUnavailable`로 실패했다. 현재 계정 identity를 검증하거나 기존 private DB 레코드를 조회하지 못했고, fail-closed 소유 marker는 생성되지 않았다. clone의 후속 local store 검증에서 Genesis 1:1·1:2 payload 지문과 모든 pending count가 실행 전과 같았다. 로그인 상태가 준비되지 않아 서버 전후 inventory 및 production ownership proof는 미실행/미판정이다.
+
+빌드 전체 로그·exit는 `/private/tmp/carve-2.0.0-acc-proof-20260925/build.log`·`build.exit`이다. 전체 launch/app 로그는 account identifier 필드를 가린 `/private/tmp/carve-2.0.0-acc-proof-20260925/app.log`에 있고, launch 결과는 `launch-baseline.log`·`launch-baseline.exit`, 읽기 전용 CloudKit 요약은 위 JSON이다. 이 시도에서는 자동 테스트나 Device Hub 수동 조작을 하지 않았다. 자동 테스트는 기존 Xcode 27 iPadOS 26.5 전체 회귀(999 passed · 4 expected failures · 5 skips · unexpected failure 0)와 별도다. 계정 로그인·레코드 조회가 가능한 동일 ACC sandbox account 세션을 사용자가 복제 simulator에 준비한 뒤 이 게이트를 이어간다. 계정 전환은 하지 않고, auto-review가 구체 작업을 거절하면 우회하지 않는다. 출시 판정은 **NO-GO** 유지다.
