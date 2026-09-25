@@ -2275,3 +2275,13 @@ destination은 iPad mini (A17 Pro), iPadOS `18.6 (22G86)`이며 Xcode 27.0의 iO
 마지막 read-only 서명 자격 재확인에서 `security find-identity -v -p codesigning`은 `0 valid identities found`를 반환했다. 두 표준 provisioning profile 저장 경로에서 찾은 프로파일 3개 중 정확한 Carve bundle profile은 Development/ad-hoc 1개뿐이었고 `get-task-allow=true`, CloudKit environment는 `Development`와 `Production` 모두였다. 이는 앞선 physical Debug build 시점의 Apple Development identity 1개 기록과 다르며 원인은 미확정이다. 현재 Apple Distribution identity와 App Store profile은 확인하지 못했다. 인증서·profile·signing 설정은 바꾸지 않았으며 Distribution Archive/export·Xcode 27 TestFlight gate는 계속 NO-GO다.
 
 따라서 iOS 18.6 focused suite와 앱 컴파일은 통과했지만 iOS 18 marker 의미·계정/ownership 왕복, iOS 17.0 직접 회귀, pending export offline update, Production CloudKit, Distribution Archive/export·TestFlight 및 물리 후보 smoke는 미완료다. Xcode 26.3 결과로 대체하지 않고 출시 판정은 **NO-GO**다.
+
+## 2026-09-25 iPadOS 17.5 1.3.0 로그인 후 실제 CloudKit 가져오기 확인
+
+사용자가 전용 `Carve-X27-iOS17.5-V3-Update-Probe-20260925` simulator(iPad mini 6, iPadOS 17.5, UDID `3E2D5B97-1682-400B-BB62-0DD640A0F62D`)의 `Settings > Apple Account`에 Carve Development 시험 계정으로 로그인했다. 이 기기에는 기존 1.3.0 앱 `1.3.0 (1)`을 실행했고, 컨테이너는 `iCloud.Carve.SwiftData.iCloud.dev`였다. 2.0.0 업데이트 전에 앱의 첫 CloudKit 연결·가져오기 결과를 확인했다.
+
+1.3.0 콘솔에서 Core Data CloudKit setup 성공, import 요청 완료, incremental import 적용 7건을 관찰했고 비-null CloudKit 오류나 `CKAccountStatusNoAccount`는 없었다. 다만 앱 컨테이너 `Library/Application Support/Carve.dev.sqlite`는 `PRAGMA quick_check=ok`였지만 `ZBIBLEDRAWING=0`, `ZBIBLEPAGEDRAWING=0`, `ANSCKRECORDMETADATA=0`이었다. 별도로 캡처한 수동 화면에서도 창세기 1장 필사란은 비어 있었다. 실행 로그와 캡처는 `/private/tmp/carve-x27-ios17.5-v3-update-20260925/legacy-1.3-console.log`, `/private/tmp/carve-x27-ios17.5-v3-update-20260925/legacy-1.3-after-import.png`에 있다. 저장소는 해당 simulator 앱 컨테이너의 `09BA1B79-D807-406E-A8CC-308810335DC9/Library/Application Support/Carve.dev.sqlite`였다.
+
+이 세션에서 실제 historical V3 필기가 앱으로 들어오지 않았으므로 importer setup 성공을 필사 수신으로 세지 않는다. 실제 표본의 화면 표시, 좌표·내용, 앱 재실행 후 보존, 첫 로그인 업로드는 여전히 미검증이다. 이전 별도 계정 없는 synthetic V3 fixture에서 확인한 298-byte 보존 결과와도 다른 시험이다. 빈 저장소를 업데이트해 무유실 성공으로 잘못 판정하지 않도록 1.3.0 상태를 유지했다.
+
+현재 `LegacyRowLinkageReader.validatedOSMajors`는 `[26]`이며, iOS 18 표본에서 확인된 `PFCloudKitMetadataModelMigratorMigrationBeganCommitKey`의 의미도 미확인이다. 사용자는 지원 보장 유지와 근거가 마련될 때까지 NO-GO를 선택했다. OS/metadata allowlist나 쓰기 안전장치는 변경하지 않았다. 실제 V3 행이 없는 이 계정은 ownership proof blocker를 닫지 않으며, 필수 release gate는 계속 **NO-GO**다.

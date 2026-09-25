@@ -285,3 +285,19 @@ Xcode 27 계정 상태 갱신 후 물리 iPad 연결과 서명을 재확인했�
 서명 자격의 현재 read-only 상태는 앞선 physical Debug build 기록과 일치하지 않는다. `security find-identity -v -p codesigning`은 `0 valid identities found`를 반환했다. 두 표준 provisioning profile 저장 경로에서 찾은 프로파일 3개 중 정확한 Carve bundle profile 1개(Development/ad-hoc, `get-task-allow=true`, CloudKit environment `Development`·`Production`)만 확인했다. Apple Distribution identity와 App Store profile은 현재 로컬 상태에서 확인되지 않는다. 이전 물리 build 시점에 Apple Development identity 1개가 유효했다는 기록은 보존하되, 현재 조회에서 재현되지 않은 원인은 미확정으로 둔다. 인증서·profile·signing 설정을 만들거나 변경하지 않았다. Xcode 계정 로그인이 Distribution archive 자격으로 이어졌다고 추정하지 않는다.
 
 오프라인 update blocker도 직접 다시 확인했다. `simctl` 도움말에 per-simulator network-off 명령이 없고, 계정 없는 임시 iOS 18.6 net-probe simulator의 Device Hub `Controls`에는 Home·Lock·Siri·App Switcher·회전·화면 캡처/녹화만 있었다. 네트워크와 Mac 연결은 변경하지 않았으므로 pending-export offline update는 실행하지 않았다. iOS 17.0 runtime도 설치돼 있지 않다. 따라서 iOS 18 marker/ownership, offline update, iOS 17.0 직접 회귀, Production CloudKit, Distribution Archive/export·TestFlight와 물리 후보 smoke는 계속 **NO-GO**다.
+
+## 2026-09-25 출시 필수 게이트 재점검 — 현재 판정
+
+사용자는 기존 1.3.0 → 2.0.0 지원 보장을 유지하고, iPadOS 17·18의 ownership proof에 근거가 생길 때까지 **NO-GO**를 선택했다. `LegacyRowLinkageReader.validatedOSMajors`는 여전히 `[26]`; iOS 18 V3에서 관찰한 `PFCloudKitMetadataModelMigratorMigrationBeganCommitKey`는 의미가 확인되지 않았다. allowlist 확대·metadata 예외 추가·쓰기 안전장치 제거는 하지 않았다.
+
+사용자가 Carve Development 시험 계정을 로그인한 전용 iPadOS 17.5 simulator에서 기존 1.3.0 앱을 실행해 첫 CloudKit import를 관찰했다. CloudKit setup과 importer 작업 로그는 성공했지만 로컬 V3 drawing row와 record metadata는 모두 0이고 창세기 1장 화면에도 필기가 없었다. 따라서 이는 실제 historical V3 사용자 표본을 받거나 표시한 증거가 아니며, 비어 있는 저장소를 업데이트해 성공으로 세지 않았다. 로그·화면·저장소 검사와 제한은 [호환성 시험 계획의 iOS 17.5 로그인 import 확인](./icloud-sync-compatibility-test-plan.md#2026-09-25-ipados-175-130-로그인-후-실제-cloudkit-가져오기-확인)에 있다.
+
+필수 게이트 상태:
+
+- **기존 필기 무유실 및 ownership proof (iPadOS 17·18): BLOCKED / 출시 NO-GO.** 실제 historical V3 행이 든 1.3.0 표본의 내용·좌표·화면 표시·재실행 보존을 확인하지 못했다. iOS 18 metadata marker도 미해결이다. 사용자는 지원 범위를 유지한 채 증거 확보 전 NO-GO를 선택했다.
+- **옛 무계정 필기의 첫 로그인 전송: BLOCKED.** 기존 synthetic historical-V3 local/peer payload는 서로 일치하지만 같은 record의 독립 서버 payload 대조가 없다. Development 서버에서 검증한 321-byte 표본은 새 2.0.0 앱이 만든 표본이며 historical 1.3.0 필기가 아니다.
+- **새 앱의 일반 동기화: PARTIAL.** 2.0.0 synthetic 표본은 Development 서버의 필드·payload와 일치하고 독립 peer import도 확인했다. 두 iPad에서 시간차 저장·수정·삭제를 양 방향 수신하는 최종 코드 증거는 아직 없다.
+- **실패 시 원본/복구본 보존: PARTIAL.** 저장소 열기 전에 검증된 raw snapshot을 만드는 코드와 migration·snapshot 실패 테스트가 있다. 실제 pending CloudKit export 상태로 업데이트·실패를 주입한 앱 동작 증거는 없다. 현재 확인된 simulator 단독 네트워크 차단 수단이 없으므로 Mac 전체 네트워크를 끊지 않았다.
+- **최종 Xcode Cloud/TestFlight 후보와 물리 iPad 핵심 smoke: BLOCKED.** 기존 TestFlight 2.0.0 (220)은 Xcode 26.6 산출물이다. 확인된 Xcode Cloud 보고서에도 Xcode 27 후보는 없다. Xcode 27 Distribution·Production CloudKit environment 서명이 확인된 후보, Production schema 비교, TestFlight 후보의 필기·필사 저장·재실행·동기화 smoke는 미완료다. 로컬 Apple Distribution identity 부재를 Cloud 배포의 별도 차단 근거로 삼지 않았다.
+
+이번 직접 실기능 확인으로 소유 proof 차단이나 새 metadata 프로필을 해결하지 못했다. 새로 수행한 작업은 iOS 17.5 simulator 로그인 import 상태 관찰과 기록이며, 코드·dependency·CI·signing·build setting·Production schema는 변경하지 않았다. 앱은 계정이 로그인된 해당 simulator에 1.3.0 상태로 남아 있다. 사용자에게 이 Development 계정에 historical V3 표본이 있어야 하는지, 아니면 표본이 있는 다른 정확한 simulator/기기를 제공할 수 있는지 확인을 요청했다. 현재 전체 배포 판정은 **NO-GO**다.
