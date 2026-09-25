@@ -1,6 +1,6 @@
 # iCloud 구·신 버전 호환성 및 복구 테스트 계획
 
-> **현행 출시 판정(2026-09-25):** 2.0.0의 필사 이전·첫 로그인 동기화 기준과 **NO-GO** 사유는 [출시 범위 문서](./release-2.0.0-migration-sync-scope.md)를 따른다. 현행 주 검증 대상은 macOS 27.2 / Xcode 27.0이고 Device Hub는 기기 확인·수동 스모크에 사용하며 자동 빌드·테스트는 CLI로 수행한다. Xcode 27 Tuist workspace Debug iPad simulator build와 iPadOS 17.5 전체 회귀(998 통과·4 expected failure·6 skip), iPadOS 18.6·26.2·26.4·26.5 전체 회귀(각 999 통과·4 expected failure·5 skip), iPadOS 27.0 전체 회귀(998 통과·4 expected failure·6 skip)가 통과했다. 여섯 runtime 모두 총 1008건·실패 0·xcresult runtimeWarnings 없음이다. iOS 17.5 전체 로그의 임시 migration/store fixture 관련 SQLite 경고는 테스트 failure나 xcresult runtime warning이 아니며, 정리 시점과 컨테이너 수명 관계는 미확정이다. 최초 iPadOS 27.0 전체 실행의 cancellation timing 실패는 focused rerun과 후속 전체 회귀에서 재현되지 않았다. 최초 SwiftData 네 실패는 iOS 27의 새 `SwiftDataError.unknownDataStoreSchema`를 확인된 1.0.x store shape에 한해 스키마 불일치로 처리하도록 고친 뒤 focused migration suite와 전체 회귀에서 통과했다. 수정 뒤 첫 전체 run에서 난 reader fixture의 SQLite 잠금 한 건도 reader suite 단독 재실행과 후속 전체 회귀에서 재현되지 않았다. 최초 F60의 XCFramework `ProcessXCFramework` 서명 실패는 workspace build에서 재현되지 않았다. 개별 `-project CarveApp` SwiftPM 모듈 오류와 읽기 전용 artifact 서명 상태 이상은 별도 관측이며 인과관계는 미확정이다. Xcode 26.3의 과거 회귀 결과는 비교 기준이지 Xcode 27 자격 증거가 아니다. Xcode 26.3의 전체 회귀와 Xcode 27 focused migration suite 결과는 아래 기록에 분리했다. Device Hub 수동 UI smoke는 새 iPadOS 27.0 simulator에서 빈 reader 표시와 창세기 1장→2장→1장 이동을 확인했으나 앱 시작 시 iCloud 필사 수신 대기 UI가 나타났다. live CloudKit proof·실기기 필기 입력·배포 서명·Archive·TestFlight는 수행하지 않아 NO-GO다. 아래 SEP 시험은 C14 분리 설계의 관측 기록이다.
+> **현행 출시 판정(2026-09-25):** 2.0.0의 필사 이전·첫 로그인 동기화 기준과 **NO-GO** 사유는 [출시 범위 문서](./release-2.0.0-migration-sync-scope.md)를 따른다. 현행 주 검증 대상은 macOS 27.2 / Xcode 27.0이고 Device Hub는 기기 확인·수동 스모크에 사용하며 자동 빌드·테스트는 CLI로 수행한다. Xcode 27 Tuist workspace Debug iPad simulator build와 iPadOS 17.5 전체 회귀(998 통과·4 expected failure·6 skip), iPadOS 18.6·26.2·26.4·26.5 전체 회귀(각 999 통과·4 expected failure·5 skip), iPadOS 27.0 전체 회귀(998 통과·4 expected failure·6 skip)가 통과했다. 여섯 runtime 모두 총 1008건·실패 0·xcresult runtimeWarnings 없음이다. iOS 17.5 전체 로그의 임시 migration/store fixture 관련 SQLite 경고는 테스트 failure나 xcresult runtime warning이 아니며, 정리 시점과 컨테이너 수명 관계는 미확정이다. 최초 iPadOS 27.0 전체 실행의 cancellation timing 실패는 focused rerun과 후속 전체 회귀에서 재현되지 않았다. 최초 SwiftData 네 실패는 iOS 27의 새 `SwiftDataError.unknownDataStoreSchema`를 확인된 1.0.x store shape에 한해 스키마 불일치로 처리하도록 고친 뒤 focused migration suite와 전체 회귀에서 통과했다. 수정 뒤 첫 전체 run에서 난 reader fixture의 SQLite 잠금 한 건도 reader suite 단독 재실행과 후속 전체 회귀에서 재현되지 않았다. 최초 F60의 XCFramework `ProcessXCFramework` 서명 실패는 workspace build에서 재현되지 않았다. 개별 `-project CarveApp` SwiftPM 모듈 오류와 읽기 전용 artifact 서명 상태 이상은 별도 관측이며 인과관계는 미확정이다. Xcode 26.3의 과거 회귀 결과는 비교 기준이지 Xcode 27 자격 증거가 아니다. Xcode 26.3의 전체 회귀와 Xcode 27 focused migration suite 결과는 아래 기록에 분리했다. Device Hub 수동 UI smoke는 새 iPadOS 27.0 simulator에서 빈 reader 표시와 창세기 1장→2장→1장 이동을 확인했으나 앱 시작 시 iCloud 필사 수신 대기 UI가 나타났다. live CloudKit proof·실기기 필기 입력·App Store 배포 서명 Archive·배포 entitlement·TestFlight는 미완료다. 로컬 Development 서명 Archive는 성공했지만 배포 증거로 보지 않아 NO-GO다. 아래 SEP 시험은 C14 분리 설계의 관측 기록이다.
 
 작성: 2026-09-16 · 최신 결과 추가: 2026-09-25 · 목표: 2.0.0 · **현행 판정은 위 출시 범위 문서와 §5-2/F59/F60을 따른다.** 단계 A~D와 CK/SEP 표의 날짜별 상태는 당시 계획·관측 기록으로 보존한다.
 
@@ -1843,4 +1843,33 @@ Device Hub 결과는 자동 결과와 분리한다. 로그인 전 첫 기기에�
 
 첫 로그인 과정에서 기존 remote row로 보이는 `1-01Genesis.txt.1`, verses `[10, 11, 12]`에 대해 iPadOS 26.5 앱의 single-canvas decode 실패가 앱 로그에 남았다. 읽기 전용 `post-first-login-store/Carve.dev.sqlite`에는 10절 4행·11절 3행·12절 1행, 총 8행이 있었고 모두 22B였다(각 verse 내 payload hash 하나). macOS 27.2 호스트의 PencilKit으로 snapshot의 8개 payload 각각을 `PKDrawing(data:)`에 넣었을 때는 decode 성공·0 strokes였다. 이는 iPadOS 26.5 앱의 실패를 해소하지 않으며, 저장 데이터 손상이나 의도된 빈 drawing 어느 쪽도 단정할 수 없다. 현재 `DrawingCodec.decodeStored`의 `try? PKDrawing(data:)` 경로는 실제 throw 사유를 숨긴다. 앱은 이 행들을 표시·활성 편집에서 제외해 다음 편집을 새 행으로 분리하며, 이 시험에서는 원본 행을 편집하거나 덮어쓰지 않았다. 플랫폼별 decode 차이의 원인·사용자 영향은 미해결이고 별도 표시·복구 점검이 필요하다. 앱 전용 전체 로그는 `/private/tmp/carve-x27-first-login-preflight-20260925/candidate-carveapp-full.log`, 읽기 전용 SQLite snapshot은 `post-first-login-store/`, peer launch 결과는 `peer-first-receive-launch.log`·`.exit`다.
 
-이번 결과는 iOS 26.5에서 만든 **한 개의 synthetic, 무계정 1.3.0 V3 행**의 Xcode 27 2.0.0 first-login export 및 다른 simulator 수신 경로를 확인한 것이다. historical 1.3.0 bundle을 Xcode 27에서 재빌드한 검증, peer physical iPad 표시, 새 sample의 독립 read-only server inventory, iOS 18 marker 의미/allowlist, iOS 17 ownership·iOS 17.0 직접 회귀, widget/history/N-Canvas 왕복, production CloudKit, signed Archive·배포 entitlement·TestFlight는 여전히 미완료다. 전체 출시 판정은 **NO-GO**다.
+이번 결과는 iOS 26.5에서 만든 **한 개의 synthetic, 무계정 1.3.0 V3 행**의 Xcode 27 2.0.0 first-login export 및 다른 simulator 수신 경로를 확인한 것이다. historical 1.3.0 bundle을 Xcode 27에서 재빌드한 검증, peer physical iPad 표시, 새 sample의 독립 read-only server inventory, iOS 18 marker 의미/allowlist, iOS 17 ownership·iOS 17.0 직접 회귀, widget/history/N-Canvas 왕복, production CloudKit, App Store 배포 서명 Archive·Production entitlement·TestFlight는 여전히 미완료다. 전체 출시 판정은 **NO-GO**다.
+
+### Xcode 27 generic iOS Release Archive 서명 사전 검증 (2026-09-25)
+
+실행 환경은 macOS `27.2 (26B5086k)`, 선택된 Xcode `27.0 (27A266a)`, Swift `6.4 (swiftlang-6.4.0.34.1)`, Tuist `4.208.0`이다. `Carve.xcodeproj`가 없어서 기존 manifest·dependency 설정은 바꾸지 않고 `mise x -- tuist generate --no-open`으로 workspace와 프로젝트를 생성했다(exit 0). Archive는 iOS SDK `27.0`의 generic iOS destination으로 수행했으며 simulator runtime과 iPhone destination을 사용하지 않았다.
+
+Archive action의 Release build settings를 읽기 전용 조회했다. `CODE_SIGNING_ALLOWED=YES`, `CODE_SIGNING_REQUIRED=YES`, `CODE_SIGN_STYLE=Automatic`, `CODE_SIGN_IDENTITY=iPhone Developer`, CloudKit/App Group entitlement 파일이 설정돼 있었다. `xcodebuild archive`는 provisioning update 허용 옵션 없이 기존 설정만 사용했다.
+
+```bash
+mise x -- tuist generate --no-open
+# exit 0; /private/tmp/carve-x27-release-archive-preflight-20260925-tuist-generate-elevated.log
+
+xcodebuild -showBuildSettings -workspace Carve.xcworkspace -scheme CarveApp \
+  -configuration Release -destination 'generic/platform=iOS' archive
+# exit 0; /private/tmp/carve-x27-release-archive-preflight-20260925-show-archive-settings.log
+
+xcodebuild archive -workspace Carve.xcworkspace -scheme CarveApp -configuration Release \
+  -destination 'generic/platform=iOS' \
+  -archivePath /private/tmp/carve-x27-release-archive-20260925/Carve.xcarchive \
+  -derivedDataPath /private/tmp/carve-x27-release-archive-20260925/DerivedData
+# ** ARCHIVE SUCCEEDED **, exit 0
+
+codesign --verify --deep --strict \
+  /private/tmp/carve-x27-release-archive-20260925/Carve.xcarchive/Products/Applications/CarveApp.app
+# exit 0
+```
+
+Archive의 bundle/version은 `kr.co.carve.leetaek`, 2.0.0 (1)이고 서명 검증은 통과했다. 단, 서명 클래스는 Apple Development이며 embedded profile은 `get-task-allow=true`인 Development profile이다. 현재 로컬에는 이 bundle의 Development profile만 있고 Apple Distribution identity 및 App Store profile은 없다. 서명된 app에는 CloudKit entitlement가 있으나 `com.apple.developer.icloud-container-environment`는 설정·서명 결과 모두에 없었다. 따라서 이 Archive는 Release 구성의 generic iOS 컴파일과 Development 서명만 증명하며 App Store 배포 서명·Production CloudKit entitlement·TestFlight 적격성을 증명하지 않는다. `xcodebuild -exportArchive`와 TestFlight upload는 실행하지 않았다. 설정·의존성·서명 프로필은 바꾸지 않았다.
+
+전체 Archive 로그는 `/private/tmp/carve-x27-release-archive-20260925/archive.log`, 읽기 전용 Archive build settings는 `/private/tmp/carve-x27-release-archive-preflight-20260925-show-archive-settings.log`, Tuist 생성 로그는 `/private/tmp/carve-x27-release-archive-preflight-20260925-tuist-generate-elevated.log`다. 서명 inventory는 로컬에서 값 노출 없이 분류했다. 빌드는 성공했으나 Sendable closure, N-Canvas 전용 `undoManager` deprecated use, SwiftLint 파일/타입 길이 경고가 로그에 남았다. 이 로컬 Development Archive 이후에도 배포 서명·entitlement·TestFlight는 NO-GO 게이트다.
