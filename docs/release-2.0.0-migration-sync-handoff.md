@@ -236,4 +236,16 @@ Xcode 27 계정 로그인 후 읽기 전용 서명 확인 결과 `security find-
 
 Genesis 1:10–12의 22B 행은 경고 전 `source-store`와 이후 `post-first-login-store`, 두 peer 전후 사본에서 모두 8행과 같은 payload SHA-256을 유지했다. 이는 저장된 표본이 전후에 바뀌지 않았다는 근거지만, warning 당시 앱 메모리의 compose 입력 및 화면 영향은 알 수 없어 결함 원인을 닫지 않는다. 이번 점검은 소스·DB·CloudKit을 변경하지 않고 빌드/테스트도 실행하지 않았다. 자세한 환경 표, 명령, 로그와 제한은 [호환성 시험 계획](./icloud-sync-compatibility-test-plan.md#남은-게이트-사전-점검-및-22b-전후-snapshot-비교-2026-09-25)에 있다.
 
-현재 새 비밀번호 로그인은 필요하지 않다. Genesis 1:31의 독립 Development server inventory를 이어가려면 기존 ACC/Xcode 로그인과 별개인 CloudKit Console User token을 사용자가 terminal의 `xcrun cktool save-token --type user --method keychain` 프롬프트에 직접 저장해야 한다. token 원문은 대화에 공유하지 않는다. iOS 18 marker의 무계정 synthetic lifecycle 비교는 CloudKit 로그인 없이 수행할 수 있고, marker와 서버 ownership의 관계를 검증하는 계정 왕복이 필요하다고 판단될 때만 기존 sandbox 계정 로그인을 요청한다.
+현재 새 비밀번호 로그인은 필요하지 않다. Genesis 1:31의 독립 Development server inventory를 이어가려면 기존 ACC/Xcode 로그인과 별개인 CloudKit Console User token을 사용자가 terminal의 `xcrun cktool save-token --type user --method keychain` 프롬프트에 직접 저장해야 한다. token 원문은 대화에 공유하지 않는다. iOS 18 marker의 무계정 synthetic lifecycle 비교 자체에는 CloudKit 로그인은 필요 없지만, 현재 simctl clone 경로가 원본 app store를 가리킨 이상 기존 simulator에서 clone 비교를 반복하지 않는다. 저장소 URL과 clone 경로 격리가 별도로 증명될 때까지 marker 결과를 보류한다. marker와 서버 ownership의 관계를 검증하는 계정 왕복이 필요하다고 판단될 때만 기존 sandbox 계정 로그인을 요청한다.
+
+## 2026-09-25 병렬 남은 게이트 점검
+
+기본 선택 환경은 macOS `27.2`, Xcode `27.0 (27A266a)`, Swift `6.4`, Tuist `4.208.0`으로 재확인했다. `mise x -- tuist generate --no-open`과 read-only `xcodebuild -list -workspace Carve.xcworkspace`는 각각 exit 0이었다. 이번 turn에는 앱 build/test를 새로 실행하지 않았다.
+
+두 iOS 27 runtime entry는 같은 identifier지만 build가 `24A5370g`·`24A434`로 나뉜다. 24A5370g root를 지정해 만든 simulator가 부팅 후 24A434로 보고해 정확한 런타임 검증이 아니므로 테스트는 시작하지 않았고 그 임시 simulator는 삭제했다. 상세 로그는 `/private/tmp/carve-x27-alt-runtime-20260925/`에 있다.
+
+iOS 18.6 무계정 marker probe는 clone 실행 로그의 CoreData store URL이 원본 UDID의 app container를 가리켜 중단했다. 실행 뒤 원본 store에서 CloudKit setup 실패 event만 7→8로 늘었고, marker integer `1`, Genesis 1:1 298B payload/hash, row 개수와 DB integrity는 유지됐다. clone의 DB는 byte-identical이었으며 export operation·record metadata는 0이었다. simulator source·clone을 종료하고, 전체 원본 app container를 보존한 다음 원본을 clone 실행 전의 95-file snapshot과 byte-for-byte 복원했다. 복원 확인 `diff -qr` exit 0이다. 앱·문서는 바뀌지 않았다. clone 경로 이슈 원인은 미확정이며, 새로 clone 비교를 반복하거나 marker 통과로 기록하지 않는다. 상세 로그와 전후 snapshot은 `/private/tmp/carve-x27-ios18-marker-offline-20260925/`에 있다.
+
+pending/local-only update gate는 아직 실행하지 않았다. 보존한 historical 1.3.0 (1) 앱은 ad-hoc signed이며 Team ID·profile·CloudKit entitlement가 없으므로 local migration 입력에만 쓸 수 있다. live pending export를 검증하려면 Development CloudKit entitlement가 확인된 old app artifact와 Xcode 27 Device Conditions의 양방향 100% network loss 지원을 먼저 갖춰야 한다. 실행 시 새 전용 iPadOS 26.5 simulator에 같은 ACC sandbox 계정 로그인이 필요하고, Development server baseline/final 조회에는 별도의 CloudKit Console User token이 필요하다. 현재 어느 것도 준비되지 않아 로그인 요청이나 sample 생성은 하지 않았다. historical artifact 검사 로그는 `/private/tmp/carve-x27-historical-130-artifact-audit-20260925/read-only-audit-corrected.log`다.
+
+따라서 iOS 18 marker/ownership, iOS 17.0 직접 회귀, 독립 Development server inventory, pending export update, Production CloudKit, Xcode 27 Distribution Archive/export·TestFlight 및 물리 후보 smoke는 계속 NO-GO다. 전체 명령, 제한과 snapshot 복구 기록은 [호환성 시험 계획의 2026-09-25 병렬 게이트 기록](./icloud-sync-compatibility-test-plan.md#병렬-남은-게이트-점검-및-ios-18-simulator-clone-격리-실패-2026-09-25)을 기준으로 한다.

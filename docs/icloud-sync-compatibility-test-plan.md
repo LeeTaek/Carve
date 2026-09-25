@@ -2080,3 +2080,31 @@ Xcode 27 계정 로그인 이후 로컬 서명 자격을 읽기 전용으로 다
 별도 Development private-zone server inventory는 여전히 미실행이다. ACC 및 Xcode 27 로그인과 다른 `cktool` User token이 필요하다. CloudKit Console에서 만든 token을 사용자가 터미널의 `xcrun cktool save-token --type user --method keychain` 프롬프트에 직접 입력해 Keychain에 저장해야 한다. token이나 계정 비밀번호를 대화에 보내지 않는다. token이 저장되면 Genesis 1:31 synthetic row에 한정해 Development private DB를 읽기 전용 조회한다.
 
 이번 사전 점검·스냅샷 비교는 자동 빌드나 테스트를 실행하지 않았다. Xcode 27 전체 회귀 및 네 runtime의 22B focused 결과는 별도 위 절에 기록한 결과 그대로다. iOS 18 marker 의미·proof, iOS 17.0 직접 회귀·ownership, 31 표본의 독립 server inventory, Production CloudKit, Distribution 서명 Archive/export·Production entitlement·TestFlight와 물리 후보 smoke는 미완료여서 출시 판정은 **NO-GO**다.
+
+### 병렬 남은 게이트 점검 및 iOS 18 simulator clone 격리 실패 (2026-09-25)
+
+작업 시작 시 `git status --short --branch`와 diff는 clean이었다. 다시 확인한 기본 환경은 macOS `27.2`, `/Applications/Xcode.app/Contents/Developer`의 Xcode `27.0 (27A266a)`, Swift `6.4 (swiftlang-6.4.0.34.1)`, Tuist `4.208.0`이다. `xcrun simctl list runtimes`와 `list devices available`는 조회됐다. iOS 27 runtime 두 항목은 같은 runtime identifier를 쓰지만 build가 `24A5370g`와 `24A434`로 다르다.
+
+이번에 필요한 생성·scheme 확인 명령은 성공했다. 자동 빌드나 테스트는 새로 실행하지 않았다.
+
+```bash
+mise x -- tuist generate --no-open
+# exit 0; /private/tmp/carve-x27-remaining-gates-20260925/tuist-generate-elevated.log
+
+xcodebuild -list -workspace Carve.xcworkspace
+# read-only scheme listing exit 0; /private/tmp/carve-x27-remaining-gates-20260925/xcodebuild-list.log
+```
+
+두 iOS 27 runtime 가운데 `24A5370g`를 검증하려고 그 runtime root로 전용 iPad mini simulator를 만들었지만, 부팅 후 runtime build 환경은 `24A434`를 반환했다. 동일 identifier만으로는 런타임을 구별할 수 없어서 테스트를 시작하지 않았다. 이번에 만든 simulator는 종료·삭제했고 사후 목록에서 사라진 것을 확인했다. 생성·부팅·정리 로그는 `/private/tmp/carve-x27-alt-runtime-20260925/`에 있다. 따라서 새 iOS 27 회귀 결과는 없다.
+
+iOS 18.6 무계정 marker 비교를 위해 기존 `Carve-X27-iOS18.6-V3-Offline-20260925`의 앱 컨테이너를 두 번 복사해 hash 안정성을 확인하고, 원본을 정상 종료한 뒤 전용 clone을 생성했다. 원본과 clone의 Accounts3에는 계정·활성·인증 행이 없었다. clone 실행 전에는 원본 95개 파일의 종료 snapshot과 clone의 별도 data root가 일치했고, clone은 계정 없음 상태였다. 그러나 clone의 `simctl appinfo/get_app_container`가 원본 경로를 반환했고, clone UDID로 시작한 앱의 Core Data CloudKit setup 로그도 원본 UDID의 `Carve.dev.sqlite` URL을 가리켰다. 소스 코드 감사에서는 저장소의 절대 경로 하드코딩을 찾지 못했다. 앱 코드는 `URL.applicationSupportDirectory`에서 저장소 URL을 런타임에 구성하므로, 경로 혼선 원인은 소스 코드가 아니라 복제된 simulator/CoreData 상태에 있을 가능성이 있으나 아직 미확정이다.
+
+clone에서 앱을 한 번 실행한 뒤 원본 DB의 `ANSCKEVENT`가 7건에서 8건으로 늘었다. 새 이벤트는 모두 `NSCocoaErrorDomain 134400` (`CKAccountStatusNoAccount`) setup 실패였다. export operation·exported object·record metadata는 계속 0개였고, Genesis 1:1의 298B payload SHA-256 `07876e8b1910039124914f5c44b9619a90b8ad488a08500bdfa6abc07762c3d6`, marker의 SQLite integer 값 `1`, 단일 drawing 행, integrity check는 유지됐다. clone의 DB는 실행 전후 byte-identical이었다. 앱 데이터 컨테이너 나머지 파일 일부도 원본에서 변경돼 이 결과를 clone 격리 또는 offline-network proof로 인정하지 않는다. 로그인은 하지 않았고 CloudKit 성공·원격 쓰기는 관찰되지 않았다.
+
+증거를 보존한 뒤 두 simulator를 종료했다. CoreSimulatorService 연결이 간헐적으로 끊겨 마지막 `simctl list devices available` 재확인은 실패했지만, 종료 성공 명령과 `/private/tmp/carve-x27-ios18-marker-offline-20260925/devices-after-safety-shutdown.log`에는 두 기기가 Shutdown으로 남아 있다. 원본 side effect로부터 계정 없는 sample을 복구하기 위해 실행 후 원본 app container 전체를 `/private/tmp/carve-x27-ios18-marker-offline-20260925/source-app-data-postlaunch-preserved/`로 보존하고, 95개 파일 종료 전 snapshot `original-app-data-pre-shutdown/`을 같은 app-container UUID 경로에 복원했다. `diff -qr`가 exit 0으로 두 95-file tree의 내용이 같은 것을 확인했고 임시 sibling 디렉터리는 정리했다. 복원은 app-local 파일만 대상으로 했고 CloudKit에는 접근하지 않았다. 전체 비교·DB 보고서·앱 로그는 `/private/tmp/carve-x27-ios18-marker-offline-20260925/`에 남아 있다. marker 의미와 iOS 18 ownership proof는 여전히 미확정이다.
+
+보존된 historical `Carve-2.0.0-test-legacy` 앱 번들은 읽기 전용 검증에서 `1.3.0 (1)`, iOS 17.0 minimum, Xcode 26.3 / iOS Simulator SDK 26.2 산출물이며 `codesign --verify --deep --strict`가 통과했다. ad-hoc 서명이고 Team ID·프로비저닝 profile·CloudKit entitlement가 비어 있으므로 전용 iPadOS 26.5에서 local install/update/migration 입력으로는 쓸 수 있지만 live CloudKit pending export proof에는 사용할 수 없다. 감사 결과는 `/private/tmp/carve-x27-historical-130-artifact-audit-20260925/read-only-audit-corrected.log`에 있다.
+
+별도 pending/local-only export gate의 조사 결과, online 상태에서 합성 행을 쓰고 곧바로 update하는 방식은 Core Data export가 먼저 끝날 수 있어 재현성이 없다. 실행 전 Xcode 27 Device Conditions가 선택 simulator에 100% 양방향 network loss를 설정할 수 있는지 확인하고, Core Data network error 및 `ZNEEDSUPLOAD=1`을 동시에 보아야 한다. 이후에만 같은 simulator에서 old app의 오프라인 합성 행 → Xcode 27 Debug 덮어 설치 → pending 유지 → 네트워크 복구 뒤 Development export·peer receive 순서로 진행한다. 새 simulator의 같은 ACC sandbox 로그인과, CloudKit Console User token을 통한 독립 Development server baseline/final query가 필요하다. 현재 historical artifact에는 Development CloudKit entitlement가 없고 token도 준비되지 않아 이 gate는 실행하지 않았다. 이 절차 설계는 시뮬레이터·계정·CloudKit 데이터에 접근하지 않았다.
+
+이번 단계에서 완료된 것은 문서 밖 환경·아티팩트 사전 점검과 원본 app-local snapshot 복구뿐이다. 테스트는 미실행이며 기존 Xcode 27 통과 결과를 새 gate의 통과로 확대하지 않는다. iOS 18 marker/ownership, iOS 17.0 직접 회귀, Development server inventory, pending export update, Production CloudKit, Distribution 서명 Archive/export·TestFlight 및 물리 후보 smoke는 미완료여서 출시 **NO-GO**를 유지한다.
