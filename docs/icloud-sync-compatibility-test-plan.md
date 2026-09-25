@@ -2237,3 +2237,41 @@ codesign --verify --deep --strict \
 이 산출물은 `kr.co.carve.leetaek` `2.0.0 (1)`이고 `Info.plist`의 `CLOUDKIT_CONTAINER_ID`는 `iCloud.Carve.SwiftData.iCloud.dev`다. signed entitlements에는 CloudKit service와 두 container ID가 있으나 `com.apple.developer.icloud-container-environment`는 없다. embedded Development profile은 `get-task-allow=true`이며 해당 environment 값을 `Development`와 `Production` 모두 허용한다. Apple 문서에 따르면 CloudKit은 이 entitlement로 런타임의 Development/Production 환경을 선택한다([CKContainer — Development 환경 테스트](https://developer.apple.com/documentation/cloudkit/ckcontainer)). 따라서 container ID만으로 CloudKit Development environment가 고정됐다고 추정하지 않는다. 같은 bundle ID로 설치하면 기존 TestFlight 앱과 설치본이 교체될 수 있고, 현재 서명 결과로는 이 기기에서 Production environment 접근을 배제할 수 없어 설치·실행하지 않았다. 읽기 전용 재확인에서 기존 TestFlight `2.0.0 (220)`은 그대로 설치돼 있었다. 물리 iPad 앱·데이터는 이번 작업에서 변경하지 않았다.
 
 전체 build log/exit, strict codesign 결과, signed entitlement·profile 검사는 `/private/tmp/carve-x27-physical-smoke-20260925/`에 있다. 이 physical Debug build·서명 검증은 자동 테스트와 분리하며, Release Distribution/Production 환경, TestFlight 후보 및 물리 CloudKit peer smoke의 증거로 세지 않는다. Development-only environment가 서명으로 확인되는 후보 없이는 해당 smoke를 진행하지 않는다.
+
+### Xcode 27 iPadOS 18.6 앱 컴파일 및 집중 회귀 (2026-09-25)
+
+환경은 macOS `27.2 (26B5086k)`, `xcode-select -p` `/Applications/Xcode.app/Contents/Developer`, Xcode `27.0 (27A266a)`, Swift `6.4.0.34.1`, Tuist `mise x -- tuist version` `4.208.0`이다. 대상은 iPad mini (A17 Pro), iPadOS `18.6 (22G86)` simulator다.
+
+새 빈 simulator `Carve-X27-Ownership-Migration-iOS18.6-20260925` (`1314A38C-D931-4733-AD31-31B4D415F9C8`)에서 먼저 관련 소유권·마이그레이션 suite를 실행했다.
+
+```bash
+xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configuration Debug \
+  -destination 'platform=iOS Simulator,id=1314A38C-D931-4733-AD31-31B4D415F9C8' \
+  -parallel-testing-enabled NO \
+  -derivedDataPath /private/tmp/carve-x27-focused-sync-tests-20260925/DerivedData \
+  -resultBundlePath /private/tmp/carve-x27-ios18.6-ownership-20260925/OwnershipAndMigration.xcresult \
+  -only-testing:DomainTest/DrawingStoreOwnershipProofTesting \
+  -only-testing:DomainTest/MigrationSyncReleaseTesting
+# exit 0; 11 passed, 0 failed, 0 skipped, 0 expected failures; xcresult runtimeWarnings 0
+```
+
+전체 로그·종료 코드는 `/private/tmp/carve-x27-ios18.6-ownership-20260925/xcodebuild-test.log` 및 `xcodebuild-test.exit`에 있다. 합성/local 경로의 결과로 CloudKit 로그인·데이터 변경은 없었으며 iOS 18.6의 실제 private metadata marker 의미나 live ownership proof는 닫지 않는다.
+
+그 다음 Xcode 27 workspace에서 `CarveApp` Debug simulator build를 실행했다.
+
+```bash
+xcodebuild -workspace Carve.xcworkspace -scheme CarveApp -configuration Debug \
+  -destination 'platform=iOS Simulator,id=7E95B700-3976-42D7-BF85-BCAF028B7605' \
+  -derivedDataPath /private/tmp/carve-x27-ios18.6-app-build-20260925/DerivedData build
+# BUILD SUCCEEDED, exit 0
+```
+
+destination은 iPad mini (A17 Pro), iPadOS `18.6 (22G86)`이며 Xcode 27.0의 iOS Simulator 27.0 SDK를 사용했다. 전체 로그·종료 코드는 `/private/tmp/carve-x27-ios18.6-app-build-20260925/xcodebuild-build.log` 및 `xcodebuild-build.exit`에 있다. 기존 `undoManager` deprecated 진단, 매크로의 non-Sendable 변환 경고와 SwiftLint 경고가 남았다. 앱을 simulator에 설치·실행하지 않았고 CloudKit/Firebase 실행 데이터도 바꾸지 않았다. 따라서 이것은 iOS 18.6 runtime에서의 앱 동작이나 Distribution 서명 검증이 아니다.
+
+같은 환경 확인에서 일반 sandbox 호출은 Tuist session 경로와 CoreSimulatorService 로그 접근 권한 오류를 냈다. 동일한 `xcode-select -p`, `xcodebuild -version`, `swift --version`, `mise x -- tuist version`, `xcrun simctl list runtimes`, `xcrun simctl list devices available`을 권한 있는 CLI로 조회해 각각 성공했으며 Tuist `4.208.0`, Xcode `27.0 (27A266a)`, Swift `6.4.0.34.1`과 runtime/device 목록을 얻었다. runtime은 iOS `17.5`, `18.6`, `26.2`, `26.4`, `26.5`, `27.0`이며 iOS `17.0`은 없다.
+
+`xcrun simctl help`에는 simulator 한 대의 네트워크 차단/비행기 모드 명령이 없다. 계정 없는 임시 `Carve-X27-AirplaneMode-NetProbe-20260925`를 Device Hub에서 선택해 `Controls`를 확인했으나 Home·Lock·Siri·App Switcher·회전·화면 캡처/녹화만 있었고 네트워크 제어는 없었다. 네트워크 격리를 설정하거나 Mac 네트워크를 끊지 않았으므로 pending-export offline update 시험은 실행하지 않았다.
+
+마지막 read-only 서명 자격 재확인에서 `security find-identity -v -p codesigning`은 `0 valid identities found`를 반환했다. 두 표준 provisioning profile 저장 경로에서 찾은 프로파일 3개 중 정확한 Carve bundle profile은 Development/ad-hoc 1개뿐이었고 `get-task-allow=true`, CloudKit environment는 `Development`와 `Production` 모두였다. 이는 앞선 physical Debug build 시점의 Apple Development identity 1개 기록과 다르며 원인은 미확정이다. 현재 Apple Distribution identity와 App Store profile은 확인하지 못했다. 인증서·profile·signing 설정은 바꾸지 않았으며 Distribution Archive/export·Xcode 27 TestFlight gate는 계속 NO-GO다.
+
+따라서 iOS 18.6 focused suite와 앱 컴파일은 통과했지만 iOS 18 marker 의미·계정/ownership 왕복, iOS 17.0 직접 회귀, pending export offline update, Production CloudKit, Distribution Archive/export·TestFlight 및 물리 후보 smoke는 미완료다. Xcode 26.3 결과로 대체하지 않고 출시 판정은 **NO-GO**다.
