@@ -2054,3 +2054,29 @@ xcrun cktool query-records \
 ```
 
 서버에 query가 도달하거나 레코드 응답을 받은 것이 아니다. CloudKit 데이터의 생성·수정·삭제는 없었다. 첫 결과는 `/private/tmp/carve-x27-cloudkit-31-inventory-20260925/remote-query.log`, 사용자 token 준비를 기다린 뒤 재시도한 결과는 `remote-query-after-token-request.log`와 `.exit`에 있다. token 확인 뒤 필요한 단계는 사용자가 CloudKit Console에서 같은 sandbox 계정의 User token을 만들고 `xcrun cktool save-token --type user --method keychain`의 terminal prompt에 직접 입력하는 것이다. token 원문은 chat·로그에 붙이지 않는다. 절차는 [Apple cktool guide](https://developer.apple.com/icloud/ck-tool/)에 있다. token이 저장되면 해당 Development private-zone query를 재개하며 Production database는 조회하지 않는다.
+
+### 남은 게이트 사전 점검 및 22B 전후 snapshot 비교 (2026-09-25)
+
+이번 점검 전 `git status --short --branch`와 문서 diff를 확인했다. 브랜치는 `codex/2-0-0-migration-sync-release`이며 기존 미커밋 변경은 없었다. Xcode 27/macOS 27.2 기준은 그대로 두고 환경을 다시 조회했다.
+
+| 명령 | 결과 |
+|---|---|
+| `xcode-select -p` | `/Applications/Xcode.app/Contents/Developer` |
+| `xcodebuild -version` | Xcode `27.0 (27A266a)` |
+| `swift --version` | Swift `6.4 (swiftlang-6.4.0.34.1)`, macOS `27.2` target |
+| `mise x -- tuist version` | Tuist `4.208.0` |
+| `xcrun simctl list runtimes` | 조회 성공. iOS 17.5·18.6·26.2·26.4·26.5·27.0이 설치됨. 27.0 runtime은 `24A5370g`와 `24A434` 두 항목이며, 현재 기기가 나열된 것은 `24A434`; iOS 17.0은 없음 |
+| `xcrun simctl list devices available` | 조회 성공. 실행 중인 iPadOS 18.6·26.5·27.0 기기 포함 |
+| `xcodebuild -showsdks` | iOS와 iOS Simulator SDK `27.0` 확인 |
+
+iOS 17.0은 현재 직접 회귀 대상이 없다. 설치된 iOS 17.5 전체 회귀를 17.0 결과로 확대하지 않는다. 이전 runtime이 Xcode Components catalog에 제공되는지는 아직 확인하지 않았으며, 이번에는 다운로드·설치를 시도하지 않았다. simulator 회귀 자체에는 iCloud 로그인이 필요하지 않다. iOS 17 ownership proof를 추후 수행하려면 새 simulator에서 기존 ACC와 같은 sandbox 계정 로그인 및 synthetic Development CloudKit 표본이 필요하다.
+
+Xcode 27 계정 로그인 이후 로컬 서명 자격을 읽기 전용으로 다시 확인했다. `security find-identity -v -p codesigning`은 exit 0, `0 valid identities found`였다. Xcode profile store의 3개 CMS payload를 로컬 임시 경로에 풀어 bundle/entitlement 조건을 분류했을 때 Carve bundle의 App Store profile과 Production CloudKit entitlement가 각각 0개였다. payload 내용 분류는 서명 검증이나 서명 설정 변경이 아니다. 이전 Xcode 27 Development Archive 결과를 현재 로컬 배포 자격으로 간주하지 않으며, 새 Distribution 자격·Production 환경 entitlement·Xcode 27 후보 TestFlight가 확보되기 전 물리 후보 앱을 설치하지 않는다.
+
+앱 경고 원인을 좁히기 위해 `/private/tmp/carve-x27-first-login-preflight-20260925/`의 보존 SQLite 복사본을 Python 표준 `sqlite3`로 `mode=ro&immutable=1` 연결해 읽었다. `source-store`, `post-first-login-store`, `peer-before-receive-store`, `peer-after-receive-store`, `peer-post-observation-store` 모두 Genesis 1:10–12의 총 8행(10절 4행, 11절 3행, 12절 1행)이 남아 있었다. 모든 payload가 22B이며 SHA-256은 `fd34c90bb64fe7516efce8a76fe2ece33b9821935183664dfda18c84b31c1d2f`로 같았다. DB 파일은 수정하지 않았다.
+
+보존된 앱 로그 `/private/tmp/carve-x27-first-login-preflight-20260925/candidate-carveapp-full.log`에는 2026-09-25 13:02:25.437에 `verses=[10, 11, 12]` undecodable 경고가 있다. source/post-login/peer snapshot의 payload가 동일하고, 동일 22B 값의 raw PencilKit 및 `DrawingCodec.compose` focused 확인도 성공했지만 당시 메모리의 대표 snapshot `lineData` hash와 `PKDrawing(data:)` 오류는 로그에 없다. 따라서 앱 warning의 원인은 여전히 미확정이고 표시·사용자 영향도 닫지 않는다. 새 빌드, 앱 재실행, CloudKit 조회 또는 행 쓰기는 이번 비교에서 하지 않았다.
+
+별도 Development private-zone server inventory는 여전히 미실행이다. ACC 및 Xcode 27 로그인과 다른 `cktool` User token이 필요하다. CloudKit Console에서 만든 token을 사용자가 터미널의 `xcrun cktool save-token --type user --method keychain` 프롬프트에 직접 입력해 Keychain에 저장해야 한다. token이나 계정 비밀번호를 대화에 보내지 않는다. token이 저장되면 Genesis 1:31 synthetic row에 한정해 Development private DB를 읽기 전용 조회한다.
+
+이번 사전 점검·스냅샷 비교는 자동 빌드나 테스트를 실행하지 않았다. Xcode 27 전체 회귀 및 네 runtime의 22B focused 결과는 별도 위 절에 기록한 결과 그대로다. iOS 18 marker 의미·proof, iOS 17.0 직접 회귀·ownership, 31 표본의 독립 server inventory, Production CloudKit, Distribution 서명 Archive/export·Production entitlement·TestFlight와 물리 후보 smoke는 미완료여서 출시 판정은 **NO-GO**다.

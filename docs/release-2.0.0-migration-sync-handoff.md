@@ -227,3 +227,13 @@ Xcode 27 workspace build와 iPadOS 17.5·18.6·26.2·26.4·26.5·27.0 전체 자
 추가 로그·문서·프롬프트에 iCloud 계정 식별 원문, 이메일, 토큰 또는 비밀정보를 적지 않는다. 계정 로그인은 사용자가 같은 계정으로 복제본과 Xcode 27에 로그인해 이번 proof를 완료했다. 이후 별도 로그인이나 계정 전환이 필요한 작업은 진행 전에 사용자에게 단계와 예상 데이터 영향을 설명한다. 계정less iOS 18.6 sample은 현재 상태를 보존한다.
 
 다른 컴퓨터에서 이어갈 때는 이 문서와 [출시 범위](./release-2.0.0-migration-sync-scope.md), [호환성 시험 계획 §5-2](./icloud-sync-compatibility-test-plan.md)을 읽고 현재 checkout·툴체인·시뮬레이터 상태를 다시 확인한다. 위의 보존 표본과 CloudKit 승인 제한을 그대로 적용한다.
+
+## 2026-09-25 남은 게이트 재점검
+
+기본 선택 Xcode는 여전히 `/Applications/Xcode.app/Contents/Developer`의 Xcode `27.0 (27A266a)`, Swift `6.4`, Tuist `4.208.0`이다. `simctl` runtime/device 목록은 성공했으며 iOS 17.0은 없다. iOS 17.5 결과는 17.0 결과로 대체할 수 없다. iOS 17.0 직접 simulator 회귀에는 iCloud 로그인이 필요하지 않지만, runtime이 제공되어 설치해야 한다. 같은 OS의 실제 ownership proof까지 할 때는 새 simulator에 기존 ACC와 같은 sandbox 계정으로 로그인하고 synthetic Development CloudKit 표본을 사용해야 한다.
+
+Xcode 27 계정 로그인 후 읽기 전용 서명 확인 결과 `security find-identity -v -p codesigning`은 `0 valid identities found`였고, 현재 Xcode profile store의 3개 CMS payload 중 Carve bundle App Store profile과 Production CloudKit entitlement는 0개였다. 예전 Development Archive는 현재 Distribution 배포 자격이 아니다. Xcode Cloud TestFlight build 220은 Xcode 26.6 결과이며, Xcode 27 후보를 만들려면 Xcode 27 환경을 실제로 선택한 Cloud workflow, 유효한 Apple Distribution 자격, Production CloudKit entitlement/environment가 따로 필요하다. workflow·signing 설정은 변경하지 않았다.
+
+Genesis 1:10–12의 22B 행은 경고 전 `source-store`와 이후 `post-first-login-store`, 두 peer 전후 사본에서 모두 8행과 같은 payload SHA-256을 유지했다. 이는 저장된 표본이 전후에 바뀌지 않았다는 근거지만, warning 당시 앱 메모리의 compose 입력 및 화면 영향은 알 수 없어 결함 원인을 닫지 않는다. 이번 점검은 소스·DB·CloudKit을 변경하지 않고 빌드/테스트도 실행하지 않았다. 자세한 환경 표, 명령, 로그와 제한은 [호환성 시험 계획](./icloud-sync-compatibility-test-plan.md#남은-게이트-사전-점검-및-22b-전후-snapshot-비교-2026-09-25)에 있다.
+
+현재 새 비밀번호 로그인은 필요하지 않다. Genesis 1:31의 독립 Development server inventory를 이어가려면 기존 ACC/Xcode 로그인과 별개인 CloudKit Console User token을 사용자가 terminal의 `xcrun cktool save-token --type user --method keychain` 프롬프트에 직접 저장해야 한다. token 원문은 대화에 공유하지 않는다. iOS 18 marker의 무계정 synthetic lifecycle 비교는 CloudKit 로그인 없이 수행할 수 있고, marker와 서버 ownership의 관계를 검증하는 계정 왕복이 필요하다고 판단될 때만 기존 sandbox 계정 로그인을 요청한다.
