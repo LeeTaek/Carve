@@ -167,7 +167,18 @@ struct StrokeOwnershipLassoTesting {
         #expect(ownership.ownedVerses == [1, 2])
     }
 
-    private func anchors(of drawing: PKDrawing, seed: UInt32) -> Set<CGPoint> {
-        Set(drawing.strokes.filter { $0.randomSeed == seed }.compactMap { resolver.anchorPoint(of: $0) })
+    private func anchors(of drawing: PKDrawing, seed: UInt32) -> [CGPoint] {
+        let points = drawing.strokes
+            .filter { $0.randomSeed == seed }
+            .compactMap { resolver.anchorPoint(of: $0) }
+            .sorted { lhs, rhs in
+                lhs.x == rhs.x ? lhs.y < rhs.y : lhs.x < rhs.x
+            }
+        var uniquePoints: [CGPoint] = []
+        for point in points {
+            if let last = uniquePoints.last, last == point { continue }
+            uniquePoints.append(point)
+        }
+        return uniquePoints
     }
 }
