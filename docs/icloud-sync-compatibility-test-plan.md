@@ -2465,3 +2465,63 @@ Device Hub 수동 smoke는 완료되지 않았다. 자동 CLI와 실제 앱 laun
 후속으로 정확한 peer에서 `com.apple.Preferences`를 열고 `simctl io screenshot`을 사용해 Settings를 확인했다. Apple Account 카드에는 iCloud/App Store 접근을 위해 로그인하라는 안내가 표시됐다. 캡처는 `/private/tmp/carve-x27-ownership-peer-b-settings-check-20260926.png`이며 Simulator CLI 캡처다. 계정 주소·자격 증명은 캡처에 없고 기록하지 않았다. 이 관측으로 이 실행 시점 peer의 Settings에는 Apple Account가 로그인되어 있지 않았음을 확인했다. 이는 Device Hub manual smoke가 아니다.
 
 Carve 종료 뒤 전체 post-login peer app container를 `/private/tmp/carve-x27-ownership-peer-b-postlogin-20260926/AppContainer`에 복사했다. 사본의 `Library/Application Support/Carve.dev.sqlite`는 `PRAGMA integrity_check=ok`, drawing/page/favorite 각 0행이고 `ANSCKRECORDMETADATA`·`ANSCKMETADATAENTRY` table이 없었다. `Preservation/Carve.dev.sqlite`는 DB 파일이 아니라 directory이며 `raw-not-needed.json` timestamp marker만 있어 이 실행의 raw SQLite snapshot은 없다. 계정 전환 전 전체 컨테이너 보존 사본은 별도 경로에 그대로 남아 있다.
+
+
+## 2026-09-27 재개 — 실제 18.6 V3 업데이트와 독립 수신 증거
+
+아래 실험은 9월 26일 오후에 수행했고 27일 재개 때 기록했다. 앞 절의 `No account`와 표본 부재는 당시 특정 기기의 관측이다. 최신 결과와 혼동하지 않는다. 증거 루트는 `/private/tmp/carve-peer-correct-20260926`이다. SQLite는 앱 종료 후 복사한 저장소에서만 검사했다. 시험 원본과 외부 payload 디렉터리를 함께 보존했다.
+
+### 기기·계정과 격리
+
+- target `A522DEEB-AA58-4ADF-B186-FB94E07C45AF`: b 계정. 기존 22행 Application Support를 기기 Documents에 보존한 뒤 별도 시험 저장소를 사용했고, 시험 뒤 **원래 지원 디렉터리를 복원**, 앱 종료했다.
+- 독립 peer `DC7D72AB-1CD2-4852-B459-0CCD45FE7862`: 사용자가 b로 로그인한 실제 peer다. 이름은 `Carve-2.0.0-Ownership-Peer-iOS18.6-20260926`. 기존 다른 소유자의 2행 저장소를 보존한 뒤 빈 시험 저장소에서 수신했고, 시험 뒤 **원래 지원 디렉터리를 복원**, 앱 종료했다.
+- `1FAEBEDC-A397-477D-A83A-6362D2C4BEB3`: 이름에 `TargetAccount`가 있는 별도 기기. 앞선 로그인 확인 요청은 이 기기와 위 peer를 혼동한 것이었다. 27일 Device Hub Settings는 여전히 로그인 안내 상태다. 현재 실제 무계정 1.3.0 → 2.0.0 첫 로그인 시험에 사용한다.
+- clone `CE6DFA0F-B768-450A-8991-ABC46BA75412`: `get_app_container`가 DC peer의 원본 경로를 반환했다. 앱 실행·초기화·uninstall 없이 종료했고 **독립 peer 증거에서 제외**했다.
+
+### 실제 관측 결과
+
+| 시험 | 결과와 한계 | 증거 루트 아래 경로 |
+|---|---|---|
+| b 로그인 + 다른 소유자 기존 저장소 | 최신 앱이 `.none` ownership hold. private attach/account-change purge 없음. 2개 drawing 및 record metadata 전후 완전 동일. 서버 전체 불변을 직접 조회한 것은 아님 | `stopped-before`, `after-held`, `app.log` |
+| 기존 b target 현행 앱 재실행 | 22행 전체 SQL 값 동일, setup/import/export 성공, import/export madeChanges 0 | `target-preserved`, `target-after-current`, `target-current-app.log` |
+| 26.5에서 보존된 V3를 18.6으로 이식 | b identity 일치로 proof 통과했지만 Core Data metadata setup이 `no such column: OLD.ZENCODEDRECORD`로 실패. 로컬 무결성 ok, 20행 보존. 정상 동일 OS 업데이트 성공으로 세지 않음. private table 수정 안 함 | `linked-v3`, `linked-v3-after`, `target-current-app.log` PID 66530 |
+| 실제 1.3.0을 18.6에서 실행 → 동일 기기 2.0.0 업데이트 | 1.3.0이 b 서버에서 22행을 받아 만든 V3. 업데이트 뒤 integrity ok, 22행 및 ID·본문 위치·번역·날짜·isPresent·drawingVersion·lineData 완전 동일. `currentPrivateCloudRecords` 소유 표식, private setup/import/export 성공 | `actual18-v3-before`, `actual18-after-update`, `target-current-app.log` PID 67094/79090 |
+| 독립 DC peer 빈 시험 저장소 수신 | import madeChanges 1, 22행 수신, export madeChanges 0. target과 b scope 일치. 기존 298B 합성 행 SHA256 `07876e8b1910039124914f5c44b9619a90b8ad488a08500bdfa6abc07762c3d6` 일치. 로컬 파일을 peer에 이식하지 않음 | `independent-receive-store`, `independent-receive.log` |
+| 실제 무계정 1.3.0 필기 → 2.0.0 | Device Hub에서 빈 창세기 22:1에 손가락 필사를 켜고 두 획 작성. V3 1행, mapping 0, 469B. 업데이트 후 모든 비교 필드 동일, 두 획 표시. No account local-only hold. 첫 로그인은 대기 중 | `actual-noaccount-v3-before`, `actual-noaccount-after-update`, `actual-noaccount-update.log`, 동일 basename `.png` |
+
+실제 무계정 payload SHA256은 `54bc93a8d37637b3d89dc17438328f527d87500af8800aca65f16aaff006eedb`다. 원본·업데이트 후 integrity는 모두 ok. 행의 `isPresent=0`, `drawingVersion=1`도 그대로다. 이 실제 입력은 Device Hub 수동 smoke이며 CLI 단위 테스트나 Apple Pencil 실기기 시험으로 세지 않는다. 화면 디자인과 본문 줄 간격은 새 앱에서 달라졌으나 동일 두 획이 해당 절에 표시됐다. 픽셀 전체 일치라고 주장하지 않는다.
+
+### 과거 표본·도구 기록 정정
+
+역사적 앱은 실제로 존재했다. `0A956010-5DAA-44BC-BA22-5BAE53FF6D82`의 bundle을 `Historical-1.3.0.app`으로 복사했다. Info는 1.3.0(1), Xcode 26.3/17C529, simulator SDK 26.2이며 strict codesign 검증 성공. 바이너리 SHA256 `de8893a70a0f2bd2bf2a1605247aaa89cea5dfafec5116460df5f7a94889bfbd`. Xcode 27에서 역사 앱을 재빌드한 결과는 아니다. 후보는 기존 Xcode 27 빌드 `/private/tmp/carve-x27-ownership-release-app-derived-20260926/Build/Products/Debug-iphonesimulator/CarveApp.app`, 바이너리 SHA256 `4e2ae5fa9b798f4b04c2432e72201c3a5837ab27cf3c7156c72734ec5606a605`다.
+
+앞선 298B 합성 행은 book key가 `66-22Revelation.txt`로 잘못돼 있었다. 실제 key는 `2-27Revelation.txt`다. 같은 잘못된 `-UITestChapter`도 decode되지 않아 Genesis 화면이 열렸다. 따라서 그 행은 payload/소유/전송 증거로만 남기고 **표시 보존 성공 근거에서는 제외**한다. 원본 값을 수정해 과거 성공으로 바꾸지 않았다.
+
+혼합 b 서버에서 받은 V3의 Genesis 1:4는 보관 필기와 활성 nil payload 행이 함께 있었다. 1.3은 획이 있는 행부터 선택하고 2.0은 활성 빈 행을 유지하므로 표시 차이가 있었다. 역사적 1.3 지우기도 빈 PKDrawing 활성 행과 보관 행 조합을 만들 수 있지만, 관측 nil 행의 출처는 혼합 서버라 확정할 수 없다. 2.0의 의도적 지우기를 되살리지 않도록 전역 대표행 규칙은 바꾸지 않았다. 이 혼합 표본을 모든 legacy 표시 보존의 증거로 세지 않는다.
+
+과거 문서의 `tools/cloudkit-observe/probe.sh`와 `/private/tmp/carve-2.0.0-acc-proof-20260925`는 이번 재개에서 실제로 없었다. 앞선 서버 직접 inventory 결과를 재실행했다고 기록하지 않는다. 이번 독립 peer의 신규 수신은 CloudKit 전송 근거지만 직접 server payload inventory와 별도로 분류한다.
+
+### Metadata 해석
+
+실제18.6 linked V3에서는 업데이트 전 metadata 7개에 추가 migrator key가 없었고 업데이트 성공 뒤 integer true가 생겼다. 반면 실패한 26.5→18.6 이식에서도 true가 생겼다. 따라서 true를 성공/완료 표식으로 사용할 수 없다. 실제 무계정 표본은 전후 4-key profile, NeedsMetadataMigration false, framework 1448이었다. 소유 판정은 marker 의미가 아닌 보존 콘텐츠·연결 대응·저장된 계정·현재 계정·서버 record 근거를 사용한다.
+
+### 27일 코드 후속 및 남은 차단
+
+proof 서버 조회 후 현재 계정을 다시 확인하도록 `PrivateStoreAttachmentPreflight`를 보완했다. 다른 계정·noAccount·unavailable이면 hold한다. 이는 proof 대기 중 전환을 막는 재확인이며, 마지막 조회와 OS의 실제 private attach 사이를 원자적으로 묶는 보장은 아니다. 첫 시도 테스트는 자동 승인 검토의 사용량 제한으로 실행되지 않았고, 27일 같은 명령을 재시도했다. iPadOS17.5 집중 ownership suite 9/9, 실패·skip·runtime warning 0. 결과 `/private/tmp/carve-ownership-identity-recheck-ios17-20260927.xcresult`, 로그 같은 basename `.log`. iPadOS18.6도 9/9, 실패·skip·runtime warning 0. 결과 `/private/tmp/carve-ownership-identity-recheck-ios18-20260927.xcresult`, 로그 같은 basename `.log`.
+
+실행 중 첫 로그인에서 기존 `.none` runtime을 안전하게 교체하는 재시도는 아직 미구현이다. 앱 재실행 안내가 있지만 정상 첫 로그인 전체 흐름의 완료로 보지 않는다. 실제 무계정 표본의 b 로그인·서버 직접 payload·독립 peer 표시, 실제 iPadOS17 정상 사용자 live proof, pending export 실제 업데이트, 혼합 표본 표시 의미 검증이 남았다. 배포/Production은 이번 실험에서 변경하지 않았다. **출시 NO-GO 유지.**
+
+주요 CLI(대상 ID는 위 표와 매칭):
+
+```bash
+xcrun simctl install <iPad-UDID> /private/tmp/carve-peer-correct-20260926/Historical-1.3.0.app
+xcrun simctl launch <iPad-UDID> kr.co.carve.leetaek
+# 실제 UI 입력 후 종료하고 Application Support 전체를 사본으로 보존
+xcrun simctl terminate <iPad-UDID> kr.co.carve.leetaek
+xcrun simctl install <iPad-UDID> /private/tmp/carve-x27-ownership-release-app-derived-20260926/Build/Products/Debug-iphonesimulator/CarveApp.app
+xcrun simctl launch <iPad-UDID> kr.co.carve.leetaek -UITestChapter '{"title":"1-01Genesis.txt","chapter":22}' -CanvasDisplayProbe
+xcodebuild test -quiet -workspace Carve.xcworkspace -scheme DomainTest \
+  -destination 'platform=iOS Simulator,id=622BB6EA-183E-44D9-B974-A51B5E22EACE' \
+  -only-testing:DomainTest/DrawingStoreOwnershipProofTesting \
+  -resultBundlePath /private/tmp/carve-ownership-identity-recheck-ios17-20260927.xcresult
+```

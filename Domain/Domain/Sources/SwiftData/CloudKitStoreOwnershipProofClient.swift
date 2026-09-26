@@ -232,10 +232,11 @@ enum PrivateStoreAttachmentPreflight {
         guard case .identified(let userRecordName) = await identity.currentIdentity() else { return .hold }
         let scope = AccountScope.make(containerID: containerID, userRecordName: userRecordName)
         if injectsOwnership { return .attach(scope) }
-        if await ownershipProof.ownership(for: scope) == scope {
-            return .attach(scope)
-        }
-        return .hold
+        guard await ownershipProof.ownership(for: scope) == scope else { return .hold }
+        // 서버 조회를 기다리는 동안 로그아웃·계정 전환이 일어났다면 이전 계정의 proof로 연결하지 않는다.
+        guard case .identified(let confirmedName) = await identity.currentIdentity(),
+              AccountScope.make(containerID: containerID, userRecordName: confirmedName) == scope else { return .hold }
+        return .attach(scope)
     }
 }
 

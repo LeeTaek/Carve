@@ -189,6 +189,18 @@ struct DrawingStoreOwnershipProofTesting {
         ) == .hold)
     }
 
+    @Test("소유 증명 대기 중 계정 변경·로그아웃·확인 실패는 private 연결을 보류한다")
+    func privateStorePreflightRechecksAccountAfterProof() async {
+        for changedIdentity in [CloudAccountIdentity.identified(userRecordName: "_b"), .noAccount, .unavailable] {
+            let identity = SequencedOwnershipIdentity(values: [.identified(userRecordName: "_a"), changedIdentity])
+            #expect(await PrivateStoreAttachmentPreflight.decide(
+                identity: identity,
+                containerID: containerID,
+                ownershipProof: StubStoreOwnershipProof(value: scope("_a"))
+            ) == .hold)
+        }
+    }
+
     @Test("한 번 기록한 저장소 소유자는 로그아웃 뒤 다른 계정으로 바뀌지 않는다")
     func ledgerDoesNotRebindToAnotherAccount() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("store-owner-\(UUID().uuidString)", isDirectory: true)
@@ -345,6 +357,17 @@ struct DrawingStoreOwnershipProofTesting {
 
 private struct NoStoreRecordLookup: StorePrivateRecordLookupClient {
     func allRecordsExist(_ recordNames: [String]) async -> Bool { false }
+}
+
+private actor SequencedOwnershipIdentity: CloudAccountIdentityClient {
+    private var values: [CloudAccountIdentity]
+
+    init(values: [CloudAccountIdentity]) { self.values = values }
+
+    func currentIdentity() async -> CloudAccountIdentity {
+        guard !values.isEmpty else { return .unavailable }
+        return values.removeFirst()
+    }
 }
 
 private actor CountingSuccessfulRecordLookup: StorePrivateRecordLookupClient {

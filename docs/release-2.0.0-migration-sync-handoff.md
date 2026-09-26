@@ -366,3 +366,14 @@ Device Hub 수동 UI smoke, no-account V3의 independent server payload와 peer/
 ### peer 계정 전환 전 보존 기록 (2026-09-26)
 
 사용자가 peer Settings의 현재 계정이 original/`never`, target 계정이 `b`라고 확인했다. peer 앱은 종료했고 전체 app data container 사본을 `/private/tmp/carve-x27-ownership-peer-pre-account-switch-20260926/AppContainer`에 남겼다. copy의 DB integrity `ok`, verse drawing/page drawing 각 0행, CloudKit record metadata table 없음이다. AccountChange reset이 발생해도 확인된 필기 payload는 없고 전체 peer app container는 복구용으로 보존돼 있다. 사용자는 peer만 target과 같은 `b`로 로그인하고 앱을 닫아 두기로 안내받았다. 원본/target 계정은 바꾸지 않는다.
+
+
+## 2026-09-27 최신 재개 지점
+
+26일 실제 iPadOS18.6 1.3.0 V3→후보 업데이트에서 b 소유 proof/private attach와 22행 필드·payload 보존을 확인했다. 별도 독립 DC peer의 빈 시험 저장소는 같은 서버22행을 받았다. target/peer의 기존 Application Support는 시험 후 모두 복원하고 앱을 종료했다. clone은 원본 컨테이너 경로를 반환해 사용하지 않았다. 자세한 실험 구분·경로·한계는 [시험 계획 최신 기록](./icloud-sync-compatibility-test-plan.md#2026-09-27-재개--실제-186-v3-업데이트와-독립-수신-증거)을 따른다.
+
+현재 `1FAEBEDC-A397-477D-A83A-6362D2C4BEB3` (`Carve-2.0.0-Ownership-Peer-iOS18.6-TargetAccount-20260926`)에는 **실제 1.3.0에서 손가락 입력한 창세기22:1 두 획**이 2.0.0으로 업데이트돼 있다. 469B payload와 모든 비교 필드 동일, 화면 표시 확인. Settings를 열고 사용자 b 로그인을 기다린다. 27일 재개 때 아직 로그인 안내였다. 기존 이름에 TargetAccount가 없는 DC peer는 b 로그인이 이미 정상이며 계정 전환을 요구하지 않는다.
+
+증거 루트 `/private/tmp/carve-peer-correct-20260926`: `actual-noaccount-v3-before`, `actual-noaccount-after-update`, `actual-noaccount-update.log`와 화면. 시험 기기 원래 빈2.0 지원 디렉터리는 Documents/ActualLegacyTrial-20260926/empty-previous-support에 남아 있다. 현재 실제 V3 이관 표본을 지우거나 과거 빈 상태로 되돌리지 않는다.
+
+새 수정은 proof가 끝난 뒤 계정을 재확인해 대기 중 전환·확인 실패를 hold하는 것이다. iPadOS17.5·18.6 ownership 각각9/9 통과. 실행 중 첫 로그인 후 `.none` runtime 교체는 아직 구현하지 않았으므로 재실행 안내만으로 정상 흐름 통과라 기록하지 않는다. 서버 직접 payload 대조 도구의 과거 경로는 사라졌고, 독립 receive와 직접 inventory를 구분한다. 실제17 정상 경로, pending export 업데이트 및 최종 표시/로그인 검증이 남아 **NO-GO**다.
