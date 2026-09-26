@@ -353,6 +353,10 @@ Xcode 27.0 (`27A266a`), macOS 27.2, Swift 6.4.0.34.1, Tuist 4.208.0에서 `mise 
 
 Device Hub 수동 UI smoke, no-account V3의 independent server payload와 peer/render, 기존 linked same-account historical 1.3 V3 update, live mismatch/unavailable no-upload는 미검증이다. 시험하지 않은 경로를 통과로 간주하지 않는다. 출시 **NO-GO**를 유지한다. 다음 작업은 사용자가 target과 같은 계정임을 확인하고 peer runtime `.available`을 확인한 뒤 Development container에서만 독립 receive를 검증하는 것이다. Production은 변경하지 않는다.
 
+### 2026-09-26 peer 로그인 후 재시도 상태
+
+사용자는 전용 iPadOS 18.6 peer에 b 로그인 완료를 알렸다. 해당 simulator에서 앱을 다시 실행했지만 CloudKit `account-status` 응답 값은 현재 로그에 없고, KVS는 `No account`, `LocalStoreLoader`는 ownership proof 미확인 local-only 경로를 기록했다. Development private import/export 및 row 수신은 관측되지 않았고, Device Hub Settings 화면도 CUA 시간 초과로 확인하지 못했다. 따라서 live 수신은 여전히 **미검증 / NO-GO**다. 정확한 peer Settings의 Apple Account > iCloud에 b가 표시되는지 사용자 확인을 기다린다. 시도와 로그 한계는 [호환성 시험 계획](./icloud-sync-compatibility-test-plan.md#b-로그인-후-peer-재검사-2026-09-26)에 있다.
+
 ## 2026-09-26 peer 계정 상태 재확인
 
 사용자는 기준 target과 peer 계정을 Gmail(b)이라고 확인했고, Hanpass(a) 및 user token이 등록된 원본 계정 `never`와 구분했다(주소 원문은 기록하지 않음). Gmail(b) peer만 재부팅한 뒤 Debug 앱을 다시 실행했으나 CloudKit은 여전히 `No account`를 보고했다. 앱은 `ownershipUnverified` local-only hold에 머물렀고 Development upload/import는 실행되지 않았다. 재부팅 후 로그는 `/private/tmp/carve-x27-ownership-peer-gmail-after-reboot-20260926.log`다. Device Hub 화면 확인은 CUA 요청 시간 초과로 완료되지 않았다. 다음에는 이 정확한 peer Simulator Settings에서 Apple Account > iCloud 상태를 확인한 뒤에만 receive를 재시도한다. 다른 계정이나 원본 기기는 바꾸지 않는다.

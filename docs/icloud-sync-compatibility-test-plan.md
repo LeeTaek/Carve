@@ -2455,3 +2455,9 @@ Device Hub 수동 smoke는 완료되지 않았다. 자동 CLI와 실제 앱 laun
 ### 2026-09-26 peer 계정 전환 전 상태 보존
 
 사용자가 해당 peer Settings에 현재 표시된 계정은 `never`이며, target과 같은 계정은 `b`라고 확인했다. 앱만 종료한 뒤 peer app data container 전체를 `/private/tmp/carve-x27-ownership-peer-pre-account-switch-20260926/AppContainer`에 복사했다. 사본 DB `PRAGMA integrity_check=ok`, `ZBIBLEDRAWING=0`, `ZBIBLEPAGEDRAWING=0`이며 `ANSCKRECORDMETADATA` table은 없었다. `Preservation/raw-not-needed.json` 외 별도 필기 복구본은 없다. 따라서 peer에서 never→b로 바꾸면 CloudKit account-change reset이 빈 local store에 영향을 줄 수 있으나, 전환 전 확인한 필기 payload는 0행이고 full app container 사본을 보존했다. 사용자는 다른 계정이나 원본/target을 바꾸지 않고 peer에만 b로 로그인하기로 안내받았다. 앱은 계정 전환 전에 종료 상태로 뒀다.
+
+### b 로그인 후 peer 재검사 (2026-09-26)
+
+사용자는 전용 peer에 b 로그인 완료를 알렸다. 지정 UDID `1FAEBEDC-A397-477D-A83A-6362D2C4BEB3`만 CLI로 확인·실행했고, 앱 시작 인자는 `-UITestChapter '{"title":"66-22Revelation.txt","chapter":22}'`였다. target/original 기기는 조작하지 않았다. 실행 로그에는 CloudKit `account-status` 요청과 KVS `No account`, StoreKit `No active account`, `LocalStoreLoader`의 ownership 근거 미확인 및 local-only 경로가 남았다. 이번 로그에는 CloudKit account-status 응답 값이나 `hasValidCredentials`가 직접 기록되지 않았으므로, 이 재실행만으로 그 API 결과를 단정하지 않는다. 기존 설정 응답과 이번 KVS/ownership hold 증거는 peer의 iCloud 설정이 앱 런타임에서 아직 사용 가능하다는 확인과 일치하지 않는다.
+
+이번 실행에서 private ModelContainer 연결·Development import/export·peer 필기 수신은 확인되지 않았다. 결과 로그는 `/private/tmp/carve-x27-ownership-peer-b-postlogin-20260926.log`, 재확인 로그는 `/private/tmp/carve-x27-ownership-peer-b-postlogin-followup-20260926.log`다. CUA 화면 상태 요청은 30초 뒤 시간 초과돼 Device Hub Settings를 독립 확인하지 못했다. 로그인 완료라는 사용자 보고와 앱 런타임 신호의 불일치를 해결하기 위해 정확한 peer의 Settings > Apple Account > iCloud에 b가 표시되는지 확인을 요청했다. 확인 전에는 peer receive를 통과로 세지 않으며, Production 변경은 없다.
