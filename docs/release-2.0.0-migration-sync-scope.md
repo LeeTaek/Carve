@@ -2,6 +2,8 @@
 
 이 문서는 2.0.0의 **필사 이전·동기화 작업**에 적용할 최신 제품 결정을 기록한다. [출시 로드맵](./release-2.0.0-roadmap.md)의 다른 기능·배포 조건까지 없애는 결정은 아니다. [C14 결정 2](./icloud-sync-and-backup-policy.md)의 분리·명시적 가져오기 설계와 실험 기록은 역사적 근거로 남기되, 이 문서의 출시 범위가 그 설계의 **2.0.0 필수 구현 범위**보다 우선한다. 현재 코드가 이미 이 범위를 만족한다는 뜻은 아니다.
 
+> **구현·검증 갱신(2026-09-26):** 최신 코드 reader는 iPadOS 17·18·26을 판정하며, 17.5와 18.6의 Xcode 27 ownership/migration 회귀는 각각 46/46 통과했다. 앱은 proof가 끝날 때까지 private CloudKit 저장소를 열지 않는다. existing linked proof는 row에 정확히 매핑된 pending 작업을 허용하고 settled records만 server에서 조회한다. iOS 18.6 표본의 migrator marker 의미는 아직 불명이며, 소유 판정은 그 의미에 의존하지 않는다. 새 peer의 runtime 계정 상태가 `No account`여서 실제 서버/peer 수신은 아직 확인되지 않았고 출시 판정은 **NO-GO**다. 아래의 `## 2026-09-26 현재 판정 갱신`은 코드·증거 최신 세부이며, 본문 안에 날짜가 붙은 과거 관측은 당시 상태로 읽는다.
+
 ## 이번 출시에서 보장할 것
 
 1. **1.3.0 → 2.0.0 업데이트 때 기존 필사를 잃지 않는다.** 실제 출시본 1.3.0(`49f2dc27`, V3)으로 만든 저장소를 사용한다. 로그인 상태와 무계정 상태를 각각 확인하고, `BibleDrawing`과 실제 표본에 있는 `BiblePageDrawing`의 행 수뿐 아니라 필기 내용·좌표·화면 표시를 업데이트 전후에 대조한다. 기존 데이터가 있는 사용자를 빈 새 설치로 잘못 취급하거나, 마이그레이션 실패 뒤 빈 저장소에서 편집하게 해서는 안 된다. 2026-09-25에는 Xcode 27 iPadOS 18.6의 새 계정 없는 simulator에서 F59 V3 synthetic 한 행을 로컬 migration해 298B payload와 raw Preservation snapshot을 보존했다. 최초 축소 화면에서는 작은 획을 놓쳤으나, 후속 read-only CanvasDisplayProbe에서 fetch 후 store와 canvas가 같은 한 획·bounds를 보이고 diff 0임을 확인했다. Device Hub 일시 오버레이를 닫고 확대하자 Genesis 1:1 획이 보였고 Genesis 1장→2장→1장 이동 뒤에도 표시됐다. 또한 같은 날 iPadOS 26.5 same-account clone에 historical 1.3.0(1) simulator bundle(이 bundle은 Xcode 27에서 재빌드되지 않음)을 설치·실행해 20개 CloudKit-backed V3 레코드를 가져온 뒤 Xcode 27 2.0.0 앱으로 업데이트했다. 무결성 `ok`, drawing·record metadata 각 20행, pending export 0, `currentPrivateCloudRecords` marker, payload·record-name set의 source clone 일치를 확인했다. Device Hub에는 기존 필기가 보였지만 첫 실행 안내와 AdMob 팝오버가 열린 화면을 조작 없이 관찰한 것이므로 pixel/좌표 전후 대조는 아니다. 이 두 확인은 한 개의 무계정 local-only migration과 한 개의 로그인된 cloud-backed upgrade에 한정되며, 미업로드 local-only row/pending export를 동반한 계정 전환과 legacy 좌표 기준 대조는 남아 있다. 실행·테스트 증거와 로그는 [호환성 시험 계획](./icloud-sync-compatibility-test-plan.md)의 2026-09-25 절에 있다.
@@ -121,3 +123,11 @@ Xcode 27.0/macOS 27.2 Domain focused suites는 iPadOS 17.5와 18.6에서 각각 
 Xcode 27.0/macOS 27.2 CLI에서 `DomainTest` ownership/migration 46/46이 iPadOS 17.5와 18.6 각각 통과했다. CarveApp Debug build도 exit 0이며 `iCloud.Carve.SwiftData.iCloud.dev` Development container를 사용한다. 자세한 xcresult/log 경로는 [호환성 시험 계획](./icloud-sync-compatibility-test-plan.md#2026-09-26-ownership-판정콘텐츠-대조-후속)과 [핸드오프](./release-2.0.0-migration-sync-handoff.md#2026-09-26-최신-ownership-판정검증-핸드오프)에 기록했다.
 
 실제 cloud release gate는 여전히 **NO-GO**다. 기존 target의 local first-login ledger·payload 보존·export bookkeeping은 independent server inventory/peer receipt가 아니다. 새 독립 iPadOS 18.6 peer의 CloudKit runtime은 실행 시 `No account`를 반환해 Development peer receive를 진행하지 않았다. target과 같은 계정 확인 후 server payload/hash, 독립 peer 수신/화면 표시, existing linked same-account V3 update, mismatch/unavailable no-upload를 별도로 실증해야 한다. Device Hub manual smoke도 미완료다. Production 데이터 변경은 없다.
+
+### Peer 로그인 후 계정 재검사 (2026-09-26)
+
+사용자는 target과 peer의 Gmail(b) 계정이 같다고 확인했다. Hanpass(a)와 user token이 등록된 original account `never`는 별도 계정이다. 원문 주소는 기록하지 않았다. 전용 peer만 재부팅하고 앱을 다시 실행해도 CloudKit runtime은 `No account`였다. 앱은 `.none` hold였고 upload/import가 없었다. 이 증거는 user가 말한 로그인 사실과 iPadOS CloudKit runtime 상태가 아직 일치하지 않음을 보여 준다. Settings > Apple Account > iCloud 상태의 수동 확인이 끝날 때까지 실제 receive gate는 닫혀 있다.
+
+### Peer 전환 전 보존 상태 (2026-09-26)
+
+peer Settings에는 target `b`가 아니라 original/`never`가 표시됐다고 사용자가 확인했다. 앱 종료 후 전체 peer app container를 `/private/tmp/carve-x27-ownership-peer-pre-account-switch-20260926/AppContainer`에 보존했다. 사본 SQLite integrity `ok`, 필기 행 0, CloudKit record metadata table 없음이다. 전용 peer에서 계정 변경 시 empty local mirror reset 영향은 있을 수 있으나 handwritten payload는 확인되지 않았고 사본이 남아 있다. 계정 전환은 peer에만 적용하고 original/target은 그대로 둔다.

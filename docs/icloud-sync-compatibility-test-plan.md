@@ -1,5 +1,7 @@
 # iCloud 구·신 버전 호환성 및 복구 테스트 계획
 
+> **최신 결과(2026-09-26):** ownership/migration `DomainTest` 회귀는 Xcode 27에서 iPadOS 17.5와 18.6 각각 46/46 통과했다. historical 18.6 V3 표본의 추가 private key는 구조적으로만 읽고 의미는 미확정으로 둔다. 별도 peer 실행 시 CloudKit이 `No account`를 반환해 실제 peer receive·서버 payload·화면 비교는 미완료다. 현행 범위와 남은 출시 gate는 [출시 범위 문서](./release-2.0.0-migration-sync-scope.md)를 따른다. 아래 9/25 전체 회귀 수치는 이미 통과한 후보 회귀의 과거 기록이고 이 ownership 수정의 검증 수치가 아니다.
+
 > **현행 출시 판정(2026-09-25):** 2.0.0의 필사 이전·첫 로그인 동기화 기준과 **NO-GO** 사유는 [출시 범위 문서](./release-2.0.0-migration-sync-scope.md)를 따른다. 현행 주 검증 대상은 macOS 27.2 / Xcode 27.0이고 Device Hub는 기기 확인·수동 스모크에 사용하며 자동 빌드·테스트는 CLI로 수행한다. Xcode 27 Tuist workspace Debug iPad simulator build와 iPadOS 17.5 전체 회귀(998 통과·4 expected failure·6 skip), iPadOS 18.6·26.2·26.4·26.5 전체 회귀(각 999 통과·4 expected failure·5 skip), iPadOS 27.0 전체 회귀(998 통과·4 expected failure·6 skip)가 통과했다. 여섯 runtime 모두 총 1008건·실패 0·xcresult runtimeWarnings 없음이다. iOS 17.5 전체 로그의 임시 migration/store fixture 관련 SQLite 경고는 테스트 failure나 xcresult runtime warning이 아니며, 정리 시점과 컨테이너 수명 관계는 미확정이다. 최초 iPadOS 27.0 전체 실행의 cancellation timing 실패는 focused rerun과 후속 전체 회귀에서 재현되지 않았다. 최초 SwiftData 네 실패는 iOS 27의 새 `SwiftDataError.unknownDataStoreSchema`를 확인된 1.0.x store shape에 한해 스키마 불일치로 처리하도록 고친 뒤 focused migration suite와 전체 회귀에서 통과했다. 수정 뒤 첫 전체 run에서 난 reader fixture의 SQLite 잠금 한 건도 reader suite 단독 재실행과 후속 전체 회귀에서 재현되지 않았다. 최초 F60의 XCFramework `ProcessXCFramework` 서명 실패는 workspace build에서 재현되지 않았다. 개별 `-project CarveApp` SwiftPM 모듈 오류와 읽기 전용 artifact 서명 상태 이상은 별도 관측이며 인과관계는 미확정이다. Xcode 26.3의 과거 회귀 결과는 비교 기준이지 Xcode 27 자격 증거가 아니다. Xcode 26.3의 전체 회귀와 Xcode 27 focused migration suite 결과는 아래 기록에 분리했다. Device Hub 수동 UI smoke는 새 iPadOS 27.0 simulator에서 빈 reader 표시와 창세기 1장→2장→1장 이동을 확인했으나 앱 시작 시 iCloud 필사 수신 대기 UI가 나타났다. live CloudKit proof·실기기 필기 입력·App Store 배포 서명 Archive·배포 entitlement·TestFlight는 미완료다. 로컬 Development 서명 Archive는 성공했지만 배포 증거로 보지 않아 NO-GO다. 아래 SEP 시험은 C14 분리 설계의 관측 기록이다.
 
 작성: 2026-09-16 · 최신 결과 추가: 2026-09-25 · 목표: 2.0.0 · **현행 판정은 위 출시 범위 문서와 §5-2/F59/F60을 따른다.** 단계 A~D와 CK/SEP 표의 날짜별 상태는 당시 계획·관측 기록으로 보존한다.
@@ -2441,3 +2443,15 @@ xcodebuild test -quiet -workspace Carve.xcworkspace -scheme DomainTest \
 새 독립 peer `Carve-2.0.0-Ownership-Peer-iOS18.6-TargetAccount-20260926` (iPad mini A17 Pro, iPadOS 18.6, UDID `1FAEBEDC-A397-477D-A83A-6362D2C4BEB3`)에 사용자가 로그인을 완료했다고 알렸지만, 앱 실행 때 CloudKit runtime은 `accountStatus=No account`, `hasValidCredentials=false`를 반환했다. 앱은 ownership hold로 `.none` local store를 택했다. 이 실행에서 Development import/export 및 peer payload 수신은 없었다. 로그는 `/private/tmp/carve-x27-ownership-target-account-peer-app-20260926.log`다. peer 앱은 종료했고 저장소를 지우거나 계정을 바꾸지 않았다. 사용자는 target에 사용한 계정과 같은 주소가 둘 중 무엇인지 확인하고 있다.
 
 Device Hub 수동 smoke는 완료되지 않았다. 자동 CLI와 실제 앱 launch 로그만 확인했으며 UI payload 비교로 확대하지 않는다. 다음 단계는 target과 같은 계정이 CloudKit runtime에서 `.available`임을 확인한 후 Development custom-zone server payload와 빈 독립 peer의 row/payload/render를 대조하는 것이다. 기존 linked same-account 1.3.0 update, live mismatch/unavailable no-upload도 실증되지 않았다. 출시 판정은 **NO-GO**다.
+
+### 2026-09-26 peer 계정 라벨 확인 및 재부팅 후 재검사
+
+사용자가 target과 peer에 로그인한 계정은 Gmail(b)이라고 확인했다. Hanpass(a)는 별도 계정이며 user token이 등록된 원본 계정은 `never`라고 부르기로 했다. 실제 이메일 주소는 이 문서에 쓰지 않는다. Gmail(b) peer를 종료한 뒤 같은 UDID `1FAEBEDC-A397-477D-A83A-6362D2C4BEB3`만 재부팅하고 앱을 다시 실행했다. 실행 로그 `/private/tmp/carve-x27-ownership-peer-gmail-after-reboot-20260926.log`에도 CloudKit `No account`가 기록됐고, `LocalStoreLoader`는 `ownershipUnverified` local-only 경로를 택했다. import/export success는 없었다. 이 실행에서 `.private` 저장소는 열지 않았다.
+
+`simctl`로 앱을 재기동했지만 Device Hub의 Settings/화면 확인은 CUA 요청 시간 초과로 끝나지 않았다. peer 실행 전·후 CloudKit 서버 데이터 변경을 확인하지 못했고 이 no-account hold 경로에서 전송을 요청하지 않았다. 현재 필요한 사용자 조치는 이 정확한 simulator Settings의 Apple Account > iCloud가 Gmail(b)로 로그인되어 있는지 확인하는 것이다. 계정 전환이나 never/원본 기기 변경은 하지 않는다.
+
+부팅 후 `simctl io ... screenshot`으로 보조 캡처 `/private/tmp/carve-x27-ownership-peer-gmail-after-reboot-20260926.png`를 만들었다. 앱은 Genesis 1장 reader와 빈 필기 열을 보였고 AdMob validator 팝오버가 겹쳐 있었다. target의 Revelation 22:21 row가 수신·표시됐다는 증거는 아니다. 이 캡처는 Simulator CLI 스크린샷이며 Device Hub 수동 smoke와 분리한다.
+
+### 2026-09-26 peer 계정 전환 전 상태 보존
+
+사용자가 해당 peer Settings에 현재 표시된 계정은 `never`이며, target과 같은 계정은 `b`라고 확인했다. 앱만 종료한 뒤 peer app data container 전체를 `/private/tmp/carve-x27-ownership-peer-pre-account-switch-20260926/AppContainer`에 복사했다. 사본 DB `PRAGMA integrity_check=ok`, `ZBIBLEDRAWING=0`, `ZBIBLEPAGEDRAWING=0`이며 `ANSCKRECORDMETADATA` table은 없었다. `Preservation/raw-not-needed.json` 외 별도 필기 복구본은 없다. 따라서 peer에서 never→b로 바꾸면 CloudKit account-change reset이 빈 local store에 영향을 줄 수 있으나, 전환 전 확인한 필기 payload는 0행이고 full app container 사본을 보존했다. 사용자는 다른 계정이나 원본/target을 바꾸지 않고 peer에만 b로 로그인하기로 안내받았다. 앱은 계정 전환 전에 종료 상태로 뒀다.
