@@ -222,6 +222,7 @@ extension CloudSettingsFeature {
     /// 설정 화면의 보류 안내 — 지금은 이 기기에만 저장된다는 것 · 까닭 · 다시 시도(다음 실행이 자동으로 다시 판정한다).
     static func holdCopy(_ hold: LegacySeparationHold) -> (title: String, detail: String) {
         let reason: String = switch hold.reason {
+        case .ownershipUnverified: "이 기기의 옛 필사가 현재 계정에 속하는지 확인하지 못했어요."
         case .linkageUnknown: "이 기기의 옛 필사가 어느 계정의 것인지 확인하지 못했어요."
         case .unlinkedRowsAwaitSeparation(let count): "이 기기에 계정과 연결되지 않은 옛 필사 \(count)개가 있어요. 사본은 이 기기에 보관했어요."
         case .preservationFailed: "옛 필사의 사본을 남기지 못했어요."

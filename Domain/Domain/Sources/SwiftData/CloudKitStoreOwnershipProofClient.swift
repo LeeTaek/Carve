@@ -63,7 +63,7 @@ actor StoreOwnershipLedger {
         var proof: Proof
     }
 
-    enum Proof: String, Codable {
+    enum Proof: String, Codable, Equatable {
         case firstRunHadNoStore
         case firstLoginFromUnaccountedV3
         case currentPrivateCloudRecords
@@ -71,7 +71,7 @@ actor StoreOwnershipLedger {
 
     enum ReadResult {
         case absent
-        case owner(AccountScope)
+        case owner(AccountScope, Proof)
         case invalid
     }
 
@@ -88,7 +88,7 @@ actor StoreOwnershipLedger {
         do {
             let marker = try JSONDecoder().decode(Marker.self, from: Data(contentsOf: area.marker))
             guard marker.formatVersion == 1 else { return .invalid }
-            return .owner(marker.owner)
+            return .owner(marker.owner, marker.proof)
         } catch {
             return .invalid
         }
@@ -96,7 +96,7 @@ actor StoreOwnershipLedger {
 
     func claim(_ scope: AccountScope, proof: Proof) -> AccountScope? {
         switch read() {
-        case .owner(let owner): return owner == scope ? owner : nil
+        case .owner(let owner, _): return owner == scope ? owner : nil
         case .invalid: return nil
         case .absent: break
         }
@@ -121,8 +121,14 @@ actor StoreOwnershipLedger {
 /// CloudKit 접근과 분리된 소유 주장 규칙. 계정 확인만으로는 두 분기 모두 통과하지 않는다.
 enum StoreOwnershipClaimRule {
     static func firstLoginLegacyV3(_ reading: LegacyRowLinkageReading) -> Bool {
-        guard case .hasVerifiedUnlinked(let rows) = reading.verdict else { return false }
-        return reading.storeModel == "V3" && !rows.isEmpty && reading.unlinkedCount == rows.count && reading.linkedCount == 0
+        unaccountedLegacyRows(reading, modelMajors: [3])
+    }
+
+    private static func unaccountedLegacyRows(_ reading: LegacyRowLinkageReading, modelMajors: Set<Int>) -> Bool {
+        guard case .hasVerifiedUnlinked(let rows) = reading.verdict,
+              let modelMajor = Int(reading.storeModel.dropFirst()),
+              modelMajors.contains(modelMajor) else { return false }
+        return !rows.isEmpty && reading.unlinkedCount == rows.count && reading.linkedCount == 0
             && reading.mirroredRecordNames.isEmpty && reading.missingRecordNameCount == 0 && reading.unsettledRecordCount == 0
             && reading.localModelRowCount == rows.count && reading.recordMetadataCount == 0
             && reading.mirroringAttached && !reading.hasAccountIdentityKeys
@@ -130,8 +136,44 @@ enum StoreOwnershipClaimRule {
             && reading.duplicateMetadataKeyCount == 0
             && LegacyRowLinkageReader.observedUnaccountedV3MetadataProfiles.contains(Set(reading.metadataKeys))
             && reading.metadataKeyCount == reading.metadataKeys.count
-            && reading.migrationBeganCommitMarker == (Set(reading.metadataKeys).contains(LegacyRowLinkageReader.migrationBeganCommitKey) ? Optional(true) : nil)
+            && migratorMarkerHasObservedStructure(reading)
             && reading.metadataValueProfileComplete && reading.metadataNeedsMigration == false
+    }
+
+    /// 관측된 private key의 존재와 저장 형식만 확인한다. true/false 어느 값에도 완료·진행 의미를 부여하지 않는다.
+    private static func migratorMarkerHasObservedStructure(_ reading: LegacyRowLinkageReading) -> Bool {
+        let keyIsPresent = reading.metadataKeys.contains(LegacyRowLinkageReader.migrationBeganCommitKey)
+        return keyIsPresent == (reading.migrationBeganCommitMarker != nil)
+    }
+
+    /// 원시 V3 사본과 아직 private에 연결하지 않은 로컬 저장소가 같은 미계정 행 집합인지 교차 확인한다.
+    static func currentStoreCanUseUnaccountedSnapshot(
+        _ current: LegacyRowLinkageReading,
+        source: LegacyRowLinkageReading
+    ) -> Bool {
+        guard unaccountedLegacyRows(source, modelMajors: [3]),
+              unaccountedLegacyRows(current, modelMajors: [3, 6]) else { return false }
+        return Set(current.rows.keys) == Set(source.rows.keys)
+    }
+
+    /// 처음 저장소가 없었다는 ledger는 비어 있고 미확인 대기 작업도 없는 현재 저장소에서만 재사용한다.
+    static func emptyUnaccountedStore(_ reading: LegacyRowLinkageReading) -> Bool {
+        guard reading.verdict == .allLinked, reading.rows.isEmpty,
+              reading.localModelRowCount == 0, reading.recordMetadataCount == 0,
+              reading.mirroredRecordNames.isEmpty, reading.missingRecordNameCount == 0,
+              reading.unsettledRecordCount == 0, reading.unsettledRecordNames.isEmpty,
+              reading.orphanCorrespondenceCount == 0, reading.needsUploadCount == 0,
+              !reading.hasAccountIdentityKeys,
+              reading.metadataEntryCount == reading.metadataKeyCount,
+              reading.duplicateMetadataKeyCount == 0 else { return false }
+
+        guard reading.mirroringAttached else {
+            return reading.metadataEntryCount == 0 && reading.metadataKeyCount == 0
+        }
+        return reading.metadataValueProfileComplete && reading.metadataNeedsMigration == false
+            && LegacyRowLinkageReader.observedUnaccountedV3MetadataProfiles.contains(Set(reading.metadataKeys))
+            && reading.metadataKeyCount == reading.metadataKeys.count
+            && migratorMarkerHasObservedStructure(reading)
     }
 
     static func existingPrivateStore(
@@ -142,6 +184,7 @@ enum StoreOwnershipClaimRule {
         allRecordsExist: Bool
     ) -> Bool {
         guard validatedOSMajors.contains(osMajor), case .allLinked = reading.verdict else { return false }
+        guard pendingRecordNames(in: reading) != nil else { return false }
         return identityMatches && allRecordsExist && reading.localModelRowCount > 0
             && reading.localModelRowCount == reading.recordMetadataCount
             && reading.recordMetadataCount == reading.mirroredRecordNames.count
@@ -153,8 +196,46 @@ enum StoreOwnershipClaimRule {
             && reading.metadataValueProfileComplete && reading.metadataNeedsMigration == false && reading.metadataIdentityChecked == true
             && LegacyRowLinkageReader.observedLinkedPrivateMetadataProfiles.contains(Set(reading.metadataKeys))
             && reading.metadataKeyCount == reading.metadataKeys.count
-            && reading.migrationBeganCommitMarker == (Set(reading.metadataKeys).contains(LegacyRowLinkageReader.migrationBeganCommitKey) ? Optional(true) : nil)
+            && migratorMarkerHasObservedStructure(reading)
             && reading.metadataKeys.filter { $0 == "NSCloudKitMirroringDelegateCKIdentityRecordNameDefaultsKey" }.count == 1
+    }
+
+    /// 미완료 작업은 해당 CloudKit 레코드의 서버 존재를 요구하지 않는다. 작업 대상 이름은 로컬 미러 행과 일치해야 한다.
+    static func pendingRecordNames(in reading: LegacyRowLinkageReading) -> Set<String>? {
+        let names = reading.unsettledRecordNames
+        guard reading.unsettledRecordCount == names.count,
+              Set(names).count == names.count,
+              Set(names).isSubset(of: Set(reading.mirroredRecordNames)) else { return nil }
+        return Set(names)
+    }
+
+    /// 서버에 이미 정착한 레코드만 확인한다. 새로 만들어지는 중인 레코드가 없어도 정상 작업으로 소유 증명할 수 있다.
+    static func recordsRequiringServerProof(in reading: LegacyRowLinkageReading) -> [String]? {
+        guard let pending = pendingRecordNames(in: reading) else { return nil }
+        return reading.mirroredRecordNames.filter { !pending.contains($0) }
+    }
+}
+
+/// `.private` 컨테이너를 열기 전에 계정 식별과 저장소 소유 증명을 모두 확인한다.
+enum PrivateStoreAttachmentPreflight {
+    enum Decision: Equatable {
+        case attach(AccountScope)
+        case hold
+    }
+
+    static func decide(
+        identity: any CloudAccountIdentityClient,
+        containerID: String,
+        ownershipProof: any StoreOwnershipProofClient,
+        injectsOwnership: Bool = false
+    ) async -> Decision {
+        guard case .identified(let userRecordName) = await identity.currentIdentity() else { return .hold }
+        let scope = AccountScope.make(containerID: containerID, userRecordName: userRecordName)
+        if injectsOwnership { return .attach(scope) }
+        if await ownershipProof.ownership(for: scope) == scope {
+            return .attach(scope)
+        }
+        return .hold
     }
 }
 
@@ -211,32 +292,61 @@ public actor CloudKitStoreOwnershipProofClient: StoreOwnershipProofClient {
     }
 
     public func ownership(for scope: AccountScope) async -> AccountScope? {
+        let storedProof: StoreOwnershipLedger.Proof?
         switch await ledger.read() {
-        case .owner(let owner): return owner == scope ? owner : nil
+        case .owner(let owner, let proof):
+            guard owner == scope else { return nil }
+            storedProof = proof
         case .invalid: return nil
-        case .absent: break
+        case .absent: storedProof = nil
+        }
+
+        guard case .identified(let userRecordName) = await identity.currentIdentity(),
+              AccountScope.make(containerID: containerID, userRecordName: userRecordName) == scope,
+              let (scratch, copy) = currentStoreCopy() else { return nil }
+        defer { try? fileManager.removeItem(at: scratch) }
+
+        let currentReading = reader.judge(copyAt: copy)
+        switch LegacyStoreAccountIdentityReader.status(copyAt: copy, userRecordName: userRecordName) {
+        case .matches:
+            return await proveExistingPrivateStore(for: scope, reading: currentReading, copy: copy, userRecordName: userRecordName)
+        case .mismatch, .invalid:
+            // 기존 ledger나 과거 unaccounted snapshot이 현재 저장소의 다른 계정 identity를 덮을 수 없다.
+            return nil
+        case .absent:
+            break
+        }
+
+        // ledger는 계정 확인을 대신하지 않는다. 실제 metadata identity가 아직 없는 두 설치 증명만 재평가한다.
+        if storedProof == .currentPrivateCloudRecords { return nil }
+        if storedProof == .firstRunHadNoStore {
+            guard fileManager.fileExists(atPath: preservation.notNeededMarker.path),
+                  StoreOwnershipClaimRule.emptyUnaccountedStore(currentReading) else { return nil }
+            return await ledger.claim(scope, proof: .firstRunHadNoStore)
         }
 
         if fileManager.fileExists(atPath: preservation.notNeededMarker.path) {
-            guard await currentAccountMatches(scope) else { return nil }
-            guard let reading = currentStoreReading() else { return nil }
-            if reading.localModelRowCount == 0 {
+            if StoreOwnershipClaimRule.emptyUnaccountedStore(currentReading) {
                 return await ledger.claim(scope, proof: .firstRunHadNoStore)
             }
-            return await proveExistingPrivateStore(for: scope)
+            return nil
         }
 
         for snapshot in RawStoreSnapshot.completedSnapshotStores(in: preservation, fileManager: fileManager) {
             guard case .known(let version) = LocalStoreLoader.storeKind(at: snapshot), version.major == 3 else { continue }
             let reading = reader.judge(copyAt: snapshot)
-            guard StoreOwnershipClaimRule.firstLoginLegacyV3(reading),
+            guard (storedProof == nil || storedProof == .firstLoginFromUnaccountedV3),
+                  StoreOwnershipClaimRule.firstLoginLegacyV3(reading),
                   case .hasVerifiedUnlinked(let rows) = reading.verdict else { continue }
-            guard await currentAccountMatches(scope) else { return nil }
+            guard StoreOwnershipClaimRule.currentStoreCanUseUnaccountedSnapshot(currentReading, source: reading),
+                  LegacyMigrationContentMatcher.matches(sourceSnapshot: snapshot, currentStore: copy, fileManager: fileManager),
+                  await currentAccountMatches(scope) else { return nil }
             Log.info("저장소 소유 근거 — 계정 연결 없는 1.3.0 V3 원본을 출시 정책에 따라 첫 로그인 계정에 연결한다", "행 \(rows.count) · 계정 식별은 기록하지 않는다")
             return await ledger.claim(scope, proof: .firstLoginFromUnaccountedV3)
         }
 
-        return await proveExistingPrivateStore(for: scope)
+        guard storedProof == nil else { return nil }
+        return await proveExistingPrivateStore(for: scope, reading: currentReading, copy: copy, userRecordName: userRecordName)
     }
 
     private func proveExistingPrivateStore(for scope: AccountScope) async -> AccountScope? {
@@ -244,15 +354,8 @@ public actor CloudKitStoreOwnershipProofClient: StoreOwnershipProofClient {
         guard case .identified(let userRecordName) = await identity.currentIdentity(),
               AccountScope.make(containerID: containerID, userRecordName: userRecordName) == scope else { return nil }
 
-        let scratch = fileManager.temporaryDirectory.appendingPathComponent("store-ownership-\(UUID().uuidString)", isDirectory: true)
+        guard let (scratch, copy) = currentStoreCopy() else { return nil }
         defer { try? fileManager.removeItem(at: scratch) }
-        let copy: URL
-        do {
-            copy = try LegacyRowLinkageReader.copyStoreFiles(from: storeURL, into: scratch, fileManager: fileManager)
-        } catch {
-            return nil
-        }
-
         let reading = reader.judge(copyAt: copy)
         return await proveExistingPrivateStore(for: scope, reading: reading, copy: copy, userRecordName: userRecordName)
     }
@@ -263,8 +366,14 @@ public actor CloudKitStoreOwnershipProofClient: StoreOwnershipProofClient {
         copy: URL,
         userRecordName: String
     ) async -> AccountScope? {
-        let identityMatches = reader.accountIdentityMatches(copyAt: copy, userRecordName: userRecordName)
-        let allRecordsExist = await privateRecordLookup.allRecordsExist(reading.mirroredRecordNames)
+        let identityMatches = LegacyStoreAccountIdentityReader.status(copyAt: copy, userRecordName: userRecordName) == .matches
+        guard let settledRecordNames = StoreOwnershipClaimRule.recordsRequiringServerProof(in: reading) else { return nil }
+        let allRecordsExist: Bool
+        if settledRecordNames.isEmpty {
+            allRecordsExist = true
+        } else {
+            allRecordsExist = await privateRecordLookup.allRecordsExist(settledRecordNames)
+        }
         guard StoreOwnershipClaimRule.existingPrivateStore(
             reading,
             osMajor: reader.osMajor,
@@ -277,14 +386,22 @@ public actor CloudKitStoreOwnershipProofClient: StoreOwnershipProofClient {
         return await ledger.claim(scope, proof: .currentPrivateCloudRecords)
     }
 
-    private func currentStoreReading() -> LegacyRowLinkageReading? {
+    private func currentStoreCopy() -> (scratch: URL, copy: URL)? {
         let scratch = fileManager.temporaryDirectory.appendingPathComponent("store-ownership-\(UUID().uuidString)", isDirectory: true)
-        defer { try? fileManager.removeItem(at: scratch) }
         guard let copy = try? LegacyRowLinkageReader.copyStoreFiles(from: storeURL, into: scratch, fileManager: fileManager) else {
+            try? fileManager.removeItem(at: scratch)
             return nil
         }
-        let reading = reader.judge(copyAt: copy)
-        return reading.isUnknown ? nil : reading
+        let support = RawStoreSnapshot.supportDirectory(for: storeURL)
+        if fileManager.fileExists(atPath: support.path) {
+            do {
+                try fileManager.copyItem(at: support, to: RawStoreSnapshot.supportDirectory(for: copy))
+            } catch {
+                try? fileManager.removeItem(at: scratch)
+                return nil
+            }
+        }
+        return (scratch, copy)
     }
 
     private func currentAccountMatches(_ scope: AccountScope) async -> Bool {

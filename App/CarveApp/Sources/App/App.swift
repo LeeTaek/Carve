@@ -15,69 +15,142 @@ import ComposableArchitecture
 import CarveFeature
 
 /// 새기다 전체 앱의 엔트리 포인트.
-/// - SwiftData의 `ModelContainer`와 TCA의 `AppCoordinatorFeature` Store를 초기화하고
-///   `WindowGroup` 루트 뷰에 주입하는 역할.
+/// 저장소 ownership preflight 를 마친 뒤 ModelContainer 와 TCA Store 를 만든다.
 @main
 struct CarveApp: App {
-    // Firebase 초기화
-    @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
-    // 전역 네비게이션을 담당하는 Store
-    private let store: StoreOf<AppCoordinatorFeature>
-    // SwiftData의 ModelContainer
-    let modelContainer: ModelContainer
-    /// 광고용 인스턴스
-    private let nativeAdClient: any NativeAdClient
-    /// 광고 동의(UMP) 확인과 광고 SDK 시작
-    private let adConsent: AdConsentCoordinator
-    /// 본문 모양(글꼴 · 글자 크기 · 줄 간격 · 자간) iCloud 백업. 실행 뒤에 늦게 내려오는 백업도 받도록 앱이 붙잡아 둔다.
-    private let sentenceSettingBackup: SentenceSettingCloudBackup
-    /// 편집이 기대는 계정 · K 환경(정책 §12-6 구현 순서 ①). 계정 변경 알림을 앱 수명 동안 받는다.
-    private let drawingEditEnvironment: LiveDrawingEditEnvironment
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var delegate
 
-    // 앱 시작 시 필요한 의존성(ContainerID, ModelContainer, Store)을 생성하는 생성자.
+    private let containerID: ContainerID
+    private let purchaseClient: any PurchaseClient
+    private let nativeAdClient: any NativeAdClient
+    private let adConsent: AdConsentCoordinator
+    /// 실행 뒤에 도착하는 본문 모양 iCloud 백업도 받도록 앱 수명 동안 유지한다.
+    private let sentenceSettingBackup: SentenceSettingCloudBackup
+
     init() {
-        // 환불 · 보호자 승인 같은 거래 변경을 놓치지 않도록 가장 먼저 만든다.
         let purchaseClient = StoreKitPurchaseClient()
-        // 기존 사용자도 단일 Canvas 기본값(on)을 따르게 한다. flag 를 읽는 Store 생성보다 앞서야 하고, 설치당 한 번만 지운다.
+        self.purchaseClient = purchaseClient
         SingleCanvasFlag.resetStoredValueOnce(in: .standard)
-        // 앱을 다시 깐 기기에 iCloud 에 백업한 본문 모양을 되살린다. 본문 설정은 처음 읽을 때 기본값이 저장돼
-        // 그 뒤로는 새 설치인지 가릴 수 없으므로, 본문 설정을 읽는 Store 생성보다 앞서야 한다.
+
         let sentenceSettingBackup = SentenceSettingCloudBackup()
         sentenceSettingBackup.start()
         self.sentenceSettingBackup = sentenceSettingBackup
+
         #if DEBUG
-        // 실기기 UI 테스트가 정한 장(`-UITestChapter`)에서 시작한다. 헤더 · 탐색 상태가 시작 장을 읽는 Store 생성보다 앞서야 한다.
         UITestLaunchChapter.apply()
         #endif
+
         let containerID = Self.makeContainerID()
-        let modelContainer = Self.makeModelContainer(containerID: containerID)
-        // 초안 · 격리 쓰기와 전체 삭제의 직렬화 경계. 보존 영역 안에 쓰므로 이 기기의 전체 삭제가 함께 지운다(정책 §12-6 구현 순서 ②).
+        self.containerID = containerID
+        let adConsent = AdConsentCoordinator(purchases: purchaseClient)
+        self.adConsent = adConsent
+        self.nativeAdClient = GoogleNativeAdClient(consent: adConsent, purchases: purchaseClient)
+    }
+
+    var body: some Scene {
+        WindowGroup {
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("-CanvasScrollSpike") {
+                // SwiftData 사용자 저장소와 연결되지 않는 Debug 전용 레이아웃 하네스.
+                CanvasScrollSpikeView()
+            } else {
+                startupView
+            }
+            #else
+            startupView
+            #endif
+        }
+    }
+
+    private var startupView: some View {
+        AppStartupView(
+            containerID: containerID,
+            purchaseClient: purchaseClient,
+            nativeAdClient: nativeAdClient,
+            adConsent: adConsent,
+            sentenceSettingBackup: sentenceSettingBackup
+        )
+    }
+
+    private static func makeContainerID() -> ContainerID {
+        let id = Bundle.main.object(forInfoDictionaryKey: "CLOUDKIT_CONTAINER_ID") as? String ?? ""
+        return ContainerID(id: id)
+    }
+}
+
+private struct AppRuntime {
+    let modelContainer: ModelContainer
+    let store: StoreOf<AppCoordinatorFeature>
+}
+
+/// 계정 확인과 저장소 소유 증명이 끝나기 전에는 `.private` ModelContainer 를 만들지 않는다.
+private struct AppStartupView: View {
+    let containerID: ContainerID
+    let purchaseClient: any PurchaseClient
+    let nativeAdClient: any NativeAdClient
+    let adConsent: AdConsentCoordinator
+    let sentenceSettingBackup: any SentenceSettingBackupClient
+
+    @State private var runtime: AppRuntime?
+    @State private var didStart = false
+
+    var body: some View {
+        Group {
+            if let runtime {
+                rootView(runtime)
+                    .modelContainer(runtime.modelContainer)
+            } else {
+                ProgressView("필사 저장소와 계정 소유를 확인하고 있어요")
+                    .task { await startIfNeeded() }
+            }
+        }
+    }
+
+    /// 소유 근거가 없거나 계정을 확인하지 못하면 Domain bootstrap 이 local-only 컨테이너와 보류 상태를 돌려준다.
+    @MainActor
+    private func startIfNeeded() async {
+        guard !didStart else { return }
+        didStart = true
+
+        let storeURL = URL.applicationSupportDirectory.appending(path: containerID.localDBPath)
+        let preservation = PreservationArea.live(localDBPath: containerID.localDBPath)
+        let identity = CloudKitAccountIdentityClient(containerID: containerID.id)
+        let ownershipProof = CloudKitStoreOwnershipProofClient(
+            identity: identity,
+            containerID: containerID.id,
+            storeURL: storeURL,
+            preservation: preservation
+        )
+        let syncManager = PersistentCloudKitContainer()
+        let holdState = LegacySeparationHoldState()
+        let injectedOwnership = Self.injectsStoreOwnership(containerID: containerID)
+        let modelContainer = await ReleaseStoreBootstrapper.load(
+            containerID: containerID,
+            identity: identity,
+            ownershipProof: ownershipProof,
+            syncManager: syncManager,
+            holdState: holdState,
+            injectsOwnership: injectedOwnership
+        )
+
         let localPreservation = LocalPreservationWriter(
             area: .live(localDBPath: containerID.localDBPath),
             eraseState: .live(localDBPath: containerID.localDBPath)
         )
-        // 저장소를 연 뒤에 계정을 확인한다. 조회는 네트워크를 기다릴 수 있어 시작을 막지 않는다 — 확인 전에는 서버 작업만 잠긴다.
         let drawingEditEnvironment = LiveDrawingEditEnvironment(
-            identity: CloudKitAccountIdentityClient(containerID: containerID.id),
+            identity: identity,
             containerID: containerID.id,
             stateStore: FileEraseStateStore(area: .live(localDBPath: containerID.localDBPath)),
             localPreservation: localPreservation,
-            ownershipProof: CloudKitStoreOwnershipProofClient(
-                identity: CloudKitAccountIdentityClient(containerID: containerID.id),
-                containerID: containerID.id,
-                storeURL: URL.applicationSupportDirectory.appending(path: containerID.localDBPath),
-                preservation: PreservationArea.live(localDBPath: containerID.localDBPath)
-            ),
-            injectsOwnership: Self.injectsStoreOwnership(containerID: containerID)
+            holdState: holdState,
+            ownershipProof: ownershipProof,
+            injectsOwnership: injectedOwnership
         )
-        self.drawingEditEnvironment = drawingEditEnvironment
-        self.modelContainer = modelContainer
-        let adConsent = AdConsentCoordinator(purchases: purchaseClient)
-        self.adConsent = adConsent
-        self.nativeAdClient = GoogleNativeAdClient(consent: adConsent, purchases: purchaseClient)
-        self.store = Self.makeStore(
+        let store = Self.makeStore(
             containerID: containerID,
             modelContainer: modelContainer,
+            syncManager: syncManager,
+            holdState: holdState,
             nativeAdClient: nativeAdClient,
             adConsentClient: adConsent,
             purchaseClient: purchaseClient,
@@ -86,29 +159,12 @@ struct CarveApp: App {
             localPreservation: localPreservation
         )
         Task { await drawingEditEnvironment.start() }
+        runtime = AppRuntime(modelContainer: modelContainer, store: store)
     }
 
-    var body: some Scene {
-        WindowGroup {
-            #if DEBUG
-            // 설계 §11 Phase 0A-S4 스크롤 A/B spike 전용 진입 경로.
-            // `-CanvasScrollSpike` 실행 인자가 있을 때만 Debug 하네스를 루트로 띄운다.
-            // SwiftData·실제 사용자 Drawing과 연결되지 않는 격리 하네스이며 릴리즈 빌드에는 포함되지 않는다.
-            if ProcessInfo.processInfo.arguments.contains("-CanvasScrollSpike") {
-                CanvasScrollSpikeView()
-            } else {
-                rootView
-            }
-            #else
-            rootView
-            #endif
-        }
-        .modelContainer(modelContainer)
-    }
-
-    /// 앱의 루트 화면. AppCoordinatorFeature의 상태/액션을 사용하는 코디네이터 뷰.
-    private var rootView: some View {
-        AppCoordinatorView(store: store)
+    /// 앱의 루트 화면. 준비된 ModelContainer 와 Store 를 사용한다.
+    private func rootView(_ runtime: AppRuntime) -> some View {
+        AppCoordinatorView(store: runtime.store)
             .trackScreen(
                 "AppCoordinator",
                 parameters: [
@@ -116,23 +172,13 @@ struct CarveApp: App {
                     "screen_class": .string("AppCoordinatorView")
                 ]
             )
-            // 화면이 뜬 뒤라야 동의 폼을 띄울 수 있다. 앱을 실행할 때마다 동의 정보를 갱신한다(UMP).
-            // 광고 제거를 샀으면 동의 폼도 광고 SDK 도 띄우지 않는다.
-            .task {
-                await adConsent.gatherConsent()
-            }
-            // 위젯을 누르면 그 절로 들어간다(시안 N6 · N7). 콜드 런치면 준비 화면이 끝난 뒤 이동한다.
+            .task { await adConsent.gatherConsent() }
             .onOpenURL { url in
-                store.send(.openedURL(url))
+                runtime.store.send(.openedURL(url))
             }
     }
-}
 
-
-// MARK: - helpers
-extension CarveApp {
-    /// Info.plist에 정의된 CLOUDKIT_CONTAINER_ID를 읽어와 `ContainerID`로 래핑.
-    /// ACC-1 2차 전용 소유 주입(DEBUG · 시뮬레이터 · dev 컨테이너 · 실행 인자). 켜지면 소유 증명이 아니라는 것을 로그로 남긴다.
+    /// ACC-1 2차 전용 소유 주입(DEBUG · 시뮬레이터 · dev 컨테이너 · 실행 인자).
     private static func injectsStoreOwnership(containerID: ContainerID) -> Bool {
         #if DEBUG
         guard StoreOwnershipInjection.isEnabled(containerID: containerID) else { return false }
@@ -143,26 +189,12 @@ extension CarveApp {
         #endif
     }
 
-    private static func makeContainerID() -> ContainerID {
-        let id = Bundle.main.object(forInfoDictionaryKey: "CLOUDKIT_CONTAINER_ID") as? String ?? ""
-        return ContainerID(id: id)
-    }
-
-    /// 현재 DependencyValues에 주입된 `containerId`를 사용하여 SwiftData `ModelContainer`를 생성.
-    /// `DependencyValues._current.modelContainer`는 `Domain` 레이어에서 정의된 기본 구성 로직을 재사용.
-    private static func makeModelContainer(containerID: ContainerID) -> ModelContainer {
-        withDependencies {
-            $0.containerId = containerID
-        } operation: {
-            DependencyValues._current.modelContainer
-        }
-    }
-
-    /// AppCoordinatorFeature의 Store를 생성.
-    /// 의존성 주입은 한 번에 묶어 루트 Store 생성 시점에만 수행.
+    /// AppCoordinatorFeature 의 Store 와 앱 의존성을 한 번에 만든다.
     private static func makeStore(
         containerID: ContainerID,
         modelContainer: ModelContainer,
+        syncManager: PersistentCloudKitContainer,
+        holdState: LegacySeparationHoldState,
         nativeAdClient: any NativeAdClient,
         adConsentClient: any AdConsentClient,
         purchaseClient: any PurchaseClient,
@@ -173,17 +205,16 @@ extension CarveApp {
         withDependencies {
             $0.containerId = containerID
             $0.modelContainer = modelContainer
+            $0.clouodKitSyncManager = syncManager
+            $0.legacySeparationHoldState = holdState
             $0.nativeAdClient = nativeAdClient
             $0.adConsentClient = adConsentClient
             $0.purchaseClient = purchaseClient
             $0.sentenceSettingBackup = sentenceSettingBackup
             $0.drawingEditEnvironment = drawingEditEnvironment
             $0.localPreservationWriter = localPreservation
-            // 편집 화면의 절 초안 — 무효가 된 세션의 미저장분도 그 세션의 초안으로 남는다(정책 §12-6 구현 순서 ②, ① 의 격리를 대신한다).
             $0.verseDraftStore = localPreservation
-            // 복구 화면(④)이 읽는 초안 — 보이지 않게 남은 것을 세어 보인다.
             $0.verseDraftRecoveryReader = localPreservation
-            // 그 화면이 지울 수 있는 유일한 것 — 읽지 못해 옆으로 옮긴 파일뿐이다(초안은 지우지 않는다).
             $0.verseDraftUnreadableCleaner = localPreservation
             $0.photoLibraryClient = PhotoKitLibraryClient()
             $0.widgetVerseClient = AppGroupWidgetVerseClient()

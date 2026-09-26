@@ -7,7 +7,7 @@ import Testing
 
 @testable import Domain
 
-@Suite("2.0.0 필사 이전·동기화 출시 경로")
+@Suite("2.0.0 필사 이전·동기화 출시 경로", .serialized)
 struct MigrationSyncReleaseTesting {
     private enum TestFailure: Error { case notReady }
 
@@ -54,6 +54,45 @@ struct MigrationSyncReleaseTesting {
         }
     }
 
+    @Test("첫 로그인 소유 증명은 V3 원본과 마이그레이션된 필기 내용을 모두 대조한다")
+    func migratedV3ContentMustMatchPreservedSnapshot() throws {
+        let directory = try LinkageFixture.makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storeURL = try LinkageFixture.makeV3Store(in: directory)
+        let area = PreservationArea(root: directory.appendingPathComponent("Preservation", isDirectory: true), storeFileName: storeURL.lastPathComponent)
+        guard case .success(.created(let snapshotDirectory)) = RawStoreSnapshot.takeIfNeeded(storeURL: storeURL, area: area) else {
+            Issue.record("업데이트 전 V3 원본 사본이 만들어지지 않았다")
+            return
+        }
+        let snapshotURL = snapshotDirectory.appendingPathComponent(storeURL.lastPathComponent)
+
+        func migrateAndReleaseContainer() throws {
+            guard case .ready(let container) = LocalStoreLoader.loadForRelease(at: storeURL, cloudKitDatabase: .none, preservation: area) else {
+                Issue.record("V3 로컬 마이그레이션이 준비되지 않았다")
+                throw TestFailure.notReady
+            }
+            let context = ModelContext(container)
+            #expect(try context.fetchCount(FetchDescriptor<BibleDrawing>()) == 3)
+        }
+        try migrateAndReleaseContainer()
+        let mismatch = LegacyMigrationContentMatcher.mismatchSummary(sourceSnapshot: snapshotURL, currentStore: storeURL)
+        #expect(mismatch == "")
+        #expect(LegacyMigrationContentMatcher.matches(sourceSnapshot: snapshotURL, currentStore: storeURL))
+
+        func changePayloadAndReleaseContainer() throws {
+            let container = try open(storeURL, area: area)
+            let context = ModelContext(container)
+            guard let row = try context.fetch(FetchDescriptor<BibleDrawing>()).first else {
+                Issue.record("마이그레이션된 legacy 필기가 없다")
+                throw TestFailure.notReady
+            }
+            row.lineData = Data("changed drawing payload".utf8)
+            try context.save()
+        }
+        try changePayloadAndReleaseContainer()
+        #expect(!LegacyMigrationContentMatcher.matches(sourceSnapshot: snapshotURL, currentStore: storeURL))
+    }
+
     @Test("종전 C14에서 보류한 V6 행도 삭제하지 않고 연결 준비한다")
     func previouslyHeldRowsRemainInStore() throws {
         try withStore { directory, area in
@@ -96,6 +135,39 @@ struct MigrationSyncReleaseTesting {
         }
     }
 
+    @Test("계정이 확인돼도 ownership proof 실패는 local-only로 열어 V3 필사를 보존한다")
+    func ownershipFailureKeepsV3ReadableWithoutCloudKit() async throws {
+        let directory = try LinkageFixture.makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("Carve.sqlite")
+        let area = PreservationArea(root: directory.appendingPathComponent("Preservation"), storeFileName: "Carve.sqlite")
+        try seedV3(url)
+
+        let outcome = await LocalStoreLoader.loadForRelease(
+            at: url,
+            containerID: "iCloud.Carve.SwiftData.iCloud.dev",
+            preservation: area,
+            identity: StubCloudAccountIdentityClient(.identified(userRecordName: "_current")),
+            ownershipProof: DenyStoreOwnershipProof()
+        )
+        guard case .held(let container, let hold) = outcome else {
+            Issue.record("소유 증명 실패 시 연결이 보류되어야 한다: \(outcome)")
+            return
+        }
+
+        #expect(hold.reason == .ownershipUnverified)
+        let context = ModelContext(container)
+        let verses = try context.fetch(FetchDescriptor<BibleDrawing>())
+        let pages = try context.fetch(FetchDescriptor<BiblePageDrawing>())
+        #expect(verses.count == 1)
+        #expect(verses.first?.id == "release-v3-verse")
+        #expect(verses.first?.lineData == RealLegacyLineData.data)
+        #expect(pages.count == 1)
+        #expect(pages.first?.id == "release-v3-page")
+        #expect(pages.first?.fullLineData == RealLegacyLineData.data)
+        #expect(RawStoreSnapshot.completedSnapshotStores(in: area).count == 1)
+    }
+
     @Test("손상된 기존 저장소는 빈 새 설치로 취급하지 않는다")
     func corruptedStoreBlocksAndKeepsBytes() throws {
         try withStore { directory, area in
@@ -125,4 +197,8 @@ struct MigrationSyncReleaseTesting {
         context.insert(page)
         try context.save()
     }
+}
+
+private struct DenyStoreOwnershipProof: StoreOwnershipProofClient {
+    func ownership(for scope: AccountScope) async -> AccountScope? { nil }
 }

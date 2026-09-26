@@ -249,7 +249,7 @@ struct LegacyRowLinkageReaderTesting {
         }
     }
 
-    @Test("관측된 migrator marker는 정확한 정수 boolean true 값만 제한 profile로 판독한다")
+    @Test("관측된 migrator marker는 의미를 추정하지 않고 SQLite boolean 형식만 판독한다")
     func migrationMarkerRequiresObservedValueShape() throws {
         try withStore { url in
             try LinkageFixture.exec(url, """
@@ -271,6 +271,17 @@ struct LegacyRowLinkageReaderTesting {
                 INSERT INTO ANSCKMETADATAENTRY
                     (Z_ENT, Z_OPT, ZBOOLVALUENUM, ZKEY)
                 VALUES (17009, 1, 0, 'PFCloudKitMetadataModelMigratorMigrationBeganCommitKey');
+                """)
+            let reading = reader.judge(storeAt: url)
+            #expect(reading.metadataValueProfileComplete)
+            #expect(reading.migrationBeganCommitMarker == false)
+            #expect(reading.unlinkedCount == 3)
+        }
+        try withStore { url in
+            try LinkageFixture.exec(url, """
+                INSERT INTO ANSCKMETADATAENTRY
+                    (Z_ENT, Z_OPT, ZBOOLVALUENUM, ZKEY)
+                VALUES (17009, 1, 2, 'PFCloudKitMetadataModelMigratorMigrationBeganCommitKey');
                 """)
             let reading = reader.judge(storeAt: url)
             #expect(!reading.metadataValueProfileComplete)

@@ -94,3 +94,30 @@ strict-profile 변경 뒤의 live CloudKit proof는 아직 미실행이다. 기�
 **2026-09-24 후보 소스 후속:** 역할이 겹치고 호출되지 않는 미완성 `LegacyRowCorrespondence.swift` 초안을 `/private/tmp/carve-legacy-row-correspondence-draft-20260924.swift`로 옮겨 source 경로에서 제외했다. 새 DerivedData에서 `EXCLUDED_SOURCE_FILE_NAMES` 없이 전체 회귀를 실행해 iPadOS 17.5는 998 통과·실패 0·6 skip·4 expected failure, 18.6·26.2는 각각 999 통과·실패 0·5 skip·4 expected failure (각 총 1008)를 확인했다. 세 xcresult 경로와 범위는 [호환성 시험 계획 §5-2](./icloud-sync-compatibility-test-plan.md#미완성-초안-이동-후-파일-제외-없는-회귀-2026-09-24)에 있다. Apple 공개 문서와 Xcode 26.3 SDK headers에서 iOS 18 private metadata migration marker의 의미를 확인할 근거를 찾지 못해 reader allowlist `[26]`을 그대로 유지한다.
 
 남은 출시 차단은 iOS 17.0 직접 시험과 소유 proof, iOS 18의 migration marker 의미와 계정 동기화 proof, iOS 19~25 profile, strict-profile 변경 뒤의 live CloudKit proof, 로그인 상태 1.3.0 업데이트 분기다. 이들 게이트가 해소되지 않아 2.0.0 출시 판정은 계속 **NO-GO**다.
+
+
+## 2026-09-26 ownership 판정 후속 — 연결 전 차단 미해결
+
+위 reader/proof 코드 수정과 17.5·18.6 focused CLI 회귀는 앱의 write gate 조건을 보강한 것이다. 실제 startup은 `App.swift`에서 proof provider를 만들기 전에 `.private` `ModelContainer`를 연다. 따라서 metadata/ownership proof가 nil이어도 그 proof는 앱의 직접 쓰기만 차단하며 Core Data의 background CloudKit mirroring을 차단하지 않는다.
+
+같은-scope peer 시험 로그에는 실행 시작 직후 persisted iCloud identity 변경 진단, Core Data `AccountChange` reset, 로컬 모델 및 mirroring metadata purge가 있고, 뒤이어 현재 계정의 import가 성공했다. 오계정 export나 server loss는 확인하지 못했고, 해당 peer의 21행 consistent 사전 백업도 없어 원본 변화량은 모른다. raw Preservation은 남지만 앱이 그 snapshot을 화면에 열람하는 코드는 찾지 못했다. 따라서 소유권 불명확·계정 mismatch에서 원본 열람과 안전한 재시도가 확보됐다고 판정하지 않는다.
+
+가장 좁은 추가 출시 차단은 `.private` attach 전에 ownership proof를 끝내는 startup gate와 비동기 재시도/컨테이너 수명 처리다. 제품 정책(무계정 1.3 V3 first-login 귀속, 새 2.0 초안 분리, mismatch시 업로드 금지)은 바꾸지 않는다. 이 gate와 실제 iPadOS 18 first-login server/independent peer receive가 검증되기 전까지 판정은 **NO-GO**다. 검증·로그 범위는 [호환성 시험 계획의 2026-09-26 후속 조사](./icloud-sync-compatibility-test-plan.md#같은-scope-peer-account-change-purge-후속-조사-2026-09-26)를 따른다.
+
+### 2026-09-26 구현 후 갱신
+
+위 항목의 “미해결”은 조사 직후 상태다. `CarveApp`은 이제 앱 Store 생성 전 `ReleaseStoreBootstrapper`를 기다린다. Domain은 snapshot/migration을 `.none`으로 수행하고, 계정 및 저장소 소유 proof가 같은 범위를 반환한 경우에만 `.private`를 만든다. 계정 미확인·불일치·proof 실패는 local-only ModelContainer + connection hold로 들어가 읽기를 유지하고 synced write/전체 삭제를 막으며 캔버스 필기는 별도 draft로 저장한다. 다음 실행에서 재판정하도록 Settings가 안내한다. 기존 metadata 판정의 exact observed profile, V3 first-login 제약은 그대로 두었고 iOS 18.6 private migrator key의 의미는 미확정으로 유지한다.
+
+Xcode 27.0/macOS 27.2 Domain focused suites는 iPadOS 17.5와 18.6에서 각각 44/44 통과했고, CarveApp iPadOS 18.6 CLI build는 exit 0이다. 자동 검증 로그·xcresult 경로, CLI/live/manual 구분 및 남은 증거 제한은 [호환성 시험 계획의 ownership gate 후속](./icloud-sync-compatibility-test-plan.md#연결-전-ownership-gate-구현-후속-2026-09-26)에 있다.
+
+이 구현은 기존 표본의 21→2 account-change purge를 복구하지 않으며 그 표본의 consistent 사전 사본이 없어 손실 여부도 확인하지 못했다. target V3 first-login은 local ownership ledger와 export bookkeeping까지 관측했지만 실제 server inventory는 아직 없다. fresh peer 수신, 실제 기존 same-account linked 1.3 V3 업데이트, live mismatch/확인 불가에서 upload 차단 및 사용자 열람·draft 확인은 미검증이다. 따라서 출시 판정은 아직 **NO-GO**이며 이 출시 gate를 완료로 추정하지 않는다.
+
+## 2026-09-26 현재 판정 갱신 — metadata 및 ownership 수정 후
+
+이 최신 항목이 과거의 `[26]` allowlist, metadata marker 거절, 수정 보류 및 과거 테스트 수를 갱신한다. 지원 최소 OS 정책은 그대로다. 현재 `LegacyRowLinkageReader`는 iPadOS major 17·18·26에서만 판정하고, 보존 V3와 실제 migrated V3/V6의 콘텐츠·좌표·표시를 비교하는 독립 proof를 first-login 전제에 추가했다. `PFCloudKitMetadataModelMigratorMigrationBeganCommitKey`의 migration 의미는 여전히 확인되지 않았다. parser는 관측된 key set 및 SQLite boolean structure를 확인할 뿐 완료 표식으로 사용하지 않는다.
+
+앱 startup은 private CloudKit ModelContainer 연결 전에 소유권 preflight를 수행한다. 동일 계정 linked 자료는 persisted identity 및 정착된 private record 조회로 대조한다. 행에 정확히 연결된 정상 pending work는 영구 차단 조건에서 제외한다. 계정 없음·불일치·판정 실패 시 local-only 열람, 별도 초안, 안내/재시도를 유지하고 synced writes와 전체 삭제를 보류한다. 이것은 코드 및 synthetic regression 근거다.
+
+Xcode 27.0/macOS 27.2 CLI에서 `DomainTest` ownership/migration 46/46이 iPadOS 17.5와 18.6 각각 통과했다. CarveApp Debug build도 exit 0이며 `iCloud.Carve.SwiftData.iCloud.dev` Development container를 사용한다. 자세한 xcresult/log 경로는 [호환성 시험 계획](./icloud-sync-compatibility-test-plan.md#2026-09-26-ownership-판정콘텐츠-대조-후속)과 [핸드오프](./release-2.0.0-migration-sync-handoff.md#2026-09-26-최신-ownership-판정검증-핸드오프)에 기록했다.
+
+실제 cloud release gate는 여전히 **NO-GO**다. 기존 target의 local first-login ledger·payload 보존·export bookkeeping은 independent server inventory/peer receipt가 아니다. 새 독립 iPadOS 18.6 peer의 CloudKit runtime은 실행 시 `No account`를 반환해 Development peer receive를 진행하지 않았다. target과 같은 계정 확인 후 server payload/hash, 독립 peer 수신/화면 표시, existing linked same-account V3 update, mismatch/unavailable no-upload를 별도로 실증해야 한다. Device Hub manual smoke도 미완료다. Production 데이터 변경은 없다.

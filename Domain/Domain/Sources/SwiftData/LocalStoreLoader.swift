@@ -144,6 +144,46 @@ enum LocalStoreLoader {
         }
     }
 
+    /// 앱 출시 경로. 로컬 보존·마이그레이션 뒤 계정과 저장소 소유를 확인하고 나서만 private CloudKit 을 연다.
+    static func loadForRelease(
+        at url: URL,
+        containerID: String,
+        preservation: PreservationArea,
+        identity: any CloudAccountIdentityClient,
+        ownershipProof: any StoreOwnershipProofClient,
+        injectsOwnership: Bool = false
+    ) async -> Outcome {
+        if let stopped = prepareForRelease(at: url, preservation: preservation) {
+            return stopped
+        }
+
+        let decision = await PrivateStoreAttachmentPreflight.decide(
+            identity: identity,
+            containerID: containerID,
+            ownershipProof: ownershipProof,
+            injectsOwnership: injectsOwnership
+        )
+        switch decision {
+        case .attach:
+            do {
+                Log.info("소유 근거를 확인해 private CloudKit 저장소를 연다", "계정 식별은 기록하지 않는다")
+                return .ready(try open(url, cloudKitDatabase: .private(containerID)))
+            } catch {
+                Log.error("소유 근거 확인 뒤 private 저장소를 열지 못했다", "로컬 원본을 보존한다", "\(error)")
+                return .unavailable(.openFailed)
+            }
+        case .hold:
+            let hold = LegacySeparationHold(reason: .ownershipUnverified)
+            do {
+                Log.error("저장소 소유 근거 미확인 — private 연결을 보류하고 로컬 읽기를 연다")
+                return .held(try open(url, cloudKitDatabase: .none), hold)
+            } catch {
+                Log.error("소유 확인 보류 중 로컬 저장소도 열지 못했다", "\(error)")
+                return .unavailable(.openFailed)
+            }
+        }
+    }
+
     /// 원시 사본과 로컬 마이그레이션만 수행한다. nil 이면 연결 가능, 그 밖은 재실행 또는 실패 처리다.
     private static func prepareForRelease(at url: URL, preservation: PreservationArea) -> Outcome? {
         switch load(at: url, cloudKitDatabase: .none, preservation: preservation) {

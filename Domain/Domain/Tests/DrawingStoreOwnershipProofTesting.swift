@@ -89,6 +89,8 @@ struct DrawingStoreOwnershipProofTesting {
         migratorMarker.migrationBeganCommitMarker = true
         #expect(StoreOwnershipClaimRule.firstLoginLegacyV3(migratorMarker))
         migratorMarker.migrationBeganCommitMarker = false
+        #expect(StoreOwnershipClaimRule.firstLoginLegacyV3(migratorMarker))
+        migratorMarker.migrationBeganCommitMarker = nil
         #expect(!StoreOwnershipClaimRule.firstLoginLegacyV3(migratorMarker))
 
         var migrating = unlinkedV3()
@@ -110,8 +112,23 @@ struct DrawingStoreOwnershipProofTesting {
         var pending = reading
         pending.needsUploadCount = 1
         pending.unsettledRecordCount = 1
+        pending.unsettledRecordNames = ["CD_BibleDrawing_sample"]
         #expect(StoreOwnershipClaimRule.existingPrivateStore(pending, osMajor: 26, validatedOSMajors: supportedOS, identityMatches: true, allRecordsExist: true))
         #expect(!StoreOwnershipClaimRule.existingPrivateStore(pending, osMajor: 26, validatedOSMajors: supportedOS, identityMatches: true, allRecordsExist: false))
+        #expect(StoreOwnershipClaimRule.recordsRequiringServerProof(in: pending) == [])
+
+        var malformedPending = pending
+        malformedPending.unsettledRecordNames = []
+        #expect(StoreOwnershipClaimRule.recordsRequiringServerProof(in: malformedPending) == nil)
+
+        var unrelatedPending = pending
+        unrelatedPending.unsettledRecordNames = ["CD_FavoriteVerse_other"]
+        #expect(StoreOwnershipClaimRule.recordsRequiringServerProof(in: unrelatedPending) == nil)
+
+        var duplicatePending = pending
+        duplicatePending.unsettledRecordCount = 2
+        duplicatePending.unsettledRecordNames = ["CD_BibleDrawing_sample", "CD_BibleDrawing_sample"]
+        #expect(StoreOwnershipClaimRule.recordsRequiringServerProof(in: duplicatePending) == nil)
 
         var incompleteMetadata = reading
         incompleteMetadata.metadataEntryCount += 1
@@ -124,6 +141,8 @@ struct DrawingStoreOwnershipProofTesting {
         migratorMarker.migrationBeganCommitMarker = true
         #expect(StoreOwnershipClaimRule.existingPrivateStore(migratorMarker, osMajor: 18, validatedOSMajors: [17, 18, 26], identityMatches: true, allRecordsExist: true))
         migratorMarker.migrationBeganCommitMarker = false
+        #expect(StoreOwnershipClaimRule.existingPrivateStore(migratorMarker, osMajor: 18, validatedOSMajors: [17, 18, 26], identityMatches: true, allRecordsExist: true))
+        migratorMarker.migrationBeganCommitMarker = nil
         #expect(!StoreOwnershipClaimRule.existingPrivateStore(migratorMarker, osMajor: 18, validatedOSMajors: [17, 18, 26], identityMatches: true, allRecordsExist: true))
 
         var migrating = reading
@@ -133,6 +152,41 @@ struct DrawingStoreOwnershipProofTesting {
         var uncheckedIdentity = reading
         uncheckedIdentity.metadataIdentityChecked = false
         #expect(!StoreOwnershipClaimRule.existingPrivateStore(uncheckedIdentity, osMajor: 26, validatedOSMajors: supportedOS, identityMatches: true, allRecordsExist: true))
+    }
+
+    @Test("private 저장소는 확인된 현재 계정의 소유 증명 뒤에만 연결한다")
+    func privateStorePreflightRequiresMatchingOwnership() async {
+        let accountA = scope("_a")
+        let accountB = scope("_b")
+        let matchingIdentity = StubCloudAccountIdentityClient(.identified(userRecordName: "_a"))
+        let matchingProof = StubStoreOwnershipProof(value: accountA)
+        let noProof = StubStoreOwnershipProof(value: nil)
+
+        #expect(await PrivateStoreAttachmentPreflight.decide(
+            identity: matchingIdentity,
+            containerID: containerID,
+            ownershipProof: matchingProof
+        ) == .attach(accountA))
+        #expect(await PrivateStoreAttachmentPreflight.decide(
+            identity: matchingIdentity,
+            containerID: containerID,
+            ownershipProof: StubStoreOwnershipProof(value: accountB)
+        ) == .hold)
+        #expect(await PrivateStoreAttachmentPreflight.decide(
+            identity: matchingIdentity,
+            containerID: containerID,
+            ownershipProof: noProof
+        ) == .hold)
+        #expect(await PrivateStoreAttachmentPreflight.decide(
+            identity: StubCloudAccountIdentityClient(.noAccount),
+            containerID: containerID,
+            ownershipProof: matchingProof
+        ) == .hold)
+        #expect(await PrivateStoreAttachmentPreflight.decide(
+            identity: StubCloudAccountIdentityClient(.unavailable),
+            containerID: containerID,
+            ownershipProof: matchingProof
+        ) == .hold)
     }
 
     @Test("한 번 기록한 저장소 소유자는 로그아웃 뒤 다른 계정으로 바뀌지 않는다")
@@ -145,11 +199,41 @@ struct DrawingStoreOwnershipProofTesting {
 
         #expect(await ledger.claim(accountA, proof: .firstRunHadNoStore) == accountA)
         #expect(await ledger.claim(accountB, proof: .firstLoginFromUnaccountedV3) == nil)
-        guard case .owner(let stored) = await ledger.read() else {
+        guard case .owner(let stored, let storedProof) = await ledger.read() else {
             Issue.record("유효한 소유 표식이 남아 있어야 한다")
             return
         }
         #expect(stored == accountA)
+        #expect(storedProof == .firstRunHadNoStore)
+    }
+
+    @Test("기존 ledger가 현재 저장소의 다른 CloudKit identity를 우회하지 않는다")
+    func existingLedgerCannotBypassChangedPersistedIdentity() async throws {
+        let root = try LinkageFixture.makeDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let storeURL = try LinkageFixture.makeV6Store(in: root)
+        for primaryKey in 1...3 {
+            try LinkageFixture.link(storeURL, entity: .bibleDrawing, primaryKey: Int64(primaryKey))
+        }
+        try LinkageFixture.addIdentityKeys(storeURL)
+        try LinkageFixture.exec(storeURL, "UPDATE ANSCKMETADATAENTRY SET ZSTRINGVALUE = '_b' WHERE ZKEY = 'NSCloudKitMirroringDelegateCKIdentityRecordNameDefaultsKey';")
+
+        let preservation = PreservationArea(root: root.appendingPathComponent("Preservation", isDirectory: true), storeFileName: storeURL.lastPathComponent)
+        let ownershipArea = StoreOwnershipArea(root: root.appendingPathComponent("Owners", isDirectory: true), fileName: "owner.json")
+        let accountA = scope("_a")
+        #expect(await StoreOwnershipLedger(area: ownershipArea).claim(accountA, proof: .currentPrivateCloudRecords) == accountA)
+        let lookup = CountingSuccessfulRecordLookup()
+        let client = CloudKitStoreOwnershipProofClient(
+            identity: StubCloudAccountIdentityClient(.identified(userRecordName: "_a")),
+            containerID: containerID,
+            storeURL: storeURL,
+            preservation: preservation,
+            ownershipArea: ownershipArea,
+            privateRecordLookup: lookup
+        )
+
+        #expect(await client.ownership(for: accountA) == nil)
+        #expect(await lookup.callCount() == 0)
     }
 
     @Test("실제 proof client는 검증된 OS에서만 무계정 V3 소유를 기록한다")
@@ -188,11 +272,12 @@ struct DrawingStoreOwnershipProofTesting {
         #expect(reading.metadataNeedsMigration == false)
         #expect(Set(reading.metadataKeys) == LegacyRowLinkageReader.unaccountedV3MetadataKeys)
         #expect(await client.ownership(for: account) == account)
-        guard case .owner(let recorded) = await StoreOwnershipLedger(area: ownershipArea).read() else {
+        guard case .owner(let recorded, let proof) = await StoreOwnershipLedger(area: ownershipArea).read() else {
             Issue.record("검증을 마친 소유 표식이 없다")
             return
         }
         #expect(recorded == account)
+        #expect(proof == .firstLoginFromUnaccountedV3)
     }
 
     @Test("요청 계정과 실제 확인 계정이 다르면 V3 소유 표식을 만들지 않는다")
@@ -260,6 +345,25 @@ struct DrawingStoreOwnershipProofTesting {
 
 private struct NoStoreRecordLookup: StorePrivateRecordLookupClient {
     func allRecordsExist(_ recordNames: [String]) async -> Bool { false }
+}
+
+private actor CountingSuccessfulRecordLookup: StorePrivateRecordLookupClient {
+    private var calls = 0
+
+    func allRecordsExist(_ recordNames: [String]) async -> Bool {
+        calls += 1
+        return true
+    }
+
+    func callCount() -> Int { calls }
+}
+
+private struct StubStoreOwnershipProof: StoreOwnershipProofClient {
+    let value: AccountScope?
+
+    func ownership(for scope: AccountScope) async -> AccountScope? {
+        value == scope ? value : nil
+    }
 }
 
 private extension StoreOwnershipLedger.ReadResult {

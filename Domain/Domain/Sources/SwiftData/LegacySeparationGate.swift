@@ -28,6 +28,8 @@ import Dependencies
 
 /// 연결을 보류한 까닭 (C14 ③).
 public enum LegacySeparationHoldReason: Hashable, Sendable {
+    /// 계정이 확인되지 않았거나 현재 계정과 로컬 저장소의 소유 관계를 입증하지 못했다.
+    case ownershipUnverified
     /// 판정이 「알 수 없음」 이다.
     case linkageUnknown(LegacyLinkageUnknownReason)
     /// 검증된 대응 없음 행이 있다. 파괴적 분리가 연결되기 전이라 분리본 · 기록만 남기고 연결하지 않는다.
@@ -53,6 +55,7 @@ public struct LegacySeparationHold: Hashable, Sendable {
     /// 2.0.0 은 아직 동의 화면을 내지 않는다. 값만 둔다.
     public var allowsConditionalConsent: Bool {
         switch reason {
+        case .ownershipUnverified: false
         case .linkageUnknown: true
         case .unlinkedRowsAwaitSeparation, .preservationFailed: false
         }

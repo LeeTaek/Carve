@@ -21,21 +21,19 @@ extension ContainerID: DependencyKey {
 
 /// Carve에서 사용하는 SwiftData ModelContainer를 의존성으로 주입하기 위한 DependencyKey.
 extension ModelContainer: @retroactive DependencyKey {
-    /// 실제 앱 환경에서 사용할 SwiftData ModelContainer.
-    /// - CloudKit Private DB와 연동되며, 로컬 파일 URL과 마이그레이션 플랜(DrawingDataMigrationPlan)을 함께 구성.
-    /// - 열기 전에 원시 사본을 뜬다(정책 §12-6 C3 ①). 뜨지 못하면 열지 않고 시작 화면에서 막는다.
-    /// - 열지 못하면 `LocalStoreLoader` 가 **V1 폴백 전에** 메타데이터로 저장소를 가린다. 확인된 1.0.x 저장소만 V1 전용 컨테이너로
-    ///   옮기고(마이그레이션 모드), 그 밖은 V1 폴백 없이 시작 화면에서 막는다 (정책 §3 표 4행 · 테스트 계획 MIG-F1).
+    /// 동기 DependencyKey 접근만으로 private 저장소를 먼저 열지 않도록 기본 경로는 로컬 전용 보류다.
+    /// 앱은 계정·ownership preflight 를 마치는 `ReleaseStoreBootstrapper` 로 ModelContainer 를 만든다.
     public static var liveValue: ModelContainer {
         @Dependency(\.containerId) var containerId
         @Dependency(\.clouodKitSyncManager) var cloudkitContainer
         @Dependency(\.legacySeparationHoldState) var holdState
         let url = URL.applicationSupportDirectory.appending(path: containerId.localDBPath)
         let preservation = PreservationArea.live(localDBPath: containerId.localDBPath)
-        // 2.0.0 출시 결정: 옛 무계정 필사는 보존·마이그레이션 뒤 첫 로그인 계정에 자동 전송한다.
-        // 새 무계정 초안의 귀속 및 기존 쓰기 차단은 DrawingEditEnvironment 에서 계속 다룬다.
-        switch LocalStoreLoader.loadForRelease(at: url, cloudKitDatabase: .private(containerId.id), preservation: preservation) {
+        switch LocalStoreLoader.loadForRelease(at: url, cloudKitDatabase: .none, preservation: preservation) {
         case .ready(let container):
+            let hold = LegacySeparationHold(reason: .ownershipUnverified)
+            holdState.hold = hold
+            cloudkitContainer.syncState = .connectionHeld(hold)
             return container
         case .held(let container, let hold):
             /// 연결 보류 — 앱에는 들어가되 이 실행은 이 기기에만 저장한다. 쓰기 · 전체 삭제는 보류 사유로 막힌다(정책 §12-6 C14 ③ · D6).
@@ -84,6 +82,53 @@ extension ModelContainer: @retroactive DependencyKey {
     
 }
 
+/// 계정과 로컬 저장소 ownership proof 를 확인한 뒤 앱의 동기화 저장소를 연다.
+/// 계정 없음·조회 실패·계정 불일치·판정 불명은 `.none` 으로 열어 기존 필사 읽기와 별도 초안 쓰기만 허용한다.
+public enum ReleaseStoreBootstrapper {
+    /// 원시 보존 → CloudKit 없는 로컬 마이그레이션 → ownership preflight → 연결 또는 local-only 보류 순으로 시작한다.
+    @discardableResult
+    public static func load(
+        containerID: ContainerID,
+        identity: any CloudAccountIdentityClient,
+        ownershipProof: any StoreOwnershipProofClient,
+        syncManager: PersistentCloudKitContainer,
+        holdState: LegacySeparationHoldState,
+        injectsOwnership: Bool = false
+    ) async -> ModelContainer {
+        let url = URL.applicationSupportDirectory.appending(path: containerID.localDBPath)
+        let preservation = PreservationArea.live(localDBPath: containerID.localDBPath)
+        switch await LocalStoreLoader.loadForRelease(
+            at: url,
+            containerID: containerID.id,
+            preservation: preservation,
+            identity: identity,
+            ownershipProof: ownershipProof,
+            injectsOwnership: injectsOwnership
+        ) {
+        case .ready(let container):
+            return container
+        case .held(let container, let hold):
+            holdState.hold = hold
+            syncManager.syncState = .connectionHeld(hold)
+            return container
+        case .legacyMigration(let container):
+            syncManager.syncState = .migration
+            return container
+        case .legacyMigrationHeld(let container, let hold):
+            holdState.hold = hold
+            syncManager.syncState = .migrationEndedWithoutImport(nil)
+            return container
+        case .unavailable(let failure):
+            syncManager.syncState = .storeUnavailable(failure)
+            do {
+                return try LocalStoreLoader.makeUnavailableStandIn()
+            } catch {
+                fatalError("Failed to create stand-in ModelContainer: \(error.localizedDescription)")
+            }
+        }
+    }
+}
+
 /// CloudKit 동기화 상태를 관리하는 PersistentCloudKitContainer를 의존성으로 주입하기 위한 키.
 extension PersistentCloudKitContainer: DependencyKey {
     public static var liveValue = PersistentCloudKitContainer()
@@ -111,6 +156,5 @@ public extension DependencyValues {
         set { self[PersistentCloudKitContainer.self] = newValue }
     }
 }
-
 
 

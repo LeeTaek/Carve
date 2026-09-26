@@ -2363,3 +2363,81 @@ xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace \
 이 target store의 local CloudKit export bookkeeping와 성공 event는 Core Data 미러링이 export를 완료했다고 보고했다는 근거다. 독립 server inventory나 peer 수신을 대신하지 않는다. 별도 독립 생성된 same-scope simulator `Carve-X27-FirstLogin-20260925` (iPadOS 26.5)은 app launch 전 직접 read-only query에서 drawing 21 / present 14 / record metadata 21 / pending 0이었고 이번 Revelation row는 없었다. target ledger owner와 peer ledger owner는 raw owner를 출력하지 않고 로컬에서 비교해 일치했다. `simctl clone` 장치는 사용하지 않았다. peer 앱 실행 뒤 Core Data CloudKit 로그는 Development private DB zone/subscription 설정과 import success, export success를 보고했으나 해당 Revelation row는 peer에 없었다. app run 뒤 consistent read-only backup `/private/tmp/carve-x27-ownership-v5-ios18.6-live-20260926/postlogin/peer-after-stop.sqlite`은 integrity `ok`, drawing 2 / metadata 2 / pending 0 / test row absent였다. launch 전 통계 21→2가 달라졌으나 그 직전의 full payload/SQLite snapshot은 만들지 못했고 원인도 확인하지 못했다. 실행 후 앱은 바로 종료했고 이 peer는 더 사용하지 않는다. 별도 V3 Preservation snapshot은 있으나 사전 21-row store와 같다는 증거는 없으므로 보존 대용으로 보지 않는다. 이 상태 변화는 시험 결과의 제한 및 추가 조사 대상으로 기록하며 임의 복구나 재실행을 하지 않았다.
 
 이전에 이름에 `CloudKit-Peer`가 들어간 `Carve-X27-CloudKit-Peer-CurrentIdentity-20260925`는 target owner scope와 일치하지 않아 수신 peer로 사용하지 않았다. 대신 새 blank peer `Carve-2.0.0-Ownership-Peer-iOS18.6-20260926` (iPad mini A17 Pro, iPadOS 18.6, UDID `DC7D72AB-1CD2-4852-B459-0CCD45FE7862`)를 독립 simulator로 만들고 Xcode 27 Debug `2.0.0 (1)` (`iCloud.Carve.SwiftData.iCloud.dev`)을 설치했다. 앱은 실행 전이라 CloudKit 연결/변경과 로컬 필기 store는 없다. 같은 Apple Account의 peer 로그인은 사용자가 직접 해야 한다. 이 peer에서 sample absent baseline→Development import→payload/hash/UI 확인 전까지 first-login peer 수신은 미통과이며 release gate는 **NO-GO**다.
+
+
+### 같은-scope peer account-change purge 후속 조사 (2026-09-26)
+
+21→2 행 변화는 앱 schema migration이나 명시적 삭제보다 Core Data account-change purger와 더 잘 맞는다. `/private/tmp/carve-x27-ownership-v5-ios18.6-live-20260926/postlogin/peer-full.log:231-249`에서 persistent store의 iCloud identity가 달라졌다는 진단 뒤 `AccountChange` reset, BibleDrawing/BiblePageDrawing/FavoriteVerse 및 CloudKit export/import/record metadata 표 제거가 기록됐다. 뒤이어 Development private zone fetch와 import `success=1 madeChanges=1`, export success도 기록됐다. 이는 account-change purge 실행을 직접 보여 주지만, 그때의 실제 계정이 의도한 계정이었는지, 잘못된 계정으로 데이터가 전송됐는지, 서버에서 데이터가 사라졌는지는 증명하지 않는다.
+
+21행의 consistent prelaunch SQLite backup은 찾지 못했다. `peer-before-import.sqlite`, `peer-after-launch.sqlite`, `peer-after-stop.sqlite`는 모두 2 drawing/2 metadata이며 integrity `ok`; 별도 `peer-preservation-copy/Carve.dev.sqlite`는 V3 1행으로 21행 linked store와 동일하다는 증거가 없다. 따라서 원본 payload의 전후 차이나 변화 범위는 판정할 수 없고 peer를 재실행·복구하지 않았다.
+
+코드 순서는 `CarveApp.init`의 `makeModelContainer` → `SwiftDataContextProvider+Dependency` → `LocalStoreLoader.loadForRelease(.private)` 후에 `LiveDrawingEditEnvironment.start()`와 ownership proof다. proof가 나중에 앱 직접 쓰기를 막아도 Core Data mirroring은 이미 시작할 수 있다. `RawStoreSnapshot`은 원본 DB/WAL/SHM/journal/external data를 보존하지만 이를 UI에서 열람·복구하는 경로는 확인되지 않았다. 그러므로 raw copy는 사용자 열람 기능이나 계정 mismatch 안전 보장의 대체물이 아니다.
+
+연결 전 ownership gate가 필요하다. first-login unaccounted V3와 same-account linked store는 각각 기존의 증거 기반 proof를 통과한 뒤에만 `.private`로 열고, 계정 없음·확인 실패·mismatch·불명확한 metadata에는 local-only 열람과 초안 보존을 유지해야 한다. 그런데 비동기 account proof 후 재시도할 때 `ModelContainer`를 안전하게 교체하는 구현이 없으므로 이 경로는 아직 미해결 출시 차단이다. 새 빈 수신기 `Carve-2.0.0-Ownership-Peer-iOS18.6-20260926`는 Device Hub Settings에서 Apple Account 로그아웃 상태로 확인했다. 앱은 아직 열지 않았으며 사용자가 같은 Development 시험 계정으로 직접 로그인하기 전까지 receive 검증을 진행하지 않는다.
+
+### 연결 전 ownership gate 구현 후속 (2026-09-26)
+
+앞 절은 구현 전 관측이다. 현재 `AppStartupView.startIfNeeded()`가 Domain의 `ReleaseStoreBootstrapper` 완료 전에는 앱 Store를 만들지 않는다. bootstrap은 raw snapshot과 `.none` 로컬 마이그레이션을 먼저 하고, identity와 V3/linked proof가 정확히 일치할 때만 `.private`를 연다. no account, identity unavailable, proof nil/mismatch에서는 `.none` local container로 기존 행을 표시하고 `LegacySeparationHoldState`를 고정한다. `connectionHeld`는 시작 화면 진입을 허용하지만 동기화 저장소 직접 쓰기와 전체 삭제는 거절하고 캔버스 필기는 별도 로컬 초안으로 남긴다. 설정 문구는 재실행을 재시도 방법으로 안내한다. 동기 DependencyKey 기본 live path 또한 `.private`에 연결하지 않는다.
+
+동일-scope pending은 `ANSCKRECORDMETADATA`의 upload/cloud-delete/local-delete flag와 record name을 행 연결과 함께 읽는다. 미완료 record 이름 수가 flag 수와 같고 중복·누락·비연결이 없을 때 pending record만 서버 존재 조회에서 빼고 나머지는 private DB에서 확인한다. 이 기능과 계정 mismatch/no-account/unavailable preflight 결정, 실제 local-only `.held`로 마이그레이션 V3 행/298B payload를 읽는 회귀를 포함한 세 suite는 Xcode 27.0에서 iPadOS 17.5와 18.6 각각 44/44 통과했다. 결과 경로는 `/private/tmp/carve-x27-ownership-preflight-ios17.5-r2-20260926.xcresult`, `/private/tmp/carve-x27-ownership-preflight-ios18.6-r4-20260926.xcresult`이다. CarveApp iPadOS 18.6 build exit 0: `/private/tmp/carve-x27-ownership-app-build-ios18.6-r1-20260926.log`.
+
+18.6 historical V3 metadata의 추가 `PFCloudKitMetadataModelMigratorMigrationBeganCommitKey=true`는 exact observed key/value profile로만 허용한다. key 이름이나 true가 migration 완료를 뜻한다고 추론하지 않는다. unknown/malformed value, pending mapping 모순, identity mismatch, 손상, migration 필요 상태는 계속 실패 닫힌다.
+
+실제 Development login/export와 peer receive는 CLI fixture 회귀와 분리한다. 이전 target first-login 기록은 ownership ledger와 Core Data 성공 event, 동일 payload hash를 보여 주지만 independent server inventory는 없었다. fresh peer는 앱을 실행하지 않고 same-account 직접 로그인을 기다리고 있다. 새 peer import/payload/UI, existing linked historical 1.3 V3 update, live mismatch/no-account 안전 경로가 완료되기 전 release gate는 **NO-GO**다.
+
+## 2026-09-26 ownership 판정·콘텐츠 대조 후속
+
+이 절은 앞선 구현 상태와 시험 결과를 갱신한다. 과거 기록의 `[26]` allowlist, 44/44 결과, blank peer 로그인 대기 상태는 당시 관측이다. 현재 코드는 iPadOS major 17·18·26 판독을 허용하고 exact metadata profile과 실제 데이터 대조를 거친다.
+
+### 보존 표본과 불확실성
+
+- Historical iPadOS 18.6 V3 사본은 `/private/tmp/carve-x27-ios18-marker-offline-20260925/original-app-data-pre-shutdown/Library/Application Support/Preservation/Carve.dev.sqlite/raw/1790300928-5DA2776C/Carve.dev.sqlite`이다. `integrity_check=ok`, V3 drawing 1행, 필기 payload 298 bytes, metadata 5개(기존 네 key와 `PFCloudKitMetadataModelMigratorMigrationBeganCommitKey`), `NeedsMetadataMigration=false`, CloudKit record metadata 및 export/import operation 0이다. marker는 SQLite integer boolean true다. 보존 기록의 source 조건은 iPadOS 18.6·계정 없음이다.
+- marker의 migration 진행/완료 의미를 밝히는 전후 migration 사본, 단계 기록, 독립 서버 대응 자료는 확인하지 못했다. historical 1.3.0 app binary도 언급된 위치에서 찾지 못했다. 앞선 clone probe는 원본 UDID를 대상으로 했으므로 독립 표본이 아니다.
+- 구현은 marker 의미에 의존하지 않는다. key 집합, 중복, SQLite boolean 열/type/value shape만 구조적으로 확인하고, 소유권은 unlinked V3 조건과 보존 원본↔현재 저장소의 행/payload 동일성으로 별도 입증한다. 실제 표본 값은 true 하나이며 false는 boolean 구조 parser 회귀 fixture에서만 확인했다. 손상, 다른 자료형/값, 중복·미지 key, `NeedsMetadataMigration` 상태, 행 차이는 거절한다.
+
+### 판정 경로와 사용자 영향
+
+`CarveApp.AppStartupView.startIfNeeded` → `ReleaseStoreBootstrapper.load` → raw snapshot 및 `.none` 로컬 migration → `PrivateStoreAttachmentPreflight` → `CloudKitStoreOwnershipProofClient` 순서다. 현재 계정 로그인만으로 `.private` attach를 허용하지 않는다.
+
+- **무계정 1.3.0 V3 첫 로그인:** strict unlinked V3 snapshot과 현재 migrated V3/V6의 절·장 행, verse/chapter, 좌표 version, 표시 flag, row identity, layout metadata, PencilKit payload와 page payload를 비교한다. 2.0.0에서 새로 생성된 FavoriteVerse·VerseDrawingVersion·DrawingEraseEpoch 행이 있으면 unaccounted V3 proof로 쓰지 않는다. 모든 비교와 현재 계정 확인이 통과한 경우에만 첫 로그인 계정으로 연결한다.
+- **기존 동일 계정 linked 저장소:** persisted CloudKit identity와 현재 계정이 같고 exact linked metadata/record mapping이 유효해야 한다. settled records는 현재 private DB에서 확인한다. 정상 pending upload/delete는 정확히 연결된 pending record 이름만 조회에서 뺀다. 누락·중복·비연결 pending mapping은 거절한다.
+- **다른 계정 또는 계정 확인 불가:** identity mismatch, no account/restricted/unavailable, proof 부재·손상은 private attach와 synced writes를 보류한다. local store에서 기존 필기를 읽고, 신규 필기는 별도 local draft로 저장한다. 전체 삭제를 보류하고 설정에서 다음 실행 재시도를 안내한다.
+
+### Xcode 27 자동 검증
+
+환경은 macOS 27.2, 기본 Xcode 27.0 (`27A266a`), Swift 6.4.0.34.1, Tuist 4.208.0이다. workspace는 `mise x -- tuist generate --no-open`으로 생성했다. 자동 test destination은 iPad simulator만 썼다.
+
+`DomainTest`의 `LegacyRowLinkageReaderTesting`, `DrawingStoreOwnershipProofTesting`, `MigrationSyncReleaseTesting` 결과:
+
+```bash
+xcodebuild test -quiet -workspace Carve.xcworkspace -scheme DomainTest \
+  -destination 'platform=iOS Simulator,id=622BB6EA-183E-44D9-B974-A51B5E22EACE' \
+  -parallel-testing-enabled NO \
+  -only-testing:DomainTest/LegacyRowLinkageReaderTesting \
+  -only-testing:DomainTest/DrawingStoreOwnershipProofTesting \
+  -only-testing:DomainTest/MigrationSyncReleaseTesting \
+  -resultBundlePath /private/tmp/carve-x27-ownership-final-ios17.5-r1-20260926.xcresult
+
+xcodebuild test -quiet -workspace Carve.xcworkspace -scheme DomainTest \
+  -destination 'platform=iOS Simulator,id=99725BD5-69EF-463D-AC2E-E174FF2FA75D' \
+  -parallel-testing-enabled NO \
+  -only-testing:DomainTest/LegacyRowLinkageReaderTesting \
+  -only-testing:DomainTest/DrawingStoreOwnershipProofTesting \
+  -only-testing:DomainTest/MigrationSyncReleaseTesting \
+  -resultBundlePath /private/tmp/carve-x27-ownership-final-ios18.6-r2-20260926.xcresult
+```
+
+| Destination | 결과 | xcresult | 로그 |
+|---|---:|---|---|
+| iPad mini 6, iPadOS 17.5, `622BB6EA-183E-44D9-B974-A51B5E22EACE` | 46 통과, 실패/skip/runtime warning 0 | `/private/tmp/carve-x27-ownership-final-ios17.5-r1-20260926.xcresult` | `/private/tmp/carve-x27-ownership-final-ios17.5-r1-20260926.log` |
+| iPad mini (A17 Pro), iPadOS 18.6, `99725BD5-69EF-463D-AC2E-E174FF2FA75D` | 46 통과, 실패/skip/runtime warning 0 | `/private/tmp/carve-x27-ownership-final-ios18.6-r2-20260926.xcresult` | `/private/tmp/carve-x27-ownership-final-ios18.6-r2-20260926.log` |
+
+앱 Debug build는 exit 0이다. 로그 `/private/tmp/carve-x27-ownership-release-app-build-20260926.log`, 산출물 `/private/tmp/carve-x27-ownership-release-app-derived-20260926/Build/Products/Debug-iphonesimulator/CarveApp.app`이다. Info.plist container는 `iCloud.Carve.SwiftData.iCloud.dev`; runtime environment는 Sandbox다. Production은 변경하지 않았다. fixture 기반 자동 회귀와 live CloudKit 증거는 서로 대체하지 않는다.
+
+### 최신 live 상태와 남은 게이트
+
+기존 target `Carve-2.0.0-Ownership-iOS18.6-20260926`의 앞선 실행은 `firstLoginFromUnaccountedV3` ledger, 보존 V3와 현재 payload 298 bytes 일치, local export success bookkeeping을 기록했다. 이것은 독립 Development server inventory나 peer 수신을 증명하지 않는다. 보존된 linked V3 표본은 현재 target 계정 identity와 일치하지 않아 기존 same-account update 근거로 사용하지 않았다.
+
+새 독립 peer `Carve-2.0.0-Ownership-Peer-iOS18.6-TargetAccount-20260926` (iPad mini A17 Pro, iPadOS 18.6, UDID `1FAEBEDC-A397-477D-A83A-6362D2C4BEB3`)에 사용자가 로그인을 완료했다고 알렸지만, 앱 실행 때 CloudKit runtime은 `accountStatus=No account`, `hasValidCredentials=false`를 반환했다. 앱은 ownership hold로 `.none` local store를 택했다. 이 실행에서 Development import/export 및 peer payload 수신은 없었다. 로그는 `/private/tmp/carve-x27-ownership-target-account-peer-app-20260926.log`다. peer 앱은 종료했고 저장소를 지우거나 계정을 바꾸지 않았다. 사용자는 target에 사용한 계정과 같은 주소가 둘 중 무엇인지 확인하고 있다.
+
+Device Hub 수동 smoke는 완료되지 않았다. 자동 CLI와 실제 앱 launch 로그만 확인했으며 UI payload 비교로 확대하지 않는다. 다음 단계는 target과 같은 계정이 CloudKit runtime에서 `.available`임을 확인한 후 Development custom-zone server payload와 빈 독립 peer의 row/payload/render를 대조하는 것이다. 기존 linked same-account 1.3.0 update, live mismatch/unavailable no-upload도 실증되지 않았다. 출시 판정은 **NO-GO**다.

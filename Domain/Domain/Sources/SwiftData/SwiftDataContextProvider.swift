@@ -98,7 +98,7 @@ public final class PersistentCloudKitContainer: ObservableObject {
         }
     }
     
-    init() {
+    public init() {
         // 현재 장 Fetch
         if let titleData = UserDefaults.standard.data(forKey: "title"),
            let decodedTitle = try? JSONDecoder().decode(BibleChapter.self, from: titleData) {

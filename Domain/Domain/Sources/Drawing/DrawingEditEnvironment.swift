@@ -168,6 +168,7 @@ public final class LiveDrawingEditEnvironment: DrawingEditEnvironmentClient, @un
     private let provider: AccountScopeProvider
     private let stateStore: FileEraseStateStore
     private let localPreservation: LocalPreservationWriter?
+    private let holdState: LegacySeparationHoldState?
     /// 앱의 저장소 소유 근거 제공자. 계정 상태와 별도로 저장소 근거가 확인돼야 범위를 돌려준다.
     private let ownershipProof: any StoreOwnershipProofClient
     /// 시험용 소유 주입(`StoreOwnershipInjection`, DEBUG 전용).
@@ -187,6 +188,7 @@ public final class LiveDrawingEditEnvironment: DrawingEditEnvironmentClient, @un
         containerID: String,
         stateStore: FileEraseStateStore,
         localPreservation: LocalPreservationWriter? = nil,
+        holdState: LegacySeparationHoldState? = nil,
         ownershipProof: any StoreOwnershipProofClient = UnverifiedStoreOwnershipProofClient(),
         notificationCenter: NotificationCenter = .default,
         injectsOwnership: Bool = false
@@ -194,6 +196,7 @@ public final class LiveDrawingEditEnvironment: DrawingEditEnvironmentClient, @un
         self.provider = AccountScopeProvider(identity: identity, containerID: containerID, stateStore: stateStore)
         self.stateStore = stateStore
         self.localPreservation = localPreservation
+        self.holdState = holdState
         self.ownershipProof = ownershipProof
         self.notificationCenter = notificationCenter
         self.injectsOwnership = injectsOwnership
@@ -268,8 +271,8 @@ public final class LiveDrawingEditEnvironment: DrawingEditEnvironmentClient, @un
 
     public func current() async -> DrawingEditEnvironment {
         // C14 연결 보류 — 컨테이너를 만들 때 정해지고 이 실행 동안 바뀌지 않는다. 어느 환경에나 그대로 실린다.
-        @Dependency(\.legacySeparationHoldState) var holdState
-        let connectionHeld = holdState.isHeld
+        @Dependency(\.legacySeparationHoldState) var dependencyHoldState
+        let connectionHeld = (holdState ?? dependencyHoldState).isHeld
         for _ in 0..<Self.maxSnapshotAttempts {
             guard !hasUnappliedNotification else { break }
             let snapshot = await provider.snapshot()

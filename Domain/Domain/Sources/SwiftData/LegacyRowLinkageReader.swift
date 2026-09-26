@@ -119,6 +119,8 @@ public struct LegacyRowLinkageReading: Equatable, Sendable {
     public var missingRecordNameCount = 0
     /// 서버 업로드·삭제 또는 로컬 삭제가 아직 끝나지 않은 대응 수.
     public var unsettledRecordCount = 0
+    /// 아직 끝나지 않은 CloudKit 작업과 연결된 레코드 이름. 값은 로그·요약에 쓰지 않는다.
+    public var unsettledRecordNames: [String] = []
     /// 저장 모델 행과 CloudKit 대응 수를 교차 확인할 때 쓴다.
     public var localModelRowCount = 0
     public var recordMetadataCount = 0
@@ -160,6 +162,7 @@ public struct LegacyRowLinkageReading: Equatable, Sendable {
         mirroredRecordNames: [String] = [],
         missingRecordNameCount: Int = 0,
         unsettledRecordCount: Int = 0,
+        unsettledRecordNames: [String] = [],
         localModelRowCount: Int = 0,
         recordMetadataCount: Int = 0,
         metadataKeys: [String] = [],
@@ -182,6 +185,7 @@ public struct LegacyRowLinkageReading: Equatable, Sendable {
         self.mirroredRecordNames = mirroredRecordNames
         self.missingRecordNameCount = missingRecordNameCount
         self.unsettledRecordCount = unsettledRecordCount
+        self.unsettledRecordNames = unsettledRecordNames.sorted()
         self.localModelRowCount = localModelRowCount
         self.recordMetadataCount = recordMetadataCount
         self.metadataKeys = metadataKeys.sorted()
@@ -274,7 +278,7 @@ public struct LegacyRowLinkageReader: Sendable {
         "PFCloudKitMetadataFrameworkVersionKey": 2,          // ZINTEGERVALUE
         "PFCloudKitMetadataModelVersionHashesKey": 5,        // ZTRANSFORMEDVALUE
         "PFCloudKitMetadataNeedsMetadataMigrationKey": 1,    // ZBOOLVALUENUM
-        migrationBeganCommitKey: 1,                           // SQLite integer boolean; only observed true is structurally accepted
+        migrationBeganCommitKey: 1,                           // SQLite integer boolean; 의미는 해석하지 않는다
         "NSCloudKitMirroringDelegateCKIdentityRecordNameDefaultsKey": 4, // ZSTRINGVALUE
         "NSCloudKitMirroringDelegateCheckedCKIdentityDefaultsKey": 1,    // ZBOOLVALUENUM
         "NSCloudKitMirroringDelegateLastHistoryTokenKey": 5             // ZTRANSFORMEDVALUE
@@ -324,26 +328,6 @@ public struct LegacyRowLinkageReader: Sendable {
         } catch {
             return Self.unknown(.queryFailed(table: "-", message: "\(error)"), model: model)
         }
-    }
-
-    /// 현재 확인한 계정의 CloudKit 레코드 이름과 저장소의 미러링 계정 키가 같은지 비교한다.
-    /// 값 원문은 호출자에게 돌려주거나 기록하지 않는다. 원본 대신 이미 만든 읽기 전용 사본에만 사용한다.
-    func accountIdentityMatches(copyAt url: URL, userRecordName: String) -> Bool {
-        var handle: OpaquePointer?
-        let uri = "file:\(url.path)?mode=ro"
-        guard sqlite3_open_v2(uri, &handle, SQLITE_OPEN_READONLY | SQLITE_OPEN_URI, nil) == SQLITE_OK, let db = handle else {
-            sqlite3_close(handle)
-            return false
-        }
-        defer { sqlite3_close(db) }
-        let query = "SELECT ZSTRINGVALUE FROM ANSCKMETADATAENTRY WHERE ZKEY = 'NSCloudKitMirroringDelegateCKIdentityRecordNameDefaultsKey'"
-        var statement: OpaquePointer?
-        guard sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK, let statement else { return false }
-        defer { sqlite3_finalize(statement) }
-        guard sqlite3_step(statement) == SQLITE_ROW, let value = sqlite3_column_text(statement, 0) else { return false }
-        let matches = String(cString: value) == userRecordName
-        // 중복된 소유 키는 모호한 저장소 상태다. 첫 값만 보고 소유를 인정하지 않는다.
-        return matches && sqlite3_step(statement) == SQLITE_DONE
     }
 
     // MARK: - 판독
@@ -521,6 +505,7 @@ public struct LegacyRowLinkageReader: Sendable {
             mirroredRecordNames: mirror.recordNames,
             missingRecordNameCount: mirror.missingRecordNames,
             unsettledRecordCount: mirror.unsettled,
+            unsettledRecordNames: mirror.unsettledRecordNames,
             localModelRowCount: try applicationModelRowCount(tables: tables, sql: sql),
             recordMetadataCount: mirror.count,
             metadataKeys: keys,
@@ -571,9 +556,8 @@ public struct LegacyRowLinkageReader: Sendable {
                 if key == "PFCloudKitMetadataNeedsMetadataMigrationKey" { needsMigration = value == 1 }
                 if key == "NSCloudKitMirroringDelegateCheckedCKIdentityDefaultsKey" { identityChecked = value == 1 }
                 if key == Self.migrationBeganCommitKey {
-                    // 의미는 해석하지 않는다. 관측된 자료형·값(true)만 허용하고 false/다른 값은 보류한다.
-                    guard value == 1 else { complete = false; return }
-                    migrationBeganCommitMarker = true
+                    // migration 단계 의미는 해석하지 않는다. SQLite boolean 형식(0 또는 1)만 보존한다.
+                    migrationBeganCommitMarker = value == 1
                 }
             case 2:
                 guard sqlite3_column_type(statement, expectedColumn) == SQLITE_INTEGER,
@@ -607,6 +591,7 @@ public struct LegacyRowLinkageReader: Sendable {
         var missingRecordNames: Int
         var needsUpload: Int
         var unsettled: Int
+        var unsettledRecordNames: [String]
 
         var count: Int { correspondences.count }
     }
@@ -616,6 +601,7 @@ public struct LegacyRowLinkageReader: Sendable {
         var missingRecordNames = 0
         var needsUpload = 0
         var unsettled = 0
+        var unsettledRecordNames: [String] = []
         try sql.rows("SELECT \(Self.correspondenceColumns.joined(separator: ", ")) FROM ANSCKRECORDMETADATA", table: "ANSCKRECORDMETADATA") { statement in
             let recordName = sql.text(statement, 2)
             let needsUploadRow = sqlite3_column_int64(statement, 3) != 0
@@ -623,7 +609,10 @@ public struct LegacyRowLinkageReader: Sendable {
             let needsLocalDelete = sqlite3_column_int64(statement, 5) != 0
             if recordName?.isEmpty != false { missingRecordNames += 1 }
             if needsUploadRow { needsUpload += 1 }
-            if needsUploadRow || needsCloudDelete || needsLocalDelete { unsettled += 1 }
+            if needsUploadRow || needsCloudDelete || needsLocalDelete {
+                unsettled += 1
+                if let recordName, !recordName.isEmpty { unsettledRecordNames.append(recordName) }
+            }
             correspondences.append(Correspondence(
                 entityID: sqlite3_column_int64(statement, 0),
                 primaryKey: sqlite3_column_int64(statement, 1),
@@ -636,7 +625,8 @@ public struct LegacyRowLinkageReader: Sendable {
             recordNames: correspondences.compactMap(\.recordName).filter { !$0.isEmpty }.sorted(),
             missingRecordNames: missingRecordNames,
             needsUpload: needsUpload,
-            unsettled: unsettled
+            unsettled: unsettled,
+            unsettledRecordNames: unsettledRecordNames.sorted()
         )
     }
 
@@ -683,6 +673,49 @@ public struct LegacyRowLinkageReader: Sendable {
             try fileManager.copyItem(at: source, to: URL(fileURLWithPath: destination.path + suffix))
         }
         return destination
+    }
+}
+
+/// 저장소의 계정 identity metadata를 읽기 전용 사본에서만 비교한다.
+enum LegacyStoreAccountIdentityReader {
+    enum Status: Equatable {
+        case absent
+        case matches
+        case mismatch
+        case invalid
+    }
+
+    /// 계정 원문은 반환하거나 로그에 남기지 않고 현재 확인 계정과 일치하는지만 구분한다.
+    static func status(copyAt url: URL, userRecordName: String) -> Status {
+        var handle: OpaquePointer?
+        let uri = "file:\(url.path)?mode=ro"
+        guard sqlite3_open_v2(uri, &handle, SQLITE_OPEN_READONLY | SQLITE_OPEN_URI, nil) == SQLITE_OK, let db = handle else {
+            sqlite3_close(handle)
+            return .invalid
+        }
+        defer { sqlite3_close(db) }
+        guard tableExists("ANSCKMETADATAENTRY", in: db) else { return .absent }
+
+        let query = "SELECT ZSTRINGVALUE FROM ANSCKMETADATAENTRY WHERE ZKEY = 'NSCloudKitMirroringDelegateCKIdentityRecordNameDefaultsKey'"
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK, let statement else { return .invalid }
+        defer { sqlite3_finalize(statement) }
+        guard sqlite3_step(statement) == SQLITE_ROW else { return .absent }
+        guard sqlite3_column_type(statement, 0) == SQLITE_TEXT,
+              let value = sqlite3_column_text(statement, 0),
+              !String(cString: value).isEmpty else { return .invalid }
+        let matches = String(cString: value) == userRecordName
+        // 중복된 소유 키는 모호한 저장소 상태다. 첫 값만 보고 소유를 인정하지 않는다.
+        guard sqlite3_step(statement) == SQLITE_DONE else { return .invalid }
+        return matches ? .matches : .mismatch
+    }
+
+    private static func tableExists(_ name: String, in db: OpaquePointer) -> Bool {
+        var statement: OpaquePointer?
+        let query = "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = '\(name)'"
+        guard sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK, let statement else { return false }
+        defer { sqlite3_finalize(statement) }
+        return sqlite3_step(statement) == SQLITE_ROW
     }
 }
 
