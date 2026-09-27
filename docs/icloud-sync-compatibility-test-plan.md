@@ -2525,3 +2525,25 @@ xcodebuild test -quiet -workspace Carve.xcworkspace -scheme DomainTest \
   -only-testing:DomainTest/DrawingStoreOwnershipProofTesting \
   -resultBundlePath /private/tmp/carve-ownership-identity-recheck-ios17-20260927.xcresult
 ```
+
+
+### 27일 직접 Development 서버 payload 재조회
+
+과거 관측기 파일이 없어 Development 컨테이너만 허용하는 임시 읽기 관측기를 `/private/tmp/carve-ownership-server-read-20260927/ReadProbe.m`으로 만들었다. SDK의 `CKFetchRecordZoneChangesOperation.recordWasChangedBlock`으로 각 레코드 오류도 집계하고, 쓰기 API 없이 private zone 전체를 조회했다. raw 계정·record ID·문자열은 출력하지 않고 SHA256으로 기록한다. `ReadProbe-v2.dylib`, `build-v2.log`, `server-v2.json`이 증거다. 앱 기존 entitlements의 `iCloud.Carve.SwiftData.iCloud.dev`/Sandbox에서만 실행했다.
+
+결과는 complete, 22 records, errors 0. 서버 CD_id 지문으로 로컬 ZID와 각각 연결해 필기20행과 nil2행을 대조했다. SQLite의 inline ZLINEDATA는 모든 비어 있지 않은20행에서 첫 바이트0x01 뒤 bytes가 서버 CD_lineData의 길이·SHA256과 정확히 같았다. 앞선 문서의298B/469B는 **SQLite 저장 blob 길이**이며 순수 CloudKit 필기 필드 길이와 혼동하지 않는다. 이 비교는 관측한 inline 표본에 한정하고 미지 external encoding을 일반화하지 않는다. 재조회 후 target을 종료해 만든 `target-after-read` 사본은 integrity ok, 기존22개 drawing 전체 값 동일했다.
+
+
+### 27일 실제 첫 로그인 반복 판정 결함과 수정
+
+사용자가 1FA peer에 b 로그인을 완료한 뒤 CloudKit Available/validCredentials를 확인했다. 08:36 실행 중 ownership client는 실제 무계정 V3 1행을 firstLoginFromUnaccountedV3로 기록했지만, `.none` runtime은 그대로였다. 08:38 재실행은 ownershipUnverified였다. 이 실패를 로그인 실패나 정상 경로 통과로 분류하지 않는다.
+
+원인: `completedSnapshotStores`로 manifest를 확인한 뒤 보존 디렉터리의 SQLite를 직접 `storeKind`/reader로 열었다. 읽기 전용 SQLite도 WAL 공유 색인 `-shm`을 변경한다. 실제 표본의 DB·WAL은 manifest와 같고 shm만 달랐다. 다음 판정에서 보존 사본 전체 지문 검사가 이를 제외했다. 수정은 검증된 원시 디렉터리를 임시 디렉터리에 복사한 뒤 그 복제본만 판독하는 것이다. manifest 검증, 소유권·내용 대조 조건은 유지한다.
+
+회귀는 WAL이 없는/열린 두 경우의 실제 client를 반복 호출하고 원시 파일 bytes와 완료 사본 수를 확인한다. Xcode27 / Swift6.4 / macOS27.2, `DomainTest/DrawingStoreOwnershipProofTesting`: iPadOS18.6 `/private/tmp/carve-ownership-snapshot-ios18-20260927.xcresult`, iPadOS17.5 `/private/tmp/carve-ownership-snapshot-ios17-r2-20260927.xcresult` 모두 9 test cases / parameter 포함10 runs 통과, 실패·skip·runtime warning 0. 17 최초 시도는 추가 테스트의 empty_count lint로 빌드 실패했으며 수정 후 재실행했다.
+
+실제 시험 표본은 변경 전 `actual-firstlogin-held-before-snapshot-fix`에 지원 디렉터리 전체를 보존했다. 이전 `actual-noaccount-after-update` 사본과 manifest·DB·WAL이 정확히 같음을 확인한 뒤, 시험 기기 보존 영역의 shm만 이전 검증된 bytes로 복원했다. 이는 시험 표본 복원이며 제품 코드가 손상 사본을 허용하거나 manifest를 다시 쓰는 기능은 아니다. 현재 필기 DB/WAL·소유 ledger는 복원 과정에서 변경하지 않았다.
+
+수정 앱 설치 후 여러 차례 실행에서 private 연결 성공과 보존 원시 사본 전 파일 지문 유지를 확인했다. Development 직접 읽기 결과 `actual-firstlogin-server.json`: 23 records/errors0, 실제 창세기22:1 ID 지문1개와 원본 필기468B SHA256 정확히 일치(SQLite blob469B의 inline 접두사 제외). 근거는 `/private/tmp/carve-peer-correct-20260926/snapshot-fix-live.log` 및 같은 루트의 서버 JSON이다. 해당 실행은 앱 재실행 검증이며 **실행 중 로그인 후 runtime 교체 성공을 뜻하지 않는다**.
+
+독립 DC peer는 원래 다른 계정 자료를 `Documents/OwnershipReceiveTrial-20260926/original-before-actual-receive-20260927` 및 `peer-original-before-actual-receive`에 보존하고, 이전 b 수신 시험 저장소를 재사용했다. 발신 DB 복사는 하지 않았다. 첫 재조회 사본 `actual-independent-receive-store`는22행이며 새 필기는 아직 없어 미통과다. 시작 대기를 `actual-independent-receive-r2.log`와 `peer-startup-sample.txt`로 조사 중이다. Mac 잠금으로 Device Hub 화면 확인은 사용자 잠금 해제를 기다린다.

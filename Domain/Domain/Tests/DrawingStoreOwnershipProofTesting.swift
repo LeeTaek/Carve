@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import SQLite3
 import Testing
 
 @testable import Domain
@@ -248,15 +249,23 @@ struct DrawingStoreOwnershipProofTesting {
         #expect(await lookup.callCount() == 0)
     }
 
-    @Test("실제 proof client는 검증된 OS에서만 무계정 V3 소유를 기록한다")
-    func productionClientClaimsVerifiedLegacySnapshot() async throws {
+    @Test("실제 proof client는 무계정 V3 원시 사본을 보존하며 반복 확인한다", arguments: [false, true])
+    func productionClientClaimsVerifiedLegacySnapshot(keepWALOpen: Bool) async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("ownership-v3-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: root) }
         let storeDirectory = root.appendingPathComponent("Store", isDirectory: true)
         try FileManager.default.createDirectory(at: storeDirectory, withIntermediateDirectories: true)
         let storeURL = try LinkageFixture.makeV3Store(in: storeDirectory)
+        var writer: OpaquePointer?
+        defer { sqlite3_close(writer) }
+        if keepWALOpen {
+            #expect(sqlite3_open_v2(storeURL.path, &writer, SQLITE_OPEN_READWRITE, nil) == SQLITE_OK)
+            let database = try #require(writer)
+            #expect(sqlite3_exec(database, "PRAGMA journal_mode=WAL; PRAGMA wal_autocheckpoint=0; UPDATE ZBIBLEDRAWING SET Z_OPT=Z_OPT+1", nil, nil, nil) == SQLITE_OK)
+            #expect(try !Data(contentsOf: URL(fileURLWithPath: storeURL.path + "-wal")).isEmpty)
+        }
         let preservation = PreservationArea(root: root.appendingPathComponent("Preservation", isDirectory: true), storeFileName: "Carve.sqlite")
-        guard case .success(.created) = RawStoreSnapshot.takeIfNeeded(storeURL: storeURL, area: preservation) else {
+        guard case .success(.created(let snapshot)) = RawStoreSnapshot.takeIfNeeded(storeURL: storeURL, area: preservation) else {
             Issue.record("업데이트 전 V3 원시 사본이 만들어지지 않았다")
             return
         }
@@ -283,7 +292,15 @@ struct DrawingStoreOwnershipProofTesting {
         #expect(reading.metadataValueProfileComplete)
         #expect(reading.metadataNeedsMigration == false)
         #expect(Set(reading.metadataKeys) == LegacyRowLinkageReader.unaccountedV3MetadataKeys)
+        let snapshotFiles = try FileManager.default.contentsOfDirectory(at: snapshot, includingPropertiesForKeys: nil)
+            .filter { !$0.hasDirectoryPath }
+        let sealedBytes = try snapshotFiles.map { try Data(contentsOf: $0) }
         #expect(await client.ownership(for: account) == account)
+        #expect(try snapshotFiles.map { try Data(contentsOf: $0) } == sealedBytes)
+        #expect(RawStoreSnapshot.completedSnapshotStores(in: preservation).count == 1)
+        // 첫 로그인 직후 private 연결 전 재시도해도 같은 원본 근거를 다시 사용할 수 있어야 한다.
+        #expect(await client.ownership(for: account) == account)
+        #expect(try snapshotFiles.map { try Data(contentsOf: $0) } == sealedBytes)
         guard case .owner(let recorded, let proof) = await StoreOwnershipLedger(area: ownershipArea).read() else {
             Issue.record("검증을 마친 소유 표식이 없다")
             return

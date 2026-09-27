@@ -377,3 +377,10 @@ Device Hub 수동 UI smoke, no-account V3의 independent server payload와 peer/
 증거 루트 `/private/tmp/carve-peer-correct-20260926`: `actual-noaccount-v3-before`, `actual-noaccount-after-update`, `actual-noaccount-update.log`와 화면. 시험 기기 원래 빈2.0 지원 디렉터리는 Documents/ActualLegacyTrial-20260926/empty-previous-support에 남아 있다. 현재 실제 V3 이관 표본을 지우거나 과거 빈 상태로 되돌리지 않는다.
 
 새 수정은 proof가 끝난 뒤 계정을 재확인해 대기 중 전환·확인 실패를 hold하는 것이다. iPadOS17.5·18.6 ownership 각각9/9 통과. 실행 중 첫 로그인 후 `.none` runtime 교체는 아직 구현하지 않았으므로 재실행 안내만으로 정상 흐름 통과라 기록하지 않는다. 서버 직접 payload 대조 도구의 과거 경로는 사라졌고, 독립 receive와 직접 inventory를 구분한다. 실제17 정상 경로, pending export 업데이트 및 최종 표시/로그인 검증이 남아 **NO-GO**다.
+
+
+### 2026-09-27 첫 로그인 후속 — 원시 사본 shm 변경 수정
+
+사용자 b 로그인은 완료됐다. 첫 소유 판정은 성공했으나 보존 V3를 직접 읽으며 shm을 변경해 다음 실행의 manifest 검증에 실패하는 결함을 재현했다. 검증된 원시 디렉터리를 임시 복제하여 판독하도록 수정했고, iPadOS17.5/18.6 각각9 cases(10 parameter runs), 실패·skip·runtime warning0이다. 실제 1FA 표본의 Development 서버23행 중 창세기22:1 필기468B가 원본과 일치하고 반복 실행 뒤 원시 사본 모든 지문이 유지된다. 시험 복원 절차·명령·실패 이력은 시험 계획 최신 절에 있다.
+
+아직 실행 중 로그인 runtime 재연결, 새 실제 표본의 독립 peer 수신/표시, 실제17 정상 로그인 경로를 통과로 기록하지 않는다. 재연결 관련 App/Feature/Settings 변경은 미커밋 작업 중이다. UI 최초 실패는 첫 실행 안내가 탭을 가로챘으며 처리 추가 후 재시험 준비 중이다. Mac 잠금으로 Device Hub 수동 확인은 대기 중이다. DC peer는 현재 b 시험 지원 디렉터리로 실행 중이며 원래 자료는 Documents/OwnershipReceiveTrial-20260926/original-before-actual-receive-20260927에 보존되어 있다. 시험 종료 후 원래 자료를 복구하고 앱을 종료한다. 출시 NO-GO 유지.

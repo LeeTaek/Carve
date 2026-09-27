@@ -334,13 +334,21 @@ public actor CloudKitStoreOwnershipProofClient: StoreOwnershipProofClient {
         }
 
         for snapshot in RawStoreSnapshot.completedSnapshotStores(in: preservation, fileManager: fileManager) {
-            guard case .known(let version) = LocalStoreLoader.storeKind(at: snapshot), version.major == 3 else { continue }
-            let reading = reader.judge(copyAt: snapshot)
+            // 읽기 전용 SQLite도 WAL 공유 색인(-shm)을 바꿀 수 있다. 봉인한 원시 사본은 직접 열지 않는다.
+            let inspectionDirectory = scratch.appendingPathComponent("source-\(UUID().uuidString)", isDirectory: true)
+            do {
+                try fileManager.copyItem(at: snapshot.deletingLastPathComponent(), to: inspectionDirectory)
+            } catch {
+                return nil
+            }
+            let inspection = inspectionDirectory.appendingPathComponent(snapshot.lastPathComponent)
+            guard case .known(let version) = LocalStoreLoader.storeKind(at: inspection), version.major == 3 else { continue }
+            let reading = reader.judge(copyAt: inspection)
             guard (storedProof == nil || storedProof == .firstLoginFromUnaccountedV3),
                   StoreOwnershipClaimRule.firstLoginLegacyV3(reading),
                   case .hasVerifiedUnlinked(let rows) = reading.verdict else { continue }
             guard StoreOwnershipClaimRule.currentStoreCanUseUnaccountedSnapshot(currentReading, source: reading),
-                  LegacyMigrationContentMatcher.matches(sourceSnapshot: snapshot, currentStore: copy, fileManager: fileManager),
+                  LegacyMigrationContentMatcher.matches(sourceSnapshot: inspection, currentStore: copy, fileManager: fileManager),
                   await currentAccountMatches(scope) else { return nil }
             Log.info("저장소 소유 근거 — 계정 연결 없는 1.3.0 V3 원본을 출시 정책에 따라 첫 로그인 계정에 연결한다", "행 \(rows.count) · 계정 식별은 기록하지 않는다")
             return await ledger.claim(scope, proof: .firstLoginFromUnaccountedV3)
