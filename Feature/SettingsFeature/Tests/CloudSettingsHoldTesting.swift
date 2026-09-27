@@ -95,7 +95,7 @@ struct CloudSettingsHoldTesting {
     func holdCopyExplains() {
         let unlinked = CloudSettingsFeature.holdCopy(hold)
         #expect(unlinked.title.contains("이 기기에만 저장돼요"))
-        #expect(unlinked.detail.contains("옛 필사 2개") && unlinked.detail.contains("다시 실행하면 다시 확인해요"))
+        #expect(unlinked.detail.contains("옛 필사 2개") && unlinked.detail.contains("다시 시도하면 필기를 보존한 뒤"))
 
         let unknown = CloudSettingsFeature.holdCopy(LegacySeparationHold(reason: .linkageUnknown(.tableMissing("x"))))
         #expect(unknown.detail.contains("확인하지 못했어요"))

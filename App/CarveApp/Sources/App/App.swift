@@ -81,6 +81,19 @@ struct CarveApp: App {
 private struct AppRuntime {
     let modelContainer: ModelContainer
     let store: StoreOf<AppCoordinatorFeature>
+    let syncManager: PersistentCloudKitContainer
+    let isConnectionHeld: Bool
+    let hold: LegacySeparationHold?
+}
+
+/// 이전 SwiftData 컨테이너가 실제로 해제되기 전에는 같은 파일을 다시 열지 않는다.
+private final class ReleasedStoreReference {
+    weak var container: ModelContainer?
+    let hold: LegacySeparationHold?
+    init(_ container: ModelContainer, hold: LegacySeparationHold?) {
+        self.container = container
+        self.hold = hold
+    }
 }
 
 /// 계정 확인과 저장소 소유 증명이 끝나기 전에는 `.private` ModelContainer 를 만들지 않는다.
@@ -93,6 +106,7 @@ private struct AppStartupView: View {
 
     @State private var runtime: AppRuntime?
     @State private var didStart = false
+    @State private var releasedStore: ReleasedStoreReference?
 
     var body: some View {
         Group {
@@ -104,6 +118,31 @@ private struct AppStartupView: View {
                     .task { await startIfNeeded() }
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            Task { await retryAfterLoginIfNeeded() }
+        }
+    }
+
+    /// 보류한 실행이 로그인 뒤 활성화되면 필기 인계를 거쳐 다시 연결한다. 계정 조회만으로 소유를 인정하지 않는다.
+    @MainActor
+    private func retryAfterLoginIfNeeded() async {
+        guard let current = runtime, current.isConnectionHeld,
+              current.store.reconnectRequestID == nil else { return }
+        let identity = CloudKitAccountIdentityClient(containerID: containerID.id)
+        guard case .identified = await identity.currentIdentity(),
+              runtime?.store === current.store else { return }
+        current.store.send(.retryConnection)
+    }
+
+    /// 완료 ACK 이후 하위 효과를 취소하고 runtime을 놓는다. 새 컨테이너 생성은 해제 확인 이후에만 한다.
+    @MainActor
+    private func releaseRuntime(_ current: AppRuntime) {
+        guard current.isConnectionHeld, current.store.reconnectReadyID != nil else { return }
+        releasedStore = ReleasedStoreReference(current.modelContainer, hold: current.hold)
+        current.store.send(.releaseForReconnect)
+        current.syncManager.stopObserving()
+        didStart = false
+        runtime = nil
     }
 
     /// 소유 근거가 없거나 계정을 확인하지 못하면 Domain bootstrap 이 local-only 컨테이너와 보류 상태를 돌려준다.
@@ -111,6 +150,21 @@ private struct AppStartupView: View {
     private func startIfNeeded() async {
         guard !didStart else { return }
         didStart = true
+        // 뷰 해체와 TCA 취소는 다음 UI 갱신에서 완료될 수 있다. 시간 경과를 해제 증거로 삼지 않는다.
+        for _ in 0..<100 where releasedStore?.container != nil {
+            do { try await Task.sleep(for: .milliseconds(100)) } catch { didStart = false; return }
+        }
+        if let previous = releasedStore?.container {
+            // 해제를 못 마쳤어도 이미 열린 local-only 컨테이너로 열람·초안 저장을 복구한다.
+            let holdState = LegacySeparationHoldState(hold: releasedStore?.hold)
+            let syncManager = PersistentCloudKitContainer()
+            if let hold = holdState.hold { syncManager.syncState = .connectionHeld(hold) }
+            installRuntime(modelContainer: previous, syncManager: syncManager, holdState: holdState)
+            runtime?.store.send(.reconnectReleaseFailed)
+            releasedStore = nil
+            return
+        }
+        releasedStore = nil
 
         let storeURL = URL.applicationSupportDirectory.appending(path: containerID.localDBPath)
         let preservation = PreservationArea.live(localDBPath: containerID.localDBPath)
@@ -132,6 +186,20 @@ private struct AppStartupView: View {
             holdState: holdState,
             injectsOwnership: injectedOwnership
         )
+
+        installRuntime(modelContainer: modelContainer, syncManager: syncManager, holdState: holdState)
+    }
+
+    /// 이미 열린 컨테이너에 화면과 로컬 보존 의존성을 연결한다. 이 함수는 저장소 파일을 다시 열지 않는다.
+    @MainActor
+    private func installRuntime(modelContainer: ModelContainer, syncManager: PersistentCloudKitContainer, holdState: LegacySeparationHoldState) {
+        let identity = CloudKitAccountIdentityClient(containerID: containerID.id)
+        let ownershipProof = CloudKitStoreOwnershipProofClient(
+            identity: identity, containerID: containerID.id,
+            storeURL: URL.applicationSupportDirectory.appending(path: containerID.localDBPath),
+            preservation: .live(localDBPath: containerID.localDBPath)
+        )
+        let injectedOwnership = Self.injectsStoreOwnership(containerID: containerID)
 
         let localPreservation = LocalPreservationWriter(
             area: .live(localDBPath: containerID.localDBPath),
@@ -159,7 +227,10 @@ private struct AppStartupView: View {
             localPreservation: localPreservation
         )
         Task { await drawingEditEnvironment.start() }
-        runtime = AppRuntime(modelContainer: modelContainer, store: store)
+        runtime = AppRuntime(
+            modelContainer: modelContainer, store: store,
+            syncManager: syncManager, isConnectionHeld: holdState.isHeld, hold: holdState.hold
+        )
     }
 
     /// 앱의 루트 화면. 준비된 ModelContainer 와 Store 를 사용한다.
@@ -173,6 +244,9 @@ private struct AppStartupView: View {
                 ]
             )
             .task { await adConsent.gatherConsent() }
+            .onChange(of: runtime.store.reconnectReadyID) { _, requestID in
+                if requestID != nil { releaseRuntime(runtime) }
+            }
             .onOpenURL { url in
                 runtime.store.send(.openedURL(url))
             }

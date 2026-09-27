@@ -135,3 +135,14 @@ peer Settings에는 target `b`가 아니라 original/`never`가 표시됐다고 
 사용자가 peer에 `b` 로그인 완료를 알린 뒤 앱을 재실행했지만 KVS는 `No account`, startup ownership proof는 local-only hold를 기록했다. 현재 log에 CloudKit `account-status`의 반환값이 없어 exact API result는 미확정이다. Development 수신이나 export는 관측되지 않았고 Device Hub 설정 화면은 확인하지 못했다. 사용자 보고만으로 peer 로그인 경로를 통과 처리하지 않는다. 정확한 peer Settings > Apple Account > iCloud 확인과 별도 peer receive/payload/render 검증 전까지 release는 **NO-GO**다. 로그·검증 한계는 [호환성 시험 계획](./icloud-sync-compatibility-test-plan.md#b-로그인-후-peer-재검사-2026-09-26)에 있다.
 
 Simulator CLI Settings 캡처에서 이 peer Apple Account 카드가 로그인 화면을 표시했다. 앱 종료 후 사본은 SQLite 무결성 `ok`, 필기 row 0 및 CloudKit record metadata 없음으로 확인했다. 전체 사본 경로와 캡처·로그 한계는 호환성 시험 계획에 있다. 사용자가 정확한 peer에서 b 로그인 완료를 다시 알려 줄 때까지 실제 receive 시험은 보류한다.
+
+
+## 2026-09-27 실제 표본 및 재연결 판정 갱신
+
+이 항목은 위의 peer 로그인 대기/서버 inventory 미확인 상태를 갱신한다. iPadOS18.6에서 실제1.3.0 V3 동일 계정 업데이트의22행 보존·private 연결을 확인했고, 실제 무계정1.3.0에서 직접 입력한 창세기22:1 두 획은 첫 b 로그인 뒤 서버 payload와 독립 peer 수신·표시까지 대조했다. 서버23행 중 해당468B 필드가 원본과 정확히 같고 peer SQLite469B도 같다. Production은 변경하지 않았다.
+
+첫 로그인 재실행에서 보존 사본의 shm이 바뀌어 다시 차단되던 결함을 재현했다. manifest 검증 뒤 보존 디렉터리를 임시 복제하여 판독하도록 고쳤으며, 사본 지문 검증을 완화하지 않았다. 반복 소유 확인은17.5/18.6 각각9 cases/10 runs 통과했다. marker의 사설 의미는 여전히 미확정이며 그 의미에 의존하지 않는다.
+
+앱 안 재시도와 활성화 후 자동 재확인을 구현했다. 마지막 획과 초안 저장을 확인한 뒤 기존 컨테이너 해제를 확인하고 다시 preflight한다. 해제가 지연되면 기존 local-only 열람/초안 화면을 복구한다. 인계 관련59 runs 및17.5/18.6 무계정 재연결 UI 각각1/1, 실패·skip·runtime warning0이다. 이것은 실제 첫 로그인 중 runtime 전환의 live 성공을 대신하지 않는다.
+
+남은 출시 차단은17.5 실제 필기 표본의 업데이트/첫 로그인, 실행 중 로그인 후 자동 연결의 실제 서버·peer 검증이다. 17.5 역사 앱의 자동 포인터 입력이0행이라 직접 입력을 준비 중이다. 따라서 **NO-GO 유지**. 최신 증거·명령·보존 경로는 [시험 계획](./icloud-sync-compatibility-test-plan.md)과 [핸드오프](./release-2.0.0-migration-sync-handoff.md)의27일 최신 항목을 따른다.

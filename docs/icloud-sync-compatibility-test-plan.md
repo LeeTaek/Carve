@@ -2547,3 +2547,24 @@ xcodebuild test -quiet -workspace Carve.xcworkspace -scheme DomainTest \
 수정 앱 설치 후 여러 차례 실행에서 private 연결 성공과 보존 원시 사본 전 파일 지문 유지를 확인했다. Development 직접 읽기 결과 `actual-firstlogin-server.json`: 23 records/errors0, 실제 창세기22:1 ID 지문1개와 원본 필기468B SHA256 정확히 일치(SQLite blob469B의 inline 접두사 제외). 근거는 `/private/tmp/carve-peer-correct-20260926/snapshot-fix-live.log` 및 같은 루트의 서버 JSON이다. 해당 실행은 앱 재실행 검증이며 **실행 중 로그인 후 runtime 교체 성공을 뜻하지 않는다**.
 
 독립 DC peer는 원래 다른 계정 자료를 `Documents/OwnershipReceiveTrial-20260926/original-before-actual-receive-20260927` 및 `peer-original-before-actual-receive`에 보존하고, 이전 b 수신 시험 저장소를 재사용했다. 발신 DB 복사는 하지 않았다. 첫 재조회 사본 `actual-independent-receive-store`는22행이며 새 필기는 아직 없어 미통과다. 시작 대기를 `actual-independent-receive-r2.log`와 `peer-startup-sample.txt`로 조사 중이다. Mac 잠금으로 Device Hub 화면 확인은 사용자 잠금 해제를 기다린다.
+
+
+### 27일 독립 수신 완료 및 재연결 검증
+
+DC peer의 시작 대기는 b 계정 암호 재확인 시스템 창이었다(CLI 진단 캡처 `peer-startup-cli.png`; 계정 주소가 포함되어 공개 첨부하지 않는다). 이후 Settings iCloud 상태를 확인하고 앱으로 돌아오자 빈 시험 저장소가23행을 받았다. `actual-independent-receive-success-store`의 integrity ok, actual V3 창세기22:1 ID1개·SQLite payload469B가 원본과 정확히 일치한다. Device Hub에서 같은 X 모양 두 획 표시를 확인했다. 별도 CLI 캡처는 `actual-independent-receive-success.png`다. 원본 DB를 발신 기기에서 복사하지 않았고 clone도 사용하지 않았다. 앞 절의22행 미수신 관측은 재인증 전 결과이며 현재 수신 성공으로 대체한다. 서버 직접 조회·독립 수신 bytes·Device Hub 표시를 각각 확인했다.
+
+새 재연결 경로는 설정의 다시 시도 및 로그인 후 앱 활성화를 받는다. Canvas의 마지막 획 인계 ACK와 초안 저장 완료를 확인하고, 이전 runtime 효과를 취소한 뒤 ModelContainer의 실제 해제를 weak 참조로 확인한다. 해제가 지연되면 이미 열린 local-only 컨테이너로 열람·초안 기능을 복구한다. 재연결 준비 중 실패/취소는 기존 대기열을 보존한다. 비활성 N-Canvas 경로는 미사용 상태와 현재 실제 hold를 함께 확인하며, 이미 편집한 Canvas의 근거를 덮지 않는다.
+
+`CarveFeatureTest/ChapterCanvasHandoffPresenceTesting`은15 cases/16 runs 통과(`/private/tmp/carve-reconnect-handoff-ios18-r5-20260927.xcresult`). 관련8 suites 확장 실행은58 cases/59 runs 통과(`/private/tmp/carve-reconnect-related-ios18-20260927.xcresult`), 실패·skip·runtime warning0. 추가 케이스는 실제 초안 저장 대기/성공/실패, 진행 중 저장의 보존, 취소된 요청의 늦은 ACK, 마지막 detach, 비활성 N-Canvas 보류 확인이다.
+
+CLI UI `CarveDeviceSmokeUITests/testHeldStoreReconnectWithoutRelaunch`는 무계정 전용 iPad17.5에서1/1 통과, 실패·skip·runtime warning0(`/private/tmp/carve-reconnect-ui-ios17-r5-20260927.xcresult`). 앱 launch는1회이며 설정→재시도→본문 복귀→설정 보류 상태를 확인한다. 최초 opt-in 누락은 skip, 다음 시도는 FirstRunGuide가 탭을 가로채 실패, 다음은 부모 accessibilityIdentifier가 버튼 식별자를 덮어 실패했다. 이를 수정한 뒤 동작했지만 해체 후 도착한 화면 액션 경고4종이 관측되어, 인계 완료로 폐기된 runtime의 액션 처리를 종료하는 수정 후 경고0으로 통과했다. 테스트의 성공은 무계정 재연결/보류 유지이며 live 첫 로그인 자동 연결의 성공과 구분한다.
+
+UI 실행은 build-for-testing으로 생성된 xctestrun 사본의 UI runner EnvironmentVariables에 `CARVE_RECONNECT_SMOKE=1`을 넣고 `xcodebuild test-without-building -xctestrun .../Build/Products/CarveReconnect.xctestrun -destination 'platform=iOS Simulator,id=622BB6EA-183E-44D9-B974-A51B5E22EACE' -only-testing:CarveAppUITests/CarveDeviceSmokeUITests/testHeldStoreReconnectWithoutRelaunch`를 사용했다. build setting·signing·의존성은 바꾸지 않았다.
+
+17.5 실제 입력용 독립 기기 `Carve-2.0.0-ActualV3-iOS17.5-20260927` (`B60A857B-34C3-4710-8795-5FC93877376C`)를 clone 없이 만들고 위 역사적1.3.0을 설치했다. 창세기23장, 무계정, 손가락 필사 허용1. Device Hub 자동 포인터 드래그는 표시/DB에 남지 않았다. 종료 후 `actual17-input-attempt` 사본은 drawing0행이다. 사용자에게 직접 짧은 획 입력을 요청했고 아직 로그인하지 않도록 안내했다. 이를 정상17 실제 필기 업데이트 통과로 간주하지 않는다.
+
+
+18.6 CLI UI 재연결도1/1, 실패·skip·runtime warning0으로 통과했다(`/private/tmp/carve-reconnect-ui-ios18-20260927.xcresult`). DC peer 시험 종료 후 원래 지원 디렉터리를 복원했고 앱은 종료 상태다. 성공한23행 수신 자료는 컨테이너의 `Documents/OwnershipReceiveTrial-20260926/actual23-success-support-20260927`에도 보존했다. 17.5 실제 입력 검증은 사용자 응답 대기다.
+
+
+재연결 최종 앱 컴파일은 `/private/tmp/carve-reconnect-final-build-20260927.log` exit0이다. 해제 지연 복구 경로의 syncState도 connectionHeld로 전달해 시작 대기 화면에 남지 않도록 했다. 해제 지연 fallback 자체를 강제한 UI 시험은 아직 하지 않았으며 일반 재연결 UI 통과와 구분한다. 기본 도구 재확인 결과 Xcode27.0(27A266a), Swift6.4.0.34.1, macOS27.2(26B5086k), `mise x -- tuist version`4.208.0으로 같았다.

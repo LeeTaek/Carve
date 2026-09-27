@@ -384,3 +384,13 @@ Device Hub 수동 UI smoke, no-account V3의 independent server payload와 peer/
 사용자 b 로그인은 완료됐다. 첫 소유 판정은 성공했으나 보존 V3를 직접 읽으며 shm을 변경해 다음 실행의 manifest 검증에 실패하는 결함을 재현했다. 검증된 원시 디렉터리를 임시 복제하여 판독하도록 수정했고, iPadOS17.5/18.6 각각9 cases(10 parameter runs), 실패·skip·runtime warning0이다. 실제 1FA 표본의 Development 서버23행 중 창세기22:1 필기468B가 원본과 일치하고 반복 실행 뒤 원시 사본 모든 지문이 유지된다. 시험 복원 절차·명령·실패 이력은 시험 계획 최신 절에 있다.
 
 아직 실행 중 로그인 runtime 재연결, 새 실제 표본의 독립 peer 수신/표시, 실제17 정상 로그인 경로를 통과로 기록하지 않는다. 재연결 관련 App/Feature/Settings 변경은 미커밋 작업 중이다. UI 최초 실패는 첫 실행 안내가 탭을 가로챘으며 처리 추가 후 재시험 준비 중이다. Mac 잠금으로 Device Hub 수동 확인은 대기 중이다. DC peer는 현재 b 시험 지원 디렉터리로 실행 중이며 원래 자료는 Documents/OwnershipReceiveTrial-20260926/original-before-actual-receive-20260927에 보존되어 있다. 시험 종료 후 원래 자료를 복구하고 앱을 종료한다. 출시 NO-GO 유지.
+
+
+### 2026-09-27 최신 수신/재연결 상태
+
+18.6 실제 무계정1.3.0 V3 필기는 b 서버 전송과 독립 DC peer 수신·표시까지 완료했다(23행, 원본469B SQLite blob/468B 서버 필드 일치). DC의 암호 재확인 창이 해소된 후 빈 시험 저장소에서 수신했으며 원래 자료는 여전히 Documents/OwnershipReceiveTrial-20260926/original-before-actual-receive-20260927에 보존돼 있다. 현재 DC 앱은 종료 상태다. 수신 성공 자료도 `actual-independent-receive-success-store`에 보존했다.
+
+재연결 UI와 마지막 획/초안 인계 코드를 구현했다. 18.6 인계 집중16 runs 및 관련59 runs 통과, 17.5 동일 프로세스 재시도 UI1/1 경고0 통과. 이 결과는 live 계정 전환 성공과 구분한다. 17.5 실제 필기 입력 전용 B60 기기는 역사적1.3.0 창세기23장 무계정으로 열려 있으며 자동 드래그가 저장되지 않아 사용자의 직접 입력을 기다린다. 사용자 b 계정 로그인 수행 허용이 추가됐으나 인증정보는 파일·로그·문서에 저장하지 않는다. 실제17 업데이트/첫 로그인·재연결 live 검증은 아직 남아 NO-GO다.
+
+
+DC peer의 원래 Application Support 복원 완료, 앱 종료. 성공한23행 수신 지원 자료는 `Documents/OwnershipReceiveTrial-20260926/actual23-success-support-20260927`에 남겼다. 18.6 재연결 CLI UI도1/1 경고0으로 통과했다. 보존 파일 경로를 사용할 때 원래 자료와 수신 시험 자료를 구분한다.

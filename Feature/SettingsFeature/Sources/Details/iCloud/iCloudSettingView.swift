@@ -94,12 +94,14 @@ public struct CloudSettingView: View {
             Text(copy.title)
                 .font(CarveTypography.body)
                 .foregroundStyle(CarveColor.ink)
+                .accessibilityIdentifier("cloudSettings.connectionHeld")
             Text(copy.detail)
                 .font(CarveTypography.caption)
                 .foregroundStyle(CarveColor.secondary)
+            Button("다시 시도") { store.send(.view(.retryConnection)) }
+                .accessibilityIdentifier("cloudSettings.retryConnection")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityIdentifier("cloudSettings.connectionHeld")
     }
 
     private func activityLine(_ text: String, emphasized: Bool) -> some View {

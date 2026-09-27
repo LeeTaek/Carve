@@ -304,7 +304,7 @@ public struct LegacyRowLinkageReader: Sendable {
         return judge(copyAt: copy)
     }
 
-    /// 이미 떠 둔 **사본**을 판독한다. 사본이라도 쓰지 않는다 — 읽기 전용으로만 연다.
+    /// 일회용 검사 사본을 판독한다. 읽기 전용 SQLite도 `-shm`을 바꿀 수 있으므로 봉인한 보존 사본을 직접 넘기지 않는다.
     public func judge(copyAt url: URL) -> LegacyRowLinkageReading {
         let kind = LocalStoreLoader.storeKind(at: url)
         guard case .known(let version) = kind, validatedSchemaMajors.contains(version.major) else {

@@ -135,5 +135,9 @@ extension ChapterCanvasFeature.Action {
         case widgetRequested(verse: Int, ink: Data?)
         /// 보이지 않게 남은 필기를 보는 자리(설정 → 남은 필기)를 열어 달라(정책 §12-6 ④). **되살리지 않는다** — 보여 주기만 한다.
         case draftRecoveryRequested
+        /// 단일 Canvas의 편집과 로컬 보존이 끝났다. 부모는 이 응답 뒤 runtime을 교체할 수 있다.
+        case storeReconnectReady(UUID)
+        /// 준비에 실패했다. 현재 Canvas 입력은 복구되고 큐와 원본은 보존된다.
+        case storeReconnectFailed(UUID, String)
     }
 }

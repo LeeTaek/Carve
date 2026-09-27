@@ -66,6 +66,8 @@ public struct CloudSettingsFeature {
         case view(View)
         
         public enum View {
+            /// 저장을 마친 뒤 iCloud 연결을 다시 준비한다. 루트 코디네이터가 처리한다.
+            case retryConnection
             case databaseIsEmpty
             /// 화면이 나타났다. 계정 상태를 **그때 조회한다** — 미리 켜 두지 않는다.
             case onAppear
@@ -90,6 +92,8 @@ public struct CloudSettingsFeature {
                     }
                     .cancellable(id: CancelID.activity, cancelInFlight: true)
                 )
+            case .view(.retryConnection):
+                return .none
             case .view(.onDisappear):
                 return .cancel(id: CancelID.activity)
             case .accountChecked(let availability):
@@ -227,7 +231,7 @@ extension CloudSettingsFeature {
         case .unlinkedRowsAwaitSeparation(let count): "이 기기에 계정과 연결되지 않은 옛 필사 \(count)개가 있어요. 사본은 이 기기에 보관했어요."
         case .preservationFailed: "옛 필사의 사본을 남기지 못했어요."
         }
-        return ("지금은 iCloud 연결이 보류돼 이 기기에만 저장돼요", reason + " 앱을 다시 실행하면 다시 확인해요.")
+        return ("지금은 iCloud 연결이 보류돼 이 기기에만 저장돼요", reason + " 다시 시도하면 필기를 보존한 뒤 계정과 저장소를 다시 확인해요.")
     }
 
     /// 전체 삭제가 함께 지우는 **이 기기의 초안 파일 수** — 모든 묶음(다른 계정 · 계정 미확인 · 로그인하지 않은 동안)의 초안과 읽지 못해 옆으로

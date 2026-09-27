@@ -43,9 +43,19 @@ struct EditSessionEnd: Equatable, Sendable {
 enum CanvasEditSessionCancelID: Hashable {
     case environment
     case handoff
+    case storeReconnect
 }
 
 extension ChapterCanvasFeature.State {
+    /// 초기 N-Canvas 경로의 빈 단일 Canvas만 해당한다. 이전 세션이나 미저장분은 이 지름길을 쓸 수 없다.
+    var isUnusedForStoreReconnect: Bool {
+        !hasCanvas && expectedVerseCount == nil && loadedDrawings == nil && loadRequestID == nil
+            && storeGeneration == nil && renderedRevision == 0 && editRevision == 0 && retiredSession == nil
+            && sessionEnd == nil && eraseTask == nil && !isReloading && !isEditing && !isPreparingEdit
+            && editQueue.isEmpty && pendingMutations.isEmpty && saveStatus == .idle && inFlightBatch.isEmpty
+            && !isSavingDrafts && drafts == DraftSessionState() && closedDrafts == ClosedDraftSessions()
+    }
+
     /// 화면에 캔버스가 있는가 — 있으면 인계 응답을 기다린다.
     var hasCanvas: Bool { !attachedCanvases.isEmpty }
 }
@@ -54,6 +64,106 @@ extension ChapterCanvasFeature {
     /// 뷰의 인계 응답을 다시 요청하기까지의 시간. **시한이 지나도 닫지 않는다** — 캔버스가 있으면 응답 지연(긴 획 · 메인 스레드 지연 ·
     /// 늦은 변경 보고)을 "캔버스 없음" 으로 보지 않고 다시 요청한다. 뷰는 획을 긋는 중이면 그 획이 반영된 뒤(0.3초)에 응답한다.
     static let sessionHandoffTimeout: Duration = .seconds(1)
+    static let storeReconnectTimeout: Duration = .seconds(10)
+
+    func prepareForStoreReconnect(state: inout State, requestID: UUID) -> Effect<Action> {
+        guard state.storeReconnectRequestID == nil else {
+            if state.storeReconnectRequestID == requestID { return .none }
+            return .send(.delegate(.storeReconnectFailed(requestID, "다른 Canvas 연결 준비가 진행 중입니다.")))
+        }
+        // N-Canvas는 단일 Canvas를 load하지 않는다. 사용한 적 없는 상태에만 현재 보류 근거를 별도로 조회한다.
+        if state.isUnusedForStoreReconnect {
+            state.storeReconnectRequestID = requestID
+            state.storeReconnectReadyID = nil
+            return .merge(
+                .run { [editEnvironment] send in
+                    await send(.storeReconnectEnvironmentChecked(requestID, await editEnvironment.current()))
+                },
+                reconnectTimeout(requestID)
+            )
+        }
+        guard state.editEnvironment.connectionHeld, state.sessionEnd == nil, state.eraseTask == nil, !state.isReloading else {
+            return .send(.delegate(.storeReconnectFailed(requestID, "이 Canvas는 소유 확인 보류 상태가 아닙니다.")))
+        }
+        state.storeReconnectRequestID = requestID
+        state.storeReconnectReadyID = nil
+        if state.hasCanvas {
+            state.handoffToken += 1
+            state.storeReconnectHandoffToken = state.handoffToken
+            return reconnectTimeout(requestID)
+        }
+        state.storeReconnectHandoffToken = nil
+        let save = startSaveIfPossible(state: &state, allowRetry: true)
+        let settle = settleStoreReconnect(state: &state)
+        return .merge(save, settle, state.storeReconnectReadyID == nil ? reconnectTimeout(requestID) : .none)
+    }
+
+    /// 비활성 Canvas는 조회 전후 모두 미사용 상태이고 실제 runtime이 보류 중일 때만 해제한다.
+    func storeReconnectEnvironmentChecked(state: inout State, requestID: UUID, environment: DrawingEditEnvironment) -> Effect<Action> {
+        guard state.storeReconnectRequestID == requestID else { return .none }
+        guard state.isUnusedForStoreReconnect, environment.connectionHeld else {
+            return failStoreReconnect(state: &state, requestID: requestID, message: "비활성 Canvas의 보류 상태를 확인하지 못했습니다.")
+        }
+        state.storeReconnectReadyID = requestID
+        return .merge(.cancel(id: CanvasEditSessionCancelID.storeReconnect), .send(.delegate(.storeReconnectReady(requestID))))
+    }
+
+    private func reconnectTimeout(_ requestID: UUID) -> Effect<Action> {
+        .run { [clock] send in
+            try await clock.sleep(for: Self.storeReconnectTimeout)
+            await send(.storeReconnectTimedOut(requestID))
+        }
+        .cancellable(id: CanvasEditSessionCancelID.storeReconnect, cancelInFlight: true)
+    }
+
+    func cancelStoreReconnect(state: inout State, requestID: UUID) -> Effect<Action> {
+        guard state.storeReconnectRequestID == requestID else { return .none }
+        state.storeReconnectRequestID = nil
+        state.storeReconnectReadyID = nil
+        state.storeReconnectHandoffToken = nil
+        return .cancel(id: CanvasEditSessionCancelID.storeReconnect)
+    }
+
+    func storeReconnectHandoffCompleted(state: inout State, token: Int) -> Effect<Action> {
+        guard state.storeReconnectRequestID != nil, state.storeReconnectHandoffToken == token else { return .none }
+        state.storeReconnectHandoffToken = nil
+        return .merge(
+            startSaveIfPossible(state: &state, allowRetry: true),
+            settleStoreReconnect(state: &state)
+        )
+    }
+
+    func failStoreReconnect(state: inout State, requestID: UUID, message: String) -> Effect<Action> {
+        guard state.storeReconnectRequestID == requestID, state.storeReconnectReadyID != requestID else { return .none }
+        state.storeReconnectRequestID = nil
+        state.storeReconnectHandoffToken = nil
+        return .merge(
+            .cancel(id: CanvasEditSessionCancelID.storeReconnect),
+            .send(.delegate(.storeReconnectFailed(requestID, message)))
+        )
+    }
+
+    /// 초안까지 내구적으로 기록된 hold 편집은 pendingMutations에 남아도 안전하다. 저장 실패/초안 실패는 완료로 보지 않는다.
+    func settleStoreReconnect(state: inout State) -> Effect<Action> {
+        guard let requestID = state.storeReconnectRequestID,
+              state.storeReconnectReadyID != requestID,
+              state.storeReconnectHandoffToken == nil else { return .none }
+        guard state.editEnvironment.connectionHeld, state.sessionEnd == nil else {
+            return failStoreReconnect(state: &state, requestID: requestID, message: "소유 확인 보류 상태가 바뀌어 연결 준비를 중단했습니다. 필기는 현재 runtime에 보존했습니다.")
+        }
+        if case .failed = state.drafts.status {
+            return failStoreReconnect(state: &state, requestID: requestID, message: "로컬 초안을 저장하지 못했습니다. 필기는 화면과 대기열에 남아 있습니다.")
+        }
+        if case .failed = state.saveStatus {
+            return failStoreReconnect(state: &state, requestID: requestID, message: "필사 저장이 끝나지 않았습니다. 대기열은 보존했습니다.")
+        }
+        guard !state.isEditing, !state.isPreparingEdit, state.editQueue.isEmpty,
+              !state.isSavingDrafts, state.drafts.status == .idle,
+              state.saveStatus == .idle, state.closedDrafts.pending.isEmpty,
+              !state.hasUnsavedPending else { return .none }
+        state.storeReconnectReadyID = requestID
+        return .merge(.cancel(id: CanvasEditSessionCancelID.storeReconnect), .send(.delegate(.storeReconnectReady(requestID))))
+    }
 
     /// 편집 환경의 변화를 구독한다. 장을 불러올 때마다 다시 건다.
     func observeEditEnvironment() -> Effect<Action> {
@@ -203,11 +313,21 @@ extension ChapterCanvasFeature {
     /// 캔버스(컨트롤러)가 화면에 붙었다 · 떨어졌다 · 새 세대를 표시했다(`ChapterCanvasView`).
     func reduceCanvasPresence(state: inout State, action: Action) -> Effect<Action> {
         switch action {
-        case .canvasAttached(let id): canvasAttached(state: &state, id: id)
+        case .canvasAttached(let id): return canvasAttached(state: &state, id: id)
         // 인계를 기다리던 도착 반영도 잇는다 — 떨어지며 미보고 획을 먼저 보고했다(P0-3).
-        case .canvasDetached(let id): .merge(canvasDetached(state: &state, id: id), arrivalCanvasDetached(state: &state))
-        case let .canvasDisplayed(id, revision): canvasDisplayed(state: &state, id: id, revision: revision)
-        default: .none
+        case .canvasDetached(let id):
+            let detached = canvasDetached(state: &state, id: id)
+            let arrival = arrivalCanvasDetached(state: &state)
+            // 마지막 캔버스는 미보고 편집을 먼저 보고했다. 요청을 뷰가 받기 전에 떨어졌어도 인계를 마칠 수 있다.
+            let reconnect: Effect<Action>
+            if !state.hasCanvas, let token = state.storeReconnectHandoffToken {
+                reconnect = storeReconnectHandoffCompleted(state: &state, token: token)
+            } else {
+                reconnect = .none
+            }
+            return .merge(detached, arrival, reconnect)
+        case let .canvasDisplayed(id, revision): return canvasDisplayed(state: &state, id: id, revision: revision)
+        default: return .none
         }
     }
 
