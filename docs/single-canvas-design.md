@@ -1145,7 +1145,7 @@ rev.8 시점 **57/57** (DomainTest 31 · CarveFeatureTest 8 · CarveToolkitTest 
 **측정 방법 (재측정 시 그대로 반복)**
 
 ```
-메모리  /usr/bin/footprint <pid>   (이 기록의 측정 Mac에서는 vmmap 권한 오류 — 같은 Physical footprint 지표. ps RSS 는 부적합; 다른 Mac에서는 다시 확인)
+메모리 /usr/bin/footprint <pid> (이 기록의 측정 Mac에서는 vmmap 권한 오류 — 같은 Physical footprint 지표. ps RSS 는 부적합; 다른 Mac에서는 다시 확인)
 CPU     ps -o time= 누적 CPU time 델타, 0.25 s 샘플링
 장 지정  simctl uninstall 로 컨테이너를 비운 뒤 설치 → defaults write … title -data <BibleChapter JSON hex> → 로그 "ChapterLayout 완성" 으로 확인
         (앱이 한 번 장을 바꾸면 Saved Application State 가 시드를 무시한다)

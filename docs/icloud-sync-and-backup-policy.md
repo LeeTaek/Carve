@@ -1,6 +1,6 @@
 # iCloud 동기화·오프라인 사용·외부 백업 정책
 
-> **현행 2.0.0 판정(2026-09-24):** [필사 이전·iCloud 출시 범위](./release-2.0.0-migration-sync-scope.md)가 이 문서의 C14 분리·명시적 가져오기를 2.0.0 필수 작업으로 정한 종전 계획보다 우선한다. 1.3.0 무계정 필사는 첫 로그인 계정으로 자동 전송하는 방향이며, `CloudKitStoreOwnershipProofClient`를 앱의 production 환경에 연결했다. **현재 소유 증명 판독 허용 OS는 iOS 26뿐**이다. iOS 17.5 legacy SwiftData migration과 전체 회귀는 수정 후 통과했다. iOS 18.6의 실제 V3 표본에는 의미를 확인하지 못한 metadata marker가 있어 거절한다. iOS 17 소유 proof·CloudKit 경로와 iOS 19~25도 검증 밖이다. 최신 strict profile의 실제 CloudKit 왕복과 로그인 상태 1.3.0 업데이트가 남아 있어 출시 판정은 **NO-GO**다. 아래 C14와 날짜가 붙은 상태 표는 해당 시점의 설계·실험 기록으로 보존한다.
+> **현행 2.0.0 판정(2026-09-28):** [필사 이전·iCloud 출시 범위](./release-2.0.0-migration-sync-scope.md)가 이 문서의 C14 분리·명시적 가져오기를 2.0.0 필수 작업으로 정한 종전 계획보다 우선한다. 1.3.0 무계정 필사는 첫 로그인 계정으로 자동 전송하고, 로그인 뒤 연결은 앱 재실행으로 한다(실행 중 재연결 없음). `CloudKitStoreOwnershipProofClient`의 판독 허용 OS는 17 · 18 · 26 · 27이며, 한 번 근거를 남긴 저장소는 계정 식별이 같으면 재실행 때 다시 증명하지 않는다. 현재 상태는 [인계](./release-2.0.0-migration-sync-handoff.md)를 따른다. 아래 C14 설계는 이후 버전의 근거로 보존한다.
 
 작성·갱신: 2026-09-18 · 목표: **2.0.0** · 상태: **설계 기준선 확정 / 검증 조건부 구현 / 미구현·미검증** · §12-5 확정 전 설계 조건 · §12-6 C3 · C7 · C11 규칙 초안 v4(2026-09-18 · 구현 착수)
 
@@ -116,7 +116,7 @@ SwiftData는 내부적으로 `NSPersistentCloudKitContainer`를 사용한다. �
 |---|---|---|
 | 20초 뒤 진입한 **열린 장**에 나중 도착분이 바로 나타나는가 | **아니다.** 열린 장은 **장을 불러올 때와 편집 환경이 바뀔 때만** 다시 읽는다. 장을 바꿨다 돌아오거나 앱을 다시 켜야 보인다 | F26(테스트 계획 §5-1)과 2026-09-21 재현 — 계정 전환으로 행 3개가 들어왔는데 열린 장은 빈 채였고 재실행하니 보였다 |
 | 저장소 변경을 듣는 자리가 있는가 | **없다.** `NSPersistentStoreRemoteChange` 구독이 없고, CloudKit 이벤트(`eventChangedNotification`)는 **시작 화면의 대기 상태**에만 쓴다 | `SwiftDataContextProvider` · 코드 검색 |
-| 외부 변경을 알리는 통로 | `DrawingDataRevision.bump()` 하나뿐이고 **설정의 전체 삭제만** 쓴다. 받는 쪽은 **미저장분을 버리는** 경로(`drawingDataCleared`)라 import 에 그대로 쓰면 사용자가 쓰던 획을 버린다 | `CarveDetailFeature.drawingDataRevisionChanged` |
+| 외부 변경을 알리는 통로 | `DrawingDataRevision.bump` 하나뿐이고 **설정의 전체 삭제만** 쓴다. 받는 쪽은 **미저장분을 버리는** 경로(`drawingDataCleared`)라 import 에 그대로 쓰면 사용자가 쓰던 획을 버린다 | `CarveDetailFeature.drawingDataRevisionChanged` |
 | 20초의 범위 | 계정 조회까지 **같은 한도 안**이다. 마이그레이션은 따로 120초 | `SwiftDataContextProvider.InitialWaitLimit` |
 
 시작 화면은 20초 뒤 「먼저 시작해도 나중에 나타날 수 있어요」 를 보이는데, **그 약속이 지켜지지 않는다** — §3-1 의 4 · 6 이 구현되지 않은 것과 같은 자리다.
@@ -615,7 +615,7 @@ F29 는 주입으로(⑨~⑭ — 소유 근거가 없어 주입으로만 재현�
 |---|---|---|---|---|---|
 | P0-1 | **다른 계정 초안이 화면에 남는다.** 대조하지 않는 묶음도 잉크를 상태에 담아 미리보기를 그린다. 계정이 바뀌어도 이미 불러온 상세 · 비교가 남는다 | `VerseDraftRecoveryQuery.entries`(접근 불가 묶음은 상세를 만들지 않는다) · `DraftRecoveryFeature`(계정 · 세대 도장 · 환경 변화 구독 · 늦은 응답 버리기 · `compare` 전후 재확인) · `DraftRecoveryView`(묶음 카드 문구 — 분류한 적 없는 수를 "보이지 않게 남은 것" 으로 말하지 않는다) | B 환경에서 A 묶음은 수 · 용량만이고 `Item.ink` 가 없다 · A 목록을 연 채 계정이 바뀌면 상세 · 비교가 비워진다 · 이전 계정에서 시작한 응답은 버린다 | ☑ `69986bac` — 도장(`DraftRecoveryFeature.Stamp` = 초안 묶음 · 참고 계정 · 확인 세대) 한 장치 + 요청 번호. 대조하지 않는 묶음은 초안 파일을 열지 않고(`inaccessibleCount`), 읽지 못한 파일 자리 · 내보내기 · 지우기도 대조한 묶음만 | ☑ Settings `otherAccountBucketCarriesCountsOnly` · `accountChangeClearsLoadedDetails` · `lateResponsesFromThePreviousAccountAreDropped`(견주기가 저장소를 읽는 사이 전환) · Domain 조회 시험 둘 갱신 |
 | P0-2a | **묶음별로 따로 판정해 어디에도 없는 초안이 생긴다.** 캔버스는 읽을 수 있는 묶음을 합쳐 한 번 판정하는데 목록은 묶음마다 돈다 | `VerseDraftRecoveryQuery` — 한 장의 읽을 수 있는 묶음을 **합쳐 한 번** 판정한 뒤 결과를 묶음별로 나눈다 | 같은 절 · 같은 기준의 초안이 `계정 A` 와 `확인 전(힌트 A)` 에 하나씩일 때, 캔버스의 `kept` 와 목록 항목이 일치한다 | ☑ `60b27c9a` — 판정 입력을 `VerseDraftRecoveryRule.screenDrafts` 한 곳으로 모아 캔버스 · 목록이 같이 쓴다. 문구 「자동으로 표시되지 않는 필사 초안」 | ☑ Domain `inventoryMatchesTheCanvasAcrossBuckets`(어느 쪽이 밀려도) · Feature `canvasHiddenDraftIsListedInRecovery`(실제 파일 · 실제 캔버스 로드) · Settings `copySaysNotAutomaticallyShown` |
-| P0-2b | **정상 저장 경로에서 메타데이터 없는 초안이 조용히 생긴다** — `metadataBlob = try? metadata.encodedBlob()`. 캔버스는 건너뛰고 목록은 `shown` 이라 뺀다 | `ChapterCanvasDraftFeature`(초안을 만들 때의 `try?`) · 표시 가능성 판정을 공통 분류에 넣거나 표시 실패 항목으로 반환 | 잉크는 있고 메타데이터가 없는 초안이 **캔버스에도 목록에도 없지 않다**(표시 실패 사유와 함께 목록에 오른다) | ☑ `94674a16` — 잉크는 보존하고 겹칠 수 있는지를 공통 분류에 넣었다(`VerseDraftRecoveryRule.isDisplayable` · `plan.undisplayable` · 사유 `undisplayable`). 생성 때 `try?` 대신 오류를 기록한다 | ☑ Feature `draftWithUnencodableMetadataIsListedAsUndisplayable`(NaN 좌표 — 정상 저장 경로) · `seededDraftWithoutMetadataIsCountedAndListed` · Domain 규칙 넷 · 조회 하나 |
+| P0-2b | **정상 저장 경로에서 메타데이터 없는 초안이 조용히 생긴다** — `metadataBlob = try? metadata.encodedBlob`. 캔버스는 건너뛰고 목록은 `shown` 이라 뺀다 | `ChapterCanvasDraftFeature`(초안을 만들 때의 `try?`) · 표시 가능성 판정을 공통 분류에 넣거나 표시 실패 항목으로 반환 | 잉크는 있고 메타데이터가 없는 초안이 **캔버스에도 목록에도 없지 않다**(표시 실패 사유와 함께 목록에 오른다) | ☑ `94674a16` — 잉크는 보존하고 겹칠 수 있는지를 공통 분류에 넣었다(`VerseDraftRecoveryRule.isDisplayable` · `plan.undisplayable` · 사유 `undisplayable`). 생성 때 `try?` 대신 오류를 기록한다 | ☑ Feature `draftWithUnencodableMetadataIsListedAsUndisplayable`(NaN 좌표 — 정상 저장 경로) · `seededDraftWithoutMetadataIsCountedAndListed` · Domain 규칙 넷 · 조회 하나 |
 | P0-3 | **2.0.0 진입 흐름의 완료 조건** — §3-1 의 선택형 대기(자동 진입 없음)와 **늦게 도착한 필사의 안전한 반영**. ④ 수정과는 별도 작업이되 출시 조건에서 빼지 않는다 | 시작 화면 · 변경 수신 경계 · 열린 장의 반영 | 반영 경로를 만들 때: `isSettledForReload` 에 **편집 중(`isEditing`) · 미보고 변경 · 도구 사용 중**을 포함하고, 다시 읽어도 `bases` · `adopted` · `inherited` 가 유지된다 | ☑ `b24c468c` 열린 장 반영(`ChapterCanvasArrivalFeature` · `CloudImportArrivalClient` · `isSettledForReload` 에 `isEditing`) · `311352ef` 시작 화면 선택형 대기(`LaunchWaitRule`) — 사용자 결정 표 그대로(§3-2) | ☑ Feature `ChapterCanvasArrivalTesting` 14(자동 반영 · 편집한 장 안내 · 획/초안 저장 중 보류 · 미보고 획 인계 · 재조회 실패 · 확인하기 성공/실패 · 기준/이어받기/출처 유지 · 긋는 중 재조회 미룸) · Domain `LaunchWaitRuleTesting` 7 · `CloudImportArrivalTesting` 2 · 앱 Debug 빌드. **기기 확인 2026-09-21**(테스트 계획 §5-1 「P0-3 기기 확인」 — 복귀 import 로 자동 반영 · 안내 · 확인하기 · 「남은 필기」, 시작 화면 · 오류 뒤 진입. 20초 · 60초 안내와 초기 import 와 겹친 순서는 재현 조건 미충족) · 2차 보완 R2-1~3(아래 2차 표) |
 | P1-4 | 전체 삭제 문구와 집계가 다르다 — `remainingDraftCount` 는 **전체 파일 수**인데 문구는 "보이지 않게 남은 필기 N개" 다 | `CloudSettingsFeature.remainingDraftCount` · `eraseConfirmBody` | 문구의 수 = 실제로 지워질 대상 수 | ☑ `63c8907e` — 수는 그대로(전체 삭제는 보존 영역을 통째로 지운다), 문구를 「이 기기의 필사 초안 N개도 모두 지워져요(다른 계정에서 쓴 것 · 읽지 못한 파일 포함)」 로 | ☑ Settings `countMatchesWhatEraseRemoves`(실제 보존 영역 — 센 수 = 파일 수 = 전체 삭제로 사라진 수) |
 | P1-5 | `isUnreadableFile` 이 **일반 파일인지 보지 않는다** — 같은 이름의 폴더 · 심볼릭 링크도 지우기 대상이 된다 | `LocalPreservationWriter.isUnreadableFile` — 일반 파일 · 표식 형식 · 경로 범위 검사 | 폴더 · 심볼릭 링크는 지워지지 않는다(실제 파일 시험) | ☑ `86cc0d06` — 이름 형식(`<초안 줄기>.unreadable-<UUID>`) · `lstat` 일반 파일 · 실제 세션 폴더 안(경로 범위). 세기 · 내보내기 · 지우기가 한 판정을 쓴다 | ☑ Domain `onlyRegularAsideFilesAreUnreadable`(폴더 · 밖을 가리키는 링크 · 표식만 든 파일 · 링크된 세션 폴더) |
@@ -771,9 +771,9 @@ F25 는 **SEP-2(삭제 전파)에 묶어서 본다**(사용자 결정 2026-09-21
 | 원시 사본(C3 ①) | 컨테이너 앞에서 뜬다. 다만 **한 번만** 뜬다 — 이미 사본이나 `raw-not-needed` 표식이 있으면 다시 뜨지 않는다(`RawStoreSnapshot.swift:112`). 그래서 **이번 판정 대상이 그 사본에 들어 있다는 보장이 없다**(나중에 1.3.0 이 새로 쓴 행 · 나중에 도착한 행) | 구현됨 |
 | CloudKit 없이 같은 파일 열기 | 미러링 엔티티(`ANSCK…`)는 모델 호환성 검사에 들어가지 않는다 (`LocalStoreLoader.swift:149`, MIG-F1) | 확인됨 |
 | C3 ②③ 행 추출 · 지속 대조 | 없다 | 미구현 |
-| 저장소 소유 근거 | 당시 `DrawingEditEnvironment.storeOwnership` 은 늘 `nil` | 2026-09-22 미구현. 2026-09-23 `CloudKitStoreOwnershipProofClient`를 production 환경에 연결했다. 현재 proof 허용 OS는 26뿐이다. iOS 18.6 V3 저장소에서 의미를 모르는 migration marker가 관측되어 iOS 18은 거절한다. OS별 최신 판정은 [출시 범위](./release-2.0.0-migration-sync-scope.md)와 [호환성 시험 계획 §5-2](./icloud-sync-compatibility-test-plan.md)를 따른다 |
+| 저장소 소유 근거 | 당시 `DrawingEditEnvironment.storeOwnership` 은 늘 `nil` | 2026-09-22 미구현. 2026-09-23 `CloudKitStoreOwnershipProofClient`를 production 환경에 연결했다. 2026-09-28 현재 proof 판독 허용 OS는 17 · 18 · 26 · 27이다(18.6의 migration marker는 구조만 확인하고 의미는 해석하지 않는다). OS별 최신 판정은 [출시 범위](./release-2.0.0-migration-sync-scope.md)와 [호환성 시험 계획 §5-2](./icloud-sync-compatibility-test-plan.md)를 따른다 |
 | 캔버스 밖 동기화 쓰기 | `SyncedWriteBlock.check` 가 즐겨찾기 · 위젯 보관 · N-Canvas · 기록 복원을 막는다(결정 1) | 구현됨 |
-| **전체 삭제** | `SyncedWriteBlock` 을 거치지 않으므로 `CloudSettingsFeature` 가 **보류 상태를 직접 본다** — 확인 팝업 진입점(`databaseIsEmpty`)과 삭제 · 재시도 진입점(`removeAlliCloudData`) 둘 다 보류면 안내만 띄우고 `eraseAll()` 을 부르지 않는다(D6). 보류가 아니면 종전대로 세 엔티티와 보존 영역(원시 사본 · 초안 · **분리본 · 분리 기록**)을 지운다 | 보류 차단 구현됨(2026-09-22) |
+| **전체 삭제** | `SyncedWriteBlock` 을 거치지 않으므로 `CloudSettingsFeature` 가 **보류 상태를 직접 본다** — 확인 팝업 진입점(`databaseIsEmpty`)과 삭제 · 재시도 진입점(`removeAlliCloudData`) 둘 다 보류면 안내만 띄우고 `eraseAll` 을 부르지 않는다(D6). 보류가 아니면 종전대로 세 엔티티와 보존 영역(원시 사본 · 초안 · **분리본 · 분리 기록**)을 지운다 | 보류 차단 구현됨(2026-09-22) |
 | 위젯 | 앱과 함께 컴파일하는 파일은 `VerseWidgetPayload.swift` 하나뿐이고 App Group 의 JSON · PNG 만 읽는다 — **게이트를 우회하는 연결 경로가 아니다**(2026-09-21 확인) | 확인됨 |
 
 **① 분리 시점**
@@ -1082,7 +1082,7 @@ C11 의 삭제 작업과 같은 형식으로 **분리 작업 기록**을 둔다 
 빌드에서도 볼 수 있다. **되살리기 · 귀속 동의는 ③ 의 버전 쓰기와 같은 시기**에 붙인다.
 
 *읽기 전용 단계의 조각.*
-1. **조회 — 2026-09-21 됨.** `LocalPreservationWriter.draftBuckets()` · `draftSummary(in:)` · `unreadableDraftFiles(in:)`.
+1. **조회 — 2026-09-21 됨.** `LocalPreservationWriter.draftBuckets` · `draftSummary(in:)` · `unreadableDraftFiles(in:)`.
    묶음 · 초안 수 · 바이트 · 읽지 못해 옆으로 옮긴 파일 · **초안이 남은 장**을 **파일만 보고** 센다 — 저장소를 읽지 않으므로
    깨진 초안이 있어도 개수 · 용량은 나온다(그 장을 여는 것은 여전히 막는다).
 2. **판정 — 2026-09-21 됨.** `VerseDraftRecoveryQuery.inventory(in:environment:)`.

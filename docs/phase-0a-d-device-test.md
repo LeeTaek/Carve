@@ -107,7 +107,7 @@
 
 | 항목 | 기준값 | 확인 |
 |---|---|---|
-| `xcode-select -p` · `xcodebuild -version` | **현행 기기·출시 후보 검증 대상은 Xcode 27.0 (27A266a)**. 2026-09-24 현재 macOS 27.2에서 선택돼 있다. generic simulator 앱 빌드는 제3자 XCFramework 서명 확인에서 중단돼 소스 호환성은 미판정(F60). Xcode 26.3 (17C529)은 과거 회귀 결과 비교용 | 머신마다 경로가 다르므로 실행 때 경로·버전을 확인한다. 기본 선택된 Xcode를 우선 사용하며, 26.3 비교 때만 `DEVELOPER_DIR`를 명시한다. **경로 하드코딩 금지** |
+| `xcode-select -p` · `xcodebuild -version` | **현행 기기·출시 후보 검증 대상은 Xcode 27.0 (27A266a)**. 2026-09-24 현재 macOS 27.2에서 선택돼 있다. 최초 generic simulator 앱 빌드의 제3자 XCFramework 서명 중단(F60)은 workspace 재검증에서 재현되지 않았다. Xcode 26.3 (17C529)은 과거 회귀 결과 비교용 | 머신마다 경로가 다르므로 실행 때 경로·버전을 확인한다. 기본 선택된 Xcode를 우선 사용하며, 26.3 비교 때만 `DEVELOPER_DIR`를 명시한다. **경로 하드코딩 금지** |
 | tuist | **4.208.0** — `PATH` 기본값과 다르므로 반드시 `mise x -- tuist …` | `mise x -- tuist version` |
 | iPad 시뮬레이터 런타임 | 2026-09-24 현재 iOS 17.5·18.6·26.2·26.4·26.5·27.0이 있다. iPad mini (6th generation) iOS 17.5 전체 회귀는 migration 수정 후 998 통과·0 실패·6 skip·4 expected failure였다. iOS 17.0 직접 시험과 실기기 입력 검증은 별도 미수행이다. 검증은 **iPad** destination 으로만 (AGENTS.md) | `xcrun simctl list devices available` — sandbox에서 Xcode 26.3을 지정할 때는 CoreSimulator 권한 오류를 확인하고, 필요하면 승인된 CLI 재실행 사용 |
 | **`sqlite3`** ★ | `/usr/bin/sqlite3` 3.54.0 — `median()` 집계까지 사용 가능. **§6-1 D8 추출의 핵심 도구** | ✅ 실행 확인 |

@@ -1,10 +1,10 @@
 # iCloud 구·신 버전 호환성 및 복구 테스트 계획
 
-> **최신 결과(2026-09-26):** ownership/migration `DomainTest` 회귀는 Xcode 27에서 iPadOS 17.5와 18.6 각각 46/46 통과했다. historical 18.6 V3 표본의 추가 private key는 구조적으로만 읽고 의미는 미확정으로 둔다. 별도 peer 실행 시 CloudKit이 `No account`를 반환해 실제 peer receive·서버 payload·화면 비교는 미완료다. 현행 범위와 남은 출시 gate는 [출시 범위 문서](./release-2.0.0-migration-sync-scope.md)를 따른다. 아래 9/25 전체 회귀 수치는 이미 통과한 후보 회귀의 과거 기록이고 이 ownership 수정의 검증 수치가 아니다.
+> **최신 결과(2026-09-28):** 로그인 뒤 연결은 앱 재실행으로 한다. iPadOS 18.6 · 17.5 live(업데이트 → 로그인 → 재실행 연결 → Development 서버 payload → 독립 peer), 18.6 시간차 양방향 저장 · 지우기, 17.5 로그인 상태 1.3.0 업데이트가 통과했다. 재실행 때 소유를 다시 증명하던 결함은 수정 뒤 18.6 시뮬레이터와 iPadOS 27.2 실기기에서 재검증했고, Xcode 26.3 전체 회귀는 26.2 · 18.6 각 1060, 17.5 1059 통과(실패 0, 각 총 1070)다. 상세는 문서 끝의 09-28 절들, 현재 요약은 [인계](./release-2.0.0-migration-sync-handoff.md)를 따른다.
 
-> **현행 출시 판정(2026-09-25):** 2.0.0의 필사 이전·첫 로그인 동기화 기준과 **NO-GO** 사유는 [출시 범위 문서](./release-2.0.0-migration-sync-scope.md)를 따른다. 현행 주 검증 대상은 macOS 27.2 / Xcode 27.0이고 Device Hub는 기기 확인·수동 스모크에 사용하며 자동 빌드·테스트는 CLI로 수행한다. Xcode 27 Tuist workspace Debug iPad simulator build와 iPadOS 17.5 전체 회귀(998 통과·4 expected failure·6 skip), iPadOS 18.6·26.2·26.4·26.5 전체 회귀(각 999 통과·4 expected failure·5 skip), iPadOS 27.0 전체 회귀(998 통과·4 expected failure·6 skip)가 통과했다. 여섯 runtime 모두 총 1008건·실패 0·xcresult runtimeWarnings 없음이다. iOS 17.5 전체 로그의 임시 migration/store fixture 관련 SQLite 경고는 테스트 failure나 xcresult runtime warning이 아니며, 정리 시점과 컨테이너 수명 관계는 미확정이다. 최초 iPadOS 27.0 전체 실행의 cancellation timing 실패는 focused rerun과 후속 전체 회귀에서 재현되지 않았다. 최초 SwiftData 네 실패는 iOS 27의 새 `SwiftDataError.unknownDataStoreSchema`를 확인된 1.0.x store shape에 한해 스키마 불일치로 처리하도록 고친 뒤 focused migration suite와 전체 회귀에서 통과했다. 수정 뒤 첫 전체 run에서 난 reader fixture의 SQLite 잠금 한 건도 reader suite 단독 재실행과 후속 전체 회귀에서 재현되지 않았다. 최초 F60의 XCFramework `ProcessXCFramework` 서명 실패는 workspace build에서 재현되지 않았다. 개별 `-project CarveApp` SwiftPM 모듈 오류와 읽기 전용 artifact 서명 상태 이상은 별도 관측이며 인과관계는 미확정이다. Xcode 26.3의 과거 회귀 결과는 비교 기준이지 Xcode 27 자격 증거가 아니다. Xcode 26.3의 전체 회귀와 Xcode 27 focused migration suite 결과는 아래 기록에 분리했다. Device Hub 수동 UI smoke는 새 iPadOS 27.0 simulator에서 빈 reader 표시와 창세기 1장→2장→1장 이동을 확인했으나 앱 시작 시 iCloud 필사 수신 대기 UI가 나타났다. live CloudKit proof·실기기 필기 입력·App Store 배포 서명 Archive·배포 entitlement·TestFlight는 미완료다. 로컬 Development 서명 Archive는 성공했지만 배포 증거로 보지 않아 NO-GO다. 아래 SEP 시험은 C14 분리 설계의 관측 기록이다.
+> **현행 출시 판정:** 필사 이전 · 동기화의 기준과 판정은 [출시 범위 문서](./release-2.0.0-migration-sync-scope.md)를 따른다. 필수 관문은 시뮬레이터 · Development · Debug 실기기 범위에서 통과했고, Xcode 27 후보 빌드 · 배포 서명 · Production 스키마 · TestFlight 실기기 확인이 남아 판정은 보류다. 아래 날짜별 절의 NO-GO · 미완료 서술은 당시 기록이다.
 
-작성: 2026-09-16 · 최신 결과 추가: 2026-09-25 · 목표: 2.0.0 · **현행 판정은 위 출시 범위 문서와 §5-2/F59/F60을 따른다.** 단계 A~D와 CK/SEP 표의 날짜별 상태는 당시 계획·관측 기록으로 보존한다.
+작성: 2026-09-16 · 최신 결과 추가: 2026-09-28 · 목표: 2.0.0 · **현행 판정은 위 출시 범위 문서를 따른다.** 단계 A~D와 CK/SEP 표의 날짜별 상태는 당시 계획·관측 기록으로 보존한다.
 
 > **2026-09-16 범위 변경** — 필사 백업 기능이 **2.1** 로 이관됐다. 단계 D 는 그때 수행하고, 2.0.0 출시 판정은 단계 A~C 로 한다.
 
@@ -38,7 +38,7 @@
 
 기존 `Carve-ACC-dut`의 업데이트 전 원시 V3 사본은 앱을 실행하지 않고 SQLite 읽기 전용으로 확인했다. `integrity_check=ok`, metadata 행 4개, 무계정 key 네 개가 각 1회, 미러링 대응 행 0개였다. 이 사본의 metadata 값은 읽지 않았다. 별도 임시 iOS 18.6 simulator에서 출시본 1.3.0을 실행하고 Genesis 1:3에 synthetic V3 행을 처음 저장한 뒤, 키 이름·키별 SQLite 값 형식과 두 boolean 상태만 요약했다. 이때 정확한 무계정 네 key 외에 `PFCloudKitMetadataModelMigratorMigrationBeganCommitKey`가 나타났고 해당 필드의 정수 boolean 상태는 `true`였다. 이 private Core Data key의 의미는 확인할 근거가 없어, iOS 18의 이 profile은 첫 로그인·기존 계정 proof 모두에서 거절한다. 계정·이메일 값은 쿼리하거나 기록하지 않았다. DUT·B의 Genesis 1:1·1:2 표본은 수정하지 않았다.
 
-**검증 환경 스냅샷(2026-09-24):** 현재 별도 Mac은 macOS 27.2 (26B5086k), 기본 `xcode-select` 경로 `/Applications/Xcode.app/Contents/Developer`, Xcode 27.0 (27A266a)이다. Tuist 4.208.0이고, 검증용 Xcode 26.3 (17C529)도 `/Applications/Xcode-26.3.0.app/Contents/Developer`에 설치돼 있다. 9/24 자동 회귀는 이 경로를 `DEVELOPER_DIR`로 지정해 Xcode 26.3에서 실행했다. 기본 Xcode 27에서 `simctl list runtimes`와 `list devices available`은 성공했다. Xcode 26.3을 지정한 sandbox 조회는 CoreSimulatorService 연결 오류를 냈으나, 권한을 높인 read-only runtime 조회는 성공했다. runtime은 iOS 17.5·18.6·26.2·26.4·26.5·27.0이며 iOS 19~25는 없다. iPad mini (6th generation) iOS 17.5 simulator(UDID `0347221E-08F5-48C9-9F8E-6D7995C25D9F`)로 회귀를 실행했다. Device Hub는 iPadOS 27.2 실기기를 표시했고, 보호 표본이나 실기기 앱은 조작하지 않았다.
+**검증 환경 스냅샷(2026-09-24):** 현재 별도 Mac은 macOS 27.2 (26B5086k), 기본 `xcode-select` 경로 `/Applications/Xcode.app/Contents/Developer`, Xcode 27.0 (27A266a)이다. Tuist 4.208.0이고, 검증용 Xcode 26.3 (17C529)도 `/Applications/Xcode-26.3.0.app/Contents/Developer`에 설치돼 있다. 9/24 자동 회귀는 이 경로를 `DEVELOPER_DIR`로 지정해 Xcode 26.3에서 실행했다. 기본 Xcode 27에서 `simctl list runtimes`와 `list devices available`은 성공했다. Xcode 26.3을 지정한 sandbox 조회는 CoreSimulatorService 연결 오류를 냈으나, 권한을 높인 read-only runtime 조회는 성공했다. runtime은 iOS 17.5·18.6·26.2·26.4·26.5·27.0이며 iOS 19~25는 없다. iPad mini (6th generation) iOS 17.5 simulator(UDID `<UDID>`)로 회귀를 실행했다. Device Hub는 iPadOS 27.2 실기기를 표시했고, 보호 표본이나 실기기 앱은 조작하지 않았다.
 
 | OS | iPad simulator | 빌드 경로 | 테스트 실행 경로 | 결과·범위 |
 |---|---|---:|---:|---|
@@ -50,47 +50,47 @@
 
 새 규칙 뒤 최초 iOS 18.6 실행은 67개/5 suite 중 `productionClientClaimsVerifiedLegacySnapshot`의 성공 경로를 OS 구분 없이 기대해 실패했다. 당시 reader의 허용 OS는 `[26]`이므로 iOS 18.6에서 판독이 unknown으로 끝나는 것이 production 정책상 맞았다. 이 실패는 iOS 18에서 소유를 허용할 근거가 아니라 테스트 기대의 오류였다. test는 허용 OS에서는 정확한 metadata profile 뒤 claim 성공을 확인하고, 그 밖의 OS에서는 unknown 판정·claim 거부·ledger 미생성을 확인하도록 고쳤다. reader 버전 assertion도 v4로 맞췄으며, raw SQLite fixture 쓰기에는 5초 busy timeout을 둔다.
 
-**최신 소스의 iPadOS 26.2 후속 검증(2026-09-23):** 일반 iPad mini (A17 Pro)에서 위 다섯 suite를 `build-for-testing`한 뒤 동일 DerivedData로 실행해 67/67 통과(실패·건너뜀 0)를 확인했고, `CarveApp` 타깃 빌드도 성공했다. 이 결과는 실기기 CloudKit proof가 아니다. 당시 첫 빌드는 checkout의 미추적 `LegacyRowCorrespondence.swift` 컴파일 오류로 실패해 파일을 보존하고 해당 미추적 파일만 빌드에서 제외했다. 최종 DerivedData는 `/private/tmp/carve-migration-sync-release-26.2-intended-derived`, 로그·결과는 `/private/tmp/carve-migration-sync-release-26.2-final-build.log`, `/private/tmp/carve-migration-sync-release-26.2-locked-tests.log`, `/private/tmp/carve-migration-sync-release-26.2-locked-tests.xcresult`, `/private/tmp/carve-migration-sync-release-26.2-app-build.log`에 있다. 이들은 현재 머신의 임시 자료다.
+**최신 소스의 iPadOS 26.2 후속 검증(2026-09-23):** 일반 iPad mini (A17 Pro)에서 위 다섯 suite를 `build-for-testing`한 뒤 동일 DerivedData로 실행해 67/67 통과(실패·건너뜀 0)를 확인했고, `CarveApp` 타깃 빌드도 성공했다. 이 결과는 실기기 CloudKit proof가 아니다. 당시 첫 빌드는 checkout의 미추적 `LegacyRowCorrespondence.swift` 컴파일 오류로 실패해 파일을 보존하고 해당 미추적 파일만 빌드에서 제외했다. 최종 DerivedData는 (로컬 증거), 로그·결과는 (로컬 증거)에 있다. 이들은 현재 머신의 임시 자료다.
 
-**iPadOS 18.6 최신 소스 재검증(2026-09-23):** macOS 27.2 + Xcode 26.3 (17C529), iPad mini (A17 Pro), build 22G86에서 집중 다섯 suite를 새 `build-for-testing` 후 동일 DerivedData로 실행했다: **67/67 통과, 실패·건너뜀 0**. 이어 Domain 전체는 xcresult 기준 449 통과·4 expected failure·실패 0·건너뜀 0, SettingsFeature 54/54, CarveFeature 457/457을 각각 빌드 성공 뒤 동일 산출물로 실행해 통과했다. `Carve-Workspace` iPadOS 18.6 simulator 빌드도 성공했다. 로그·결과 bundle은 `/private/tmp/carve-migration-sync-release-ios18.6-final-build2.log`, `/private/tmp/carve-migration-sync-release-ios18.6-final-tests2.log`, `/private/tmp/carve-migration-sync-release-ios18.6-final-tests2.xcresult`, `/private/tmp/carve-migration-sync-release-ios18.6-domain-full-build.log`, `/private/tmp/carve-migration-sync-release-ios18.6-domain-full-tests.log`, `/private/tmp/carve-migration-sync-release-ios18.6-domain-full-tests.xcresult`, `/private/tmp/carve-migration-sync-release-ios18.6-settings-tests.xcresult`, `/private/tmp/carve-migration-sync-release-ios18.6-carve-feature-tests.xcresult`, `/private/tmp/carve-migration-sync-release-ios18.6-app-build.log`에 있다. 기존 미추적 `LegacyRowCorrespondence.swift`만 빌드에서 제외했고, 보호된 `Carve-Ownership-iOS18-6`·ACC 기기와 실제 CloudKit 계정은 사용하지 않았다.
+**iPadOS 18.6 최신 소스 재검증(2026-09-23):** macOS 27.2 + Xcode 26.3 (17C529), iPad mini (A17 Pro), build 22G86에서 집중 다섯 suite를 새 `build-for-testing` 후 동일 DerivedData로 실행했다: **67/67 통과, 실패·건너뜀 0**. 이어 Domain 전체는 xcresult 기준 449 통과·4 expected failure·실패 0·건너뜀 0, SettingsFeature 54/54, CarveFeature 457/457을 각각 빌드 성공 뒤 동일 산출물로 실행해 통과했다. `Carve-Workspace` iPadOS 18.6 simulator 빌드도 성공했다. 로그·결과 bundle은 (로컬 증거)에 있다. 기존 미추적 `LegacyRowCorrespondence.swift`만 빌드에서 제외했고, 보호된 `Carve-Ownership-iOS18-6`·ACC 기기와 실제 CloudKit 계정은 사용하지 않았다.
 
-**전체 회귀·시작 smoke·Release configuration 후속(2026-09-23):** `Carve-Workspace` 전체 테스트를 Xcode 26.3에서 일반 iPad mini (A17 Pro) iPadOS 18.6, iPad mini iPadOS 26.2, iPad Air 11-inch (M3) iPadOS 26.2로 각각 실행했다. 세 실행 모두 **997 passed, 4 expected failures, 5 skipped, 0 failed (총 1006)**였다. skip 5개는 실기기 전용 UI test다. 별도 blank/no-account simulator에서 iPadOS 18.6 mini와 iPadOS 26.2 Air가 FirstRunGuide까지 크래시 없이 표시되는 것을 확인했다. 이 smoke는 안내의 시작 버튼을 누르거나 실제 필사·계정 흐름을 확인한 것은 아니다. `CarveApp` Release configuration simulator build는 성공했고 Info.plist의 버전은 2.0.0 (build 1)이었다. 서명을 끈 simulator compile이므로 archive·배포 서명·entitlement 검증으로 세지 않는다. 결과는 `/private/tmp/carve-release-2.0-current-ios18-regression.xcresult`, `/private/tmp/carve-release-2.0-current-ios26.2-regression.xcresult`, `/private/tmp/carve-release-2.0-current-ios26.2-air-regression-run2.xcresult`, 로그는 각 `...-regression.log` 및 `/private/tmp/carve-release-2.0-current-ios26.2-air-regression-run2.log`, Release log는 `/private/tmp/carve-release-2.0-current-release-config-build.log`에 있다.
+**전체 회귀·시작 smoke·Release configuration 후속(2026-09-23):** `Carve-Workspace` 전체 테스트를 Xcode 26.3에서 일반 iPad mini (A17 Pro) iPadOS 18.6, iPad mini iPadOS 26.2, iPad Air 11-inch (M3) iPadOS 26.2로 각각 실행했다. 세 실행 모두 **997 passed, 4 expected failures, 5 skipped, 0 failed (총 1006)**였다. skip 5개는 실기기 전용 UI test다. 별도 blank/no-account simulator에서 iPadOS 18.6 mini와 iPadOS 26.2 Air가 FirstRunGuide까지 크래시 없이 표시되는 것을 확인했다. 이 smoke는 안내의 시작 버튼을 누르거나 실제 필사·계정 흐름을 확인한 것은 아니다. `CarveApp` Release configuration simulator build는 성공했고 Info.plist의 버전은 2.0.0 (build 1)이었다. 서명을 끈 simulator compile이므로 archive·배포 서명·entitlement 검증으로 세지 않는다. 결과는 (로컬 증거), 로그는 각 `...-regression.log` 및 (로컬 증거), Release log는 (로컬 증거)에 있다.
 
-**전체 자동 회귀 재실행(2026-09-24, 이전 후보):** macOS 27.2 / Xcode 26.3 (17C529), Tuist 4.208.0으로 생성한 `Carve.xcworkspace`, iPad mini (A17 Pro)에서 iPadOS 18.6과 26.2 전체 `Carve-Workspace` 테스트를 다시 빌드·실행했다. 두 OS 모두 **997 passed · 4 expected failures · 5 skipped · 0 failed (총 1006)**로 통과했다. skip 5개는 실기기 전용 UI 테스트다. 이 실행은 미추적 초안을 제외한 당시 소스 기준이었다. 상세 결과 bundle은 `/private/tmp/carve-2-0-0-autotest-20260924-full-ios18.6.xcresult`, `/private/tmp/carve-2-0-0-autotest-20260924-full-ios26.2.xcresult`다.
+**전체 자동 회귀 재실행(2026-09-24, 이전 후보):** macOS 27.2 / Xcode 26.3 (17C529), Tuist 4.208.0으로 생성한 `Carve.xcworkspace`, iPad mini (A17 Pro)에서 iPadOS 18.6과 26.2 전체 `Carve-Workspace` 테스트를 다시 빌드·실행했다. 두 OS 모두 **997 passed · 4 expected failures · 5 skipped · 0 failed (총 1006)**로 통과했다. skip 5개는 실기기 전용 UI 테스트다. 이 실행은 미추적 초안을 제외한 당시 소스 기준이었다. 상세 결과 bundle은 (로컬 증거)다.
 
 재현한 전체 실행 명령은 아래와 같다. 두 명령 모두 동일한 iPad mini 대상과 검증된 Xcode 26.3을 사용했다.
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode-26.3.0.app/Contents/Developer xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -destination 'platform=iOS Simulator,name=iPad mini (A17 Pro),OS=18.6' -derivedDataPath /private/tmp/carve-2-0-0-autotest-20260924-derived -resultBundlePath /private/tmp/carve-2-0-0-autotest-20260924-full-ios18.6.xcresult EXCLUDED_SOURCE_FILE_NAMES=LegacyRowCorrespondence.swift -quiet
-DEVELOPER_DIR=/Applications/Xcode-26.3.0.app/Contents/Developer xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -destination 'platform=iOS Simulator,name=iPad mini (A17 Pro),OS=26.2' -derivedDataPath /private/tmp/carve-2-0-0-autotest-20260924-derived -resultBundlePath /private/tmp/carve-2-0-0-autotest-20260924-full-ios26.2.xcresult EXCLUDED_SOURCE_FILE_NAMES=LegacyRowCorrespondence.swift -quiet
+DEVELOPER_DIR=/Applications/Xcode-26.3.0.app/Contents/Developer xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -destination 'platform=iOS Simulator,name=iPad mini (A17 Pro),OS=18.6' -derivedDataPath (로컬 증거) -resultBundlePath (로컬 증거) EXCLUDED_SOURCE_FILE_NAMES=LegacyRowCorrespondence.swift -quiet
+DEVELOPER_DIR=/Applications/Xcode-26.3.0.app/Contents/Developer xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -destination 'platform=iOS Simulator,name=iPad mini (A17 Pro),OS=26.2' -derivedDataPath (로컬 증거) -resultBundlePath (로컬 증거) EXCLUDED_SOURCE_FILE_NAMES=LegacyRowCorrespondence.swift -quiet
 ```
 
-최초 집중 실행은 파일 제외 값을 셸 환경 변수로 전달해 Xcode 빌드 설정에 적용하지 못했고, `LegacyRowCorrespondence.swift`에서 `LegacyJudgementDoubt: Error` 미준수와 `Int64`/`Int` 형식 오류가 나 테스트 시작 전에 실패했다(`/private/tmp/carve-2-0-0-autotest-20260924-focused.xcresult`). 빌드 설정 인자로 제외를 전달한 재실행은 통과했다. 해당 미추적 파일은 현재 미완성 코드이며 `fatalError` 자리표시자도 있어 이 문서의 성공 결과에 포함되지 않는다. 파일을 배포 후보에 넣으려면 구현을 완성하고 제외 없이 다시 빌드·테스트해야 한다. 이번 실행은 테스트/앱 컴파일 경로 회귀이며, 별도 UI 조작·Apple Pencil 입력·iCloud 로그인·CloudKit 왕복은 수행하지 않았다.
+최초 집중 실행은 파일 제외 값을 셸 환경 변수로 전달해 Xcode 빌드 설정에 적용하지 못했고, `LegacyRowCorrespondence.swift`에서 `LegacyJudgementDoubt: Error` 미준수와 `Int64`/`Int` 형식 오류가 나 테스트 시작 전에 실패했다((로컬 증거)). 빌드 설정 인자로 제외를 전달한 재실행은 통과했다. 해당 미추적 파일은 현재 미완성 코드이며 `fatalError` 자리표시자도 있어 이 문서의 성공 결과에 포함되지 않는다. 파일을 배포 후보에 넣으려면 구현을 완성하고 제외 없이 다시 빌드·테스트해야 한다. 이번 실행은 테스트/앱 컴파일 경로 회귀이며, 별도 UI 조작·Apple Pencil 입력·iCloud 로그인·CloudKit 왕복은 수행하지 않았다.
 
 변경한 두 테스트 파일의 SwiftLint도 `mise x -- swiftlint lint --quiet --config .swiftlint.yml Domain/Domain/Tests/DrawingStoreOwnershipProofTesting.swift Domain/Domain/Tests/LegacyRowLinkageReaderTesting.swift`로 실행해 통과했다. 문서 수정 뒤 `git diff --check`도 통과했다. Xcode 빌드의 저장소 범위 lint 단계에서 나온 기존 경고는 별도로 남아 있으며 전체 저장소 lint 무경고를 뜻하지 않는다.
 
 당시 이 빌드·회귀에서는 checkout의 미추적 `Domain/Domain/Sources/SwiftData/LegacyRowCorrespondence.swift`가 Swift 오류(throw된 `LegacyJudgementDoubt`가 `Error`를 따르지 않음, `Int64`/`Int` 인자 불일치)를 내서 파일은 보존하고 `EXCLUDED_SOURCE_FILE_NAMES=LegacyRowCorrespondence.swift`로 제외했다. 따라서 그 결과를 checkout의 모든 미추적 소스 기준 빌드 성공으로 표현하지 않았다. 테스트한 tracked 후보 소스와 문서의 통계는 성공했지만, 파일을 커밋 후보에 포함한다면 먼저 컴파일을 고치고 제외 없이 다시 빌드해야 한다.
 
-strict-profile 변경 후 live CloudKit proof를 수행하려고 기존 ACC simulator의 clone을 준비했으나, clone 앱을 실행하는 작업은 기존 필기가 private Development CloudKit DB로 자동 전송·서버 상태 변경을 일으킬 수 있다는 auto-review 사유로 차단됐다. 앱을 실행하지 않았고 원본 ACC simulator는 변경하지 않았으며 임시 clone은 삭제했다. 이 gate는 통과가 아니라 미실행으로 둔다. 이어 실제 private DB proof를 하려면 기존 ACC 합성/필기 payload의 전송과 Development private DB 변경을 사용자가 명시적으로 승인하거나, 별도 synthetic 표본·계정으로 범위를 바꿔야 한다.
+strict-profile 변경 후 live CloudKit proof를 수행하려고 기존 ACC simulator의 clone을 준비했으나, clone 앱을 실행하면 기존 필기가 private Development CloudKit DB로 자동 전송돼 서버 상태가 바뀔 수 있어 승인 전에는 실행하지 않았다. 앱을 실행하지 않았고 원본 ACC simulator는 변경하지 않았으며 임시 clone은 삭제했다. 이 gate는 통과가 아니라 미실행으로 둔다. 이어 실제 private DB proof를 하려면 기존 ACC 합성/필기 payload의 전송과 Development private DB 변경을 사용자가 명시적으로 승인하거나, 별도 synthetic 표본·계정으로 범위를 바꿔야 한다.
 
 ### 미완성 초안 이동 후 파일 제외 없는 회귀 (2026-09-24)
 
-`Domain/Domain/Sources/SwiftData/LegacyRowCorrespondence.swift`는 실제 호출처가 없는 이전 판독기 초안이었다. 같은 목적의 실제 경로는 `LegacyRowLinkageReader`가 담당하며 초안에는 컴파일 오류와 `fatalError` 자리표시자가 있었다. 초안을 덮어쓰거나 병렬 구현으로 승격하지 않고, 원본을 복구할 수 있도록 `/private/tmp/carve-legacy-row-correspondence-draft-20260924.swift`로 이동했다. Tuist 프로젝트를 다시 생성한 뒤 새 DerivedData에서 `EXCLUDED_SOURCE_FILE_NAMES` 없이 Xcode 26.3 `Carve-Workspace` 전체 회귀를 세 iPadOS runtime에 실행했다.
+`Domain/Domain/Sources/SwiftData/LegacyRowCorrespondence.swift`는 실제 호출처가 없는 이전 판독기 초안이었다. 같은 목적의 실제 경로는 `LegacyRowLinkageReader`가 담당하며 초안에는 컴파일 오류와 `fatalError` 자리표시자가 있었다. 초안을 덮어쓰거나 병렬 구현으로 승격하지 않고, 원본을 복구할 수 있도록 (로컬 증거)로 이동했다. Tuist 프로젝트를 다시 생성한 뒤 새 DerivedData에서 `EXCLUDED_SOURCE_FILE_NAMES` 없이 Xcode 26.3 `Carve-Workspace` 전체 회귀를 세 iPadOS runtime에 실행했다.
 
 | iPadOS | 기기 | 결과 | xcresult |
 |---|---|---|---|
-| 17.5 | iPad mini (6th generation) | **998 통과 · 실패 0 · 6 skip · 4 expected failure (총 1008)** | `/private/tmp/carve-2-0-0-candidate-unexcluded-ios17.5.xcresult` |
-| 18.6 | iPad mini (A17 Pro) | **999 통과 · 실패 0 · 5 skip · 4 expected failure (총 1008)** | `/private/tmp/carve-2-0-0-candidate-unexcluded-ios18.6.xcresult` |
-| 26.2 | iPad mini (A17 Pro) | **999 통과 · 실패 0 · 5 skip · 4 expected failure (총 1008)** | `/private/tmp/carve-2-0-0-candidate-unexcluded-ios26.2.xcresult` |
+| 17.5 | iPad mini (6th generation) | **998 통과 · 실패 0 · 6 skip · 4 expected failure (총 1008)** | (로컬 증거) |
+| 18.6 | iPad mini (A17 Pro) | **999 통과 · 실패 0 · 5 skip · 4 expected failure (총 1008)** | (로컬 증거) |
+| 26.2 | iPad mini (A17 Pro) | **999 통과 · 실패 0 · 5 skip · 4 expected failure (총 1008)** | (로컬 증거) |
 
 세 번 모두 기존 test plan의 실기기 전용 UI skip과 선언된 expected failure만 남았다. 빌드에 연결된 저장소 범위 SwiftLint는 5~6개 기존 warning을 출력했으며 xcodebuild/test 결과에는 실패가 없었다. 이번 실행은 UI smoke·실기기 입력·CloudKit 로그인/왕복을 포함하지 않는다.
 
 Tuist 생성 후 아래 명령을 같은 새 DerivedData에서 순서대로 실행했다. 세 명령 모두 `EXCLUDED_SOURCE_FILE_NAMES` 설정 없이 실행했다.
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode-26.3.0.app/Contents/Developer xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -destination 'platform=iOS Simulator,id=0347221E-08F5-48C9-9F8E-6D7995C25D9F' -derivedDataPath /private/tmp/carve-2-0-0-candidate-unexcluded-derived -resultBundlePath /private/tmp/carve-2-0-0-candidate-unexcluded-ios17.5.xcresult -parallel-testing-enabled NO -quiet
-DEVELOPER_DIR=/Applications/Xcode-26.3.0.app/Contents/Developer xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -destination 'platform=iOS Simulator,id=7E95B700-3976-42D7-BF85-BCAF028B7605' -derivedDataPath /private/tmp/carve-2-0-0-candidate-unexcluded-derived -resultBundlePath /private/tmp/carve-2-0-0-candidate-unexcluded-ios18.6.xcresult -parallel-testing-enabled NO -quiet
-DEVELOPER_DIR=/Applications/Xcode-26.3.0.app/Contents/Developer xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -destination 'platform=iOS Simulator,id=086F17F4-649B-4AE5-9C78-22659E0F93F6' -derivedDataPath /private/tmp/carve-2-0-0-candidate-unexcluded-derived -resultBundlePath /private/tmp/carve-2-0-0-candidate-unexcluded-ios26.2.xcresult -parallel-testing-enabled NO -quiet
+DEVELOPER_DIR=/Applications/Xcode-26.3.0.app/Contents/Developer xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -destination 'platform=iOS Simulator,id=<UDID>' -derivedDataPath (로컬 증거) -resultBundlePath (로컬 증거) -parallel-testing-enabled NO -quiet
+DEVELOPER_DIR=/Applications/Xcode-26.3.0.app/Contents/Developer xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -destination 'platform=iOS Simulator,id=<UDID>' -derivedDataPath (로컬 증거) -resultBundlePath (로컬 증거) -parallel-testing-enabled NO -quiet
+DEVELOPER_DIR=/Applications/Xcode-26.3.0.app/Contents/Developer xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -destination 'platform=iOS Simulator,id=<UDID>' -derivedDataPath (로컬 증거) -resultBundlePath (로컬 증거) -parallel-testing-enabled NO -quiet
 ```
 
 ### iOS 18 metadata migration marker 공개 근거 조사 (2026-09-24)
@@ -109,9 +109,9 @@ DEVELOPER_DIR=/Applications/Xcode-26.3.0.app/Contents/Developer xcodebuild test 
 
 이 표본은 로그아웃한 1.3.0 설치의 업데이트 경로다. **1.3.0에서 이미 iCloud에 로그인해 둔 상태로 2.0.0을 덮어 설치하는 별도 경로는 실행하지 않았다.** 출시 범위가 요구한 로그인 상태 업데이트 분기는 아직 미검증이다.
 
-자동 회귀·후보 덮어 설치·미로그인 실행 뒤에도 DUT 저장소는 2행, 같은 내용·레이아웃 지문, 미러링 대응 0건이었다. 복사본은 `/private/tmp/carve-release-sync-evidence/snaps/dut-before-login`, `dut-after-automated-tests`, `dut-after-candidate-install`, `dut-after-final-candidate-launch`에 두었다. 최종 실행 화면(`/private/tmp/carve-release-sync-evidence/dut-after-final-candidate.png`)에서도 두 획이 표시됐다. 로그인 직후 DUT는 2행 그대로였고 미러링 표가 아직 없었다(`dut-after-account-login-pre-probe`). 앱을 재실행한 뒤 CloudKit에서 기존 행 15개를 받고 실제 표본 두 행에 대응이 생겨 총 17행·매핑 17건·업로드 대기 0건이 됐다(`dut-after-account-login-relaunch`).
+자동 회귀·후보 덮어 설치·미로그인 실행 뒤에도 DUT 저장소는 2행, 같은 내용·레이아웃 지문, 미러링 대응 0건이었다. 복사본은 (로컬 증거), `dut-after-automated-tests`, `dut-after-candidate-install`, `dut-after-final-candidate-launch`에 두었다. 최종 실행 화면((로컬 증거))에서도 두 획이 표시됐다. 로그인 직후 DUT는 2행 그대로였고 미러링 표가 아직 없었다(`dut-after-account-login-pre-probe`). 앱을 재실행한 뒤 CloudKit에서 기존 행 15개를 받고 실제 표본 두 행에 대응이 생겨 총 17행·매핑 17건·업로드 대기 0건이 됐다(`dut-after-account-login-relaunch`).
 
-로그인 전 서버 probe는 60초 내 완료되지 않아 서버 기준선은 얻지 못했다. 당시 B 로컬 13행을 서버 행 수로 간주하지 않는다. 이후 사용자가 두 시뮬레이터를 같은 시험 계정에 로그인시켰다. DUT 재실행 뒤 private DB probe는 `CD_BibleDrawing` 17개를 읽었고, Genesis 1:1은 654B / `3a267e075d4d23e7`, 1:2는 794B / `4f38e8eb0d805fa2`로 DUT 로컬 표본 payload와 각각 일치했다. B는 DUT export 전 15행에서 B 앱 재실행·probe 뒤 17행·매핑 17건으로 늘었으며 같은 두 payload 지문을 보유했다. 스냅숏은 `b-after-account-login-pre-probe`, `b-after-dut-server-export-before-probe`, `b-after-dut-first-export-and-b-probe`다. B 화면 캡처(`/private/tmp/carve-release-sync-evidence/b-after-dut-first-export.png`)에서도 1:1 지그재그와 1:2 고리가 보였다. AdMob 안내창은 본문 일부를 덮었지만 필기 획은 가리지 않았다. 서버 로그는 `0923-105645-probe-after-dut-login-first-export.log`와 B 조회용 probe 로그이며 계정 식별 원문은 문서에 기록하지 않았다.
+로그인 전 서버 probe는 60초 내 완료되지 않아 서버 기준선은 얻지 못했다. 당시 B 로컬 13행을 서버 행 수로 간주하지 않는다. 이후 사용자가 두 시뮬레이터를 같은 시험 계정에 로그인시켰다. DUT 재실행 뒤 private DB probe는 `CD_BibleDrawing` 17개를 읽었고, Genesis 1:1은 654B / `3a267e075d4d23e7`, 1:2는 794B / `4f38e8eb0d805fa2`로 DUT 로컬 표본 payload와 각각 일치했다. B는 DUT export 전 15행에서 B 앱 재실행·probe 뒤 17행·매핑 17건으로 늘었으며 같은 두 payload 지문을 보유했다. 스냅숏은 `b-after-account-login-pre-probe`, `b-after-dut-server-export-before-probe`, `b-after-dut-first-export-and-b-probe`다. B 화면 캡처((로컬 증거))에서도 1:1 지그재그와 1:2 고리가 보였다. AdMob 안내창은 본문 일부를 덮었지만 필기 획은 가리지 않았다. 서버 로그는 `0923-105645-probe-after-dut-login-first-export.log`와 B 조회용 probe 로그이며 계정 식별 원문은 문서에 기록하지 않았다.
 
 첫 로그인 옛 필사의 서버 전송과 같은 계정 다른 iPad 수신 관문은 iOS 26.2 시뮬레이터에서 통과했다. 사용자가 두 시뮬레이터를 같은 시험 계정에 직접 로그인시켰다. DUT는 설정에서 돌아온 실행 중에는 전송하지 않았고, 앱 재실행 뒤 CloudKit 연결이 붙어 첫 export가 완료됐다. 서버 payload bytes 지문·B 저장소·화면이 일치했다.
 
@@ -119,9 +119,9 @@ DEVELOPER_DIR=/Applications/Xcode-26.3.0.app/Contents/Developer xcodebuild test 
 
 B에서 보고된 1:7 추가 획은 후보 설치 전 만든 미확인 초안이 이미 있는 절에 그린 것이었다. 화면에는 추가 획이 보였으나 canonical 행 지문과 초안 revision은 바뀌지 않아 저장·수정으로 인정하지 않았다. 기존 초안은 저장소 소유 근거가 없으므로 후보가 자동 업로드하지 않는다. 이 동작은 2.0.0 로그인 없는 신규 초안을 자동 귀속하지 않는 안전 규칙을 유지한다.
 
-빈 절 Genesis 1:8의 일반 생성·전송은 통과했다. B의 새 행은 19행·19매핑 중 하나였고, 서버 private DB에는 `isPresent=1`, 965B / `261787e7b7ead104`로 있었다. 앱 재실행 뒤 DUT가 같은 rowUUID·payload를 받아 19행·19매핑, 업로드 대기 0건이 됐다. 서버 probe는 B에서, 일정 시간 뒤 fetch probe는 DUT에서 각각 실행했다. 저장소 사본은 `b-after-1-8-create-before-probe`, `b-after-1-8-server-export`, `dut-before-1-8-receive`, `dut-after-1-8-delayed-receive`이며 화면 캡처는 `/private/tmp/carve-release-sync-evidence/b-after-1-8-export.png`, `/private/tmp/carve-release-sync-evidence/dut-after-1-8-delayed-receive-settled.png`다.
+빈 절 Genesis 1:8의 일반 생성·전송은 통과했다. B의 새 행은 19행·19매핑 중 하나였고, 서버 private DB에는 `isPresent=1`, 965B / `261787e7b7ead104`로 있었다. 앱 재실행 뒤 DUT가 같은 rowUUID·payload를 받아 19행·19매핑, 업로드 대기 0건이 됐다. 서버 probe는 B에서, 일정 시간 뒤 fetch probe는 DUT에서 각각 실행했다. 저장소 사본은 `b-after-1-8-create-before-probe`, `b-after-1-8-server-export`, `dut-before-1-8-receive`, `dut-after-1-8-delayed-receive`이며 화면 캡처는 (로컬 증거)다.
 
-역방향 수정과 지연 payload 수신은 통과했다. DUT에서 1:8에 두 번째 획을 더한 뒤 payload가 965B / `261787e7b7ead104`에서 1802B / `de5df55aa6147ab5`로 바뀌었고 layout metadata 지문은 `2bfaf8b7d683127c`였다. DUT의 재실행 probe는 private DB에 같은 payload와 metadata, `isPresent=1`을 확인했다. 30초 넘게 열린 B의 로컬 사본은 이전 965B payload였고, B 앱 재실행 후에는 1802B payload를 받았다. B의 local layout metadata 지문은 `2cd2d9d9c1ba25ca`로 서버·DUT와 달랐지만, 사용자가 B에서 Genesis 1:8을 확인해 두 획과 좌표가 맞게 표시됨을 확인했다(`/private/tmp/carve-release-sync-evidence/b-1-8-after-reverse-receive-visible.png`). 즐겨찾기 추가·해제와 일반 필사 지우기 왕복도 통과했다. 이 문장은 2026-09-22 당시 남은 확인 범위다. 2026-09-23 후속 검증에서 iOS 18의 제한된 V3 증거 판독을 추가했지만, iOS 18 실제 로그인 소유 증명·왕복과 로그인된 1.3.0 업데이트는 여전히 미검증이다. iOS 17과 설치 런타임이 없는 iOS 19~25는 계속 fail closed다.
+역방향 수정과 지연 payload 수신은 통과했다. DUT에서 1:8에 두 번째 획을 더한 뒤 payload가 965B / `261787e7b7ead104`에서 1802B / `de5df55aa6147ab5`로 바뀌었고 layout metadata 지문은 `2bfaf8b7d683127c`였다. DUT의 재실행 probe는 private DB에 같은 payload와 metadata, `isPresent=1`을 확인했다. 30초 넘게 열린 B의 로컬 사본은 이전 965B payload였고, B 앱 재실행 후에는 1802B payload를 받았다. B의 local layout metadata 지문은 `2cd2d9d9c1ba25ca`로 서버·DUT와 달랐지만, 사용자가 B에서 Genesis 1:8을 확인해 두 획과 좌표가 맞게 표시됨을 확인했다((로컬 증거)). 즐겨찾기 추가·해제와 일반 필사 지우기 왕복도 통과했다. 이 문장은 2026-09-22 당시 남은 확인 범위다. 2026-09-23 후속 검증에서 iOS 18의 제한된 V3 증거 판독을 추가했지만, iOS 18 실제 로그인 소유 증명·왕복과 로그인된 1.3.0 업데이트는 여전히 미검증이다. iOS 17과 설치 런타임이 없는 iOS 19~25는 계속 fail closed다.
 
 즐겨찾기 추가·해제의 실제 저장 경로도 확인했다. B에서 Genesis 1:8을 즐겨찾기에 넣은 뒤 로컬은 즐겨찾기 1건·매핑 20건·대기 0건이었고, private DB probe는 Genesis 1:8 `CD_FavoriteVerse`를 포함한 활성 레코드 20건을 읽었다. 30초 뒤 DUT도 즐겨찾기 1건을 수신했다. B에서 즐겨찾기를 해제하자 로컬은 즐겨찾기 0건·매핑 19건이 됐고 서버는 그 레코드의 삭제 tombstone을 반환하며 활성 레코드 수가 19건으로 줄었다. 다음 30초 지연 수신 뒤 DUT도 즐겨찾기 0건·매핑 19건이 됐고 1:8 필사 payload는 1802B / `de5df55aa6147ab5` 그대로였다. 증거 사본은 `b-after-favorite-add-before-probe`, `dut-after-favorite-add-delayed-receive`, `b-after-favorite-remove-before-probe`, `dut-after-favorite-remove-delayed-receive`; server logs는 `logs/probe-favorite-add-after-export-run.txt`와 `logs/probe-favorite-remove-after-export-run.txt`다.
 
@@ -380,7 +380,7 @@ OLD의 실제 전체 삭제가 특정 모델 삭제인지 컨테이너·존 삭�
 - 각 시점에 **계정 확인 결과, 저장소 식별, 표식, 원본 행 해시, K, 편집 세션 근거, 양쪽 서버의 실제 레코드**를 함께 대조한다. 행 수와 import 성공만으로 판정하지 않는다
 - 계정 식별 원문은 로그에 남기지 않고 시험 별칭(A · B)으로 적는다
 
-**준비:** 두 번째 샌드박스 계정(사용자가 만들고 시뮬레이터에 로그인), 서로 다른 잉크 표본, `tools/cloudkit-observe` 의 서버 조회 · 저장소 비교.
+**준비:** 두 번째 샌드박스 계정(사용자가 만들고 시뮬레이터에 로그인), 서로 다른 잉크 표본, 저장소 밖 CloudKit 관측 도구 의 서버 조회 · 저장소 비교.
 
 ### 3-2. ACC-1 2차 — ②-2 보완 빌드로 다시 (계획, 2026-09-18 9차 리뷰 · 10차 리뷰 보완)
 
@@ -419,7 +419,7 @@ OLD의 실제 전체 삭제가 특정 모델 삭제인지 컨테이너·존 삭�
 **DEBUG 소유 주입 — 구현(10차 리뷰에서 조건을 더해 승인)**
 
 - **켜는 법:** DEBUG 빌드 · **시뮬레이터** · **시험(dev) 컨테이너(`Carve.dev.sqlite`)** · 실행 인자 `-ACC1InjectStoreOwnership` 이 모두 맞을 때만(`StoreOwnershipInjection.isEnabled`). 이 판정과 앱의 분기는 `#if DEBUG` 안이라 Release 에는 **켜는 경로가 없다**(환경 쪽 분기는 남지만 값이 늘 false 다).
-- **주입하는 것:** `LiveDrawingEditEnvironment.current()` 가 **확인된 계정일 때만** 저장소 소유 근거를 그 계정으로 채우고 `ownershipInjected` 를 켠다. 미확인 · 로그인 안 함 · K 읽기 실패는 그대로다 — 보존만 경로는 주입 빌드에서도 같다.
+- **주입하는 것:** `LiveDrawingEditEnvironment.current` 가 **확인된 계정일 때만** 저장소 소유 근거를 그 계정으로 채우고 `ownershipInjected` 를 켠다. 미확인 · 로그인 안 함 · K 읽기 실패는 그대로다 — 보존만 경로는 주입 빌드에서도 같다.
 - **드러나게:** 켜지면 시작할 때 경고 로그(`소유 주입(DEBUG · 시뮬레이터 · dev 컨테이너) — 소유 증명이 아니다`)와 필사 화면 위 배지("소유 주입(DEBUG) · 소유 증명 아님")를 띄운다.
 - **번지지 않게:** 주입한 세션의 초안 · 닫은 세션의 초안 · 늦은 편집의 초안 · 이어 쓴 초안이 `ownershipInjected` 를 잇는다. 주입 없는 실행은 그 초안의 소유 근거를 없는 것으로 읽는다 — 보이기만 하고, **이후 편집도 그 계정에 귀속하지 않는다**(원 초안의 출처를 이은 초안만 쓰고 저장소에 쓰지 않는다).
 - **판정 범위:** 주입은 판정 **뒤의** 경로(저장소 쓰기 · 이어 쓰기 · 전환 때 초안 보존)를 재현할 뿐 저장소 소유를 판정하지 않는다. 결과는 "주입된 소유를 전제로 한 경로" 로 한정해 **주입 · 비주입을 따로** 기록하고, 소유 근거 채택(§3-1)의 근거로 쓰지 않는다.
@@ -447,7 +447,7 @@ OLD의 실제 전체 삭제가 특정 모델 삭제인지 컨테이너·존 삭�
 
 **회귀로 함께 본다:** P0-3 늦은 import 반영 · ②-2 초안 보호 · 결정 1 의 쓰기 차단 · C11 전체 삭제가 C14 를 붙인 뒤에도 그대로인가.
 
-**관문 미확인 항목의 실험 절차 (2026-09-22 준비, 이 맥 기준 — 계정 조작은 사용자 몫).** 도구 · 표본 · 로그는 저장소 밖 `tools/cloudkit-observe/work/sep/`(`scripts/` · `samples/` · `logs/` · `apps/` · `dd/`)에 있다 — `sep-capture.sh` 표본 뜨기 · `read-store.sh` 신호 읽기 · `sep-run.sh` 하네스 한 번 · `sep-putback.sh` 되돌려 놓기 · `sep-wait.sh` 연결 뒤 이벤트가 조용해질 때까지 · `probe-compare.py` 서버 조회와 저장소를 레코드 이름 · 행 ID 로 맞춤, 그리고 **`sep-gate-rounds.sh`(아래 G1 ~ G4 · 게이트 실기기 경로를 한 번에 — 첫 단계 `preflight` 가 자격 증명을 보고 무효면 아무것도 바꾸지 않고 멈춘다)**. 하네스 지시서는 `insert`(`entity` · `id`) · `truncateHistory` · `deleteSwiftData`(`entity`) · `steps`. 서버 확인은 `tools/cloudkit-observe/probe.sh` 로 레코드 이름과 **삭제 흔적(tombstone)** 을 직접 본다(앱을 재실행한다).
+**관문 미확인 항목의 실험 절차 (2026-09-22 준비, 이 맥 기준 — 계정 조작은 사용자 몫).** 도구 · 표본 · 로그는 저장소 밖 CloudKit 관측 도구(`scripts/` · `samples/` · `logs/` · `apps/` · `dd/`)에 있다 — `sep-capture.sh` 표본 뜨기 · `read-store.sh` 신호 읽기 · `sep-run.sh` 하네스 한 번 · `sep-putback.sh` 되돌려 놓기 · `sep-wait.sh` 연결 뒤 이벤트가 조용해질 때까지 · `probe-compare.py` 서버 조회와 저장소를 레코드 이름 · 행 ID 로 맞춤, 그리고 **`sep-gate-rounds.sh`(아래 G1 ~ G4 · 게이트 실기기 경로를 한 번에 — 첫 단계 `preflight` 가 자격 증명을 보고 무효면 아무것도 바꾸지 않고 멈춘다)**. 하네스 지시서는 `insert`(`entity` · `id`) · `truncateHistory` · `deleteSwiftData`(`entity`) · `steps`. 서버 확인은 저장소 밖 CloudKit 관측 도구 로 레코드 이름과 **삭제 흔적(tombstone)** 을 직접 본다(앱을 재실행한다).
 
 | # | 관문 항목 | 절차 | 판정 |
 |---|---|---|---|
@@ -1294,7 +1294,7 @@ C14 의 열기 순서(원시 사본 → CloudKit 없이 마이그레이션 → �
 
 ### C14 게이트 기기 시험 · SEP-6 (2026-09-22)
 
-**환경:** 이 맥(macOS 26.3 · Xcode 26.3). 시험용 시뮬레이터 둘을 새로 만들었다 — `Carve-SEP-noacct`(865D8028… · iPad Pro 11 M4 · iOS 26.2 · **계정 없음**) · `Carve-SEP-ios18`(C3D165F9… · iPad mini A17 Pro · **iOS 18.6** · 계정 없음). 게이트 빌드는 이 브랜치의 Debug. 표본 · 로그 · 앱 사본은 `tools/cloudkit-observe/work/sep/`.
+**환경:** 이 맥(macOS 26.3 · Xcode 26.3). 시험용 시뮬레이터 둘을 새로 만들었다 — `Carve-SEP-noacct`(iPad Pro 11 M4 · iOS 26.2 · **계정 없음**) · `Carve-SEP-ios18`(iPad mini A17 Pro · **iOS 18.6** · 계정 없음). 게이트 빌드는 이 브랜치의 Debug. 표본 · 로그 · 앱 사본은 저장소 밖 CloudKit 관측 도구.
 
 **① 1.3.0 무계정 → 2.0.0 업데이트 경로(실제 앱):** 무계정 기기에 OLD 1.3.0(`49f2dc27`)을 깔아 띄우자 V3 저장소가 생겼다(미러링 표 18개 · 메타데이터 키 4 · 계정 식별 없음 · setup 실패 134400). 하네스로 V3 행 3개(`SEP-NA-BD-0~2`)를 넣고 되돌려 놓은 뒤 게이트 빌드를 **그 위에 설치**해 띄웠다.
 
@@ -1332,11 +1332,11 @@ C14 의 열기 순서(원시 사본 → CloudKit 없이 마이그레이션 → �
 
 ### C14 관문 시험 G1 ~ G6 — 같은 계정 재연결 · 서버 직접 확인 (2026-09-22)
 
-**환경:** `Carve-ACC-dut`(4419ABC7…) · `Carve-ACC-B`(FD20B387…), 같은 샌드박스 계정(사용자가 재로그인) · dev 컨테이너. 연결은 게이트 없는 Debug(`712bdaac`, P0-3 빌드), 게이트 확인은 이 브랜치의 게이트 빌드. 손질은 `LegacyRowSeparationProbeTesting`(하네스) — 넣기는 이력 추적을 켠 `NSPersistentContainer`, 지우기는 **제품과 같은 SwiftData**(`ModelConfiguration(cloudKitDatabase: .none)` + 마이그레이션 플랜 + `ModelContext.delete`). 서버는 `probe.sh`(레코드 이름 · 유형 · 행 ID · 삭제 흔적)로 읽고 `probe-compare.py` 로 저장소와 맞췄다. 실행은 `work/sep/scripts/sep-gate-rounds.sh`, 기록은 `work/sep/logs/*`.
+**환경:** `Carve-ACC-dut` · `Carve-ACC-B`, 같은 샌드박스 계정(사용자가 재로그인) · dev 컨테이너. 연결은 게이트 없는 Debug(`712bdaac`, P0-3 빌드), 게이트 확인은 이 브랜치의 게이트 빌드. 손질은 `LegacyRowSeparationProbeTesting`(하네스) — 넣기는 이력 추적을 켠 `NSPersistentContainer`, 지우기는 **제품과 같은 SwiftData**(`ModelConfiguration(cloudKitDatabase: .none)` + 마이그레이션 플랜 + `ModelContext.delete`). 서버는 `probe.sh`(레코드 이름 · 유형 · 행 ID · 삭제 흔적)로 읽고 `probe-compare.py` 로 저장소와 맞췄다. 실행은 `work/sep/scripts/sep-gate-rounds.sh`, 기록은 `work/sep/logs/*`.
 
 | 단계 | 손질 | 연결 뒤(서버는 레코드 이름으로) | 관문 |
 |---|---|---|---|
-| r0 | 없음 | 서버 `CD_BibleDrawing` 12 · 삭제 흔적 5. **앞 세션(다른 맥)의 SEP-2 · SEP-1 행이 그대로 있었다** — F37 의 `EDBC4D34…` 는 삭제 흔적, F38 의 `SEP2-84BCE6F6` 은 레코드도 흔적도 없음, `SEP2-ADCD3285` · `SEP2-2CAEA3DF` 는 레코드, 사용자가 그린 1:5 · 1:6 은 레코드 | ④(F50) |
+| r0 | 없음 | 서버 `CD_BibleDrawing` 12 · 삭제 흔적 5. **앞 세션(다른 맥)의 SEP-2 · SEP-1 행이 그대로 있었다** — F37 의 는 삭제 흔적, F38 의 `SEP2-84BCE6F6` 은 레코드도 흔적도 없음, `SEP2-ADCD3285` · `SEP2-2CAEA3DF` 는 레코드, 사용자가 그린 1:5 · 1:6 은 레코드 | ④(F50) |
 | r1 | `FavoriteVerse` · `BiblePageDrawing` · `BibleDrawing` 한 행씩(대응 없음 · 이력 있음) | 46초 안에 셋 다 올라감 — 대응 `ZENTITYID` 2(PD) · 4(FV) · 1(BD), 서버 레코드 유형과 행 ID 가 그 행과 같음 | ②(F51) |
 | r2 | `BibleDrawing` 두 행 + **이력 표 비움** | 첫 export 가 **134301(history token expired)** → 미러링이 메타데이터를 비우고 다시 동기화 → 두 행 모두 올라감. 기존 15행은 **같은 레코드 이름** · 서버 중복 없음 · 로컬 기본 키는 새로 매겨짐 | ①(F52) |
 | r3 | SwiftData 로 지움 — 대응 있는 BD · FV · PD · r2 의 한 행, 넣자마자 지운 대응 없는 행 | 준비본에 삭제 이력(변경 종류 2)과 고아 대응 4 → 연결 뒤 네 행의 레코드가 **서버 삭제 흔적**(세 엔티티 모두), 넣자마자 지운 행은 **레코드도 흔적도 없음** | ③(F53) |
@@ -1395,27 +1395,27 @@ C14 의 열기 순서(원시 사본 → CloudKit 없이 마이그레이션 → �
 | F34 | **행별 대응은 `ANSCKRECORDMETADATA` 에 있고, 공개 API 로는 읽히지 않는다** — 서버에서 내려온 `BibleDrawing` 5행은 그 표에 `ZENTITYID` · `ZENTITYPK` · `ZCKRECORDNAME`(있음) · `ZNEEDSUPLOAD`(0) 로 남아 있었다. 같은 저장소를 `cloudKitContainerOptions = nil` 로 연 뒤 `NSPersistentCloudKitContainer.recordID(for:)` 를 부르면 **5행 모두 nil** 이었다 | SEP-0 수행(§5-1) | **공개 API 를 판정에 쓰면 모든 행이 「대응 없음」이 되어 저장소 전체를 분리한다.** C14 의 판독기는 사설 테이블로 가고, 검증한 OS · 모델 범위 밖은 「알 수 없음」 으로 둔다. `ZNEEDSUPLOAD` 로 **대응은 있지만 미전송인 행**을 구분할 수 있다 |
 | F35 | **읽기 전용으로 열어도 `-shm` 은 바뀐다** — `NSReadOnlyPersistentStoreOption` 으로 연 뒤 본 파일과 `-wal` 의 SHA-256 은 그대로였고 `-shm` 만 달라졌다. 앱 스키마로 **마이그레이션 없이**(`shouldMigrateStoreAutomatically = false`) 열려 행이 읽혔다 | SEP-0 수행(§5-1) | 판정은 **사본에서** 한다 — 내용은 바뀌지 않지만 원본 파일을 건드리지 않는 쪽을 규칙으로 둔다 |
 | F36 | **대응 없는 행은 연결된 계정으로 올라간다** — 이력 추적을 켠 채 미러링 없이 넣은 `BibleDrawing` 2행(대응 없음 · 이력 +1건)을 dut 저장소에 되돌려 놓고 연결하자 setup(21:45:37 시작) → import(21:48:58) → **export(21:49:18)** 뒤 대응이 **5 → 7** 이 되고 두 행에 CKRecord 이름이 붙었다(SEP-2 1라운드). 밖에서 바꿔 넣은 저장소의 setup 은 3분 넘게 걸려 45초 관측으로는 판정할 수 없었다. **서버 확인(B 기기):** B 가 두 행 중 남긴 쪽(`SEP2-ADCD3285`)을 받았다 | SEP-2 수행(§5-1) · `ANSCKEVENT` · `ANSCKRECORDMETADATA` · B 기기 | **결정 2 의 전제 — F30 의 1.3.0 판 — 가 관측됐다.** 미러링은 자기가 모르던 행을 지금 계정으로 올린다. 한계: ① 이력 트랜잭션이 남아 있는 행으로만 봤다 ② 이미 계정 식별 키가 있던 저장소였다 ③ 2.0.0 스키마(V6) 저장소다 — 1.3.0 V3 무계정 저장소(식별 없음 · 오래된 이력)는 SEP-1 에서 따로 본다 |
-| F37 | **연결 없이 지운 「대응 있는 행」의 삭제는 재연결 때 서버로 전파된다** — 이력 추적을 켠 채 `.none` 으로 열어 pk 6(1라운드에서 올라간 `SEP2-D7684E25`, 대응 있음)을 지우자 행은 사라지고 대응만 남았다(고아). 되돌려 놓고 연결하니 setup(21:54:25 ~ 21:55:40) → import → **export(21:56:07 ~ 08)** 뒤 **그 고아 대응이 사라졌고**, 그 레코드(`EDBC4D34…`)는 4분 안에 다시 내려오지 않았다. 다른 행 · 대응은 그대로였다. **서버 확인(B 기기, 22:07):** 같은 계정으로 붙인 B 가 받은 7행에 이 레코드가 없었다 | SEP-2 2라운드(§5-1) · `ANSCKEVENT` · `ANSCKRECORDMETADATA` · B 기기 | **저장소 단위로 분리(전부 삭제)하면 서버에 있던 행까지 지운다 — D1 (나) 는 데이터 파괴 경로다.** D1 (가)(대응 없는 행만 분리)의 근거. 삭제 전파의 통로는 **persistent history** 다 — `ATRANSACTION` 에 남은 삭제를 export 가 읽었다. **한계(2026-09-22 정정):** 지운 행은 하네스가 넣은 22바이트 합성 행이고 삽입 이력이 방금 생긴 것이다 · 삭제 경로는 `NSPersistentContainer` + 이력 추적 옵션(제품의 SwiftData 경로가 아니다) · 서버는 B 기기 수신 목록으로 봤다(레코드 ID 직접 조회 아님) · `BibleDrawing` 만 |
+| F37 | **연결 없이 지운 「대응 있는 행」의 삭제는 재연결 때 서버로 전파된다** — 이력 추적을 켠 채 `.none` 으로 열어 pk 6(1라운드에서 올라간 `SEP2-D7684E25`, 대응 있음)을 지우자 행은 사라지고 대응만 남았다(고아). 되돌려 놓고 연결하니 setup(21:54:25 ~ 21:55:40) → import → **export(21:56:07 ~ 08)** 뒤 **그 고아 대응이 사라졌고**, 그 레코드는 4분 안에 다시 내려오지 않았다. 다른 행 · 대응은 그대로였다. **서버 확인(B 기기, 22:07):** 같은 계정으로 붙인 B 가 받은 7행에 이 레코드가 없었다 | SEP-2 2라운드(§5-1) · `ANSCKEVENT` · `ANSCKRECORDMETADATA` · B 기기 | **저장소 단위로 분리(전부 삭제)하면 서버에 있던 행까지 지운다 — D1 (나) 는 데이터 파괴 경로다.** D1 (가)(대응 없는 행만 분리)의 근거. 삭제 전파의 통로는 **persistent history** 다 — `ATRANSACTION` 에 남은 삭제를 export 가 읽었다. **한계(2026-09-22 정정):** 지운 행은 하네스가 넣은 22바이트 합성 행이고 삽입 이력이 방금 생긴 것이다 · 삭제 경로는 `NSPersistentContainer` + 이력 추적 옵션(제품의 SwiftData 경로가 아니다) · 서버는 B 기기 수신 목록으로 봤다(레코드 ID 직접 조회 아님) · `BibleDrawing` 만 |
 | F38 | **대응 없는 행을 연결 전에 지우면 서버에 흔적이 없다** — 같은 손질에서 넣고 곧 지운 pk 8(`SEP2-84BCE6F6`, 대응 없음)은 연결 뒤 행도 대응도 이벤트 오류도 없었다. 넣기만 한 pk 9 는 올라갔다(F36 재현). **서버 확인(B 기기):** B 가 받은 7행에 pk 8 은 없고 pk 9(`SEP2-2CAEA3DF`)는 있었다 | SEP-2 2라운드(§5-1) · B 기기 | **C14 게이트가 하는 일 — 대응 없는 행을 연결 전에 빼는 것 — 은 서버에 아무 영향을 주지 않는다.** 이력에 삭제가 남아 있어도 미러링이 모르는 레코드라 export 할 것이 없다. **한계(2026-09-22 정정):** F37 과 같은 합성 행 · 방금 생긴 삽입 이력 · `NSPersistentContainer` 삭제 경로 · B 기기 수신 목록 · `BibleDrawing` 만. **삽입 이력이 없거나 잘린 무대응 행과 제품의 SwiftData 삭제 경로는 미관측** — 관문 미확인 항목 ① · ③ |
 | F39 | **V3 → V6 마이그레이션은 기본 키와 미러링 대응을 그대로 둔다** — 1.3.0(V3) 저장소 세 벌(무계정 3행 · 계정 있는 혼합 10행 = 대응 7 + 없음 3 · **사용자가 OLD 화면에서 그린 2행을 포함한 12행**)을 앱의 마이그레이션 플랜으로 **CloudKit 없이** 열자 `VerseDrawingVersion` 표가 생기고, `BibleDrawing` 의 (Z_PK, id) 가 전부 같은 자리에 남았으며(옮겨짐 · 사라짐 0), `ANSCKRECORDMETADATA` 의 (엔티티, Z_PK) 집합도 같았다. 마이그레이션 자체가 이력 1건을 남긴다 | SEP-1 수행(§5-1) | C14 게이트의 열기 순서(원시 사본 → `.none` 으로 열어 마이그레이션 → 판정)가 성립한다. 세 값 판정은 표본마다 기대대로였다 — 무계정: 식별 키 없음 · 검증된 대응 없음 3, 혼합: 대응 있음 7 · 검증된 대응 없음 3. **한계(2026-09-22 정정):** `BibleDrawing` 만 — 어느 표본에도 `BiblePageDrawing` · `FavoriteVerse` 행이 없어 **엔티티 3종의 대응 · 기본 키 유지는 미관측**(관문 미확인 항목 ②). 무계정 표본의 행은 하네스가 넣은 것이다 |
 | F40 | **1.3.0 이 계정 없이 쓴 저장소를 2.0.0 이 열면 그 행이 처음 로그인된 계정으로 올라간다** — 무계정 V3 표본(행 3 · 식별 키 없음 · 대응 0, OLD 가 만든 저장소에는 setup 실패 이벤트 134400 이 남아 있었다)을 로그인된 dut 에 넣고 CURRENT 앱을 띄우자 원시 사본이 떴고(C3 ①), V3 → V6 로 옮겨졌으며(기본 키 1~3 그대로), setup(22:18:45) → import(22:19:00, 서버 7행) → **export(22:19:01)** 뒤 세 행 모두 대응을 얻었다 | SEP-1 수행(§5-1) · `ANSCKEVENT` · `ANSCKRECORDMETADATA` | **결정 2 가 막으려는 바로 그 일이 2.0.0 의 실제 시작 경로에서 일어난다** — 추정(F30 의 1.3.0 판)이 아니라 관측이다. C14 게이트가 없으면 업데이트 첫 실행에서 자동 귀속된다. 한계: 행의 필기 내용은 하네스가 넣은 것이다(저장소 · 스키마 · 이력 · 이벤트는 OLD 의 것). **경로 차이(2026-09-22 정정):** 무계정 기기에서 만든 V3 저장소를 **로그인된 기기의 컨테이너에 넣고** 보존 영역을 지워 첫 실행처럼 꾸민 것이다 — 그 기기에서 1.3.0 을 쓰다 2.0.0 으로 업데이트하고 로그인하는 실제 순서와 다르다 |
 | F41 | **계정을 바꾼 뒤 연결하면 연결 없이 지운 행의 삭제가 이전 계정으로 가지 않는다** — 사용자가 OLD 화면에서 그린 1:5 를 `.none` 으로 지워 고아 대응을 남긴 저장소(행 11 · 대응 12 · 이력 6)에서 계정을 B → A 로 바꾸고 연결하자, setup 실패(134405) → setup → import → export 가 **3초 만에** 끝나며 **로컬 행 · 대응 · 고아 대응이 통째로 지워지고** A 의 행 3개만 남았다(식별 키도 A 로). 그 뒤 B 기기를 올리니 **1:5 가 927바이트로 살아 있었다**(B 의 행 12개) | SEP-2 계정 변경 갈래(§5-1) · `ANSCKEVENT` · B 기기 | **삭제 전파는 같은 계정으로 재연결할 때만이다**(F37 과 대비). C14 에 두 가지를 못 박는다 — ① 분리 도중 계정이 바뀌어도 이전 계정 서버로 삭제가 새지 않는다 ② **계정이 바뀌면 로컬 저장소가 3초 만에 비워지므로** 분리본 · 초안은 반드시 비동기화 보존 영역에 있어야 하고, 조건부 연결 동의는 계정에 묶여 무효가 되어야 한다. **한계(2026-09-22 정정):** B → A **한 방향** · **앱을 끈 채** 전환한 한 가지 타이밍 · 지운 것은 **대응 있는 행**뿐 — 대응 없는 행의 계정 변경 삭제 · 앱을 켠 채 전환 · 오프라인 전환 · `.none` 열기에서 이력 추적 끄기 · F25 의 순서는 미관측 |
 | F42 | **`FavoriteVerse` 의 대응도 그 저장소의 `Z_ENT` 로 적힌다 — 스파이크 저장소 사본 1행에서만 봤다** — 이 맥의 `Carve-CK-A-old`(스파이크 빌드 `2c124cb3` 가 쓰던 저장소, 엔티티 등록 `BibleDrawing` 1 · `BiblePageDrawing` 2 · `FavoriteVerse` 3 · `VerseDrawingVersion` 4) 사본의 `ANSCKRECORDMETADATA` 에 `ZENTITYID` 3 이 1건(`FavoriteVerse` 1행 · 레코드 이름 있음 · 업로드 대기 0), 4 가 6건(`VerseDrawingVersion` 6행) 있었다. `BiblePageDrawing` 은 어느 저장소에도 행 · 대응이 없다 | 2026-09-22 저장소 사본 읽기(읽기 전용 SQLite, 값은 키 이름만) | 판독기의 「`ZENTITYID` = 그 저장소의 `Z_ENT`」 가정을 `BibleDrawing` 밖에서도 뒷받침하는 **첫 관측**이지만, 현재 V6 배치(`FavoriteVerse` 가 4)에서 미러링이 만든 대응은 아직 못 봤고 표본이 1행이다 — **검증 집합(`validatedEntities`)에 넣지 않았다.** V6 저장소에서 `FavoriteVerse` · `BiblePageDrawing` 행을 올려 대응이 생기는 것을 본 뒤 넣는다(관문 미확인 항목 ②) |
-| F43 | **이 맥의 실제 미러링 저장소 두 벌은 판독기가 「모두 대응 있음」 으로 읽고, 검증 밖 모델은 읽기 전에 보류한다** — `Carve-ACC-dut`(4419ABC7…) · `Carve-ACC-B`(FD20B387…) 의 `Carve.dev.sqlite` 사본(각각 `BibleDrawing` 5행 · 대응 5 · 계정 식별 키 있음 · V6)은 대응 있음 5 · 검증된 대응 없음 0 · 고아 0. 스파이크 저장소(마이그레이션 플랜에 없는 모델) 와 `Carve-Migration-Test` 의 V5 저장소는 각각 `unvalidatedModel("unknown")` · `unvalidatedModel("known(5.0.0)")` 로 「알 수 없음」 | 2026-09-22 `LegacyRowLinkageProbeTesting`(`sep3/` 손) 보고 | 판독기의 정상 경로가 실제 저장소에서 성립하고, **정상 표본이 아닌 것은 실제로 보류된다.** 계정 변경 · 재설치 뒤의 저장소는 아직 안 봤다 |
+| F43 | **이 맥의 실제 미러링 저장소 두 벌은 판독기가 「모두 대응 있음」 으로 읽고, 검증 밖 모델은 읽기 전에 보류한다** — `Carve-ACC-dut` · `Carve-ACC-B` 의 `Carve.dev.sqlite` 사본(각각 `BibleDrawing` 5행 · 대응 5 · 계정 식별 키 있음 · V6)은 대응 있음 5 · 검증된 대응 없음 0 · 고아 0. 스파이크 저장소(마이그레이션 플랜에 없는 모델) 와 `Carve-Migration-Test` 의 V5 저장소는 각각 `unvalidatedModel("unknown")` · `unvalidatedModel("known(5.0.0)")` 로 「알 수 없음」 | 2026-09-22 `LegacyRowLinkageProbeTesting`(`sep3/` 손) 보고 | 판독기의 정상 경로가 실제 저장소에서 성립하고, **정상 표본이 아닌 것은 실제로 보류된다.** 계정 변경 · 재설치 뒤의 저장소는 아직 안 봤다 |
 | F44 | **1.3.0 은 계정이 없어도 저장소에 미러링 표를 만들고, 2.0.0 게이트가 CloudKit 없이 처음 만든 저장소에는 미러링 표가 없다** — 무계정 기기의 OLD 가 만든 V3 저장소에는 `ANSCK…` 표 18개 · 메타데이터 키 4 · setup 실패 이벤트(134400)가 있었다. 저장소가 없던 기기에서 게이트가 먼저 만든 저장소는 표가 없었다(「미러링 표 없음」) | 2026-09-22 무계정 · iOS 18.6 기기 | 「미러링 표 없음」 은 **붙은 적 없는 저장소**의 신호다. legacy 행이 없으면 연결, 있으면 관측한 적 없는 모양이라 보류한다(C14 ②) |
 | F45 | **게이트는 1.3.0 무계정 저장소를 실제 업데이트 경로에서 보류하고 분리본 · 작업 기록을 남긴다** — 원시 사본 → V3 → V6 → 「검증된 대응 없음 3」 → 분리본 · 기록 → 보류, CloudKit 로그 0줄. 두 번째 실행은 같은 기록을 썼고, `BiblePageDrawing` 행을 더하자 기록 없이 보류했다. 보류 중 전체 삭제 · 즐겨찾기 · 위젯 추가가 막혔다 | §5-1 「C14 게이트 기기 시험」 ① | **계정이 없는 기기**의 관측이다. 로그인된 기기에서 같은 표본이 서버로 올라가지 않는지(F40 의 반대)는 자격 증명 회복 뒤 `gate-hold` 로 본다 |
 | F46 | **검증 밖 OS(iOS 18.6)에서 새 설치는 연결하고, legacy 행이 있는 저장소는 보류한다** — 대응 있는 5행 저장소가 행 · 대응 · 계정 식별 그대로 남았다. 계정이 없는 기기라 연결했다면 F30 처럼 지워졌을 저장소다 | §5-1 ② | iOS 17 · 18 의 기존 사용자는 판독기를 그 OS 에서 검증하기 전까지 **동기화되지 않는다**. 출시 전에 iOS 18 에서 SEP-1 을 다시 해 검증 집합을 넓혀야 한다(계정이 붙은 iOS 18 기기 필요) |
 | F47 | **매 실행 전체 검사의 비용은 행 수에 거의 선형이다(고친 뒤)** — 31,102행 모두 대응 1.0초 · 5,000행 모두 없음 1.2초 · 재실행 0.8초, 메모리 증가 16MB 이하(시뮬레이터) | §5-1 ③ | 시작 경로에서 동기로 돈다. 실기기는 더 느릴 수 있다 — 출시 전에 iPad 에서 같은 표를 잰다. 가장 큰 몫은 무결성 검사로 보인다(빠른 통과 · `quick_check` 은 「미루는 것」) |
 | F48 | **이 맥을 재부팅하자 시뮬레이터의 샌드박스 계정 자격 증명이 무효가 됐다** — 부팅 2초 뒤부터 `hasValidCredentials=false`, 앱의 미러링 setup 은 134400("계정은 있지만 유효한 자격 증명이 없다")으로 끝났다. 저장소는 바뀌지 않았다(실패한 setup 이벤트 하나만 늘었다) | 2026-09-22 dut 로그(식별 값 제외) | 계정 시험 전에 자격 증명부터 본다 — `sep-gate-rounds.sh preflight`. 설정 앱에서 암호를 다시 넣는 것은 사용자 조작이다 |
 | F49 | **CloudKit 없이 옮겨도 미러링 대응은 새 행을 잘못 가리키지 않는다(원본 V1 · V2 · V5)** — V5 → V6 는 `FavoriteVerse` 번호를 3 → 4 로 바꾸고(3 은 `DrawingEraseEpoch` 가 받는다) 대응의 `ZENTITYID` 도 4 로 옮겼다. V2 → V6 는 (엔티티, 기본 키) 대응과 행이 그대로였다. V1 → V6(행을 새로 만드는 사용자 정의 마이그레이션)은 옛 `DrawingVO` 행과 그 대응을 함께 지웠고, 새 행 3개는 「검증된 대응 없음」 이었다 | 2026-09-22 `LegacyEntityNumberingTesting`(대응은 SQL 로 심은 것 — 실제 미러링이 만든 메타데이터는 아니다) | 게이트는 옮긴 뒤의 사본을 판정한다. 원본 모델을 따로 판정에 넣지 않아도 된다 — 낡은 대응이 대응 있음으로 잘못 읽히는 경로가 관측되지 않았다. V1 원본의 행은 분리 대상이 되어 보류된다(연결하면 새 레코드로 올라갈 행이라 판정이 맞다). 실제 미러링 메타데이터로 V5 → V6 를 한 번 더 보는 것은 G3 에 묶는다 |
-| F50 | **앞 세션(다른 맥)의 SEP-2 · SEP-1 은 이 맥의 dut · B 와 같은 샌드박스 계정 · dev 컨테이너를 썼고, 서버에서 그 결과를 레코드 이름으로 직접 확인했다** — F37 의 `EDBC4D34…` 는 삭제 흔적, F38 의 `SEP2-84BCE6F6` 은 레코드도 흔적도 없음, F36 · F38 의 `SEP2-ADCD3285` · `SEP2-2CAEA3DF` 는 레코드, F41 의 사용자 필기 1:5 · 1:6 은 레코드 | 2026-09-22 r0 서버 조회 | F36 ~ F38 · F41 의 서버 쪽 근거가 B 기기 수신 목록에서 **레코드 ID 기준**으로 바뀐다(관문 ④) |
+| F50 | **앞 세션(다른 맥)의 SEP-2 · SEP-1 은 이 맥의 dut · B 와 같은 샌드박스 계정 · dev 컨테이너를 썼고, 서버에서 그 결과를 레코드 이름으로 직접 확인했다** — F37 의 는 삭제 흔적, F38 의 `SEP2-84BCE6F6` 은 레코드도 흔적도 없음, F36 · F38 의 `SEP2-ADCD3285` · `SEP2-2CAEA3DF` 는 레코드, F41 의 사용자 필기 1:5 · 1:6 은 레코드 | 2026-09-22 r0 서버 조회 | F36 ~ F38 · F41 의 서버 쪽 근거가 B 기기 수신 목록에서 **레코드 ID 기준**으로 바뀐다(관문 ④) |
 | F51 | **V6 저장소에서 미러링이 만든 대응은 `BiblePageDrawing` · `FavoriteVerse` 도 그 엔티티의 `Z_ENT`(2 · 4)로 적힌다** — 대응 없는 한 행씩을 넣고 연결하자 46초 안에 올라갔고, 대응이 가리키는 서버 레코드의 유형(`CD_BiblePageDrawing` · `CD_FavoriteVerse`)과 행 ID 가 그 행과 같았다 | 2026-09-22 r1 · 서버 조회 | 관문 ②. 판독기 v2 가 검증 집합을 legacy 3종으로 넓혔다 — 넓히지 않으면 장 전체 필기 · 즐겨찾기가 있는 저장소는 모두 보류된다 |
 | F52 | **이력 표가 비어 있으면 연결 때 export 가 134301(persistent history 토큰 만료)로 실패하고, 미러링이 메타데이터를 비운 뒤 다시 동기화한다 — 대응 없는 행은 삽입 이력이 없어도 올라간다** — 기존 행은 같은 레코드 이름을 유지했고 서버 중복은 없었으며, 로컬 기본 키는 새로 매겨졌다 | 2026-09-22 r2 · 미러링 로그 · 서버 조회 | 관문 ①. 이력은 판정의 축이 될 수 없다 — 대응으로 판정하는 D1 (가)가 맞다. 초기화 뒤 기본 키가 바뀌므로 분리 기록의 (엔티티, 기본 키)는 연결 전 한 실행 안에서만 쓴다 |
 | F53 | **제품과 같은 SwiftData 경로(CloudKit 없이)로 지운 삭제는 이력에 남고, 대응 있는 행의 삭제는 같은 계정 재연결 때 서버 삭제 흔적이 된다 — 세 엔티티 모두** — 넣자마자 지운 대응 없는 행은 레코드도 흔적도 없었다 | 2026-09-22 r3 · 서버 조회 | 관문 ③. F37 · F38 이 하네스(`NSPersistentContainer`)만의 성질이 아니다 |
 | F54 | **대응 없는 행을 연결 전에 지우면 서버에 흔적이 없다 — 이력이 잘린 행도, 1.3.0 무계정 저장소의 첫 연결에서도** — 1.3.0 무계정 V3 저장소의 대응 없는 3행을 모두 지우고 로그인된 기기에서 연결하자 서버는 레코드 14 · 삭제 흔적 9 그대로였고 저장소에는 그 계정의 행만 남았다 | 2026-09-22 g1b · g6 · 서버 조회 | **파괴적 분리가 서버에 영향을 주지 않는다는 직접 증거**(게이트의 삭제를 하네스로 흉내 냈다). 게이트의 삭제 단계는 아직 연결하지 않았다 |
 | F55 | **게이트 빌드는 로그인된 기기에서 1.3.0 무계정 저장소를 보류하고 올리지 않으며, 모두 대응 있는 저장소는 CloudKit 없이 연 뒤 연결해 setup · import · export 가 정상이다** | 2026-09-22 gate-hold · gate-connect | F40 이 게이트 빌드에서는 일어나지 않는다. `.none` → `.private` 두 번 열기가 실제 미러링에서 문제없다 |
-| F58 | **macOS 27.2 / Xcode 27.0의 Device Hub에서 1.3.0 필기는 화면에 보이지만 저장 행은 아직 없다** — 사용자는 `Carve-2.0.0-test-legacy`에서 Mac 포인터/트랙패드로 드래그했고, Device Hub 접근성 트리와 화면에는 현재 창세기 1장 1·2절 필기가 보인다. 선택된 시뮬레이터는 iPad Pro 11-inch M5 · iPadOS 26.5, 설치 앱은 1.3.0(1)이다. 다음 장으로 갔다가 돌아온 뒤에도 화면 필기는 남았지만, 입력 전후에 확보한 DB 사본과 live `Carve.dev.sqlite` 모두 무결성 `ok`, `ZBIBLEDRAWING` · `ZBIBLEPAGEDRAWING` 각각 0행이고 WAL은 입력 시각 이후 갱신되지 않았다. `allowFingerDrawing=false`와 OLD `CombinedCanvasView`의 기본 `.pencilOnly`는 확인됐다. 저장 호출은 `StableCanvasView`의 Pencil 접촉 종료 콜백에서만 발생한다(`49f2dc27:CombinedCanvasView.swift`); Device Hub 포인터 입력이 그 콜백을 발생시켰는지는 관측하지 못했으므로 원인을 단정하지 않는다. 앞선 F58 판정은 정정한다 | 2026-09-24 macOS `27.2 (26B5086k)` · Xcode `27.0 (27A266a)` · Device Hub 화면 · 시뮬레이터 `0A956010-5DAA-44BC-BA22-5BAE53FF6D82` · 컨테이너 `7BF1000E-9090-4317-8945-A5FC563D3422` · `devicehub-before-navigation.sqlite` · OLD 코드 `49f2dc27` | 화면에 표시된 필기와 디스크 저장 상태가 불일치한다. 이 원인을 먼저 확인할 때까지 해당 설치에 2.0.0을 덮어 설치하지 않는다. 사용자의 입력을 다시 요구하지 않는다 |
-| F59 | **별도 iPadOS 18.6 표본의 1.3.0 → 2.0.0 오프라인 업데이트에서 1절 필기가 유지됐다** — 전용 `iPad (A16)` 시뮬레이터(`D6141A38-61ED-4030-852C-B3C470E4307D`)에 1.3.0(1)을 설치했다. `손가락 필사 허용`을 끈 상태의 첫 포인터 드래그는 저장되지 않았고, 앱 설정에서 켠 뒤 같은 필사 열에 드래그하자 `ZBIBLEDRAWING` 1행이 저장됐다(무결성 `ok`, 장 1·절 1, `ZDRAWINGVERSION=1`, `ZISPRESENT=0`, payload 298B; `ZBIBLEPAGEDRAWING` 0행). 이 DB의 사전 사본을 보존한 뒤 같은 bundle ID의 2.0.0(1)을 Device Hub로 설치했다. 로그인은 하지 않았다. 2.0.0 첫 실행 안내를 넘긴 뒤 창세기 1장의 필기가 화면·접근성 트리에 보였고, 창세기 2장으로 갔다가 1장으로 돌아와도 남았다. 업데이트 뒤 저장소는 무결성 `ok`, 필사 1행·장 전체 필기 0행이며 2.0 스키마의 `ZROWUUID` · `ZLAYOUTMETADATADATA` 열이 생겼다. 1.3.0 전후 `ZLINEDATA` payload 길이와 SHA-256(`07876e8b1910039124914f5c44b9619a90b8ad488a08500bdfa6abc07762c3d6`)은 같았다 | 2026-09-24 macOS `27.2 (26B5086k)` · Device Hub/Xcode `27.0 (27A266a)` · 설치 산출물은 Xcode `26.3 (17C529)` 빌드 · iPadOS `18.6` · 컨테이너 전 `0BF476A9-285F-46E3-ABD0-13AC647AA338`, 후 `EDE319D5-8D70-471E-9B27-280BAC97077B` · `/private/tmp/carve-2.0-live-proof-20260924/legacy-ios18.6-pointer-sample-before-2.0.sqlite` · `legacy-ios18.6-sample-after-2.0.sqlite` | 이 표본에서는 손가락 허용 상태의 Device Hub 포인터 필기가 디스크에 저장되고, 2.0.0의 오프라인 로컬 업데이트 뒤 payload와 화면 표시가 유지됐다. F58의 기존 iPadOS 26.5 설치에서 보인 무행 필기 원인은 별개로 미확인이다. 실제 iCloud 로그인·CloudKit 전송·계정 ownership proof, Xcode 27 빌드 검증으로 확대 해석하지 않는다 |
+| F58 | **macOS 27.2 / Xcode 27.0의 Device Hub에서 1.3.0 필기는 화면에 보이지만 저장 행은 아직 없다** — 사용자는 `Carve-2.0.0-test-legacy`에서 Mac 포인터/트랙패드로 드래그했고, Device Hub 접근성 트리와 화면에는 현재 창세기 1장 1·2절 필기가 보인다. 선택된 시뮬레이터는 iPad Pro 11-inch M5 · iPadOS 26.5, 설치 앱은 1.3.0(1)이다. 다음 장으로 갔다가 돌아온 뒤에도 화면 필기는 남았지만, 입력 전후에 확보한 DB 사본과 live `Carve.dev.sqlite` 모두 무결성 `ok`, `ZBIBLEDRAWING` · `ZBIBLEPAGEDRAWING` 각각 0행이고 WAL은 입력 시각 이후 갱신되지 않았다. `allowFingerDrawing=false`와 OLD `CombinedCanvasView`의 기본 `.pencilOnly`는 확인됐다. 저장 호출은 `StableCanvasView`의 Pencil 접촉 종료 콜백에서만 발생한다(`49f2dc27:CombinedCanvasView.swift`); Device Hub 포인터 입력이 그 콜백을 발생시켰는지는 관측하지 못했으므로 원인을 단정하지 않는다. 앞선 F58 판정은 정정한다 | 2026-09-24 macOS `27.2 (26B5086k)` · Xcode `27.0 (27A266a)` · Device Hub 화면 · 시뮬레이터 컨테이너 `devicehub-before-navigation.sqlite` · OLD 코드 `49f2dc27` | 화면에 표시된 필기와 디스크 저장 상태가 불일치한다. 이 원인을 먼저 확인할 때까지 해당 설치에 2.0.0을 덮어 설치하지 않는다. 사용자의 입력을 다시 요구하지 않는다 |
+| F59 | **별도 iPadOS 18.6 표본의 1.3.0 → 2.0.0 오프라인 업데이트에서 1절 필기가 유지됐다** — 전용 `iPad (A16)` 시뮬레이터에 1.3.0(1)을 설치했다. `손가락 필사 허용`을 끈 상태의 첫 포인터 드래그는 저장되지 않았고, 앱 설정에서 켠 뒤 같은 필사 열에 드래그하자 `ZBIBLEDRAWING` 1행이 저장됐다(무결성 `ok`, 장 1·절 1, `ZDRAWINGVERSION=1`, `ZISPRESENT=0`, payload 298B; `ZBIBLEPAGEDRAWING` 0행). 이 DB의 사전 사본을 보존한 뒤 같은 bundle ID의 2.0.0(1)을 Device Hub로 설치했다. 로그인은 하지 않았다. 2.0.0 첫 실행 안내를 넘긴 뒤 창세기 1장의 필기가 화면·접근성 트리에 보였고, 창세기 2장으로 갔다가 1장으로 돌아와도 남았다. 업데이트 뒤 저장소는 무결성 `ok`, 필사 1행·장 전체 필기 0행이며 2.0 스키마의 `ZROWUUID` · `ZLAYOUTMETADATADATA` 열이 생겼다. 1.3.0 전후 `ZLINEDATA` payload 길이와 SHA-256(`07876e8b1910039124914f5c44b9619a90b8ad488a08500bdfa6abc07762c3d6`)은 같았다 | 2026-09-24 macOS `27.2 (26B5086k)` · Device Hub/Xcode `27.0 (27A266a)` · 설치 산출물은 Xcode `26.3 (17C529)` 빌드 · iPadOS `18.6` · 컨테이너 전 , 후 (로컬 증거) · `legacy-ios18.6-sample-after-2.0.sqlite` | 이 표본에서는 손가락 허용 상태의 Device Hub 포인터 필기가 디스크에 저장되고, 2.0.0의 오프라인 로컬 업데이트 뒤 payload와 화면 표시가 유지됐다. F58의 기존 iPadOS 26.5 설치에서 보인 무행 필기 원인은 별개로 미확인이다. 실제 iCloud 로그인·CloudKit 전송·계정 ownership proof, Xcode 27 빌드 검증으로 확대 해석하지 않는다 |
 
 | F60 | **초기 F60 명령에서 앱 빌드가 XCFramework 서명 확인 단계에서 멈췄다고 기록됐다** — pinned Tuist 4.208.0 상태에서 `xcodebuild build -project App/CarveApp/CarveApp.xcodeproj -scheme CarveApp -destination 'generic/platform=iOS Simulator'`가 `ProcessXCFramework` 단계의 기존 Google/Firebase 계열 XCFramework 서명 검증 오류로 실패했다고 관측했다. 이 명령에서는 Swift 소스 컴파일 전이었다. 당시 CoreSimulatorService 조회도 실패했으나 기본 Xcode 27에서 `simctl` 목록 조회는 성공한다. Xcode 26.3 지정 sandbox runtime 조회는 실패했고, 권한을 높인 read-only 재조회는 성공했다 | 2026-09-24 `xcode-select=/Applications/Xcode.app/Contents/Developer` · Xcode `27.0 (27A266a)` · Tuist `4.208.0` · generic iOS Simulator destination | 이 초기 관측은 재현되지 않았다. Tuist workspace 갱신 후 다섯 `ProcessXCFramework` 작업과 앱·Domain 컴파일은 통과했다. 후속 iPadOS 26.2 전체 회귀는 통과했고 27.0 전체 회귀는 5건 실패했다(아래 § Xcode 27 기록). 서명·의존성·build setting을 바꾸어 우회하지 않았다. |
 
@@ -1427,7 +1427,7 @@ F1·F2 는 코드 검토만으로는 나오지 않았고 실제로 돌려 봐야
 
 **CloudKit 콘솔 — 샌드박스 계정 private DB 접근 거부 (2026-09-17).** 사용자가 CK-A0 의 서버 레코드를 콘솔에서 보려 했으나 샌드박스 계정이라 권한이 없다고 거부됐다. 조회 도구(관측 도구 표)로 대체했다.
 
-**앞 세션 자료는 다른 맥의 기록이다 (2026-09-22 정정).** 2026-09-21 의 SEP-0 ~ SEP-2 는 다른 맥(macOS 27 beta · 베타 시뮬레이터)에서 돌았다. 기록에 나오는 경로(`/Users/leetaek/Carve` · scratchpad 표본 · `~/Carve-old-49f2dc27`)와 시뮬레이터(DDE9B05A… · DB142B76… · F2623D91… · 9611DACC…)는 **그 맥의 것이라 이 맥에는 적용되지 않는다**(사용자 확인). 이 맥의 `Carve-ACC-dut`(4419ABC7…) · `Carve-ACC-B`(FD20B387…)는 이름만 같은 다른 기기다(F43). 이 맥의 표본 · 스크립트는 `tools/cloudkit-observe/work/sep/` 에 둔다.
+**앞 세션 자료는 다른 맥의 기록이다 (2026-09-22 정정).** 2026-09-21 의 SEP-0 ~ SEP-2 는 다른 맥(macOS 27 beta · 베타 시뮬레이터)에서 돌았다. 기록에 나오는 경로(`<repo>` · scratchpad 표본 · `~/Carve-old-49f2dc27`)와 시뮬레이터는 **그 맥의 것이라 이 맥에는 적용되지 않는다**(사용자 확인). 이 맥의 `Carve-ACC-dut` · `Carve-ACC-B`는 이름만 같은 다른 기기다(F43). 이 맥의 표본 · 스크립트는 저장소 밖 CloudKit 관측 도구 에 둔다.
 
 **자격 증명 무효로 같은 계정 시험이 멈춤 → 해소 (2026-09-22).** 재부팅 뒤 dut · B 의 샌드박스 계정이 유효한 자격 증명을 잃었다(F48). 사용자가 암호를 다시 넣은 뒤 G1 ~ G6 을 모두 돌렸다. 감시가 "감시 시작 뒤" 로그만 보다가, 먼저 유효해진 B 를 놓친 일이 있었다 — `--since` 로 기준 시각을 당겨 해결했다.
 
@@ -1449,15 +1449,15 @@ F1·F2 는 코드 검토만으로는 나오지 않았고 실제로 돌려 봐야
 
 ### iPadOS 17.5 최초 전체 회귀 (2026-09-24, migration 수정 전)
 
-사용자가 iOS 17 runtime을 설치했다고 알려와 목록을 다시 확인했다. Xcode 26.3 (17C529 / Swift 6.2.4), Tuist 4.208.0, iPad mini (6th generation), iOS 17.5 build 21F79 (UDID `0347221E-08F5-48C9-9F8E-6D7995C25D9F`)로 CLI `xcodebuild test`를 실행했다. `.xcodeproj`가 gitignore 대상이라 `mise x -- tuist generate --no-open` 후 `Carve-Workspace` scheme을 사용했다. 당시 checkout의 미추적 미완성 `Domain/Domain/Sources/SwiftData/LegacyRowCorrespondence.swift`는 검증 명령에서 제외했다. iPhone simulator, Xcode MCP, Device Hub 조작, CloudKit 로그인·실기기 입력은 사용하지 않았다.
+사용자가 iOS 17 runtime을 설치했다고 알려와 목록을 다시 확인했다. Xcode 26.3 (17C529 / Swift 6.2.4), Tuist 4.208.0, iPad mini (6th generation), iOS 17.5 build 21F79 (UDID `<UDID>`)로 CLI `xcodebuild test`를 실행했다. `.xcodeproj`가 gitignore 대상이라 `mise x -- tuist generate --no-open` 후 `Carve-Workspace` scheme을 사용했다. 당시 checkout의 미추적 미완성 `Domain/Domain/Sources/SwiftData/LegacyRowCorrespondence.swift`는 검증 명령에서 제외했다. iPhone simulator, Xcode MCP, Device Hub 조작, CloudKit 로그인·실기기 입력은 사용하지 않았다.
 
-최종 전체 회귀는 병렬 테스트를 끈 상태로 수행해 **993 passed · 3 failed · 6 skipped · 4 expected failures (총 1006)**였다. 결과는 `/private/tmp/carve-2-0-0-autotest-20260924-full-final2-ios17.5.xcresult`, 로그는 `/private/tmp/carve-2-0-0-autotest-20260924-full-final2-ios17.5.log`다. 실패 3건은 다음과 같다.
+최종 전체 회귀는 병렬 테스트를 끈 상태로 수행해 **993 passed · 3 failed · 6 skipped · 4 expected failures (총 1006)**였다. 결과는 (로컬 증거), 로그는 (로컬 증거)다. 실패 3건은 다음과 같다.
 
 | 실패한 케이스 | 결과 | 해석 |
 |---|---|---|
-| `DrawingDatabaseTesting/migrationV1toV2()` | `SwiftDataError.loadIssueModelContainer` | V1 versioned store에서 앱 최신 스키마로 staged migration을 열지 못함 |
+| `DrawingDatabaseTesting/migrationV1toV2` | `SwiftDataError.loadIssueModelContainer` | V1 versioned store에서 앱 최신 스키마로 staged migration을 열지 못함 |
 | `LocalStoreLoadFailureTesting/unversionedStoreKeepsLegacyMigrationPath(_:)` | dynamic case `1.0.0~1.0.3`에서 재실행 시 앱 스키마 open 실패. `1.0.4~1.0.7`은 통과 | 구형 무버전 store의 날짜 필드가 없는 1.0.0 모양을 V1로 옮긴 뒤 최신 앱 스키마로 여는 경로가 실패 |
-| `LegacyEntityNumberingTesting/v2ToV6KeepsCorrespondences()` | `SwiftDataError.loadIssueModelContainer` | V2 versioned store의 V6 앱 스키마 staged migration 경로가 실패 |
+| `LegacyEntityNumberingTesting/v2ToV6KeepsCorrespondences` | `SwiftDataError.loadIssueModelContainer` | V2 versioned store의 V6 앱 스키마 staged migration 경로가 실패 |
 
 전체 회귀에서 6건 skip은 실기기 전용 UI 시험 5건과, iOS 18.6·26.2에서만 관측된 잘못된 V1 컨테이너의 no-op 저장 동작 시험 1건이다. 그 no-op 시험은 iOS 17에서 같은 호출이 SwiftData trap을 일으킨 이전 실행을 반영해 OS 조건부 skip으로 바꿨다. 네 건의 expected failure는 프로젝트에 선언된 기존 기대 실패다. 이 skip을 iOS 17 동작 확인으로 세지 않았다.
 
@@ -1465,19 +1465,19 @@ F1·F2 는 코드 검토만으로는 나오지 않았고 실제로 돌려 봐야
 
 | 실행 | 결과 | xcresult |
 |---|---|---|
-| 소유 판독기·ownership proof·edit environment·snapshot·release 경로 집중 5 suite | **67/67 통과**, 실패·skip 0 | `/private/tmp/carve-2-0-0-autotest-20260924-focused-ios17.5.xcresult` |
-| `CGPoint` anchor hash 충돌 보정과 관련 lasso·reconcile·history wiring·DB actor suite | **27/27 통과** | `/private/tmp/carve-2-0-0-autotest-20260924-focused-final-ios17.5.xcresult` |
-| 최초 전체 실행(핵심 iOS 17 호환 수정 전) | 테스트 프로세스가 여러 SIGSEGV로 실패했고 47 failures를 보고했다. 일부 pass 수는 중도 종료 결과라 완결 회귀 수로 쓰지 않는다 | `/private/tmp/carve-2-0-0-autotest-20260924-full-ios17.5.xcresult` |
-| CGPoint·SwiftData fixture 수정 뒤 전체 회귀 | 991 통과·6 실패·5 skip·4 expected failure | `/private/tmp/carve-2-0-0-autotest-20260924-full-ios17.5-rerun.xcresult` |
-| SwiftData migration 재확인용 4 suite | 35 통과·3 실패. iOS 17.5에서 지원되지 않는 V1-only 호출 시험은 이 시도에서 trap | `/private/tmp/carve-2-0-0-autotest-20260924-swiftdata-retry5-ios17.5.xcresult` |
-| conditional skip / 최신 스키마 fixture 적용 후 migration 집중 재검증 | 9 통과·2 실패·1 skip. dynamic migration case 중 `1.0.0~1.0.3` 실패, `1.0.4~1.0.7` 통과 | `/private/tmp/carve-2-0-0-autotest-20260924-migration-recheck2-ios17.5.xcresult` |
-| 현재 스키마를 명시적 `Schema(versionedSchema: DrawingSchemaV6.self)`로 열어 migration 재검증 | 9 통과·2 실패·1 skip으로 실패가 그대로 재현됐다. 가설이 개선을 보이지 않아 이 schema 변경은 되돌렸다 | `/private/tmp/carve-2-0-0-autotest-20260924-versioned-schema-recheck-ios17.5.xcresult` |
-| migration 집중 재검증 첫 compile | `@Test` trait 인자 순서 컴파일 오류, **테스트 0건 실행**. 순서를 고친 뒤 위 재검증 완료 | `/private/tmp/carve-2-0-0-autotest-20260924-migration-recheck-ios17.5.log` |
-| actor insert 격리 및 migration suite 단독 실행 | `actorInsert` 통과, `migrationV1toV2` 실패. 이 결과를 반영해 최종 전체 회귀를 다시 실행 | `/private/tmp/carve-2-0-0-autotest-20260924-failures-isolated-ios17.5.xcresult` |
-| 최종 전체 회귀 직전 단일 V2→V6 filter invocation | XCTest 선택 필터가 케이스를 선택하지 않아 **0건 실행**, 결과 `unknown`; 통과 증거로 세지 않음. 해당 케이스는 최종 전체 회귀에서 실패로 확인 | `/private/tmp/carve-2-0-0-autotest-20260924-v2-v6-isolated-ios17.5.xcresult` |
-| test-only container 격리 변경 후 전체 회귀, 병렬 실행 끔 | **993 통과·3 실패·6 skip·4 expected failure** | `/private/tmp/carve-2-0-0-autotest-20260924-full-final2-ios17.5.xcresult` |
+| 소유 판독기·ownership proof·edit environment·snapshot·release 경로 집중 5 suite | **67/67 통과**, 실패·skip 0 | (로컬 증거) |
+| `CGPoint` anchor hash 충돌 보정과 관련 lasso·reconcile·history wiring·DB actor suite | **27/27 통과** | (로컬 증거) |
+| 최초 전체 실행(핵심 iOS 17 호환 수정 전) | 테스트 프로세스가 여러 SIGSEGV로 실패했고 47 failures를 보고했다. 일부 pass 수는 중도 종료 결과라 완결 회귀 수로 쓰지 않는다 | (로컬 증거) |
+| CGPoint·SwiftData fixture 수정 뒤 전체 회귀 | 991 통과·6 실패·5 skip·4 expected failure | (로컬 증거) |
+| SwiftData migration 재확인용 4 suite | 35 통과·3 실패. iOS 17.5에서 지원되지 않는 V1-only 호출 시험은 이 시도에서 trap | (로컬 증거) |
+| conditional skip / 최신 스키마 fixture 적용 후 migration 집중 재검증 | 9 통과·2 실패·1 skip. dynamic migration case 중 `1.0.0~1.0.3` 실패, `1.0.4~1.0.7` 통과 | (로컬 증거) |
+| 현재 스키마를 명시적 `Schema(versionedSchema: DrawingSchemaV6.self)`로 열어 migration 재검증 | 9 통과·2 실패·1 skip으로 실패가 그대로 재현됐다. 가설이 개선을 보이지 않아 이 schema 변경은 되돌렸다 | (로컬 증거) |
+| migration 집중 재검증 첫 compile | `@Test` trait 인자 순서 컴파일 오류, **테스트 0건 실행**. 순서를 고친 뒤 위 재검증 완료 | (로컬 증거) |
+| actor insert 격리 및 migration suite 단독 실행 | `actorInsert` 통과, `migrationV1toV2` 실패. 이 결과를 반영해 최종 전체 회귀를 다시 실행 | (로컬 증거) |
+| 최종 전체 회귀 직전 단일 V2→V6 filter invocation | XCTest 선택 필터가 케이스를 선택하지 않아 **0건 실행**, 결과 `unknown`; 통과 증거로 세지 않음. 해당 케이스는 최종 전체 회귀에서 실패로 확인 | (로컬 증거) |
+| test-only container 격리 변경 후 전체 회귀, 병렬 실행 끔 | **993 통과·3 실패·6 skip·4 expected failure** | (로컬 증거) |
 
-iOS 17에서 처음 드러난 `Set<CGPoint>` hash crash는 production `AnchorIndex` 키를 좌표 `x/y`로 해시하는 값 타입으로 바꾸고, lasso 테스트 fixture는 정렬·중복 제거 배열을 쓰도록 해 해결했다. `DrawingDatabaseTesting.actorInsert()`는 공유 dependency 컨테이너 대신 테스트 전용 in-memory `ModelContainer`와 actor를 만들어 단독 재검증 및 최종 전체 회귀에서 통과했다. SwiftData batch atomicity 시험에서 관측한 롤백 뒤 외부 저장 Data 잔류는 repository가 metadata와 replace row ID를 먼저 검증해 잘못된 batch를 실제 mutation 전에 거절하도록 보완했으며 관련 focused run에서 통과했다. `CarveDetailHistoryWiringTesting` fixture도 iOS 17에서 `BibleDrawing` 생성 전 모델 컨테이너를 등록하도록 보완했다.
+iOS 17에서 처음 드러난 `Set<CGPoint>` hash crash는 production `AnchorIndex` 키를 좌표 `x/y`로 해시하는 값 타입으로 바꾸고, lasso 테스트 fixture는 정렬·중복 제거 배열을 쓰도록 해 해결했다. `DrawingDatabaseTesting.actorInsert`는 공유 dependency 컨테이너 대신 테스트 전용 in-memory `ModelContainer`와 actor를 만들어 단독 재검증 및 최종 전체 회귀에서 통과했다. SwiftData batch atomicity 시험에서 관측한 롤백 뒤 외부 저장 Data 잔류는 repository가 metadata와 replace row ID를 먼저 검증해 잘못된 batch를 실제 mutation 전에 거절하도록 보완했으며 관련 focused run에서 통과했다. `CarveDetailHistoryWiringTesting` fixture도 iOS 17에서 `BibleDrawing` 생성 전 모델 컨테이너를 등록하도록 보완했다.
 
 마지막 검사에서 수정한 Swift 파일에 대한 `mise x -- swiftlint lint --quiet --config .swiftlint.yml …`는 종료 코드 0이었다. 출력된 7개 warning은 이번 수정 파일이 아닌 다른 기존 소스·테스트 파일에 있었다. `git diff --check`도 통과했다.
 
@@ -1494,56 +1494,56 @@ iOS 17에서 처음 드러난 `Set<CGPoint>` hash crash는 production `AnchorInd
 
 | 검증 | 결과 | 산출물 |
 |---|---|---|
-| 직접 만든 V2 저장소를 V1 포함 전체 plan으로 열기 (원인 재현) | **실패**, iOS 17.5에서 `134504` 확인 | `/private/tmp/carve-2-0-0-v2-minimal-ios17.5.xcresult` |
-| 같은 V2 저장소를 V2 시작 suffix plan으로 열기 | **1/1 통과** | `/private/tmp/carve-2-0-0-v2-suffix-ios17.5.xcresult` |
-| `DrawingDatabaseTesting/migrationV1toV2` | **1/1 통과** | `/private/tmp/carve-2-0-0-migration-v1-fix-ios17.5.xcresult` |
-| 무버전 1.0.0~1.0.3 parameterized migration | **2 dynamic runs 통과** | `/private/tmp/carve-2-0-0-unversioned-v1-fix-ios17.5.xcresult` |
-| V1·무버전·V2→V6 대응 보존·V2 무대응 행·V2 suffix·V5→V6를 포함한 집중 migration 회귀 | iOS 17.5·18.6·26.2에서 각각 **6/6 테스트 정의 통과**(동적 parameter 포함 7회 실행), 실패·skip 0 | `/private/tmp/carve-2-0-0-migration-regression-ios17.5.xcresult`, `/private/tmp/carve-2-0-0-migration-regression-ios18.6.xcresult`, `/private/tmp/carve-2-0-0-migration-regression-ios26.2.xcresult` |
-| iPadOS 17.5 `Carve-Workspace` 전체 회귀 | **998 통과 · 0 실패 · 6 skip · 4 expected failure (총 1008)** | `/private/tmp/carve-2-0-0-full-after-migration-fix-ios17.5.xcresult`; 로그 `/private/tmp/carve-2-0-0-full-after-migration-fix-ios17.5.log` |
+| 직접 만든 V2 저장소를 V1 포함 전체 plan으로 열기 (원인 재현) | **실패**, iOS 17.5에서 `134504` 확인 | (로컬 증거) |
+| 같은 V2 저장소를 V2 시작 suffix plan으로 열기 | **1/1 통과** | (로컬 증거) |
+| `DrawingDatabaseTesting/migrationV1toV2` | **1/1 통과** | (로컬 증거) |
+| 무버전 1.0.0~1.0.3 parameterized migration | **2 dynamic runs 통과** | (로컬 증거) |
+| V1·무버전·V2→V6 대응 보존·V2 무대응 행·V2 suffix·V5→V6를 포함한 집중 migration 회귀 | iOS 17.5·18.6·26.2에서 각각 **6/6 테스트 정의 통과**(동적 parameter 포함 7회 실행), 실패·skip 0 | (로컬 증거) |
+| iPadOS 17.5 `Carve-Workspace` 전체 회귀 | **998 통과 · 0 실패 · 6 skip · 4 expected failure (총 1008)** | (로컬 증거); 로그 (로컬 증거) |
 
 전체 회귀의 6 skip은 실기기 전용 UI 시험 5개와 iOS 18·26에서만 관측한 V1-only no-op 시험 1개다. 네 expected failure는 기존 테스트 선언이다. 이 기록은 iOS 17.5에서 확인한 로컬 migration 결과이며 iOS 17.0, 실기기 동작, 소유 proof나 CloudKit 왕복을 대신하지 않는다. 최신 strict-profile의 live CloudKit proof, iOS 18 migration marker 의미와 계정 왕복, 로그인 상태 1.3.0 업데이트 경로, iOS 17.0 및 iOS 19~25 profile은 여전히 확인되지 않아 출시 판정은 **NO-GO**다. 미추적 미완성 파일을 포함한 시험도 별도 재검증해야 한다.
 
 ### Xcode 27.0 F60 후속 재현·서명 진단 (2026-09-24)
 
-**환경 확인:** macOS `27.2 (26B5086k)`, `xcode-select -p` `/Applications/Xcode.app/Contents/Developer`, Xcode `27.0 (27A266a)`, Swift `6.4 (swiftlang-6.4.0.34.1)`, Tuist `4.208.0`. 확인에 사용한 명령은 `xcode-select -p`, `xcodebuild -version`, `swift --version`, `mise x -- tuist version`, `xcrun simctl list runtimes`, `xcrun simctl list devices available`이다. 두 simctl 조회는 성공했다. iPad runtime은 17.5 (`21F79`), 18.6 (`22G86`), 26.2 (`23C54`), 26.4 (`23E244`), 26.5 (`23F77`), 27.0 (`24A5370g`, `24A434`)였다. iPad mini (A17 Pro) iPadOS 18.6 simulator는 UDID `7E95B700-3976-42D7-BF85-BCAF028B7605`로 목록에서 확인됐다. 첫 시도 당시 `CarveApp.xcodeproj`와 `Carve.xcworkspace`는 이미 있어 생성하지 않았다. 이후 workspace 파일(9/12)이 앱 프로젝트(9/24)보다 오래됐고 `xcodebuild -list -workspace`가 인식 오류를 내어, 생성물 복사본을 보존한 뒤 아래 기록처럼 `mise x -- tuist generate --no-open`으로 전체 그래프를 갱신했다.
+**환경 확인:** macOS `27.2 (26B5086k)`, `xcode-select -p` `/Applications/Xcode.app/Contents/Developer`, Xcode `27.0 (27A266a)`, Swift `6.4 (swiftlang-6.4.0.34.1)`, Tuist `4.208.0`. 확인에 사용한 명령은 `xcode-select -p`, `xcodebuild -version`, `swift --version`, `mise x -- tuist version`, `xcrun simctl list runtimes`, `xcrun simctl list devices available`이다. 두 simctl 조회는 성공했다. iPad runtime은 17.5 (`21F79`), 18.6 (`22G86`), 26.2 (`23C54`), 26.4 (`23E244`), 26.5 (`23F77`), 27.0 (`24A5370g`, `24A434`)였다. iPad mini (A17 Pro) iPadOS 18.6 simulator는 UDID `<UDID>`로 목록에서 확인됐다. 첫 시도 당시 `CarveApp.xcodeproj`와 `Carve.xcworkspace`는 이미 있어 생성하지 않았다. 이후 workspace 파일(9/12)이 앱 프로젝트(9/24)보다 오래됐고 `xcodebuild -list -workspace`가 인식 오류를 내어, 생성물 복사본을 보존한 뒤 아래 기록처럼 `mise x -- tuist generate --no-open`으로 전체 그래프를 갱신했다.
 
 **빌드 재실행:**
 
 | 실행 | 결과 | 전체 로그 / 종료 결과 |
 |---|---|---|
-| `xcodebuild build -project App/CarveApp/CarveApp.xcodeproj -scheme CarveApp -configuration Debug -destination 'platform=iOS Simulator,id=7E95B700-3976-42D7-BF85-BCAF028B7605' -derivedDataPath /private/tmp/carve-2.0.0-xcode27-f60-20260924/DerivedData` (기본 샌드박스) | CoreSimulatorService 연결 오류로 destination 해석 전에 실패, 종료 코드 **70**. 서명 단계 미도달 | 로그 `/private/tmp/carve-2.0.0-xcode27-f60-20260924/build.log`, 종료 `/private/tmp/carve-2.0.0-xcode27-f60-20260924/build.exit`; 자동 생성 result bundle `/var/folders/83/7jccsyy179s48jt_6w4c1cb40000gn/T/ResultBundle_2026-24-09_21-18-0024.xcresult` |
-| `xcodebuild build -project App/CarveApp/CarveApp.xcodeproj -scheme CarveApp -configuration Debug -destination 'platform=iOS Simulator,id=7E95B700-3976-42D7-BF85-BCAF028B7605' -derivedDataPath /private/tmp/carve-2.0.0-xcode27-f60-20260924-escalated/DerivedData` (CoreSimulator 서비스 접근 오류 뒤 재실행) | `ProcessXCFramework` 작업과 Swift 컴파일이 시작됐으나 TCA `ComposableArchitectureMacros`의 `SwiftDiagnostics`, `SwiftOperators`, `SwiftSyntax`, `SwiftSyntaxBuilder`, `SwiftSyntaxMacros`, `SwiftSyntaxMacroExpansion`, `SwiftCompilerPlugin` 모듈을 해석하지 못해 종료 코드 **65**. 앱 소스 컴파일·테스트 미도달 | 전체 로그 `/private/tmp/carve-2.0.0-xcode27-f60-20260924-escalated/build.log`, 종료 `/private/tmp/carve-2.0.0-xcode27-f60-20260924-escalated/build.exit` |
-| `xcodebuild build -project App/CarveApp/CarveApp.xcodeproj -scheme CarveApp -destination 'generic/platform=iOS Simulator' -derivedDataPath /private/tmp/carve-2.0.0-xcode27-f60-20260924-generic/DerivedData` | `ProcessXCFramework`는 실패 목록에 없고, SwiftPM `Sharing` 컴파일에서 `Dependencies`, `PerceptionCore`, `IssueReporting`, `ConcurrencyExtras`, `CustomDump`, `IdentifiedCollections` 모듈을 해석하지 못해 종료 코드 **65**. 앱 소스 컴파일·테스트 미도달 | 전체 로그 `/private/tmp/carve-2.0.0-xcode27-f60-20260924-generic/build.log`, 종료 `/private/tmp/carve-2.0.0-xcode27-f60-20260924-generic/build.exit` |
+| (로컬 증거) (기본 샌드박스) | CoreSimulatorService 연결 오류로 destination 해석 전에 실패, 종료 코드 **70**. 서명 단계 미도달 | 로그 (로컬 증거), 종료 (로컬 증거); 자동 생성 result bundle `/var/folders/83/7jccsyy179s48jt_6w4c1cb40000gn/T/ResultBundle_2026-24-09_21-18-0024.xcresult` |
+| (로컬 증거) (CoreSimulator 서비스 접근 오류 뒤 재실행) | `ProcessXCFramework` 작업과 Swift 컴파일이 시작됐으나 TCA `ComposableArchitectureMacros`의 `SwiftDiagnostics`, `SwiftOperators`, `SwiftSyntax`, `SwiftSyntaxBuilder`, `SwiftSyntaxMacros`, `SwiftSyntaxMacroExpansion`, `SwiftCompilerPlugin` 모듈을 해석하지 못해 종료 코드 **65**. 앱 소스 컴파일·테스트 미도달 | 전체 로그 (로컬 증거), 종료 (로컬 증거) |
+| (로컬 증거) | `ProcessXCFramework`는 실패 목록에 없고, SwiftPM `Sharing` 컴파일에서 `Dependencies`, `PerceptionCore`, `IssueReporting`, `ConcurrencyExtras`, `CustomDump`, `IdentifiedCollections` 모듈을 해석하지 못해 종료 코드 **65**. 앱 소스 컴파일·테스트 미도달 | 전체 로그 (로컬 증거), 종료 (로컬 증거) |
 
 기본 샌드박스 실패 뒤 동일한 iPadOS 18.6 빌드를 서비스 접근이 가능한 CLI 실행으로 한 번 재시도했다. generic 재현 로그에서 Google/Firebase의 `UserMessagingPlatform`, `GoogleAppMeasurementIdentitySupport`, `GoogleAppMeasurement`, `FirebaseAnalytics`, `GoogleMobileAds` XCFramework `ProcessXCFramework` 작업은 각각 실행됐고 “identity … is not recorded in your project”는 **note**로 출력됐다. 이 재실행에서는 해당 작업의 서명 오류가 실패로 보고되지 않았다. 따라서 이번 generic 빌드는 기존 F60의 `ProcessXCFramework` 종료를 그대로 재현하지 못했으며, 현 시점의 빌드 종료 원인은 SwiftPM 의존성 모듈 해석 오류다. 다만 이것도 Xcode 27 앱 호환성 통과를 뜻하지는 않는다.
 
-**읽기 전용 서명 조사:** 위 5개 XCFramework에 `codesign -dv --verbose=4`와 `codesign --verify --deep --strict --verbose=2`를 실행했다. 모두 서명 메타데이터와 TeamIdentifier `EQHXZ8M8AV`가 있었지만, `Authority`는 `unavailable`이고 번들 검증은 `invalid signature (code or signature have been modified)`로 종료됐다. 각 iOS simulator `.framework` slice는 별도 `codesign` 검사에서 서명되지 않은 코드 객체로 보고됐다. 상세 출력은 `/private/tmp/carve-2.0.0-xcode27-f60-20260924-escalated/codesign-inspection.txt`에 보존했다. 이는 캐시된 artifact의 서명 상태 이상을 확인한 것이지만, 이번 빌드 로그의 `ProcessXCFramework` 실패는 아니므로 두 현상의 인과관계는 아직 확정하지 않는다. 서명·의존성·빌드 설정을 수정하거나 검증을 우회하지 않았다.
+**읽기 전용 서명 조사:** 위 5개 XCFramework에 `codesign -dv --verbose=4`와 `codesign --verify --deep --strict --verbose=2`를 실행했다. 모두 서명 메타데이터와 TeamIdentifier `EQHXZ8M8AV`가 있었지만, `Authority`는 `unavailable`이고 번들 검증은 `invalid signature (code or signature have been modified)`로 종료됐다. 각 iOS simulator `.framework` slice는 별도 `codesign` 검사에서 서명되지 않은 코드 객체로 보고됐다. 상세 출력은 (로컬 증거)에 보존했다. 이는 캐시된 artifact의 서명 상태 이상을 확인한 것이지만, 이번 빌드 로그의 `ProcessXCFramework` 실패는 아니므로 두 현상의 인과관계는 아직 확정하지 않는다. 서명·의존성·빌드 설정을 수정하거나 검증을 우회하지 않았다.
 
-**당시 테스트·Device Hub:** 이 첫 재현 시점에는 빌드가 성공하지 않아 가장 좁은 관련 iPad simulator 테스트도 실행하지 않았다. 이후 결과는 아래 별도 Xcode 27 재검증 기록에 있다. Device Hub UI는 CUA에서 Mac이 잠겨 접근할 수 없다는 상태가 반환되어 열람하지 못했고, 앱 설치·실행 수동 스모크도 하지 않았다. 이는 자동화 테스트 결과와 별도 상태다. ACC 표본·CloudKit 계정·서버 상태는 사용하지 않았다.
+**당시 테스트·Device Hub:** 이 첫 재현 시점에는 빌드가 성공하지 않아 가장 좁은 관련 iPad simulator 테스트도 실행하지 않았다. 이후 결과는 아래 별도 Xcode 27 재검증 기록에 있다. Device Hub UI는 호스트 Mac이 잠겨 있어 열람하지 못했고, 앱 설치·실행 수동 스모크도 하지 않았다. 이는 자동화 테스트 결과와 별도 상태다. ACC 표본·CloudKit 계정·서버 상태는 사용하지 않았다.
 
 ### Tuist workspace 갱신 후 Xcode 27 빌드·회귀 (2026-09-24)
 
-앞 절의 `-project CarveApp` 명령은 F60의 XCFramework 서명 실패를 재현하지 못했고 SwiftPM `Sharing` 타깃의 모듈 의존성 오류로 끝났다. 해당 시점의 생성 workspace는 앱 프로젝트보다 오래됐으며 Xcode 27 `-list -workspace`가 “not a workspace file”을 반환했다. 기존 상태를 덮지 않도록 실행 전에 다음 생성물을 `/private/tmp/carve-2.0.0-xcode27-f60-20260924-regenerate/preserved/`에 복사했다: `Carve.xcworkspace`, `CarveApp.xcodeproj`, `Tuist/.build/tuist-derived`.
+앞 절의 `-project CarveApp` 명령은 F60의 XCFramework 서명 실패를 재현하지 못했고 SwiftPM `Sharing` 타깃의 모듈 의존성 오류로 끝났다. 해당 시점의 생성 workspace는 앱 프로젝트보다 오래됐으며 Xcode 27 `-list -workspace`가 “not a workspace file”을 반환했다. 기존 상태를 덮지 않도록 실행 전에 다음 생성물을 (로컬 증거)에 복사했다: `Carve.xcworkspace`, `CarveApp.xcodeproj`, `Tuist/.build/tuist-derived`.
 
 ```bash
 mise x -- tuist generate --no-open
-# 성공, 전체 로그: /private/tmp/carve-2.0.0-xcode27-f60-20260924-regenerate/tuist-generate.log
+# 성공, 전체 로그: (로컬 증거)
 
 xcodebuild build -workspace Carve.xcworkspace -scheme Carve-Workspace -configuration Debug \
-  -destination 'platform=iOS Simulator,id=7E95B700-3976-42D7-BF85-BCAF028B7605' \
-  -derivedDataPath /private/tmp/carve-2.0.0-xcode27-f60-20260924-workspace/DerivedData
+  -destination 'platform=iOS Simulator,id=<UDID>' \
+  -derivedDataPath (로컬 증거)
 # BUILD SUCCEEDED, exit 0
 ```
 
-빌드 전체 로그는 `/private/tmp/carve-2.0.0-xcode27-f60-20260924-workspace/build.log`, 종료 코드는 `build.exit`다. destination은 iPad mini (A17 Pro) iPadOS 18.6 (`22G86`)이며 SDK는 Xcode 27의 iOS Simulator 27.0이다. Google/Firebase XCFramework 다섯 개 모두 `ProcessXCFramework`를 통과했고 앱·Domain 소스 컴파일까지 진행했다. 앞서 읽기 전용 `codesign --verify`에서 확인한 artifact 상태 이상은 이 빌드의 실패 원인이 아니었다. 다만 별도 `-project CarveApp` generic 명령의 SwiftPM 모듈 오류는 계속 남으며 그 원인은 확정하지 않았다. `xcodebuild -list -workspace`는 생성 전후 exit 66 “not a workspace file”이었지만 실제 `-workspace Carve-Workspace` build/test는 실행됐다.
+빌드 전체 로그는 (로컬 증거), 종료 코드는 `build.exit`다. destination은 iPad mini (A17 Pro) iPadOS 18.6 (`22G86`)이며 SDK는 Xcode 27의 iOS Simulator 27.0이다. Google/Firebase XCFramework 다섯 개 모두 `ProcessXCFramework`를 통과했고 앱·Domain 소스 컴파일까지 진행했다. 앞서 읽기 전용 `codesign --verify`에서 확인한 artifact 상태 이상은 이 빌드의 실패 원인이 아니었다. 다만 별도 `-project CarveApp` generic 명령의 SwiftPM 모듈 오류는 계속 남으며 그 원인은 확정하지 않았다. `xcodebuild -list -workspace`는 생성 전후 exit 66 “not a workspace file”이었지만 실제 `-workspace Carve-Workspace` build/test는 실행됐다.
 
-가장 좁은 두 suite를 최신 iPadOS 27.0 iPad mini (A17 Pro), UDID `C72A6CC6-4E3C-4822-BED1-9D76F8542D6B` (`24A434`)에서 먼저 실행했다.
+가장 좁은 두 suite를 최신 iPadOS 27.0 iPad mini (A17 Pro) (`24A434`)에서 먼저 실행했다.
 
 ```bash
 xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configuration Debug \
-  -destination 'platform=iOS Simulator,id=C72A6CC6-4E3C-4822-BED1-9D76F8542D6B' \
-  -derivedDataPath /private/tmp/carve-2.0.0-xcode27-f60-20260924-test-ios27/DerivedData \
-  -resultBundlePath /private/tmp/carve-2.0.0-xcode27-f60-20260924-test-ios27/focused-reader-ownership.xcresult \
+  -destination 'platform=iOS Simulator,id=<UDID>' \
+  -derivedDataPath (로컬 증거) \
+  -resultBundlePath (로컬 증거) \
   -parallel-testing-enabled NO \
   -only-testing:DomainTest/LegacyRowLinkageReaderTesting \
   -only-testing:DomainTest/DrawingStoreOwnershipProofTesting
@@ -1554,22 +1554,22 @@ xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configurat
 
 ```bash
 xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configuration Debug \
-  -destination 'platform=iOS Simulator,id=C72A6CC6-4E3C-4822-BED1-9D76F8542D6B' \
-  -derivedDataPath /private/tmp/carve-2.0.0-xcode27-f60-20260924-test-ios27/DerivedData \
-  -resultBundlePath /private/tmp/carve-2.0.0-xcode27-f60-20260924-test-ios27/full-ios27.xcresult \
+  -destination 'platform=iOS Simulator,id=<UDID>' \
+  -derivedDataPath (로컬 증거) \
+  -resultBundlePath (로컬 증거) \
   -parallel-testing-enabled NO
 # TEST FAILED, exit 65
 ```
 
-전체 로그는 `/private/tmp/carve-2.0.0-xcode27-f60-20260924-test-ios27/full-ios27.log`, exit는 `full-ios27.exit`다. 총 1008건 중 994 통과, 5개 미해결 실패, 기존 known issue 4건, 실기기 전용 UI 5건 skip이었다. `CarveFeatureTest/ChapterCanvasControllerTesting.changelessToolUseIsCancelled` 1건은 `cancelledCount == 1` 기대가 450ms 뒤에도 0이었다. Domain의 `LegacySeparationGateTesting.unversionedStoreIsMigratedButHeld` 1건과 `LocalStoreLoadFailureTesting` 3건은 iOS 27 SwiftData의 `unknownDataStoreSchema` / Core Data `134504 Cannot use staged migration with an unknown model version`로 기록됐다. 네 expected known issue는 별도 표본 probe 부재에 따른 기존 known issue다.
+전체 로그는 (로컬 증거), exit는 `full-ios27.exit`다. 총 1008건 중 994 통과, 5개 미해결 실패, 기존 known issue 4건, 실기기 전용 UI 5건 skip이었다. `CarveFeatureTest/ChapterCanvasControllerTesting.changelessToolUseIsCancelled` 1건은 `cancelledCount == 1` 기대가 450ms 뒤에도 0이었다. Domain의 `LegacySeparationGateTesting.unversionedStoreIsMigratedButHeld` 1건과 `LocalStoreLoadFailureTesting` 3건은 iOS 27 SwiftData의 `unknownDataStoreSchema` / Core Data `134504 Cannot use staged migration with an unknown model version`로 기록됐다. 네 expected known issue는 별도 표본 probe 부재에 따른 기존 known issue다.
 
-전체 결과의 안정성을 분리하려고 세 실패 suite를 같은 iPadOS 27.0 iPad mini에서 다시 실행했다. 첫 기본 sandbox 호출은 CoreSimulatorService 연결이 무효화되어 테스트를 시작하지 못했고, 종료 코드는 66이다(`/private/tmp/carve-2.0.0-xcode27-f60-20260924-test-ios27-rerun/focused-failures-ios27-rerun.log`, `.exit`; 지정 xcresult 디렉터리는 생겼지만 테스트 결과는 없다). 서비스 접근이 가능한 CLI 재실행은 다음과 같다.
+전체 결과의 안정성을 분리하려고 세 실패 suite를 같은 iPadOS 27.0 iPad mini에서 다시 실행했다. 첫 기본 sandbox 호출은 CoreSimulatorService 연결이 무효화되어 테스트를 시작하지 못했고, 종료 코드는 66이다((로컬 증거), `.exit`; 지정 xcresult 디렉터리는 생겼지만 테스트 결과는 없다). 서비스 접근이 가능한 CLI 재실행은 다음과 같다.
 
 ```bash
 xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configuration Debug \
-  -destination 'platform=iOS Simulator,id=C72A6CC6-4E3C-4822-BED1-9D76F8542D6B' \
-  -derivedDataPath /private/tmp/carve-2.0.0-xcode27-f60-20260924-test-ios27/DerivedData \
-  -resultBundlePath /private/tmp/carve-2.0.0-xcode27-f60-20260924-test-ios27-rerun-escalated/focused-failures-ios27-rerun.xcresult \
+  -destination 'platform=iOS Simulator,id=<UDID>' \
+  -derivedDataPath (로컬 증거) \
+  -resultBundlePath (로컬 증거) \
   -parallel-testing-enabled NO \
   -only-testing:DomainTest/LegacySeparationGateTesting \
   -only-testing:DomainTest/LocalStoreLoadFailureTesting \
@@ -1577,21 +1577,21 @@ xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configurat
 # TEST FAILED, exit 65
 ```
 
-`ChapterCanvasControllerTesting`은 **22/22 통과**해 전체 회귀의 cancellation timing 실패는 재현되지 않았다. Domain 두 suite는 총 26 tests 중 4 issues로 실패했다: `LegacySeparationGateTesting.unversionedStoreIsMigratedButHeld` 1건, `LocalStoreLoadFailureTesting`에서 기대한 `loadIssueModelContainer` 대신 `unknownDataStoreSchema`가 나온 1건, 1.0.0~1.0.3 무버전 migration dynamic case 2건이다. 따라서 다섯 실패 중 한 건은 focused rerun에서 재현되지 않았고, 네 SwiftData 관련 실패는 반복됐다. 전체 로그는 `/private/tmp/carve-2.0.0-xcode27-f60-20260924-test-ios27-rerun-escalated/focused-failures-ios27-rerun.log`, 종료 코드는 `.exit`, xcresult는 `focused-failures-ios27-rerun.xcresult`다. Test runner는 test 실행 후 simulator diagnostics 응답을 600초 기다렸다가 타임아웃했고 총 663.729초 뒤 종료했지만, 결과·로그 bundle은 생성됐다.
+`ChapterCanvasControllerTesting`은 **22/22 통과**해 전체 회귀의 cancellation timing 실패는 재현되지 않았다. Domain 두 suite는 총 26 tests 중 4 issues로 실패했다: `LegacySeparationGateTesting.unversionedStoreIsMigratedButHeld` 1건, `LocalStoreLoadFailureTesting`에서 기대한 `loadIssueModelContainer` 대신 `unknownDataStoreSchema`가 나온 1건, 1.0.0~1.0.3 무버전 migration dynamic case 2건이다. 따라서 다섯 실패 중 한 건은 focused rerun에서 재현되지 않았고, 네 SwiftData 관련 실패는 반복됐다. 전체 로그는 (로컬 증거), 종료 코드는 `.exit`, xcresult는 `focused-failures-ios27-rerun.xcresult`다. Test runner는 test 실행 후 simulator diagnostics 응답을 600초 기다렸다가 타임아웃했고 총 663.729초 뒤 종료했지만, 결과·로그 bundle은 생성됐다.
 
 #### iOS 27 SwiftData 오류 대응 및 전체 회귀 재검증 (2026-09-24)
 
-후속 재검증을 시작할 때 `CarveApp.xcodeproj`는 없고 `Carve.xcworkspace`는 9/12 생성본이었다. 재생성 전에 workspace와 `Tuist/.build/tuist-derived`를 `/private/tmp/carve-2.0.0-xcode27-swiftdata-errors-20260924/preserved/`에 각각 복사했다. `mise x -- tuist generate --no-open`은 exit 0으로 workspace와 앱 프로젝트를 새로 만들었다. 그 전 첫 `xcodebuild` 시도는 stale workspace 및 sandbox CoreSimulatorService 연결 오류로 exit 66이었고 테스트는 0건이었다(`/private/tmp/carve-2.0.0-xcode27-swiftdata-errors-20260924/focused-ios27.log`, `.exit`).
+후속 재검증을 시작할 때 `CarveApp.xcodeproj`는 없고 `Carve.xcworkspace`는 9/12 생성본이었다. 재생성 전에 workspace와 `Tuist/.build/tuist-derived`를 (로컬 증거)에 각각 복사했다. `mise x -- tuist generate --no-open`은 exit 0으로 workspace와 앱 프로젝트를 새로 만들었다. 그 전 첫 `xcodebuild` 시도는 stale workspace 및 sandbox CoreSimulatorService 연결 오류로 exit 66이었고 테스트는 0건이었다((로컬 증거), `.exit`).
 
 실패한 1.0.x store는 `NSPersistentStoreCoordinator` metadata의 모델 해시가 확인된 `unversionedLegacy`였지만, iOS 27 SwiftData가 Core Data 134504를 `.loadIssueModelContainer` 대신 새 `.unknownDataStoreSchema`로 노출해 기존 폴백 판별이 막았다. `LocalStoreLoader`는 iOS 27에서 해당 오류를 legacy schema mismatch로 인정하되, metadata 해시가 정확히 확인된 1.0.x store에만 V1 경로를 허용한다. `.unknown` store는 계속 `.unknownVersion`으로 막고 V7 데이터·파일 보존 테스트도 유지했다. V7 오류 기대 테스트는 OS에 따라 두 공개 SwiftData error 중 하나를 허용한다. 서명·빌드 설정·의존성은 바꾸지 않았다.
 
-두 migration suite를 각각 26건 실행한 focused 검증은 Xcode 27에서 iOS 17.5, 18.6, 26.2, 27.0 모두 통과했다. 명령 형식은 다음과 같고 `<UDID>`는 각 runtime의 iPad mini (A17 Pro) 대상이다.
+두 migration suite를 각각 26건 실행한 focused 검증은 Xcode 27에서 iOS 17.5, 18.6, 26.2, 27.0 모두 통과했다. 명령 형식은 다음과 같고 는 각 runtime의 iPad mini (A17 Pro) 대상이다.
 
 ```bash
 xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configuration Debug \
   -destination 'platform=iOS Simulator,id=<UDID>' \
-  -derivedDataPath /private/tmp/carve-2.0.0-xcode27-f60-20260924-test-ios27/DerivedData \
-  -resultBundlePath '/private/tmp/carve-2.0.0-xcode27-swiftdata-errors-20260924/focused-{runtime}-after-fix.xcresult' \
+  -derivedDataPath (로컬 증거) \
+  -resultBundlePath '(로컬 증거) \
   -parallel-testing-enabled NO \
   -only-testing:DomainTest/LegacySeparationGateTesting \
   -only-testing:DomainTest/LocalStoreLoadFailureTesting
@@ -1599,20 +1599,20 @@ xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configurat
 
 | Xcode 27 runtime | UDID | 결과 | 로그 / exit / xcresult |
 |---|---|---|---|
-| iOS 17.5 | `0347221E-08F5-48C9-9F8E-6D7995C25D9F` | 26/26 통과 | `/private/tmp/carve-2.0.0-xcode27-swiftdata-errors-20260924/focused-ios17.5-after-fix.{log,exit,xcresult}` |
-| iOS 18.6 | `7E95B700-3976-42D7-BF85-BCAF028B7605` | 26/26 통과 | 같은 폴더 `focused-ios18.6-after-fix.{log,exit,xcresult}` |
-| iOS 26.2 | `086F17F4-649B-4AE5-9C78-22659E0F93F6` | 26/26 통과 | 같은 폴더 `focused-ios26.2-after-fix.{log,exit,xcresult}` |
-| iOS 27.0 | `C72A6CC6-4E3C-4822-BED1-9D76F8542D6B` | 26/26 통과 | 같은 폴더 `focused-ios27-after-fix.{log,exit,xcresult}` |
+| iOS 17.5 | | 26/26 통과 | (로컬 증거) |
+| iOS 18.6 | | 26/26 통과 | 같은 폴더 `focused-ios18.6-after-fix.{log,exit,xcresult}` |
+| iOS 26.2 | | 26/26 통과 | 같은 폴더 `focused-ios26.2-after-fix.{log,exit,xcresult}` |
+| iOS 27.0 | | 26/26 통과 | 같은 폴더 `focused-ios27-after-fix.{log,exit,xcresult}` |
 
-수정 뒤 첫 iOS 27.0 전체 run은 997 통과·1 SQLite `database is locked`·4 expected failure·6 skip으로 끝났다. reader suite 31/31 단독 재실행은 통과해 잠금이 재현되지 않았다(`/private/tmp/carve-2.0.0-xcode27-swiftdata-errors-20260924/reader-suite-ios27.{log,exit,xcresult}`). 함수 단위 `-only-testing` 시도는 Swift Testing 케이스를 선택하지 않아 **0건 실행**이었으며 결과에서 제외한다(`reader-single-ios27.*`). 이어 실행한 파일 제외 없는 전체 `Carve-Workspace` 회귀는 **998 통과·실패 0·4 expected failure·6 skip (총 1008)**로 통과했다(`/private/tmp/carve-2.0.0-xcode27-swiftdata-errors-20260924/full-ios27-rerun.{log,exit,xcresult}`). 따라서 기존 다섯 unexpected failure는 수정 후 최신 전체 run에서 남지 않았다. iOS 27.0 CloudKit ownership 허용, live sync, 배포 아카이브 자격은 이 로컬 simulator 회귀로 승인하지 않는다.
+수정 뒤 첫 iOS 27.0 전체 run은 997 통과·1 SQLite `database is locked`·4 expected failure·6 skip으로 끝났다. reader suite 31/31 단독 재실행은 통과해 잠금이 재현되지 않았다((로컬 증거)). 함수 단위 `-only-testing` 시도는 Swift Testing 케이스를 선택하지 않아 **0건 실행**이었으며 결과에서 제외한다(`reader-single-ios27.*`). 이어 실행한 파일 제외 없는 전체 `Carve-Workspace` 회귀는 **998 통과·실패 0·4 expected failure·6 skip (총 1008)**로 통과했다((로컬 증거)). 따라서 기존 다섯 unexpected failure는 수정 후 최신 전체 run에서 남지 않았다. iOS 27.0 CloudKit ownership 허용, live sync, 배포 아카이브 자격은 이 로컬 simulator 회귀로 승인하지 않는다.
 
-runtime 차이를 분리하기 위해 실패 suite를 같은 Xcode 27에서 iPad mini (A17 Pro) iPadOS 26.2 (`23C54`), UDID `086F17F4-649B-4AE5-9C78-22659E0F93F6`로 재실행했다.
+runtime 차이를 분리하기 위해 실패 suite를 같은 Xcode 27에서 iPad mini (A17 Pro) iPadOS 26.2 (`23C54`)로 재실행했다.
 
 ```bash
 xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configuration Debug \
-  -destination 'platform=iOS Simulator,id=086F17F4-649B-4AE5-9C78-22659E0F93F6' \
-  -derivedDataPath /private/tmp/carve-2.0.0-xcode27-f60-20260924-test-ios27/DerivedData \
-  -resultBundlePath /private/tmp/carve-2.0.0-xcode27-f60-20260924-test-ios26.2/focused-failures.xcresult \
+  -destination 'platform=iOS Simulator,id=<UDID>' \
+  -derivedDataPath (로컬 증거) \
+  -resultBundlePath (로컬 증거) \
   -parallel-testing-enabled NO \
   -only-testing:DomainTest/LegacySeparationGateTesting \
   -only-testing:DomainTest/LocalStoreLoadFailureTesting \
@@ -1624,14 +1624,14 @@ xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configurat
 
 ```bash
 xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configuration Debug \
-  -destination 'platform=iOS Simulator,id=086F17F4-649B-4AE5-9C78-22659E0F93F6' \
-  -derivedDataPath /private/tmp/carve-2.0.0-xcode27-f60-20260924-test-ios27/DerivedData \
-  -resultBundlePath /private/tmp/carve-2.0.0-xcode27-f60-20260924-test-ios26.2/full-ios26.2.xcresult \
+  -destination 'platform=iOS Simulator,id=<UDID>' \
+  -derivedDataPath (로컬 증거) \
+  -resultBundlePath (로컬 증거) \
   -parallel-testing-enabled NO
 # TEST SUCCEEDED: 999 passed, 4 known issues, 5 device-only UI skips; 0 unexpected failures (1008 total)
 ```
 
-전체 로그는 `/private/tmp/carve-2.0.0-xcode27-f60-20260924-test-ios26.2/full-ios26.2.log`, 종료 코드는 `full-ios26.2.exit`다. 집중 재실행 로그·결과도 같은 폴더의 `focused-failures.log`, `focused-failures.exit`, `focused-failures.xcresult`에 보존했다. Xcode 27의 iPadOS 26.2와 27.0 전체 회귀는 모두 통과했다. iOS 27.0의 `.unknownDataStoreSchema` 처리는 metadata가 확인된 1.0.x store에 한해 적용하며 ownership allowlist `[26]`은 유지한다. live CloudKit proof와 배포 자격은 별도로 확인해야 한다. Xcode 26.3 결과는 비교용 과거 기준으로 계속 분리한다.
+전체 로그는 (로컬 증거), 종료 코드는 `full-ios26.2.exit`다. 집중 재실행 로그·결과도 같은 폴더의 `focused-failures.log`, `focused-failures.exit`, `focused-failures.xcresult`에 보존했다. Xcode 27의 iPadOS 26.2와 27.0 전체 회귀는 모두 통과했다. iOS 27.0의 `.unknownDataStoreSchema` 처리는 metadata가 확인된 1.0.x store에 한해 적용하며 ownership allowlist `[26]`은 유지한다. live CloudKit proof와 배포 자격은 별도로 확인해야 한다. Xcode 26.3 결과는 비교용 과거 기준으로 계속 분리한다.
 
 ### Xcode 27 전체 회귀 추가 runtime (2026-09-25)
 
@@ -1639,49 +1639,49 @@ macOS `27.2 (26B5086k)`, 기본 Xcode `27.0 (27A266a)`, Swift `6.4 (swiftlang-6.
 
 ```bash
 xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configuration Debug \
-  -destination 'platform=iOS Simulator,id=0347221E-08F5-48C9-9F8E-6D7995C25D9F' \
-  -derivedDataPath /private/tmp/carve-2.0.0-xcode27-full-20260925/ios17.5/DerivedData \
-  -resultBundlePath /private/tmp/carve-2.0.0-xcode27-full-20260925/ios17.5/full.xcresult \
+  -destination 'platform=iOS Simulator,id=<UDID>' \
+  -derivedDataPath (로컬 증거) \
+  -resultBundlePath (로컬 증거) \
   -parallel-testing-enabled NO
 # iPad mini (6th generation), iOS 17.5 (21F79): 998 passed, 4 expected failures, 6 skipped, 0 failed (1008 total)
 ```
 
 ```bash
 xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configuration Debug \
-  -destination 'platform=iOS Simulator,id=7E95B700-3976-42D7-BF85-BCAF028B7605' \
-  -derivedDataPath /private/tmp/carve-2.0.0-xcode27-full-20260925/ios18.6/DerivedData \
-  -resultBundlePath /private/tmp/carve-2.0.0-xcode27-full-20260925/ios18.6/full.xcresult \
+  -destination 'platform=iOS Simulator,id=<UDID>' \
+  -derivedDataPath (로컬 증거) \
+  -resultBundlePath (로컬 증거) \
   -parallel-testing-enabled NO
 # iPad mini (A17 Pro), iOS 18.6 (22G86): 999 passed, 4 expected failures, 5 skipped, 0 failed (1008 total)
 ```
 
-두 실행의 전체 로그·exit·xcresult는 각각 `/private/tmp/carve-2.0.0-xcode27-full-20260925/ios17.5/`와 `.../ios18.6/` 아래 `full.log`, `full.exit`, `full.xcresult`다. xcresult summary는 두 runtime 모두 `Passed`, unexpected failure 0, `runtimeWarnings` 없음이었다. iOS 17.5의 전체 로그에는 simulator `data/tmp` 아래 UUID 임시 migration/store fixture와 `-wal`·`-shm` 파일을 가리키는 `vnode unlinked while in use` 382건과 `invalidated open fd` 382건이 기록됐다. 대표 사례는 V3→V5 및 V4 migration 테스트 중 임시 저장소 정리 시점이며 해당 테스트는 통과했다. 로그만으로 컨테이너 객체 수명 원인을 확정할 수 없어 fixture cleanup 후속 조사 항목으로 남긴다. iOS 18.6 로그에서는 같은 경고가 관찰되지 않았다. 이 로그 진단은 xcresult failure/runtime warning으로 집계되지 않았고 사용자 저장소를 가리키지 않았다.
+두 실행의 전체 로그·exit·xcresult는 각각 (로컬 증거)와 `.../ios18.6/` 아래 `full.log`, `full.exit`, `full.xcresult`다. xcresult summary는 두 runtime 모두 `Passed`, unexpected failure 0, `runtimeWarnings` 없음이었다. iOS 17.5의 전체 로그에는 simulator `data/tmp` 아래 UUID 임시 migration/store fixture와 `-wal`·`-shm` 파일을 가리키는 `vnode unlinked while in use` 382건과 `invalidated open fd` 382건이 기록됐다. 대표 사례는 V3→V5 및 V4 migration 테스트 중 임시 저장소 정리 시점이며 해당 테스트는 통과했다. 로그만으로 컨테이너 객체 수명 원인을 확정할 수 없어 fixture cleanup 후속 조사 항목으로 남긴다. iOS 18.6 로그에서는 같은 경고가 관찰되지 않았다. 이 로그 진단은 xcresult failure/runtime warning으로 집계되지 않았고 사용자 저장소를 가리키지 않았다.
 
 ```bash
 xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configuration Debug \
-  -destination 'platform=iOS Simulator,id=2C610CAE-8E1D-4145-A145-9FE7E1CC1356' \
-  -derivedDataPath /private/tmp/carve-2.0.0-xcode27-full-20260925/ios26.4/DerivedData \
-  -resultBundlePath /private/tmp/carve-2.0.0-xcode27-full-20260925/ios26.4/retry.xcresult \
+  -destination 'platform=iOS Simulator,id=<UDID>' \
+  -derivedDataPath (로컬 증거) \
+  -resultBundlePath (로컬 증거) \
   -parallel-testing-enabled NO
 # iPad mini (A17 Pro), iPadOS 26.4 (23E244): 999 passed, 4 expected failures, 5 skipped, 0 failed (1008 total)
 ```
 
 ```bash
 xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configuration Debug \
-  -destination 'platform=iOS Simulator,id=589A8DAB-2D5C-45FC-B76B-C4260FB87C67' \
-  -derivedDataPath /private/tmp/carve-2.0.0-xcode27-full-20260925/ios26.5/DerivedData \
-  -resultBundlePath /private/tmp/carve-2.0.0-xcode27-full-20260925/ios26.5/full.xcresult \
+  -destination 'platform=iOS Simulator,id=<UDID>' \
+  -derivedDataPath (로컬 증거) \
+  -resultBundlePath (로컬 증거) \
   -parallel-testing-enabled NO
 # iPad mini (A17 Pro), iPadOS 26.5 (23F77): 999 passed, 4 expected failures, 5 skipped, 0 failed (1008 total)
 ```
 
 iPadOS 26.4·26.5 결과 bundle도 `Passed`, unexpected failure 0, `runtimeWarnings` 없음이다. 26.4 최종 로그·exit는 `ios26.4/retry.log`·`retry.exit`·`retry.xcresult`에 있다. 앞선 sandbox service 조회는 exit 66, service 접근 뒤 첫 빌드 호출은 기존 `full.xcresult` 경로 충돌(exit 64)로 테스트를 시작하지 못했다. 그 경로를 보존하고 최종 검증은 별도 `retry.xcresult`로 수행했다. 26.5 로그·exit·xcresult는 `ios26.5/full.log`·`full.exit`·`full.xcresult`다. 두 runtime의 테스트는 Xcode 27 CLI로 수행했고 ACC·iCloud 로그인·CloudKit 서버 변경은 없었다.
 
-초기 검증 시점에는 CUA가 호스트 Mac 잠금 상태를 반환해 Device Hub 스모크를 하지 못했다. 2026-09-24 잠금 해제 뒤 수행한 수동 확인은 아래 별도 기록에 있다. 이는 자동 CLI build/test와 별도다. ACC simulator/데이터를 사용하지 않았고, CloudKit 계정 로그인·필기 입력·의도적인 서버 상태 변경은 하지 않았다. 앱 시작 화면은 기존 iCloud 필사를 받고 있다고 표시했으므로 백그라운드 네트워크 읽기 여부는 검증하지 않았으며 이 결과를 CloudKit proof로 세지 않는다. Release Archive·배포 서명·TestFlight도 확인하지 않았다. 당시 출시 판정은 **NO-GO**였다. 이후 Xcode 27 iPadOS 26.5 ACC sandbox clone에서 기존 private-store ownership proof를 통과했으며, 전체 현행 게이트와 제한은 이 절 뒤의 2026-09-25 기록을 따른다. iOS 18 migration marker·계정 왕복, 로그인 상태 1.3.0 업데이트, iOS 17.0 직접 시험, production CloudKit 및 배포 archive/TestFlight는 여전히 남아 있어 출시 판정은 **NO-GO**다.
+초기 검증 시점에는 호스트 Mac이 잠겨 있어 Device Hub 스모크를 하지 못했다. 2026-09-24 잠금 해제 뒤 수행한 수동 확인은 아래 별도 기록에 있다. 이는 자동 CLI build/test와 별도다. ACC simulator/데이터를 사용하지 않았고, CloudKit 계정 로그인·필기 입력·의도적인 서버 상태 변경은 하지 않았다. 앱 시작 화면은 기존 iCloud 필사를 받고 있다고 표시했으므로 백그라운드 네트워크 읽기 여부는 검증하지 않았으며 이 결과를 CloudKit proof로 세지 않는다. Release Archive·배포 서명·TestFlight도 확인하지 않았다. 당시 출시 판정은 **NO-GO**였다. 이후 Xcode 27 iPadOS 26.5 ACC sandbox clone에서 기존 private-store ownership proof를 통과했으며, 전체 현행 게이트와 제한은 이 절 뒤의 2026-09-25 기록을 따른다. iOS 18 migration marker·계정 왕복, 로그인 상태 1.3.0 업데이트, iOS 17.0 직접 시험, production CloudKit 및 배포 archive/TestFlight는 여전히 남아 있어 출시 판정은 **NO-GO**다.
 
 #### Device Hub 수동 UI smoke (2026-09-24, 자동 테스트와 별도)
 
-호스트 잠금 해제 후 새 simulator `Carve-Xcode27-DeviceHub-Smoke-20260924` (iPad mini (A17 Pro), iPadOS 27.0 build `24A434`, UDID `0D967FE8-ECAC-42F5-AAC6-56E927A3844D`)를 만들었다. 생성 직후 Device Hub에 `No Developer Apps`로 보였고, Xcode 27 `Carve-Workspace` Debug build의 `CarveApp.app` (bundle `kr.co.carve.leetaek`, version 2.0.0 (1))을 설치했다. Device Hub에서 앱을 직접 열고 “먼저 시작하기”와 첫 실행 안내 “건너뛰기”를 눌러 창세기 1장 reader까지 확인했다. 31절 본문과 빈 필사 열이 표시됐고 실행 취소·다시 실행은 비활성이었다. 필기 입력, 메뉴, 장 이동, 저장 기능은 누르지 않았다. 크래시나 화면 오류는 관찰하지 않았다.
+호스트 잠금 해제 후 새 simulator `Carve-Xcode27-DeviceHub-Smoke-20260924` (iPad mini (A17 Pro), iPadOS 27.0 build `24A434`)를 만들었다. 생성 직후 Device Hub에 `No Developer Apps`로 보였고, Xcode 27 `Carve-Workspace` Debug build의 `CarveApp.app` (bundle `kr.co.carve.leetaek`, version 2.0.0 (1))을 설치했다. Device Hub에서 앱을 직접 열고 “먼저 시작하기”와 첫 실행 안내 “건너뛰기”를 눌러 창세기 1장 reader까지 확인했다. 31절 본문과 빈 필사 열이 표시됐고 실행 취소·다시 실행은 비활성이었다. 필기 입력, 메뉴, 장 이동, 저장 기능은 누르지 않았다. 크래시나 화면 오류는 관찰하지 않았다.
 
 후속 수동 확인에서 Device Hub의 `nextChapter` 버튼을 눌러 창세기 2장으로 이동한 뒤 이전 장 버튼으로 창세기 1장에 복귀했다. 양쪽 장 제목과 본문이 표시되는 것을 접근성 트리에서 확인했다. 본문 이동 확인만 했으며 필기나 절 메뉴를 조작하지 않았다. Device Hub 창과 simulator 명칭은 기존 startup smoke와 같고 자동화 테스트 결과에는 포함하지 않는다.
 
@@ -1691,21 +1691,21 @@ iPadOS 26.4·26.5 결과 bundle도 `Passed`, unexpected failure 0, `runtimeWarni
 
 현행 환경은 macOS `27.2 (26B5086k)`, 기본 선택 Xcode `27.0 (27A266a)`, Swift `6.4 (swiftlang-6.4.0.34.1)`, Tuist `4.208.0`이다. `xcode-select -p`는 `/Applications/Xcode.app/Contents/Developer`를 가리킨다. 대상은 ownership reader 허용 범위 `[26]`에 속하는 iPadOS 26.5 (`23F77`)이며, iPhone destination은 사용하지 않았다.
 
-사용자가 2026-09-25 기존 ACC 데이터 변경을 허용했다. 원본 `Carve-ACC-B` (`DB142B76-153A-462E-AC54-4A9B3BDF6D9F`)는 종료 상태로 두고 `xcrun simctl clone`으로 `Carve-ACC-Xcode27-Proof-20260925` (`E73A3120-C87C-4017-BF59-BA227BFCD580`)를 만들었다. 복제는 같은 sandbox 계정과 Development private DB를 공유할 수 있으므로 서버 격리가 아니다. 계정 전환이나 로그인 조작은 하지 않았다.
+사용자가 2026-09-25 기존 ACC 데이터 변경을 허용했다. 원본 `Carve-ACC-B` (`<UDID>`)는 종료 상태로 두고 `xcrun simctl clone`으로 `Carve-ACC-Xcode27-Proof-20260925` (`<UDID>`)를 만들었다. 복제는 같은 sandbox 계정과 Development private DB를 공유할 수 있으므로 서버 격리가 아니다. 계정 전환이나 로그인 조작은 하지 않았다.
 
-앱 실행 전 원본 SQLite, `-wal`, `-shm`, Preservation, EraseState를 `/private/tmp/carve-2.0.0-acc-proof-20260925/pre-local/`에 복사했다. 원본 store는 V6, `integrity_check=ok`, `BibleDrawing` 12행, record metadata 12행, nonempty·unique CK record name 12개, upload/cloud-delete/local-delete pending은 각각 0이었다. Genesis 1:1 및 1:2의 row UUID 해시, line/layout byte 수와 SHA-256은 복제 전 snapshot과 앱 실행 뒤 복제본에서 같았다(1:1 line 1340B, 1:2 line 1220B). 복제본도 무결성 `ok`, 12행·12 metadata, pending 0이며 StoreOwnership marker는 없었다. ACC-B 원본의 DB 본문과 WAL 해시는 snapshot과 같았다. 다만 한 번 `simctl get_app_container`가 clone 호출에도 원본 경로를 반환했고, 그 경로를 읽기 전용 SQLite로 확인하는 동안 원본 `-shm`가 바뀌었다. SQLite의 읽기 전용 open도 `-shm`를 갱신할 수 있다는 F35 관측과 맞으며, DB/WAL 및 표본 payload는 바뀌지 않았다. 원본 simulator는 계속 종료 상태다.
+앱 실행 전 원본 SQLite, `-wal`, `-shm`, Preservation, EraseState를 (로컬 증거)에 복사했다. 원본 store는 V6, `integrity_check=ok`, `BibleDrawing` 12행, record metadata 12행, nonempty·unique CK record name 12개, upload/cloud-delete/local-delete pending은 각각 0이었다. Genesis 1:1 및 1:2의 row UUID 해시, line/layout byte 수와 SHA-256은 복제 전 snapshot과 앱 실행 뒤 복제본에서 같았다(1:1 line 1340B, 1:2 line 1220B). 복제본도 무결성 `ok`, 12행·12 metadata, pending 0이며 StoreOwnership marker는 없었다. ACC-B 원본의 DB 본문과 WAL 해시는 snapshot과 같았다. 다만 한 번 `simctl get_app_container`가 clone 호출에도 원본 경로를 반환했고, 그 경로를 읽기 전용 SQLite로 확인하는 동안 원본 `-shm`가 바뀌었다. SQLite의 읽기 전용 open도 `-shm`를 갱신할 수 있다는 F35 관측과 맞으며, DB/WAL 및 표본 payload는 바뀌지 않았다. 원본 simulator는 계속 종료 상태다.
 
 로컬-only strict profile 재확인에서는 `ANSCKMETADATAENTRY`가 예상 metadata key 7개를 중복 없이 모두 가지고 있었고 값 형식 profile 완전, `needsMigration=false`, 저장소 내부 `identityChecked=true`였다. 이 flag는 저장소 내부 값만 확인한 것이며 현재 iCloud 계정 identity와 일치한다는 뜻은 아니다. 세 legacy entity를 합쳐 12행 모두 대응 12개, 이름 존재·유일성 12개, orphan 0, pending 0이었다. 계정 상태와 CloudKit fetch가 준비되지 않아 이 로컬 결과만으로 ownership marker를 만들거나 소유를 인정하지 않았다.
 
 ```bash
 xcodebuild build -workspace Carve.xcworkspace -scheme CarveApp -configuration Debug \
-  -destination 'platform=iOS Simulator,id=DDE9B05A-B684-486E-A8A2-AFFCED4BA600' \
-  -derivedDataPath /private/tmp/carve-2.0.0-acc-proof-20260925/DerivedData
+  -destination 'platform=iOS Simulator,id=<UDID>' \
+  -derivedDataPath (로컬 증거)
 # BUILD SUCCEEDED, exit 0; build.log, build.exit
 
-SIMCTL_CHILD_DYLD_INSERT_LIBRARIES=/private/tmp/carve-2.0.0-acc-proof-20260925/libCarveCloudKitReadOnlyProbe.dylib \
+SIMCTL_CHILD_DYLD_INSERT_LIBRARIES=(로컬 증거) \
 SIMCTL_CHILD_CARVE_CK_PROBE_LABEL=baseline \
-  xcrun simctl launch E73A3120-C87C-4017-BF59-BA227BFCD580 kr.co.carve.leetaek
+  xcrun simctl launch <UDID> kr.co.carve.leetaek
 # launch exit 0; launch-baseline.log, launch-baseline.exit
 ```
 
@@ -1713,7 +1713,7 @@ SIMCTL_CHILD_CARVE_CK_PROBE_LABEL=baseline \
 
 앱이 시작된 뒤 CloudKit 로그는 account status `Temporarily Unavailable`, `hasValidCredentials=false`를 보였다. Core Data CloudKit setup은 `NSCocoaErrorDomain 134400` / `CKAccountStatusTemporarilyUnavailable`로 실패했다. 현재 계정 identity를 검증하거나 기존 private DB 레코드를 조회하지 못했고, fail-closed 소유 marker는 생성되지 않았다. clone의 후속 local store 검증에서 Genesis 1:1·1:2 payload 지문과 모든 pending count가 실행 전과 같았다. 로그인 상태가 준비되지 않아 서버 전후 inventory 및 production ownership proof는 미실행/미판정이다.
 
-빌드 전체 로그·exit는 `/private/tmp/carve-2.0.0-acc-proof-20260925/build.log`·`build.exit`이다. 첫 launch/app 로그는 account identifier 필드를 가린 `/private/tmp/carve-2.0.0-acc-proof-20260925/app.log`에 있고, launch 결과는 `launch-baseline.log`·`launch-baseline.exit`, 읽기 전용 CloudKit 요약은 위 JSON이다. 첫 시도에서는 자동 테스트나 Device Hub 수동 조작을 하지 않았다. 자동 테스트는 기존 Xcode 27 iPadOS 26.5 전체 회귀(999 passed · 4 expected failures · 5 skips · unexpected failure 0)와 별도다. 사용자가 같은 ACC sandbox account를 복제 simulator에 로그인한 뒤 이어서 확인한 결과는 다음 절에 기록한다. 계정 전환이나 auto-review 우회는 하지 않았다. 출시 판정은 **NO-GO** 유지다.
+빌드 전체 로그·exit는 (로컬 증거)·`build.exit`이다. 첫 launch/app 로그는 account identifier 필드를 가린 (로컬 증거)에 있고, launch 결과는 `launch-baseline.log`·`launch-baseline.exit`, 읽기 전용 CloudKit 요약은 위 JSON이다. 첫 시도에서는 자동 테스트나 Device Hub 수동 조작을 하지 않았다. 자동 테스트는 기존 Xcode 27 iPadOS 26.5 전체 회귀(999 passed · 4 expected failures · 5 skips · unexpected failure 0)와 별도다. 사용자가 같은 ACC sandbox account를 복제 simulator에 로그인한 뒤 이어서 확인한 결과는 다음 절에 기록한다. 계정 전환은 하지 않았다. 출시 판정은 **NO-GO** 유지다.
 
 ### Xcode 27 기존 private CloudKit ownership proof — 로그인 후 재개 (2026-09-25)
 
@@ -1728,37 +1728,37 @@ SIMCTL_CHILD_CARVE_CK_PROBE_LABEL=baseline \
 주요 명령과 증거 경로:
 
 ```bash
-SIMCTL_CHILD_DYLD_INSERT_LIBRARIES=/private/tmp/carve-2.0.0-acc-proof-20260925/libCarveCloudKitReadOnlyProbe.dylib \
+SIMCTL_CHILD_DYLD_INSERT_LIBRARIES=(로컬 증거) \
 SIMCTL_CHILD_CARVE_CK_PROBE_LABEL=post-login-baseline \
-  xcrun simctl launch --terminate-running-process E73A3120-C87C-4017-BF59-BA227BFCD580 kr.co.carve.leetaek
+  xcrun simctl launch --terminate-running-process <UDID> kr.co.carve.leetaek
 
-SIMCTL_CHILD_DYLD_INSERT_LIBRARIES=/private/tmp/carve-2.0.0-acc-proof-20260925/libCarveCloudKitReadOnlyProbe.dylib \
+SIMCTL_CHILD_DYLD_INSERT_LIBRARIES=(로컬 증거) \
 SIMCTL_CHILD_CARVE_CK_PROBE_LABEL=post-proof \
-  xcrun simctl launch --terminate-running-process E73A3120-C87C-4017-BF59-BA227BFCD580 kr.co.carve.leetaek
+  xcrun simctl launch --terminate-running-process <UDID> kr.co.carve.leetaek
 ```
 
-두 launch는 exit 0이다. baseline·최종 JSON은 clone app container의 `tmp/carve-cloudkit-post-login-baseline.json` 및 `tmp/carve-cloudkit-post-proof.json`, 마지막 로그는 identifier 필드를 가린 `/private/tmp/carve-2.0.0-acc-proof-20260925/app-after-login.log`에 있다. 민감한 원본 로그는 같은 디렉터리의 `.private-raw.log`로 남아 파일 모드 600이다. 이 실행에서는 자동 회귀를 재실행하거나 Device Hub를 사용하지 않았다. Xcode 27 iPadOS 26.5 전체 회귀(999 passed · 4 expected failures · 5 skips · unexpected failure 0)는 별도 CLI 결과다. 이 성공은 iOS 26.5의 기존 store + ACC sandbox private CloudKit ownership 경로에 한정되며 iOS 18 marker, 로그인 상태 1.3.0 업데이트, iOS 17, production CloudKit, Archive·배포 서명·TestFlight를 통과시키지 않는다. 출시 판정은 **NO-GO** 유지다.
+두 launch는 exit 0이다. baseline·최종 JSON은 clone app container의 `tmp/carve-cloudkit-post-login-baseline.json` 및 `tmp/carve-cloudkit-post-proof.json`, 마지막 로그는 identifier 필드를 가린 (로컬 증거)에 있다. 민감한 원본 로그는 같은 디렉터리의 `.private-raw.log`로 남아 파일 모드 600이다. 이 실행에서는 자동 회귀를 재실행하거나 Device Hub를 사용하지 않았다. Xcode 27 iPadOS 26.5 전체 회귀(999 passed · 4 expected failures · 5 skips · unexpected failure 0)는 별도 CLI 결과다. 이 성공은 iOS 26.5의 기존 store + ACC sandbox private CloudKit ownership 경로에 한정되며 iOS 18 marker, 로그인 상태 1.3.0 업데이트, iOS 17, production CloudKit, Archive·배포 서명·TestFlight를 통과시키지 않는다. 출시 판정은 **NO-GO** 유지다.
 
 ### Xcode 27 iPadOS 18.6 1.3.0 → 2.0.0 계정 없는 V3 migration probe (2026-09-25)
 
-환경은 macOS `27.2 (26B5086k)`, 기본 Xcode `27.0 (27A266a)`, Swift `6.4 (swiftlang-6.4.0.34.1)`, 현재 checkout Tuist `4.208.0`이다. 대상은 새 iPad mini (A17 Pro) iOS 18.6 simulator `Carve-X27-iOS18.6-V3-Offline-20260925` (`9078BCF2-5F9C-40F9-A265-3F0600BC3A0D`)이며 ACC/F59 원본 simulator를 사용하지 않았다. 이 실행에서는 simulator에 iCloud 계정을 추가하지 않았다.
+환경은 macOS `27.2 (26B5086k)`, 기본 Xcode `27.0 (27A266a)`, Swift `6.4 (swiftlang-6.4.0.34.1)`, 현재 checkout Tuist `4.208.0`이다. 대상은 새 iPad mini (A17 Pro) iOS 18.6 simulator `Carve-X27-iOS18.6-V3-Offline-20260925`이며 ACC/F59 원본 simulator를 사용하지 않았다. 이 실행에서는 simulator에 iCloud 계정을 추가하지 않았다.
 
-정확한 1.3.0 소스 commit `49f2dc2791c632627257d28f33278d43e7df8cc9`에서 Tuist `4.39.0`으로 프로젝트를 생성했다. 고정된 29개 package pin을 임시 cache에 설치했고 `Tuist/Package.resolved` SHA-256은 전후 `e9c594efdef65c60c2002f6948764d14a8a76cc4076fb4a75156f401d6d4e628`로 같았다. Xcode 27로 historical 1.3.0 앱을 다시 빌드한 시도는 exit 65로 실패했다. Firebase·GoogleUtilities 계열 등의 iOS 12/13 및 SwiftSyntax 계열의 macOS 10.15 deployment target을 Xcode 27 SDK가 지원하는 최솟값(iOS 15/macOS 12)보다 낮다고 거절했다. 로그에 Swift compile task가 없어 자사 Swift 소스 컴파일 전 빌드 계획 단계에서 멈췄다. 의존성 버전이나 deployment target/build setting을 바꾸지 않았다. 시작 앱은 `Carve-2.0.0-test-legacy` (`0A956010-5DAA-44BC-BA22-5BAE53FF6D82`)에 이미 설치돼 있던 1.3.0(1) simulator bundle을 임시 디렉터리로 복사해 사용했고, 복사본의 `codesign --verify --deep --strict`는 통과했다. 따라서 이 과거 앱 bundle 자체를 Xcode 27에서 새로 빌드한 결과로 취급하지 않는다.
+정확한 1.3.0 소스 commit `49f2dc2791c632627257d28f33278d43e7df8cc9`에서 Tuist `4.39.0`으로 프로젝트를 생성했다. 고정된 29개 package pin을 임시 cache에 설치했고 `Tuist/Package.resolved` SHA-256은 전후 `e9c594efdef65c60c2002f6948764d14a8a76cc4076fb4a75156f401d6d4e628`로 같았다. Xcode 27로 historical 1.3.0 앱을 다시 빌드한 시도는 exit 65로 실패했다. Firebase·GoogleUtilities 계열 등의 iOS 12/13 및 SwiftSyntax 계열의 macOS 10.15 deployment target을 Xcode 27 SDK가 지원하는 최솟값(iOS 15/macOS 12)보다 낮다고 거절했다. 로그에 Swift compile task가 없어 자사 Swift 소스 컴파일 전 빌드 계획 단계에서 멈췄다. 의존성 버전이나 deployment target/build setting을 바꾸지 않았다. 시작 앱은 `Carve-2.0.0-test-legacy`에 이미 설치돼 있던 1.3.0(1) simulator bundle을 임시 디렉터리로 복사해 사용했고, 복사본의 `codesign --verify --deep --strict`는 통과했다. 따라서 이 과거 앱 bundle 자체를 Xcode 27에서 새로 빌드한 결과로 취급하지 않는다.
 
-재빌드 시도 명령은 다음과 같다. 사용한 2.0.0(1) 앱은 이전 Xcode 27 workspace build 산출물 `/private/tmp/carve-2.0.0-acc-proof-20260925/DerivedData/Build/Products/Debug-iphonesimulator/CarveApp.app`이며, 해당 `build.exit`는 0이다. 이 후보 앱의 소스는 이 probe 전후 바뀌지 않았다.
+재빌드 시도 명령은 다음과 같다. 사용한 2.0.0(1) 앱은 이전 Xcode 27 workspace build 산출물 (로컬 증거)이며, 해당 `build.exit`는 0이다. 이 후보 앱의 소스는 이 probe 전후 바뀌지 않았다.
 
 ```bash
 xcodebuild build -workspace Carve.xcworkspace -scheme CarveApp -configuration Debug \
-  -destination 'platform=iOS Simulator,id=7E95B700-3976-42D7-BF85-BCAF028B7605' \
-  -derivedDataPath /private/tmp/carve-1.3.0-artifact-20260925.hYLOHD/DerivedData
-xcrun simctl launch --terminate-running-process 9078BCF2-5F9C-40F9-A265-3F0600BC3A0D kr.co.carve.leetaek
+  -destination 'platform=iOS Simulator,id=<UDID>' \
+  -derivedDataPath (로컬 증거)
+xcrun simctl launch --terminate-running-process <UDID> kr.co.carve.leetaek
 ```
 
-입력은 F59에서 보존한 계정 없는 V3 synthetic 표본 `/private/tmp/carve-2.0-live-proof-20260924/legacy-ios18.6-pointer-sample-before-2.0.sqlite`의 별도 복사본이다. 원본 및 F59 simulator는 변경하지 않았다. 복사본은 무결성 `ok`, Genesis 1:1 한 행, `ZLINEDATA` 298B / SHA-256 `07876e8b1910039124914f5c44b9619a90b8ad488a08500bdfa6abc07762c3d6`, `ANSCKMETADATAENTRY` 네 개, `ANSCKRECORDMETADATA` 0행이었다. 해당 표본의 기존 1.3.0(1) 앱을 새 simulator에 설치하고 store를 심은 뒤 Xcode 27 빌드 2.0.0 앱을 같은 bundle ID로 설치·실행했다. install과 launch는 각각 exit 0이다.
+입력은 F59에서 보존한 계정 없는 V3 synthetic 표본 (로컬 증거)의 별도 복사본이다. 원본 및 F59 simulator는 변경하지 않았다. 복사본은 무결성 `ok`, Genesis 1:1 한 행, `ZLINEDATA` 298B / SHA-256 `07876e8b1910039124914f5c44b9619a90b8ad488a08500bdfa6abc07762c3d6`, `ANSCKMETADATAENTRY` 네 개, `ANSCKRECORDMETADATA` 0행이었다. 해당 표본의 기존 1.3.0(1) 앱을 새 simulator에 설치하고 store를 심은 뒤 Xcode 27 빌드 2.0.0 앱을 같은 bundle ID로 설치·실행했다. install과 launch는 각각 exit 0이다.
 
 2.0.0 실행 후 SQLite `integrity_check=ok`, `BibleDrawing` 1행이었다. iOS 17.x→2.0 스키마 migration 열 `ZROWUUID`와 `ZLAYOUTMETADATADATA`가 생겼고, Genesis 1:1 `ZLINEDATA`는 298B이며 입력 snapshot과 SHA-256이 같았다. `Library/Application Support/Preservation/.../Carve.dev.sqlite` 원본 사본의 SHA-256도 입력 파일과 같아 보존 snapshot을 확인했다. 앱이 만든 metadata key는 다섯 개로 늘었고 새 키 `PFCloudKitMetadataModelMigratorMigrationBeganCommitKey`가 있었다. 이 private marker의 의미는 확인되지 않았으며 iOS 18 ownership 허용 근거로 쓰지 않는다. 앱 로그의 Core Data CloudKit setup은 `NSCocoaErrorDomain 134400` / `CKAccountStatusNoAccount`로 중단됐다. record metadata·pending 작업은 0, `StoreOwnership` marker는 없었다. 이는 이 합성 단일 행의 **로컬 migration·payload 보존 통과**만 뜻한다. 계정 proof·CloudKit import/export·서버 변경 여부는 시험하지 않았다.
 
-새 실행의 초기 전체 로그와 exit는 `/private/tmp/carve-1.3.0-artifact-20260925.hYLOHD/` 아래에 기록됐으나 2026-09-25 후속 점검 시 이 임시 디렉터리는 이미 없어 원본 파일을 재열 수 없었다. 저장소에는 당시 exit·결과가 위 문단과 이 문서의 실행 기록에 보존돼 있다. 당시 Device Hub 최초 화면 관찰은 필사 획이 보이지 않는다고 기록했지만, 이것은 확대 전·일시 오버레이를 열린 화면의 관찰이었다.
+새 실행의 초기 전체 로그와 exit는 (로컬 증거) 아래에 기록됐으나 2026-09-25 후속 점검 시 이 임시 디렉터리는 이미 없어 원본 파일을 재열 수 없었다. 저장소에는 당시 exit·결과가 위 문단과 이 문서의 실행 기록에 보존돼 있다. 당시 Device Hub 최초 화면 관찰은 필사 획이 보이지 않는다고 기록했지만, 이것은 확대 전·일시 오버레이를 열린 화면의 관찰이었다.
 
 #### 2026-09-25 후속 read-only CanvasDisplayProbe 및 Device Hub 재확인
 
@@ -1766,11 +1766,11 @@ xcrun simctl launch --terminate-running-process 9078BCF2-5F9C-40F9-A265-3F0600BC
 
 ```bash
 xcrun simctl launch --terminate-running-process --console \
-  9078BCF2-5F9C-40F9-A265-3F0600BC3A0D kr.co.carve.leetaek -CanvasDisplayProbe
-xcrun simctl terminate 9078BCF2-5F9C-40F9-A265-3F0600BC3A0D kr.co.carve.leetaek
+   kr.co.carve.leetaek -CanvasDisplayProbe
+xcrun simctl terminate <UDID> kr.co.carve.leetaek
 ```
 
-probe 로그 `/private/tmp/carve-x27-v3-display-probe-20260925/probe-console.raw.log`와 launch/terminate 로그·exit 파일은 확인 시 존재했고 파일 mode는 600이었다. launch와 terminate는 각각 exit 0이다.
+probe 로그 (로컬 증거)와 launch/terminate 로그·exit 파일은 확인 시 존재했고 파일 mode는 600이었다. launch와 terminate는 각각 exit 0이다.
 
 첫 fetch 전 sample은 `expected=n0`, `canvas=n0`였고, fetch 완료 sample은 `expected=n1:(433.0, 145.0, 49.0, 4.0)`, `canvas=n1:(433.0, 145.0, 49.0, 4.0)`, `storeDiff=0`, `deliveredDiff=0`, `screenInk=(433.0, 287.0, 49.0, 4.0)`였다. 실제 canvas가 store의 한 획을 받아 동일 경계로 적용했고 화면 변환에서도 non-empty 영역을 보고했다. 기존 SQLite 행도 `drawingVersion=1`, payload 298B, 기존 SHA-256과 일치했다. Device Hub에서 일시 오버레이를 닫고 화면을 확대하자 Genesis 1:1 오른쪽 필사 영역에 작은 획이 보였다. 창세기 1→2→1 이동 뒤 확인한 이 수동 화면 관찰은 자동 CLI 테스트 결과와 구분한다.
 
@@ -1778,22 +1778,22 @@ probe 로그 `/private/tmp/carve-x27-v3-display-probe-20260925/probe-console.raw
 
 ### Xcode 27 iPadOS 26.5 로그인 상태 1.3.0 → 2.0.0 기존 store 승격 (2026-09-25)
 
-실행 환경은 macOS `27.2 (26B5086k)`, 기본 Xcode `27.0 (27A266a)`, Swift `6.4 (swiftlang-6.4.0.34.1)`, Tuist `4.208.0`이다. Xcode 27의 iOS Simulator SDK `27.0`으로 빌드했고, 자동 테스트는 iPad mini (A17 Pro) iPadOS `26.5 (23F77)` (`589A8DAB-2D5C-45FC-B76B-C4260FB87C67`)를 사용했다. 이 테스트 destination은 ACC clone과 별도이며 iPhone destination은 사용하지 않았다. checkout에 Tuist workspace가 있으므로 재생성하지 않았다.
+실행 환경은 macOS `27.2 (26B5086k)`, 기본 Xcode `27.0 (27A266a)`, Swift `6.4 (swiftlang-6.4.0.34.1)`, Tuist `4.208.0`이다. Xcode 27의 iOS Simulator SDK `27.0`으로 빌드했고, 자동 테스트는 iPad mini (A17 Pro) iPadOS `26.5 (23F77)`를 사용했다. 이 테스트 destination은 ACC clone과 별도이며 iPhone destination은 사용하지 않았다. checkout에 Tuist workspace가 있으므로 재생성하지 않았다.
 
 먼저 Xcode 27 후보 앱을 CLI로 빌드했다. 변경된 서명·빌드 설정은 없었다.
 
 ```bash
 xcodebuild build -workspace Carve.xcworkspace -scheme CarveApp -configuration Debug \
-  -destination 'platform=iOS Simulator,id=589A8DAB-2D5C-45FC-B76B-C4260FB87C67' \
-  -derivedDataPath /private/tmp/carve-x27-acc-login-update-20260925/DerivedData
+  -destination 'platform=iOS Simulator,id=<UDID>' \
+  -derivedDataPath (로컬 증거)
 # BUILD SUCCEEDED, exit 0
 ```
 
-전체 빌드 로그·종료 코드는 `/private/tmp/carve-x27-acc-login-update-20260925/build.log`·`build.exit`다. 생성된 simulator 앱의 bundle version은 2.0.0 (1)이며 `codesign --verify --deep --strict`가 통과했다. 로그에는 File Length와 Sendable 관련 비치명적 경고가 있었고 빌드는 성공했다. 이는 simulator 산출물 검사이고 배포 서명·Archive 증거가 아니다.
+전체 빌드 로그·종료 코드는 (로컬 증거)·`build.exit`다. 생성된 simulator 앱의 bundle version은 2.0.0 (1)이며 `codesign --verify --deep --strict`가 통과했다. 로그에는 File Length와 Sendable 관련 비치명적 경고가 있었고 빌드는 성공했다. 이는 simulator 산출물 검사이고 배포 서명·Archive 증거가 아니다.
 
-기존 로그인 proof source `Carve-ACC-Xcode27-Proof-20260925` (`E73A3120-C87C-4017-BF59-BA227BFCD580`)를 종료 상태로 보존하고 같은 기기의 별도 복제본 `Carve-ACC-Xcode27-LoginUpdate-20260925` (`6C59D527-24D2-4519-AD43-2AC988C14F54`)에서만 설치·실행했다. clone과 source의 private CloudKit identity 지문은 일치했다. `Carve-ACC-dut`는 identity 지문이 달라 이번 시험에서 제외했다. 원본 ACC-B와 해당 기기의 데이터는 변경하지 않았다.
+기존 로그인 proof source `Carve-ACC-Xcode27-Proof-20260925`를 종료 상태로 보존하고 같은 기기의 별도 복제본 `Carve-ACC-Xcode27-LoginUpdate-20260925`에서만 설치·실행했다. clone과 source의 private CloudKit identity 지문은 일치했다. `Carve-ACC-dut`는 identity 지문이 달라 이번 시험에서 제외했다. 원본 ACC-B와 해당 기기의 데이터는 변경하지 않았다.
 
-legacy 입력 앱은 기존 `Carve-2.0.0-test-legacy` simulator에서 복사한 historical 1.3.0 (1) bundle(`/Users/leetaek/Library/Developer/CoreSimulator/Devices/0A956010-5DAA-44BC-BA22-5BAE53FF6D82/data/Containers/Bundle/Application/B90495D8-3A9B-4E2B-A035-F4D6D54799D2/CarveApp.app`)이다. 이 bundle의 읽기 전용 strict signature 확인은 통과했으나 Xcode 27에서 다시 빌드한 것은 아니다. 정확한 1.3.0 소스의 Xcode 27 재빌드는 이전 기록처럼 dependency deployment target 검증 단계에서 중단됐고, 그 설정은 바꾸지 않았다.
+legacy 입력 앱은 기존 `Carve-2.0.0-test-legacy` simulator에서 복사한 historical 1.3.0 (1) bundle(`(시뮬레이터 컨테이너 경로)`)이다. 이 bundle의 읽기 전용 strict signature 확인은 통과했으나 Xcode 27에서 다시 빌드한 것은 아니다. 정확한 1.3.0 소스의 Xcode 27 재빌드는 이전 기록처럼 dependency deployment target 검증 단계에서 중단됐고, 그 설정은 바꾸지 않았다.
 
 clone의 기존 2.0.0 앱 컨테이너를 제거한 뒤 위 1.3.0 bundle을 설치·실행했다. 동일 계정 private store에서 기존 레코드 20개가 local V3 store로 들어왔고 `BibleDrawing`/`ANSCKRECORDMETADATA` 각각 20행, pending export 0, 무결성 `ok`를 확인했다. payload multiset·CloudKit record-name hash 집합·계정 identity 지문은 source proof clone과 일치했다. 그 다음 새 Xcode 27 2.0.0 산출물을 같은 clone에 설치·실행했다. 실행 뒤 무결성은 `ok`, drawing/record metadata는 각각 20행, pending export 0, V4 `ZROWUUID` 열과 새 `currentPrivateCloudRecords` ownership marker가 확인됐다. payload multiset, record-name hash 집합, marker의 owner scope는 source와 같았다. identity 원문이나 account identifier는 저장·출력하지 않았다. 이 upgrade 실행 뒤 별도 read-only server inventory를 재수집하지 않았으므로 서버의 독립적인 전후 inventory 불변성까지 주장하지 않는다.
 
@@ -1803,16 +1803,16 @@ Device Hub 수동 확인은 자동 CLI 테스트와 별도다. 잠금 해제 뒤
 
 ```bash
 xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configuration Debug \
-  -destination 'platform=iOS Simulator,id=589A8DAB-2D5C-45FC-B76B-C4260FB87C67' \
-  -derivedDataPath /private/tmp/carve-x27-acc-login-update-20260925/DerivedData \
-  -resultBundlePath /private/tmp/carve-x27-acc-login-update-20260925/ownership-focused-retry.xcresult \
+  -destination 'platform=iOS Simulator,id=<UDID>' \
+  -derivedDataPath (로컬 증거) \
+  -resultBundlePath (로컬 증거) \
   -parallel-testing-enabled NO \
   -only-testing:DomainTest/LegacyRowLinkageReaderTesting \
   -only-testing:DomainTest/DrawingStoreOwnershipProofTesting
 # 37 passed, 0 failed, 0 skipped; xcresult Passed, exit 0
 ```
 
-제한된 sandbox에서 같은 테스트를 처음 호출했을 때 CoreSimulatorService의 log/runtime 조회 권한 오류와 workspace 읽기 오류로 테스트 시작 전 exit 66이 났다. 해당 원본 로그·exit는 `/private/tmp/carve-x27-acc-login-update-20260925/ownership-focused.log`·`ownership-focused.exit`에 보존했다. 더 넓은 CLI 권한으로 별도 `ownership-focused-retry.*` 경로에 재시도했고, `/private/tmp/carve-x27-acc-login-update-20260925/ownership-focused-retry.log`·`ownership-focused-retry.exit`·`ownership-focused-retry.xcresult`에 성공 실행 전체 로그·exit·결과 bundle을 보존했다. 재시도는 37 통과, 실패 0, skip 0이다.
+제한된 sandbox에서 같은 테스트를 처음 호출했을 때 CoreSimulatorService의 log/runtime 조회 권한 오류와 workspace 읽기 오류로 테스트 시작 전 exit 66이 났다. 해당 원본 로그·exit는 (로컬 증거)·`ownership-focused.exit`에 보존했다. 더 넓은 CLI 권한으로 별도 `ownership-focused-retry.*` 경로에 재시도했고, (로컬 증거)·`ownership-focused-retry.exit`·`ownership-focused-retry.xcresult`에 성공 실행 전체 로그·exit·결과 bundle을 보존했다. 재시도는 37 통과, 실패 0, skip 0이다.
 
 또한 Xcode 27 iOS Simulator 27.0 SDK의 CoreData simulator SDK 파일에서 `PFCloudKitMetadataModelMigratorMigrationBeganCommitKey` 문자열을 읽기 전용 검색했지만 정의를 찾지 못했다. 이는 private marker의 의미를 확인하지 못한 상태를 바꾸지 않으며 iOS 18 허용 근거가 아니다.
 
@@ -1822,28 +1822,28 @@ xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configurat
 
 실행 환경을 다시 확인했다. `xcode-select -p`는 `/Applications/Xcode.app/Contents/Developer`, `xcodebuild -version`은 Xcode `27.0 (27A266a)`, Swift는 `6.4 (swiftlang-6.4.0.34.1)`, Tuist는 `mise x -- tuist version` 결과 `4.208.0`이다. 첫 sandbox Tuist 조회는 user state session 권한 오류로 실패해 같은 표준 명령을 권한을 높여 재시도했다. iOS 17.5·18.6·26.2·26.4·26.5·27.0 runtime이 있으며 이번 대상은 iPad mini (A17 Pro) iPadOS `26.5 (23F77)`다. iPhone destination을 사용하지 않았다.
 
-대상 `Carve-X27-FirstLogin-20260925` (`7284FDE5-6F95-4CC6-8EE6-75A794009F0F`)은 새 계정 없는 simulator에서 historical 1.3.0 (1) 앱으로 synthetic Genesis 1:31 필기를 저장하고 Xcode 27 2.0.0 (1) 앱으로 덮어 업데이트한 동일 기기다. historical 앱 bundle은 이미 존재하던 1.3.0 simulator 산출물이며 Xcode 27에서 재빌드하지 않았다. 로그인 전 2.0.0 local store는 V4 `ZROWUUID`를 갖고 integrity `ok`, Genesis 1:31 한 행, drawing/record metadata 미생성, pending export 0이었다. 입력 payload는 300B, SHA-256 `2174feb6c509e187417d9aa41400618b86c12e07cb4f39f729d98d71c87c3558`이다. 원본·로그인 전후 snapshot은 `/private/tmp/carve-x27-first-login-preflight-20260925/` 아래에 둔다.
+대상 `Carve-X27-FirstLogin-20260925`은 새 계정 없는 simulator에서 historical 1.3.0 (1) 앱으로 synthetic Genesis 1:31 필기를 저장하고 Xcode 27 2.0.0 (1) 앱으로 덮어 업데이트한 동일 기기다. historical 앱 bundle은 이미 존재하던 1.3.0 simulator 산출물이며 Xcode 27에서 재빌드하지 않았다. 로그인 전 2.0.0 local store는 V4 `ZROWUUID`를 갖고 integrity `ok`, Genesis 1:31 한 행, drawing/record metadata 미생성, pending export 0이었다. 입력 payload는 300B, SHA-256 `2174feb6c509e187417d9aa41400618b86c12e07cb4f39f729d98d71c87c3558`이다. 원본·로그인 전후 snapshot은 (로컬 증거) 아래에 둔다.
 
 사용자가 이 simulator의 설정에서 기존 ACC와 같은 sandbox Apple 계정으로 직접 로그인했고 계정 전환은 없었다. Xcode 27에도 같은 계정이 로그인된 상태였다. 비밀번호·계정 식별 원문은 문서에 기록하지 않았다. 로그인 뒤 앱을 CLI로 실행했다.
 
 ```bash
-xcrun simctl launch --terminate-running-process 7284FDE5-6F95-4CC6-8EE6-75A794009F0F kr.co.carve.leetaek
-# exit 0; /private/tmp/carve-x27-first-login-preflight-20260925/candidate-first-login-launch.log(.exit)
+xcrun simctl launch --terminate-running-process <UDID> kr.co.carve.leetaek
+# exit 0; (로컬 증거))
 
-xcrun simctl spawn 7284FDE5-6F95-4CC6-8EE6-75A794009F0F log show --last 10m --style compact \
+xcrun simctl spawn <UDID> log show --last 10m --style compact \
   --predicate 'process == "CarveApp"'
-# 앱 프로세스 전체 로그: /private/tmp/carve-x27-first-login-preflight-20260925/candidate-carveapp-full.log
+# 앱 프로세스 전체 로그: (로컬 증거)
 ```
 
 Core Data가 private Development container 연결을 성공했다. 시작 중 export 재요청 2건은 이미 대기 중인 요청과 겹쳐 `134417`으로 취소됐으나, 뒤이어 원격 import가 `success=1, madeChanges=1`, synthetic local row export가 `success=1, madeChanges=1`, 후속 export가 `success=1, madeChanges=0`으로 끝났다. 앱 실행 뒤 store는 drawing 21행·record metadata 21행, `ZROWUUID` 존재, `integrity_check=ok`였다. Genesis 1:31 payload는 300B와 위 SHA-256 그대로다. 이 row metadata의 upload·cloud-delete·local-delete pending 합계는 각각 0이며 StoreOwnership marker의 비민감 필드는 `formatVersion=1`, `proof=firstLoginFromUnaccountedV3`였다. 전체 로그인 후 SQLite 복사본은 `post-first-login-store/`다.
 
-독립 peer `Carve-ACC-Xcode27-LoginUpdate-20260925` (`6C59D527-24D2-4519-AD43-2AC988C14F54`)은 같은 계정의 iPadOS 26.5 simulator clone이다. 앱 실행 전 보존한 store는 drawing/metadata 각 20행이고 Genesis 1:31 row는 없었으며 기존 `currentPrivateCloudRecords` marker와 integrity `ok`를 확인했다. CLI로 2.0.0 앱을 실행한 뒤 보존한 store는 drawing/metadata 각 21행, Genesis 1:31 row 한 개와 동일한 300B payload SHA-256, row metadata pending 세 종류 모두 0, integrity `ok`였다. Device Hub 관찰 뒤 다시 보존한 사본에서도 21행·payload 지문·pending 0이 같았다. 이 전후 차이는 peer의 기존 로컬 store에는 없던 sample이 첫 기기 export 뒤 peer의 CloudKit 연동 store에 수신된 것을 확인한다. 사본은 `peer-before-receive-store/`, `peer-after-receive-store/`, `peer-post-observation-store/`다.
+독립 peer `Carve-ACC-Xcode27-LoginUpdate-20260925`은 같은 계정의 iPadOS 26.5 simulator clone이다. 앱 실행 전 보존한 store는 drawing/metadata 각 20행이고 Genesis 1:31 row는 없었으며 기존 `currentPrivateCloudRecords` marker와 integrity `ok`를 확인했다. CLI로 2.0.0 앱을 실행한 뒤 보존한 store는 drawing/metadata 각 21행, Genesis 1:31 row 한 개와 동일한 300B payload SHA-256, row metadata pending 세 종류 모두 0, integrity `ok`였다. Device Hub 관찰 뒤 다시 보존한 사본에서도 21행·payload 지문·pending 0이 같았다. 이 전후 차이는 peer의 기존 로컬 store에는 없던 sample이 첫 기기 export 뒤 peer의 CloudKit 연동 store에 수신된 것을 확인한다. 사본은 `peer-before-receive-store/`, `peer-after-receive-store/`, `peer-post-observation-store/`다.
 
-read-only CloudKit probe artifact가 `/private/tmp`에서 사라져 이 실행의 업로드 직후 remote-zone inventory/hash를 직접 다시 읽지는 못했다. 따라서 새 레코드의 원격 필드 자체를 독립 조회했다고 주장하지 않는다. 다만 첫 기기의 성공 export와 peer의 사전 부재·사후 동일 payload 수신으로 이 synthetic 한 행의 Development private CloudKit 첫 로그인 전송·다른 simulator 수신은 확인했다. 원본 `Carve-ACC-B` simulator는 종료 상태로 보존했다. 두 simulator clone은 같은 Development private DB를 공유하므로 sandbox 서버에는 synthetic Genesis 1:31 테스트 row가 존재한다. 이번 작업에서는 이를 삭제하지 않았다.
+read-only CloudKit probe artifact가 임시 폴더에서 사라져 이 실행의 업로드 직후 remote-zone inventory/hash를 직접 다시 읽지는 못했다. 따라서 새 레코드의 원격 필드 자체를 독립 조회했다고 주장하지 않는다. 다만 첫 기기의 성공 export와 peer의 사전 부재·사후 동일 payload 수신으로 이 synthetic 한 행의 Development private CloudKit 첫 로그인 전송·다른 simulator 수신은 확인했다. 원본 `Carve-ACC-B` simulator는 종료 상태로 보존했다. 두 simulator clone은 같은 Development private DB를 공유하므로 sandbox 서버에는 synthetic Genesis 1:31 테스트 row가 존재한다. 이번 작업에서는 이를 삭제하지 않았다.
 
 Device Hub 결과는 자동 결과와 분리한다. 로그인 전 첫 기기에서 2.0.0 Genesis 1:31 sample이 남은 것을 시각적으로 확인했다. 첫 peer 관찰에서는 Genesis 1:31 위치가 화면 밖이라 UI 수신을 확정하지 못했다. 후속 수동 확인에서는 peer clone 앱을 Device Hub에서 다시 열고 화면을 확대했다. Device Hub `Capture Keyboard`를 켠 뒤 `Page_Down`으로 본문을 이동해 Genesis 1:31 필기 한 줄을 확인했다. 손가락 드래그·절 메뉴·장 이동·필기 입력은 사용하지 않았고 확인 뒤 키보드 전달을 껐다. 이 관찰은 자동화 테스트 결과가 아니다. 앱 종료 뒤 live peer SQLite를 읽기 전용으로 검사해 `integrity_check=ok`, drawing/metadata 각 21행, Genesis 1:31 payload 300B와 동일 SHA-256, upload/cloud-delete/local-delete pending 합계 0을 재확인했다. 이번 왕복에는 `xcodebuild test`를 실행하지 않았다. 같은 후보의 좁은 `LegacyRowLinkageReaderTesting` + `DrawingStoreOwnershipProofTesting` CLI 회귀는 직전 기록대로 37/37 통과이며, Xcode 27 여섯 runtime 전체 회귀도 별도 기록대로 통과했다.
 
-첫 로그인 과정에서 기존 remote row로 보이는 `1-01Genesis.txt.1`, verses `[10, 11, 12]`에 대해 iPadOS 26.5 앱의 single-canvas decode 실패가 앱 로그에 남았다. 읽기 전용 `post-first-login-store/Carve.dev.sqlite`에는 10절 4행·11절 3행·12절 1행, 총 8행이 있었고 모두 22B였다(각 verse 내 payload hash 하나). macOS 27.2 호스트의 PencilKit으로 snapshot의 8개 payload 각각을 `PKDrawing(data:)`에 넣었을 때는 decode 성공·0 strokes였다. 이는 iPadOS 26.5 앱의 실패를 해소하지 않으며, 저장 데이터 손상이나 의도된 빈 drawing 어느 쪽도 단정할 수 없다. 현재 `DrawingCodec.decodeStored`의 `try? PKDrawing(data:)` 경로는 실제 throw 사유를 숨긴다. 앱은 이 행들을 표시·활성 편집에서 제외해 다음 편집을 새 행으로 분리하며, 이 시험에서는 원본 행을 편집하거나 덮어쓰지 않았다. 플랫폼별 decode 차이의 원인·사용자 영향은 미해결이고 별도 표시·복구 점검이 필요하다. 앱 전용 전체 로그는 `/private/tmp/carve-x27-first-login-preflight-20260925/candidate-carveapp-full.log`, 읽기 전용 SQLite snapshot은 `post-first-login-store/`, peer launch 결과는 `peer-first-receive-launch.log`·`.exit`다.
+첫 로그인 과정에서 기존 remote row로 보이는 `1-01Genesis.txt.1`, verses `[10, 11, 12]`에 대해 iPadOS 26.5 앱의 single-canvas decode 실패가 앱 로그에 남았다. 읽기 전용 `post-first-login-store/Carve.dev.sqlite`에는 10절 4행·11절 3행·12절 1행, 총 8행이 있었고 모두 22B였다(각 verse 내 payload hash 하나). macOS 27.2 호스트의 PencilKit으로 snapshot의 8개 payload 각각을 `PKDrawing(data:)`에 넣었을 때는 decode 성공·0 strokes였다. 이는 iPadOS 26.5 앱의 실패를 해소하지 않으며, 저장 데이터 손상이나 의도된 빈 drawing 어느 쪽도 단정할 수 없다. 현재 `DrawingCodec.decodeStored`의 `try? PKDrawing(data:)` 경로는 실제 throw 사유를 숨긴다. 앱은 이 행들을 표시·활성 편집에서 제외해 다음 편집을 새 행으로 분리하며, 이 시험에서는 원본 행을 편집하거나 덮어쓰지 않았다. 플랫폼별 decode 차이의 원인·사용자 영향은 미해결이고 별도 표시·복구 점검이 필요하다. 앱 전용 전체 로그는 (로컬 증거), 읽기 전용 SQLite snapshot은 `post-first-login-store/`, peer launch 결과는 `peer-first-receive-launch.log`·`.exit`다.
 
 이번 결과는 iOS 26.5에서 만든 **한 개의 synthetic, 무계정 1.3.0 V3 행**의 Xcode 27 2.0.0 first-login export 및 다른 simulator 수신 경로를 확인한 것이다. historical 1.3.0 bundle을 Xcode 27에서 재빌드한 검증, peer physical iPad 표시, 새 sample의 독립 read-only server inventory, iOS 18 marker 의미/allowlist, iOS 17 ownership·iOS 17.0 직접 회귀, widget/history/N-Canvas 왕복, production CloudKit, App Store 배포 서명 Archive·Production entitlement·TestFlight는 여전히 미완료다. 전체 출시 판정은 **NO-GO**다.
 
@@ -1855,26 +1855,26 @@ Archive action의 Release build settings를 읽기 전용 조회했다. `CODE_SI
 
 ```bash
 mise x -- tuist generate --no-open
-# exit 0; /private/tmp/carve-x27-release-archive-preflight-20260925-tuist-generate-elevated.log
+# exit 0; (로컬 증거)
 
 xcodebuild -showBuildSettings -workspace Carve.xcworkspace -scheme CarveApp \
   -configuration Release -destination 'generic/platform=iOS' archive
-# exit 0; /private/tmp/carve-x27-release-archive-preflight-20260925-show-archive-settings.log
+# exit 0; (로컬 증거)
 
 xcodebuild archive -workspace Carve.xcworkspace -scheme CarveApp -configuration Release \
   -destination 'generic/platform=iOS' \
-  -archivePath /private/tmp/carve-x27-release-archive-20260925/Carve.xcarchive \
-  -derivedDataPath /private/tmp/carve-x27-release-archive-20260925/DerivedData
+  -archivePath (로컬 증거) \
+  -derivedDataPath (로컬 증거)
 # ** ARCHIVE SUCCEEDED **, exit 0
 
 codesign --verify --deep --strict \
-  /private/tmp/carve-x27-release-archive-20260925/Carve.xcarchive/Products/Applications/CarveApp.app
+  (로컬 증거)
 # exit 0
 ```
 
 Archive의 bundle/version은 `kr.co.carve.leetaek`, 2.0.0 (1)이고 서명 검증은 통과했다. 단, 서명 클래스는 Apple Development이며 embedded profile은 `get-task-allow=true`인 Development profile이다. 현재 로컬에는 이 bundle의 Development profile만 있고 Apple Distribution identity 및 App Store profile은 없다. 서명된 app에는 CloudKit entitlement가 있으나 `com.apple.developer.icloud-container-environment`는 설정·서명 결과 모두에 없었다. 따라서 이 Archive는 Release 구성의 generic iOS 컴파일과 Development 서명만 증명하며 App Store 배포 서명·Production CloudKit entitlement·TestFlight 적격성을 증명하지 않는다. `xcodebuild -exportArchive`와 TestFlight upload는 실행하지 않았다. 설정·의존성·서명 프로필은 바꾸지 않았다.
 
-전체 Archive 로그는 `/private/tmp/carve-x27-release-archive-20260925/archive.log`, 읽기 전용 Archive build settings는 `/private/tmp/carve-x27-release-archive-preflight-20260925-show-archive-settings.log`, Tuist 생성 로그는 `/private/tmp/carve-x27-release-archive-preflight-20260925-tuist-generate-elevated.log`다. 서명 inventory는 로컬에서 값 노출 없이 분류했다. 빌드는 성공했으나 Sendable closure, N-Canvas 전용 `undoManager` deprecated use, SwiftLint 파일/타입 길이 경고가 로그에 남았다. 이 로컬 Development Archive 이후에도 배포 서명·entitlement·TestFlight는 NO-GO 게이트다.
+전체 Archive 로그는 (로컬 증거), 읽기 전용 Archive build settings는 (로컬 증거), Tuist 생성 로그는 (로컬 증거)다. 서명 inventory는 로컬에서 값 노출 없이 분류했다. 빌드는 성공했으나 Sendable closure, N-Canvas 전용 `undoManager` deprecated use, SwiftLint 파일/타입 길이 경고가 로그에 남았다. 이 로컬 Development Archive 이후에도 배포 서명·entitlement·TestFlight는 NO-GO 게이트다.
 
 ### Device Hub 물리 iPad Xcode 27 후보 접근성 확인 (2026-09-25)
 
@@ -1886,16 +1886,16 @@ Device Hub에서 연결된 iPad mini (A17 Pro) iPadOS `27.2`를 확인했다. �
 
 사용자의 TestFlight 설치본 교체 승인을 받은 뒤 `devicectl`로 기기를 읽기 전용 확인했다. 기기는 unlocked, Developer Mode enabled, iPadOS `27.2`이며 연결 transport는 `localNetwork`였다. 설치 앱은 `kr.co.carve.leetaek` `2.0.0 (220)`이었다. Release Archive의 Development profile에는 물리 iPad UDID가 포함돼 있었다. 그러나 Release 구성은 `iCloud.Carve.SwiftData.iCloud` 컨테이너 ID를 사용하고 signed app에서 `com.apple.developer.icloud-container-environment`가 빠져 있다. 따라서 실행 시 Development/Production CloudKit 환경을 이 산출물만으로 단정할 수 없어 Release Archive를 설치·실행하지 않았다.
 
-Production 컨테이너에 접근하지 않는 물리 UI 확인 가능성을 보기 위해 기존 설정을 바꾸지 않고 macOS 27.2 / Xcode 27.0 (27A266a) / Swift 6.4 / iPhoneOS 27.0 SDK에서 기본 Debug 구성을 generic iOS destination으로 빌드했다(시뮬레이터 runtime은 사용하지 않음). Debug 앱 Info.plist는 명시적으로 `iCloud.Carve.SwiftData.iCloud.dev`를 가리켰고, signed app에는 CloudKit service와 두 container ID가 있었으나 environment entitlement는 역시 없었다. Debug provisioning profile은 `get-task-allow=true`, Development·Production environment 허용, 해당 물리 iPad 포함으로 확인됐다. 전체 로그는 `/private/tmp/carve-x27-physical-debug-smoke-20260925/build.log`, 종료 코드는 `build.exit`이며 빌드는 exit 0이다.
+Production 컨테이너에 접근하지 않는 물리 UI 확인 가능성을 보기 위해 기존 설정을 바꾸지 않고 macOS 27.2 / Xcode 27.0 (27A266a) / Swift 6.4 / iPhoneOS 27.0 SDK에서 기본 Debug 구성을 generic iOS destination으로 빌드했다(시뮬레이터 runtime은 사용하지 않음). Debug 앱 Info.plist는 명시적으로 `iCloud.Carve.SwiftData.iCloud.dev`를 가리켰고, signed app에는 CloudKit service와 두 container ID가 있었으나 environment entitlement는 역시 없었다. Debug provisioning profile은 `get-task-allow=true`, Development·Production environment 허용, 해당 물리 iPad 포함으로 확인됐다. 전체 로그는 (로컬 증거), 종료 코드는 `build.exit`이며 빌드는 exit 0이다.
 
 ```bash
 xcodebuild build -workspace Carve.xcworkspace -scheme CarveApp -configuration Debug \
   -destination 'generic/platform=iOS' \
-  -derivedDataPath /private/tmp/carve-x27-physical-debug-smoke-20260925/DerivedData
+  -derivedDataPath (로컬 증거)
 # BUILD SUCCEEDED (exit 0)
 
 codesign --verify --deep --strict \
-  /private/tmp/carve-x27-physical-debug-smoke-20260925/DerivedData/Build/Products/Debug-iphoneos/CarveApp.app
+  (로컬 증거)
 # CSSMERR_TP_NOT_TRUSTED (exit 1)
 ```
 
@@ -1907,10 +1907,10 @@ Debug 앱의 엄격한 서명 검증은 `CSSMERR_TP_NOT_TRUSTED`로 실패했고
 
 ```bash
 xcrun devicectl device info apps \
-  --device 00008130-000C24A60C92001C \
+  --device <device-udid> \
   --bundle-id kr.co.carve.leetaek \
-  --json-output /private/tmp/carve-x27-testflight-cloud-check-20260925/device-apps.json \
-  --log-output /private/tmp/carve-x27-testflight-cloud-check-20260925/device-apps.log
+  --json-output (로컬 증거) \
+  --log-output (로컬 증거)
 # exit 0; 새기다 2.0.0 (220)
 ```
 
@@ -1926,9 +1926,9 @@ Genesis 1:10–12의 플랫폼별 PencilKit decode 차이와 직접 관련된 fa
 
 ```bash
 xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configuration Debug \
-  -destination 'platform=iOS Simulator,id=589A8DAB-2D5C-45FC-B76B-C4260FB87C67' \
-  -derivedDataPath /private/tmp/carve-x27-undecodable-row-focus-20260925/DerivedData \
-  -resultBundlePath /private/tmp/carve-x27-undecodable-row-focus-20260925/UndecodableRow.xcresult \
+  -destination 'platform=iOS Simulator,id=<UDID>' \
+  -derivedDataPath (로컬 증거) \
+  -resultBundlePath (로컬 증거) \
   -only-testing:CarveFeatureTest/SingleCanvasRollbackTesting/undecodableRowIsNotOverwritten \
   -parallel-testing-enabled NO
 # exit 0, 실제 선택 0 tests — 무효 시도, 결과 bundle은 보존
@@ -1936,105 +1936,105 @@ xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configurat
 
 ```bash
 xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configuration Debug \
-  -destination 'platform=iOS Simulator,id=589A8DAB-2D5C-45FC-B76B-C4260FB87C67' \
-  -derivedDataPath /private/tmp/carve-x27-undecodable-row-focus-20260925/DerivedData \
-  -resultBundlePath /private/tmp/carve-x27-undecodable-row-focus-20260925/SingleCanvasRollbackSuite.xcresult \
+  -destination 'platform=iOS Simulator,id=<UDID>' \
+  -derivedDataPath (로컬 증거) \
+  -resultBundlePath (로컬 증거) \
   -only-testing:CarveFeatureTest/SingleCanvasRollbackTesting \
   -parallel-testing-enabled NO
 # iPad mini (A17 Pro), iPadOS 26.5 (23F77): 9 passed, 0 failed, 0 skipped (exit 0)
 ```
 
-환경은 macOS 27.2, Xcode 27.0 (27A266a), Swift 6.4, Tuist 4.208.0이다. `xcresulttool get test-results summary`에서 `Passed`, 9 passed, failed/skip/expected failure 0, runtime warning 없음과 목적 simulator를 확인했다. 특히 `undecodableRowIsNotOverwritten`는 synthetic decode 실패 행을 활성 행에서 제외하고 다음 편집에 새 row를 만들어 원본 식별 행을 덮지 않는 테스트다. 전체 suite 로그와 종료 코드는 `suite.log`·`suite.exit`, 0건 시도의 로그·종료 코드는 `test.log`·`test.exit`이며 디렉터리는 `/private/tmp/carve-x27-undecodable-row-focus-20260925/`다. 계정 clone이나 CloudKit을 사용하지 않았다. 이 결과는 fail-safe 회귀만 입증하며 Genesis 1:10–12 실제 22B payload의 플랫폼별 decode 원인이나 표시·복구 결과를 설명하지 않는다.
+환경은 macOS 27.2, Xcode 27.0 (27A266a), Swift 6.4, Tuist 4.208.0이다. `xcresulttool get test-results summary`에서 `Passed`, 9 passed, failed/skip/expected failure 0, runtime warning 없음과 목적 simulator를 확인했다. 특히 `undecodableRowIsNotOverwritten`는 synthetic decode 실패 행을 활성 행에서 제외하고 다음 편집에 새 row를 만들어 원본 식별 행을 덮지 않는 테스트다. 전체 suite 로그와 종료 코드는 `suite.log`·`suite.exit`, 0건 시도의 로그·종료 코드는 `test.log`·`test.exit`이며 디렉터리는 (로컬 증거)다. 계정 clone이나 CloudKit을 사용하지 않았다. 이 결과는 fail-safe 회귀만 입증하며 Genesis 1:10–12 실제 22B payload의 플랫폼별 decode 원인이나 표시·복구 결과를 설명하지 않는다.
 
 ### Genesis 1:10–12 22B payload 직접 PencilKit 재확인 (2026-09-25)
 
 첫 로그인 시 `candidate-carveapp-full.log`의 `ChapterCanvasFeature` 로그는 verses `[10, 11, 12]`를 undecodable로 표시했다. 이 현상이 원시 `PKDrawing(data:)` 입력에서 재현되는지 확인하기 위해, ACC clone은 수정하지 않고 앞서 보존된 `post-first-login-store/Carve.dev.sqlite`의 **복사본**에서 여덟 `ZLINEDATA` 값을 읽었다. 10절 4행, 11절 3행, 12절 1행이 모두 22B였고 여덟 값의 SHA-256은 `fd34c90bb64fe7516efce8a76fe2ece33b9821935183664dfda18c84b31c1d2f`로 같았다. 원본 DB·행·CloudKit 레코드는 이 검사에서 쓰지 않았다.
 
-작은 iPad-only Tuist 앱을 `/private/tmp/carve-x27-22b-decode-audit-20260925/harness`에 만들고 같은 payload 파일을 앱 리소스로 포함했다. 앱은 각 값을 `PKDrawing(data:)`로 열고 byte count, SHA-256, stroke count 또는 NSError domain/code만 임시 Documents 파일에 남겼다. 앱에 CloudKit entitlement나 네트워크 동작은 없었다. macOS 호스트, iPadOS 26.5 새 iPad mini (A17 Pro) simulator, iPadOS 27.0 iPad mini (A17 Pro) simulator에서 각 3개 verse payload가 모두 **decode 성공·0 strokes**였다. 따라서 현재 확인된 직접 PencilKit 호출에서는 플랫폼별 decode 실패가 재현되지 않았고, 이 표본은 세 런타임에서 유효한 빈 drawing으로 해석됐다.
+작은 iPad-only Tuist 앱을 (로컬 증거)에 만들고 같은 payload 파일을 앱 리소스로 포함했다. 앱은 각 값을 `PKDrawing(data:)`로 열고 byte count, SHA-256, stroke count 또는 NSError domain/code만 임시 Documents 파일에 남겼다. 앱에 CloudKit entitlement나 네트워크 동작은 없었다. macOS 호스트, iPadOS 26.5 새 iPad mini (A17 Pro) simulator, iPadOS 27.0 iPad mini (A17 Pro) simulator에서 각 3개 verse payload가 모두 **decode 성공·0 strokes**였다. 따라서 현재 확인된 직접 PencilKit 호출에서는 플랫폼별 decode 실패가 재현되지 않았고, 이 표본은 세 런타임에서 유효한 빈 drawing으로 해석됐다.
 
 실행 환경은 macOS `27.2 (26B5086k)`, 선택된 Xcode `27.0 (27A266a)`, Swift `6.4 (swiftlang-6.4.0.34.1)`, Tuist `4.208.0`, iOS Simulator SDK `27.0`이다. iPadOS 26.5 runtime은 `23F77`, iPadOS 27.0 대상은 `24A434`였다. Tuist 생성은 기본 세션 경로와 Swift module cache 권한 문제로 첫 시도들이 실패했다. 공유 설정을 변경하지 않고, 임시 Tuist state와 `.mise.toml`의 일회성 trust 경로를 지정해 생성했다. CoreSimulator의 user log/device set 접근은 sandbox에서 실패해 분리된 26.5 simulator의 생성·부팅·설치·실행과 27.0 simulator 실행은 권한 상승으로 수행했다.
 
 ```bash
-XDG_STATE_HOME=/private/tmp/carve-x27-22b-decode-audit-20260925/tuist-state \
-MISE_TRUSTED_CONFIG_PATHS=/Users/leetaek/Carve/.mise.toml \
-MISE_DATA_DIR=/Users/leetaek/.local/share/mise \
+XDG_STATE_HOME=(로컬 증거) \
+MISE_TRUSTED_CONFIG_PATHS=<repo>/.mise.toml \
+MISE_DATA_DIR=~/.local/share/mise \
 mise x -- tuist generate \
-  --path /private/tmp/carve-x27-22b-decode-audit-20260925/harness --no-open
+  --path (로컬 증거) --no-open
 # exit 0
 
-xcodebuild -project /private/tmp/carve-x27-22b-decode-audit-20260925/harness/CarveDrawingDecodeProbe.xcodeproj \
+xcodebuild -project (로컬 증거) \
   -scheme CarveDrawingDecodeProbe -configuration Debug -sdk iphonesimulator \
   -destination 'generic/platform=iOS Simulator' \
-  -derivedDataPath /private/tmp/carve-x27-22b-decode-audit-20260925/DerivedData build
+  -derivedDataPath (로컬 증거) build
 # BUILD SUCCEEDED, exit 0
 
-swift -module-cache-path /private/tmp/carve-x27-22b-decode-audit-20260925/clang-module-cache \
-  /private/tmp/carve-x27-22b-decode-audit-20260925/macOS-decode.swift
+swift -module-cache-path (로컬 증거) \
+  (로컬 증거)
 # macOS 27.2: verse 10–12 각각 bytes=22, 위 SHA-256, decode=success, strokes=0, exit 0
 
 xcrun simctl create Carve-22B-Decode-20260925 \
   com.apple.CoreSimulator.SimDeviceType.iPad-mini-A17-Pro \
   com.apple.CoreSimulator.SimRuntime.iOS-26-5
-# D4E5AA55-2C2D-4E04-AE73-51D6D14E5105; iPad 전용 임시 simulator
-xcrun simctl boot D4E5AA55-2C2D-4E04-AE73-51D6D14E5105
-xcrun simctl bootstatus D4E5AA55-2C2D-4E04-AE73-51D6D14E5105 -b
-xcrun simctl install D4E5AA55-2C2D-4E04-AE73-51D6D14E5105 \
-  /private/tmp/carve-x27-22b-decode-audit-20260925/DerivedData/Build/Products/Debug-iphonesimulator/CarveDrawingDecodeProbe.app
-xcrun simctl launch D4E5AA55-2C2D-4E04-AE73-51D6D14E5105 kr.co.carve.pencilkitdecodeprobe
+# ; iPad 전용 임시 simulator
+xcrun simctl boot <UDID>
+xcrun simctl bootstatus <UDID> -b
+xcrun simctl install <UDID> \
+  (로컬 증거)
+xcrun simctl launch <UDID> kr.co.carve.pencilkitdecodeprobe
 # iPad mini (A17 Pro), iPadOS 26.5 (23F77): 3/3 decode success, strokes=0
 
-xcrun simctl boot C72A6CC6-4E3C-4822-BED1-9D76F8542D6B
-xcrun simctl bootstatus C72A6CC6-4E3C-4822-BED1-9D76F8542D6B -b
-xcrun simctl install C72A6CC6-4E3C-4822-BED1-9D76F8542D6B \
-  /private/tmp/carve-x27-22b-decode-audit-20260925/DerivedData/Build/Products/Debug-iphonesimulator/CarveDrawingDecodeProbe.app
-xcrun simctl launch C72A6CC6-4E3C-4822-BED1-9D76F8542D6B kr.co.carve.pencilkitdecodeprobe
+xcrun simctl boot <UDID>
+xcrun simctl bootstatus <UDID> -b
+xcrun simctl install <UDID> \
+  (로컬 증거)
+xcrun simctl launch <UDID> kr.co.carve.pencilkitdecodeprobe
 # iPad mini (A17 Pro), iPadOS 27.0 (24A434): 3/3 decode success, strokes=0
 ```
 
-전체 Tuist·build·host decode·simulator boot/install/launch 기록과 결과는 `/private/tmp/carve-x27-22b-decode-audit-20260925/`에 있다. `harness/Project.swift`, `harness/Sources/ProbeApp.swift`, `macOS-decode.swift`, `ios-simulator-build.log`, `macOS-decode.log`, `ios26.5-decode.log`, `ios27.0-decode.log`, 각 `sim-*.log` 및 `tuist-generate-elevated.log`를 보존했다. 신규 26.5 simulator는 삭제했고, 기존 27.0 test simulator에서는 probe 앱만 제거한 뒤 shutdown했다. 직접 재현은 `DrawingCodec.compose`를 호출하지 않은 원시 PencilKit API 검사이지 Carve 앱의 화면 검증이나 CloudKit 시험이 아니다. 따라서 이전 앱 로그의 undecodable 경고와 이후 직접 API 성공 사이의 불일치는 남는다. 실행 중 앱이 선택한 snapshot과 저장 후 DB payload가 같은 값이었는지, 해당 compose 시점의 앱 상태가 무엇이었는지는 관측하지 못했다. 실제 DrawingCodec 통합·표시 결과를 성공으로 간주하지 않으며 데이터 변경이나 자동 회귀를 수행하지 않았다. Xcode Cloud/TestFlight·Production CloudKit·서명 게이트에는 영향이 없으므로 전체 출시 판정은 **NO-GO**다.
+전체 Tuist·build·host decode·simulator boot/install/launch 기록과 결과는 (로컬 증거)에 있다. `harness/Project.swift`, `harness/Sources/ProbeApp.swift`, `macOS-decode.swift`, `ios-simulator-build.log`, `macOS-decode.log`, `ios26.5-decode.log`, `ios27.0-decode.log`, 각 `sim-*.log` 및 `tuist-generate-elevated.log`를 보존했다. 신규 26.5 simulator는 삭제했고, 기존 27.0 test simulator에서는 probe 앱만 제거한 뒤 shutdown했다. 직접 재현은 `DrawingCodec.compose`를 호출하지 않은 원시 PencilKit API 검사이지 Carve 앱의 화면 검증이나 CloudKit 시험이 아니다. 따라서 이전 앱 로그의 undecodable 경고와 이후 직접 API 성공 사이의 불일치는 남는다. 실행 중 앱이 선택한 snapshot과 저장 후 DB payload가 같은 값이었는지, 해당 compose 시점의 앱 상태가 무엇이었는지는 관측하지 못했다. 실제 DrawingCodec 통합·표시 결과를 성공으로 간주하지 않으며 데이터 변경이나 자동 회귀를 수행하지 않았다. Xcode Cloud/TestFlight·Production CloudKit·서명 게이트에는 영향이 없으므로 전체 출시 판정은 **NO-GO**다.
 
 ### 동일 22B payload의 `DrawingCodec.compose` focused 확인 (2026-09-25)
 
 위 raw PencilKit 검사와 앱 로그 사이를 좁히기 위해, 보존된 `verse-10.bin`을 읽는 임시 테스트 하나를 기존 `DrawingCodecTesting` suite에 추가해 Xcode 27에서 iPadOS 17.5·18.6·26.5·27.0 simulator로 각각 실행했다. 각 목적지는 일반 iPad mini simulator였고 ACC/오프라인 migration clone을 쓰지 않았다. 테스트는 입력 bytes를 외부 저장소에 쓰지 않고 `DrawingCodec.compose`가 `undecodableVerses`를 비우는지, 해당 row를 `activeRowIDs`에 유지하는지, 결과 drawing이 0 strokes인지 확인했다. 네 runtime 모두 **각 13/13 통과, xcodebuild exit 0**이다. 임시 테스트 코드는 실행 직후 제거했고, 원본 테스트 파일 backup과 현재 파일의 차이가 없으며 저장소에 코드 변경을 남기지 않았다. CloudKit client를 호출하지 않았다.
 
-실행 환경은 macOS `27.2 (26B5086k)`, 기본 선택 Xcode `27.0 (27A266a)`, Swift `6.4 (6.4.0.34.1)`, Tuist `4.208.0`, iOS Simulator SDK `27.0`이다. 네 대상은 iPad mini (6th generation) iPadOS `17.5 (21F79)`, iPad mini (A17 Pro) iPadOS `18.6 (22G86)`, iPad mini (A17 Pro) iPadOS `26.5 (23F77)`, iPad mini (A17 Pro) iPadOS `27.0 (24A434)`다. `xcode-select -p`, `xcodebuild -version`, `swift --version`, `mise x -- tuist version`, `xcrun simctl list runtimes`, `xcrun simctl list devices available`를 확인했다. Tuist version은 읽기 전용 확인도 `/private/tmp/carve-x27-compose-probe-20260925/state`의 임시 XDG 상태 경로로 실행했다.
+실행 환경은 macOS `27.2 (26B5086k)`, 기본 선택 Xcode `27.0 (27A266a)`, Swift `6.4 (6.4.0.34.1)`, Tuist `4.208.0`, iOS Simulator SDK `27.0`이다. 네 대상은 iPad mini (6th generation) iPadOS `17.5 (21F79)`, iPad mini (A17 Pro) iPadOS `18.6 (22G86)`, iPad mini (A17 Pro) iPadOS `26.5 (23F77)`, iPad mini (A17 Pro) iPadOS `27.0 (24A434)`다. `xcode-select -p`, `xcodebuild -version`, `swift --version`, `mise x -- tuist version`, `xcrun simctl list runtimes`, `xcrun simctl list devices available`를 확인했다. Tuist version은 읽기 전용 확인도 (로컬 증거)의 임시 XDG 상태 경로로 실행했다.
 
 ```bash
-XDG_STATE_HOME=/private/tmp/carve-x27-compose-probe-20260925/state \
-MISE_TRUSTED_CONFIG_PATHS=/Users/leetaek/Carve \
+XDG_STATE_HOME=(로컬 증거) \
+MISE_TRUSTED_CONFIG_PATHS=<repo> \
 mise x -- tuist generate --no-open
 # 권한 상승 실행, exit 0; tuist-generate-elevated.log / tuist-generate-elevated.exit
 
 xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configuration Debug \
-  -destination 'platform=iOS Simulator,id=0347221E-08F5-48C9-9F8E-6D7995C25D9F' \
-  -derivedDataPath /private/tmp/carve-x27-compose-probe-20260925/WorkspaceDerivedData \
-  -resultBundlePath /private/tmp/carve-x27-compose-probe-20260925/compose-22b-ios17.5.xcresult \
+  -destination 'platform=iOS Simulator,id=<UDID>' \
+  -derivedDataPath (로컬 증거) \
+  -resultBundlePath (로컬 증거) \
   -parallel-testing-enabled NO -only-testing:CarveFeatureTest/DrawingCodecTesting
 # iPad mini (6th generation), iPadOS 17.5 (21F79): 13/13, exit 0
 
 xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configuration Debug \
-  -destination 'platform=iOS Simulator,id=7E95B700-3976-42D7-BF85-BCAF028B7605' \
-  -derivedDataPath /private/tmp/carve-x27-compose-probe-20260925/WorkspaceDerivedData \
-  -resultBundlePath /private/tmp/carve-x27-compose-probe-20260925/compose-22b-ios18.6.xcresult \
+  -destination 'platform=iOS Simulator,id=<UDID>' \
+  -derivedDataPath (로컬 증거) \
+  -resultBundlePath (로컬 증거) \
   -parallel-testing-enabled NO -only-testing:CarveFeatureTest/DrawingCodecTesting
 # iPad mini (A17 Pro), iPadOS 18.6 (22G86): 13/13, exit 0
 
 xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configuration Debug \
-  -destination 'platform=iOS Simulator,id=589A8DAB-2D5C-45FC-B76B-C4260FB87C67' \
-  -derivedDataPath /private/tmp/carve-x27-compose-probe-20260925/WorkspaceDerivedData \
-  -resultBundlePath /private/tmp/carve-x27-compose-probe-20260925/compose-22b-workspace.xcresult \
+  -destination 'platform=iOS Simulator,id=<UDID>' \
+  -derivedDataPath (로컬 증거) \
+  -resultBundlePath (로컬 증거) \
   -parallel-testing-enabled NO -only-testing:CarveFeatureTest/DrawingCodecTesting
 # iPad mini (A17 Pro), iPadOS 26.5 (23F77): 13/13, exit 0
 
 xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configuration Debug \
-  -destination 'platform=iOS Simulator,id=C72A6CC6-4E3C-4822-BED1-9D76F8542D6B' \
-  -derivedDataPath /private/tmp/carve-x27-compose-probe-20260925/WorkspaceDerivedData \
-  -resultBundlePath /private/tmp/carve-x27-compose-probe-20260925/compose-22b-ios27.0.xcresult \
+  -destination 'platform=iOS Simulator,id=<UDID>' \
+  -derivedDataPath (로컬 증거) \
+  -resultBundlePath (로컬 증거) \
   -parallel-testing-enabled NO -only-testing:CarveFeatureTest/DrawingCodecTesting
 # iPad mini (A17 Pro), iPadOS 27.0 (24A434): 13/13, exit 0
 ```
 
-단독 `CarveFeature.xcodeproj`로 같은 suite를 먼저 실행한 시도는 `Dependencies`, `PerceptionCore`, `IssueReporting`, `ConcurrencyExtras`, `CustomDump`, `IdentifiedCollections` 모듈 해석 오류로 테스트 전 build 단계에서 중단됐다. 이를 test 실패로 세지 않았고, Tuist workspace 경로로 다시 실행했다. sandbox에서는 workspace listing 중 CoreSimulator/Xcode 사용자 로그 경로 접근이 막혀 exit 66이었으며 권한 상승 read-only `xcodebuild -list -workspace Carve.xcworkspace`는 exit 0으로 scheme을 확인했다. 전체 생성·실패 시도·성공 실행 로그와 exit 파일은 `/private/tmp/carve-x27-compose-probe-20260925/`에 보존했다.
+단독 `CarveFeature.xcodeproj`로 같은 suite를 먼저 실행한 시도는 `Dependencies`, `PerceptionCore`, `IssueReporting`, `ConcurrencyExtras`, `CustomDump`, `IdentifiedCollections` 모듈 해석 오류로 테스트 전 build 단계에서 중단됐다. 이를 test 실패로 세지 않았고, Tuist workspace 경로로 다시 실행했다. sandbox에서는 workspace listing 중 CoreSimulator/Xcode 사용자 로그 경로 접근이 막혀 exit 66이었으며 권한 상승 read-only `xcodebuild -list -workspace Carve.xcworkspace`는 exit 0으로 scheme을 확인했다. 전체 생성·실패 시도·성공 실행 로그와 exit 파일은 (로컬 증거)에 보존했다.
 
 동일 22B payload의 `PKDrawing(data:)`와 `DrawingCodec.compose`는 iPadOS 17.5·18.6·26.5·27.0에서 모두 성공했다. 최초 앱 경고가 발생한 시점에 SwiftData repository가 넘긴 `snapshot.lineData`가 이 보존 snapshot과 동일했는지는 보지 못했다. 앱 내부 합성 입력의 byte count/hash와 결과를 읽기 전용 clone 실행에서 관찰하기 전에는 최초 warning 원인을 확정하거나 사용자 화면 영향을 닫지 않는다. 이 확인은 iOS 18 marker, iOS 17.0 ownership proof, Production CloudKit, Distribution 서명·TestFlight 게이트를 대체하지 않아 출시 판정은 계속 **NO-GO**다.
 
@@ -2055,13 +2055,13 @@ xcrun cktool query-records \
 # Error: Could not read token from keychain with status: -50
 ```
 
-초기 시도는 서버에 query가 도달하기 전에 Keychain에서 멈췄고 CloudKit 데이터 변경은 없었다. 사용자가 target simulator에 로그인된 계정으로 User token을 발급·등록했다고 확인한 뒤 2026-09-25 같은 read-only query를 두 번 재시도했다. 기본 sandbox 호출은 Keychain 조회 `status: -50`으로 종료됐고, 승인된 권한 있는 CLI 재시도는 Keychain 단계 뒤 CloudKit의 `authorization-failed`로 종료됐다. 어느 쪽도 레코드를 반환하지 않았으며 CloudKit 데이터 생성·수정·삭제는 없었다. 따라서 token이 CloudKit에서 받아들여지는지, Console의 Act As 계정·container context·token 유효기간이 맞는지는 확인되지 않았다. 원문 token은 출력·로그·문서에 저장하지 않았다. 전체 로그와 종료 코드는 `/private/tmp/carve-x27-cloudkit-31-inventory-20260925/remote-query-after-correct-account-token.log`, `.exit`, `remote-query-keychain-access-retry.log`, `.exit`에 있다. 다음 단계는 CloudKit Console에서 Carve Development container를 선택한 상태로 `Act As iCloud Account` banner가 ACC target account를 가리키는지 확인하고, 해당 사용자용 fresh User token을 Keychain에 다시 저장하는 것이다. token이 CloudKit에서 승인되면 Development private-zone query를 재개하며 Production database는 조회하지 않는다. [Apple cktool guide](https://developer.apple.com/icloud/ck-tool/)는 User token이 private database 접근에 쓰이고 짧은 유효기간으로 재인증이 필요할 수 있음을 설명하며, [CloudKit Console의 Act As 기능](https://developer.apple.com/videos/play/wwdc2022/10115/)은 이후 query의 계정 관점을 바꾼다고 설명한다.
+초기 시도는 서버에 query가 도달하기 전에 Keychain에서 멈췄고 CloudKit 데이터 변경은 없었다. 사용자가 target simulator에 로그인된 계정으로 User token을 발급·등록했다고 확인한 뒤 2026-09-25 같은 read-only query를 두 번 재시도했다. 기본 sandbox 호출은 Keychain 조회 `status: -50`으로 종료됐고, 승인된 권한 있는 CLI 재시도는 Keychain 단계 뒤 CloudKit의 `authorization-failed`로 종료됐다. 어느 쪽도 레코드를 반환하지 않았으며 CloudKit 데이터 생성·수정·삭제는 없었다. 따라서 token이 CloudKit에서 받아들여지는지, Console의 Act As 계정·container context·token 유효기간이 맞는지는 확인되지 않았다. 원문 token은 출력·로그·문서에 저장하지 않았다. 전체 로그와 종료 코드는 (로컬 증거), `.exit`, `remote-query-keychain-access-retry.log`, `.exit`에 있다. 다음 단계는 CloudKit Console에서 Carve Development container를 선택한 상태로 `Act As iCloud Account` banner가 ACC target account를 가리키는지 확인하고, 해당 사용자용 fresh User token을 Keychain에 다시 저장하는 것이다. token이 CloudKit에서 승인되면 Development private-zone query를 재개하며 Production database는 조회하지 않는다. [Apple cktool guide](https://developer.apple.com/icloud/ck-tool/)는 User token이 private database 접근에 쓰이고 짧은 유효기간으로 재인증이 필요할 수 있음을 설명하며, [CloudKit Console의 Act As 기능](https://developer.apple.com/videos/play/wwdc2022/10115/)은 이후 query의 계정 관점을 바꾼다고 설명한다.
 
 사용자는 이번 token 발급에 사용한 계정이 개발자 Apple Account가 아니라 App Store Connect에서 만든 Sandbox Apple Account라고 추가 확인했다. Apple 문서상 이 Sandbox 계정은 앱 내 구입·Apple Pay 테스트용이고, CloudKit private database는 기기에 실제 iCloud account가 연결돼 있어야 접근할 수 있다 ([Sandbox 테스트 범위](https://developer.apple.com/help/app-store-connect/test-in-app-purchases/overview-of-testing-in-sandbox), [CloudKit private database 요건](https://developer.apple.com/documentation/cloudkit/ckcontainer/privateclouddatabase)). 따라서 해당 Sandbox Apple Account에서 발급된 token은 CloudKit 사용자 inventory 증거로 사용할 수 없다. 앞선 first-login synthetic upload에서 실제 iCloud identity가 무엇이었는지는 앱 로그·비식별 기록으로 확인되지 않았다. 기존 simulator 계정을 바꾸기 전에 업로드 당시 `Settings > Apple Account`의 실제 iCloud 로그인 계정을 확인한다. 새 검증은 전용 iCloud test account를 우선 사용하고, 개인 개발자 iCloud 계정은 그 private Development DB와 기타 iCloud 서비스에 영향을 줄 수 있음을 사용자가 확인한 뒤에만 선택한다. ASC Sandbox Apple Account를 CloudKit identity와 혼동하지 않는다.
 
-사용자가 `Carve-X27-FirstLogin-20260925` (iPadOS 26.5, UDID `7284FDE5-6F95-4CC6-8EE6-75A794009F0F`)에 iCloud 계정을 로그인하고 User token을 등록했다고 알린 뒤 같은 private-zone `CD_BibleDrawing` read-only inventory query를 실행했다. 기본 sandbox 실행은 Keychain 접근 때문에 실패했지만 권한 있는 CLI 호출은 exit 0으로 끝나 token authorization을 통과했다. 응답은 `records: []`였다. 로그 `/private/tmp/carve-x27-cloudkit-31-inventory-20260925/remote-query-after-icloud-account-login.log`, exit `/private/tmp/carve-x27-cloudkit-31-inventory-20260925/remote-query-after-icloud-account-login.exit`에 있다. 이는 해당 User token·Development container·private zone·record type 조합에서 레코드가 반환되지 않았다는 뜻이다. Genesis 1:31 업로드 당시 실제 iCloud identity·환경·zone이 현재 쿼리와 같았는지 미확인이라, 표본이 업로드되지 않았거나 CloudKit 데이터가 없다고 확대 해석하지 않는다. 이번 실행은 record ID 목록을 받지 못했으며 CloudKit 데이터 변경은 없었다.
+사용자가 `Carve-X27-FirstLogin-20260925` (iPadOS 26.5)에 iCloud 계정을 로그인하고 User token을 등록했다고 알린 뒤 같은 private-zone `CD_BibleDrawing` read-only inventory query를 실행했다. 기본 sandbox 실행은 Keychain 접근 때문에 실패했지만 권한 있는 CLI 호출은 exit 0으로 끝나 token authorization을 통과했다. 응답은 `records: []`였다. 로그 (로컬 증거), exit (로컬 증거)에 있다. 이는 해당 User token·Development container·private zone·record type 조합에서 레코드가 반환되지 않았다는 뜻이다. Genesis 1:31 업로드 당시 실제 iCloud identity·환경·zone이 현재 쿼리와 같았는지 미확인이라, 표본이 업로드되지 않았거나 CloudKit 데이터가 없다고 확대 해석하지 않는다. 이번 실행은 record ID 목록을 받지 못했으며 CloudKit 데이터 변경은 없었다.
 
-zone mismatch 가능성만 확인하기 위해 같은 `CD_BibleDrawing` record type을 Development private DB의 `_defaultZone`에서도 조회했다. 이 query도 exit 0, `records: []`였으며 결과·종료 코드는 `/private/tmp/carve-x27-cloudkit-31-inventory-20260925/remote-query-default-zone-after-icloud-account-login.log`와 `.exit`에 있다. 확인 범위는 두 zone의 해당 record type뿐이다. 다른 record type·환경·사용자·production DB는 조회하지 않았다.
+zone mismatch 가능성만 확인하기 위해 같은 `CD_BibleDrawing` record type을 Development private DB의 `_defaultZone`에서도 조회했다. 이 query도 exit 0, `records: []`였으며 결과·종료 코드는 (로컬 증거)와 `.exit`에 있다. 확인 범위는 두 zone의 해당 record type뿐이다. 다른 record type·환경·사용자·production DB는 조회하지 않았다.
 
 ### 남은 게이트 사전 점검 및 22B 전후 snapshot 비교 (2026-09-25)
 
@@ -2081,9 +2081,9 @@ iOS 17.0은 현재 직접 회귀 대상이 없다. 설치된 iOS 17.5 전체 회
 
 Xcode 27 계정 로그인 이후 로컬 서명 자격을 읽기 전용으로 다시 확인했다. `security find-identity -v -p codesigning`은 exit 0, `0 valid identities found`였다. Xcode profile store의 3개 CMS payload를 로컬 임시 경로에 풀어 bundle/entitlement 조건을 분류했을 때 Carve bundle의 App Store profile과 Production CloudKit entitlement가 각각 0개였다. payload 내용 분류는 서명 검증이나 서명 설정 변경이 아니다. 이전 Xcode 27 Development Archive 결과를 현재 로컬 배포 자격으로 간주하지 않으며, 새 Distribution 자격·Production 환경 entitlement·Xcode 27 후보 TestFlight가 확보되기 전 물리 후보 앱을 설치하지 않는다.
 
-앱 경고 원인을 좁히기 위해 `/private/tmp/carve-x27-first-login-preflight-20260925/`의 보존 SQLite 복사본을 Python 표준 `sqlite3`로 `mode=ro&immutable=1` 연결해 읽었다. `source-store`, `post-first-login-store`, `peer-before-receive-store`, `peer-after-receive-store`, `peer-post-observation-store` 모두 Genesis 1:10–12의 총 8행(10절 4행, 11절 3행, 12절 1행)이 남아 있었다. 모든 payload가 22B이며 SHA-256은 `fd34c90bb64fe7516efce8a76fe2ece33b9821935183664dfda18c84b31c1d2f`로 같았다. DB 파일은 수정하지 않았다.
+앱 경고 원인을 좁히기 위해 (로컬 증거)의 보존 SQLite 복사본을 Python 표준 `sqlite3`로 `mode=ro&immutable=1` 연결해 읽었다. `source-store`, `post-first-login-store`, `peer-before-receive-store`, `peer-after-receive-store`, `peer-post-observation-store` 모두 Genesis 1:10–12의 총 8행(10절 4행, 11절 3행, 12절 1행)이 남아 있었다. 모든 payload가 22B이며 SHA-256은 `fd34c90bb64fe7516efce8a76fe2ece33b9821935183664dfda18c84b31c1d2f`로 같았다. DB 파일은 수정하지 않았다.
 
-보존된 앱 로그 `/private/tmp/carve-x27-first-login-preflight-20260925/candidate-carveapp-full.log`에는 2026-09-25 13:02:25.437에 `verses=[10, 11, 12]` undecodable 경고가 있다. source/post-login/peer snapshot의 payload가 동일하고, 동일 22B 값의 raw PencilKit 및 `DrawingCodec.compose` focused 확인도 성공했지만 당시 메모리의 대표 snapshot `lineData` hash와 `PKDrawing(data:)` 오류는 로그에 없다. 따라서 앱 warning의 원인은 여전히 미확정이고 표시·사용자 영향도 닫지 않는다. 새 빌드, 앱 재실행, CloudKit 조회 또는 행 쓰기는 이번 비교에서 하지 않았다.
+보존된 앱 로그 (로컬 증거)에는 2026-09-25 13:02:25.437에 `verses=[10, 11, 12]` undecodable 경고가 있다. source/post-login/peer snapshot의 payload가 동일하고, 동일 22B 값의 raw PencilKit 및 `DrawingCodec.compose` focused 확인도 성공했지만 당시 메모리의 대표 snapshot `lineData` hash와 `PKDrawing(data:)` 오류는 로그에 없다. 따라서 앱 warning의 원인은 여전히 미확정이고 표시·사용자 영향도 닫지 않는다. 새 빌드, 앱 재실행, CloudKit 조회 또는 행 쓰기는 이번 비교에서 하지 않았다.
 
 별도 Development private-zone server inventory는 여전히 미실행이다. ACC 및 Xcode 27 로그인과 다른 `cktool` User token이 필요하다. CloudKit Console에서 만든 token을 사용자가 터미널의 `xcrun cktool save-token --type user --method keychain` 프롬프트에 직접 입력해 Keychain에 저장해야 한다. token이나 계정 비밀번호를 대화에 보내지 않는다. token이 저장되면 Genesis 1:31 synthetic row에 한정해 Development private DB를 읽기 전용 조회한다.
 
@@ -2097,21 +2097,21 @@ Xcode 27 계정 로그인 이후 로컬 서명 자격을 읽기 전용으로 다
 
 ```bash
 mise x -- tuist generate --no-open
-# exit 0; /private/tmp/carve-x27-remaining-gates-20260925/tuist-generate-elevated.log
+# exit 0; (로컬 증거)
 
 xcodebuild -list -workspace Carve.xcworkspace
-# read-only scheme listing exit 0; /private/tmp/carve-x27-remaining-gates-20260925/xcodebuild-list.log
+# read-only scheme listing exit 0; (로컬 증거)
 ```
 
-두 iOS 27 runtime 가운데 `24A5370g`를 검증하려고 그 runtime root로 전용 iPad mini simulator를 만들었지만, 부팅 후 runtime build 환경은 `24A434`를 반환했다. 동일 identifier만으로는 런타임을 구별할 수 없어서 테스트를 시작하지 않았다. 이번에 만든 simulator는 종료·삭제했고 사후 목록에서 사라진 것을 확인했다. 생성·부팅·정리 로그는 `/private/tmp/carve-x27-alt-runtime-20260925/`에 있다. 따라서 새 iOS 27 회귀 결과는 없다.
+두 iOS 27 runtime 가운데 `24A5370g`를 검증하려고 그 runtime root로 전용 iPad mini simulator를 만들었지만, 부팅 후 runtime build 환경은 `24A434`를 반환했다. 동일 identifier만으로는 런타임을 구별할 수 없어서 테스트를 시작하지 않았다. 이번에 만든 simulator는 종료·삭제했고 사후 목록에서 사라진 것을 확인했다. 생성·부팅·정리 로그는 (로컬 증거)에 있다. 따라서 새 iOS 27 회귀 결과는 없다.
 
 iOS 18.6 무계정 marker 비교를 위해 기존 `Carve-X27-iOS18.6-V3-Offline-20260925`의 앱 컨테이너를 두 번 복사해 hash 안정성을 확인하고, 원본을 정상 종료한 뒤 전용 clone을 생성했다. 원본과 clone의 Accounts3에는 계정·활성·인증 행이 없었다. clone 실행 전에는 원본 95개 파일의 종료 snapshot과 clone의 별도 data root가 일치했고, clone은 계정 없음 상태였다. 그러나 clone의 `simctl appinfo/get_app_container`가 원본 경로를 반환했고, clone UDID로 시작한 앱의 Core Data CloudKit setup 로그도 원본 UDID의 `Carve.dev.sqlite` URL을 가리켰다. 소스 코드 감사에서는 저장소의 절대 경로 하드코딩을 찾지 못했다. 앱 코드는 `URL.applicationSupportDirectory`에서 저장소 URL을 런타임에 구성하므로, 경로 혼선 원인은 소스 코드가 아니라 복제된 simulator/CoreData 상태에 있을 가능성이 있으나 아직 미확정이다.
 
 clone에서 앱을 한 번 실행한 뒤 원본 DB의 `ANSCKEVENT`가 7건에서 8건으로 늘었다. 새 이벤트는 모두 `NSCocoaErrorDomain 134400` (`CKAccountStatusNoAccount`) setup 실패였다. export operation·exported object·record metadata는 계속 0개였고, Genesis 1:1의 298B payload SHA-256 `07876e8b1910039124914f5c44b9619a90b8ad488a08500bdfa6abc07762c3d6`, marker의 SQLite integer 값 `1`, 단일 drawing 행, integrity check는 유지됐다. clone의 DB는 실행 전후 byte-identical이었다. 앱 데이터 컨테이너 나머지 파일 일부도 원본에서 변경돼 이 결과를 clone 격리 또는 offline-network proof로 인정하지 않는다. 로그인은 하지 않았고 CloudKit 성공·원격 쓰기는 관찰되지 않았다.
 
-증거를 보존한 뒤 두 simulator를 종료했다. CoreSimulatorService 연결이 간헐적으로 끊겨 마지막 `simctl list devices available` 재확인은 실패했지만, 종료 성공 명령과 `/private/tmp/carve-x27-ios18-marker-offline-20260925/devices-after-safety-shutdown.log`에는 두 기기가 Shutdown으로 남아 있다. 원본 side effect로부터 계정 없는 sample을 복구하기 위해 실행 후 원본 app container 전체를 `/private/tmp/carve-x27-ios18-marker-offline-20260925/source-app-data-postlaunch-preserved/`로 보존하고, 95개 파일 종료 전 snapshot `original-app-data-pre-shutdown/`을 같은 app-container UUID 경로에 복원했다. `diff -qr`가 exit 0으로 두 95-file tree의 내용이 같은 것을 확인했고 임시 sibling 디렉터리는 정리했다. 복원은 app-local 파일만 대상으로 했고 CloudKit에는 접근하지 않았다. 전체 비교·DB 보고서·앱 로그는 `/private/tmp/carve-x27-ios18-marker-offline-20260925/`에 남아 있다. marker 의미와 iOS 18 ownership proof는 여전히 미확정이다.
+증거를 보존한 뒤 두 simulator를 종료했다. CoreSimulatorService 연결이 간헐적으로 끊겨 마지막 `simctl list devices available` 재확인은 실패했지만, 종료 성공 명령과 (로컬 증거)에는 두 기기가 Shutdown으로 남아 있다. 원본 side effect로부터 계정 없는 sample을 복구하기 위해 실행 후 원본 app container 전체를 (로컬 증거)로 보존하고, 95개 파일 종료 전 snapshot `original-app-data-pre-shutdown/`을 같은 app-container UUID 경로에 복원했다. `diff -qr`가 exit 0으로 두 95-file tree의 내용이 같은 것을 확인했고 임시 sibling 디렉터리는 정리했다. 복원은 app-local 파일만 대상으로 했고 CloudKit에는 접근하지 않았다. 전체 비교·DB 보고서·앱 로그는 (로컬 증거)에 남아 있다. marker 의미와 iOS 18 ownership proof는 여전히 미확정이다.
 
-보존된 historical `Carve-2.0.0-test-legacy` 앱 번들은 읽기 전용 검증에서 `1.3.0 (1)`, iOS 17.0 minimum, Xcode 26.3 / iOS Simulator SDK 26.2 산출물이며 `codesign --verify --deep --strict`가 통과했다. ad-hoc 서명이고 Team ID·프로비저닝 profile·CloudKit entitlement가 비어 있으므로 전용 iPadOS 26.5에서 local install/update/migration 입력으로는 쓸 수 있지만 live CloudKit pending export proof에는 사용할 수 없다. 감사 결과는 `/private/tmp/carve-x27-historical-130-artifact-audit-20260925/read-only-audit-corrected.log`에 있다.
+보존된 historical `Carve-2.0.0-test-legacy` 앱 번들은 읽기 전용 검증에서 `1.3.0 (1)`, iOS 17.0 minimum, Xcode 26.3 / iOS Simulator SDK 26.2 산출물이며 `codesign --verify --deep --strict`가 통과했다. ad-hoc 서명이고 Team ID·프로비저닝 profile·CloudKit entitlement가 비어 있으므로 전용 iPadOS 26.5에서 local install/update/migration 입력으로는 쓸 수 있지만 live CloudKit pending export proof에는 사용할 수 없다. 감사 결과는 (로컬 증거)에 있다.
 
 별도 pending/local-only export gate의 조사 결과, online 상태에서 합성 행을 쓰고 곧바로 update하는 방식은 Core Data export가 먼저 끝날 수 있어 재현성이 없다. 실행에는 해당 simulator 하나에만 적용되는 신뢰할 수 있는 100% 양방향 network loss가 필요하다. 2026-09-25 Xcode 27 Device Hub의 Controls·More Actions·inspector와 Simulator Developer 설정을 직접 확인했지만 선택 simulator용 네트워크 차단/Network Link Conditioner 제어는 찾지 못했다. 과거 Xcode의 Device Conditions 자료는 네트워크 shaping을 설명하나, 현재 Xcode 27에서 확실한 양방향 차단이 가능하다는 증거가 아니다. Mac 전체 network disconnect는 다른 앱 통신에도 영향을 주므로 사용자의 명시 승인을 받기 전에는 하지 않는다. 확인된 차단 수단이 생긴 뒤 Core Data network error 및 `ZNEEDSUPLOAD=1`을 함께 보며, 같은 simulator에서 old app의 오프라인 합성 행 → Xcode 27 Debug 덮어 설치 → pending 유지 → 네트워크 복구 뒤 Development export·peer receive 순서로 진행한다. 새 simulator의 같은 ACC sandbox 로그인과, CloudKit Console User token을 통한 독립 Development server baseline/final query가 필요하다. 현재 historical artifact에는 Development CloudKit entitlement가 없고 simulator 전용 차단 수단 및 token도 확인되지 않아 이 gate는 실행하지 않았다. 이 절차 설계는 시뮬레이터·계정·CloudKit 데이터에 접근하지 않았다.
 
@@ -2119,7 +2119,7 @@ clone에서 앱을 한 번 실행한 뒤 원본 DB의 `ANSCKEVENT`가 7건에서
 
 ### Xcode 27 직접 V3 로컬 마이그레이션 회귀 (2026-09-25)
 
-테스트 시작 전 tracked worktree는 clean이었다. 기본 선택 Xcode는 `/Applications/Xcode.app/Contents/Developer`의 `27.0 (27A266a)`, macOS `27.2`, Swift `6.4 (6.4.0.34.1)`, Tuist `4.208.0`이다. `Carve-Workspace`의 Debug scheme에서 iPad mini (A17 Pro), iOS `18.6 (22G86)`, UDID `7E95B700-3976-42D7-BF85-BCAF028B7605`를 사용했다. SDK는 iOS Simulator `27.0`이다. 모든 명령은 CLI `xcodebuild test`, `-parallel-testing-enabled NO`로 실행했다. Xcode 27 전체 회귀를 대신하려는 시험이 아니라 V3 local migration 경로에 집중한 추가 증거다.
+테스트 시작 전 tracked worktree는 clean이었다. 기본 선택 Xcode는 `/Applications/Xcode.app/Contents/Developer`의 `27.0 (27A266a)`, macOS `27.2`, Swift `6.4 (6.4.0.34.1)`, Tuist `4.208.0`이다. `Carve-Workspace`의 Debug scheme에서 iPad mini (A17 Pro), iOS `18.6 (22G86)`, UDID `<UDID>`를 사용했다. SDK는 iOS Simulator `27.0`이다. 모든 명령은 CLI `xcodebuild test`, `-parallel-testing-enabled NO`로 실행했다. Xcode 27 전체 회귀를 대신하려는 시험이 아니라 V3 local migration 경로에 집중한 추가 증거다.
 
 | suite | 결과 | 목적 |
 |---|---:|---|
@@ -2129,7 +2129,7 @@ clone에서 앱을 한 번 실행한 뒤 원본 DB의 `ANSCKEVENT`가 7건에서
 | `CarveFeatureTest/LegacyStoreMigrationTesting` | 3/3 | V3 임시 store → 현재 schema → repository → legacy 필기 합성·편집 왕복 |
 | `DomainTest/DrawingSchemaV4MigrationTesting` + `CarveFeatureTest/DrawingCodecLegacyMigrationTesting` | 14/14 | V3→V4 행·blob 보존과 legacy 좌표 배치 확인 |
 
-다섯 실행 묶음은 총 **59/59 통과**, failed·skip·expected failure 0, `xcodebuild` 종료 코드 0이다. 실제 V3 end-to-end suite의 xcresult는 `Passed`, 3/3이고 runtimeWarnings 0이다. 인접 두 suite는 11+3으로 14/14이며 xcresult runtimeWarnings 0이다. 앞서 실행한 첫 세 suite 로그·결과와 두 migration 실행 전체 로그·종료 파일은 각각 `/private/tmp/carve-x27-marker-focused-20260925/`와 `/private/tmp/carve-x27-legacy-store-migration-20260925/`에 있다.
+다섯 실행 묶음은 총 **59/59 통과**, failed·skip·expected failure 0, `xcodebuild` 종료 코드 0이다. 실제 V3 end-to-end suite의 xcresult는 `Passed`, 3/3이고 runtimeWarnings 0이다. 인접 두 suite는 11+3으로 14/14이며 xcresult runtimeWarnings 0이다. 앞서 실행한 첫 세 suite 로그·결과와 두 migration 실행 전체 로그·종료 파일은 각각 (로컬 증거)에 있다.
 
 직접 migration suite는 테스트 전용 임시 SQLite에 synthetic V3 행과 PencilKit blob을 만들고 제거한다. `CarveFeatureTest`는 CarveApp이 아닌 unit-test target이며 앱을 설치·실행하지 않았다. ACC 저장소, iCloud 로그인, CloudKit 서버, 네트워크 데이터는 사용하지 않았다. 따라서 이 결과는 실제 1.3.0 앱 번들 업데이트·iOS 18 marker 해석·계정 소유 proof를 통과시킨 것이 아니다.
 
@@ -2139,18 +2139,18 @@ V3 store를 여는 두 migration suite의 전체 로그에는 CoreData가 `NSMan
 
 ```bash
 xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configuration Debug \
-  -destination 'platform=iOS Simulator,id=7E95B700-3976-42D7-BF85-BCAF028B7605' \
+  -destination 'platform=iOS Simulator,id=<UDID>' \
   -parallel-testing-enabled NO \
-  -derivedDataPath /private/tmp/carve-x27-legacy-store-migration-20260925/DerivedData \
-  -resultBundlePath /private/tmp/carve-x27-legacy-store-migration-20260925/LegacyStoreMigrationTesting.xcresult \
+  -derivedDataPath (로컬 증거) \
+  -resultBundlePath (로컬 증거) \
   -only-testing:CarveFeatureTest/LegacyStoreMigrationTesting
 # 3/3 passed, exit 0; 전체 로그 xcodebuild.log, 종료 코드 xcodebuild.exit
 
 xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configuration Debug \
-  -destination 'platform=iOS Simulator,id=7E95B700-3976-42D7-BF85-BCAF028B7605' \
+  -destination 'platform=iOS Simulator,id=<UDID>' \
   -parallel-testing-enabled NO \
-  -derivedDataPath /private/tmp/carve-x27-legacy-store-migration-20260925/DerivedData \
-  -resultBundlePath /private/tmp/carve-x27-legacy-store-migration-20260925/AdjacentMigrationSuites.xcresult \
+  -derivedDataPath (로컬 증거) \
+  -resultBundlePath (로컬 증거) \
   -only-testing:DomainTest/DrawingSchemaV4MigrationTesting \
   -only-testing:CarveFeatureTest/DrawingCodecLegacyMigrationTesting
 # 14/14 passed, exit 0; 전체 로그 adjacent-suites.log, 종료 코드 adjacent-suites.exit
@@ -2162,11 +2162,11 @@ xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configurat
 
 ### 현재 개발자 iCloud 계정의 CloudKit inventory 재확인 및 격리 시뮬레이터 준비 (2026-09-25)
 
-사용자가 `Carve-X27-FirstLogin-20260925` (iPadOS 26.5, UDID `7284FDE5-6F95-4CC6-8EE6-75A794009F0F`)에 개발자 iCloud 계정을 로그인하고 CloudKit Console User token을 등록했다고 알렸다. 해당 token으로 Development private DB read-only query를 다시 실행했다. 지정한 `com.apple.coredata.cloudkit.zone`과 `_defaultZone`의 `CD_BibleDrawing` 결과는 각각 `records: []`, 명령 종료 코드는 0이다. 원격 응답과 종료 코드는 `/private/tmp/carve-x27-cloudkit-31-inventory-20260925/remote-query-after-icloud-account-login.log` 및 `.exit`, `/private/tmp/carve-x27-cloudkit-31-inventory-20260925/remote-query-default-zone-after-icloud-account-login.log` 및 `.exit`에 있다. 쿼리는 Development·private·해당 record type·두 zone에 한정됐고 record ID 목록을 받지 못했다. 다른 record type·계정·environment·Production DB는 조회하지 않았다.
+사용자가 `Carve-X27-FirstLogin-20260925` (iPadOS 26.5)에 개발자 iCloud 계정을 로그인하고 CloudKit Console User token을 등록했다고 알렸다. 해당 token으로 Development private DB read-only query를 다시 실행했다. 지정한 `com.apple.coredata.cloudkit.zone`과 `_defaultZone`의 `CD_BibleDrawing` 결과는 각각 `records: []`, 명령 종료 코드는 0이다. 원격 응답과 종료 코드는 (로컬 증거) 및 `.exit`, (로컬 증거) 및 `.exit`에 있다. 쿼리는 Development·private·해당 record type·두 zone에 한정됐고 record ID 목록을 받지 못했다. 다른 record type·계정·environment·Production DB는 조회하지 않았다.
 
-같은 첫 로그인 시뮬레이터의 `Carve.dev.sqlite`를 `sqlite3 -readonly`로 조사했다. `ZBIBLEDRAWING` 21행, `ANSCKRECORDMETADATA` 21행, `ZNEEDSUPLOAD` 합계 0, export operation 0건, exported object 0건이었다. zone metadata는 `com.apple.coredata.cloudkit.zone` / `__defaultOwner__`, `needsImport=0`이었고 `PRAGMA integrity_check`는 `ok`였다. 집계 로그는 `/private/tmp/carve-x27-cloudkit-31-inventory-20260925/simulator-local-store-metadata-summary.log`에 있다. local store에는 CloudKit metadata가 연결된 21개 행이 있지만 현재 token으로 조회한 서버 목록에서는 행이 반환되지 않았다. 이것만으로 계정·소유자 불일치, 이전 업로드 실패 또는 서버 데이터 부재 중 어느 것이 원인인지 확정하지 않는다. 데이터는 읽기만 했으며 기존 시뮬레이터 앱을 재실행하거나 행을 수정하지 않았다.
+같은 첫 로그인 시뮬레이터의 `Carve.dev.sqlite`를 `sqlite3 -readonly`로 조사했다. `ZBIBLEDRAWING` 21행, `ANSCKRECORDMETADATA` 21행, `ZNEEDSUPLOAD` 합계 0, export operation 0건, exported object 0건이었다. zone metadata는 `com.apple.coredata.cloudkit.zone` / `__defaultOwner__`, `needsImport=0`이었고 `PRAGMA integrity_check`는 `ok`였다. 집계 로그는 (로컬 증거)에 있다. local store에는 CloudKit metadata가 연결된 21개 행이 있지만 현재 token으로 조회한 서버 목록에서는 행이 반환되지 않았다. 이것만으로 계정·소유자 불일치, 이전 업로드 실패 또는 서버 데이터 부재 중 어느 것이 원인인지 확정하지 않는다. 데이터는 읽기만 했으며 기존 시뮬레이터 앱을 재실행하거나 행을 수정하지 않았다.
 
-기존 21행을 새 계정과 섞지 않고 독립 검증하기 위해 빈 iPad mini (A17 Pro), iPadOS 26.5 simulator `Carve-X27-CloudKit-CurrentIdentity-20260925` (UDID `D0E83844-A29A-4031-B174-9663A138CEEA`)를 생성했다. 첫 부팅 OS data migration 완료를 기다린 뒤 기존 Xcode 27 Debug 앱 `2.0.0 (1)`을 설치했고 `simctl appinfo`로 bundle/version을 확인했다. Settings만 열었으며 Carve 앱은 실행하지 않았다. 사용자가 이 새 simulator에 기존 개발자 iCloud 계정으로 로그인하는 단계가 남아 있다. 다음에는 이 빈 store에서 synthetic Genesis 1:31 행 하나를 만들고 local pending/export 완료와 peer/server read-only inventory를 분리해 확인한다. 기존 simulator의 21행을 복사·삭제·재전송하지 않는다.
+기존 21행을 새 계정과 섞지 않고 독립 검증하기 위해 빈 iPad mini (A17 Pro), iPadOS 26.5 simulator `Carve-X27-CloudKit-CurrentIdentity-20260925` (UDID `<UDID>`)를 생성했다. 첫 부팅 OS data migration 완료를 기다린 뒤 기존 Xcode 27 Debug 앱 `2.0.0 (1)`을 설치했고 `simctl appinfo`로 bundle/version을 확인했다. Settings만 열었으며 Carve 앱은 실행하지 않았다. 사용자가 이 새 simulator에 기존 개발자 iCloud 계정으로 로그인하는 단계가 남아 있다. 다음에는 이 빈 store에서 synthetic Genesis 1:31 행 하나를 만들고 local pending/export 완료와 peer/server read-only inventory를 분리해 확인한다. 기존 simulator의 21행을 복사·삭제·재전송하지 않는다.
 
 추가로 시도한 `xcrun cktool export-schema`는 user token만으로 schema 조회를 허용하지 않고 `No management token found`로 exit 64를 반환했다. schema export는 하지 못했다. 이번 단계에서는 앱 빌드·테스트를 실행하지 않았고 CloudKit 데이터 변경도 없었다. 두 zone query 결과는 server inventory 완료로 인정하지 않는다. iOS 18 marker/ownership, iOS 17.0 직접 회귀, Development CloudKit first-login 독립 inventory, pending export update, Production CloudKit, Distribution 서명 Archive/export·TestFlight와 물리 후보 smoke는 미완료여서 출시 판정 **NO-GO**를 유지한다.
 
@@ -2174,52 +2174,52 @@ xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configurat
 
 2026-09-25 재확인 환경은 macOS `27.2 (26B5086k)`, `xcode-select -p` `/Applications/Xcode.app/Contents/Developer`, Xcode `27.0 (27A266a)`, Swift `6.4 (swiftlang-6.4.0.34.1)`, Tuist `mise x -- tuist version` `4.208.0`이다. 샌드박스에서 Tuist 사용자 session 경로 권한 오류가 한 번 발생해 같은 `mise x -- tuist version`을 권한 있는 CLI로 재확인했다. `xcrun simctl list runtimes`와 `list devices available`도 권한 있는 CLI에서 성공했다. 확인된 iOS runtime은 17.5, 18.6, 26.2, 26.4, 26.5, 27.0이며 iOS 27.0은 build `24A5370g`와 `24A434` 두 항목이다. 이번 업로드 source는 iPad mini (A17 Pro), iPadOS `26.5 (23F77)`이고 iPhone destination은 사용하지 않았다.
 
-새 current-identity source simulator `Carve-X27-CloudKit-CurrentIdentity-20260925` (`D0E83844-A29A-4031-B174-9663A138CEEA`)에서 Tuist workspace를 생성한 뒤 Xcode 27 Debug `CarveApp` `2.0.0 (1)`을 build·install했다. Debug 앱 `Info.plist`의 `CLOUDKIT_CONTAINER_ID`는 `iCloud.Carve.SwiftData.iCloud.dev`이고 일반 simulator signing/entitlement 경로를 사용했다. signature 우회, build setting·dependency 변경은 없었다.
+새 current-identity source simulator `Carve-X27-CloudKit-CurrentIdentity-20260925`에서 Tuist workspace를 생성한 뒤 Xcode 27 Debug `CarveApp` `2.0.0 (1)`을 build·install했다. Debug 앱 `Info.plist`의 `CLOUDKIT_CONTAINER_ID`는 `iCloud.Carve.SwiftData.iCloud.dev`이고 일반 simulator signing/entitlement 경로를 사용했다. signature 우회, build setting·dependency 변경은 없었다.
 
 ```bash
 mise x -- tuist generate --no-open
 # exit 0
 
 xcodebuild -workspace Carve.xcworkspace -scheme CarveApp -configuration Debug \
-  -destination 'platform=iOS Simulator,id=D0E83844-A29A-4031-B174-9663A138CEEA' \
-  -derivedDataPath /private/tmp/carve-x27-cloudkit-current-identity-20260925/DerivedData build
-# exit 0; 전체 로그 /private/tmp/carve-x27-cloudkit-current-identity-20260925/xcodebuild-build.log
+  -destination 'platform=iOS Simulator,id=<UDID>' \
+  -derivedDataPath (로컬 증거) build
+# exit 0; 전체 로그 (로컬 증거)
 
-xcrun simctl launch D0E83844-A29A-4031-B174-9663A138CEEA kr.co.carve.leetaek \
+xcrun simctl launch <UDID> kr.co.carve.leetaek \
   -UITestChapter '{"title":"1-01Genesis.txt","chapter":1}'
-# 수동 UI smoke 시작용 launch; 앱 로그 /private/tmp/carve-x27-cloudkit-current-identity-20260925/carve-log-stream.log
+# 수동 UI smoke 시작용 launch; 앱 로그 (로컬 증거)
 ```
 
 사용자가 이 source simulator에 로그인한 뒤 합성 Genesis 1:31 필기 한 획을 Simulator UI에서 입력했다. 이는 수동 UI smoke이며 `xcodebuild test` 자동화 결과가 아니다. 자동 테스트는 이번 proof에서 새로 실행하지 않았다. Genesis 1:5로 잘못 잡힌 앞선 UI 드래그는 즉시 Undo했다. 읽기 전용 확인에서 이 절의 local `ZLINEDATA`는 `NULL`로 남았지만 빈 Core Data 행과 CloudKit metadata가 생겼고 Development inventory에도 빈 verse 5 record가 보여, 이를 payload가 있는 필기로 세지 않는다.
 
-서버 query 전 baseline은 Development private DB의 Core Data custom zone `com.apple.coredata.cloudkit.zone`과 `_defaultZone` 모두 `CD_BibleDrawing` `records: []`, exit 0이었다. Genesis 1:31 입력 뒤 `NSPersistentCloudKitContainerEvent` Export 성공이 앱 log에 기록됐다. `Carve.dev.sqlite`의 read-only 검사에서는 integrity `ok`, verse 31 drawing metadata `ZNEEDSUPLOAD=0`, last exported transaction `3`, export operation 0건이며 metadata record name `7FA1F4D1-EBDE-4DD1-8687-5CD801914172`였다.
+서버 query 전 baseline은 Development private DB의 Core Data custom zone `com.apple.coredata.cloudkit.zone`과 `_defaultZone` 모두 `CD_BibleDrawing` `records: []`, exit 0이었다. Genesis 1:31 입력 뒤 `NSPersistentCloudKitContainerEvent` Export 성공이 앱 log에 기록됐다. `Carve.dev.sqlite`의 read-only 검사에서는 integrity `ok`, verse 31 drawing metadata `ZNEEDSUPLOAD=0`, last exported transaction `3`, export operation 0건이며 metadata record name 였다.
 
-같은 개발자 iCloud identity의 CloudKit Console User token을 Keychain에서 읽는 `cktool` query를 Development·private·`CD_BibleDrawing`에 한정해 실행했다. custom zone query와 전체 field query는 exit 0이고 두 record를 반환했다. verse 31 server record `7FA1F4D1-EBDE-4DD1-8687-5CD801914172`의 `CD_titleName=1-01Genesis.txt`, `CD_titleChapter=1`, `CD_verse=31`, `CD_isPresent=1`, `CD_drawingVersion=3`, `CD_lineData` 321 bytes다. 이 record name은 local CloudKit metadata와 같다. local SQLite의 `.externalStorage` 원시 `ZLINEDATA` blob은 322 bytes이고 첫 byte가 `0x01`이었다. 그 한 byte 뒤의 321 bytes는 server `CD_lineData`와 바이트 단위로 같고 SHA-256은 양쪽 모두 `dba2e45b2762abd627907d43e6b1a53a6b678ba03d46a5f619b79a30e28496de`다. `_defaultZone` query는 exit 0, `records: []`였다. 이번 조회는 Development private zone과 record type에 한정하며 Production DB는 조회하지 않았다.
+같은 개발자 iCloud identity의 CloudKit Console User token을 Keychain에서 읽는 `cktool` query를 Development·private·`CD_BibleDrawing`에 한정해 실행했다. custom zone query와 전체 field query는 exit 0이고 두 record를 반환했다. verse 31 server record 의 `CD_titleName=1-01Genesis.txt`, `CD_titleChapter=1`, `CD_verse=31`, `CD_isPresent=1`, `CD_drawingVersion=3`, `CD_lineData` 321 bytes다. 이 record name은 local CloudKit metadata와 같다. local SQLite의 `.externalStorage` 원시 `ZLINEDATA` blob은 322 bytes이고 첫 byte가 `0x01`이었다. 그 한 byte 뒤의 321 bytes는 server `CD_lineData`와 바이트 단위로 같고 SHA-256은 양쪽 모두 `dba2e45b2762abd627907d43e6b1a53a6b678ba03d46a5f619b79a30e28496de`다. `_defaultZone` query는 exit 0, `records: []`였다. 이번 조회는 Development private zone과 record type에 한정하며 Production DB는 조회하지 않았다.
 
-전체 build·app log·baseline 및 post-upload query와 exit 파일은 `/private/tmp/carve-x27-cloudkit-current-identity-20260925/`에 있다 (`post-sample-custom-zone.log`, `post-sample-custom-zone-full-fields.log`, `post-sample-custom-zone.exit`, `post-sample-default-zone.log`, `post-sample-default-zone.exit`, local/server `verse31-lineData` 비교 파일). 원문 User token은 출력·저장하지 않았다. 합성 verse 31 sample과 Undo 뒤 남은 빈 verse 5 test row는 Development sandbox에 유지되며 삭제하지 않았다.
+전체 build·app log·baseline 및 post-upload query와 exit 파일은 (로컬 증거)에 있다 (`post-sample-custom-zone.log`, `post-sample-custom-zone-full-fields.log`, `post-sample-custom-zone.exit`, `post-sample-default-zone.log`, `post-sample-default-zone.exit`, local/server `verse31-lineData` 비교 파일). 원문 User token은 출력·저장하지 않았다. 합성 verse 31 sample과 Undo 뒤 남은 빈 verse 5 test row는 Development sandbox에 유지되며 삭제하지 않았다.
 
-새 record의 independent peer 수신은 별도 신규 simulator에서 확인했다. 기존 `Carve-ACC-Xcode27-LoginUpdate-20260925`는 verse 31의 다른 record ID를 이미 포함하고 있어 이번 record의 baseline peer로 사용하지 않았다. 현재 source를 `simctl clone`한 임시 장치는 `get_app_container`가 source app container 경로를 그대로 반환해 격리 peer로 인정하지 않았고 앱을 삭제·실행하지 않았다. 대신 신규 iPad mini (A17 Pro), iPadOS 26.5 `Carve-X27-CloudKit-Peer-CurrentIdentity-20260925` (`99987218-4E3C-471F-8000-7BFACC072452`)를 만들고 같은 Xcode 27 Debug `2.0.0 (1)`을 설치했다. 사용자가 source와 같은 개발자 iCloud 계정으로 로그인한 뒤 앱을 실행했다. 앱 실행 직전 CoreData store는 없었다. 앱 log의 CloudKit Setup은 success, 이어진 Import는 `succeeded: YES`; fetch count는 2였다. peer store는 integrity `ok`, drawing·record metadata 각 2행, import/export operation 0, Genesis 1:31의 record name `7FA1F4D1-EBDE-4DD1-8687-5CD801914172`, `ZNEEDSUPLOAD=0`이다. peer `.externalStorage` raw blob에서 첫 `0x01`을 제외한 payload는 서버와 동일 321 bytes이며 SHA-256 `dba2e45b2762abd627907d43e6b1a53a6b678ba03d46a5f619b79a30e28496de`로 일치했다. peer Import 뒤 Development server query는 exit 0, 동일 record 2개와 동일 record IDs를 반환해 추가·중복 레코드가 없었다. 완료된 peer 앱의 Genesis 1:31 화면에서도 수신 표본을 수동으로 관찰했다. 이는 Simulator UI 관찰이며 자동 테스트와 분리한다. peer app/launch/event 로그 및 post-import server query는 `/private/tmp/carve-x27-cloudkit-current-identity-20260925/`에 보존했다.
+새 record의 independent peer 수신은 별도 신규 simulator에서 확인했다. 기존 `Carve-ACC-Xcode27-LoginUpdate-20260925`는 verse 31의 다른 record ID를 이미 포함하고 있어 이번 record의 baseline peer로 사용하지 않았다. 현재 source를 `simctl clone`한 임시 장치는 `get_app_container`가 source app container 경로를 그대로 반환해 격리 peer로 인정하지 않았고 앱을 삭제·실행하지 않았다. 대신 신규 iPad mini (A17 Pro), iPadOS 26.5 `Carve-X27-CloudKit-Peer-CurrentIdentity-20260925` (`<UDID>`)를 만들고 같은 Xcode 27 Debug `2.0.0 (1)`을 설치했다. 사용자가 source와 같은 개발자 iCloud 계정으로 로그인한 뒤 앱을 실행했다. 앱 실행 직전 CoreData store는 없었다. 앱 log의 CloudKit Setup은 success, 이어진 Import는 `succeeded: YES`; fetch count는 2였다. peer store는 integrity `ok`, drawing·record metadata 각 2행, import/export operation 0, Genesis 1:31의 record name `<UDID>`, `ZNEEDSUPLOAD=0`이다. peer `.externalStorage` raw blob에서 첫 `0x01`을 제외한 payload는 서버와 동일 321 bytes이며 SHA-256 `dba2e45b2762abd627907d43e6b1a53a6b678ba03d46a5f619b79a30e28496de`로 일치했다. peer Import 뒤 Development server query는 exit 0, 동일 record 2개와 동일 record IDs를 반환해 추가·중복 레코드가 없었다. 완료된 peer 앱의 Genesis 1:31 화면에서도 수신 표본을 수동으로 관찰했다. 이는 Simulator UI 관찰이며 자동 테스트와 분리한다. peer app/launch/event 로그 및 post-import server query는 (로컬 증거)에 보존했다.
 
 이에 따라 새 current-identity synthetic row의 first-login Development export, independent server record/payload 일치, 독립 iPadOS 26.5 peer simulator import까지 확인했다. 물리 iPad 수신, iOS 18 marker/ownership, iOS 17 ownership·17.0 직접 회귀, pending export update, Production CloudKit, Distribution 서명 Archive/export·Xcode 27 TestFlight는 미완료다. 자동 전체 회귀의 기존 Xcode 27 결과는 별도 기준으로 유지하고, 출시 판정은 **NO-GO**다.
 
 ### Xcode 27 ownership/migration focused CLI 재실행 (2026-09-25)
 
-CloudKit peer proof와 별도로, 새 빈 iPad mini (A17 Pro) simulator `Carve-X27-Focused-Sync-Tests-20260925` (`9513D5AF-A266-4178-B3F9-19EC89A13BE8`), iPadOS `26.5 (23F77)`에서 관련 두 suite를 다시 실행했다. 환경은 macOS `27.2 (26B5086k)`, Xcode `27.0 (27A266a)`, Swift `6.4 (swiftlang-6.4.0.34.1)`이며 iPhone destination은 사용하지 않았다.
+CloudKit peer proof와 별도로, 새 빈 iPad mini (A17 Pro) simulator `Carve-X27-Focused-Sync-Tests-20260925`, iPadOS `26.5 (23F77)`에서 관련 두 suite를 다시 실행했다. 환경은 macOS `27.2 (26B5086k)`, Xcode `27.0 (27A266a)`, Swift `6.4 (swiftlang-6.4.0.34.1)`이며 iPhone destination은 사용하지 않았다.
 
 ```bash
 xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configuration Debug \
-  -destination 'platform=iOS Simulator,id=9513D5AF-A266-4178-B3F9-19EC89A13BE8' \
+  -destination 'platform=iOS Simulator,id=<UDID>' \
   -parallel-testing-enabled NO \
-  -derivedDataPath /private/tmp/carve-x27-focused-sync-tests-20260925/DerivedData \
-  -resultBundlePath /private/tmp/carve-x27-focused-sync-tests-20260925/OwnershipAndMigration.xcresult \
+  -derivedDataPath (로컬 증거) \
+  -resultBundlePath (로컬 증거) \
   -only-testing:DomainTest/DrawingStoreOwnershipProofTesting \
   -only-testing:DomainTest/MigrationSyncReleaseTesting
 # exit 0 — 11 passed, 0 failed, 0 skipped, 0 expected failures
 ```
 
-`xcresulttool get test-results summary`도 `Passed`, 11/11, runtimeWarnings 0을 반환했다. 전체 로그는 `/private/tmp/carve-x27-focused-sync-tests-20260925/xcodebuild-test.log`, 종료 코드는 `xcodebuild-test.exit`, xcresult는 위 경로에 있다. fail-closed 입력을 검증하는 두 테스트가 의도한 보존 실패 경로를 지나는 중 진단용 CoreData/SQLite error 로그를 출력했지만 해당 테스트들은 통과했고 xcresult runtime warning은 없었다.
+`xcresulttool get test-results summary`도 `Passed`, 11/11, runtimeWarnings 0을 반환했다. 전체 로그는 (로컬 증거), 종료 코드는 `xcodebuild-test.exit`, xcresult는 위 경로에 있다. fail-closed 입력을 검증하는 두 테스트가 의도한 보존 실패 경로를 지나는 중 진단용 CoreData/SQLite error 로그를 출력했지만 해당 테스트들은 통과했고 xcresult runtime warning은 없었다.
 
-첫 시도는 기존 iPad mini (A17 Pro), iPadOS 26.5 UDID `589A8DAB-2D5C-45FC-B76B-C4260FB87C67`를 destination으로 지정했으나 Xcode가 요청 destination을 available로 찾지 못해 exit 70으로 테스트 시작 전에 끝났다. 당시 Xcode 오류는 같은 UDID를 compatible 목록에 함께 표시했다. 이 첫 시도의 전체 로그는 `/private/tmp/carve-x27-cloudkit-peer-focused-20260925/xcodebuild-test.log`다. 보호 계정/필기 데이터가 있는 simulator를 선택하지 않고 새 빈 iPadOS 26.5 simulator에서 재시도해 통과했다. 이 두 synthetic/local suite 결과는 live CloudKit marker 의미, 실제 store migration의 모든 OS, 물리 iPad, Production CloudKit 또는 배포 서명 증거를 대신하지 않으며 출시 판정 **NO-GO**를 유지한다.
+첫 시도는 기존 iPad mini (A17 Pro), iPadOS 26.5 를 destination으로 지정했으나 Xcode가 요청 destination을 available로 찾지 못해 exit 70으로 테스트 시작 전에 끝났다. 당시 Xcode 오류는 같은 UDID를 compatible 목록에 함께 표시했다. 이 첫 시도의 전체 로그는 (로컬 증거)다. 보호 계정/필기 데이터가 있는 simulator를 선택하지 않고 새 빈 iPadOS 26.5 simulator에서 재시도해 통과했다. 이 두 synthetic/local suite 결과는 live CloudKit marker 의미, 실제 store migration의 모든 OS, 물리 iPad, Production CloudKit 또는 배포 서명 증거를 대신하지 않으며 출시 판정 **NO-GO**를 유지한다.
 
 ### Xcode 27 physical iPad Debug artifact 재확인 (2026-09-25)
 
@@ -2227,48 +2227,48 @@ xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configurat
 
 ```bash
 xcodebuild -workspace Carve.xcworkspace -scheme CarveApp -configuration Debug \
-  -destination 'platform=iOS,id=00008130-000C24A60C92001C' \
-  -derivedDataPath /private/tmp/carve-x27-physical-smoke-20260925/DerivedData build
+  -destination 'platform=iOS,id=<device-udid>' \
+  -derivedDataPath (로컬 증거) build
 # BUILD SUCCEEDED, exit 0
 
 codesign --verify --deep --strict \
-  /private/tmp/carve-x27-physical-smoke-20260925/DerivedData/Build/Products/Debug-iphoneos/CarveApp.app
+  (로컬 증거)
 # valid on disk; satisfies its Designated Requirement; exit 0
 ```
 
 이 산출물은 `kr.co.carve.leetaek` `2.0.0 (1)`이고 `Info.plist`의 `CLOUDKIT_CONTAINER_ID`는 `iCloud.Carve.SwiftData.iCloud.dev`다. signed entitlements에는 CloudKit service와 두 container ID가 있으나 `com.apple.developer.icloud-container-environment`는 없다. embedded Development profile은 `get-task-allow=true`이며 해당 environment 값을 `Development`와 `Production` 모두 허용한다. Apple 문서에 따르면 CloudKit은 이 entitlement로 런타임의 Development/Production 환경을 선택한다([CKContainer — Development 환경 테스트](https://developer.apple.com/documentation/cloudkit/ckcontainer)). 따라서 container ID만으로 CloudKit Development environment가 고정됐다고 추정하지 않는다. 같은 bundle ID로 설치하면 기존 TestFlight 앱과 설치본이 교체될 수 있고, 현재 서명 결과로는 이 기기에서 Production environment 접근을 배제할 수 없어 설치·실행하지 않았다. 읽기 전용 재확인에서 기존 TestFlight `2.0.0 (220)`은 그대로 설치돼 있었다. 물리 iPad 앱·데이터는 이번 작업에서 변경하지 않았다.
 
-전체 build log/exit, strict codesign 결과, signed entitlement·profile 검사는 `/private/tmp/carve-x27-physical-smoke-20260925/`에 있다. 이 physical Debug build·서명 검증은 자동 테스트와 분리하며, Release Distribution/Production 환경, TestFlight 후보 및 물리 CloudKit peer smoke의 증거로 세지 않는다. Development-only environment가 서명으로 확인되는 후보 없이는 해당 smoke를 진행하지 않는다.
+전체 build log/exit, strict codesign 결과, signed entitlement·profile 검사는 (로컬 증거)에 있다. 이 physical Debug build·서명 검증은 자동 테스트와 분리하며, Release Distribution/Production 환경, TestFlight 후보 및 물리 CloudKit peer smoke의 증거로 세지 않는다. Development-only environment가 서명으로 확인되는 후보 없이는 해당 smoke를 진행하지 않는다.
 
 ### Xcode 27 iPadOS 18.6 앱 컴파일 및 집중 회귀 (2026-09-25)
 
 환경은 macOS `27.2 (26B5086k)`, `xcode-select -p` `/Applications/Xcode.app/Contents/Developer`, Xcode `27.0 (27A266a)`, Swift `6.4.0.34.1`, Tuist `mise x -- tuist version` `4.208.0`이다. 대상은 iPad mini (A17 Pro), iPadOS `18.6 (22G86)` simulator다.
 
-새 빈 simulator `Carve-X27-Ownership-Migration-iOS18.6-20260925` (`1314A38C-D931-4733-AD31-31B4D415F9C8`)에서 먼저 관련 소유권·마이그레이션 suite를 실행했다.
+새 빈 simulator `Carve-X27-Ownership-Migration-iOS18.6-20260925`에서 먼저 관련 소유권·마이그레이션 suite를 실행했다.
 
 ```bash
 xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace -configuration Debug \
-  -destination 'platform=iOS Simulator,id=1314A38C-D931-4733-AD31-31B4D415F9C8' \
+  -destination 'platform=iOS Simulator,id=<UDID>' \
   -parallel-testing-enabled NO \
-  -derivedDataPath /private/tmp/carve-x27-focused-sync-tests-20260925/DerivedData \
-  -resultBundlePath /private/tmp/carve-x27-ios18.6-ownership-20260925/OwnershipAndMigration.xcresult \
+  -derivedDataPath (로컬 증거) \
+  -resultBundlePath (로컬 증거) \
   -only-testing:DomainTest/DrawingStoreOwnershipProofTesting \
   -only-testing:DomainTest/MigrationSyncReleaseTesting
 # exit 0; 11 passed, 0 failed, 0 skipped, 0 expected failures; xcresult runtimeWarnings 0
 ```
 
-전체 로그·종료 코드는 `/private/tmp/carve-x27-ios18.6-ownership-20260925/xcodebuild-test.log` 및 `xcodebuild-test.exit`에 있다. 합성/local 경로의 결과로 CloudKit 로그인·데이터 변경은 없었으며 iOS 18.6의 실제 private metadata marker 의미나 live ownership proof는 닫지 않는다.
+전체 로그·종료 코드는 (로컬 증거) 및 `xcodebuild-test.exit`에 있다. 합성/local 경로의 결과로 CloudKit 로그인·데이터 변경은 없었으며 iOS 18.6의 실제 private metadata marker 의미나 live ownership proof는 닫지 않는다.
 
 그 다음 Xcode 27 workspace에서 `CarveApp` Debug simulator build를 실행했다.
 
 ```bash
 xcodebuild -workspace Carve.xcworkspace -scheme CarveApp -configuration Debug \
-  -destination 'platform=iOS Simulator,id=7E95B700-3976-42D7-BF85-BCAF028B7605' \
-  -derivedDataPath /private/tmp/carve-x27-ios18.6-app-build-20260925/DerivedData build
+  -destination 'platform=iOS Simulator,id=<UDID>' \
+  -derivedDataPath (로컬 증거) build
 # BUILD SUCCEEDED, exit 0
 ```
 
-destination은 iPad mini (A17 Pro), iPadOS `18.6 (22G86)`이며 Xcode 27.0의 iOS Simulator 27.0 SDK를 사용했다. 전체 로그·종료 코드는 `/private/tmp/carve-x27-ios18.6-app-build-20260925/xcodebuild-build.log` 및 `xcodebuild-build.exit`에 있다. 기존 `undoManager` deprecated 진단, 매크로의 non-Sendable 변환 경고와 SwiftLint 경고가 남았다. 앱을 simulator에 설치·실행하지 않았고 CloudKit/Firebase 실행 데이터도 바꾸지 않았다. 따라서 이것은 iOS 18.6 runtime에서의 앱 동작이나 Distribution 서명 검증이 아니다.
+destination은 iPad mini (A17 Pro), iPadOS `18.6 (22G86)`이며 Xcode 27.0의 iOS Simulator 27.0 SDK를 사용했다. 전체 로그·종료 코드는 (로컬 증거) 및 `xcodebuild-build.exit`에 있다. 기존 `undoManager` deprecated 진단, 매크로의 non-Sendable 변환 경고와 SwiftLint 경고가 남았다. 앱을 simulator에 설치·실행하지 않았고 CloudKit/Firebase 실행 데이터도 바꾸지 않았다. 따라서 이것은 iOS 18.6 runtime에서의 앱 동작이나 Distribution 서명 검증이 아니다.
 
 같은 환경 확인에서 일반 sandbox 호출은 Tuist session 경로와 CoreSimulatorService 로그 접근 권한 오류를 냈다. 동일한 `xcode-select -p`, `xcodebuild -version`, `swift --version`, `mise x -- tuist version`, `xcrun simctl list runtimes`, `xcrun simctl list devices available`을 권한 있는 CLI로 조회해 각각 성공했으며 Tuist `4.208.0`, Xcode `27.0 (27A266a)`, Swift `6.4.0.34.1`과 runtime/device 목록을 얻었다. runtime은 iOS `17.5`, `18.6`, `26.2`, `26.4`, `26.5`, `27.0`이며 iOS `17.0`은 없다.
 
@@ -2280,9 +2280,9 @@ destination은 iPad mini (A17 Pro), iPadOS `18.6 (22G86)`이며 Xcode 27.0의 iO
 
 ## 2026-09-25 iPadOS 17.5 1.3.0 로그인 후 실제 CloudKit 가져오기 확인
 
-사용자가 전용 `Carve-X27-iOS17.5-V3-Update-Probe-20260925` simulator(iPad mini 6, iPadOS 17.5, UDID `3E2D5B97-1682-400B-BB62-0DD640A0F62D`)의 `Settings > Apple Account`에 Carve Development 시험 계정으로 로그인했다. 이 기기에는 기존 1.3.0 앱 `1.3.0 (1)`을 실행했고, 컨테이너는 `iCloud.Carve.SwiftData.iCloud.dev`였다. 2.0.0 업데이트 전에 앱의 첫 CloudKit 연결·가져오기 결과를 확인했다.
+사용자가 전용 `Carve-X27-iOS17.5-V3-Update-Probe-20260925` simulator(iPad mini 6, iPadOS 17.5)의 `Settings > Apple Account`에 Carve Development 시험 계정으로 로그인했다. 이 기기에는 기존 1.3.0 앱 `1.3.0 (1)`을 실행했고, 컨테이너는 `iCloud.Carve.SwiftData.iCloud.dev`였다. 2.0.0 업데이트 전에 앱의 첫 CloudKit 연결·가져오기 결과를 확인했다.
 
-1.3.0 콘솔에서 Core Data CloudKit setup 성공, import 요청 완료, incremental import 적용 7건을 관찰했고 비-null CloudKit 오류나 `CKAccountStatusNoAccount`는 없었다. 다만 앱 컨테이너 `Library/Application Support/Carve.dev.sqlite`는 `PRAGMA quick_check=ok`였지만 `ZBIBLEDRAWING=0`, `ZBIBLEPAGEDRAWING=0`, `ANSCKRECORDMETADATA=0`이었다. 별도로 캡처한 수동 화면에서도 창세기 1장 필사란은 비어 있었다. 실행 로그와 캡처는 `/private/tmp/carve-x27-ios17.5-v3-update-20260925/legacy-1.3-console.log`, `/private/tmp/carve-x27-ios17.5-v3-update-20260925/legacy-1.3-after-import.png`에 있다. 저장소는 해당 simulator 앱 컨테이너의 `09BA1B79-D807-406E-A8CC-308810335DC9/Library/Application Support/Carve.dev.sqlite`였다.
+1.3.0 콘솔에서 Core Data CloudKit setup 성공, import 요청 완료, incremental import 적용 7건을 관찰했고 비-null CloudKit 오류나 `CKAccountStatusNoAccount`는 없었다. 다만 앱 컨테이너 `Library/Application Support/Carve.dev.sqlite`는 `PRAGMA quick_check=ok`였지만 `ZBIBLEDRAWING=0`, `ZBIBLEPAGEDRAWING=0`, `ANSCKRECORDMETADATA=0`이었다. 별도로 캡처한 수동 화면에서도 창세기 1장 필사란은 비어 있었다. 실행 로그와 캡처는 (로컬 증거)에 있다. 저장소는 해당 simulator 앱 컨테이너의 /Library/Application Support/Carve.dev.sqlite`였다.
 
 이 세션에서 실제 historical V3 필기가 앱으로 들어오지 않았으므로 importer setup 성공을 필사 수신으로 세지 않는다. 실제 표본의 화면 표시, 좌표·내용, 앱 재실행 후 보존, 첫 로그인 업로드는 여전히 미검증이다. 이전 별도 계정 없는 synthetic V3 fixture에서 확인한 298-byte 보존 결과와도 다른 시험이다. 빈 저장소를 업데이트해 무유실 성공으로 잘못 판정하지 않도록 1.3.0 상태를 유지했다.
 
@@ -2312,9 +2312,9 @@ pending export update를 위해 사용자가 Mac 전체 연결을 약 5분 끊�
 
 ### 증거 범위와 표본
 
-이 항목은 기존 기록의 현재 상태 오인 방지를 위해 추가한다. 2026-09-25 보존 사본의 manifest는 `/private/tmp/carve-x27-ios18-marker-offline-20260925/original-app-data-pre-shutdown/Library/Application Support/Preservation/Carve.dev.sqlite/raw/1790300928-5DA2776C/Carve.dev.sqlite`이며 SHA-256 `8f5ae897cef55544b61d5dc458089313b4dacfca562113f92ec6defdb3ed70cf`, size 208896, externalReferences 0이다. 원본은 직접 열지 않고 사본에서만 읽었다. `integrity_check=ok`, V3 1 drawing row / payload 298 bytes, metadata 5개(기존 네 key와 `PFCloudKitMetadataModelMigratorMigrationBeganCommitKey`), `NeedsMetadataMigration=false`, record metadata 0, export/import operation 0이었다. marker 열은 SQLite integer boolean 1이다. manifest와 probe summary에 기록된 source OS 18.6 / no-account 조건 외에 marker가 migration 진행인지 완료인지 입증하는 전후 서버 대응은 없다. 이름과 true 값만으로 뜻을 정하지 않는다.
+이 항목은 기존 기록의 현재 상태 오인 방지를 위해 추가한다. 2026-09-25 보존 사본의 manifest는 (로컬 증거)이며 SHA-256 `8f5ae897cef55544b61d5dc458089313b4dacfca562113f92ec6defdb3ed70cf`, size 208896, externalReferences 0이다. 원본은 직접 열지 않고 사본에서만 읽었다. `integrity_check=ok`, V3 1 drawing row / payload 298 bytes, metadata 5개(기존 네 key와 `PFCloudKitMetadataModelMigratorMigrationBeganCommitKey`), `NeedsMetadataMigration=false`, record metadata 0, export/import operation 0이었다. marker 열은 SQLite integer boolean 1이다. manifest와 probe summary에 기록된 source OS 18.6 / no-account 조건 외에 marker가 migration 진행인지 완료인지 입증하는 전후 서버 대응은 없다. 이름과 true 값만으로 뜻을 정하지 않는다.
 
-`/private/tmp/carve-x27-ios18-marker-offline-20260925/probe-summary.txt`는 앞선 probe에서 source와 clone 모두 계정 없음, marker 1, 8개 CloudKit event 실패(no account), record metadata와 export/import operation 없음이라고 기록한다. 단, clone 실행이 source UDID를 대상으로 해 source event 수를 7→8로 바꾼 사고가 있었으므로 해당 clone은 독립 표본이 아니며 추가 source 변경 근거로 쓰지 않는다. 별도 보존 사본은 위 manifest로 파일/지문이 연결되며 event 수가 다를 수 있다. 문서가 언급하는 historical iOS 18.6 앱 bundle 파일은 이번 경로 조사에서 찾지 못했다. 따라서 이번 live local launch는 historical binary 실행이 아니라 보존된 V3 bytes로 만든 synthetic identity의 Xcode 27 `2.0.0 (1)` 앱 시험이다.
+(로컬 증거)는 앞선 probe에서 source와 clone 모두 계정 없음, marker 1, 8개 CloudKit event 실패(no account), record metadata와 export/import operation 없음이라고 기록한다. 단, clone 실행이 source UDID를 대상으로 해 source event 수를 7→8로 바꾼 사고가 있었으므로 해당 clone은 독립 표본이 아니며 추가 source 변경 근거로 쓰지 않는다. 별도 보존 사본은 위 manifest로 파일/지문이 연결되며 event 수가 다를 수 있다. 문서가 언급하는 historical iOS 18.6 앱 bundle 파일은 이번 경로 조사에서 찾지 못했다. 따라서 이번 live local launch는 historical binary 실행이 아니라 보존된 V3 bytes로 만든 synthetic identity의 Xcode 27 `2.0.0 (1)` 앱 시험이다.
 
 ### 구현과 좁은 CLI 회귀
 
@@ -2328,33 +2328,33 @@ xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace \
   -only-testing:DomainTest/LegacyRowLinkageReaderTesting \
   -only-testing:DomainTest/DrawingStoreOwnershipProofTesting \
   -only-testing:DomainTest/DrawingEditEnvironmentTesting \
-  -resultBundlePath /private/tmp/carve-x27-ownership-reader-v5-ios18.6-20260926-final.xcresult
-# 51 tests / 3 suites passed; log: /private/tmp/carve-x27-ownership-reader-v5-ios18.6-20260926-final.log
+  -resultBundlePath (로컬 증거)
+# 51 tests / 3 suites passed; log: (로컬 증거)
 
 xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace \
-  -destination 'platform=iOS Simulator,id=0347221E-08F5-48C9-9F8E-6D7995C25D9F' \
+  -destination 'platform=iOS Simulator,id=<UDID>' \
   -only-testing:DomainTest/LegacyRowLinkageReaderTesting \
   -only-testing:DomainTest/DrawingStoreOwnershipProofTesting \
   -only-testing:DomainTest/DrawingEditEnvironmentTesting \
-  -resultBundlePath /private/tmp/carve-x27-ownership-reader-v5-ios17.5-20260926.xcresult
-# 51 tests / 3 suites passed; log: /private/tmp/carve-x27-ownership-reader-v5-ios17.5-20260926.log
+  -resultBundlePath (로컬 증거)
+# 51 tests / 3 suites passed; log: (로컬 증거)
 ```
 
 두 simulator fixture test는 synthetic SQLite와 test double이므로 actual CloudKit ownership proof를 증명하지 않는다. 변경 네 Swift 파일의 SwiftLint는 exit 0이고 기존 `LegacyRowLinkageReader.swift` function body 156/150, type body 378/300 경고 두 개가 남았다. `git diff --check`는 통과했다. 기록된 Xcode 27 전체 회귀 결과를 반복 빌드로 대체하지 않았다.
 
 ### 독립 iPadOS 18.6 no-account app launch
 
-독립 생성 기기는 `Carve-2.0.0-Ownership-iOS18.6-20260926`, UDID `A522DEEB-AA58-4ADF-B186-FB94E07C45AF`, iPad mini (A17 Pro), iPadOS 18.6이다. source preservation 사본을 복사한 시험 전용 seed는 충돌 없는 synthetic Revelation 22:21 row identity를 사용했고 payload bytes는 298B 그대로였다. 기기는 clone이 아니며 원본 앱 컨테이너를 공유하지 않는다. Dev build는 bundle `kr.co.carve.leetaek`, `2.0.0 (1)`이고 Debug configuration의 CloudKit container는 Development `iCloud.Carve.SwiftData.iCloud.dev`다. Production을 변경하지 않았다.
+독립 생성 기기는 `Carve-2.0.0-Ownership-iOS18.6-20260926`, iPad mini (A17 Pro), iPadOS 18.6이다. source preservation 사본을 복사한 시험 전용 seed는 충돌 없는 synthetic Revelation 22:21 row identity를 사용했고 payload bytes는 298B 그대로였다. 기기는 clone이 아니며 원본 앱 컨테이너를 공유하지 않는다. Dev build는 bundle `kr.co.carve.leetaek`, `2.0.0 (1)`이고 Debug configuration의 CloudKit container는 Development `iCloud.Carve.SwiftData.iCloud.dev`다. Production을 변경하지 않았다.
 
-기록 명령은 `xcrun simctl launch A522DEEB-AA58-4ADF-B186-FB94E07C45AF kr.co.carve.leetaek -UITestChapter '{"title":"66-22Revelation.txt","chapter":22}'`이다. 앱은 실제 실행됐다. 실행 직후 앱 컨테이너 저장소에서 read-only `PRAGMA integrity_check=ok`, ZBIBLEDRAWING row 1 (`chapter=22`, `verse=21`, `ZISPRESENT=1`, line data 298B), marker bool 1, record metadata/export/import operation 각 0을 확인했다. 앱 로그 `/private/tmp/carve-x27-ownership-v5-ios18.6-live-20260926/noaccount.log`에는 iCloud account unavailable이 기록됐다. 화면 `/private/tmp/carve-x27-ownership-v5-ios18.6-live-20260926/noaccount.png`는 필기 화면과 필기 텍스트를 보였지만 first-run guide와 AdMob dialog가 겹쳐 정확한 stroke 표시 증거로는 세지 않는다. CUA native UI 연결 timeout으로 이를 닫거나 로그인 화면으로 이동하지 못했다. 사용자가 직접 인증을 하기로 했으며 이 기록 시점까지 로그인, Development export, 독립 peer 수신은 미실행이다.
+기록 명령은 `xcrun simctl launch <UDID> kr.co.carve.leetaek -UITestChapter '{"title":"66-22Revelation.txt","chapter":22}'`이다. 앱은 실제 실행됐다. 실행 직후 앱 컨테이너 저장소에서 read-only `PRAGMA integrity_check=ok`, ZBIBLEDRAWING row 1 (`chapter=22`, `verse=21`, `ZISPRESENT=1`, line data 298B), marker bool 1, record metadata/export/import operation 각 0을 확인했다. 앱 로그 (로컬 증거)에는 iCloud account unavailable이 기록됐다. 화면 (로컬 증거)는 필기 화면과 필기 텍스트를 보였지만 first-run guide와 AdMob dialog가 겹쳐 정확한 stroke 표시 증거로는 세지 않는다. 화면 자동 조작이 시간 초과돼 이를 닫거나 로그인 화면으로 이동하지 못했다. 사용자가 직접 인증을 하기로 했으며 이 기록 시점까지 로그인, Development export, 독립 peer 수신은 미실행이다.
 
 따라서 코드·합성 fixture reader 회귀와 OS 18.6 local launch/저장소 보존은 확인했지만, iPadOS 18 사용자의 실제 로그인 proof, no-account V3 first-login upload, peer receive, 화면 좌표 비교, 계정 불일치/확인 불가의 live 경로는 검증 완료로 간주하지 않는다. 출시 gate는 계속 **NO-GO**다.
 
 ### 로그인 후 재확인 (2026-09-26)
 
-사용자는 전용 simulator에 로그인했다고 알렸다. 앱을 다시 실행했을 때 `/private/tmp/carve-x27-ownership-v5-ios18.6-live-20260926/postlogin/app-after-login.log`에는 여전히 `iCloud 계정을 쓸 수 없다`가 기록됐고, `CloudKitAccountStatusClient`에서 이는 `.noAccount` 또는 `.restricted`에 해당한다(`.unknown`은 별도 메시지). 첫 실행 때 첫 로그인 V3 snapshot 및 재실행 뒤 현재 private store의 account proof를 진행하지 못했다. StoreOwnership ledger marker 파일은 생성되지 않았다. CloudKit export/import operation·record metadata도 0이므로 잘못된 계정으로의 전송 흔적은 없다.
+사용자는 전용 simulator에 로그인했다고 알렸다. 앱을 다시 실행했을 때 (로컬 증거)에는 여전히 `iCloud 계정을 쓸 수 없다`가 기록됐고, `CloudKitAccountStatusClient`에서 이는 `.noAccount` 또는 `.restricted`에 해당한다(`.unknown`은 별도 메시지). 첫 실행 때 첫 로그인 V3 snapshot 및 재실행 뒤 현재 private store의 account proof를 진행하지 못했다. StoreOwnership ledger marker 파일은 생성되지 않았다. CloudKit export/import operation·record metadata도 0이므로 잘못된 계정으로의 전송 흔적은 없다.
 
-설정 화면에는 연락처를 iCloud와 병합할지 묻는 OS 확인창이 있었으나, Carve 필사 시험과 무관한 연락처 전송이므로 선택하지 않았다. 설정 대화창이 떠 있다는 화면만으로 Apple Account의 iCloud 로그인 완료 여부를 판정하지 않는다. 재실행 화면은 `/private/tmp/carve-x27-ownership-v5-ios18.6-live-20260926/postlogin/carve-after-login.png`다. 동일 기기의 사후 V3 Preservation 사본을 먼저 별도 임시 디렉터리에 복사한 뒤 read-only로 열어 integrity `ok`, V3 schema version 1, drawing 1 / present 1 / payload 총 298B, 관측 marker bool 1, metadata migration false, CloudKit record metadata·export/import 각 0을 다시 확인했다. 현재 V6 저장소의 일관성 있는 SQLite backup `/private/tmp/carve-x27-ownership-v5-ios18.6-live-20260926/postlogin/store-after-relaunch.sqlite`도 integrity `ok`, Revelation 22:21 present row 1 / 298B, metadata marker true, CloudKit record metadata·export/import 각 0이다. 이는 로그인 이후에도 원본 payload 보존 및 잘못된 전송 부재를 보여 주지만 로그인 소유 proof나 export 성공은 아니다.
+설정 화면에는 연락처를 iCloud와 병합할지 묻는 OS 확인창이 있었으나, Carve 필사 시험과 무관한 연락처 전송이므로 선택하지 않았다. 설정 대화창이 떠 있다는 화면만으로 Apple Account의 iCloud 로그인 완료 여부를 판정하지 않는다. 재실행 화면은 (로컬 증거)다. 동일 기기의 사후 V3 Preservation 사본을 먼저 별도 임시 디렉터리에 복사한 뒤 read-only로 열어 integrity `ok`, V3 schema version 1, drawing 1 / present 1 / payload 총 298B, 관측 marker bool 1, metadata migration false, CloudKit record metadata·export/import 각 0을 다시 확인했다. 현재 V6 저장소의 일관성 있는 SQLite backup (로컬 증거)도 integrity `ok`, Revelation 22:21 present row 1 / 298B, metadata marker true, CloudKit record metadata·export/import 각 0이다. 이는 로그인 이후에도 원본 payload 보존 및 잘못된 전송 부재를 보여 주지만 로그인 소유 proof나 export 성공은 아니다.
 
 이 상태에서는 first-login proof/export·Development 서버 조회·peer receive를 실행 또는 성공 처리하지 않았다. CloudKit `.available` 상태가 확인된 뒤에만 이어서 진행한다. 사용자가 설정에서 iCloud 로그인이 완료됐다고 했으나 API 관측은 `.noAccount`/`.restricted` 범주라 상충한다. 사용자가 확인할 최소 항목은 해당 simulator Settings의 Apple Account > iCloud 로그인 상태다. 암호·인증 토큰은 요청하거나 기록하지 않는다.
 
@@ -2362,26 +2362,26 @@ xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace \
 
 사용자가 target simulator에 재로그인했다고 알린 뒤 같은 기기에서 Carve를 다시 실행했다. 이 실행에서 `StoreOwnership/Carve.dev.sqlite.json`이 생성되고 `proof=firstLoginFromUnaccountedV3`가 기록됐다(계정 scope 원문은 출력하지 않았다). 이는 현재 iCloud identity 조회와 엄격한 무계정 V3 snapshot 판정이 통과했음을 보여 준다. 대상 payload는 기존 보존 V3 사본과 현재 저장소에서 각각 298B이고 SHA-256이 일치한다(`07876e8b1910039124914f5c44b9619a90b8ad488a08500bdfa6abc07762c3d6`). 현행 store는 integrity `ok`, drawing 22행/표시 15행, record metadata 22행, 합계 `ZNEEDSUPLOAD=0`, export/import operation 0이었다. synthetic Revelation 22:21은 `ZISPRESENT=1`, payload 298B, 대응 record metadata의 `ZNEEDSUPLOAD=0`, `ZLASTEXPORTEDTRANSACTIONNUMBER=3`이다. CloudKit event table에는 무계정 시점의 error `134400` 이력도 있으나 재로그인 뒤 성공한 event rows가 확인됐다. 현재 Development container ID는 `iCloud.Carve.SwiftData.iCloud.dev`; Production은 건드리지 않았다.
 
-이 target store의 local CloudKit export bookkeeping와 성공 event는 Core Data 미러링이 export를 완료했다고 보고했다는 근거다. 독립 server inventory나 peer 수신을 대신하지 않는다. 별도 독립 생성된 same-scope simulator `Carve-X27-FirstLogin-20260925` (iPadOS 26.5)은 app launch 전 직접 read-only query에서 drawing 21 / present 14 / record metadata 21 / pending 0이었고 이번 Revelation row는 없었다. target ledger owner와 peer ledger owner는 raw owner를 출력하지 않고 로컬에서 비교해 일치했다. `simctl clone` 장치는 사용하지 않았다. peer 앱 실행 뒤 Core Data CloudKit 로그는 Development private DB zone/subscription 설정과 import success, export success를 보고했으나 해당 Revelation row는 peer에 없었다. app run 뒤 consistent read-only backup `/private/tmp/carve-x27-ownership-v5-ios18.6-live-20260926/postlogin/peer-after-stop.sqlite`은 integrity `ok`, drawing 2 / metadata 2 / pending 0 / test row absent였다. launch 전 통계 21→2가 달라졌으나 그 직전의 full payload/SQLite snapshot은 만들지 못했고 원인도 확인하지 못했다. 실행 후 앱은 바로 종료했고 이 peer는 더 사용하지 않는다. 별도 V3 Preservation snapshot은 있으나 사전 21-row store와 같다는 증거는 없으므로 보존 대용으로 보지 않는다. 이 상태 변화는 시험 결과의 제한 및 추가 조사 대상으로 기록하며 임의 복구나 재실행을 하지 않았다.
+이 target store의 local CloudKit export bookkeeping와 성공 event는 Core Data 미러링이 export를 완료했다고 보고했다는 근거다. 독립 server inventory나 peer 수신을 대신하지 않는다. 별도 독립 생성된 same-scope simulator `Carve-X27-FirstLogin-20260925` (iPadOS 26.5)은 app launch 전 직접 read-only query에서 drawing 21 / present 14 / record metadata 21 / pending 0이었고 이번 Revelation row는 없었다. target ledger owner와 peer ledger owner는 raw owner를 출력하지 않고 로컬에서 비교해 일치했다. `simctl clone` 장치는 사용하지 않았다. peer 앱 실행 뒤 Core Data CloudKit 로그는 Development private DB zone/subscription 설정과 import success, export success를 보고했으나 해당 Revelation row는 peer에 없었다. app run 뒤 consistent read-only backup (로컬 증거)은 integrity `ok`, drawing 2 / metadata 2 / pending 0 / test row absent였다. launch 전 통계 21→2가 달라졌으나 그 직전의 full payload/SQLite snapshot은 만들지 못했고 원인도 확인하지 못했다. 실행 후 앱은 바로 종료했고 이 peer는 더 사용하지 않는다. 별도 V3 Preservation snapshot은 있으나 사전 21-row store와 같다는 증거는 없으므로 보존 대용으로 보지 않는다. 이 상태 변화는 시험 결과의 제한 및 추가 조사 대상으로 기록하며 임의 복구나 재실행을 하지 않았다.
 
-이전에 이름에 `CloudKit-Peer`가 들어간 `Carve-X27-CloudKit-Peer-CurrentIdentity-20260925`는 target owner scope와 일치하지 않아 수신 peer로 사용하지 않았다. 대신 새 blank peer `Carve-2.0.0-Ownership-Peer-iOS18.6-20260926` (iPad mini A17 Pro, iPadOS 18.6, UDID `DC7D72AB-1CD2-4852-B459-0CCD45FE7862`)를 독립 simulator로 만들고 Xcode 27 Debug `2.0.0 (1)` (`iCloud.Carve.SwiftData.iCloud.dev`)을 설치했다. 앱은 실행 전이라 CloudKit 연결/변경과 로컬 필기 store는 없다. 같은 Apple Account의 peer 로그인은 사용자가 직접 해야 한다. 이 peer에서 sample absent baseline→Development import→payload/hash/UI 확인 전까지 first-login peer 수신은 미통과이며 release gate는 **NO-GO**다.
+이전에 이름에 `CloudKit-Peer`가 들어간 `Carve-X27-CloudKit-Peer-CurrentIdentity-20260925`는 target owner scope와 일치하지 않아 수신 peer로 사용하지 않았다. 대신 새 blank peer `Carve-2.0.0-Ownership-Peer-iOS18.6-20260926` (iPad mini A17 Pro, iPadOS 18.6)를 독립 simulator로 만들고 Xcode 27 Debug `2.0.0 (1)` (`iCloud.Carve.SwiftData.iCloud.dev`)을 설치했다. 앱은 실행 전이라 CloudKit 연결/변경과 로컬 필기 store는 없다. 같은 Apple Account의 peer 로그인은 사용자가 직접 해야 한다. 이 peer에서 sample absent baseline→Development import→payload/hash/UI 확인 전까지 first-login peer 수신은 미통과이며 release gate는 **NO-GO**다.
 
 
 ### 같은-scope peer account-change purge 후속 조사 (2026-09-26)
 
-21→2 행 변화는 앱 schema migration이나 명시적 삭제보다 Core Data account-change purger와 더 잘 맞는다. `/private/tmp/carve-x27-ownership-v5-ios18.6-live-20260926/postlogin/peer-full.log:231-249`에서 persistent store의 iCloud identity가 달라졌다는 진단 뒤 `AccountChange` reset, BibleDrawing/BiblePageDrawing/FavoriteVerse 및 CloudKit export/import/record metadata 표 제거가 기록됐다. 뒤이어 Development private zone fetch와 import `success=1 madeChanges=1`, export success도 기록됐다. 이는 account-change purge 실행을 직접 보여 주지만, 그때의 실제 계정이 의도한 계정이었는지, 잘못된 계정으로 데이터가 전송됐는지, 서버에서 데이터가 사라졌는지는 증명하지 않는다.
+21→2 행 변화는 앱 schema migration이나 명시적 삭제보다 Core Data account-change purger와 더 잘 맞는다. (로컬 증거)에서 persistent store의 iCloud identity가 달라졌다는 진단 뒤 `AccountChange` reset, BibleDrawing/BiblePageDrawing/FavoriteVerse 및 CloudKit export/import/record metadata 표 제거가 기록됐다. 뒤이어 Development private zone fetch와 import `success=1 madeChanges=1`, export success도 기록됐다. 이는 account-change purge 실행을 직접 보여 주지만, 그때의 실제 계정이 의도한 계정이었는지, 잘못된 계정으로 데이터가 전송됐는지, 서버에서 데이터가 사라졌는지는 증명하지 않는다.
 
 21행의 consistent prelaunch SQLite backup은 찾지 못했다. `peer-before-import.sqlite`, `peer-after-launch.sqlite`, `peer-after-stop.sqlite`는 모두 2 drawing/2 metadata이며 integrity `ok`; 별도 `peer-preservation-copy/Carve.dev.sqlite`는 V3 1행으로 21행 linked store와 동일하다는 증거가 없다. 따라서 원본 payload의 전후 차이나 변화 범위는 판정할 수 없고 peer를 재실행·복구하지 않았다.
 
-코드 순서는 `CarveApp.init`의 `makeModelContainer` → `SwiftDataContextProvider+Dependency` → `LocalStoreLoader.loadForRelease(.private)` 후에 `LiveDrawingEditEnvironment.start()`와 ownership proof다. proof가 나중에 앱 직접 쓰기를 막아도 Core Data mirroring은 이미 시작할 수 있다. `RawStoreSnapshot`은 원본 DB/WAL/SHM/journal/external data를 보존하지만 이를 UI에서 열람·복구하는 경로는 확인되지 않았다. 그러므로 raw copy는 사용자 열람 기능이나 계정 mismatch 안전 보장의 대체물이 아니다.
+코드 순서는 `CarveApp.init`의 `makeModelContainer` → `SwiftDataContextProvider+Dependency` → `LocalStoreLoader.loadForRelease(.private)` 후에 `LiveDrawingEditEnvironment.start`와 ownership proof다. proof가 나중에 앱 직접 쓰기를 막아도 Core Data mirroring은 이미 시작할 수 있다. `RawStoreSnapshot`은 원본 DB/WAL/SHM/journal/external data를 보존하지만 이를 UI에서 열람·복구하는 경로는 확인되지 않았다. 그러므로 raw copy는 사용자 열람 기능이나 계정 mismatch 안전 보장의 대체물이 아니다.
 
 연결 전 ownership gate가 필요하다. first-login unaccounted V3와 same-account linked store는 각각 기존의 증거 기반 proof를 통과한 뒤에만 `.private`로 열고, 계정 없음·확인 실패·mismatch·불명확한 metadata에는 local-only 열람과 초안 보존을 유지해야 한다. 그런데 비동기 account proof 후 재시도할 때 `ModelContainer`를 안전하게 교체하는 구현이 없으므로 이 경로는 아직 미해결 출시 차단이다. 새 빈 수신기 `Carve-2.0.0-Ownership-Peer-iOS18.6-20260926`는 Device Hub Settings에서 Apple Account 로그아웃 상태로 확인했다. 앱은 아직 열지 않았으며 사용자가 같은 Development 시험 계정으로 직접 로그인하기 전까지 receive 검증을 진행하지 않는다.
 
 ### 연결 전 ownership gate 구현 후속 (2026-09-26)
 
-앞 절은 구현 전 관측이다. 현재 `AppStartupView.startIfNeeded()`가 Domain의 `ReleaseStoreBootstrapper` 완료 전에는 앱 Store를 만들지 않는다. bootstrap은 raw snapshot과 `.none` 로컬 마이그레이션을 먼저 하고, identity와 V3/linked proof가 정확히 일치할 때만 `.private`를 연다. no account, identity unavailable, proof nil/mismatch에서는 `.none` local container로 기존 행을 표시하고 `LegacySeparationHoldState`를 고정한다. `connectionHeld`는 시작 화면 진입을 허용하지만 동기화 저장소 직접 쓰기와 전체 삭제는 거절하고 캔버스 필기는 별도 로컬 초안으로 남긴다. 설정 문구는 재실행을 재시도 방법으로 안내한다. 동기 DependencyKey 기본 live path 또한 `.private`에 연결하지 않는다.
+앞 절은 구현 전 관측이다. 현재 `AppStartupView.startIfNeeded`가 Domain의 `ReleaseStoreBootstrapper` 완료 전에는 앱 Store를 만들지 않는다. bootstrap은 raw snapshot과 `.none` 로컬 마이그레이션을 먼저 하고, identity와 V3/linked proof가 정확히 일치할 때만 `.private`를 연다. no account, identity unavailable, proof nil/mismatch에서는 `.none` local container로 기존 행을 표시하고 `LegacySeparationHoldState`를 고정한다. `connectionHeld`는 시작 화면 진입을 허용하지만 동기화 저장소 직접 쓰기와 전체 삭제는 거절하고 캔버스 필기는 별도 로컬 초안으로 남긴다. 설정 문구는 재실행을 재시도 방법으로 안내한다. 동기 DependencyKey 기본 live path 또한 `.private`에 연결하지 않는다.
 
-동일-scope pending은 `ANSCKRECORDMETADATA`의 upload/cloud-delete/local-delete flag와 record name을 행 연결과 함께 읽는다. 미완료 record 이름 수가 flag 수와 같고 중복·누락·비연결이 없을 때 pending record만 서버 존재 조회에서 빼고 나머지는 private DB에서 확인한다. 이 기능과 계정 mismatch/no-account/unavailable preflight 결정, 실제 local-only `.held`로 마이그레이션 V3 행/298B payload를 읽는 회귀를 포함한 세 suite는 Xcode 27.0에서 iPadOS 17.5와 18.6 각각 44/44 통과했다. 결과 경로는 `/private/tmp/carve-x27-ownership-preflight-ios17.5-r2-20260926.xcresult`, `/private/tmp/carve-x27-ownership-preflight-ios18.6-r4-20260926.xcresult`이다. CarveApp iPadOS 18.6 build exit 0: `/private/tmp/carve-x27-ownership-app-build-ios18.6-r1-20260926.log`.
+동일-scope pending은 `ANSCKRECORDMETADATA`의 upload/cloud-delete/local-delete flag와 record name을 행 연결과 함께 읽는다. 미완료 record 이름 수가 flag 수와 같고 중복·누락·비연결이 없을 때 pending record만 서버 존재 조회에서 빼고 나머지는 private DB에서 확인한다. 이 기능과 계정 mismatch/no-account/unavailable preflight 결정, 실제 local-only `.held`로 마이그레이션 V3 행/298B payload를 읽는 회귀를 포함한 세 suite는 Xcode 27.0에서 iPadOS 17.5와 18.6 각각 44/44 통과했다. 결과 경로는 (로컬 증거)이다. CarveApp iPadOS 18.6 build exit 0: (로컬 증거).
 
 18.6 historical V3 metadata의 추가 `PFCloudKitMetadataModelMigratorMigrationBeganCommitKey=true`는 exact observed key/value profile로만 허용한다. key 이름이나 true가 migration 완료를 뜻한다고 추론하지 않는다. unknown/malformed value, pending mapping 모순, identity mismatch, 손상, migration 필요 상태는 계속 실패 닫힌다.
 
@@ -2393,7 +2393,7 @@ xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace \
 
 ### 보존 표본과 불확실성
 
-- Historical iPadOS 18.6 V3 사본은 `/private/tmp/carve-x27-ios18-marker-offline-20260925/original-app-data-pre-shutdown/Library/Application Support/Preservation/Carve.dev.sqlite/raw/1790300928-5DA2776C/Carve.dev.sqlite`이다. `integrity_check=ok`, V3 drawing 1행, 필기 payload 298 bytes, metadata 5개(기존 네 key와 `PFCloudKitMetadataModelMigratorMigrationBeganCommitKey`), `NeedsMetadataMigration=false`, CloudKit record metadata 및 export/import operation 0이다. marker는 SQLite integer boolean true다. 보존 기록의 source 조건은 iPadOS 18.6·계정 없음이다.
+- Historical iPadOS 18.6 V3 사본은 (로컬 증거)이다. `integrity_check=ok`, V3 drawing 1행, 필기 payload 298 bytes, metadata 5개(기존 네 key와 `PFCloudKitMetadataModelMigratorMigrationBeganCommitKey`), `NeedsMetadataMigration=false`, CloudKit record metadata 및 export/import operation 0이다. marker는 SQLite integer boolean true다. 보존 기록의 source 조건은 iPadOS 18.6·계정 없음이다.
 - marker의 migration 진행/완료 의미를 밝히는 전후 migration 사본, 단계 기록, 독립 서버 대응 자료는 확인하지 못했다. historical 1.3.0 app binary도 언급된 위치에서 찾지 못했다. 앞선 clone probe는 원본 UDID를 대상으로 했으므로 독립 표본이 아니다.
 - 구현은 marker 의미에 의존하지 않는다. key 집합, 중복, SQLite boolean 열/type/value shape만 구조적으로 확인하고, 소유권은 unlinked V3 조건과 보존 원본↔현재 저장소의 행/payload 동일성으로 별도 입증한다. 실제 표본 값은 true 하나이며 false는 boolean 구조 parser 회귀 fixture에서만 확인했다. 손상, 다른 자료형/값, 중복·미지 key, `NeedsMetadataMigration` 상태, 행 차이는 거절한다.
 
@@ -2413,70 +2413,70 @@ xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace \
 
 ```bash
 xcodebuild test -quiet -workspace Carve.xcworkspace -scheme DomainTest \
-  -destination 'platform=iOS Simulator,id=622BB6EA-183E-44D9-B974-A51B5E22EACE' \
+  -destination 'platform=iOS Simulator,id=<UDID>' \
   -parallel-testing-enabled NO \
   -only-testing:DomainTest/LegacyRowLinkageReaderTesting \
   -only-testing:DomainTest/DrawingStoreOwnershipProofTesting \
   -only-testing:DomainTest/MigrationSyncReleaseTesting \
-  -resultBundlePath /private/tmp/carve-x27-ownership-final-ios17.5-r1-20260926.xcresult
+  -resultBundlePath (로컬 증거)
 
 xcodebuild test -quiet -workspace Carve.xcworkspace -scheme DomainTest \
-  -destination 'platform=iOS Simulator,id=99725BD5-69EF-463D-AC2E-E174FF2FA75D' \
+  -destination 'platform=iOS Simulator,id=<UDID>' \
   -parallel-testing-enabled NO \
   -only-testing:DomainTest/LegacyRowLinkageReaderTesting \
   -only-testing:DomainTest/DrawingStoreOwnershipProofTesting \
   -only-testing:DomainTest/MigrationSyncReleaseTesting \
-  -resultBundlePath /private/tmp/carve-x27-ownership-final-ios18.6-r2-20260926.xcresult
+  -resultBundlePath (로컬 증거)
 ```
 
 | Destination | 결과 | xcresult | 로그 |
 |---|---:|---|---|
-| iPad mini 6, iPadOS 17.5, `622BB6EA-183E-44D9-B974-A51B5E22EACE` | 46 통과, 실패/skip/runtime warning 0 | `/private/tmp/carve-x27-ownership-final-ios17.5-r1-20260926.xcresult` | `/private/tmp/carve-x27-ownership-final-ios17.5-r1-20260926.log` |
-| iPad mini (A17 Pro), iPadOS 18.6, `99725BD5-69EF-463D-AC2E-E174FF2FA75D` | 46 통과, 실패/skip/runtime warning 0 | `/private/tmp/carve-x27-ownership-final-ios18.6-r2-20260926.xcresult` | `/private/tmp/carve-x27-ownership-final-ios18.6-r2-20260926.log` |
+| iPad mini 6, iPadOS 17.5, | 46 통과, 실패/skip/runtime warning 0 | (로컬 증거) | (로컬 증거) |
+| iPad mini (A17 Pro), iPadOS 18.6, | 46 통과, 실패/skip/runtime warning 0 | (로컬 증거) | (로컬 증거) |
 
-앱 Debug build는 exit 0이다. 로그 `/private/tmp/carve-x27-ownership-release-app-build-20260926.log`, 산출물 `/private/tmp/carve-x27-ownership-release-app-derived-20260926/Build/Products/Debug-iphonesimulator/CarveApp.app`이다. Info.plist container는 `iCloud.Carve.SwiftData.iCloud.dev`; runtime environment는 Sandbox다. Production은 변경하지 않았다. fixture 기반 자동 회귀와 live CloudKit 증거는 서로 대체하지 않는다.
+앱 Debug build는 exit 0이다. 로그 (로컬 증거), 산출물 (로컬 증거)이다. Info.plist container는 `iCloud.Carve.SwiftData.iCloud.dev`; runtime environment는 Sandbox다. Production은 변경하지 않았다. fixture 기반 자동 회귀와 live CloudKit 증거는 서로 대체하지 않는다.
 
 ### 최신 live 상태와 남은 게이트
 
 기존 target `Carve-2.0.0-Ownership-iOS18.6-20260926`의 앞선 실행은 `firstLoginFromUnaccountedV3` ledger, 보존 V3와 현재 payload 298 bytes 일치, local export success bookkeeping을 기록했다. 이것은 독립 Development server inventory나 peer 수신을 증명하지 않는다. 보존된 linked V3 표본은 현재 target 계정 identity와 일치하지 않아 기존 same-account update 근거로 사용하지 않았다.
 
-새 독립 peer `Carve-2.0.0-Ownership-Peer-iOS18.6-TargetAccount-20260926` (iPad mini A17 Pro, iPadOS 18.6, UDID `1FAEBEDC-A397-477D-A83A-6362D2C4BEB3`)에 사용자가 로그인을 완료했다고 알렸지만, 앱 실행 때 CloudKit runtime은 `accountStatus=No account`, `hasValidCredentials=false`를 반환했다. 앱은 ownership hold로 `.none` local store를 택했다. 이 실행에서 Development import/export 및 peer payload 수신은 없었다. 로그는 `/private/tmp/carve-x27-ownership-target-account-peer-app-20260926.log`다. peer 앱은 종료했고 저장소를 지우거나 계정을 바꾸지 않았다. 사용자는 target에 사용한 계정과 같은 주소가 둘 중 무엇인지 확인하고 있다.
+새 독립 peer `Carve-2.0.0-Ownership-Peer-iOS18.6-TargetAccount-20260926` (iPad mini A17 Pro, iPadOS 18.6)에 사용자가 로그인을 완료했다고 알렸지만, 앱 실행 때 CloudKit runtime은 `accountStatus=No account`, `hasValidCredentials=false`를 반환했다. 앱은 ownership hold로 `.none` local store를 택했다. 이 실행에서 Development import/export 및 peer payload 수신은 없었다. 로그는 (로컬 증거)다. peer 앱은 종료했고 저장소를 지우거나 계정을 바꾸지 않았다. 사용자는 target에 사용한 계정과 같은 주소가 둘 중 무엇인지 확인하고 있다.
 
 Device Hub 수동 smoke는 완료되지 않았다. 자동 CLI와 실제 앱 launch 로그만 확인했으며 UI payload 비교로 확대하지 않는다. 다음 단계는 target과 같은 계정이 CloudKit runtime에서 `.available`임을 확인한 후 Development custom-zone server payload와 빈 독립 peer의 row/payload/render를 대조하는 것이다. 기존 linked same-account 1.3.0 update, live mismatch/unavailable no-upload도 실증되지 않았다. 출시 판정은 **NO-GO**다.
 
 ### 2026-09-26 peer 계정 라벨 확인 및 재부팅 후 재검사
 
-사용자가 target과 peer에 로그인한 계정은 Gmail(b)이라고 확인했다. Hanpass(a)는 별도 계정이며 user token이 등록된 원본 계정은 `never`라고 부르기로 했다. 실제 이메일 주소는 이 문서에 쓰지 않는다. Gmail(b) peer를 종료한 뒤 같은 UDID `1FAEBEDC-A397-477D-A83A-6362D2C4BEB3`만 재부팅하고 앱을 다시 실행했다. 실행 로그 `/private/tmp/carve-x27-ownership-peer-gmail-after-reboot-20260926.log`에도 CloudKit `No account`가 기록됐고, `LocalStoreLoader`는 `ownershipUnverified` local-only 경로를 택했다. import/export success는 없었다. 이 실행에서 `.private` 저장소는 열지 않았다.
+사용자가 target과 peer에 로그인한 계정은 시험 계정 b라고 확인했다. 시험 계정 a는 별도 계정이며 user token이 등록된 원본 계정은 `never`라고 부르기로 했다. 실제 이메일 주소는 이 문서에 쓰지 않는다. 시험 계정 b peer를 종료한 뒤 같은 만 재부팅하고 앱을 다시 실행했다. 실행 로그 (로컬 증거)에도 CloudKit `No account`가 기록됐고, `LocalStoreLoader`는 `ownershipUnverified` local-only 경로를 택했다. import/export success는 없었다. 이 실행에서 `.private` 저장소는 열지 않았다.
 
-`simctl`로 앱을 재기동했지만 Device Hub의 Settings/화면 확인은 CUA 요청 시간 초과로 끝나지 않았다. peer 실행 전·후 CloudKit 서버 데이터 변경을 확인하지 못했고 이 no-account hold 경로에서 전송을 요청하지 않았다. 현재 필요한 사용자 조치는 이 정확한 simulator Settings의 Apple Account > iCloud가 Gmail(b)로 로그인되어 있는지 확인하는 것이다. 계정 전환이나 never/원본 기기 변경은 하지 않는다.
+`simctl`로 앱을 재기동했지만 Device Hub의 Settings/화면 확인은 끝내지 못했다. peer 실행 전·후 CloudKit 서버 데이터 변경을 확인하지 못했고 이 no-account hold 경로에서 전송을 요청하지 않았다. 현재 필요한 사용자 조치는 이 정확한 simulator Settings의 Apple Account > iCloud가 시험 계정 b로 로그인되어 있는지 확인하는 것이다. 계정 전환이나 never/원본 기기 변경은 하지 않는다.
 
-부팅 후 `simctl io ... screenshot`으로 보조 캡처 `/private/tmp/carve-x27-ownership-peer-gmail-after-reboot-20260926.png`를 만들었다. 앱은 Genesis 1장 reader와 빈 필기 열을 보였고 AdMob validator 팝오버가 겹쳐 있었다. target의 Revelation 22:21 row가 수신·표시됐다는 증거는 아니다. 이 캡처는 Simulator CLI 스크린샷이며 Device Hub 수동 smoke와 분리한다.
+부팅 후 `simctl io ... screenshot`으로 보조 캡처 (로컬 증거)를 만들었다. 앱은 Genesis 1장 reader와 빈 필기 열을 보였고 AdMob validator 팝오버가 겹쳐 있었다. target의 Revelation 22:21 row가 수신·표시됐다는 증거는 아니다. 이 캡처는 Simulator CLI 스크린샷이며 Device Hub 수동 smoke와 분리한다.
 
 ### 2026-09-26 peer 계정 전환 전 상태 보존
 
-사용자가 해당 peer Settings에 현재 표시된 계정은 `never`이며, target과 같은 계정은 `b`라고 확인했다. 앱만 종료한 뒤 peer app data container 전체를 `/private/tmp/carve-x27-ownership-peer-pre-account-switch-20260926/AppContainer`에 복사했다. 사본 DB `PRAGMA integrity_check=ok`, `ZBIBLEDRAWING=0`, `ZBIBLEPAGEDRAWING=0`이며 `ANSCKRECORDMETADATA` table은 없었다. `Preservation/raw-not-needed.json` 외 별도 필기 복구본은 없다. 따라서 peer에서 never→b로 바꾸면 CloudKit account-change reset이 빈 local store에 영향을 줄 수 있으나, 전환 전 확인한 필기 payload는 0행이고 full app container 사본을 보존했다. 사용자는 다른 계정이나 원본/target을 바꾸지 않고 peer에만 b로 로그인하기로 안내받았다. 앱은 계정 전환 전에 종료 상태로 뒀다.
+사용자가 해당 peer Settings에 현재 표시된 계정은 `never`이며, target과 같은 계정은 `b`라고 확인했다. 앱만 종료한 뒤 peer app data container 전체를 (로컬 증거)에 복사했다. 사본 DB `PRAGMA integrity_check=ok`, `ZBIBLEDRAWING=0`, `ZBIBLEPAGEDRAWING=0`이며 `ANSCKRECORDMETADATA` table은 없었다. `Preservation/raw-not-needed.json` 외 별도 필기 복구본은 없다. 따라서 peer에서 never→b로 바꾸면 CloudKit account-change reset이 빈 local store에 영향을 줄 수 있으나, 전환 전 확인한 필기 payload는 0행이고 full app container 사본을 보존했다. 사용자는 다른 계정이나 원본/target을 바꾸지 않고 peer에만 b로 로그인하기로 안내받았다. 앱은 계정 전환 전에 종료 상태로 뒀다.
 
 ### b 로그인 후 peer 재검사 (2026-09-26)
 
-사용자는 전용 peer에 b 로그인 완료를 알렸다. 지정 UDID `1FAEBEDC-A397-477D-A83A-6362D2C4BEB3`만 CLI로 확인·실행했고, 앱 시작 인자는 `-UITestChapter '{"title":"66-22Revelation.txt","chapter":22}'`였다. target/original 기기는 조작하지 않았다. 실행 로그에는 CloudKit `account-status` 요청과 KVS `No account`, StoreKit `No active account`, `LocalStoreLoader`의 ownership 근거 미확인 및 local-only 경로가 남았다. 이번 로그에는 CloudKit account-status 응답 값이나 `hasValidCredentials`가 직접 기록되지 않았으므로, 이 재실행만으로 그 API 결과를 단정하지 않는다. 기존 설정 응답과 이번 KVS/ownership hold 증거는 peer의 iCloud 설정이 앱 런타임에서 아직 사용 가능하다는 확인과 일치하지 않는다.
+사용자는 전용 peer에 b 로그인 완료를 알렸다. 지정 만 CLI로 확인·실행했고, 앱 시작 인자는 `-UITestChapter '{"title":"66-22Revelation.txt","chapter":22}'`였다. target/original 기기는 조작하지 않았다. 실행 로그에는 CloudKit `account-status` 요청과 KVS `No account`, StoreKit `No active account`, `LocalStoreLoader`의 ownership 근거 미확인 및 local-only 경로가 남았다. 이번 로그에는 CloudKit account-status 응답 값이나 `hasValidCredentials`가 직접 기록되지 않았으므로, 이 재실행만으로 그 API 결과를 단정하지 않는다. 기존 설정 응답과 이번 KVS/ownership hold 증거는 peer의 iCloud 설정이 앱 런타임에서 아직 사용 가능하다는 확인과 일치하지 않는다.
 
-이번 실행에서 private ModelContainer 연결·Development import/export·peer 필기 수신은 확인되지 않았다. 결과 로그는 `/private/tmp/carve-x27-ownership-peer-b-postlogin-20260926.log`, 재확인 로그는 `/private/tmp/carve-x27-ownership-peer-b-postlogin-followup-20260926.log`다. CUA 화면 상태 요청은 30초 뒤 시간 초과돼 Device Hub Settings를 독립 확인하지 못했다. 로그인 완료라는 사용자 보고와 앱 런타임 신호의 불일치를 해결하기 위해 정확한 peer의 Settings > Apple Account > iCloud에 b가 표시되는지 확인을 요청했다. 확인 전에는 peer receive를 통과로 세지 않으며, Production 변경은 없다.
+이번 실행에서 private ModelContainer 연결·Development import/export·peer 필기 수신은 확인되지 않았다. 결과 로그는 (로컬 증거), 재확인 로그는 (로컬 증거)다. 화면 상태 확인이 30초 뒤 시간 초과돼 Device Hub Settings를 독립 확인하지 못했다. 로그인 완료라는 사용자 보고와 앱 런타임 신호의 불일치를 해결하기 위해 정확한 peer의 Settings > Apple Account > iCloud에 b가 표시되는지 확인을 요청했다. 확인 전에는 peer receive를 통과로 세지 않으며, Production 변경은 없다.
 
-후속으로 정확한 peer에서 `com.apple.Preferences`를 열고 `simctl io screenshot`을 사용해 Settings를 확인했다. Apple Account 카드에는 iCloud/App Store 접근을 위해 로그인하라는 안내가 표시됐다. 캡처는 `/private/tmp/carve-x27-ownership-peer-b-settings-check-20260926.png`이며 Simulator CLI 캡처다. 계정 주소·자격 증명은 캡처에 없고 기록하지 않았다. 이 관측으로 이 실행 시점 peer의 Settings에는 Apple Account가 로그인되어 있지 않았음을 확인했다. 이는 Device Hub manual smoke가 아니다.
+후속으로 정확한 peer에서 `com.apple.Preferences`를 열고 `simctl io screenshot`을 사용해 Settings를 확인했다. Apple Account 카드에는 iCloud/App Store 접근을 위해 로그인하라는 안내가 표시됐다. 캡처는 (로컬 증거)이며 Simulator CLI 캡처다. 계정 주소·자격 증명은 캡처에 없고 기록하지 않았다. 이 관측으로 이 실행 시점 peer의 Settings에는 Apple Account가 로그인되어 있지 않았음을 확인했다. 이는 Device Hub manual smoke가 아니다.
 
-Carve 종료 뒤 전체 post-login peer app container를 `/private/tmp/carve-x27-ownership-peer-b-postlogin-20260926/AppContainer`에 복사했다. 사본의 `Library/Application Support/Carve.dev.sqlite`는 `PRAGMA integrity_check=ok`, drawing/page/favorite 각 0행이고 `ANSCKRECORDMETADATA`·`ANSCKMETADATAENTRY` table이 없었다. `Preservation/Carve.dev.sqlite`는 DB 파일이 아니라 directory이며 `raw-not-needed.json` timestamp marker만 있어 이 실행의 raw SQLite snapshot은 없다. 계정 전환 전 전체 컨테이너 보존 사본은 별도 경로에 그대로 남아 있다.
+Carve 종료 뒤 전체 post-login peer app container를 (로컬 증거)에 복사했다. 사본의 `Library/Application Support/Carve.dev.sqlite`는 `PRAGMA integrity_check=ok`, drawing/page/favorite 각 0행이고 `ANSCKRECORDMETADATA`·`ANSCKMETADATAENTRY` table이 없었다. `Preservation/Carve.dev.sqlite`는 DB 파일이 아니라 directory이며 `raw-not-needed.json` timestamp marker만 있어 이 실행의 raw SQLite snapshot은 없다. 계정 전환 전 전체 컨테이너 보존 사본은 별도 경로에 그대로 남아 있다.
 
 
 ## 2026-09-27 재개 — 실제 18.6 V3 업데이트와 독립 수신 증거
 
-아래 실험은 9월 26일 오후에 수행했고 27일 재개 때 기록했다. 앞 절의 `No account`와 표본 부재는 당시 특정 기기의 관측이다. 최신 결과와 혼동하지 않는다. 증거 루트는 `/private/tmp/carve-peer-correct-20260926`이다. SQLite는 앱 종료 후 복사한 저장소에서만 검사했다. 시험 원본과 외부 payload 디렉터리를 함께 보존했다.
+아래 실험은 9월 26일 오후에 수행했고 27일 재개 때 기록했다. 앞 절의 `No account`와 표본 부재는 당시 특정 기기의 관측이다. 최신 결과와 혼동하지 않는다. 증거 루트는 (로컬 증거)이다. SQLite는 앱 종료 후 복사한 저장소에서만 검사했다. 시험 원본과 외부 payload 디렉터리를 함께 보존했다.
 
 ### 기기·계정과 격리
 
-- target `A522DEEB-AA58-4ADF-B186-FB94E07C45AF`: b 계정. 기존 22행 Application Support를 기기 Documents에 보존한 뒤 별도 시험 저장소를 사용했고, 시험 뒤 **원래 지원 디렉터리를 복원**, 앱 종료했다.
-- 독립 peer `DC7D72AB-1CD2-4852-B459-0CCD45FE7862`: 사용자가 b로 로그인한 실제 peer다. 이름은 `Carve-2.0.0-Ownership-Peer-iOS18.6-20260926`. 기존 다른 소유자의 2행 저장소를 보존한 뒤 빈 시험 저장소에서 수신했고, 시험 뒤 **원래 지원 디렉터리를 복원**, 앱 종료했다.
-- `1FAEBEDC-A397-477D-A83A-6362D2C4BEB3`: 이름에 `TargetAccount`가 있는 별도 기기. 앞선 로그인 확인 요청은 이 기기와 위 peer를 혼동한 것이었다. 27일 Device Hub Settings는 여전히 로그인 안내 상태다. 현재 실제 무계정 1.3.0 → 2.0.0 첫 로그인 시험에 사용한다.
-- clone `CE6DFA0F-B768-450A-8991-ABC46BA75412`: `get_app_container`가 DC peer의 원본 경로를 반환했다. 앱 실행·초기화·uninstall 없이 종료했고 **독립 peer 증거에서 제외**했다.
+- target : b 계정. 기존 22행 Application Support를 기기 Documents에 보존한 뒤 별도 시험 저장소를 사용했고, 시험 뒤 **원래 지원 디렉터리를 복원**, 앱 종료했다.
+- 독립 peer : 사용자가 b로 로그인한 실제 peer다. 이름은 `Carve-2.0.0-Ownership-Peer-iOS18.6-20260926`. 기존 다른 소유자의 2행 저장소를 보존한 뒤 빈 시험 저장소에서 수신했고, 시험 뒤 **원래 지원 디렉터리를 복원**, 앱 종료했다.
+- : 이름에 `TargetAccount`가 있는 별도 기기. 앞선 로그인 확인 요청은 이 기기와 위 peer를 혼동한 것이었다. 27일 Device Hub Settings는 여전히 로그인 안내 상태다. 현재 실제 무계정 1.3.0 → 2.0.0 첫 로그인 시험에 사용한다.
+- clone : `get_app_container`가 DC peer의 원본 경로를 반환했다. 앱 실행·초기화·uninstall 없이 종료했고 **독립 peer 증거에서 제외**했다.
 
 ### 실제 관측 결과
 
@@ -2493,13 +2493,13 @@ Carve 종료 뒤 전체 post-login peer app container를 `/private/tmp/carve-x27
 
 ### 과거 표본·도구 기록 정정
 
-역사적 앱은 실제로 존재했다. `0A956010-5DAA-44BC-BA22-5BAE53FF6D82`의 bundle을 `Historical-1.3.0.app`으로 복사했다. Info는 1.3.0(1), Xcode 26.3/17C529, simulator SDK 26.2이며 strict codesign 검증 성공. 바이너리 SHA256 `de8893a70a0f2bd2bf2a1605247aaa89cea5dfafec5116460df5f7a94889bfbd`. Xcode 27에서 역사 앱을 재빌드한 결과는 아니다. 후보는 기존 Xcode 27 빌드 `/private/tmp/carve-x27-ownership-release-app-derived-20260926/Build/Products/Debug-iphonesimulator/CarveApp.app`, 바이너리 SHA256 `4e2ae5fa9b798f4b04c2432e72201c3a5837ab27cf3c7156c72734ec5606a605`다.
+역사적 앱은 실제로 존재했다. 의 bundle을 `Historical-1.3.0.app`으로 복사했다. Info는 1.3.0(1), Xcode 26.3/17C529, simulator SDK 26.2이며 strict codesign 검증 성공. 바이너리 SHA256 `de8893a70a0f2bd2bf2a1605247aaa89cea5dfafec5116460df5f7a94889bfbd`. Xcode 27에서 역사 앱을 재빌드한 결과는 아니다. 후보는 기존 Xcode 27 빌드 (로컬 증거), 바이너리 SHA256 `4e2ae5fa9b798f4b04c2432e72201c3a5837ab27cf3c7156c72734ec5606a605`다.
 
 앞선 298B 합성 행은 book key가 `66-22Revelation.txt`로 잘못돼 있었다. 실제 key는 `2-27Revelation.txt`다. 같은 잘못된 `-UITestChapter`도 decode되지 않아 Genesis 화면이 열렸다. 따라서 그 행은 payload/소유/전송 증거로만 남기고 **표시 보존 성공 근거에서는 제외**한다. 원본 값을 수정해 과거 성공으로 바꾸지 않았다.
 
 혼합 b 서버에서 받은 V3의 Genesis 1:4는 보관 필기와 활성 nil payload 행이 함께 있었다. 1.3은 획이 있는 행부터 선택하고 2.0은 활성 빈 행을 유지하므로 표시 차이가 있었다. 역사적 1.3 지우기도 빈 PKDrawing 활성 행과 보관 행 조합을 만들 수 있지만, 관측 nil 행의 출처는 혼합 서버라 확정할 수 없다. 2.0의 의도적 지우기를 되살리지 않도록 전역 대표행 규칙은 바꾸지 않았다. 이 혼합 표본을 모든 legacy 표시 보존의 증거로 세지 않는다.
 
-과거 문서의 `tools/cloudkit-observe/probe.sh`와 `/private/tmp/carve-2.0.0-acc-proof-20260925`는 이번 재개에서 실제로 없었다. 앞선 서버 직접 inventory 결과를 재실행했다고 기록하지 않는다. 이번 독립 peer의 신규 수신은 CloudKit 전송 근거지만 직접 server payload inventory와 별도로 분류한다.
+과거 문서의 저장소 밖 CloudKit 관측 도구와 (로컬 증거)는 이번 재개에서 실제로 없었다. 앞선 서버 직접 inventory 결과를 재실행했다고 기록하지 않는다. 이번 독립 peer의 신규 수신은 CloudKit 전송 근거지만 직접 server payload inventory와 별도로 분류한다.
 
 ### Metadata 해석
 
@@ -2507,29 +2507,29 @@ Carve 종료 뒤 전체 post-login peer app container를 `/private/tmp/carve-x27
 
 ### 27일 코드 후속 및 남은 차단
 
-proof 서버 조회 후 현재 계정을 다시 확인하도록 `PrivateStoreAttachmentPreflight`를 보완했다. 다른 계정·noAccount·unavailable이면 hold한다. 이는 proof 대기 중 전환을 막는 재확인이며, 마지막 조회와 OS의 실제 private attach 사이를 원자적으로 묶는 보장은 아니다. 첫 시도 테스트는 자동 승인 검토의 사용량 제한으로 실행되지 않았고, 27일 같은 명령을 재시도했다. iPadOS17.5 집중 ownership suite 9/9, 실패·skip·runtime warning 0. 결과 `/private/tmp/carve-ownership-identity-recheck-ios17-20260927.xcresult`, 로그 같은 basename `.log`. iPadOS18.6도 9/9, 실패·skip·runtime warning 0. 결과 `/private/tmp/carve-ownership-identity-recheck-ios18-20260927.xcresult`, 로그 같은 basename `.log`.
+proof 서버 조회 후 현재 계정을 다시 확인하도록 `PrivateStoreAttachmentPreflight`를 보완했다. 다른 계정·noAccount·unavailable이면 hold한다. 이는 proof 대기 중 전환을 막는 재확인이며, 마지막 조회와 OS의 실제 private attach 사이를 원자적으로 묶는 보장은 아니다. 첫 시도 테스트는 자동 승인 검토의 사용량 제한으로 실행되지 않았고, 27일 같은 명령을 재시도했다. iPadOS17.5 집중 ownership suite 9/9, 실패·skip·runtime warning 0. 결과 (로컬 증거), 로그 같은 basename `.log`. iPadOS18.6도 9/9, 실패·skip·runtime warning 0. 결과 (로컬 증거), 로그 같은 basename `.log`.
 
 실행 중 첫 로그인에서 기존 `.none` runtime을 안전하게 교체하는 재시도는 아직 미구현이다. 앱 재실행 안내가 있지만 정상 첫 로그인 전체 흐름의 완료로 보지 않는다. 실제 무계정 표본의 b 로그인·서버 직접 payload·독립 peer 표시, 실제 iPadOS17 정상 사용자 live proof, pending export 실제 업데이트, 혼합 표본 표시 의미 검증이 남았다. 배포/Production은 이번 실험에서 변경하지 않았다. **출시 NO-GO 유지.**
 
 주요 CLI(대상 ID는 위 표와 매칭):
 
 ```bash
-xcrun simctl install <iPad-UDID> /private/tmp/carve-peer-correct-20260926/Historical-1.3.0.app
+xcrun simctl install <iPad-UDID> (로컬 증거)
 xcrun simctl launch <iPad-UDID> kr.co.carve.leetaek
 # 실제 UI 입력 후 종료하고 Application Support 전체를 사본으로 보존
 xcrun simctl terminate <iPad-UDID> kr.co.carve.leetaek
-xcrun simctl install <iPad-UDID> /private/tmp/carve-x27-ownership-release-app-derived-20260926/Build/Products/Debug-iphonesimulator/CarveApp.app
+xcrun simctl install <iPad-UDID> (로컬 증거)
 xcrun simctl launch <iPad-UDID> kr.co.carve.leetaek -UITestChapter '{"title":"1-01Genesis.txt","chapter":22}' -CanvasDisplayProbe
 xcodebuild test -quiet -workspace Carve.xcworkspace -scheme DomainTest \
-  -destination 'platform=iOS Simulator,id=622BB6EA-183E-44D9-B974-A51B5E22EACE' \
+  -destination 'platform=iOS Simulator,id=<UDID>' \
   -only-testing:DomainTest/DrawingStoreOwnershipProofTesting \
-  -resultBundlePath /private/tmp/carve-ownership-identity-recheck-ios17-20260927.xcresult
+  -resultBundlePath (로컬 증거)
 ```
 
 
 ### 27일 직접 Development 서버 payload 재조회
 
-과거 관측기 파일이 없어 Development 컨테이너만 허용하는 임시 읽기 관측기를 `/private/tmp/carve-ownership-server-read-20260927/ReadProbe.m`으로 만들었다. SDK의 `CKFetchRecordZoneChangesOperation.recordWasChangedBlock`으로 각 레코드 오류도 집계하고, 쓰기 API 없이 private zone 전체를 조회했다. raw 계정·record ID·문자열은 출력하지 않고 SHA256으로 기록한다. `ReadProbe-v2.dylib`, `build-v2.log`, `server-v2.json`이 증거다. 앱 기존 entitlements의 `iCloud.Carve.SwiftData.iCloud.dev`/Sandbox에서만 실행했다.
+과거 관측기 파일이 없어 Development 컨테이너만 허용하는 임시 읽기 관측기를 (로컬 증거)으로 만들었다. SDK의 `CKFetchRecordZoneChangesOperation.recordWasChangedBlock`으로 각 레코드 오류도 집계하고, 쓰기 API 없이 private zone 전체를 조회했다. raw 계정·record ID·문자열은 출력하지 않고 SHA256으로 기록한다. `ReadProbe-v2.dylib`, `build-v2.log`, `server-v2.json`이 증거다. 앱 기존 entitlements의 `iCloud.Carve.SwiftData.iCloud.dev`/Sandbox에서만 실행했다.
 
 결과는 complete, 22 records, errors 0. 서버 CD_id 지문으로 로컬 ZID와 각각 연결해 필기20행과 nil2행을 대조했다. SQLite의 inline ZLINEDATA는 모든 비어 있지 않은20행에서 첫 바이트0x01 뒤 bytes가 서버 CD_lineData의 길이·SHA256과 정확히 같았다. 앞선 문서의298B/469B는 **SQLite 저장 blob 길이**이며 순수 CloudKit 필기 필드 길이와 혼동하지 않는다. 이 비교는 관측한 inline 표본에 한정하고 미지 external encoding을 일반화하지 않는다. 재조회 후 target을 종료해 만든 `target-after-read` 사본은 integrity ok, 기존22개 drawing 전체 값 동일했다.
 
@@ -2540,11 +2540,11 @@ xcodebuild test -quiet -workspace Carve.xcworkspace -scheme DomainTest \
 
 원인: `completedSnapshotStores`로 manifest를 확인한 뒤 보존 디렉터리의 SQLite를 직접 `storeKind`/reader로 열었다. 읽기 전용 SQLite도 WAL 공유 색인 `-shm`을 변경한다. 실제 표본의 DB·WAL은 manifest와 같고 shm만 달랐다. 다음 판정에서 보존 사본 전체 지문 검사가 이를 제외했다. 수정은 검증된 원시 디렉터리를 임시 디렉터리에 복사한 뒤 그 복제본만 판독하는 것이다. manifest 검증, 소유권·내용 대조 조건은 유지한다.
 
-회귀는 WAL이 없는/열린 두 경우의 실제 client를 반복 호출하고 원시 파일 bytes와 완료 사본 수를 확인한다. Xcode27 / Swift6.4 / macOS27.2, `DomainTest/DrawingStoreOwnershipProofTesting`: iPadOS18.6 `/private/tmp/carve-ownership-snapshot-ios18-20260927.xcresult`, iPadOS17.5 `/private/tmp/carve-ownership-snapshot-ios17-r2-20260927.xcresult` 모두 9 test cases / parameter 포함10 runs 통과, 실패·skip·runtime warning 0. 17 최초 시도는 추가 테스트의 empty_count lint로 빌드 실패했으며 수정 후 재실행했다.
+회귀는 WAL이 없는/열린 두 경우의 실제 client를 반복 호출하고 원시 파일 bytes와 완료 사본 수를 확인한다. Xcode27 / Swift6.4 / macOS27.2, `DomainTest/DrawingStoreOwnershipProofTesting`: iPadOS18.6 (로컬 증거), iPadOS17.5 (로컬 증거) 모두 9 test cases / parameter 포함10 runs 통과, 실패·skip·runtime warning 0. 17 최초 시도는 추가 테스트의 empty_count lint로 빌드 실패했으며 수정 후 재실행했다.
 
 실제 시험 표본은 변경 전 `actual-firstlogin-held-before-snapshot-fix`에 지원 디렉터리 전체를 보존했다. 이전 `actual-noaccount-after-update` 사본과 manifest·DB·WAL이 정확히 같음을 확인한 뒤, 시험 기기 보존 영역의 shm만 이전 검증된 bytes로 복원했다. 이는 시험 표본 복원이며 제품 코드가 손상 사본을 허용하거나 manifest를 다시 쓰는 기능은 아니다. 현재 필기 DB/WAL·소유 ledger는 복원 과정에서 변경하지 않았다.
 
-수정 앱 설치 후 여러 차례 실행에서 private 연결 성공과 보존 원시 사본 전 파일 지문 유지를 확인했다. Development 직접 읽기 결과 `actual-firstlogin-server.json`: 23 records/errors0, 실제 창세기22:1 ID 지문1개와 원본 필기468B SHA256 정확히 일치(SQLite blob469B의 inline 접두사 제외). 근거는 `/private/tmp/carve-peer-correct-20260926/snapshot-fix-live.log` 및 같은 루트의 서버 JSON이다. 해당 실행은 앱 재실행 검증이며 **실행 중 로그인 후 runtime 교체 성공을 뜻하지 않는다**.
+수정 앱 설치 후 여러 차례 실행에서 private 연결 성공과 보존 원시 사본 전 파일 지문 유지를 확인했다. Development 직접 읽기 결과 `actual-firstlogin-server.json`: 23 records/errors0, 실제 창세기22:1 ID 지문1개와 원본 필기468B SHA256 정확히 일치(SQLite blob469B의 inline 접두사 제외). 근거는 (로컬 증거) 및 같은 루트의 서버 JSON이다. 해당 실행은 앱 재실행 검증이며 **실행 중 로그인 후 runtime 교체 성공을 뜻하지 않는다**.
 
 독립 DC peer는 원래 다른 계정 자료를 `Documents/OwnershipReceiveTrial-20260926/original-before-actual-receive-20260927` 및 `peer-original-before-actual-receive`에 보존하고, 이전 b 수신 시험 저장소를 재사용했다. 발신 DB 복사는 하지 않았다. 첫 재조회 사본 `actual-independent-receive-store`는22행이며 새 필기는 아직 없어 미통과다. 시작 대기를 `actual-independent-receive-r2.log`와 `peer-startup-sample.txt`로 조사 중이다. Mac 잠금으로 Device Hub 화면 확인은 사용자 잠금 해제를 기다린다.
 
@@ -2555,19 +2555,19 @@ DC peer의 시작 대기는 b 계정 암호 재확인 시스템 창이었다(CLI
 
 새 재연결 경로는 설정의 다시 시도 및 로그인 후 앱 활성화를 받는다. Canvas의 마지막 획 인계 ACK와 초안 저장 완료를 확인하고, 이전 runtime 효과를 취소한 뒤 ModelContainer의 실제 해제를 weak 참조로 확인한다. 해제가 지연되면 이미 열린 local-only 컨테이너로 열람·초안 기능을 복구한다. 재연결 준비 중 실패/취소는 기존 대기열을 보존한다. 비활성 N-Canvas 경로는 미사용 상태와 현재 실제 hold를 함께 확인하며, 이미 편집한 Canvas의 근거를 덮지 않는다.
 
-`CarveFeatureTest/ChapterCanvasHandoffPresenceTesting`은15 cases/16 runs 통과(`/private/tmp/carve-reconnect-handoff-ios18-r5-20260927.xcresult`). 관련8 suites 확장 실행은58 cases/59 runs 통과(`/private/tmp/carve-reconnect-related-ios18-20260927.xcresult`), 실패·skip·runtime warning0. 추가 케이스는 실제 초안 저장 대기/성공/실패, 진행 중 저장의 보존, 취소된 요청의 늦은 ACK, 마지막 detach, 비활성 N-Canvas 보류 확인이다.
+`CarveFeatureTest/ChapterCanvasHandoffPresenceTesting`은15 cases/16 runs 통과((로컬 증거)). 관련8 suites 확장 실행은58 cases/59 runs 통과((로컬 증거)), 실패·skip·runtime warning0. 추가 케이스는 실제 초안 저장 대기/성공/실패, 진행 중 저장의 보존, 취소된 요청의 늦은 ACK, 마지막 detach, 비활성 N-Canvas 보류 확인이다.
 
-CLI UI `CarveDeviceSmokeUITests/testHeldStoreReconnectWithoutRelaunch`는 무계정 전용 iPad17.5에서1/1 통과, 실패·skip·runtime warning0(`/private/tmp/carve-reconnect-ui-ios17-r5-20260927.xcresult`). 앱 launch는1회이며 설정→재시도→본문 복귀→설정 보류 상태를 확인한다. 최초 opt-in 누락은 skip, 다음 시도는 FirstRunGuide가 탭을 가로채 실패, 다음은 부모 accessibilityIdentifier가 버튼 식별자를 덮어 실패했다. 이를 수정한 뒤 동작했지만 해체 후 도착한 화면 액션 경고4종이 관측되어, 인계 완료로 폐기된 runtime의 액션 처리를 종료하는 수정 후 경고0으로 통과했다. 테스트의 성공은 무계정 재연결/보류 유지이며 live 첫 로그인 자동 연결의 성공과 구분한다.
+CLI UI `CarveDeviceSmokeUITests/testHeldStoreReconnectWithoutRelaunch`는 무계정 전용 iPad17.5에서1/1 통과, 실패·skip·runtime warning0((로컬 증거)). 앱 launch는1회이며 설정→재시도→본문 복귀→설정 보류 상태를 확인한다. 최초 opt-in 누락은 skip, 다음 시도는 FirstRunGuide가 탭을 가로채 실패, 다음은 부모 accessibilityIdentifier가 버튼 식별자를 덮어 실패했다. 이를 수정한 뒤 동작했지만 해체 후 도착한 화면 액션 경고4종이 관측되어, 인계 완료로 폐기된 runtime의 액션 처리를 종료하는 수정 후 경고0으로 통과했다. 테스트의 성공은 무계정 재연결/보류 유지이며 live 첫 로그인 자동 연결의 성공과 구분한다.
 
-UI 실행은 build-for-testing으로 생성된 xctestrun 사본의 UI runner EnvironmentVariables에 `CARVE_RECONNECT_SMOKE=1`을 넣고 `xcodebuild test-without-building -xctestrun .../Build/Products/CarveReconnect.xctestrun -destination 'platform=iOS Simulator,id=622BB6EA-183E-44D9-B974-A51B5E22EACE' -only-testing:CarveAppUITests/CarveDeviceSmokeUITests/testHeldStoreReconnectWithoutRelaunch`를 사용했다. build setting·signing·의존성은 바꾸지 않았다.
+UI 실행은 build-for-testing으로 생성된 xctestrun 사본의 UI runner EnvironmentVariables에 `CARVE_RECONNECT_SMOKE=1`을 넣고 `xcodebuild test-without-building -xctestrun .../Build/Products/CarveReconnect.xctestrun -destination 'platform=iOS Simulator,id=<UDID>' -only-testing:CarveAppUITests/CarveDeviceSmokeUITests/testHeldStoreReconnectWithoutRelaunch`를 사용했다. build setting·signing·의존성은 바꾸지 않았다.
 
-17.5 실제 입력용 독립 기기 `Carve-2.0.0-ActualV3-iOS17.5-20260927` (`B60A857B-34C3-4710-8795-5FC93877376C`)를 clone 없이 만들고 위 역사적1.3.0을 설치했다. 창세기23장, 무계정, 손가락 필사 허용1. Device Hub 자동 포인터 드래그는 표시/DB에 남지 않았다. 종료 후 `actual17-input-attempt` 사본은 drawing0행이다. 사용자에게 직접 짧은 획 입력을 요청했고 아직 로그인하지 않도록 안내했다. 이를 정상17 실제 필기 업데이트 통과로 간주하지 않는다.
-
-
-18.6 CLI UI 재연결도1/1, 실패·skip·runtime warning0으로 통과했다(`/private/tmp/carve-reconnect-ui-ios18-20260927.xcresult`). DC peer 시험 종료 후 원래 지원 디렉터리를 복원했고 앱은 종료 상태다. 성공한23행 수신 자료는 컨테이너의 `Documents/OwnershipReceiveTrial-20260926/actual23-success-support-20260927`에도 보존했다. 17.5 실제 입력 검증은 사용자 응답 대기다.
+17.5 실제 입력용 독립 기기 `Carve-2.0.0-ActualV3-iOS17.5-20260927`를 clone 없이 만들고 위 역사적1.3.0을 설치했다. 창세기23장, 무계정, 손가락 필사 허용1. Device Hub 자동 포인터 드래그는 표시/DB에 남지 않았다. 종료 후 `actual17-input-attempt` 사본은 drawing0행이다. 사용자에게 직접 짧은 획 입력을 요청했고 아직 로그인하지 않도록 안내했다. 이를 정상17 실제 필기 업데이트 통과로 간주하지 않는다.
 
 
-재연결 최종 앱 컴파일은 `/private/tmp/carve-reconnect-final-build-20260927.log` exit0이다. 해제 지연 복구 경로의 syncState도 connectionHeld로 전달해 시작 대기 화면에 남지 않도록 했다. 해제 지연 fallback 자체를 강제한 UI 시험은 아직 하지 않았으며 일반 재연결 UI 통과와 구분한다. 기본 도구 재확인 결과 Xcode27.0(27A266a), Swift6.4.0.34.1, macOS27.2(26B5086k), `mise x -- tuist version`4.208.0으로 같았다.
+18.6 CLI UI 재연결도1/1, 실패·skip·runtime warning0으로 통과했다((로컬 증거)). DC peer 시험 종료 후 원래 지원 디렉터리를 복원했고 앱은 종료 상태다. 성공한23행 수신 자료는 컨테이너의 `Documents/OwnershipReceiveTrial-20260926/actual23-success-support-20260927`에도 보존했다. 17.5 실제 입력 검증은 사용자 응답 대기다.
+
+
+재연결 최종 앱 컴파일은 (로컬 증거) exit0이다. 해제 지연 복구 경로의 syncState도 connectionHeld로 전달해 시작 대기 화면에 남지 않도록 했다. 해제 지연 fallback 자체를 강제한 UI 시험은 아직 하지 않았으며 일반 재연결 UI 통과와 구분한다. 기본 도구 재확인 결과 Xcode27.0(27A266a), Swift6.4.0.34.1, macOS27.2(26B5086k), `mise x -- tuist version`4.208.0으로 같았다.
 
 
 ## 2026-09-28 다른 Mac 재개 — Xcode 26.3 빌드 복구와 iPadOS 18.6 실행 중 첫 로그인 live
@@ -2578,7 +2578,7 @@ UI 실행은 build-for-testing으로 생성된 xctestrun 사본의 UI runner Env
 
 - macOS 26.3 (25D125), `xcode-select -p` = `/Applications/Xcode.app/Contents/Developer`, Xcode 26.3 (17C529), Swift 6.2.4, `mise x -- tuist version` 4.208.0, SwiftLint 0.59.1. Xcode 27은 설치돼 있지 않다.
 - runtime: iOS 16.4 · 17.5 (21F79, 이날 사용자가 설치) · 18.3.1 · 18.6 (22G86) · 26.2 (23C54). 26.4 · 26.5 · 27.0 없음.
-- 증거 루트: 이 세션 scratchpad의 `evidence-20260928/` (이 Mac 임시 경로). 앱 사본·해시 `apps/hashes.txt`, target `target186/`, peer `peer186/`, 서버 조회 `server/logs/`, 보유 추적 `retain-trace-*`.
+- 증거 루트: 저장소 밖 로컬 임시 경로의 `evidence-20260928/`. 앱 사본·해시 `apps/hashes.txt`, target `target186/`, peer `peer186/`, 서버 조회 `server/logs/`, 보유 추적 `retain-trace-*`.
 
 ### Xcode 26.3 컴파일 실패 — `aebb5e63` 이후 Xcode 26.x 빌드 없음
 
@@ -2600,7 +2600,7 @@ HEAD `c9f6c399`는 Xcode 26.3에서 컴파일되지 않았다: `LocalStoreLoader
 
 - **1.3.0 입력 앱:** 기존 `old-1.3.0` worktree에는 09-16부터 `drawingPolicy = .anyInput` TEST-ONLY 수정이 있어 쓰지 않았다(worktree는 수정하지 않음). `git archive 49f2dc27`로 뽑은 깨끗한 소스를 Tuist 4.39.0·Xcode 26.3·SDK 26.2 Debug로 빌드했다. 1.3.0(1), dev container, 바이너리 SHA256 `dc0eef223de4afe4c8dca34c9b7edc1592faf9eebfff8efec91ad5096013d17c`, strict codesign 통과. 원래 Mac의 `Historical-1.3.0.app`(`de8893a7…`)과 **같은 바이너리가 아니다.** 의존성 checkout은 네트워크 없이 기존 worktree에서 APFS 복제했고, lint 단계는 `MISE_TRUSTED_CONFIG_PATHS`로 신뢰했다.
 - **2.0.0 후보:** HEAD + 위 컴파일 조건, Debug, SHA256 `f2aa3cd02dbfd154c5c850ace7c3f8e1536ef9879b0c6982252adeec408df88e`(아래 재연결 수정 **전** 빌드).
-- **기기:** 새로 만든 독립 iPad mini (A17 Pro) 18.6 target `Carve-LiveLogin-18.6-Target-20260928`(`35FF5450-0BD9-4815-B160-BE35D80CCC14`)와 peer `Carve-LiveLogin-18.6-Peer-20260928`(`8FA7976C-BEE0-4ECC-AD2A-26AFB9DCDEF2`). clone은 쓰지 않았다. 두 기기의 Apple Account는 사용자가 직접 로그인했고 같은 계정임을 계정 DB 해시 비교로만 확인했다.
+- **기기:** 새로 만든 독립 iPad mini (A17 Pro) 18.6 target `Carve-LiveLogin-18.6-Target-20260928`와 peer `Carve-LiveLogin-18.6-Peer-20260928`. clone은 쓰지 않았다. 두 기기의 Apple Account는 사용자가 직접 로그인했고 같은 계정임을 계정 DB 해시 비교로만 확인했다.
 
 | 단계 | 관측 | 분류 |
 |---|---|---|
@@ -2611,7 +2611,7 @@ HEAD `c9f6c399`는 Xcode 26.3에서 컴파일되지 않았다: `LocalStoreLoader
 | 설정 「다시 시도」 ×2 (10:45:40, 10:49:36) | 인계 뒤 runtime 해제를 약 10초 기다렸다가 기존 local-only 컨테이너로 복구: 「필기는 보존했지만 연결 준비를 마치지 못했어요. 잠시 후 다시 시도해 주세요.」 | **실행 중 수동 재연결 실패** |
 | 위 실패 뒤 종료 사본 | 저장소 불변(1행·같은 payload), record metadata 0·export 0 → **업로드 없음**. `StoreOwnership/Carve.dev.sqlite.json`에 `proof: firstLoginFromUnaccountedV3`(소유 키는 해시) | fail-safe 확인 |
 | 앱 재실행 (PID 33856, 10:53) | `첫 로그인 계정에 연결한다` → `소유 근거를 확인해 private CloudKit 저장소를 연다` → Setup ✓ · Import ✓ · Export ✓×2. 저장소 24행(자기 1 + 서버 23)·매핑 24·업로드 대기 0, 24:1 매핑 1개 | 재실행 경로 첫 로그인 전송 |
-| Development 서버 직접 조회 (10:55) | 이 Mac의 `tools/cloudkit-observe/probe.sh`(쓰기 없는 `CKFetchRecordZoneChangesOperation`, 앱 재실행): 24 records, error none. 로컬 24:1과 같은 레코드 이름의 `CD_lineData` **1151B / `fe6586c52e1c9d39`** 일치, 24:1 레코드 1개 | 서버 payload 일치 |
+| Development 서버 직접 조회 (10:55) | 저장소 밖 CloudKit 관측 도구(쓰기 없는 `CKFetchRecordZoneChangesOperation`, 앱 재실행): 24 records, error none. 로컬 24:1과 같은 레코드 이름의 `CD_lineData` **1151B / `fe6586c52e1c9d39`** 일치, 24:1 레코드 1개 | 서버 payload 일치 |
 | 독립 peer (빈 저장소, PID 34938) | `원시 사본: notNeeded` → private 연결 → Import ✓. 24행·매핑 24·대기 0, 24:1이 같은 레코드 이름·ZID·payload(1151B, 바이트 동일)로 수신, 화면에 X 두 획 표시 | 독립 수신·표시 |
 
 ### 실행 중 재연결이 끝나지 않는 원인
@@ -2654,7 +2654,7 @@ A·D 뒤에도 교정된 UI 시험은 해제 실패로 끝난다. 마지막 추�
 
 ### iPadOS 17.5 live — 실제 1.3.0 저장소 + 합성 필기 행 → 2.0.0 → 로그인 → 재실행 (2026-09-28)
 
-**기기:** 새 독립 iPad mini (6th generation) iPadOS 17.5 (21F79) `Carve-LiveLogin-17.5-Target-20260928`(`B65A7868-635C-43CE-9C8B-E99C3BCFF4A6`), clone 없음. peer는 18.6 `…Peer…`(`8FA7976C…`). 두 기기 계정이 같음을 계정 DB 해시 비교로만 확인했다. 앱: 깨끗한 1.3.0(`dc0eef22…`) → 재실행 안내 반영 2.0.0(`2a260b86…`).
+**기기:** 새 독립 iPad mini (6th generation) iPadOS 17.5 (21F79) `Carve-LiveLogin-17.5-Target-20260928`, clone 없음. peer는 18.6 `…Peer…`. 두 기기 계정이 같음을 계정 DB 해시 비교로만 확인했다. 앱: 깨끗한 1.3.0(`dc0eef22…`) → 재실행 안내 반영 2.0.0(`2a260b86…`).
 
 **필기 입력이 안 되는 원인(17.5 한정):** 17.5에서는 axe 합성 드래그와 사용자의 Simulator 마우스 드래그 모두 1.3.0 · 2.0.0 어디에서도 획을 만들지 못했다(18.6은 같은 바이너리 · 같은 입력으로 저장됨). PencilKit은 `Update allows finger drawing: YES`를 기록해 설정은 적용됐고, 터치는 18.6과 같은 종류(`backing type 11`)로 도착했다. 그러나 필기 제스처 인식기 실패(`_gestureRecognizerFailed`)가 17.5 484회 · 18.6 15회였고, 드래그가 본문을 스크롤할 때 절 캔버스 재생성과 첫 응답자 왕복이 함께 나왔다. 1.3.0은 절마다 `PKCanvasView`를 SwiftUI `ScrollView` 안에 둔다 — iPadOS 17.5에서는 한 손가락 드래그를 스크롤이 가져가 PencilKit 제스처가 실패하는 것으로 본다(추정, OS별 제스처 조정 차이). 하드웨어 키보드는 연결돼 있지 않았다(`ConnectHardwareKeyboard=0`). Simulator에는 Apple Pencil 입력 흉내가 없다. **실제 iPadOS 17 기기에서 손가락 · Pencil 필기가 되는지는 확인하지 못했다.** 예전 기록(OLD 캔버스 합성 터치 실패, 18.6 F59 성공)과 같은 양상이다.
 
@@ -2676,7 +2676,7 @@ A·D 뒤에도 교정된 UI 시험은 해제 실패로 끝난다. 마지막 추�
 
 ### iPadOS 27 실기기 · 재실행 소유 판정 실측 (2026-09-28)
 
-**환경과 안전 범위:** 이 Mac(macOS 26.3, Xcode 26.3 `17C529`, iphoneos26.2 SDK)에서 Debug 빌드를 USB로 연결한 iPad mini (A17 Pro) iPadOS 27.2 (`24B5084k`)에 설치했다. Xcode 26.3 개발 서명(팀 `H4MSW7FUBB`)으로 설치 · 실행됐다. dev 컨테이너(`iCloud.Carve.SwiftData.iCloud.dev`, Development)와 `Carve.dev.sqlite`만 썼다(09-17 사용자 허락 범위). 기기 iCloud는 사용자 본인 계정이다(계정 식별값은 해시로만 비교). 운영 `Carve.sqlite`는 열지 않았고 수정 시각이 설치 전(13:52)과 같음을 확인했다. 위젯 App Group은 시험 전후 모두 비어 있었다. 앱 설정 plist는 시험 전 사본으로 되돌렸다(바이트 동일). Debug 설치가 TestFlight 앱을 대체했으므로 사용자가 TestFlight에서 다시 설치한다.
+**환경과 안전 범위:** 이 Mac(macOS 26.3, Xcode 26.3 `17C529`, iphoneos26.2 SDK)에서 Debug 빌드를 USB로 연결한 iPad mini (A17 Pro) iPadOS 27.2 (`24B5084k`)에 설치했다. Xcode 26.3 개발 서명(팀 `H4MSW7FUBB`)으로 설치 · 실행됐다. dev 컨테이너(`iCloud.Carve.SwiftData.iCloud.dev`, Development)와 `Carve.dev.sqlite`만 썼다(09-17 사용자 허락 범위). 기기에 로그인된 Apple 계정을 그대로 썼다(계정 식별값은 해시로만 비교). 운영 `Carve.sqlite`는 열지 않았고 수정 시각이 설치 전(13:52)과 같음을 확인했다. 위젯 App Group은 시험 전후 모두 비어 있었다. 앱 설정 plist는 시험 전 사본으로 되돌렸다(바이트 동일). Debug 설치가 TestFlight 앱을 대체했으므로 사용자가 TestFlight에서 다시 설치한다.
 
 **관측 방법:** `devicectl device process launch --console --environment-variables '{"OS_ACTIVITY_DT_MODE":"YES"}'`로 앱의 Info · Error os_log를 콘솔로 받았다(Debug 레벨은 나오지 않는다). 비행기 모드를 바꾸면 콘솔 세션이 끊기지만 앱은 계속 돈다. 저장소는 `devicectl device copy from`으로 사본을 떠서 읽었다. `devicectl device info apps`는 설치돼 있어도 빈 목록이었다. 파일 삭제 명령이 없어, 새 설치 상태는 dev 저장소 세 파일을 0바이트로 덮고 `Preservation/Carve.dev.sqlite/raw-not-needed.json` 표식을 넣어 흉내 냈다(앱이 새 설치 때 쓰는 표식과 같은 조건).
 
@@ -2699,7 +2699,7 @@ A·D 뒤에도 교정된 UI 시험은 해제 실패로 끝난다. 마지막 추�
 
 ### iPadOS 18.6 최종 빌드 양방향 저장 · 지우기 (2026-09-28)
 
-target `35FF5450…`, peer `8FA7976C…` 모두 최종 빌드(실행 파일 `2a260b86…`)로 덮어 설치했고 둘 다 시험 계정 b다. 두 기기 모두 재실행 때 연결됐다. 필기는 axe 합성 터치다(Apple Pencil 아님).
+target , peer 모두 최종 빌드(실행 파일 `2a260b86…`)로 덮어 설치했고 둘 다 시험 계정 b다. 두 기기 모두 재실행 때 연결됐다. 필기는 axe 합성 터치다(Apple Pencil 아님).
 
 | 단계 | 결과 |
 |---|---|
@@ -2714,7 +2714,7 @@ target `35FF5450…`, peer `8FA7976C…` 모두 최종 빌드(실행 파일 `2a2
 
 ### iPadOS 17.5 로그인 상태 1.3.0 → 2.0.0 (2026-09-28)
 
-새 기기 `Carve-LiveLogin-17.5-Linked-20260928`(`D4F02C54…`)에 사용자가 b로 로그인한 뒤 깨끗한 1.3.0(`dc0eef22…`)을 처음 실행해 서버 28행을 받았다(대응 28 · 대기 0, metadata 7키 연결 profile, `FrameworkVersion 1345`). 최종 2.0.0을 덮어 설치하자 원시 사본이 생겼고 DB · WAL · SHM이 업데이트 전 사본과 바이트 동일했다. 소유 확인이 통과해(`currentPrivateCloudRecords`) 연결됐고, 28행 필기가 28/28 같았으며 대응 28 · 대기 0이었다. 연결 뒤 migrator 표식 키가 생겼다(18.6과 같음). 두 번째 실행도 연결됐다(`alreadyTaken`). 필기 행은 서버에서 받은 것이고 17.5에서 직접 그린 것은 아니다. 창세기 1:10~12의 22B 행 디코드 경고는 기존 관측과 같다.
+새 기기 `Carve-LiveLogin-17.5-Linked-20260928`에 사용자가 b로 로그인한 뒤 깨끗한 1.3.0(`dc0eef22…`)을 처음 실행해 서버 28행을 받았다(대응 28 · 대기 0, metadata 7키 연결 profile, `FrameworkVersion 1345`). 최종 2.0.0을 덮어 설치하자 원시 사본이 생겼고 DB · WAL · SHM이 업데이트 전 사본과 바이트 동일했다. 소유 확인이 통과해(`currentPrivateCloudRecords`) 연결됐고, 28행 필기가 28/28 같았으며 대응 28 · 대기 0이었다. 연결 뒤 migrator 표식 키가 생겼다(18.6과 같음). 두 번째 실행도 연결됐다(`alreadyTaken`). 필기 행은 서버에서 받은 것이고 17.5에서 직접 그린 것은 아니다. 창세기 1:10~12의 22B 행 디코드 경고는 기존 관측과 같다.
 
 ### 판정 — 재실행 소유 판정이 일반 사용 흐름을 막는다
 
@@ -2731,7 +2731,7 @@ target `35FF5450…`, peer `8FA7976C…` 모두 최종 빌드(실행 파일 `2a2
 
 **수정 방향(①~③은 아래 「수정 반영과 재검증」에서 반영, ④는 미결정):** ① 이 저장소를 2.0.0이 이미 그 계정으로 연결했고(ledger 소유자 = 현재 범위) 저장소의 CloudKit 식별이 현재 계정과 같으면, 재실행 때 행 · 대응 · 서버 조회 · OS 조건을 다시 요구하지 않고 연결한다(식별 불일치는 계속 보류). ② 편집 환경의 소유 판정도 같은 규칙을 써서 네트워크가 끊겨도 편집이 초안으로 바뀌지 않게 한다. ③ 1.3.0에서 처음 올라올 때의 판독 허용 OS에 27을 더한다(근거: 27.2 연결 profile이 관측 7키와 같고 D4 · D7에서 통과). ④ 같은 확인 계정으로 쓴 소유 근거 없는 초안을 연결 뒤 저장소에 넣을지 정한다.
 
-증거: 이 세션 `scratchpad/ipad27/`(시각표, 콘솔 로그, 저장소 · 초안 사본), `scratchpad/sync-final/`(저장소 사본, 화면), `scratchpad/linked175/`.
+증거: 시각표, 콘솔 로그, 저장소 · 초안 사본, 화면(로컬 증거).
 
 ### 수정 반영과 재검증 — 이미 연결한 저장소의 재실행 판정 (2026-09-28)
 
@@ -2755,7 +2755,7 @@ target `35FF5450…`, peer `8FA7976C…` 모두 최종 빌드(실행 파일 `2a2
 | 대응 없는 27:3 행 때문에 보류돼 있던 peer 재실행 | 연결, 27:3에 대응이 생겨 업로드. target이 같은 해시로 수신 |
 | target 27:4를 그리고 1.0초 뒤 종료(행 671B, 대응 없음) | 재실행 연결, 27:4 업로드, peer 수신 |
 
-**iPadOS 27.2 실기기(수정 빌드, dev 저장소 · 본인 계정 Development):**
+**iPadOS 27.2 실기기(수정 빌드, dev 저장소 · Development 환경):**
 
 | 시험 | 결과 |
 |---|---|
@@ -2770,4 +2770,15 @@ target `35FF5450…`, peer `8FA7976C…` 모두 최종 빌드(실행 파일 `2a2
 
 **판정:** 재실행 소유 판정 때문에 확인된 네 흐름(iPadOS 27 연결 저장소, 빈 저장소, 대응 전 종료 행, 오프라인 필기)은 해소됐다. 남은 것: ④ 이전 빌드나 계정 미확인 상태에서 소유 근거 없이 쓰인 초안의 편입 결정, 27 무계정 V3 profile 관측, 캐시된 계정 식별이 없는 첫 오프라인 실행(미시험), Xcode 27 출시 후보 빌드 · TestFlight · Production 스키마 · 실기기 TestFlight 스모크.
 
-증거: 이 세션 `scratchpad/live/`(시뮬레이터), `scratchpad/ipad/`(시각표, 콘솔 로그, 저장소 사본), `scratchpad/full-26.2.out`, `regress-fix-ios18.6.xcresult`, `regress-fix-ios17.5.xcresult`.
+증거: 시뮬레이터 · 실기기 시각표, 콘솔 로그, 저장소 사본, `regress-fix-ios18.6.xcresult` · `regress-fix-ios17.5.xcresult`(로컬 증거).
+
+### 머지 전 정리 — 쓰지 않는 경로 제거와 회귀 (2026-09-28)
+
+develop 머지 전에 `claude/2-0-0-chart-di` 를 먼저 합치고(차트 의존성 주입), 출시 경로에서 닿지 않는 코드를 지웠다.
+
+| 제거 | 이유 |
+|---|---|
+| 실행 중 재연결 경로(`retryConnection` · 해제 대기 · 캔버스 `prepareForStoreReconnect` · 재연결 오버레이) | 위 결정으로 보내는 곳이 없어졌다(정적 확인). 위 「결정 반영」 표의 「이후 버전용으로 남겼다」 는 이 정리로 대체한다. 설정 → iCloud 에 재연결 버튼이 없다는 UI 단언은 남긴다 |
+| `DrawingQuarantine` · `InstallationID` · 복구 사본 폴더 · 쓰지 않는 보조 함수 | 제품 코드에서 호출하는 곳이 없다. C14 분리 게이트(`EraseJobRule.quarantine` 등)는 이후 버전 근거로 남긴다 |
+
+시험 18개가 함께 빠졌다. **전체 회귀(Xcode 26.3):** iPadOS 26.2 · 18.6 각 **1060 passed · 0 failed · 6 skipped · 4 expected (1070)**, 17.5 **1059 · 0 · 7 · 4 (1070)**. 무계정 재실행 안내 UI 시험(`TEST_RUNNER_CARVE_RECONNECT_SMOKE=1`) 17.5 · 18.6 각 1/1.

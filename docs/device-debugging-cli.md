@@ -38,7 +38,7 @@ xcrun devicectl device info lockState --device "$CARVE_DEVICE_ID"
 
 `transportType: wired`, Developer Mode, 기기 잠금을 확인한다. 이번 실측은 iPad mini(A17 Pro), iPadOS 27.0 beta `24A5408d`, USB였다. Instruments 기록은 USB가 필수다. `devicectl`의 CoreDevice UUID와 `xcodebuild`/`xctrace`의 하드웨어 UDID를 섞지 않는다. 하드웨어 UDID가 필요하면 `xcrun xctrace list devices`로 확인한다.
 
-이전 실행에서는 Codex 샌드박스 안의 CoreDevice 초기화 timeout, CoreSimulator connection invalid, `mise` 상태 접근 오류가 있었고 일부는 권한을 높인 재실행으로 해결했다. 2026-09-24 현재 기본 Xcode 27의 `simctl` runtime·device 목록은 일반 CLI 호출에서 성공했다. Xcode 26.3을 지정한 runtime 조회는 sandbox에서 CoreSimulatorService와 사용자 로그 경로 오류를 냈지만, 권한을 높인 read-only 재실행은 성공했다. 이것이 `devicectl`의 모든 동작까지 보증하지는 않는다. 오류는 명령·Xcode 선택·sandbox·서비스별로 구분하고 곧바로 기기·OS 고장으로 판단하거나 시스템 설정을 바꾸지 않는다.
+이전 실행에서는 CoreDevice 초기화 timeout, CoreSimulator connection invalid, `mise` 상태 접근 오류가 있었고 일부는 재실행으로 해결했다. 2026-09-24 현재 기본 Xcode 27의 `simctl` runtime·device 목록은 일반 CLI 호출에서 성공했다. Xcode 26.3을 지정한 runtime 조회는 sandbox에서 CoreSimulatorService와 사용자 로그 경로 오류를 냈지만, 권한을 높인 read-only 재실행은 성공했다. 이것이 `devicectl`의 모든 동작까지 보증하지는 않는다. 오류는 명령·Xcode 선택·sandbox·서비스별로 구분하고 곧바로 기기·OS 고장으로 판단하거나 시스템 설정을 바꾸지 않는다.
 
 ## 2. 빌드와 업데이트 설치
 
@@ -50,7 +50,7 @@ xcodebuild build -workspace Carve.xcworkspace -scheme CarveApp \
   > "$CARVE_DEVICE_LOGS/build.log" 2>&1
 ```
 
-명령 종료 코드와 `BUILD SUCCEEDED`를 확인한 뒤 설치한다. 이 절차는 실행 시 선택된 Xcode를 사용하므로 Xcode 버전과 SDK를 결과에 기록한다. 위 `/tmp` 빌드 경로는 재사용 가능한 예시다. 조사 당시에는 이미 있던 `/Users/leetaek/carve-build/device` 캐시를 재사용했으며 이 경로를 다른 머신에 하드코딩할 필요는 없다.
+명령 종료 코드와 `BUILD SUCCEEDED`를 확인한 뒤 설치한다. 이 절차는 실행 시 선택된 Xcode를 사용하므로 Xcode 버전과 SDK를 결과에 기록한다. 위 `/tmp` 빌드 경로는 재사용 가능한 예시다. 조사 당시에는 이미 있던 `<빌드 캐시 경로>` 캐시를 재사용했으며 이 경로를 다른 머신에 하드코딩할 필요는 없다.
 
 ```bash
 xcrun devicectl device install app --device "$CARVE_DEVICE_ID" \
