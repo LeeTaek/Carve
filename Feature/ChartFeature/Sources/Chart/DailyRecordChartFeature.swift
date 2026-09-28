@@ -25,6 +25,11 @@ public struct DailyRecordChartFeature {
     
     public enum PageMove: Equatable { case prev, stay, next }
     private enum CancelID { case paging, yScale }
+
+    /// 이동 가능 범위의 상한(오늘)을 정하는 현재 시각이다.
+    @Dependency(\.date) var date
+    /// 페이지 전환 · Y축 축소 지연을 기다리는 시계다.
+    @Dependency(\.continuousClock) var clock
     
     @ObservableState
     public struct State: Equatable {
@@ -194,7 +199,7 @@ public struct DailyRecordChartFeature {
                 state.isScrolling = true
                 state.selectedDate = nil
 
-                let upperBoundDate = Calendar.current.startOfDay(for: Date())
+                let upperBoundDate = Calendar.current.startOfDay(for: date.now)
                 let maxOverscroll = min(32, state.pageWidth * 0.08)
 
                 if translationX > 0, !canMove(.prev, state: state, upperBoundDate: upperBoundDate) {
@@ -220,7 +225,7 @@ public struct DailyRecordChartFeature {
             case .view(.dragEnded(let translationX)):
                 guard !state.isPaging else { return .none }
                 let threshold: CGFloat = max(60, state.pageWidth * 0.15)
-                let upperBoundDate = Calendar.current.startOfDay(for: Date())
+                let upperBoundDate = Calendar.current.startOfDay(for: date.now)
                 
                 let move: PageMove = {
                     if translationX > threshold {
@@ -243,7 +248,7 @@ extension DailyRecordChartFeature {
         let aligned = state.scrollPosition.alignToDay()
         
         if force || state.pages.isEmpty || state.pages[safe: visiblePageIndex]?.start != aligned {
-            let upperBoundDate = Calendar.current.startOfDay(for: Date())
+            let upperBoundDate = Calendar.current.startOfDay(for: date.now)
             state.pages = make3Pages(
                 anchorStart: aligned,
                 records: state.records,
@@ -355,7 +360,7 @@ extension DailyRecordChartFeature {
     
     private func handleCommitMove(_ state: inout State, move: PageMove) -> Effect<Action> {
         guard !state.isPaging else { return .none }
-        let move = canMove(move, state: state, upperBoundDate: Calendar.current.startOfDay(for: Date())) ? move : .stay
+        let move = canMove(move, state: state, upperBoundDate: Calendar.current.startOfDay(for: date.now)) ? move : .stay
         guard move != .stay else {
             withAnimation(.interactiveSpring(response: 0.25, dampingFraction: 0.85)) {
                 state.dragX = 0
@@ -378,7 +383,7 @@ extension DailyRecordChartFeature {
         }
 
         return .run { send in
-            try? await Task.sleep(nanoseconds: 240_000_000)
+            try await clock.sleep(for: .milliseconds(240))
             await send(.finishMove(move))
         }
         .cancellable(id: CancelID.paging, cancelInFlight: true)
@@ -386,7 +391,7 @@ extension DailyRecordChartFeature {
 
     private func handleFinishMove(_ state: inout State, move: PageMove) -> Effect<Action> {
         state.isPaging = false
-        let upperBoundDate = Calendar.current.startOfDay(for: Date())
+        let upperBoundDate = Calendar.current.startOfDay(for: date.now)
         
         let currentStart = state.pages[safe: visiblePageIndex]?.start ?? state.scrollPosition.alignToDay()
         let newAnchor: Date = {
@@ -426,7 +431,7 @@ extension DailyRecordChartFeature {
                 state.isScrolling = false
                 
                 return .run { send in
-                    try? await Task.sleep(nanoseconds: 40_000_000)
+                    try await clock.sleep(for: .milliseconds(40))
                     await send(.applyYScale(target))
                 }
                 .cancellable(id: CancelID.yScale, cancelInFlight: true)
