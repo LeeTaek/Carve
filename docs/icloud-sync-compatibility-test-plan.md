@@ -2568,3 +2568,167 @@ UI 실행은 build-for-testing으로 생성된 xctestrun 사본의 UI runner Env
 
 
 재연결 최종 앱 컴파일은 `/private/tmp/carve-reconnect-final-build-20260927.log` exit0이다. 해제 지연 복구 경로의 syncState도 connectionHeld로 전달해 시작 대기 화면에 남지 않도록 했다. 해제 지연 fallback 자체를 강제한 UI 시험은 아직 하지 않았으며 일반 재연결 UI 통과와 구분한다. 기본 도구 재확인 결과 Xcode27.0(27A266a), Swift6.4.0.34.1, macOS27.2(26B5086k), `mise x -- tuist version`4.208.0으로 같았다.
+
+
+## 2026-09-28 다른 Mac 재개 — Xcode 26.3 빌드 복구와 iPadOS 18.6 실행 중 첫 로그인 live
+
+이 절은 원래 Mac(macOS 27.2 / Xcode 27.0)과 **다른 Mac**의 기록이다. 모든 결과는 Xcode 26.3 별도 툴체인 결과이며 Xcode 27 주 검증을 대신하지 않는다. 계정 주소·암호·토큰은 파일·로그·문서에 남기지 않았다. 출시 판정은 **NO-GO 유지**다.
+
+### 환경
+
+- macOS 26.3 (25D125), `xcode-select -p` = `/Applications/Xcode.app/Contents/Developer`, Xcode 26.3 (17C529), Swift 6.2.4, `mise x -- tuist version` 4.208.0, SwiftLint 0.59.1. Xcode 27은 설치돼 있지 않다.
+- runtime: iOS 16.4 · 17.5 (21F79, 이날 사용자가 설치) · 18.3.1 · 18.6 (22G86) · 26.2 (23C54). 26.4 · 26.5 · 27.0 없음.
+- 증거 루트: 이 세션 scratchpad의 `evidence-20260928/` (이 Mac 임시 경로). 앱 사본·해시 `apps/hashes.txt`, target `target186/`, peer `peer186/`, 서버 조회 `server/logs/`, 보유 추적 `retain-trace-*`.
+
+### Xcode 26.3 컴파일 실패 — `aebb5e63` 이후 Xcode 26.x 빌드 없음
+
+HEAD `c9f6c399`는 Xcode 26.3에서 컴파일되지 않았다: `LocalStoreLoader.swift:296: type 'SwiftDataError' has no member 'unknownDataStoreSchema'`. `aebb5e63`(09-25)이 iOS 27 SDK에만 있는 case를 `#available(iOS 27, *)`로만 감쌌는데, 이는 런타임 검사라 컴파일 시점의 심볼 부재를 막지 못한다. iOS 26.2 SDK SwiftData interface에는 해당 case가 없음을 확인했다. 시험 `LocalStoreLoadFailureTesting.swift:253`도 같다. 따라서 09-25 이후 이 브랜치는 Xcode 26.x로 빌드된 적이 없고, Xcode Cloud `MAIN`(26.3)·`DevelopBranch`(26.6) workflow도 같은 오류를 낼 가능성이 크다(26.6 SDK는 미확인).
+
+두 곳을 `#if compiler(>=6.4)`로 감쌌다. Xcode 27(Swift 6.4) 빌드 동작은 같다. Xcode 26.x 빌드는 이 오류를 스키마 불일치로 보지 않아 확인된 1.0.x 저장소도 폴백 없이 막는다(fail-closed). Xcode 26.x로 만든 빌드가 iOS 27에서 이 case를 받는지는 확인하지 않았다 — 출시 후보는 Xcode 27로 만든다는 전제를 유지한다.
+
+### 자동 회귀 (Xcode 26.3, 파일 제외 없음)
+
+| iPad simulator | 컴파일 조건만 적용 | 재연결 수정까지 적용(아래) |
+|---|---|---|
+| iPad mini (A17 Pro) iPadOS 26.2 | 1013 passed · 0 failed · 6 skipped · 4 expected (1023) | 1015 · 0 · 6 · 4 (1025) |
+| iPad mini (A17 Pro) iPadOS 18.6 | 1013 · 0 · 6 · 4 (1023) | 1015 · 0 · 6 · 4 (1025) |
+| iPad mini (6th generation) iPadOS 17.5 | 1012 · 0 · 7 · 4 (1023) | 1014 · 0 · 7 · 4 (1025) |
+
+17.5의 skip 1건 추가는 iOS 18·26 전용 V1 no-op 시험의 조건부 skip이다. xcresult runtime warning·warning·error summary 0. 좁은 관련 시험(ownership snapshot·로드 실패·C14 gate·인계·설정 보류) 26.2 54/54 통과. 27일 변경 뒤 처음으로 세 runtime 전체 회귀를 수행한 기록이다.
+
+### iPadOS 18.6 live — 깨끗한 1.3.0 → 2.0.0 → 실행 중 첫 로그인 (Development · `b`)
+
+- **1.3.0 입력 앱:** 기존 `old-1.3.0` worktree에는 09-16부터 `drawingPolicy = .anyInput` TEST-ONLY 수정이 있어 쓰지 않았다(worktree는 수정하지 않음). `git archive 49f2dc27`로 뽑은 깨끗한 소스를 Tuist 4.39.0·Xcode 26.3·SDK 26.2 Debug로 빌드했다. 1.3.0(1), dev container, 바이너리 SHA256 `dc0eef223de4afe4c8dca34c9b7edc1592faf9eebfff8efec91ad5096013d17c`, strict codesign 통과. 원래 Mac의 `Historical-1.3.0.app`(`de8893a7…`)과 **같은 바이너리가 아니다.** 의존성 checkout은 네트워크 없이 기존 worktree에서 APFS 복제했고, lint 단계는 `MISE_TRUSTED_CONFIG_PATHS`로 신뢰했다.
+- **2.0.0 후보:** HEAD + 위 컴파일 조건, Debug, SHA256 `f2aa3cd02dbfd154c5c850ace7c3f8e1536ef9879b0c6982252adeec408df88e`(아래 재연결 수정 **전** 빌드).
+- **기기:** 새로 만든 독립 iPad mini (A17 Pro) 18.6 target `Carve-LiveLogin-18.6-Target-20260928`(`35FF5450-0BD9-4815-B160-BE35D80CCC14`)와 peer `Carve-LiveLogin-18.6-Peer-20260928`(`8FA7976C-BEE0-4ECC-AD2A-26AFB9DCDEF2`). clone은 쓰지 않았다. 두 기기의 Apple Account는 사용자가 직접 로그인했고 같은 계정임을 계정 DB 해시 비교로만 확인했다.
+
+| 단계 | 관측 | 분류 |
+|---|---|---|
+| 1.3.0 무계정 필기 | `title` 창세기 24장·`allowFingerDrawing` 컨테이너 plist 시드, axe 합성 터치로 24:1에 X 두 획. 종료 사본: integrity ok, 1행 `isPresent=0`·`drawingVersion=1`·NKRV, blob 1152B(inline `0x01`) → payload **1151B, SHA256 `fe6586c5…79310b43`**, record metadata 0, metadata 4-key | 실제 1.3.0 코드 경로의 합성 터치 입력(Apple Pencil 아님) |
+| 2.0.0 덮어 설치 첫 실행 (PID 23105) | `원시 사본: created` → `저장소 소유 근거 미확인 — private 연결을 보류` → `connectionHeld(ownershipUnverified, readerVersion 5)`. Preservation raw DB·WAL·SHM이 1.3.0 사본과 바이트 동일, 현재 저장소 1행 모든 필드·payload 동일, 스키마 2.0 엔티티로 이전, 화면에 X 표시 | 로컬 보존 확인 |
+| 재실행 (PID 24000) | `원시 사본: alreadyTaken` → 보류. `-CanvasDisplayProbe` `store=2 canvas=2`, bounds `(432,145,115,60)` 동일, `storeDiff=0` | 표시 보존(수치) |
+| Carve를 켠 채 사용자 로그인 → 같은 PID 활성화 (10:40:19) | 편집 환경이 `firstLoginFromUnaccountedV3`를 6회 기록, 그러나 재연결은 **거절**: 알림 「연결 준비를 마치지 못했어요 — 이 Canvas는 소유 확인 보류 상태가 아닙니다.」 | **실행 중 자동 재연결 실패** |
+| 설정 「다시 시도」 ×2 (10:45:40, 10:49:36) | 인계 뒤 runtime 해제를 약 10초 기다렸다가 기존 local-only 컨테이너로 복구: 「필기는 보존했지만 연결 준비를 마치지 못했어요. 잠시 후 다시 시도해 주세요.」 | **실행 중 수동 재연결 실패** |
+| 위 실패 뒤 종료 사본 | 저장소 불변(1행·같은 payload), record metadata 0·export 0 → **업로드 없음**. `StoreOwnership/Carve.dev.sqlite.json`에 `proof: firstLoginFromUnaccountedV3`(소유 키는 해시) | fail-safe 확인 |
+| 앱 재실행 (PID 33856, 10:53) | `첫 로그인 계정에 연결한다` → `소유 근거를 확인해 private CloudKit 저장소를 연다` → Setup ✓ · Import ✓ · Export ✓×2. 저장소 24행(자기 1 + 서버 23)·매핑 24·업로드 대기 0, 24:1 매핑 1개 | 재실행 경로 첫 로그인 전송 |
+| Development 서버 직접 조회 (10:55) | 이 Mac의 `tools/cloudkit-observe/probe.sh`(쓰기 없는 `CKFetchRecordZoneChangesOperation`, 앱 재실행): 24 records, error none. 로컬 24:1과 같은 레코드 이름의 `CD_lineData` **1151B / `fe6586c52e1c9d39`** 일치, 24:1 레코드 1개 | 서버 payload 일치 |
+| 독립 peer (빈 저장소, PID 34938) | `원시 사본: notNeeded` → private 연결 → Import ✓. 24행·매핑 24·대기 0, 24:1이 같은 레코드 이름·ZID·payload(1151B, 바이트 동일)로 수신, 화면에 X 두 획 표시 | 독립 수신·표시 |
+
+### 실행 중 재연결이 끝나지 않는 원인
+
+1. **경합** — 로그인 뒤 활성화는 편집 환경 변화와 `.retryConnection`을 함께 만든다. 계정 근거가 바뀐 캔버스가 세션을 다시 읽는 중(`isReloading`/`sessionEnd`)에 준비 요청이 오면 `prepareForStoreReconnect`가 기다리지 않고 거절했다(`ChapterCanvasEditSession.swift`의 guard).
+2. **이전 ModelContainer가 해제되지 않음** — 해제 대기 중 `heap`/`leaks --trace`로 참조 경로를 추적했다(`retain-trace-*`). 처음에는 `CodableAppStorageKey`의 `@Dependency(\.defaultAppStorage)` 저장 래퍼가 만든 곳의 DependencyValues(runtime ModelContainer 포함)를 붙잡고, swift-sharing 전역 공유 참조·알림 구독이 그 키를 보관했다(`SentenceSetting` 107 · `PencilPalatte` 11 · `BibleChapter` 4 roots). 이어 `SwiftDatabaseActor.liveValue`(`static var` 즉시 실행 클로저)와 이를 쥔 `DrawingRepositoryKey`·`FavoriteVerseRepositoryKey`의 `static let` 기본값이 **처음 읽은 runtime의 컨테이너로 한 번 만들어져 전역에 남았다.** runtime은 `\.modelContainer`만 재정의했으므로, 해제가 되더라도 새 runtime이 옛 컨테이너에 쓰는 위험도 있었다.
+3. **UI 시험 가짜 통과** — `testHeldStoreReconnectWithoutRelaunch` 66행이 실제와 다른 문구를 확인해, 첨부 화면에 해제 실패 알림이 떠 있어도 통과했다. 따라서 27일 「무계정 재연결 UI 17.5·18.6 각 1/1」은 성공적인 해제의 증거가 아니다.
+
+### 이번 수정과 검증
+
+| 수정 | 파일 | 검증 |
+|---|---|---|
+| 컴파일 조건 | `LocalStoreLoader.swift`, `LocalStoreLoadFailureTesting.swift` | Xcode 26.3 빌드·전체 회귀 |
+| A. 키가 저장소(`UserDefaults`)만 보관 | `CodableAppStorageKey.swift` | 새 `keyDoesNotRetainCreationDependencies`: 수정 전 소스 **실패** → 수정 후 통과, 스위트 5/5 |
+| B. 로그인 재적재 중 준비 요청은 기다렸다가 인계 | `ChapterCanvasEditSession.swift`, `ChapterCanvasFeature.swift` | 새 `ChapterCanvasLoginReconnectTesting/storeReconnectWaitsForLoginReload`: 수정 전 **실패**(「다시 읽는 중이라고 거절했다」) → 통과. 초안 실패로 멈춘 닫기·지우기·보류 아님은 기존처럼 즉시 거절 |
+| C. UI 시험이 실패 안내 제목을 확인 | `CarveDeviceSmokeUITests.swift` | 교정 뒤 17.5·18.6 모두 **실패**(해제 실패를 올바르게 잡음) |
+| D. runtime마다 actor·필사/즐겨찾기 저장소·`DrawingDatabase`·동기화 활동/도착/계정 상태 client를 새로 주입 | `App.swift`, `DrawingDatabase.swift`(public init) | 전체 회귀 통과. Store 밖에서 이 의존성을 읽는 곳이 없음을 확인(동기화 관리자의 `drawingData`는 선언만 있고 미사용) |
+
+CarveFeatureTest 468/468·SettingsFeatureTest 54/54, 전체 회귀는 위 표. 변경 파일 lint 오류 0(경고 3건은 HEAD에 있던 길이 경고).
+
+### 남은 차단과 판정
+
+A·D 뒤에도 교정된 UI 시험은 해제 실패로 끝난다. 마지막 추적(`retain-trace-fixE`)의 남은 보유 경로는 `static AppCoordinatorFeature.State.initialState`(TCA `StackState`의 `@Dependency` initialValues), runtime 문맥을 task-local로 물려받은 비구조 Task(네트워크 스택), UIKit 이벤트 환경, AdMob `WKNavigation`, Swift metadata 경유 캐시와 직접 root다. TCA·swift-dependencies의 문맥 캡처 전반에 걸친 문제라 하나씩 제거로 수렴을 보장하기 어렵다.
+
+따라서 **실행 중 첫 로그인 재연결은 여전히 동작하지 않는다**(필기 보존·업로드 없음의 안전한 실패). **재실행 경로는 18.6에서 업데이트 보존 → 첫 로그인 전송 → 서버 payload → 독립 peer 수신·표시까지 통과**했다. 설계 결정(보유 경로를 계속 제거할지, 2.0.0은 로그인 뒤 재실행 안내를 지원 경로로 삼을지)이 필요하다. iPadOS 17.5 실제 표본 경로는 런타임을 확보했고 아직 수행하지 않았다.
+
+### 결정 반영 — 2.0.0 은 로그인 뒤 재실행으로 연결한다 (2026-09-28 사용자 결정)
+
+실행 중 첫 로그인 재연결은 2.0.0 범위에서 뺀다. 요구: ① 로그인 완료와 실제 연결 완료를 구분해 표시, ② 자동으로 재연결되지 않는 상태에서 로딩을 유지하지 않기, ③ 「연결을 완료하려면 앱을 완전히 종료한 뒤 다시 열어 주세요.」 처럼 분명한 안내.
+
+| 변경 | 파일 | 내용 |
+|---|---|---|
+| 판정 | `DrawingEditEnvironment.swift` | `connectsOnRelaunch` — 보류 중 · 확인된 계정 · 저장소 소유가 그 계정일 때만 참(시험용 주입 제외). 로그인만으로는 참이 아니다 |
+| 자동 재연결 제거 | `App.swift` | 활성화 때 `.retryConnection`을 보내던 경로를 지웠다 → 「마지막 필기를 보존하고 있어요」 로딩 · 해제 대기 · 실패 알림이 생기지 않는다 |
+| 재실행 안내 | `AppCoordinatorFeature.swift`, `AppCoordinatorView.swift` | 보류로 시작한 실행이면 편집 환경 변화를 구독해 `connectsOnRelaunch`가 되면 로딩 없는 안내를 한 번 띄운다: 「iCloud 로그인을 확인했어요 / 아직 이 기기의 필사는 iCloud와 연결되지 않았어요. 연결을 완료하려면 앱을 완전히 종료한 뒤 다시 열어 주세요.」 입력을 막지 않는다. `.retryConnection`과 준비 · 해제 경로는 보내는 곳 없이 이후 버전용으로 남겼다 |
+| 설정 → iCloud | `iCloudSettingReducer.swift`, `iCloudSettingView.swift` | 로그인 줄: 보류 중이면 「iCloud에 로그인돼 있어요 · 아직 이 기기의 필사는 iCloud와 연결되지 않았어요」, 연결되면 「iCloud에 연결돼 있어요」. 보류 줄: 「다시 시도」 버튼 삭제. 소유가 확인되면 위 재실행 문장, 로그인 전이면 「iCloud에 로그인한 뒤 앱을 완전히 종료하고 다시 열면 계정과 저장소를 다시 확인해요」, 그 밖(다른 계정 등)은 연결을 약속하지 않는 「다시 확인해요」. 보류 중일 때만 편집 환경을 구독해 앱 밖 로그인 뒤에도 갱신한다 |
+| 시험 | `DrawingEditEnvironmentTesting`, `CloudSettingsHoldTesting`, `CarveDeviceSmokeUITests` | 판정 표 1건, 문구 · 화면 구독 2건 추가. UI 시험은 `testHeldStoreGuidesRelaunchWithoutRetry`로 교체(재실행 문구 있음 · 「다시 시도」 없음 · 무계정에서 재실행 안내 미표시) |
+
+검증(Xcode 26.3): 좁은 시험 SettingsFeatureTest 56/56 · 편집 환경 15/15. 전체 회귀 iPadOS 26.2 · 18.6 각 **1018 passed · 0 failed · 6 skipped · 4 expected (1028)**, 17.5 **1017 · 0 · 7 · 4 (1028)**. 무계정 재실행 안내 UI는 17.5 · 18.6 각 1/1(최종 빌드 SHA256 `2a260b86…f5f4a021`). 처음 전체 회귀에서 `CloudSettingsFeatureTesting`의 exhaustive 시험 2건이 새 `.connectionChecked`를 예상하지 못해 실패했고, 구독을 보류 중으로 한정해 해결했다(좁은 시험 범위를 한 스위트로만 잡아 놓친 것).
+
+### iPadOS 17.5 live — 실제 1.3.0 저장소 + 합성 필기 행 → 2.0.0 → 로그인 → 재실행 (2026-09-28)
+
+**기기:** 새 독립 iPad mini (6th generation) iPadOS 17.5 (21F79) `Carve-LiveLogin-17.5-Target-20260928`(`B65A7868-635C-43CE-9C8B-E99C3BCFF4A6`), clone 없음. peer는 18.6 `…Peer…`(`8FA7976C…`). 두 기기 계정이 같음을 계정 DB 해시 비교로만 확인했다. 앱: 깨끗한 1.3.0(`dc0eef22…`) → 재실행 안내 반영 2.0.0(`2a260b86…`).
+
+**필기 입력이 안 되는 원인(17.5 한정):** 17.5에서는 axe 합성 드래그와 사용자의 Simulator 마우스 드래그 모두 1.3.0 · 2.0.0 어디에서도 획을 만들지 못했다(18.6은 같은 바이너리 · 같은 입력으로 저장됨). PencilKit은 `Update allows finger drawing: YES`를 기록해 설정은 적용됐고, 터치는 18.6과 같은 종류(`backing type 11`)로 도착했다. 그러나 필기 제스처 인식기 실패(`_gestureRecognizerFailed`)가 17.5 484회 · 18.6 15회였고, 드래그가 본문을 스크롤할 때 절 캔버스 재생성과 첫 응답자 왕복이 함께 나왔다. 1.3.0은 절마다 `PKCanvasView`를 SwiftUI `ScrollView` 안에 둔다 — iPadOS 17.5에서는 한 손가락 드래그를 스크롤이 가져가 PencilKit 제스처가 실패하는 것으로 본다(추정, OS별 제스처 조정 차이). 하드웨어 키보드는 연결돼 있지 않았다(`ConnectHardwareKeyboard=0`). Simulator에는 Apple Pencil 입력 흉내가 없다. **실제 iPadOS 17 기기에서 손가락 · Pencil 필기가 되는지는 확인하지 못했다.** 예전 기록(OLD 캔버스 합성 터치 실패, 18.6 F59 성공)과 같은 양상이다.
+
+**표본(사용자 승인):** 실제 1.3.0이 17.5에서 만든 무계정 V3 저장소(필기 0행)에, 앱을 끈 상태로 18.6에서 실제 PencilKit으로 그린 payload(1151B, SHA256 `fe6586c5…79310b43`)를 창세기 25:1 새 행(새 ZID)으로 넣었다. 1.3.0이 한 번 저장했을 때와 같은 모양으로 영속 이력(트랜잭션 1 · 변경 1 · 문자열 2)과 `Z_PRIMARYKEY`를 함께 넣었다. **실제 입력 표본이 아니라 「실제 1.3.0 저장소 + 합성 행」이다.** 1.3.0을 다시 열어 25:1에 X 두 획 표시를 확인했다.
+
+17.5 무계정 1.3.0 저장소의 metadata는 **5-key**(무계정 4-key + `PFCloudKitMetadataModelMigratorMigrationBeganCommitKey` 정수 불리언 1, `FrameworkVersion 1345`)였다. 18.6 무계정 표본(4-key, 1448)과 다르다. reader v5의 관측 variant로 받아들여졌다(아래).
+
+| 단계 | 관측 | 분류 |
+|---|---|---|
+| 업데이트 전 최종 사본 | integrity ok, 25:1 1행, record metadata 0, 이력 1/1 | 실제 1.3.0 저장소 + 합성 행 |
+| 2.0.0 첫 실행 (PID 18984) | `원시 사본: created` → `connectionHeld(ownershipUnverified)`. Preservation raw DB · WAL · SHM이 업데이트 전 사본과 바이트 동일, 현재 행 모든 필드 · payload 동일, 표시 진단 `store=2 canvas=2 (432,145,115,60) storeDiff=0`, 화면에 X | 로컬 보존 · 표시 |
+| 보류 실행 중 로그인 → 같은 PID(19446) 활성화 | 1초 안에 로딩 없는 안내 「iCloud 로그인을 확인했어요 / 아직 이 기기의 필사는 iCloud와 연결되지 않았어요. 연결을 완료하려면 앱을 완전히 종료한 뒤 다시 열어 주세요.」, 진행 표시 0. 편집 환경 `첫 로그인 계정에 연결한다`(5-key 저장소도 통과). 설정: 「iCloud에 로그인돼 있어요 · 아직 … 연결되지 않았어요」 + 보류 줄에 같은 재실행 문장, 「다시 시도」 없음. CloudKit 이벤트 0 | 재실행 안내 UX · fail-safe |
+| 종료 사본 | 저장소 불변, record metadata 0 → **업로드 없음**. ledger `firstLoginFromUnaccountedV3` | fail-safe |
+| 재실행 (PID 20032) | `원시 사본: alreadyTaken` → `소유 근거를 확인해 private CloudKit 저장소를 연다` → Setup ✓ · Import ✓ · Export ✓×2. 25행(자기 1 + 서버 24) · 매핑 25 · 대기 0 | 재실행 연결 · 첫 로그인 전송 |
+| Development 서버 직접 조회(17.5에서) | 25 records, error none. 25:1 레코드 1개, 로컬과 같은 레코드 이름, `CD_lineData 1151B / fe6586c52e1c9d39` 일치 | 서버 payload 일치 |
+| 독립 peer (18.6) | 24 → 25행 · 매핑 25 · 대기 0, 25:1이 같은 ZID · 레코드 이름 · payload(바이트 동일)로 수신, 화면에 X | 독립 수신 · 표시 |
+
+**판정:** iPadOS 17.5에서 실제 1.3.0이 만든 무계정 저장소의 업데이트 보존, 실행 중 로그인 뒤 재실행 안내(로딩 없음), 재실행 연결 · 첫 로그인 전송 · 서버 payload · 독립 peer 수신까지 통과했다. 한계: 필기 행은 합성이다(17.5 시뮬레이터에서 실제 입력 불가), 2.0.0은 Xcode 26.3 빌드다, Production · Distribution · 실기기는 대상이 아니다. 증거: 이 세션 `evidence-20260928/target175/`, `server/logs/*probe-target175-after-relaunch.log`, `peer186/peer-*-25-1`.
+
+### iPadOS 27 실기기 · 재실행 소유 판정 실측 (2026-09-28)
+
+**환경과 안전 범위:** 이 Mac(macOS 26.3, Xcode 26.3 `17C529`, iphoneos26.2 SDK)에서 Debug 빌드를 USB로 연결한 iPad mini (A17 Pro) iPadOS 27.2 (`24B5084k`)에 설치했다. Xcode 26.3 개발 서명(팀 `H4MSW7FUBB`)으로 설치 · 실행됐다. dev 컨테이너(`iCloud.Carve.SwiftData.iCloud.dev`, Development)와 `Carve.dev.sqlite`만 썼다(09-17 사용자 허락 범위). 기기 iCloud는 사용자 본인 계정이다(계정 식별값은 해시로만 비교). 운영 `Carve.sqlite`는 열지 않았고 수정 시각이 설치 전(13:52)과 같음을 확인했다. 위젯 App Group은 시험 전후 모두 비어 있었다. 앱 설정 plist는 시험 전 사본으로 되돌렸다(바이트 동일). Debug 설치가 TestFlight 앱을 대체했으므로 사용자가 TestFlight에서 다시 설치한다.
+
+**관측 방법:** `devicectl device process launch --console --environment-variables '{"OS_ACTIVITY_DT_MODE":"YES"}'`로 앱의 Info · Error os_log를 콘솔로 받았다(Debug 레벨은 나오지 않는다). 비행기 모드를 바꾸면 콘솔 세션이 끊기지만 앱은 계속 돈다. 저장소는 `devicectl device copy from`으로 사본을 떠서 읽었다. `devicectl device info apps`는 설치돼 있어도 빈 목록이었다. 파일 삭제 명령이 없어, 새 설치 상태는 dev 저장소 세 파일을 0바이트로 덮고 `Preservation/Carve.dev.sqlite/raw-not-needed.json` 표식을 넣어 흉내 냈다(앱이 새 설치 때 쓰는 표식과 같은 조건).
+
+**빌드:** 최종 코드(시험 계획 09-28 결정 반영본)와, `LegacyRowLinkageReader.validatedOSMajors`에 27만 더한 시험 빌드. 시험 빌드 변경은 되돌렸다(저장소 차이 없음).
+
+| 단계 | 빌드 | 저장소 상태 | 결과 |
+|---|---|---|---|
+| D1 | 최종 | 09-17 dev 저장소: 현재 계정과 연결 식별 일치, metadata 7키(관측한 연결 profile, `FrameworkVersion 1632`), 필기 0행(전체 삭제 뒤 모양) | 원시 사본 생성, V5→V6 로컬 전환, **보류** |
+| D2 | 27 허용 | 같은 저장소(V6, 0행) | **보류** — 계정 해시 일치 · metadata profile 일치, 남은 실패 조건은 `existingPrivateStore`의 행 1개 이상 · 레코드 이름 비어 있지 않음 |
+| D3 | 27 허용 | 새 설치 흉내 | 첫 실행 경로(`firstRunHadNoStore`)로 연결, 서버에서 2행 가져옴(대응 2 · 대기 0) |
+| D4 | 27 허용 | 2행 연결 저장소 재실행 | **연결** |
+| D5 | 27 허용 | 사용자 Apple Pencil 필기 로마서 1:1(2556B) · 1:2(1998B) | 저장 · 업로드(대응 4 · 대기 0) |
+| D6 | 최종 | 4행 모두 연결 | **보류**(27 불허) |
+| D7 | 27 허용 | 같은 저장소 | **연결** — 보류는 비파괴이고 27을 허용한 업데이트로 풀린다 |
+| D8 | 27 허용 | 연결 중 비행기 모드 → 1:3 필기 | 동기화 저장소가 아니라 초안(`drafts/<계정 범위>/<세션>/NKRV~2-06Romans.txt~1~3.json`, `storeOwnership` 없음)에 저장 |
+| D9 | 27 허용 | 비행기 모드로 재실행 | private DB 레코드 조회 실패(`Network Unavailable`) → **보류**, 초안 표시 |
+| D10 | 27 허용 | 온라인 재실행 | 연결. 1:3은 초안으로만 남음(저장소 · 서버 4행) |
+| D11 | 27 허용 | 1:3에 한 획 더(온라인 · 연결) | 여전히 초안(이번 세션, 획 합본 4132자, `storeOwnership` 없음) — `inherit` 계보 |
+| D12 | 27 허용 | 새 절 1:4 필기 | 저장소 · 서버 반영(5행 · 대기 0) — 세션 자체는 소유 근거가 있다 |
+
+### iPadOS 18.6 최종 빌드 양방향 저장 · 지우기 (2026-09-28)
+
+target `35FF5450…`, peer `8FA7976C…` 모두 최종 빌드(실행 파일 `2a260b86…`)로 덮어 설치했고 둘 다 시험 계정 b다. 두 기기 모두 재실행 때 연결됐다. 필기는 axe 합성 터치다(Apple Pencil 아님).
+
+| 단계 | 결과 |
+|---|---|
+| target 창세기 27:1 두 획 | 1216B `7d39ad069ae1`, 대응 · 업로드 완료 |
+| peer 재실행 | 같은 크기 · 해시 · 레코드 이름으로 수신, 화면에 X |
+| peer 27:2 V 획 | 1096B `ca72cfd99f16` 업로드 |
+| target 재실행 | 같은 해시로 수신, 화면 표시 |
+| target 27:1 절 메뉴 「지우기」 | 활성 행은 빈 필기(대응 유지), 보관 행(`isPresent=0`, 1216B) 생성. 보관 행 대응은 몇 초 뒤 생겼다 |
+| peer 재실행 | 빈 활성 행과 보관 행을 받아 화면에서 27:1이 비었다 |
+
+**필기 직후 종료:** 같은 peer에서 27:3을 그리고 1.0초 뒤 `simctl terminate`하자 행(620B)은 저장됐지만 CloudKit 대응이 없었다. 재실행 두 번 모두 **보류**였고, 보류 중에는 CloudKit 없이 열려 그 행이 업로드되지 않는다. 본문 화면에는 필기가 그대로 보이고 보류 표시는 없다. 이 peer는 수정 검증용으로 보류 상태 그대로 둔다.
+
+### iPadOS 17.5 로그인 상태 1.3.0 → 2.0.0 (2026-09-28)
+
+새 기기 `Carve-LiveLogin-17.5-Linked-20260928`(`D4F02C54…`)에 사용자가 b로 로그인한 뒤 깨끗한 1.3.0(`dc0eef22…`)을 처음 실행해 서버 28행을 받았다(대응 28 · 대기 0, metadata 7키 연결 profile, `FrameworkVersion 1345`). 최종 2.0.0을 덮어 설치하자 원시 사본이 생겼고 DB · WAL · SHM이 업데이트 전 사본과 바이트 동일했다. 소유 확인이 통과해(`currentPrivateCloudRecords`) 연결됐고, 28행 필기가 28/28 같았으며 대응 28 · 대기 0이었다. 연결 뒤 migrator 표식 키가 생겼다(18.6과 같음). 두 번째 실행도 연결됐다(`alreadyTaken`). 필기 행은 서버에서 받은 것이고 17.5에서 직접 그린 것은 아니다. 창세기 1:10~12의 22B 행 디코드 경고는 기존 관측과 같다.
+
+### 판정 — 재실행 소유 판정이 일반 사용 흐름을 막는다
+
+앱은 실행할 때마다 `PrivateStoreAttachmentPreflight.decide` → `ownership(for:)`를 거친다. 저장소의 CloudKit 식별이 현재 계정과 같으면(`.matches`) `existingPrivateStore`만 인정하고, 이 규칙은 검증 OS(17 · 18 · 26), 모든 행의 CloudKit 대응, 행 1개 이상, 서버 레코드 조회 성공을 모두 요구한다([CloudKitStoreOwnershipProofClient.swift](../Domain/Domain/Sources/SwiftData/CloudKitStoreOwnershipProofClient.swift) `existingPrivateStore`). 보류된 실행은 CloudKit 없이 열리므로 조건이 스스로 풀리지 않는다. 필기와 로컬 원본은 모든 경우에 보존됐다.
+
+| 막히는 흐름 | 근거 | 범위 |
+|---|---|---|
+| iPadOS 27의 연결된 저장소 전부 | D1 · D6(실기기, 실제 필기) | 1.3.0에서 올라온 사용자는 첫 실행부터, 새 설치는 두 번째 실행부터, OS를 27로 올린 기존 사용자는 그다음 실행부터 |
+| 빈 연결 저장소(전체 삭제 뒤 · 자료 없는 새 사용자) | D2(27 허용 빌드) | 모든 OS, 영구 |
+| 대응이 생기기 전에 끝난 행(저장 뒤 몇 초 안의 종료 · 크래시) | 18.6 필기 직후 종료 | 모든 OS, 영구 |
+| 오프라인 실행 · 연결 중 네트워크 끊김 | D8~D11 | 그 실행은 보류, 그동안의 필기는 초안으로만 남고 다시 연결돼도 · 다시 그려도 동기화되지 않는다 |
+
+따라서 「일반 순차 동기화」 관문은 흔한 사용 흐름에서 실패하고, 출시 판정은 **NO-GO**다. 18.6 양방향 저장 · 지우기와 17.5 로그인 상태 업데이트는 통과했다.
+
+**수정 방향(제안, 미구현):** ① 이 저장소를 2.0.0이 이미 그 계정으로 연결했고(ledger 소유자 = 현재 범위) 저장소의 CloudKit 식별이 현재 계정과 같으면, 재실행 때 행 · 대응 · 서버 조회 · OS 조건을 다시 요구하지 않고 연결한다(식별 불일치는 계속 보류). ② 편집 환경의 소유 판정도 같은 규칙을 써서 네트워크가 끊겨도 편집이 초안으로 바뀌지 않게 한다. ③ 1.3.0에서 처음 올라올 때의 판독 허용 OS에 27을 더한다(근거: 27.2 연결 profile이 관측 7키와 같고 D4 · D7에서 통과). ④ 같은 확인 계정으로 쓴 소유 근거 없는 초안을 연결 뒤 저장소에 넣을지 정한다.
+
+증거: 이 세션 `scratchpad/ipad27/`(시각표, 콘솔 로그, 저장소 · 초안 사본), `scratchpad/sync-final/`(저장소 사본, 화면), `scratchpad/linked175/`.
