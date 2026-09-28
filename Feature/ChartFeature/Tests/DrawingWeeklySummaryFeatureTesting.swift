@@ -22,9 +22,11 @@ struct DrawingWeeklySummaryFeatureTesting {
             verse: BibleVerse(title: BibleChapter(title: .john, chapter: 3), verse: 16, sentence: ""),
             updatedAt: Date(timeIntervalSince1970: 1_800)
         )
-        let store = TestStore(initialState: DrawingWeeklySummaryFeature.State()) {
+        var state = DrawingWeeklySummaryFeature.State()
+        state.scrollPosition = fixedChartDay(0)
+        let store = TestStore(initialState: state) {
             DrawingWeeklySummaryFeature()
-        } withDependencies: { liveTimeDependencies(&$0) }
+        } withDependencies: { fixedTimeDependencies(&$0) }
 
         // When / Then: 상태는 그대로이고 openVerse 만 나온다
         await store.send(.view(.recentVerseTapped(item)))
@@ -35,9 +37,11 @@ struct DrawingWeeklySummaryFeatureTesting {
     @MainActor
     func recentChapterTappedOpensChapter() async {
         let chapter = BibleChapter(title: .psalms, chapter: 23)
-        let store = TestStore(initialState: DrawingWeeklySummaryFeature.State()) {
+        var state = DrawingWeeklySummaryFeature.State()
+        state.scrollPosition = fixedChartDay(0)
+        let store = TestStore(initialState: state) {
             DrawingWeeklySummaryFeature()
-        } withDependencies: { liveTimeDependencies(&$0) }
+        } withDependencies: { fixedTimeDependencies(&$0) }
 
         await store.send(.view(.recentChapterTapped(chapter)))
         await store.receive(\.openChapter, chapter)
@@ -47,7 +51,7 @@ struct DrawingWeeklySummaryFeatureTesting {
     @MainActor
     func topChapterTappedOpensTopChapter() async {
         // Given
-        let start = chartDay(-6)
+        let start = fixedChartDay(-6)
         let genesis = BibleChapter(title: .genesis, chapter: 1)
         let john = BibleChapter(title: .john, chapter: 3)
         var state = DrawingWeeklySummaryFeature.State()
@@ -55,7 +59,7 @@ struct DrawingWeeklySummaryFeatureTesting {
         state.chapterCountsByDay = [start: [genesis: 1, john: 4]]
         let store = TestStore(initialState: state) {
             DrawingWeeklySummaryFeature()
-        } withDependencies: { liveTimeDependencies(&$0) }
+        } withDependencies: { fixedTimeDependencies(&$0) }
 
         // When / Then
         await store.send(.view(.topChapterTapped))
@@ -66,12 +70,12 @@ struct DrawingWeeklySummaryFeatureTesting {
     @MainActor
     func topChapterTappedWithoutRecordsDoesNothing() async {
         var state = DrawingWeeklySummaryFeature.State()
-        state.scrollPosition = chartDay(-6)
-        // 보이는 주 밖(오늘-7)의 기록만 있다
-        state.chapterCountsByDay = [chartDay(-7): [BibleChapter(title: .genesis, chapter: 1): 3]]
+        state.scrollPosition = fixedChartDay(-6)
+        // 보이는 주 밖(기준일-7)의 기록만 있다
+        state.chapterCountsByDay = [fixedChartDay(-7): [BibleChapter(title: .genesis, chapter: 1): 3]]
         let store = TestStore(initialState: state) {
             DrawingWeeklySummaryFeature()
-        } withDependencies: { liveTimeDependencies(&$0) }
+        } withDependencies: { fixedTimeDependencies(&$0) }
         #expect(store.state.topChapter == nil)
 
         await store.send(.view(.topChapterTapped))
@@ -90,7 +94,7 @@ struct DrawingWeeklySummaryFeatureTesting {
         ]
     )
     func weekAverageCountRoundsToNearest(counts: [Int], average: Int) {
-        let start = chartDay(-6)
+        let start = fixedChartDay(-6)
         var state = DrawingWeeklySummaryFeature.State()
         state.scrollPosition = start
         state.dailyRecords = chartRecords(from: start, counts: counts)
@@ -101,7 +105,7 @@ struct DrawingWeeklySummaryFeatureTesting {
     @Test("기록이 없으면 하루 평균 표시는 0.0 이다")
     func weekAverageTextIsZeroWithoutRecords() {
         var state = DrawingWeeklySummaryFeature.State()
-        state.scrollPosition = chartDay(-6)
+        state.scrollPosition = fixedChartDay(-6)
 
         #expect(state.weekAverageText == "0.0")
         #expect(state.weekMaxCount == 0)
@@ -109,17 +113,17 @@ struct DrawingWeeklySummaryFeatureTesting {
 
     @Test("스크롤 위치에 시각이 섞여 있어도 그날 자정부터 7일을 이번 주로 본다")
     func weekRangeStartsAtStartOfScrollDay() {
-        // Given: 스크롤 위치가 오늘-6 의 오후
-        let start = chartDay(-6)
+        // Given: 스크롤 위치가 기준일-6 의 오후
+        let start = fixedChartDay(-6)
         var state = DrawingWeeklySummaryFeature.State()
         state.scrollPosition = start.addingTimeInterval(3_600 * 15)
         state.dailyRecords = [
             DailyRecord(date: start, count: 3),
-            DailyRecord(date: chartDay(0).addingTimeInterval(3_600 * 23), count: 4),
-            DailyRecord(date: chartDay(1), count: 50)
+            DailyRecord(date: fixedChartDay(0).addingTimeInterval(3_600 * 23), count: 4),
+            DailyRecord(date: fixedChartDay(1), count: 50)
         ]
 
-        // Then: 오늘-6 자정 기록과 오늘 23시 기록은 포함, 내일은 제외
+        // Then: 기준일-6 자정 기록과 기준일 23시 기록은 포함, 기준일+1 은 제외
         #expect(state.weekTotalCount == 7)
         #expect(state.weekMaxCount == 4)
     }
@@ -127,7 +131,7 @@ struct DrawingWeeklySummaryFeatureTesting {
     @Test("권별 횟수는 보이는 주의 날짜 키가 자정일 때만 합산한다")
     func topChapterReadsOnlyMidnightDayKeys() {
         // Given: 같은 날이지만 자정이 아닌 키로 들어온 횟수
-        let start = chartDay(-6)
+        let start = fixedChartDay(-6)
         let genesis = BibleChapter(title: .genesis, chapter: 1)
         let exodus = BibleChapter(title: .exodus, chapter: 20)
         var state = DrawingWeeklySummaryFeature.State()
