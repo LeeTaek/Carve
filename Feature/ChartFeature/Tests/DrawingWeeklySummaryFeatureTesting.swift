@@ -24,7 +24,7 @@ struct DrawingWeeklySummaryFeatureTesting {
         )
         let store = TestStore(initialState: DrawingWeeklySummaryFeature.State()) {
             DrawingWeeklySummaryFeature()
-        }
+        } withDependencies: { liveTimeDependencies(&$0) }
 
         // When / Then: 상태는 그대로이고 openVerse 만 나온다
         await store.send(.view(.recentVerseTapped(item)))
@@ -37,7 +37,7 @@ struct DrawingWeeklySummaryFeatureTesting {
         let chapter = BibleChapter(title: .psalms, chapter: 23)
         let store = TestStore(initialState: DrawingWeeklySummaryFeature.State()) {
             DrawingWeeklySummaryFeature()
-        }
+        } withDependencies: { liveTimeDependencies(&$0) }
 
         await store.send(.view(.recentChapterTapped(chapter)))
         await store.receive(\.openChapter, chapter)
@@ -55,7 +55,7 @@ struct DrawingWeeklySummaryFeatureTesting {
         state.chapterCountsByDay = [start: [genesis: 1, john: 4]]
         let store = TestStore(initialState: state) {
             DrawingWeeklySummaryFeature()
-        }
+        } withDependencies: { liveTimeDependencies(&$0) }
 
         // When / Then
         await store.send(.view(.topChapterTapped))
@@ -71,7 +71,7 @@ struct DrawingWeeklySummaryFeatureTesting {
         state.chapterCountsByDay = [chartDay(-7): [BibleChapter(title: .genesis, chapter: 1): 3]]
         let store = TestStore(initialState: state) {
             DrawingWeeklySummaryFeature()
-        }
+        } withDependencies: { liveTimeDependencies(&$0) }
         #expect(store.state.topChapter == nil)
 
         await store.send(.view(.topChapterTapped))

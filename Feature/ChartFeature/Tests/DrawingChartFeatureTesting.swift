@@ -30,7 +30,7 @@ struct DrawingChartFeatureTesting {
     func backToWritingSendsDelegate() async {
         let store = TestStore(initialState: DrawingChartFeature.State()) {
             DrawingChartFeature()
-        }
+        } withDependencies: { liveTimeDependencies(&$0) }
 
         await store.send(.view(.backToWriting))
         await store.receive(\.delegate)
@@ -45,7 +45,7 @@ struct DrawingChartFeatureTesting {
         let counts: [Date: [BibleChapter: Int]] = [chartDay(0): [chapter: 3]]
         let store = TestStore(initialState: DrawingChartFeature.State()) {
             DrawingChartFeature()
-        }
+        } withDependencies: { liveTimeDependencies(&$0) }
 
         // When / Then: 스크롤은 마지막 날 6일 전, 선택은 마지막 날
         await store.send(.setFetchedDailyData(dailyRecords: records, chapterCountsByDay: counts)) {
@@ -75,7 +75,7 @@ struct DrawingChartFeatureTesting {
         state.drawingWeeklySummary.dailyRecords = [previous]
         let store = TestStore(initialState: state) {
             DrawingChartFeature()
-        }
+        } withDependencies: { liveTimeDependencies(&$0) }
 
         // When / Then
         await store.send(.setFetchedDailyData(dailyRecords: [], chapterCountsByDay: [:])) {
@@ -98,7 +98,7 @@ struct DrawingChartFeatureTesting {
         ]
         let store = TestStore(initialState: DrawingChartFeature.State()) {
             DrawingChartFeature()
-        }
+        } withDependencies: { liveTimeDependencies(&$0) }
 
         await store.send(.setRecentItems(recentVerses: verses, recentChapters: [chapter])) {
             $0.drawingWeeklySummary.recentVerses = verses
@@ -115,7 +115,7 @@ struct DrawingChartFeatureTesting {
         state.dailyRecordChart.records = records
         let store = TestStore(initialState: state) {
             DrawingChartFeature()
-        }
+        } withDependencies: { liveTimeDependencies(&$0) }
 
         // When / Then
         await store.send(.view(.tapSymbol(chartDay(-4)))) {
@@ -134,7 +134,7 @@ struct DrawingChartFeatureTesting {
         state.selectedRecord = existing
         let store = TestStore(initialState: state) {
             DrawingChartFeature()
-        }
+        } withDependencies: { liveTimeDependencies(&$0) }
 
         await store.send(.view(.tapSymbol(chartDay(-3)))) {
             $0.dailyRecordChart.selectedDate = chartDay(-3)
@@ -151,7 +151,7 @@ struct DrawingChartFeatureTesting {
         state.dailyRecordChart.records = records
         let store = TestStore(initialState: state) {
             DrawingChartFeature()
-        }
+        } withDependencies: { liveTimeDependencies(&$0) }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
         // When: 하위 차트가 바인딩으로 날짜를 고른다
@@ -172,7 +172,7 @@ struct DrawingChartFeatureTesting {
     func childScrollPositionChangeSyncsWeeklySummary() async {
         let store = TestStore(initialState: DrawingChartFeature.State()) {
             DrawingChartFeature()
-        }
+        } withDependencies: { liveTimeDependencies(&$0) }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
         await store.send(.dailyRecordChart(.binding(.set(\.scrollPosition, chartDay(-13)))))
@@ -188,7 +188,7 @@ struct DrawingChartFeatureTesting {
         state.isAppendingPastData = true
         let store = TestStore(initialState: state) {
             DrawingChartFeature()
-        }
+        } withDependencies: { liveTimeDependencies(&$0) }
 
         await store.send(.endAppending) {
             $0.isAppendingPastData = false
@@ -203,7 +203,7 @@ struct DrawingChartFeatureTesting {
         state.earliestFetchedDate = state.lowerBoundDate
         let store = TestStore(initialState: state) {
             DrawingChartFeature()
-        }
+        } withDependencies: { liveTimeDependencies(&$0) }
 
         // When / Then: 잠깐 추가 중으로 바뀌었다가 endAppending 으로 내려온다
         await store.send(.view(.loadMoreBefore(state.lowerBoundDate))) {

@@ -6,6 +6,7 @@
 //
 
 @testable import ChartFeature
+import ComposableArchitecture
 import Foundation
 
 // TestStore 는 State: Equatable 을 요구한다. 제품 State 는 Equatable 이 아니므로
@@ -33,6 +34,30 @@ extension DrawingChartFeature.State: @retroactive Equatable {
             && lhs.selectedRecord == rhs.selectedRecord
             && lhs.chapterCountsByDay == rhs.chapterCountsByDay
     }
+}
+
+/// 차트 테스트가 기준으로 삼는 고정 시각(2026-01-14 12:00 UTC).
+enum ChartTestTime {
+    static let now = Date(timeIntervalSince1970: 1_768_392_000)
+}
+
+/// 고정 시각의 자정에서 `offset` 일 떨어진 날의 자정을 돌려준다.
+func fixedChartDay(_ offset: Int) -> Date {
+    let calendar = Calendar.current
+    let today = calendar.startOfDay(for: ChartTestTime.now)
+    return calendar.date(byAdding: .day, value: offset, to: today)!
+}
+
+/// 날짜를 고정 시각으로, 시계를 즉시 끝나는 시계로 둔다.
+func fixedTimeDependencies(_ dependencies: inout DependencyValues) {
+    dependencies.date = .constant(ChartTestTime.now)
+    dependencies.continuousClock = ImmediateClock()
+}
+
+/// 과도기용: 지금과 같이 실제 현재 시각과 실제 시계를 쓴다. 테스트를 고정 시각으로 옮기면 지운다.
+func liveTimeDependencies(_ dependencies: inout DependencyValues) {
+    dependencies.date = .constant(Date())
+    dependencies.continuousClock = ContinuousClock()
 }
 
 /// 오늘 자정에서 `offset` 일 떨어진 날의 자정을 돌려준다.

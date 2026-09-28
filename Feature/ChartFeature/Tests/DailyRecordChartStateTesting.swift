@@ -22,7 +22,7 @@ struct DailyRecordChartStateTesting {
         state.yScale = 0...20
         let store = TestStore(initialState: state) {
             DailyRecordChartFeature()
-        }
+        } withDependencies: { liveTimeDependencies(&$0) }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
         await store.send(.view(.dragChanged(translationX: 1_000)))

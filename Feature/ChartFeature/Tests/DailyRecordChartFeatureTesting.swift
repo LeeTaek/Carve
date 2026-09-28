@@ -25,7 +25,7 @@ struct DailyRecordChartFeatureTesting {
         )
         let store = TestStore(initialState: state) {
             DailyRecordChartFeature()
-        }
+        } withDependencies: { liveTimeDependencies(&$0) }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
         // When
@@ -64,7 +64,7 @@ struct DailyRecordChartFeatureTesting {
             )
         ) {
             DailyRecordChartFeature()
-        }
+        } withDependencies: { liveTimeDependencies(&$0) }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
         // When
@@ -88,7 +88,7 @@ struct DailyRecordChartFeatureTesting {
         state.yScale = 0...12
         let store = TestStore(initialState: state) {
             DailyRecordChartFeature()
-        }
+        } withDependencies: { liveTimeDependencies(&$0) }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
         // When
@@ -151,7 +151,7 @@ struct DailyRecordChartFeatureTesting {
             initialState: DailyRecordChartFeature.State(lowerBoundDate: chartDay(-30), scrollPosition: chartDay(-27))
         ) {
             DailyRecordChartFeature()
-        }
+        } withDependencies: { liveTimeDependencies(&$0) }
         #expect(!store.state.canMoveToPreviousWeek)
 
         // When / Then: 상태 변화도 효과도 없다
@@ -165,7 +165,7 @@ struct DailyRecordChartFeatureTesting {
             initialState: DailyRecordChartFeature.State(lowerBoundDate: chartDay(-30), scrollPosition: chartDay(-6))
         ) {
             DailyRecordChartFeature()
-        }
+        } withDependencies: { liveTimeDependencies(&$0) }
         #expect(!store.state.canMoveToNextWeek)
 
         await store.send(.view(.nextWeekTapped))
@@ -179,7 +179,7 @@ struct DailyRecordChartFeatureTesting {
         state.pageWidth = 600
         let store = TestStore(initialState: state) {
             DailyRecordChartFeature()
-        }
+        } withDependencies: { liveTimeDependencies(&$0) }
         store.exhaustivity = .off(showSkippedAssertions: false)
         #expect(store.state.canMoveToPreviousWeek)
 
@@ -210,7 +210,7 @@ struct DailyRecordChartFeatureTesting {
         state.pageWidth = 600
         let store = TestStore(initialState: state) {
             DailyRecordChartFeature()
-        }
+        } withDependencies: { liveTimeDependencies(&$0) }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
         await store.send(.view(.nextWeekTapped))
@@ -241,7 +241,7 @@ extension DailyRecordChartFeatureTesting {
         state.yScale = 0...20
         let store = TestStore(initialState: state) {
             DailyRecordChartFeature()
-        }
+        } withDependencies: { liveTimeDependencies(&$0) }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
         // When
@@ -267,7 +267,7 @@ extension DailyRecordChartFeatureTesting {
         state.selectedDate = chartDay(-10)
         let store = TestStore(initialState: state) {
             DailyRecordChartFeature()
-        }
+        } withDependencies: { liveTimeDependencies(&$0) }
 
         // 상태 변화도 효과도 없어야 한다
         await store.send(.view(.dragChanged(translationX: 120)))
@@ -282,7 +282,7 @@ extension DailyRecordChartFeatureTesting {
         state.selectedDate = chartDay(-10)
         let store = TestStore(initialState: state) {
             DailyRecordChartFeature()
-        }
+        } withDependencies: { liveTimeDependencies(&$0) }
 
         await store.send(.view(.dragChanged(translationX: 100))) {
             $0.isScrolling = true
@@ -298,7 +298,7 @@ extension DailyRecordChartFeatureTesting {
         state.pageWidth = 600
         let store = TestStore(initialState: state) {
             DailyRecordChartFeature()
-        }
+        } withDependencies: { liveTimeDependencies(&$0) }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
         // When: 폭 600 을 100 넘게 끈다
@@ -317,7 +317,7 @@ extension DailyRecordChartFeatureTesting {
         state.pageWidth = 600
         let store = TestStore(initialState: state) {
             DailyRecordChartFeature()
-        }
+        } withDependencies: { liveTimeDependencies(&$0) }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
         // When
@@ -335,7 +335,7 @@ extension DailyRecordChartFeatureTesting {
             initialState: DailyRecordChartFeature.State(lowerBoundDate: chartDay(-30), scrollPosition: chartDay(-6))
         ) {
             DailyRecordChartFeature()
-        }
+        } withDependencies: { liveTimeDependencies(&$0) }
 
         await store.send(.view(.dragChanged(translationX: -200))) {
             $0.isScrolling = true
@@ -353,7 +353,7 @@ extension DailyRecordChartFeatureTesting {
         state.isScrolling = true
         let store = TestStore(initialState: state) {
             DailyRecordChartFeature()
-        }
+        } withDependencies: { liveTimeDependencies(&$0) }
 
         // When
         await store.send(.view(.dragEnded(translationX: 80)))
@@ -372,7 +372,7 @@ extension DailyRecordChartFeatureTesting {
         state.pageWidth = 600
         let store = TestStore(initialState: state) {
             DailyRecordChartFeature()
-        }
+        } withDependencies: { liveTimeDependencies(&$0) }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
         await store.send(.view(.dragEnded(translationX: 200)))
@@ -392,7 +392,7 @@ extension DailyRecordChartFeatureTesting {
         state.isScrolling = true
         let store = TestStore(initialState: state) {
             DailyRecordChartFeature()
-        }
+        } withDependencies: { liveTimeDependencies(&$0) }
 
         await store.send(.view(.dragEnded(translationX: -300)))
         await store.receive(\.commitMove, .stay) {
