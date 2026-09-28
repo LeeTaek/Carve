@@ -214,6 +214,110 @@ struct DrawingChartFeatureTesting {
         }
     }
 
+    @Test("차트에 들어오면 오늘까지 30일 기록 · 장별 횟수와 최근 필사 항목을 저장소에서 불러온다")
+    @MainActor
+    func fetchDataLoadsThirtyDaysAndRecentItems() async {
+        // Given: 오늘 요한복음 3장 2절, 이틀 전 창세기 1장 1절, 기간 밖 한 절
+        let john = BibleChapter(title: .john, chapter: 3)
+        let genesis = BibleChapter(title: .genesis, chapter: 1)
+        let activities = [
+            chartActivity(fixedChartDay(0).addingTimeInterval(7_200), john, verse: 17),
+            chartActivity(fixedChartDay(0).addingTimeInterval(3_600), john, verse: 16),
+            chartActivity(fixedChartDay(-2).addingTimeInterval(3_600), genesis, verse: 1),
+            chartActivity(fixedChartDay(-40), genesis, verse: 2)
+        ]
+        let store = TestStore(initialState: fixedState()) {
+            DrawingChartFeature()
+        } withDependencies: {
+            fixedTimeDependencies(&$0)
+            $0.drawingActivityRepository = StubDrawingActivityRepository(activities: activities)
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+        let records = chartRecords(from: fixedChartDay(-29), counts: Array(repeating: 0, count: 27) + [1, 0, 2])
+        var counts: [Date: [BibleChapter: Int]] = Dictionary(uniqueKeysWithValues: records.map { ($0.date, [:]) })
+        counts[fixedChartDay(-2)] = [genesis: 1]
+        counts[fixedChartDay(0)] = [john: 2]
+
+        // When
+        await store.send(.view(.fetchData))
+
+        // Then: 기간 안의 필사만 날짜별로 세고, 마지막 날을 고른다
+        await store.receive(\.setFetchedDailyData) {
+            $0.chapterCountsByDay = counts
+            $0.dailyRecordChart.records = records
+            $0.dailyRecordChart.selectedDate = fixedChartDay(0)
+            $0.selectedRecord = records.last
+        }
+        // Then: 최근 항목은 최신순, 장은 겹치지 않게 (limit 5 라 기간 밖 절도 들어온다)
+        await store.receive(\.setRecentItems) {
+            $0.drawingWeeklySummary.recentVerses = activities.map(recentItem)
+            $0.drawingWeeklySummary.recentChapters = [john, genesis]
+        }
+    }
+
+    @Test("저장소가 비어 있으면 30일 모두 0회로 채운다")
+    @MainActor
+    func fetchDataWithEmptyRepositoryFillsZeros() async {
+        // Given: 테스트 기본 저장소(빈 저장소)
+        let store = TestStore(initialState: fixedState()) {
+            DrawingChartFeature()
+        } withDependencies: { fixedTimeDependencies(&$0) }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+        let records = chartRecords(from: fixedChartDay(-29), counts: Array(repeating: 0, count: 30))
+
+        // When
+        await store.send(.view(.fetchData))
+
+        // Then
+        await store.receive(\.setFetchedDailyData) {
+            $0.dailyRecordChart.records = records
+            $0.chapterCountsByDay = Dictionary(uniqueKeysWithValues: records.map { ($0.date, [:]) })
+        }
+        await store.receive(\.setRecentItems)
+        #expect(store.state.drawingWeeklySummary.recentVerses.isEmpty)
+        #expect(store.state.drawingWeeklySummary.recentChapters.isEmpty)
+    }
+
+    @Test("과거 추가 로드는 직전 주 기록을 앞에 붙이고 보던 위치를 붙인 날 수만큼 민다")
+    @MainActor
+    func loadMoreBeforePrependsPreviousWeek() async {
+        // Given: 가장 이른 날이 오늘이고, 직전 주 둘째 날에 요한복음 3장 한 절
+        let calendar = Calendar.current
+        let weekStart = calendar.dateInterval(of: .weekOfYear, for: fixedChartDay(0))!.start
+        let previousWeekStart = calendar.date(byAdding: .day, value: -7, to: weekStart)!
+        let secondDay = calendar.date(byAdding: .day, value: 1, to: previousWeekStart)!
+        let john = BibleChapter(title: .john, chapter: 3)
+        let store = TestStore(initialState: fixedState()) {
+            DrawingChartFeature()
+        } withDependencies: {
+            fixedTimeDependencies(&$0)
+            $0.drawingActivityRepository = StubDrawingActivityRepository(
+                activities: [chartActivity(secondDay.addingTimeInterval(3_600), john, verse: 16)]
+            )
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+        let records = chartRecords(from: previousWeekStart, counts: [0, 1, 0, 0, 0, 0, 0])
+
+        // When
+        await store.send(.view(.loadMoreBefore(fixedChartDay(0)))) {
+            $0.isAppendingPastData = true
+        }
+
+        // Then
+        await store.receive(\.setFetchedDailyData) {
+            $0.dailyRecordChart.records = records
+            $0.earliestFetchedDate = previousWeekStart
+            $0.chapterCountsByDay[secondDay] = [john: 1]
+        }
+        await store.receive(\.dailyRecordChart) {
+            $0.dailyRecordChart.scrollPosition = fixedChartDay(7)
+            $0.drawingWeeklySummary.scrollPosition = fixedChartDay(7)
+        }
+        await store.receive(\.endAppending) {
+            $0.isAppendingPastData = false
+        }
+    }
+
     /// State 의 오늘 기준 날짜 필드를 고정 시각 기준으로 채운다(State 기본값은 실제 오늘을 쓴다).
     private func fixedState() -> DrawingChartFeature.State {
         var state = DrawingChartFeature.State()
@@ -224,4 +328,43 @@ struct DrawingChartFeatureTesting {
         state.drawingWeeklySummary.scrollPosition = fixedChartDay(0)
         return state
     }
+}
+
+/// 주어진 활동을 돌려주는 저장소 — 기간 조회는 범위로 거르고, 최근 조회는 최신순으로 자른다(`DrawingDatabase` 조회와 같은 규칙).
+private struct StubDrawingActivityRepository: DrawingActivityRepository {
+    let activities: [DrawingActivity]
+
+    func activities(in range: DateInterval) async throws -> [DrawingActivity] {
+        newestFirst.filter { activity in
+            guard let date = activity.updateDate else { return false }
+            return date >= range.start && date < range.end
+        }
+    }
+
+    func recentActivities(limit: Int) async throws -> [DrawingActivity] {
+        Array(newestFirst.prefix(max(limit, 0)))
+    }
+
+    private var newestFirst: [DrawingActivity] {
+        activities
+            .filter { $0.updateDate != nil }
+            .sorted { $0.updateDate! > $1.updateDate! }
+    }
+}
+
+/// 장 · 절 · 시각으로 필사 활동 하나를 만든다.
+private func chartActivity(_ date: Date, _ chapter: BibleChapter, verse: Int) -> DrawingActivity {
+    DrawingActivity(updateDate: date, titleName: chapter.title.rawValue, titleChapter: chapter.chapter, verse: verse)
+}
+
+/// 필사 활동이 최근 항목으로 보일 모양.
+private func recentItem(_ activity: DrawingActivity) -> RecentVerseItem {
+    RecentVerseItem(
+        verse: BibleVerse(
+            title: BibleChapter(title: BibleTitle(rawValue: activity.titleName!)!, chapter: activity.titleChapter!),
+            verse: activity.verse!,
+            sentence: ""
+        ),
+        updatedAt: activity.updateDate!
+    )
 }
