@@ -1,6 +1,6 @@
 # CarveFeature 단일 Canvas 전환 설계
 
-> **상태 (rev.34 · 2026-09-09):** Phase 0A~3 구현 및 `develop` 병합 완료. 단일 Canvas 기본값은 **on** (`SingleCanvasFlag.defaultValue = true`)입니다. 2026-09-15 부터 앱을 켤 때 기존 저장값을 설치당 한 번 지워 기존 사용자도 기본값을 따르게 하고(`SingleCanvasFlag.resetStoredValueOnce(in:)`), 그 뒤에 끈 값은 유지합니다.
+> **상태 (rev.35 · 2026-09-28):** Phase 0A~3 구현 및 `develop` 병합 완료. 단일 Canvas 기본값은 **on** (`SingleCanvasFlag.defaultValue = true`)입니다. 2026-09-15 부터 앱을 켤 때 기존 저장값을 설치당 한 번 지워 기존 사용자도 기본값을 따르게 하고(`SingleCanvasFlag.resetStoredValueOnce(in:)`), 그 뒤에 끈 값은 유지합니다.
 > **2.0.0 작업 순서와 출시 범위는 [로드맵](./release-2.0.0-roadmap.md)을 기준으로 합니다.** Phase 4(구 구조 제거)는 출시 후 안정화 과제입니다.
 > D9 의 실제 통과·미수행 범위는 [런북 §6-9 · §8-7](./phase-0a-d-device-test.md)에 남깁니다. 미보유 구기기·120Hz 검증을 출시 선행 조건으로 두지 않습니다.
 >
@@ -13,7 +13,7 @@
 > D9-1 · D9-2 · D9-3-1·2·4 · D9-4-1·4 · **D9-5** · **D9-6**(R23·R24 수정 후 재검증) · D9-7-1·3·4 · D9-8 · **D9-CK②·③** 통과. **D9-7-2 만 ❓ 미수행**(Pencil 입력이 필요해 자동화 불가) (런북 §8-7).
 > ⚠️ Δ 0.00 은 실제 필기 표시의 정상 판정이 **아닙니다** — 계측은 "값이 도달했는가" 만 말합니다 (§20-16).
 > [D9 H 분석](./single-canvas-rotation-display-investigation.md) · [실기기 조작](./device-debugging-cli.md).
-> 회귀 기준선 **312** (§19-4-2). 대상: `Feature/CarveFeature`, `Feature/SettingsFeature`, `Domain`.
+> 회귀 기준선 **1069** (2026-09-28 develop 머지 뒤, §19-4-2). 대상: `Carve-Workspace` 의 테스트 타깃 전부 — `App/CarveApp` UI 테스트는 시뮬레이터에서 건너뜁니다. 현재 값은 [AGENTS.md](../AGENTS.md) 「공통 명령어」와 같게 둡니다.
 >
 > **읽는 법.** §1~§17 이 설계이고 §18~§20 은 실측·변경 기록입니다. 절 번호는 코드 주석과 AGENTS.md 가 참조하므로 **바꾸지 않습니다.**
 > 결정이 끝난 항목은 결정만 남기고 논의 과정은 지웠습니다 (rev.19 · rev.25 정리). 과정이 필요하면 git 이력(`git log -- docs/single-canvas-design.md`)을 보십시오.
@@ -45,7 +45,8 @@
 | 31 | **R26 수정** — 장 전환에서 이전 본문 컬럼을 놓는다. 긴 장을 떠난 뒤 **945 → 124.4 MB**. 회전 전이는 콘텐츠 넓이에 비례함을 실측(짧은 장은 전이 0). 기준선 310 → **312** | §5 · §16 · 런북 §8-7 |
 | 32 | **D9-CK③ 완료** — CloudKit 운영 컨테이너에 `CD_layoutMetadataData` · `CD_rowUUID` 승격. 배포 전 죽은 필드 3개와 `CD_BiblePageDrawing` 정리. **기본 활성화 하드 블로커 해소.** R27 · R28 신설 | §10-1-a · §16 · 런북 §8-7 |
 | 33 | **롤백된 옛 단일 Canvas 구현 제거** — `CombinedCanvasFeature`·`CombinedCanvasView` 967줄. 살아 있는 참조가 0건이었고 삭제 후 312 통과. 낡은 deprecation 문구도 실제 대체재(단일 Canvas / `delegatesUndoToCanvas`)로 정정 | §11 · §16 |
-| **34** | **2.0.0 문서 정리** — 기본 on · D9 최신 판정 동기화. 과거 측정 기록은 보존하고 미보유 기기 검증을 출시 후 관측으로 분류. 신규 로드맵 연결 | §16 · §17 · [로드맵](./release-2.0.0-roadmap.md) |
+| 34 | **2.0.0 문서 정리** — 기본 on · D9 최신 판정 동기화. 과거 측정 기록은 보존하고 미보유 기기 검증을 출시 후 관측으로 분류. 신규 로드맵 연결 | §16 · §17 · [로드맵](./release-2.0.0-roadmap.md) |
+| **35** | **회귀 기준선 갱신** — rev.31 이후 병합된 작업의 시험이 §19-4-2 에 반영되지 않았던 것을 2026-09-28 develop 머지 뒤 실측으로 바로잡음. 요약 줄 · 런북 · 로드맵의 312 표기도 현재 기준선으로 맞춤. 설계 변경 없음. 기준선 312 → **1069** | §19-4-2 |
 
 ---
 
@@ -1247,7 +1248,8 @@ peak **363.6 MB** · 최종 정지 **109.7 MB** · CPU > 90% 샘플 47 / 188. **
 | 26 | 304 | R23 회귀 2 (① 프로그램 대입은 v3 를 강등하지 않는다 ② 사용자 편집 콜백은 그대로 저장된다 — 억제 과잉 방지). 실측 내역: Swift Testing 302 + XCTest 2. 변이 테스트로 억제 제거 시 `drawingVersion → 2` · `metadata → nil` 실패 확인 |
 | 28 | 308 | R24 회귀 4 (`ChapterLayoutReloadTesting`: 같은 장 유지 · 다른 장 폐기 · 절 목록 변경 시 폐기 · 실측 높이 유지). Swift Testing 306 + XCTest 2 |
 | 30 | 310 | 단일 Canvas 기본 전환 회귀 2 (토글 미조작 사용자가 기본값을 본다 · 명시적 off 가 유지된다). Swift Testing 308 + XCTest 2 |
-| **31** | **312** | **현재 실측 기준선** — R26 회귀 2 (같은 장은 컬럼을 놓지 않는다 · 장이 바뀌면 놓는다). Swift Testing 310 + XCTest 2 |
+| 31 | 312 | 당시 기준선 — R26 회귀 2 (같은 장은 컬럼을 놓지 않는다 · 장이 바뀌면 놓는다). Swift Testing 310 + XCTest 2 |
+| **35** | **1069** | **현재 실측 기준선** (2026-09-28 develop 머지 뒤) — 전체 1079 · 통과 1069 · 실패 0 · 건너뜀 6(`CarveAppUITests`) · expected failure 4. rev.31 이후 병합된 작업의 시험이 이 표에 빠져 있던 것을 바로잡는다. 같은 빌드로 iPadOS 18.6 1069 · 17.5 1068. 이후 갱신은 [AGENTS.md](../AGENTS.md) 「공통 명령어」와 이 표에 함께 적는다 |
 
 통과한 실행에서도 PencilKit 필기인식 권한 `com.apple.corehandwriting -1003`와 CoreData persistent history 정리 로그가 관찰됐습니다. 모든 `error:`를 노이즈로 취급하지 말고, 명령 종료 코드·실행 테스트 수·실패 내용을 함께 확인합니다. rev.16 클린 빌드에서 `UIComponentsTest` 의 테스트 타깃 의존성 누락을 고쳤습니다.
 
