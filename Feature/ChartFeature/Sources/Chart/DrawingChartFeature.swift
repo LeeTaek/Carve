@@ -52,6 +52,8 @@ public struct DrawingChartFeature {
     }
     
     @Dependency(\.drawingData) var drawingData
+    /// 조회 범위의 기준이 되는 오늘을 읽는다.
+    @Dependency(\.date) var date
     
     public enum Action: ViewAction, BindableAction {
         case binding(BindingAction<State>)
@@ -156,9 +158,10 @@ extension DrawingChartFeature {
         return .none
     }
     
+    /// 오늘(`date.now`)부터 30일치 기록과 최근 필사 항목을 불러온다.
     private func handleFetchData() -> Effect<Action> {
         let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
+        let today = calendar.startOfDay(for: date.now)
         let start = calendar.date(byAdding: .day, value: -29, to: today)!
         let end = calendar.date(byAdding: .day, value: 1, to: today)!
         let range = DateInterval(start: start, end: end)

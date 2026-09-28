@@ -28,9 +28,9 @@ struct DrawingChartFeatureTesting {
     @Test("빈 상태에서 필사로 돌아가기를 누르면 부모에게 알린다")
     @MainActor
     func backToWritingSendsDelegate() async {
-        let store = TestStore(initialState: DrawingChartFeature.State()) {
+        let store = TestStore(initialState: fixedState()) {
             DrawingChartFeature()
-        } withDependencies: { liveTimeDependencies(&$0) }
+        } withDependencies: { fixedTimeDependencies(&$0) }
 
         await store.send(.view(.backToWriting))
         await store.receive(\.delegate)
@@ -40,23 +40,23 @@ struct DrawingChartFeatureTesting {
     @MainActor
     func setFetchedDailyDataSelectsLatestDayAndSyncsChildren() async {
         // Given
-        let records = chartRecords(from: chartDay(-29), counts: Array(repeating: 0, count: 29) + [3])
+        let records = chartRecords(from: fixedChartDay(-29), counts: Array(repeating: 0, count: 29) + [3])
         let chapter = BibleChapter(title: .john, chapter: 3)
-        let counts: [Date: [BibleChapter: Int]] = [chartDay(0): [chapter: 3]]
-        let store = TestStore(initialState: DrawingChartFeature.State()) {
+        let counts: [Date: [BibleChapter: Int]] = [fixedChartDay(0): [chapter: 3]]
+        let store = TestStore(initialState: fixedState()) {
             DrawingChartFeature()
-        } withDependencies: { liveTimeDependencies(&$0) }
+        } withDependencies: { fixedTimeDependencies(&$0) }
 
         // When / Then: 스크롤은 마지막 날 6일 전, 선택은 마지막 날
         await store.send(.setFetchedDailyData(dailyRecords: records, chapterCountsByDay: counts)) {
             $0.chapterCountsByDay = counts
-            $0.earliestFetchedDate = chartDay(-29)
+            $0.earliestFetchedDate = fixedChartDay(-29)
             $0.selectedRecord = records.last
             $0.dailyRecordChart.records = records
-            $0.dailyRecordChart.scrollPosition = chartDay(-6)
-            $0.dailyRecordChart.selectedDate = chartDay(0)
+            $0.dailyRecordChart.scrollPosition = fixedChartDay(-6)
+            $0.dailyRecordChart.selectedDate = fixedChartDay(0)
             $0.drawingWeeklySummary.dailyRecords = records
-            $0.drawingWeeklySummary.scrollPosition = chartDay(-6)
+            $0.drawingWeeklySummary.scrollPosition = fixedChartDay(-6)
             $0.drawingWeeklySummary.chapterCountsByDay = counts
         }
         #expect(store.state.drawingWeeklySummary.weekTotalCount == 3)
@@ -67,15 +67,15 @@ struct DrawingChartFeatureTesting {
     @MainActor
     func setFetchedEmptyDailyDataClearsSelection() async {
         // Given: 이전에 선택한 날이 있다
-        var state = DrawingChartFeature.State()
-        let previous = DailyRecord(date: chartDay(-1), count: 2)
+        var state = fixedState()
+        let previous = DailyRecord(date: fixedChartDay(-1), count: 2)
         state.dailyRecordChart.records = [previous]
         state.dailyRecordChart.selectedDate = previous.date
         state.selectedRecord = previous
         state.drawingWeeklySummary.dailyRecords = [previous]
         let store = TestStore(initialState: state) {
             DrawingChartFeature()
-        } withDependencies: { liveTimeDependencies(&$0) }
+        } withDependencies: { fixedTimeDependencies(&$0) }
 
         // When / Then
         await store.send(.setFetchedDailyData(dailyRecords: [], chapterCountsByDay: [:])) {
@@ -96,9 +96,9 @@ struct DrawingChartFeatureTesting {
                 updatedAt: Date(timeIntervalSince1970: 3_600)
             )
         ]
-        let store = TestStore(initialState: DrawingChartFeature.State()) {
+        let store = TestStore(initialState: fixedState()) {
             DrawingChartFeature()
-        } withDependencies: { liveTimeDependencies(&$0) }
+        } withDependencies: { fixedTimeDependencies(&$0) }
 
         await store.send(.setRecentItems(recentVerses: verses, recentChapters: [chapter])) {
             $0.drawingWeeklySummary.recentVerses = verses
@@ -110,16 +110,16 @@ struct DrawingChartFeatureTesting {
     @MainActor
     func tapSymbolSelectsMatchingRecord() async {
         // Given
-        let records = chartRecords(from: chartDay(-6), counts: [1, 2, 3, 4, 5, 6, 7])
-        var state = DrawingChartFeature.State()
+        let records = chartRecords(from: fixedChartDay(-6), counts: [1, 2, 3, 4, 5, 6, 7])
+        var state = fixedState()
         state.dailyRecordChart.records = records
         let store = TestStore(initialState: state) {
             DrawingChartFeature()
-        } withDependencies: { liveTimeDependencies(&$0) }
+        } withDependencies: { fixedTimeDependencies(&$0) }
 
         // When / Then
-        await store.send(.view(.tapSymbol(chartDay(-4)))) {
-            $0.dailyRecordChart.selectedDate = chartDay(-4)
+        await store.send(.view(.tapSymbol(fixedChartDay(-4)))) {
+            $0.dailyRecordChart.selectedDate = fixedChartDay(-4)
             $0.selectedRecord = records[2]
         }
     }
@@ -127,17 +127,17 @@ struct DrawingChartFeatureTesting {
     @Test("기록에 없는 날을 누르면 날짜만 선택하고 보여 줄 기록은 없다")
     @MainActor
     func tapSymbolOnMissingDayClearsRecord() async {
-        var state = DrawingChartFeature.State()
-        let existing = DailyRecord(date: chartDay(-1), count: 2)
+        var state = fixedState()
+        let existing = DailyRecord(date: fixedChartDay(-1), count: 2)
         state.dailyRecordChart.records = [existing]
         state.dailyRecordChart.selectedDate = existing.date
         state.selectedRecord = existing
         let store = TestStore(initialState: state) {
             DrawingChartFeature()
-        } withDependencies: { liveTimeDependencies(&$0) }
+        } withDependencies: { fixedTimeDependencies(&$0) }
 
-        await store.send(.view(.tapSymbol(chartDay(-3)))) {
-            $0.dailyRecordChart.selectedDate = chartDay(-3)
+        await store.send(.view(.tapSymbol(fixedChartDay(-3)))) {
+            $0.dailyRecordChart.selectedDate = fixedChartDay(-3)
             $0.selectedRecord = nil
         }
     }
@@ -146,16 +146,16 @@ struct DrawingChartFeatureTesting {
     @MainActor
     func childSelectedDateChangeUpdatesSelectedRecord() async {
         // Given
-        let records = chartRecords(from: chartDay(-6), counts: [1, 2, 3, 4, 5, 6, 7])
-        var state = DrawingChartFeature.State()
+        let records = chartRecords(from: fixedChartDay(-6), counts: [1, 2, 3, 4, 5, 6, 7])
+        var state = fixedState()
         state.dailyRecordChart.records = records
         let store = TestStore(initialState: state) {
             DrawingChartFeature()
-        } withDependencies: { liveTimeDependencies(&$0) }
+        } withDependencies: { fixedTimeDependencies(&$0) }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
         // When: 하위 차트가 바인딩으로 날짜를 고른다
-        await store.send(.dailyRecordChart(.binding(.set(\.selectedDate, chartDay(-1)))))
+        await store.send(.dailyRecordChart(.binding(.set(\.selectedDate, fixedChartDay(-1)))))
 
         // Then
         #expect(store.state.selectedRecord == records[5])
@@ -170,25 +170,25 @@ struct DrawingChartFeatureTesting {
     @Test("차트 하위 기능의 스크롤 위치가 바뀌면 주간 요약도 같은 주를 본다")
     @MainActor
     func childScrollPositionChangeSyncsWeeklySummary() async {
-        let store = TestStore(initialState: DrawingChartFeature.State()) {
+        let store = TestStore(initialState: fixedState()) {
             DrawingChartFeature()
-        } withDependencies: { liveTimeDependencies(&$0) }
+        } withDependencies: { fixedTimeDependencies(&$0) }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
-        await store.send(.dailyRecordChart(.binding(.set(\.scrollPosition, chartDay(-13)))))
+        await store.send(.dailyRecordChart(.binding(.set(\.scrollPosition, fixedChartDay(-13)))))
 
-        #expect(store.state.dailyRecordChart.scrollPosition == chartDay(-13))
-        #expect(store.state.drawingWeeklySummary.scrollPosition == chartDay(-13))
+        #expect(store.state.dailyRecordChart.scrollPosition == fixedChartDay(-13))
+        #expect(store.state.drawingWeeklySummary.scrollPosition == fixedChartDay(-13))
     }
 
     @Test("추가 로드가 끝나면 추가 중 표시를 내린다")
     @MainActor
     func endAppendingClearsFlag() async {
-        var state = DrawingChartFeature.State()
+        var state = fixedState()
         state.isAppendingPastData = true
         let store = TestStore(initialState: state) {
             DrawingChartFeature()
-        } withDependencies: { liveTimeDependencies(&$0) }
+        } withDependencies: { fixedTimeDependencies(&$0) }
 
         await store.send(.endAppending) {
             $0.isAppendingPastData = false
@@ -199,11 +199,11 @@ struct DrawingChartFeatureTesting {
     @MainActor
     func loadMoreBeforeAtLowerBoundEndsImmediately() async {
         // Given: 가장 이른 날이 하한과 같다
-        var state = DrawingChartFeature.State()
+        var state = fixedState()
         state.earliestFetchedDate = state.lowerBoundDate
         let store = TestStore(initialState: state) {
             DrawingChartFeature()
-        } withDependencies: { liveTimeDependencies(&$0) }
+        } withDependencies: { fixedTimeDependencies(&$0) }
 
         // When / Then: 잠깐 추가 중으로 바뀌었다가 endAppending 으로 내려온다
         await store.send(.view(.loadMoreBefore(state.lowerBoundDate))) {
@@ -212,5 +212,16 @@ struct DrawingChartFeatureTesting {
         await store.receive(\.endAppending) {
             $0.isAppendingPastData = false
         }
+    }
+
+    /// State 의 오늘 기준 날짜 필드를 고정 시각 기준으로 채운다(State 기본값은 실제 오늘을 쓴다).
+    private func fixedState() -> DrawingChartFeature.State {
+        var state = DrawingChartFeature.State()
+        state.lowerBoundDate = fixedChartDay(-30)
+        state.earliestFetchedDate = fixedChartDay(0)
+        state.dailyRecordChart.lowerBoundDate = fixedChartDay(-30)
+        state.dailyRecordChart.scrollPosition = fixedChartDay(0)
+        state.drawingWeeklySummary.scrollPosition = fixedChartDay(0)
+        return state
     }
 }
