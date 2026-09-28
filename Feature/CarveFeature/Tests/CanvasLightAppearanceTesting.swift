@@ -8,6 +8,7 @@
 import Domain
 import Foundation
 import PencilKit
+import SwiftData
 import SwiftUI
 import Testing
 import UIKit
@@ -149,6 +150,10 @@ struct CanvasLightAppearanceTesting {
 
     @Test("다크 화면에서도 절 캔버스(N-Canvas)는 라이트이고 검정 잉크를 검정으로 그린다", arguments: DarkSource.allCases)
     func verseCanvasDrawsStoredInkColorInDark(source: DarkSource) async throws {
+        // iPadOS 17 의 SwiftData 는 활성 컨테이너 없이 모델을 만들면 멈춘다(`failed to find a currently active container for BibleDrawing`).
+        // 18 이상은 통과해 모르고 지나갔다(2026-09-28 17.5 전체 회귀). 인메모리 컨테이너를 먼저 만들고 시험이 끝날 때까지 쥔다.
+        let container = try ModelContainer(for: BibleDrawing.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        defer { withExtendedLifetime(container) {} }
         try await withDependencies {
             $0.undoManager = SharedUndoManager()
         } operation: {
