@@ -28,6 +28,10 @@ public struct AppCoordinatorFeature {
         public var reconnectError: String?
         /// 인계가 끝난 이전 runtime은 해체 중 도착하는 화면 알림을 더 처리하지 않는다.
         var isReleasedForReconnect = false
+        /// 보류 중 로그인과 저장소 소유가 확인됐다 — 로딩 없이 재실행을 안내한다(2026-09-28 결정).
+        public var showsRelaunchGuidance = false
+        /// 이번 실행에서 재실행 안내를 이미 띄웠다. 닫은 뒤 다시 띄우지 않는다 — 설정의 iCloud 화면은 계속 같은 안내를 보인다.
+        var didShowRelaunchGuidance = false
         /// 현재 루트 화면 (트리기반)
         @Presents public var root: Root.State? = .launchProgress(.initialState)
         /// 업데이트 패치노트 표시 상태
@@ -69,7 +73,10 @@ public struct AppCoordinatorFeature {
     }
     @Dependency(\.analyticsClient) private var analyticsClient
     @Dependency(\.legacySeparationHoldState) private var holdState
+    @Dependency(\.drawingEditEnvironment) private var editEnvironment
     @Dependency(\.uuid) private var uuid
+
+    private enum CancelID { case relaunchGuidance }
     
     public enum Action {
         case root(PresentationAction<Root.Action>)
@@ -79,8 +86,13 @@ public struct AppCoordinatorFeature {
         case path(StackActionOf<Path>)
         /// 위젯 등 외부에서 앱을 열었다.
         case openedURL(URL)
-        /// 로그인 후 또는 설정에서 연결 보류를 다시 확인한다.
+        /// 실행 중에 보류 runtime 을 교체하도록 준비한다. **2.0.0 은 보내지 않는다** — 옛 컨테이너가 해제되지 않아
+        /// local-only 로 되돌아갔다(2026-09-28 iPadOS 18.6 실측). 연결은 재실행으로 하고, 이 경로는 이후 버전을 위해 남긴다.
         case retryConnection
+        /// 보류 중 편집 환경을 다시 읽었다 — 재실행하면 연결되는지 본다.
+        case connectionEnvironmentChanged(DrawingEditEnvironment)
+        /// 재실행 안내를 닫았다.
+        case relaunchGuidanceDismissed
         /// 사용자가 연결 준비를 취소한다. 원래 로컬 runtime은 유지한다.
         case cancelReconnect
         /// 인계 완료 후 하위 화면과 효과를 해제한다.
@@ -113,6 +125,17 @@ public struct AppCoordinatorFeature {
         return BibleVerse(title: BibleChapter(title: title, chapter: link.chapter), verse: link.verse, sentence: "")
     }
 
+    /// 보류 중 편집 환경이 바뀔 때마다(로그인 · 앱 활성화) 다시 읽는다. 재실행하면 연결되면 안내하고 구독을 멈춘다.
+    private func observeRelaunchGuidance() -> Effect<Action> {
+        .run { [editEnvironment] send in
+            await send(.connectionEnvironmentChanged(await editEnvironment.current()))
+            for await _ in editEnvironment.changes() {
+                await send(.connectionEnvironmentChanged(await editEnvironment.current()))
+            }
+        }
+        .cancellable(id: CancelID.relaunchGuidance, cancelInFlight: true)
+    }
+
     public var body: some Reducer<State, Action> {
         Reduce { state, action in
             guard !state.isReleasedForReconnect else { return .none }
@@ -129,8 +152,7 @@ public struct AppCoordinatorFeature {
             case .reconnectReleaseFailed:
                 state.reconnectError = "필기는 보존했지만 연결 준비를 마치지 못했어요. 잠시 후 다시 시도해 주세요."
                 return .none
-            case .retryConnection,
-                 .settings(.presented(.path(.presented(.iCloud(.view(.retryConnection)))))):
+            case .retryConnection:
                 guard holdState.isHeld, state.reconnectRequestID == nil,
                       case .carve = state.root else { return .none }
                 let requestID = uuid()
@@ -186,12 +208,24 @@ public struct AppCoordinatorFeature {
                 if let previousVersion, previousVersion != currentVersion {
                     state.patchnote = .initialState
                 }
+                // 보류 중이면 로그인 · 소유가 확인되는지 지켜보다가 재실행을 안내한다. 연결을 기다리는 로딩은 띄우지 않는다.
+                let guidance: Effect<Action> = holdState.isHeld ? observeRelaunchGuidance() : .none
                 // 위젯을 눌러 시작했다면 필사 화면이 준비된 지금 그 절로 간다.
                 if let verse = state.pendingWidgetVerse {
                     state.pendingWidgetVerse = nil
-                    return .send(.root(.presented(.carve(.moveToVerse(verse)))))
+                    return .merge(guidance, .send(.root(.presented(.carve(.moveToVerse(verse))))))
                 }
-                
+                return guidance
+
+            case .connectionEnvironmentChanged(let environment):
+                guard !state.didShowRelaunchGuidance, environment.connectsOnRelaunch else { break }
+                state.didShowRelaunchGuidance = true
+                state.showsRelaunchGuidance = true
+                return .cancel(id: CancelID.relaunchGuidance)
+
+            case .relaunchGuidanceDismissed:
+                state.showsRelaunchGuidance = false
+
             case .openedURL(let url):
                 guard let verse = Self.verse(from: url) else { break }
                 // 위젯에서 들어왔다 — 설정 · 다른 화면을 닫고 그 절을 연다.

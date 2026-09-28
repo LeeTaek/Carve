@@ -38,7 +38,8 @@ final class CarveDeviceSmokeUITests: XCTestCase {
     }
 
     /// 무계정 전용 iPad simulator에서 명시적으로 실행한다. 기존 실제 필기/계정 시험 기기에 실행하지 않는다.
-    func testHeldStoreReconnectWithoutRelaunch() throws {
+    /// 2.0.0 은 실행 중에 다시 연결하지 않는다(2026-09-28 결정) — 보류 안내가 앱을 다시 열라고 말하고, 「다시 시도」 와 연결 대기 표시가 없다.
+    func testHeldStoreGuidesRelaunchWithoutRetry() throws {
         #if !targetEnvironment(simulator)
         throw XCTSkip("무계정 시험 simulator 전용")
         #endif
@@ -53,22 +54,19 @@ final class CarveDeviceSmokeUITests: XCTestCase {
             app.buttons["건너뛰기"].tap()
         }
         XCTAssertTrue(app.buttons["성경 탐색 열기"].waitForExistence(timeout: 45))
+        // 로그인하지 않았다 — 재실행 안내(로그인 · 소유 확인 뒤에만 뜬다)는 없어야 한다.
+        XCTAssertFalse(app.otherElements["relaunchGuidance"].exists)
         app.buttons["성경 탐색 열기"].tap()
         XCTAssertTrue(app.buttons["앱 설정"].waitForExistence(timeout: 10))
         app.buttons["앱 설정"].tap()
-        let retry = app.buttons["cloudSettings.retryConnection"]
-        XCTAssertTrue(retry.waitForExistence(timeout: 10), "무계정 보류와 재시도 버튼이 없다")
-        retry.tap()
-        // runtime이 재생성되면 설정은 닫히고 본문이 새로 열린다. 앱 launch는 한 번만 수행한다.
-        let readerReady = NSPredicate(format: "exists == true AND hittable == true")
-        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: readerReady, object: app.buttons["성경 탐색 열기"])], timeout: 30), .completed,
-                       "기존 저장소 해제 후 본문으로 복귀하지 못했다")
-        XCTAssertFalse(app.staticTexts["필기는 보존했지만 저장소 연결 준비를 마치지 못했어요"].exists)
-        app.buttons["성경 탐색 열기"].tap()
-        XCTAssertTrue(app.buttons["앱 설정"].waitForExistence(timeout: 10))
-        app.buttons["앱 설정"].tap()
-        XCTAssertTrue(retry.waitForExistence(timeout: 10), "무계정이므로 재연결 뒤에도 안전한 보류 상태여야 한다")
-        attach(app, "held-store-reconnect-without-relaunch")
+
+        XCTAssertTrue(app.staticTexts["cloudSettings.connectionHeld"].waitForExistence(timeout: 10), "무계정 보류 안내가 없다")
+        let detail = app.staticTexts["cloudSettings.connectionHeldDetail"]
+        XCTAssertTrue(detail.exists)
+        XCTAssertTrue(detail.label.contains("iCloud에 로그인한 뒤 앱을 완전히 종료하고 다시 열면"), "재실행 안내가 없다: \(detail.label)")
+        XCTAssertFalse(app.buttons["cloudSettings.retryConnection"].exists, "실행 중 재연결 버튼이 남아 있다")
+        XCTAssertFalse(app.buttons["다시 시도"].exists)
+        attach(app, "held-store-guides-relaunch")
     }
 
     /// 접근성 트리를 남긴다 — D9-5(롱프레스 → 메뉴)·D9-7(탭·fling)을 쓰려면 요소 구조를 알아야 한다.

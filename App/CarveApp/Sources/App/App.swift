@@ -118,20 +118,8 @@ private struct AppStartupView: View {
                     .task { await startIfNeeded() }
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
-            Task { await retryAfterLoginIfNeeded() }
-        }
-    }
-
-    /// 보류한 실행이 로그인 뒤 활성화되면 필기 인계를 거쳐 다시 연결한다. 계정 조회만으로 소유를 인정하지 않는다.
-    @MainActor
-    private func retryAfterLoginIfNeeded() async {
-        guard let current = runtime, current.isConnectionHeld,
-              current.store.reconnectRequestID == nil else { return }
-        let identity = CloudKitAccountIdentityClient(containerID: containerID.id)
-        guard case .identified = await identity.currentIdentity(),
-              runtime?.store === current.store else { return }
-        current.store.send(.retryConnection)
+        // 2.0.0 은 보류한 실행이 로그인 뒤 활성화돼도 저장소를 다시 연결하지 않는다. 실행 중 교체는 옛 컨테이너가 해제되지 않아
+        // local-only 로 되돌아갔다(2026-09-28 iPadOS 18.6 실측). 소유가 확인되면 코디네이터가 재실행을 안내하고, 다음 실행의 시작 판정이 연결한다.
     }
 
     /// 완료 ACK 이후 하위 효과를 취소하고 runtime을 놓는다. 새 컨테이너 생성은 해제 확인 이후에만 한다.
@@ -276,9 +264,21 @@ private struct AppStartupView: View {
         drawingEditEnvironment: any DrawingEditEnvironmentClient,
         localPreservation: LocalPreservationWriter
     ) -> StoreOf<AppCoordinatorFeature> {
-        withDependencies {
+        // actor 와 그것을 쥔 저장소의 기본값(`static` liveValue)은 처음 읽은 runtime 의 컨테이너로 한 번 만들어져 전역에 남는다.
+        // runtime 마다 새로 만들어야 이 값들이 옛 컨테이너를 붙잡지 않고, 새 runtime 이 옛 컨테이너에 쓰지 않는다(2026-09-28 iPadOS 18.6 실측).
+        // 다른 보유 경로가 남아 있어 이것만으로 재연결 해제가 끝나지는 않는다 — 호환성 시험 계획 09-28 절.
+        let database = SwiftDatabaseActor(modelContainer: modelContainer)
+        return withDependencies {
             $0.containerId = containerID
             $0.modelContainer = modelContainer
+            $0.createSwiftDataActor = database
+            $0.drawingRepository = SwiftDataDrawingRepository(actor: database)
+            $0.favoriteVerseRepository = SwiftDataFavoriteVerseRepository(actor: database)
+            // `@Dependency` 를 저장한 기본값도 처음 읽힌 runtime 문맥을 전역 캐시에 남긴다. 여기서(runtime 밖 문맥) 만들어 넘긴다.
+            $0.drawingData = DrawingDatabase()
+            $0.cloudSyncActivity = LiveCloudSyncActivityClient()
+            $0.cloudImportArrivals = LiveCloudImportArrivalClient()
+            $0.cloudAccountStatus = CloudKitAccountStatusClient()
             $0.clouodKitSyncManager = syncManager
             $0.legacySeparationHoldState = holdState
             $0.nativeAdClient = nativeAdClient

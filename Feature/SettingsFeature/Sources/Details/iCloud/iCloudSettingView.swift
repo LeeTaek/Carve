@@ -32,8 +32,11 @@ public struct CloudSettingView: View {
         switch store.availability {
         case .checking:
             AccountStatusCopy(title: "iCloud 상태를 확인하는 중이에요", detail: "")
+        case .available where store.connectionHold != nil:
+            // 로그인과 연결을 섞지 않는다 — 이번 실행은 보류라 아직 주고받지 않는다(아래 보류 안내가 까닭과 할 일을 말한다).
+            AccountStatusCopy(title: "iCloud에 로그인돼 있어요", detail: "아직 이 기기의 필사는 iCloud와 연결되지 않았어요.")
         case .available:
-            AccountStatusCopy(title: "iCloud 계정에 연결돼 있어요", detail: "필사가 같은 계정의 다른 기기로 전해져요.")
+            AccountStatusCopy(title: "iCloud에 연결돼 있어요", detail: "필사가 같은 계정의 다른 기기로 전해져요.")
         case .noAccount:
             AccountStatusCopy(title: "iCloud에 로그인돼 있지 않아요", detail: "지금은 이 기기에만 저장돼요.")
         case .restricted:
@@ -87,9 +90,12 @@ public struct CloudSettingView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// 연결 보류 한 줄 — 지금은 이 기기에만 저장된다는 것 · 까닭 · 다시 시도.
+    /// 연결 보류 한 줄 — 지금은 이 기기에만 저장된다는 것 · 까닭 · 앱을 다시 열어야 한다는 것.
+    /// 실행 중에 다시 연결하지 않으므로 「다시 시도」 · 로딩 표시를 두지 않는다(2026-09-28 결정).
     private func holdRow(_ hold: LegacySeparationHold) -> some View {
-        let copy = CloudSettingsFeature.holdCopy(hold)
+        let copy = CloudSettingsFeature.holdCopy(
+            hold, availability: store.availability, connectsOnRelaunch: store.connectsOnRelaunch
+        )
         return VStack(alignment: .leading, spacing: CarveSpacing.xSmall) {
             Text(copy.title)
                 .font(CarveTypography.body)
@@ -97,9 +103,8 @@ public struct CloudSettingView: View {
                 .accessibilityIdentifier("cloudSettings.connectionHeld")
             Text(copy.detail)
                 .font(CarveTypography.caption)
-                .foregroundStyle(CarveColor.secondary)
-            Button("다시 시도") { store.send(.view(.retryConnection)) }
-                .accessibilityIdentifier("cloudSettings.retryConnection")
+                .foregroundStyle(store.connectsOnRelaunch ? CarveColor.ink : CarveColor.secondary)
+                .accessibilityIdentifier("cloudSettings.connectionHeldDetail")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -133,7 +138,7 @@ public struct CloudSettingView: View {
                     // 조작할 수 없는 토글을 켜 둔 채로 보여 주지 않는다. 지금 확인된 계정 상태를 그대로 적는다.
                     accountStatusRow
 
-                    // C14 연결 보류 — 계정이 있어도 이 실행은 이 기기에만 저장한다(정책 §12-6 C14 ③). 까닭과 다시 시도를 적는다.
+                    // C14 연결 보류 — 계정이 있어도 이 실행은 이 기기에만 저장한다(정책 §12-6 C14 ③). 까닭과 재실행 안내를 적는다.
                     if let hold = store.connectionHold {
                         holdRow(hold)
                     } else if store.availability.canSync {

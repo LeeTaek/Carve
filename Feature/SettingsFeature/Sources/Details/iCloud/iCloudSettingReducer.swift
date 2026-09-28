@@ -29,14 +29,18 @@ public struct CloudSettingsFeature {
         public var isLoading: Bool = false
         /// 이번 실행의 C14 연결 보류(정책 §12-6 C14 ③). 화면이 뜰 때 읽는다. 있으면 전체 삭제를 막는다(D6).
         public var connectionHold: LegacySeparationHold?
+        /// 보류 중이지만 지금 계정으로 저장소 소유가 확인됐다 — 앱을 다시 열면 연결된다(`DrawingEditEnvironment.connectsOnRelaunch`).
+        /// 로그인만 확인된 상태와 구분해, 재실행 안내를 이때만 「연결을 완료하려면」 으로 쓴다.
+        public var connectsOnRelaunch = false
     }
     @Dependency(\.createSwiftDataActor) private var database
     @Dependency(\.cloudAccountStatus) private var accountStatus
     @Dependency(\.cloudSyncActivity) private var syncActivity
     @Dependency(\.legacySeparationHoldState) private var holdState
+    @Dependency(\.drawingEditEnvironment) private var editEnvironment
 
-    /// 화면이 떠 있는 동안만 활동을 구독한다.
-    private enum CancelID { case activity }
+    /// 화면이 떠 있는 동안만 활동 · 편집 환경을 구독한다.
+    private enum CancelID { case activity, connection }
     @Dependency(\.widgetVerseClient) private var widgetVerseClient
     @Dependency(\.drawingDataEraser) private var drawingDataEraser
     /// 전체 삭제가 함께 지우는 **남은 필기**(보존 영역)를 세기 위해 읽는다.
@@ -46,6 +50,8 @@ public struct CloudSettingsFeature {
         case path(PresentationAction<Path.Action>)
         /// 계정 조회 결과가 도착했다.
         case accountChecked(CloudAccountAvailability)
+        /// 편집 환경(계정 · 저장소 소유 · 보류)을 다시 읽었다.
+        case connectionChecked(DrawingEditEnvironment)
         /// 동기화 활동이 바뀌었다.
         case activityChanged(CloudSyncActivity)
         case removeAlliCloudData
@@ -66,8 +72,6 @@ public struct CloudSettingsFeature {
         case view(View)
         
         public enum View {
-            /// 저장을 마친 뒤 iCloud 연결을 다시 준비한다. 루트 코디네이터가 처리한다.
-            case retryConnection
             case databaseIsEmpty
             /// 화면이 나타났다. 계정 상태를 **그때 조회한다** — 미리 켜 두지 않는다.
             case onAppear
@@ -90,14 +94,15 @@ public struct CloudSettingsFeature {
                             await send(.activityChanged(activity))
                         }
                     }
-                    .cancellable(id: CancelID.activity, cancelInFlight: true)
+                    .cancellable(id: CancelID.activity, cancelInFlight: true),
+                    observeHeldConnection()
                 )
-            case .view(.retryConnection):
-                return .none
             case .view(.onDisappear):
-                return .cancel(id: CancelID.activity)
+                return .merge(.cancel(id: CancelID.activity), .cancel(id: CancelID.connection))
             case .accountChecked(let availability):
                 state.availability = availability
+            case .connectionChecked(let environment):
+                state.connectsOnRelaunch = environment.connectsOnRelaunch
             case .activityChanged(let activity):
                 state.activity = activity
             case .view(.databaseIsEmpty):
@@ -217,21 +222,52 @@ public struct CloudSettingsFeature {
         }
         .ifLet(\.$path, action: \.path)
     }
+
+    /// 보류 중일 때만 — 앱 밖에서 로그인하고 돌아와도 이 화면이 로그인과 연결을 따로 말하도록 계정 변화마다 다시 읽는다.
+    /// 보류가 없으면 이미 연결된 실행이라 재실행을 판정할 것이 없다.
+    private func observeHeldConnection() -> Effect<Action> {
+        guard holdState.isHeld else { return .none }
+        return .run { [editEnvironment, accountStatus] send in
+            await send(.connectionChecked(await editEnvironment.current()))
+            for await _ in editEnvironment.changes() {
+                await send(.connectionChecked(await editEnvironment.current()))
+                await send(.accountChecked(await accountStatus.availability()))
+            }
+        }
+        .cancellable(id: CancelID.connection, cancelInFlight: true)
+    }
 }
 
 extension CloudSettingsFeature {
     /// 연결 보류 중의 전체 삭제 거절 문구(정책 §12-6 C14 ③, 사용자 결정 2026-09-21).
     static let eraseHeldBody = "지금은 iCloud 연결이 보류되어 전체 삭제를 할 수 없어요.\n연결 문제를 해결한 뒤 다시 시도해 주세요."
 
-    /// 설정 화면의 보류 안내 — 지금은 이 기기에만 저장된다는 것 · 까닭 · 다시 시도(다음 실행이 자동으로 다시 판정한다).
-    static func holdCopy(_ hold: LegacySeparationHold) -> (title: String, detail: String) {
+    /// 2.0.0 은 실행 중에 연결을 바꾸지 않는다 — 로그인과 소유가 확인되면 이 문장으로 재실행을 안내한다(2026-09-28 결정).
+    public static let relaunchToConnect = "연결을 완료하려면 앱을 완전히 종료한 뒤 다시 열어 주세요."
+
+    /// 설정 화면의 보류 안내 — 지금은 이 기기에만 저장된다는 것 · 까닭 · 다음 실행에서 다시 판정한다는 것.
+    ///
+    /// 앱을 다시 열어야 연결 여부를 다시 판정한다. **재실행하면 연결된다고 말하는 것은 소유가 확인됐을 때뿐**이다 —
+    /// 다른 계정이면 다시 열어도 보류된다.
+    static func holdCopy(
+        _ hold: LegacySeparationHold,
+        availability: CloudAccountAvailability,
+        connectsOnRelaunch: Bool
+    ) -> (title: String, detail: String) {
+        let title = "지금은 iCloud 연결이 보류돼 이 기기에만 저장돼요"
+        if connectsOnRelaunch {
+            return (title, "iCloud 로그인과 이 기기 필사의 계정이 확인됐어요. " + relaunchToConnect)
+        }
         let reason: String = switch hold.reason {
         case .ownershipUnverified: "이 기기의 옛 필사가 현재 계정에 속하는지 확인하지 못했어요."
         case .linkageUnknown: "이 기기의 옛 필사가 어느 계정의 것인지 확인하지 못했어요."
         case .unlinkedRowsAwaitSeparation(let count): "이 기기에 계정과 연결되지 않은 옛 필사 \(count)개가 있어요. 사본은 이 기기에 보관했어요."
         case .preservationFailed: "옛 필사의 사본을 남기지 못했어요."
         }
-        return ("지금은 iCloud 연결이 보류돼 이 기기에만 저장돼요", reason + " 다시 시도하면 필기를 보존한 뒤 계정과 저장소를 다시 확인해요.")
+        let next = availability == .noAccount
+            ? " iCloud에 로그인한 뒤 앱을 완전히 종료하고 다시 열면 계정과 저장소를 다시 확인해요."
+            : " 앱을 완전히 종료한 뒤 다시 열면 계정과 저장소를 다시 확인해요."
+        return (title, reason + next)
     }
 
     /// 전체 삭제가 함께 지우는 **이 기기의 초안 파일 수** — 모든 묶음(다른 계정 · 계정 미확인 · 로그인하지 않은 동안)의 초안과 읽지 못해 옆으로

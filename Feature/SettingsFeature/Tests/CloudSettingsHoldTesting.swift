@@ -91,13 +91,55 @@ struct CloudSettingsHoldTesting {
         }
     }
 
-    @Test("보류 안내는 지금은 이 기기에만 저장된다는 것 · 까닭 · 다시 시도를 말한다")
+    /// 2.0.0 은 실행 중에 다시 연결하지 않는다(2026-09-28 결정) — 「다시 시도」 대신 앱을 다시 열어야 한다고 말한다.
+    @Test("보류 안내는 지금은 이 기기에만 저장된다는 것 · 까닭 · 앱을 다시 열어야 한다는 것을 말한다")
     func holdCopyExplains() {
-        let unlinked = CloudSettingsFeature.holdCopy(hold)
+        let unlinked = CloudSettingsFeature.holdCopy(hold, availability: .available, connectsOnRelaunch: false)
         #expect(unlinked.title.contains("이 기기에만 저장돼요"))
-        #expect(unlinked.detail.contains("옛 필사 2개") && unlinked.detail.contains("다시 시도하면 필기를 보존한 뒤"))
+        #expect(unlinked.detail.contains("옛 필사 2개") && unlinked.detail.contains("앱을 완전히 종료한 뒤 다시 열면"))
+        #expect(!unlinked.detail.contains("다시 시도"))
+        // 소유를 확인하지 못했다 — 다시 열어도 다른 계정이면 보류된다. 연결을 완료한다고 약속하지 않는다.
+        #expect(!unlinked.detail.contains(CloudSettingsFeature.relaunchToConnect))
 
-        let unknown = CloudSettingsFeature.holdCopy(LegacySeparationHold(reason: .linkageUnknown(.tableMissing("x"))))
+        let unknown = CloudSettingsFeature.holdCopy(
+            LegacySeparationHold(reason: .linkageUnknown(.tableMissing("x"))), availability: .available, connectsOnRelaunch: false
+        )
         #expect(unknown.detail.contains("확인하지 못했어요"))
+
+        let signedOut = CloudSettingsFeature.holdCopy(
+            LegacySeparationHold(reason: .ownershipUnverified), availability: .noAccount, connectsOnRelaunch: false
+        )
+        #expect(signedOut.detail.contains("iCloud에 로그인한 뒤 앱을 완전히 종료하고 다시 열면"))
+    }
+
+    @Test("로그인과 저장소 소유가 확인되면 재실행으로 연결을 완료하라고 안내한다")
+    func holdCopyGuidesRelaunchWhenOwned() {
+        let copy = CloudSettingsFeature.holdCopy(
+            LegacySeparationHold(reason: .ownershipUnverified), availability: .available, connectsOnRelaunch: true
+        )
+        #expect(copy.title.contains("이 기기에만 저장돼요"))
+        #expect(copy.detail.hasSuffix("연결을 완료하려면 앱을 완전히 종료한 뒤 다시 열어 주세요."))
+    }
+
+    @Test("iCloud 화면은 편집 환경을 읽어 재실행하면 연결되는지 표시한다")
+    func screenReadsRelaunchConnection() async {
+        let owner = AccountScope.make(containerID: "iCloud.Carve.SwiftData.iCloud.dev", userRecordName: "_a")
+        let loggedInHeld = DrawingEditEnvironment(
+            accountState: .confirmed(owner), serverWork: AccountServerWorkToken(scope: owner, generation: 1),
+            knowledge: EraseEpochKnowledge(), storeOwnership: owner, connectionHeld: true
+        )
+        let store = TestStore(initialState: .initialState) {
+            CloudSettingsFeature()
+        } withDependencies: {
+            $0.legacySeparationHoldState = LegacySeparationHoldState(hold: LegacySeparationHold(reason: .ownershipUnverified))
+            $0.drawingEditEnvironment = StubDrawingEditEnvironment(loggedInHeld)
+            $0.cloudAccountStatus = StubCloudAccountStatusClient(.available)
+            $0.cloudSyncActivity = StubCloudSyncActivityClient([])
+        }
+        store.exhaustivity = .off
+
+        await store.send(.view(.onAppear))
+        await store.receive(\.connectionChecked) { $0.connectsOnRelaunch = true }
+        await store.send(.view(.onDisappear))
     }
 }

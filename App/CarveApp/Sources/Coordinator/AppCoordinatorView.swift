@@ -89,6 +89,19 @@ public struct AppCoordinatorView: View {
                 }
                 .padding(24)
                 .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+            } else if store.showsRelaunchGuidance {
+                // 로그인 완료와 연결 완료를 구분한다 — 이 실행은 계속 이 기기에만 저장한다. 기다릴 것이 없으므로 로딩을 띄우지 않는다.
+                VStack(spacing: 16) {
+                    Text("iCloud 로그인을 확인했어요")
+                    Text("아직 이 기기의 필사는 iCloud와 연결되지 않았어요.\n\(CloudSettingsFeature.relaunchToConnect)")
+                        .font(.caption)
+                        .multilineTextAlignment(.center)
+                    Button("확인") { store.send(.relaunchGuidanceDismissed) }
+                }
+                .padding(24)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("relaunchGuidance")
             }
         }
 

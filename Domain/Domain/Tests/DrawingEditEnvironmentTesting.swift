@@ -317,4 +317,26 @@ struct DrawingEditEnvironmentTesting {
         #expect(current.accountBasis == .unverified(hint: nil))
         #expect(current.knowledge == nil)
     }
+
+    /// 2.0.0 은 실행 중에 연결을 바꾸지 않는다 — 보류 중 로그인과 저장소 소유가 모두 확인됐을 때만 「앱을 다시 열면 연결된다」 고 말한다(2026-09-28).
+    @Test("재실행 연결 판정 — 보류 중이고 확인된 계정이 저장소 소유와 같을 때만 참이다")
+    func connectsOnRelaunchRequiresHeldConfirmedOwner() {
+        let owner = scope("_a"), other = scope("_b")
+        func environment(
+            _ state: AccountScopeState, owner: AccountScope?, held: Bool = true, injected: Bool = false
+        ) -> DrawingEditEnvironment {
+            DrawingEditEnvironment(
+                accountState: state, serverWork: nil, knowledge: EraseEpochKnowledge(),
+                storeOwnership: owner, ownershipInjected: injected, connectionHeld: held
+            )
+        }
+
+        #expect(environment(.confirmed(owner), owner: owner).connectsOnRelaunch)
+        #expect(!environment(.confirmed(owner), owner: owner, held: false).connectsOnRelaunch, "이미 연결됐다")
+        #expect(!environment(.confirmed(owner), owner: nil).connectsOnRelaunch, "로그인만 확인됐다")
+        #expect(!environment(.confirmed(owner), owner: other).connectsOnRelaunch, "다른 계정의 저장소다")
+        #expect(!environment(.noAccount, owner: nil).connectsOnRelaunch)
+        #expect(!environment(.unconfirmed(lastConfirmed: owner), owner: owner).connectsOnRelaunch)
+        #expect(!environment(.confirmed(owner), owner: owner, injected: true).connectsOnRelaunch, "시험용 주입은 근거가 아니다")
+    }
 }

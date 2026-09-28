@@ -74,6 +74,14 @@ public struct DrawingEditEnvironment: Equatable, Sendable {
         }
     }
 
+    /// 이번 실행은 연결을 보류했지만 지금 계정으로 저장소 소유가 확인됐다 — **앱을 다시 열면 연결된다.**
+    /// 2.0.0 은 실행 중에 저장소 연결을 바꾸지 않는다(2026-09-28 결정 — 실행 중 교체는 옛 컨테이너가 해제되지 않아 끝나지 않았다).
+    /// 로그인만으로는 아니다: 소유 근거가 그 계정이어야 한다. 시험용 주입은 근거가 아니다.
+    public var connectsOnRelaunch: Bool {
+        guard connectionHeld, !ownershipInjected, case .confirmed(let scope) = accountState else { return false }
+        return storeOwnership == scope
+    }
+
     /// 확인 전 · 아무 정보도 없는 환경 — 서버 작업을 하지 않는 쪽이 기본이다. K 도 모른다.
     public static let unknown = DrawingEditEnvironment(
         accountState: .unconfirmed(lastConfirmed: nil),
