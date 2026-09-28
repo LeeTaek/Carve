@@ -290,10 +290,14 @@ enum LocalStoreLoader {
     /// SwiftData가 스키마 불일치를 보고하는 오류는 OS에 따라 다르다.
     /// iOS 27부터 `unknownDataStoreSchema`가 추가됐지만, 폴백 허용 여부는 아래에서
     /// metadata 해시로 정확히 확인한 1.0.x 저장소에만 적용한다.
+    /// 이 case 는 iOS 27 SDK(Xcode 27 · Swift 6.4)에만 있어 그 전 SDK 빌드에서는 컴파일 조건으로 뺀다 —
+    /// 그 빌드는 이 오류를 불일치로 보지 않으므로 1.0.x 저장소도 폴백 없이 막는다(fail-closed).
     private static func isLegacySchemaMismatch(_ error: Error) -> Bool {
         guard let swiftDataError = error as? SwiftDataError else { return false }
         if swiftDataError == .loadIssueModelContainer { return true }
+        #if compiler(>=6.4)
         if #available(iOS 27, *), swiftDataError == .unknownDataStoreSchema { return true }
+        #endif
         return false
     }
 
