@@ -481,25 +481,6 @@ public actor LocalPreservationWriter {
         return removed
     }
 
-    // MARK: - 격리
-
-    /// 무효가 된 편집 세션의 미저장분을 격리본으로 남긴다. 세션이 기댄 세대 뒤에 전체 삭제가 있었으면 쓰지 않는다.
-    public func quarantine(
-        _ items: [DrawingQuarantineItem],
-        environment: DrawingEditEnvironment,
-        batchID: String,
-        deviceID: String
-    ) throws -> WriteOutcome {
-        let current = try requireGeneration()
-        guard environment.eraseGeneration == current else { return .rejectedByErase(current: current) }
-        try stampLiveDirectory(current)
-        try FileDrawingQuarantine.write(
-            items, environment: environment, batchID: batchID, deviceID: deviceID,
-            store: FileRecoveryCopyStore(root: area.recoveryCopiesDirectory, fileManager: fileManager), now: now()
-        )
-        return .written
-    }
-
     // MARK: - 전체 삭제
 
     /// 이 기기의 보존 영역(원시 사본 · 복구 사본 · 격리본 · 초안)을 지운다. **사용자가 이 기기에서 전체 삭제를 요청했을 때만** 부른다.

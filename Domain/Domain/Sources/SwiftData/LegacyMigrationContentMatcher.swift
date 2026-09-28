@@ -137,10 +137,6 @@ enum LegacyMigrationContentMatcher {
         return categories.joined(separator: ", ")
     }
 
-    private static func content(in container: ModelContainer) throws -> Content {
-        try content(in: ModelContext(container))
-    }
-
     private static func contentV3(at storeURL: URL) throws -> Content {
         let container = try ModelContainer(
             for: Schema(DrawingSchemaV3.models),

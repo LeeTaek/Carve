@@ -377,17 +377,6 @@ public actor CloudKitStoreOwnershipProofClient: StoreOwnershipProofClient {
         return await proveExistingPrivateStore(for: scope, reading: currentReading, copy: copy, userRecordName: userRecordName)
     }
 
-    private func proveExistingPrivateStore(for scope: AccountScope) async -> AccountScope? {
-        guard reader.validatedOSMajors.contains(reader.osMajor) else { return nil }
-        guard case .identified(let userRecordName) = await identity.currentIdentity(),
-              AccountScope.make(containerID: containerID, userRecordName: userRecordName) == scope else { return nil }
-
-        guard let (scratch, copy) = currentStoreCopy() else { return nil }
-        defer { try? fileManager.removeItem(at: scratch) }
-        let reading = reader.judge(copyAt: copy)
-        return await proveExistingPrivateStore(for: scope, reading: reading, copy: copy, userRecordName: userRecordName)
-    }
-
     private func proveExistingPrivateStore(
         for scope: AccountScope,
         reading: LegacyRowLinkageReading,

@@ -272,11 +272,6 @@ public final class LiveDrawingEditEnvironment: DrawingEditEnvironmentClient, @un
         return unappliedNotifications > 0
     }
 
-    /// `K(기기)` 가 바뀌었다(기준점 수신 등). 편집 문맥을 다시 판정하게 알린다.
-    public func knowledgeDidChange() {
-        notifySubscribers()
-    }
-
     public func current() async -> DrawingEditEnvironment {
         // C14 연결 보류 — 컨테이너를 만들 때 정해지고 이 실행 동안 바뀌지 않는다. 어느 환경에나 그대로 실린다.
         @Dependency(\.legacySeparationHoldState) var dependencyHoldState

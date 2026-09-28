@@ -46,7 +46,7 @@ public struct AppCoordinatorView: View {
                     CarveNavigationView(store: store)
                 }
             default:
-                ProgressView("필기를 보존하고 iCloud 연결을 준비하고 있어요")
+                fatalError("RootView init failed")
             }
         } destination: { store in
             // push destination - Stack 기반
@@ -57,7 +57,7 @@ public struct AppCoordinatorView: View {
                 FavoriteListView(store: store)
             }
         }
-        .allowsHitTesting(store.patchnote == nil && store.settings == nil && store.reconnectRequestID == nil)
+        .allowsHitTesting(store.patchnote == nil && store.settings == nil)
         .accessibilityHidden(store.patchnote != nil || store.settings != nil)
         .overlay {
             if let settingsStore = store.scope(state: \.settings, action: \.settings.presented) {
@@ -74,22 +74,8 @@ public struct AppCoordinatorView: View {
                 PatchnoteView(store: patchnoteStore)
             }
         }
-        .disabled(store.reconnectRequestID != nil)
         .overlay {
-            if store.reconnectRequestID != nil || store.reconnectError != nil {
-                VStack(spacing: 16) {
-                    if let message = store.reconnectError {
-                        Text("연결 준비를 마치지 못했어요")
-                        Text(message).font(.caption)
-                        Button("확인") { store.send(.cancelReconnect) }
-                    } else {
-                        ProgressView("마지막 필기를 보존하고 있어요")
-                        Button("취소") { store.send(.cancelReconnect) }
-                    }
-                }
-                .padding(24)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
-            } else if store.showsRelaunchGuidance {
+            if store.showsRelaunchGuidance {
                 // 로그인 완료와 연결 완료를 구분한다 — 이 실행은 계속 이 기기에만 저장한다. 기다릴 것이 없으므로 로딩을 띄우지 않는다.
                 VStack(spacing: 16) {
                     Text("iCloud 로그인을 확인했어요")
@@ -104,6 +90,5 @@ public struct AppCoordinatorView: View {
                 .accessibilityIdentifier("relaunchGuidance")
             }
         }
-
     }
 }

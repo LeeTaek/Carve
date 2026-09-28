@@ -20,14 +20,6 @@ public struct AppCoordinatorFeature {
     @ObservableState
     public struct State {
         public static var initialState = Self()
-        /// 로컬 저장소를 다시 연결하기 전에 마지막 필기 인계를 기다리는 요청.
-        public var reconnectRequestID: UUID?
-        /// 캔버스와 초안 저장이 모두 끝나 앱 runtime을 해제해도 되는 요청.
-        public var reconnectReadyID: UUID?
-        /// 인계·보존 실패는 기존 runtime을 유지하고 다시 시도하게 알린다.
-        public var reconnectError: String?
-        /// 인계가 끝난 이전 runtime은 해체 중 도착하는 화면 알림을 더 처리하지 않는다.
-        var isReleasedForReconnect = false
         /// 보류 중 로그인과 저장소 소유가 확인됐다 — 로딩 없이 재실행을 안내한다(2026-09-28 결정).
         public var showsRelaunchGuidance = false
         /// 이번 실행에서 재실행 안내를 이미 띄웠다. 닫은 뒤 다시 띄우지 않는다 — 설정의 iCloud 화면은 계속 같은 안내를 보인다.
@@ -74,7 +66,6 @@ public struct AppCoordinatorFeature {
     @Dependency(\.analyticsClient) private var analyticsClient
     @Dependency(\.legacySeparationHoldState) private var holdState
     @Dependency(\.drawingEditEnvironment) private var editEnvironment
-    @Dependency(\.uuid) private var uuid
 
     private enum CancelID { case relaunchGuidance }
     
@@ -86,19 +77,11 @@ public struct AppCoordinatorFeature {
         case path(StackActionOf<Path>)
         /// 위젯 등 외부에서 앱을 열었다.
         case openedURL(URL)
-        /// 실행 중에 보류 runtime 을 교체하도록 준비한다. **2.0.0 은 보내지 않는다** — 옛 컨테이너가 해제되지 않아
-        /// local-only 로 되돌아갔다(2026-09-28 iPadOS 18.6 실측). 연결은 재실행으로 하고, 이 경로는 이후 버전을 위해 남긴다.
-        case retryConnection
         /// 보류 중 편집 환경을 다시 읽었다 — 재실행하면 연결되는지 본다.
+        /// 2.0.0 은 실행 중에 저장소를 다시 연결하지 않는다 — 옛 컨테이너가 해제되지 않아 local-only 로 되돌아갔다(2026-09-28 실측).
         case connectionEnvironmentChanged(DrawingEditEnvironment)
         /// 재실행 안내를 닫았다.
         case relaunchGuidanceDismissed
-        /// 사용자가 연결 준비를 취소한다. 원래 로컬 runtime은 유지한다.
-        case cancelReconnect
-        /// 인계 완료 후 하위 화면과 효과를 해제한다.
-        case releaseForReconnect
-        /// 기존 local-only 컨테이너 해제를 못 마쳐 열람 화면을 복구했다.
-        case reconnectReleaseFailed
     }
     
     @Reducer
@@ -137,63 +120,11 @@ public struct AppCoordinatorFeature {
     }
 
     public var body: some Reducer<State, Action> {
-        Reduce { state, action in
-            guard !state.isReleasedForReconnect else { return .none }
-            return activeRuntime.reduce(into: &state, action: action)
-        }
-    }
-
-    private var activeRuntime: some Reducer<State, Action> {
         /// 자식 Feature에서 올라오는 액션을 기반으로 루트 화면 전환을 수행하는 Reducer.
         /// - Note: LaunchProgress의 `.syncCompleted`, Carve의 `.moveToSetting,
         ///         Settings의 `.backToCarve`와 같은 액션을 감지하여 `root`, `path`를 교체한다.
         Reduce { state, action in
             switch action {
-            case .reconnectReleaseFailed:
-                state.reconnectError = "필기는 보존했지만 연결 준비를 마치지 못했어요. 잠시 후 다시 시도해 주세요."
-                return .none
-            case .retryConnection:
-                guard holdState.isHeld, state.reconnectRequestID == nil,
-                      case .carve = state.root else { return .none }
-                let requestID = uuid()
-                state.reconnectRequestID = requestID
-                state.reconnectReadyID = nil
-                state.reconnectError = nil
-                return .send(.root(.presented(.carve(.scope(.carveDetailAction(
-                    .scope(.chapterCanvasAction(.prepareForStoreReconnect(requestID)))
-                ))))))
-
-            case .root(.presented(.carve(.scope(.carveDetailAction(
-                .scope(.chapterCanvasAction(.delegate(.storeReconnectReady(let requestID))))
-            ))))):
-                guard state.reconnectRequestID == requestID else { return .none }
-                state.reconnectReadyID = requestID
-
-            case .root(.presented(.carve(.scope(.carveDetailAction(
-                .scope(.chapterCanvasAction(.delegate(.storeReconnectFailed(let requestID, let message))))
-            ))))):
-                guard state.reconnectRequestID == requestID else { return .none }
-                state.reconnectError = message
-                state.reconnectRequestID = nil
-                return .send(.root(.presented(.carve(.scope(.carveDetailAction(
-                    .scope(.chapterCanvasAction(.cancelStoreReconnect(requestID)))
-                ))))))
-
-            case .cancelReconnect:
-                state.reconnectError = nil
-                guard let requestID = state.reconnectRequestID, state.reconnectReadyID == nil else { return .none }
-                state.reconnectRequestID = nil
-                return .send(.root(.presented(.carve(.scope(.carveDetailAction(
-                    .scope(.chapterCanvasAction(.cancelStoreReconnect(requestID)))
-                ))))))
-
-            case .releaseForReconnect:
-                guard state.reconnectReadyID != nil else { return .none }
-                state.isReleasedForReconnect = true
-                state.settings = nil
-                state.patchnote = nil
-                state.path.removeAll()
-                state.root = nil
             case .root(.presented(.launchProgress(.syncCompleted))):
                 // 들어가기 직전에 시작 화면의 상태를 한 번 더 본다 — 막힘 · 재실행 요구로 바뀌었으면 들어가지 않는다 (테스트 계획 MIG-F1).
                 // 저장소를 쓸 수 없을 때 앱이 쥔 대체 컨테이너는 저장을 거절하지 않으므로 이 확인이 마지막 경계다. 대기 방식(초기 복원 · 일반)과

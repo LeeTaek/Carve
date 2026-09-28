@@ -185,13 +185,6 @@ public struct ChapterCanvasFeature {
         var reloadAfterAccountCheck = false
         /// 뷰에 보내는 인계 요청 토큰. 올리면 뷰가 미보고 편집을 보고하고 `editHandoffCompleted` 로 알린다.
         var handoffToken = 0
-        /// 부모가 소유 hold runtime을 교체하기 전 준비를 요청한 ID. 준비 중/완료 후 입력을 잠근다.
-        public var storeReconnectRequestID: UUID?
-        /// 동일 요청의 안전한 저장 완료를 부모에 알린 ID.
-        public var storeReconnectReadyID: UUID?
-        var storeReconnectHandoffToken: Int?
-        /// 연결 준비가 세션 닫기 · 다시 읽기가 끝나기를 기다린다. 끝나면 `settleStoreReconnect` 가 인계를 시작한다.
-        var storeReconnectAwaitsSettling = false
         /// 화면에 있는 캔버스(컨트롤러)와 그 캔버스가 표시하는 세대(아직 표시 전이면 `Int.max`). 없으면 인계를 기다리지 않는다 — 있으면 응답이
         /// 늦어도 완료로 보지 않는다. 늦은 보고는 캔버스가 표시하는 세대로만 오므로, 모든 캔버스가 더 새 세대를 표시해야 닫은 문맥을 놓는다.
         var attachedCanvases: [UUID: Int] = [:]
@@ -250,9 +243,7 @@ public struct ChapterCanvasFeature {
             return !isComposed || loadFailure.source == .drafts || loadedDrawings == nil ? loadFailure : nil
         }
         /// §6-2 입력 게이트 — 합성이 끝났고, 다시 합성하지도 지우지도 않는 중일 때만 입력을 받는다.
-        var isInputEnabled: Bool {
-            isComposed && !isReloading && !isErasing && sessionEnd == nil && storeReconnectRequestID == nil && blockingLoadFailure == nil
-        }
+        var isInputEnabled: Bool { isComposed && !isReloading && !isErasing && sessionEnd == nil && blockingLoadFailure == nil }
         /// 지우기가 실제로 도는 중인가. `.failed` 는 **포함하지 않는다** — 실패하면 잠금을 풀고 필기를 그대로 쓰게 둔다.
         var isErasing: Bool {
             switch eraseTask?.phase {
@@ -324,12 +315,6 @@ public struct ChapterCanvasFeature {
         case editEnvironmentChanged(DrawingEditEnvironment)
         /// 뷰가 인계를 마쳤다 — 그 토큰의 요청 전까지의 편집은 모두 보고됐다.
         case editHandoffCompleted(token: Int)
-        /// 소유 확인 보류 중인 runtime을 교체하기 전, 단일 Canvas의 편집·초안 저장을 안전하게 끝낸다.
-        case prepareForStoreReconnect(UUID)
-        /// 미사용 Canvas의 연결 보류를 현재 의존성에서 다시 확인했다.
-        case storeReconnectEnvironmentChecked(UUID, DrawingEditEnvironment)
-        case cancelStoreReconnect(UUID)
-        case storeReconnectTimedOut(UUID)
         /// 닫는 세션이 뷰의 인계 응답을 기다린 시한이 지났다. `id` 는 닫는 세션이다. 캔버스가 있으면 다시 요청한다.
         case sessionHandoffTimedOut(id: String)
         /// 캔버스가 화면에 붙었다 · 떨어졌다(미보고 편집을 먼저 보고한 뒤) · 새 세대를 표시했다(이전 세대의 마지막 획을 먼저 보고한 뒤).
@@ -402,11 +387,7 @@ public struct ChapterCanvasFeature {
                 return beginLoad(state: &state, chapter: chapter, expectedVerseCount: expectedVerseCount)
 
             case .drawingsLoaded(let requestID, let environment, let result, let drafts):
-                // 다시 읽기가 끝나기를 기다리던 연결 준비를 잇는다.
-                return .merge(
-                    finishLoad(state: &state, requestID: requestID, environment: environment, result: result, drafts: drafts),
-                    settleStoreReconnect(state: &state)
-                )
+                return finishLoad(state: &state, requestID: requestID, environment: environment, result: result, drafts: drafts)
 
             case .retryLoad:
                 guard state.blockingLoadFailure != nil else { return .none }
@@ -442,7 +423,7 @@ public struct ChapterCanvasFeature {
 
             case .editCancelled:
                 state.isEditing = false
-                return .merge(applyDeferredChanges(state: &state), resumeSessionEndIfDraining(state: &state), settleAfterEdit(state: &state), settleStoreReconnect(state: &state))
+                return .merge(applyDeferredChanges(state: &state), resumeSessionEndIfDraining(state: &state), settleAfterEdit(state: &state))
 
             case .editEnded(let snapshot):
                 state.isEditing = false
@@ -474,15 +455,14 @@ public struct ChapterCanvasFeature {
                 effects.append(applyDeferredChanges(state: &state))
                 effects.append(resumeSessionEndIfDraining(state: &state))
                 effects.append(settleAfterEdit(state: &state))
-                effects.append(settleStoreReconnect(state: &state))
                 return .merge(effects)
 
             case .mutationsPrepared(let revision, let result):
                 let finished = finishEdit(state: &state, revision: revision, result: result)
-                return .merge(finished, resumeSessionEndIfDraining(state: &state), settleStoreReconnect(state: &state))
+                return .merge(finished, resumeSessionEndIfDraining(state: &state))
 
             case .saveFinished(let requestID, let revision, let failure):
-                return .merge(finishSave(state: &state, requestID: requestID, revision: revision, failure: failure), settleStoreReconnect(state: &state))
+                return finishSave(state: &state, requestID: requestID, revision: revision, failure: failure)
 
             case .flushPending:
                 if state.sessionEnd != nil {
@@ -497,32 +477,19 @@ public struct ChapterCanvasFeature {
                 return clearAfterExternalDelete(state: &state)
 
             case .editEnvironmentChanged(let latest):
-                return .merge(editEnvironmentChanged(state: &state, latest: latest), settleStoreReconnect(state: &state))
+                return editEnvironmentChanged(state: &state, latest: latest)
 
             case .editHandoffCompleted(let token):
-                let reconnect = storeReconnectHandoffCompleted(state: &state, token: token)
-                return .merge(editHandoffCompleted(state: &state, token: token), arrivalHandoffCompleted(state: &state, token: token), reconnect)
-
-            case .prepareForStoreReconnect(let requestID):
-                return prepareForStoreReconnect(state: &state, requestID: requestID)
-
-            case .storeReconnectEnvironmentChecked(let requestID, let environment):
-                return storeReconnectEnvironmentChecked(state: &state, requestID: requestID, environment: environment)
-
-            case .cancelStoreReconnect(let requestID):
-                return cancelStoreReconnect(state: &state, requestID: requestID)
-
-            case .storeReconnectTimedOut(let requestID):
-                return failStoreReconnect(state: &state, requestID: requestID, message: "캔버스 편집 인계가 시간 안에 끝나지 않았습니다.")
+                return .merge(editHandoffCompleted(state: &state, token: token), arrivalHandoffCompleted(state: &state, token: token))
 
             case .sessionHandoffTimedOut(let id):
                 return sessionHandoffTimedOut(state: &state, id: id)
 
             case .canvasAttached, .canvasDetached, .canvasDisplayed:
-                return .merge(reduceCanvasPresence(state: &state, action: action), settleStoreReconnect(state: &state))
+                return reduceCanvasPresence(state: &state, action: action)
 
             case .draftsSaved(let requestID, let saved, let failure):
-                return .merge(finishDraftSave(state: &state, requestID: requestID, saved: saved, failure: failure), settleStoreReconnect(state: &state))
+                return finishDraftSave(state: &state, requestID: requestID, saved: saved, failure: failure)
 
             case .importArrived, .arrivalChecked, .arrivalNoticeTapped, .arrivalNoticeDismissed:
                 return reduceArrival(state: &state, action: action)

@@ -91,7 +91,7 @@ struct LocalPreservationWriterTesting {
 
     // MARK: - 전체 삭제와 늦은 쓰기
 
-    @Test("전체 삭제는 세대를 올리고 보존 영역을 지우며, 삭제 전 세대에 기댄 늦은 초안 · 격리를 거절한다")
+    @Test("전체 삭제는 세대를 올리고 보존 영역을 지우며, 삭제 전 세대에 기댄 늦은 초안을 거절한다")
     func eraseRejectsLateWrites() async throws {
         try await withAreas { areas in
             let writer = LocalPreservationWriter(area: areas.preservation, eraseState: areas.eraseState)
@@ -102,11 +102,6 @@ struct LocalPreservationWriterTesting {
             #expect(next == 1)
             #expect(!FileManager.default.fileExists(atPath: areas.preservation.storeDirectory.path))
             #expect(try await writer.saveDraft(draft(revision: 2)) == .rejectedByErase(current: 1))
-            let item = DrawingQuarantineItem(chapter: chapter, verse: 1, revision: 2, lineData: Data("획".utf8), drawingVersion: 3,
-                                             layoutMetadataData: nil)
-            #expect(try await writer.quarantine([item], environment: environment(eraseGeneration: 0), batchID: "b", deviceID: "d")
-                == .rejectedByErase(current: 1))
-            #expect(!FileManager.default.fileExists(atPath: areas.preservation.recoveryCopiesDirectory.path))
             // 새 세대에 기댄 쓰기는 받는다.
             #expect(try await writer.saveDraft(draft(revision: 3, generation: 1)) == .written)
         }
@@ -123,25 +118,6 @@ struct LocalPreservationWriterTesting {
 
             #expect(await relaunched.currentGeneration() == 1)
             #expect(try await relaunched.saveDraft(draft(generation: 0)) == .rejectedByErase(current: 1))
-        }
-    }
-
-    @Test("격리를 직렬화 경계로 하면 세션이 기댄 세대 뒤의 전체 삭제를 실패로 알린다")
-    func writerQuarantineClientReportsRejection() async throws {
-        try await withAreas { areas in
-            let writer = LocalPreservationWriter(area: areas.preservation, eraseState: areas.eraseState)
-            let client = WriterDrawingQuarantine(writer: writer, deviceID: "device-1")
-            let item = DrawingQuarantineItem(chapter: chapter, verse: 1, revision: 1, lineData: Data("획".utf8), drawingVersion: 3,
-                                             layoutMetadataData: nil)
-
-            try await client.quarantine([item], environment: environment(eraseGeneration: 0), batchID: "b")
-            #expect(try FileRecoveryCopyStore(root: areas.preservation.recoveryCopiesDirectory).entries(accountScope: account.key).count == 1)
-
-            try await writer.eraseAllLocal()
-            await #expect(throws: WriterDrawingQuarantine.RejectedByErase.self) {
-                try await client.quarantine([item], environment: environment(eraseGeneration: 0), batchID: "b")
-            }
-            #expect(!FileManager.default.fileExists(atPath: areas.preservation.recoveryCopiesDirectory.path))
         }
     }
 

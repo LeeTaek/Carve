@@ -81,19 +81,6 @@ struct CarveApp: App {
 private struct AppRuntime {
     let modelContainer: ModelContainer
     let store: StoreOf<AppCoordinatorFeature>
-    let syncManager: PersistentCloudKitContainer
-    let isConnectionHeld: Bool
-    let hold: LegacySeparationHold?
-}
-
-/// 이전 SwiftData 컨테이너가 실제로 해제되기 전에는 같은 파일을 다시 열지 않는다.
-private final class ReleasedStoreReference {
-    weak var container: ModelContainer?
-    let hold: LegacySeparationHold?
-    init(_ container: ModelContainer, hold: LegacySeparationHold?) {
-        self.container = container
-        self.hold = hold
-    }
 }
 
 /// 계정 확인과 저장소 소유 증명이 끝나기 전에는 `.private` ModelContainer 를 만들지 않는다.
@@ -106,7 +93,6 @@ private struct AppStartupView: View {
 
     @State private var runtime: AppRuntime?
     @State private var didStart = false
-    @State private var releasedStore: ReleasedStoreReference?
 
     var body: some View {
         Group {
@@ -122,37 +108,11 @@ private struct AppStartupView: View {
         // local-only 로 되돌아갔다(2026-09-28 iPadOS 18.6 실측). 소유가 확인되면 코디네이터가 재실행을 안내하고, 다음 실행의 시작 판정이 연결한다.
     }
 
-    /// 완료 ACK 이후 하위 효과를 취소하고 runtime을 놓는다. 새 컨테이너 생성은 해제 확인 이후에만 한다.
-    @MainActor
-    private func releaseRuntime(_ current: AppRuntime) {
-        guard current.isConnectionHeld, current.store.reconnectReadyID != nil else { return }
-        releasedStore = ReleasedStoreReference(current.modelContainer, hold: current.hold)
-        current.store.send(.releaseForReconnect)
-        current.syncManager.stopObserving()
-        didStart = false
-        runtime = nil
-    }
-
     /// 소유 근거가 없거나 계정을 확인하지 못하면 Domain bootstrap 이 local-only 컨테이너와 보류 상태를 돌려준다.
     @MainActor
     private func startIfNeeded() async {
         guard !didStart else { return }
         didStart = true
-        // 뷰 해체와 TCA 취소는 다음 UI 갱신에서 완료될 수 있다. 시간 경과를 해제 증거로 삼지 않는다.
-        for _ in 0..<100 where releasedStore?.container != nil {
-            do { try await Task.sleep(for: .milliseconds(100)) } catch { didStart = false; return }
-        }
-        if let previous = releasedStore?.container {
-            // 해제를 못 마쳤어도 이미 열린 local-only 컨테이너로 열람·초안 저장을 복구한다.
-            let holdState = LegacySeparationHoldState(hold: releasedStore?.hold)
-            let syncManager = PersistentCloudKitContainer()
-            if let hold = holdState.hold { syncManager.syncState = .connectionHeld(hold) }
-            installRuntime(modelContainer: previous, syncManager: syncManager, holdState: holdState)
-            runtime?.store.send(.reconnectReleaseFailed)
-            releasedStore = nil
-            return
-        }
-        releasedStore = nil
 
         let storeURL = URL.applicationSupportDirectory.appending(path: containerID.localDBPath)
         let preservation = PreservationArea.live(localDBPath: containerID.localDBPath)
@@ -215,10 +175,7 @@ private struct AppStartupView: View {
             localPreservation: localPreservation
         )
         Task { await drawingEditEnvironment.start() }
-        runtime = AppRuntime(
-            modelContainer: modelContainer, store: store,
-            syncManager: syncManager, isConnectionHeld: holdState.isHeld, hold: holdState.hold
-        )
+        runtime = AppRuntime(modelContainer: modelContainer, store: store)
     }
 
     /// 앱의 루트 화면. 준비된 ModelContainer 와 Store 를 사용한다.
@@ -232,9 +189,6 @@ private struct AppStartupView: View {
                 ]
             )
             .task { await adConsent.gatherConsent() }
-            .onChange(of: runtime.store.reconnectReadyID) { _, requestID in
-                if requestID != nil { releaseRuntime(runtime) }
-            }
             .onOpenURL { url in
                 runtime.store.send(.openedURL(url))
             }
@@ -264,9 +218,8 @@ private struct AppStartupView: View {
         drawingEditEnvironment: any DrawingEditEnvironmentClient,
         localPreservation: LocalPreservationWriter
     ) -> StoreOf<AppCoordinatorFeature> {
-        // actor 와 그것을 쥔 저장소의 기본값(`static` liveValue)은 처음 읽은 runtime 의 컨테이너로 한 번 만들어져 전역에 남는다.
-        // runtime 마다 새로 만들어야 이 값들이 옛 컨테이너를 붙잡지 않고, 새 runtime 이 옛 컨테이너에 쓰지 않는다(2026-09-28 iPadOS 18.6 실측).
-        // 다른 보유 경로가 남아 있어 이것만으로 재연결 해제가 끝나지는 않는다 — 호환성 시험 계획 09-28 절.
+        // actor 와 그것을 쥔 저장소의 기본값(`static` liveValue)은 처음 읽힌 문맥의 컨테이너로 한 번 만들어져 전역에 남는다.
+        // 기본값에 기대지 않고 이 실행이 연 컨테이너로 직접 만들어 넘긴다(2026-09-28 iPadOS 18.6 실측).
         let database = SwiftDatabaseActor(modelContainer: modelContainer)
         return withDependencies {
             $0.containerId = containerID
