@@ -102,11 +102,13 @@ struct DrawingStoreOwnershipProofTesting {
     @Test("기존 로그인 저장소는 현재 계정과의 미러링 일치와 서버 레코드 확인을 모두 요구한다")
     func existingStoreRequiresCloudProof() {
         let reading = linkedStore()
-        let supportedOS: Set<Int> = [17, 18, 26]
+        let supportedOS = LegacyRowLinkageReader().validatedOSMajors
         #expect(StoreOwnershipClaimRule.existingPrivateStore(reading, osMajor: 26, validatedOSMajors: supportedOS, identityMatches: true, allRecordsExist: true))
         #expect(StoreOwnershipClaimRule.existingPrivateStore(reading, osMajor: 17, validatedOSMajors: supportedOS, identityMatches: true, allRecordsExist: true))
         #expect(StoreOwnershipClaimRule.existingPrivateStore(reading, osMajor: 18, validatedOSMajors: supportedOS, identityMatches: true, allRecordsExist: true))
+        #expect(StoreOwnershipClaimRule.existingPrivateStore(reading, osMajor: 27, validatedOSMajors: supportedOS, identityMatches: true, allRecordsExist: true))
         #expect(!StoreOwnershipClaimRule.existingPrivateStore(reading, osMajor: 19, validatedOSMajors: supportedOS, identityMatches: true, allRecordsExist: true))
+        #expect(!StoreOwnershipClaimRule.existingPrivateStore(reading, osMajor: 28, validatedOSMajors: supportedOS, identityMatches: true, allRecordsExist: true))
         #expect(!StoreOwnershipClaimRule.existingPrivateStore(reading, osMajor: 26, validatedOSMajors: supportedOS, identityMatches: false, allRecordsExist: true))
         #expect(!StoreOwnershipClaimRule.existingPrivateStore(reading, osMajor: 26, validatedOSMajors: supportedOS, identityMatches: true, allRecordsExist: false))
 
@@ -372,8 +374,143 @@ struct DrawingStoreOwnershipProofTesting {
     }
 }
 
+/// 이미 연결한 저장소의 재실행 판정(시험 계획 2026-09-28). 첫 연결 판정을 매 실행 다시 요구하면 빈 저장소 · 대응 전 행 · 오프라인에서 영구 보류된다.
+@Suite("이미 연결한 저장소의 재실행 소유 판정")
+struct StoreOwnershipRelaunchTesting {
+    private let containerID = "iCloud.Carve.SwiftData.iCloud.dev"
+
+    enum StoreShape: String, CaseIterable, Sendable {
+        /// 전체 삭제 뒤 · 필사 없이 로그인만 한 저장소.
+        case empty
+        /// 저장한 뒤 CloudKit 대응이 생기기 전에 앱이 끝난 행이 있다.
+        case unlinkedRow
+        /// 모든 행이 대응돼 있지만 서버에 닿지 못한다(오프라인).
+        case serverUnreachable
+    }
+
+    private func scope(_ name: String) -> AccountScope {
+        .make(containerID: containerID, userRecordName: name)
+    }
+
+    /// `persistedAccount` 로 연결된 적 있는 V6 저장소. 절 1 · 2 · 3 중 `linked` 만 대응을 붙이고, `empty` 면 행을 모두 지운다.
+    private func linkedV6Store(in root: URL, persistedAccount: String, linked: [Int64], empty: Bool = false) throws -> URL {
+        let storeURL = try LinkageFixture.makeV6Store(in: root)
+        if empty {
+            try LinkageFixture.exec(storeURL, "DELETE FROM ZBIBLEDRAWING;")
+        }
+        for primaryKey in linked {
+            try LinkageFixture.link(storeURL, entity: .bibleDrawing, primaryKey: primaryKey)
+        }
+        try LinkageFixture.addIdentityKeys(storeURL)
+        try LinkageFixture.exec(
+            storeURL,
+            "UPDATE ANSCKMETADATAENTRY SET ZSTRINGVALUE = '\(persistedAccount)' WHERE ZKEY = 'NSCloudKitMirroringDelegateCKIdentityRecordNameDefaultsKey';"
+        )
+        return storeURL
+    }
+
+    private func store(_ shape: StoreShape, in root: URL, persistedAccount: String) throws -> URL {
+        switch shape {
+        case .empty: try linkedV6Store(in: root, persistedAccount: persistedAccount, linked: [], empty: true)
+        case .unlinkedRow: try linkedV6Store(in: root, persistedAccount: persistedAccount, linked: [1, 2])
+        case .serverUnreachable: try linkedV6Store(in: root, persistedAccount: persistedAccount, linked: [1, 2, 3])
+        }
+    }
+
+    private func makeClient(
+        storeURL: URL,
+        root: URL,
+        currentAccount: String,
+        lookup: any StorePrivateRecordLookupClient
+    ) -> (client: CloudKitStoreOwnershipProofClient, ownershipArea: StoreOwnershipArea) {
+        let preservation = PreservationArea(root: root.appendingPathComponent("Preservation", isDirectory: true), storeFileName: storeURL.lastPathComponent)
+        let ownershipArea = StoreOwnershipArea(root: root.appendingPathComponent("Owners", isDirectory: true), fileName: "owner.json")
+        let client = CloudKitStoreOwnershipProofClient(
+            identity: StubCloudAccountIdentityClient(.identified(userRecordName: currentAccount)),
+            containerID: containerID,
+            storeURL: storeURL,
+            preservation: preservation,
+            ownershipArea: ownershipArea,
+            privateRecordLookup: lookup
+        )
+        return (client, ownershipArea)
+    }
+
+    @Test("이 계정으로 표식을 남긴 저장소는 재실행 때 행 · 대응 · 서버 조회 없이 연결한다", arguments: StoreShape.allCases)
+    func ledgerOwnerAttachesWithoutFirstConnectionProof(shape: StoreShape) async throws {
+        let root = try LinkageFixture.makeDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let storeURL = try store(shape, in: root, persistedAccount: "_a")
+        let lookup = CountingFailingRecordLookup()
+        let (client, ownershipArea) = makeClient(storeURL: storeURL, root: root, currentAccount: "_a", lookup: lookup)
+        let account = scope("_a")
+        #expect(await StoreOwnershipLedger(area: ownershipArea).claim(account, proof: .currentPrivateCloudRecords) == account)
+
+        #expect(await client.ownership(for: account) == account)
+        #expect(await client.ownership(for: account) == account)
+        #expect(await lookup.callCount() == 0)
+    }
+
+    @Test("표식이 없는 빈 연결 저장소는 빈 저장소 근거를 남기고 연결한다")
+    func emptyLinkedStoreClaimsWithoutServerProof() async throws {
+        let root = try LinkageFixture.makeDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let storeURL = try store(.empty, in: root, persistedAccount: "_a")
+        let lookup = CountingFailingRecordLookup()
+        let (client, ownershipArea) = makeClient(storeURL: storeURL, root: root, currentAccount: "_a", lookup: lookup)
+        let account = scope("_a")
+
+        #expect(await client.ownership(for: account) == account)
+        #expect(await lookup.callCount() == 0)
+        guard case .owner(let recorded, let proof) = await StoreOwnershipLedger(area: ownershipArea).read() else {
+            Issue.record("빈 연결 저장소의 소유 표식이 없다")
+            return
+        }
+        #expect(recorded == account)
+        #expect(proof == .emptyLinkedStore)
+    }
+
+    @Test("표식이 없고 행이 있으면 첫 연결 판정을 그대로 요구한다", arguments: [StoreShape.unlinkedRow, .serverUnreachable])
+    func unmarkedStoreWithRowsKeepsFirstConnectionProof(shape: StoreShape) async throws {
+        let root = try LinkageFixture.makeDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let storeURL = try store(shape, in: root, persistedAccount: "_a")
+        let (client, ownershipArea) = makeClient(storeURL: storeURL, root: root, currentAccount: "_a", lookup: CountingFailingRecordLookup())
+
+        #expect(await client.ownership(for: scope("_a")) == nil)
+        #expect(await StoreOwnershipLedger(area: ownershipArea).read().isAbsent)
+    }
+
+    @Test("저장소의 계정 식별이 다르면 비어 있어도 · 표식이 있어도 연결하지 않는다", arguments: [false, true])
+    func differentPersistedAccountStaysHeld(hasLedger: Bool) async throws {
+        let root = try LinkageFixture.makeDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let storeURL = try store(.empty, in: root, persistedAccount: "_b")
+        let (client, ownershipArea) = makeClient(storeURL: storeURL, root: root, currentAccount: "_a", lookup: CountingFailingRecordLookup())
+        let account = scope("_a")
+        if hasLedger {
+            #expect(await StoreOwnershipLedger(area: ownershipArea).claim(account, proof: .emptyLinkedStore) == account)
+        }
+
+        #expect(await client.ownership(for: account) == nil)
+        #expect(await StoreOwnershipLedger(area: ownershipArea).read().isAbsent == !hasLedger)
+    }
+}
+
 private struct NoStoreRecordLookup: StorePrivateRecordLookupClient {
     func allRecordsExist(_ recordNames: [String]) async -> Bool { false }
+}
+
+/// 서버에 닿지 못하는 조회 — 불렸는지 센다.
+private actor CountingFailingRecordLookup: StorePrivateRecordLookupClient {
+    private var calls = 0
+
+    func allRecordsExist(_ recordNames: [String]) async -> Bool {
+        calls += 1
+        return false
+    }
+
+    func callCount() -> Int { calls }
 }
 
 private actor SequencedOwnershipIdentity: CloudAccountIdentityClient {

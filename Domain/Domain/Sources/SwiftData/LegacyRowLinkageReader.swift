@@ -232,8 +232,10 @@ public struct LegacyRowLinkageReader: Sendable {
     public static let version = 5
 
     /// private mirror schema/profile을 확인한 OS 주 버전. 17·18은 strict metadata, account/record/pending proof를 모두 거친다.
-    /// 19~25는 검사하지 않았다.
-    public var validatedOSMajors: Set<Int> = [17, 18, 26]
+    /// 19~25는 검사하지 않았다. 27은 2026-09-28 iPadOS 27.2 실기기에서 연결 저장소 metadata 가 관측한 7키 profile 과 같고
+    /// (`FrameworkVersion 1632`) 기존 로그인 저장소 증명이 통과함을 확인했다. 27의 무계정 V3 profile 은 관측하지 못했다 —
+    /// 다르면 첫 로그인 증명이 실패 닫힘으로 보류한다. 이 목록은 처음 연결할 때의 판독에만 쓰인다(이미 연결한 저장소의 재실행은 보지 않는다).
+    public var validatedOSMajors: Set<Int> = [17, 18, 26, 27]
     /// 판독기를 검증한 저장소 스키마 주 버전 — 1.3.0 의 V3(마이그레이션 전)와 현재 V6(마이그레이션 뒤). SEP-1 F39.
     public var validatedSchemaMajors: Set<Int> = [3, 6]
     /// `ZENTITYID = Z_ENT` 를 **실제 미러링 저장소에서 관측한** 엔티티. 관측이 없는 엔티티에 행 · 대응이 있으면 「알 수 없음」 이다.

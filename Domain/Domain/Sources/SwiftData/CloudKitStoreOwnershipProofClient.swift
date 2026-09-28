@@ -67,6 +67,8 @@ actor StoreOwnershipLedger {
         case firstRunHadNoStore
         case firstLoginFromUnaccountedV3
         case currentPrivateCloudRecords
+        /// 현재 계정으로 연결된 적 있는 저장소에 앱 데이터가 한 행도 없었다 — 다른 계정에 잘못 귀속될 내용이 없다.
+        case emptyLinkedStore
     }
 
     enum ReadResult {
@@ -154,6 +156,12 @@ enum StoreOwnershipClaimRule {
         guard unaccountedLegacyRows(source, modelMajors: [3]),
               unaccountedLegacyRows(current, modelMajors: [3, 6]) else { return false }
         return Set(current.rows.keys) == Set(source.rows.keys)
+    }
+
+    /// 현재 계정으로 연결된 적 있는 저장소에 앱 데이터가 한 행도 없다. 옮길 필사가 없으므로 첫 연결 판정(행 · 대응 · 서버 조회)을 요구하지 않는다.
+    /// 전체 삭제 뒤나 필사 없이 로그인만 한 1.3.0 사용자의 저장소가 여기에 해당한다. 판독이 불확실하면(`unknown`) 빈 저장소로 보지 않는다.
+    static func emptyLinkedStore(_ reading: LegacyRowLinkageReading) -> Bool {
+        reading.verdict == .allLinked && reading.rows.isEmpty && reading.localModelRowCount == 0
     }
 
     /// 처음 저장소가 없었다는 ledger는 비어 있고 미확인 대기 작업도 없는 현재 저장소에서만 재사용한다.
@@ -245,7 +253,10 @@ enum PrivateStoreAttachmentPreflight {
 /// - 처음 없던 저장소: 첫 실행 때 원본 파일이 없었다는 원시 보존 표식으로 확인한다.
 /// - 1.3.0 무계정 저장소: 업데이트 전 V3 사본에서 미러링 대응이 하나도 없는 경우에만 출시 결정의 첫 로그인 전송을 허용한다.
 /// - 기존 로그인 저장소: 미러링 계정 키가 현재 CloudKit 계정과 같고, 모든 행이 동기화된 뒤 현재 계정의 private DB에서 레코드가 확인될 때만 허용한다.
-/// 판정할 근거가 없거나 읽기·네트워크가 실패하면 소유를 인정하지 않는다.
+///   앱 데이터가 한 행도 없으면 옮길 필사가 없으므로 이 확인 없이 허용한다.
+/// - 이미 연결한 저장소: 위 근거로 한 번 표식을 남긴 뒤에는, 미러링 계정 키가 현재 계정과 같은 한 재실행 때 첫 연결 판정을 다시 요구하지 않는다.
+///   매 실행 다시 요구하면 빈 저장소 · 대응 전 행 · 오프라인 · 검증 밖 OS 에서 영구 보류된다(시험 계획 2026-09-28).
+/// 판정할 근거가 없거나 읽기·네트워크가 실패하면 소유를 인정하지 않는다. 미러링 계정 키가 다르면 표식이 있어도 보류한다.
 public actor CloudKitStoreOwnershipProofClient: StoreOwnershipProofClient {
     private let identity: any CloudAccountIdentityClient
     private let containerID: String
@@ -307,9 +318,17 @@ public actor CloudKitStoreOwnershipProofClient: StoreOwnershipProofClient {
               let (scratch, copy) = currentStoreCopy() else { return nil }
         defer { try? fileManager.removeItem(at: scratch) }
 
+        let identityStatus = LegacyStoreAccountIdentityReader.status(copyAt: copy, userRecordName: userRecordName)
+        // 이 계정으로 이미 연결한 저장소다 — 표식의 소유자와 Core Data 가 남긴 계정 식별이 모두 지금 계정이다.
+        // 그 뒤에 생긴 행은 이 계정으로 연결된 동안만 쓰였으므로 행 · 대응 · 서버 조회 · 검증 OS 를 다시 묻지 않는다.
+        if identityStatus == .matches, storedProof != nil { return scope }
+
         let currentReading = reader.judge(copyAt: copy)
-        switch LegacyStoreAccountIdentityReader.status(copyAt: copy, userRecordName: userRecordName) {
+        switch identityStatus {
         case .matches:
+            if StoreOwnershipClaimRule.emptyLinkedStore(currentReading) {
+                return await ledger.claim(scope, proof: .emptyLinkedStore)
+            }
             return await proveExistingPrivateStore(for: scope, reading: currentReading, copy: copy, userRecordName: userRecordName)
         case .mismatch, .invalid:
             // 기존 ledger나 과거 unaccounted snapshot이 현재 저장소의 다른 계정 identity를 덮을 수 없다.
