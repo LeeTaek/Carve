@@ -23,14 +23,21 @@ extension SharedKey {
 /// UserDefaults에 저장할때 사용하는 키를 주입받고, 해당 키로 Encoding, Decoding하여 저장/반환
 /// UserDefaults.didChangeNotification를 구독하여 값 변경시 새로운 값 전파
 public struct CodableAppStorageKey<Value: Codable>: SharedKey {
-    @Dependency(\.defaultAppStorage) var store
+    /// 만들 때 꺼낸 저장소. `@Dependency` 래퍼를 들고 있으면 만든 곳의 의존성 문맥 전체(runtime 의 ModelContainer 포함)를 붙잡는다 —
+    /// Sharing 은 이 키를 전역 공유 참조와 알림 구독에 오래 두므로, 재연결 때 옛 컨테이너가 해제되지 않았다(2026-09-28 iPadOS 18.6 실측).
+    /// Sharing 의 `AppStorageKey` 처럼 저장소만 보관한다.
+    private let storage: UncheckedSendable<UserDefaults>
     private let key: String
+
+    private var store: UserDefaults { storage.wrappedValue }
 
     public var id: AnyHashable {
         AppStorageKeyID(key: key, store: store)
     }
 
     public init(_ key: String) {
+        @Dependency(\.defaultAppStorage) var store
+        self.storage = UncheckedSendable(store)
         self.key = key
     }
 

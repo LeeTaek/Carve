@@ -66,8 +66,11 @@ public struct SettingsView: View {
             }
             Section("저장") {
                 NavigationLink(value: SettingsFeature.SidebarItem.iCloud) {
-                    sidebarRow("iCloud", value: "켬")
+                    // 연결 보류 중에는 「보류」 — 이 실행은 이 기기에만 저장한다(정책 §12-6 C14 ③). 까닭은 iCloud 화면이 말한다.
+                    sidebarRow("iCloud", value: store.isConnectionHeld ? "보류" : "켬")
                 }
+                // 보이지 않게 남은 필기의 지속적인 진입점(정책 §12-6 ④) — 개수는 화면을 열 때 센다.
+                NavigationLink("남은 필기", value: SettingsFeature.SidebarItem.draftRecovery)
             }
             Section("지원") {
                 NavigationLink("도움말", value: SettingsFeature.SidebarItem.help)
@@ -128,6 +131,10 @@ public struct SettingsView: View {
         case .iCloud:
             if let store = store.scope(state: \.path?.iCloud, action: \.path.iCloud) {
                 CloudSettingView(store: store)
+            }
+        case .draftRecovery:
+            if let store = store.scope(state: \.path?.draftRecovery, action: \.path.draftRecovery) {
+                DraftRecoveryView(store: store)
             }
         case .canvas:
             if let store = store.scope(state: \.path?.canvas, action: \.path.canvas) {

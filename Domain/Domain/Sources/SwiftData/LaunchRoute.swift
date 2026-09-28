@@ -31,6 +31,7 @@ public extension PersistentCloudKitContainer.CloudSyncState {
     /// | `syncCompleted` · `stillWaiting` · `failed` | 들어간다 — 로컬 저장소는 앱 스키마로 열려 있다 |
     /// | `migrationCompleted` · `migrationEndedWithoutImport` | 재실행을 요구한다 |
     /// | `storeUnavailable` | 막는다 |
+    /// | `connectionHeld` | 들어간다 — 저장소는 앱 스키마로 열려 있고, 이 실행은 이 기기에만 저장한다(정책 §12-6 C14 ③ "시작 화면은 통과시킨다") |
     ///
     /// - Important: 이전 구현은 마이그레이션 모드에서도 계정 없음 · 확인 실패 · import 실패 · 시간 초과가 `failed` · `stillWaiting`
     ///              으로 끝나 V1 전용 컨테이너를 쥔 채 필사 화면에 들어갔다. 그 컨테이너에서는 필사 조회가 비고, 저장은 오류 없이
@@ -38,7 +39,7 @@ public extension PersistentCloudKitContainer.CloudSyncState {
     var launchRoute: LaunchRoute {
         switch self {
         case .idle, .syncing, .migration: .stay
-        case .syncCompleted, .stillWaiting, .failed: .enterWriting
+        case .syncCompleted, .stillWaiting, .failed, .connectionHeld: .enterWriting
         case .migrationCompleted, .migrationEndedWithoutImport: .restartRequired
         case .storeUnavailable(let failure): .blocked(failure)
         }

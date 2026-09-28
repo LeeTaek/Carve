@@ -77,6 +77,22 @@ public struct AppCoordinatorView: View {
                 PatchnoteView(store: patchnoteStore)
             }
         }
+        .overlay {
+            if store.showsRelaunchGuidance {
+                // 로그인 완료와 연결 완료를 구분한다 — 이 실행은 계속 이 기기에만 저장한다. 기다릴 것이 없으므로 로딩을 띄우지 않는다.
+                VStack(spacing: 16) {
+                    Text("iCloud 로그인을 확인했어요")
+                    Text("아직 이 기기의 필사는 iCloud와 연결되지 않았어요.\n\(CloudSettingsFeature.relaunchToConnect)")
+                        .font(.caption)
+                        .multilineTextAlignment(.center)
+                    Button("확인") { store.send(.relaunchGuidanceDismissed) }
+                }
+                .padding(24)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("relaunchGuidance")
+            }
+        }
         // 이 창의 오버레이 · 팝오버까지 같은 모드를 따른다. 필사 영역은 모드와 무관하게 라이트로 그린다(결정 8-1 안 1).
         .preferredColorScheme(appearanceMode.colorScheme)
     }

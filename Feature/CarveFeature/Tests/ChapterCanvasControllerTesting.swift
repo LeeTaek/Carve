@@ -79,7 +79,8 @@ struct ChapterCanvasControllerTesting {
             }
             controller.loadViewIfNeeded()
             controller.view.layoutIfNeeded()
-            controller.onEvent = { [unowned self] event in self.events.append(event) }
+            // 컨트롤러는 사라진 뒤에도 마지막 보고(표시 · 인계)를 다음 턴에 보낸다 — 하네스가 먼저 사라져도 읽지 않게 약하게 잡는다.
+            controller.onEvent = { [weak self] event in self?.events.append(event) }
         }
 
         @MainActor

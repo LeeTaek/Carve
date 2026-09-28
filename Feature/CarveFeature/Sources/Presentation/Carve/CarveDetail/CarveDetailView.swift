@@ -45,6 +45,7 @@ public struct CarveDetailView: View {
                 }
                 .overlay(alignment: .bottom) { paletteDock }
                 .overlay(alignment: .bottom) { layoutDebugHUD }
+                .overlay(alignment: .top) { ownershipInjectionBadge }
                 .overlay(alignment: .bottom) { favoriteNoticeOverlay }
                 .overlay { verseMenuOverlay }
                 .overlay { historyOverlay }
@@ -57,6 +58,7 @@ public struct CarveDetailView: View {
                 }
                 .overlay(alignment: .bottom) { paletteDock }
                 .overlay(alignment: .bottom) { layoutDebugHUD }
+                .overlay(alignment: .top) { ownershipInjectionBadge }
                 .overlay(alignment: .bottom) { favoriteNoticeOverlay }
                 .overlay { verseMenuOverlay }
                 .overlay { historyOverlay }
@@ -92,27 +94,6 @@ public struct CarveDetailView: View {
         }
         #endif
     }
-
-    /// 캔버스가 실제로 합성에 쓴 상태 (E-4 진단 — HUD `compose` 줄).
-    #if DEBUG
-    private var composeProbe: CanvasComposeProbe {
-        let canvas = store.chapterCanvas
-        return CanvasComposeProbe(
-            renderedSignature: canvas.renderedLayout?.signature,
-            renderedColumnOrigin: canvas.renderedColumnOrigin,
-            columnOrigin: canvas.columnOrigin,
-            renderedRevision: canvas.renderedRevision,
-            isReloading: canvas.isReloading,
-            reloadWhenSettled: canvas.reloadWhenSettled,
-            isEditing: canvas.isEditing,
-            hasPendingLayout: canvas.pendingLayout != nil,
-            mismatchVerses: canvas.layoutMismatchVerses.sorted(),
-            legacyVerses: canvas.legacyVerses.sorted(),
-            undecodableVerses: canvas.undecodableVerses.sorted(),
-            legacyInkBounds: canvas.legacyInkBounds
-        )
-    }
-    #endif
 
     /// Phase 2 디버그 HUD. Debug 빌드에서 `-ChapterLayoutOverlay` 실행 인자가 있을 때만 보인다.
     @ViewBuilder
@@ -360,7 +341,8 @@ public struct CarveDetailView: View {
                     SentencesWithDrawingView(
                         store: childStore,
                         halfWidth: $halfWidth,
-                        isLayoutReady: store.isLayoutReady,
+                        // N-Canvas 는 초안 없이 동기화 저장소에 바로 쓴다 — 소유가 확인되기 전에는 입력을 닫는다(정책 §12-6 결정 1).
+                        isLayoutReady: store.isLayoutReady && (store.usesSingleCanvas || store.nCanvasWriteBlock == nil),
                         isCanvasActive: isCanvasActive(childStore.id),
                         isFavorite: store.favoriteVerses.contains(childStore.sentence.verse),
                         onUnderlineLayoutChange: { id, layout in
@@ -428,6 +410,43 @@ private extension CarveDetailView {
     /// 캔버스를 미리 만들어 둘 범위 — 뷰포트 위아래로 이 배수만큼.
     /// 타입 본문이 아니라 확장에 둔다 — `CarveDetailView` 본문을 길이 제한(300줄) 안에 둔다.
     static var canvasActivationMargin: CGFloat { 1.5 }
+
+    /// 캔버스가 실제로 합성에 쓴 상태 (E-4 진단 — HUD `compose` 줄).
+    #if DEBUG
+    var composeProbe: CanvasComposeProbe {
+        let canvas = store.chapterCanvas
+        return CanvasComposeProbe(
+            renderedSignature: canvas.renderedLayout?.signature,
+            renderedColumnOrigin: canvas.renderedColumnOrigin,
+            columnOrigin: canvas.columnOrigin,
+            renderedRevision: canvas.renderedRevision,
+            isReloading: canvas.isReloading,
+            reloadWhenSettled: canvas.reloadWhenSettled,
+            isEditing: canvas.isEditing,
+            hasPendingLayout: canvas.pendingLayout != nil,
+            mismatchVerses: canvas.layoutMismatchVerses.sorted(),
+            legacyVerses: canvas.legacyVerses.sorted(),
+            undecodableVerses: canvas.undecodableVerses.sorted(),
+            legacyInkBounds: canvas.legacyInkBounds
+        )
+    }
+    #endif
+
+    /// ACC-1 2차의 시험용 소유 주입이 이 세션에 걸려 있다 — 소유 증명이 아니라는 것을 화면에서 늘 보인다(DEBUG 전용).
+    @ViewBuilder
+    var ownershipInjectionBadge: some View {
+        #if DEBUG
+        if store.chapterCanvas.editEnvironment.ownershipInjected {
+            Text("소유 주입(DEBUG) · 소유 증명 아님")
+                .font(CarveTypography.caption)
+                .foregroundStyle(CarveColor.ink)
+                .padding(.horizontal, CarveSpacing.small)
+                .background(Color.yellow.opacity(0.85), in: Capsule())
+                .allowsHitTesting(false)
+                .accessibilityLabel("시험용 소유 주입이 켜져 있어요")
+        }
+        #endif
+    }
 
     /// 헤더 스크롤 애니메이션 등 과도한 이벤트 호출을 방지하기 위한 딜레이
     func delay(
@@ -515,6 +534,7 @@ private extension CarveDetailView {
                 onImage: { send(.verseMenuImageTapped) },
                 onWidget: { send(.verseMenuWidgetTapped) },
                 onErase: { send(.verseMenuEraseTapped) },
+                onDrafts: { send(.verseMenuDraftsTapped) },
                 onDismiss: { send(.verseMenuDismissed) }
             )
         }
@@ -531,12 +551,22 @@ private extension CarveDetailView {
                     send(.saveRetryTapped)
                 }
                 .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
-            } else if store.chapterCanvas.blockingLoadFailure != nil {
+            } else if let failure = store.chapterCanvas.blockingLoadFailure {
                 // 불러오지 못한 장은 쓸 수 없게 닫혀 있다. 저장 실패 다음으로 — 그쪽은 이미 쓴 필사가 위험하다.
-                LoadFailureNoticeView {
+                LoadFailureNoticeView(failure: failure) {
                     send(.loadRetryTapped)
                 }
                 .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+            } else if store.usesSingleCanvas, let notice = store.chapterCanvas.arrival.notice {
+                // 늦게 도착한 필사 — 편집한 장은 자동으로 바꾸지 않고 여기서 알린다(P0-3). 실패 안내 다음이다 — 그쪽은 이미 쓴 필사가 위험하다.
+                // 캔버스의 일이라 그 스토어로 바로 보낸다(절 메뉴 · 지우기 확인창처럼).
+                let canvas = store.scope(state: \.chapterCanvas, action: \.scope.chapterCanvasAction)
+                ArrivalNoticeView(notice: notice, onAction: { canvas.send(.arrivalNoticeTapped) }, onDismiss: { canvas.send(.arrivalNoticeDismissed) })
+                    .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+            } else if !store.usesSingleCanvas, let block = store.nCanvasWriteBlock {
+                // 입력을 닫은 사유를 보인다 — 다시 시도해도 같은 사유라 버튼을 두지 않는다(정책 §12-6 결정 1).
+                CarveStatusMessage(.failure, message: "절마다 쓰는 화면에서는 지금 필기를 받지 않아요. " + block.reasonText)
+                    .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
             } else if let notice = store.favoriteNotice {
                 FavoriteNoticeView(notice: notice) {
                     send(.favoriteRetryTapped)
@@ -568,6 +598,7 @@ private extension CarveDetailView {
         .padding(.bottom, favoriteNoticeBottomInset)
         .animation(reduceMotion ? .easeOut(duration: 0.12) : .snappy(duration: 0.25), value: store.chapterCanvas.saveRetryCount)
         .animation(reduceMotion ? .easeOut(duration: 0.12) : .snappy(duration: 0.25), value: store.chapterCanvas.blockingLoadFailure)
+        .animation(reduceMotion ? .easeOut(duration: 0.12) : .snappy(duration: 0.25), value: store.chapterCanvas.arrival.notice)
         .animation(.easeOut(duration: 0.2), value: localSaveText)
         .animation(reduceMotion ? .easeOut(duration: 0.12) : .snappy(duration: 0.25), value: store.favoriteNotice)
         .animation(reduceMotion ? .easeOut(duration: 0.12) : .snappy(duration: 0.25), value: store.imageSaveNotice)

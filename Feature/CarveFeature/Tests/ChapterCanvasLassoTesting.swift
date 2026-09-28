@@ -65,7 +65,8 @@ struct ChapterCanvasLassoEditContractTesting {
             controller.view.frame = CGRect(x: 0, y: 0, width: 800, height: 1200)
             controller.loadViewIfNeeded()
             controller.view.layoutIfNeeded()
-            controller.onEvent = { [unowned self] event in self.events.append(event) }
+            // 컨트롤러는 사라진 뒤에도 마지막 보고를 다음 턴에 보낸다 — 하네스가 먼저 사라져도 읽지 않게 약하게 잡는다.
+            controller.onEvent = { [weak self] event in self?.events.append(event) }
             controller.apply(ChapterCanvasController.Configuration(
                 renderedData: data, renderedRevision: 4, isInputEnabled: true,
                 tool: tool, drawingPolicy: .anyInput, topInset: 0, bottomInset: 24,

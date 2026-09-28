@@ -20,6 +20,10 @@ public struct AppCoordinatorFeature {
     @ObservableState
     public struct State {
         public static var initialState = Self()
+        /// 보류 중 로그인과 저장소 소유가 확인됐다 — 로딩 없이 재실행을 안내한다(2026-09-28 결정).
+        public var showsRelaunchGuidance = false
+        /// 이번 실행에서 재실행 안내를 이미 띄웠다. 닫은 뒤 다시 띄우지 않는다 — 설정의 iCloud 화면은 계속 같은 안내를 보인다.
+        var didShowRelaunchGuidance = false
         /// 현재 루트 화면 (트리기반)
         @Presents public var root: Root.State? = .launchProgress(.initialState)
         /// 업데이트 패치노트 표시 상태
@@ -60,6 +64,10 @@ public struct AppCoordinatorFeature {
         }
     }
     @Dependency(\.analyticsClient) private var analyticsClient
+    @Dependency(\.legacySeparationHoldState) private var holdState
+    @Dependency(\.drawingEditEnvironment) private var editEnvironment
+
+    private enum CancelID { case relaunchGuidance }
     
     public enum Action {
         case root(PresentationAction<Root.Action>)
@@ -69,6 +77,11 @@ public struct AppCoordinatorFeature {
         case path(StackActionOf<Path>)
         /// 위젯 등 외부에서 앱을 열었다.
         case openedURL(URL)
+        /// 보류 중 편집 환경을 다시 읽었다 — 재실행하면 연결되는지 본다.
+        /// 2.0.0 은 실행 중에 저장소를 다시 연결하지 않는다 — 옛 컨테이너가 해제되지 않아 local-only 로 되돌아갔다(2026-09-28 실측).
+        case connectionEnvironmentChanged(DrawingEditEnvironment)
+        /// 재실행 안내를 닫았다.
+        case relaunchGuidanceDismissed
     }
     
     @Reducer
@@ -95,6 +108,17 @@ public struct AppCoordinatorFeature {
         return BibleVerse(title: BibleChapter(title: title, chapter: link.chapter), verse: link.verse, sentence: "")
     }
 
+    /// 보류 중 편집 환경이 바뀔 때마다(로그인 · 앱 활성화) 다시 읽는다. 재실행하면 연결되면 안내하고 구독을 멈춘다.
+    private func observeRelaunchGuidance() -> Effect<Action> {
+        .run { [editEnvironment] send in
+            await send(.connectionEnvironmentChanged(await editEnvironment.current()))
+            for await _ in editEnvironment.changes() {
+                await send(.connectionEnvironmentChanged(await editEnvironment.current()))
+            }
+        }
+        .cancellable(id: CancelID.relaunchGuidance, cancelInFlight: true)
+    }
+
     public var body: some Reducer<State, Action> {
         /// 자식 Feature에서 올라오는 액션을 기반으로 루트 화면 전환을 수행하는 Reducer.
         /// - Note: LaunchProgress의 `.syncCompleted`, Carve의 `.moveToSetting,
@@ -103,9 +127,9 @@ public struct AppCoordinatorFeature {
             switch action {
             case .root(.presented(.launchProgress(.syncCompleted))):
                 // 들어가기 직전에 시작 화면의 상태를 한 번 더 본다 — 막힘 · 재실행 요구로 바뀌었으면 들어가지 않는다 (테스트 계획 MIG-F1).
-                // 저장소를 쓸 수 없을 때 앱이 쥔 대체 컨테이너는 저장을 거절하지 않으므로 이 확인이 마지막 경계다.
-                guard case .launchProgress(let launch)? = state.root,
-                      launch.syncState.launchRoute == .enterWriting else {
+                // 저장소를 쓸 수 없을 때 앱이 쥔 대체 컨테이너는 저장을 거절하지 않으므로 이 확인이 마지막 경계다. 대기 방식(초기 복원 · 일반)과
+                // 「먼저 시작하기」 까지 본다(`LaunchWaitRule`, 정책 §3-1).
+                guard case .launchProgress(let launch)? = state.root, launch.route == .enterWriting else {
                     break
                 }
                 let currentVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
@@ -115,12 +139,24 @@ public struct AppCoordinatorFeature {
                 if let previousVersion, previousVersion != currentVersion {
                     state.patchnote = .initialState
                 }
+                // 보류 중이면 로그인 · 소유가 확인되는지 지켜보다가 재실행을 안내한다. 연결을 기다리는 로딩은 띄우지 않는다.
+                let guidance: Effect<Action> = holdState.isHeld ? observeRelaunchGuidance() : .none
                 // 위젯을 눌러 시작했다면 필사 화면이 준비된 지금 그 절로 간다.
                 if let verse = state.pendingWidgetVerse {
                     state.pendingWidgetVerse = nil
-                    return .send(.root(.presented(.carve(.moveToVerse(verse)))))
+                    return .merge(guidance, .send(.root(.presented(.carve(.moveToVerse(verse))))))
                 }
-                
+                return guidance
+
+            case .connectionEnvironmentChanged(let environment):
+                guard !state.didShowRelaunchGuidance, environment.connectsOnRelaunch else { break }
+                state.didShowRelaunchGuidance = true
+                state.showsRelaunchGuidance = true
+                return .cancel(id: CancelID.relaunchGuidance)
+
+            case .relaunchGuidanceDismissed:
+                state.showsRelaunchGuidance = false
+
             case .openedURL(let url):
                 guard let verse = Self.verse(from: url) else { break }
                 // 위젯에서 들어왔다 — 설정 · 다른 화면을 닫고 그 절을 연다.
@@ -135,6 +171,13 @@ public struct AppCoordinatorFeature {
 
             case .root(.presented(.carve(.view(.moveToSetting)))):
                 state.settings = .initialState
+
+            // 절 메뉴의 「남은 필기 N」 — 설정을 그 자리로 연다(정책 §12-6 ④). 되살리지 않고 보여 주기만 한다.
+            case .root(.presented(.carve(.scope(.carveDetailAction(
+                .scope(.chapterCanvasAction(.delegate(.draftRecoveryRequested)))
+            ))))):
+                state.settings = SettingsFeature.State.initialState(path: .draftRecovery(.initialState))
+                return .send(.root(.presented(.carve(.view(.closeNavigationBar)))))
                 
             case .root(.presented(.carve(.view(.moveToChart)))):
                 state.path.append(.chart(.initialState))

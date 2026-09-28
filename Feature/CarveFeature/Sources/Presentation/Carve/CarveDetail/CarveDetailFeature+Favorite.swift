@@ -24,6 +24,8 @@ extension CarveDetailFeature {
         case added
         /// 저장하지 못했다. 「다시 시도」 는 같은 변경을 다시 보낸다.
         case failed(FavoriteChange)
+        /// 동기화 저장소에 쓰지 않고 막았다 — 사유를 보인다. 다시 시도해도 같은 사유로 막히므로 버튼을 두지 않는다.
+        case blocked(FavoriteChange, SyncedWriteBlock)
     }
 
     /// 즐겨찾기 한 번의 변경. 실패하면 이 값 그대로 다시 시도한다.
@@ -82,6 +84,12 @@ extension CarveDetailFeature {
             }
             return showFavoriteNotice(state: &state, .added, duration: Self.favoriteAddedNoticeDuration)
 
+        case let .favoriteChangeBlocked(change, block):
+            Log.info("즐겨찾기 — 동기화 저장소에 쓰지 않고 막았다", "\(block)")
+            // 먼저 바꿔 둔 표시를 되돌리고 막은 사유를 보인다.
+            setFavoriteMark(state: &state, key: change.key, isFavorite: !change.isAdding)
+            return showFavoriteNotice(state: &state, .blocked(change, block), duration: Self.favoriteFailureNoticeDuration)
+
         case .favoriteNoticeExpired:
             state.favoriteNotice = nil
             return .none
@@ -122,13 +130,22 @@ extension CarveDetailFeature {
     ///   - verse: 절 번호.
     ///   - ink: 캔버스가 지금 보이는 그 절의 필기. 획이 없으면 nil.
     func toggleFavorite(state: inout State, verse: Int, ink: Data?) -> Effect<Action> {
-        guard let chapter = state.favoriteChapter else { return .none }
+        guard let chapter = state.favoriteChapter else {
+            // 이 장의 즐겨찾기를 아직 읽지 못했다 — 누른 것이 아무 일도 하지 않으므로 그 사실을 남긴다.
+            Log.error("즐겨찾기 — 이 장을 아직 읽지 못해 누름을 무시했다", "verse=\(verse)")
+            return .none
+        }
         let key = FavoriteVerseKey(chapter: chapter, verse: verse)
         guard !state.favoriteVerses.contains(verse) else {
             return applyFavoriteChange(state: &state, .remove(key))
         }
         let sentence = state.sentenceWithDrawingState.first { $0.sentence.verse == verse }?.sentence.sentenceScript ?? ""
         let favorite = FavoriteVerseSnapshot(key: key, sentence: sentence, lineData: ink, createdDate: date.now)
+        // 보이기만 하는 초안(다른 계정 · 확인 전)을 이어 보는 절이다 — 그 잉크를 즐겨찾기로 옮기지 않는다(11차 리뷰 P0-2).
+        guard !state.usesSingleCanvas || !state.chapterCanvas.inheritsOtherSessionInk(verse: verse) else {
+            return showFavoriteNotice(state: &state, .blocked(.add(favorite), .verseFromOtherSession),
+                                      duration: Self.favoriteFailureNoticeDuration)
+        }
         return applyFavoriteChange(state: &state, .add(favorite))
     }
 
@@ -139,7 +156,12 @@ extension CarveDetailFeature {
         state.favoriteNotice = nil
         return .merge(
             .cancel(id: CancelID.favoriteNotice),
-            .run { [favoriteRepository] send in
+            .run { [favoriteRepository, drawingEditEnvironment] send in
+                // 즐겨찾기는 동기화 저장소에 바로 쓴다 — 쓰기 직전에 소유가 확인됐는지 다시 본다(정책 §12-6 결정 1, ACC-1 F30).
+                if let block = SyncedWriteBlock.check(await drawingEditEnvironment.current()) {
+                    await send(.favoriteChangeBlocked(change, block))
+                    return
+                }
                 do {
                     switch change {
                     case .add(let favorite):

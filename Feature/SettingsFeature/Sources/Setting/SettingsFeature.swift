@@ -23,6 +23,8 @@ public struct SettingsFeature {
         public var isPrivacyOptionsRequired = false
         /// 사이드바에서 선택 표시할 행. 상세 화면의 상태가 바뀌어도 같은 화면이면 같은 행이다.
         public var selectedSidebarItem: SidebarItem? { path?.sidebarItem }
+        /// 이번 실행의 iCloud 연결이 C14 게이트로 보류됐는가(정책 §12-6 C14 ③ · D2 — 설정 항목으로도 안내한다). 화면이 뜰 때 읽는다.
+        public var isConnectionHeld = false
 
         public static func initialState(path: Path.State?) -> Self {
             var state = Self()
@@ -52,6 +54,8 @@ public struct SettingsFeature {
     @Reducer
     public enum Path {
         case iCloud(CloudSettingsFeature)
+        /// 보이지 않게 남은 필기 — 개수 · 용량 · 목록(정책 §12-6 구현 순서 ④, 읽기 전용).
+        case draftRecovery(DraftRecoveryFeature)
         /// 필사 캔버스 — 단일 Canvas flag 토글 (설계 §13 Phase 3 (3/3)).
         case canvas(CanvasSettingsFeature)
         /// 위젯에 표시할 말씀(시안 N7 · N8).
@@ -74,6 +78,7 @@ public struct SettingsFeature {
     ///    상세 화면의 상태가 바뀌는 순간(필사 캔버스 토글 · 광고 제거 상품 불러오기) 선택 값과 달라져 선택 표시가 풀렸다.
     public enum SidebarItem: Hashable, CaseIterable, Sendable {
         case iCloud
+        case draftRecovery
         case canvas
         case widget
         case appearance
@@ -85,6 +90,7 @@ public struct SettingsFeature {
     }
     
     @Dependency(\.adConsentClient) var adConsentClient
+    @Dependency(\.legacySeparationHoldState) var holdState
 
     public var body: some Reducer<State, Action> {
         Reduce { state, action in
@@ -93,6 +99,7 @@ public struct SettingsFeature {
                 state.isPrivacyOptionsRequired = MainActor.assumeIsolated {
                     adConsentClient.isPrivacyOptionsRequired
                 }
+                state.isConnectionHeld = holdState.isHeld
             case .view(.privacyOptionsTapped):
                 return .run { _ in
                     // 폼을 닫거나 띄우지 못해도 설정 화면 상태는 바뀌지 않는다.
@@ -124,6 +131,7 @@ extension SettingsFeature.Path.State {
     var sidebarItem: SettingsFeature.SidebarItem {
         switch self {
         case .iCloud: .iCloud
+        case .draftRecovery: .draftRecovery
         case .canvas: .canvas
         case .widget: .widget
         case .appearance: .appearance
@@ -141,6 +149,7 @@ extension SettingsFeature.SidebarItem {
     var initialPath: SettingsFeature.Path.State {
         switch self {
         case .iCloud: .iCloud(.initialState)
+        case .draftRecovery: .draftRecovery(.initialState)
         case .canvas: .canvas(.initialState)
         case .widget: .widget(.initialState)
         case .appearance: .appearance(.initialState)

@@ -239,13 +239,29 @@ struct LocalStoreLoadFailureTesting {
         try await withStore { url in
             try StoreFixture.seedV7Store(at: url)
 
-            // 앱 스키마로는 열리지 않는다 — CoreData 134504(unknown model version)가 `loadIssueModelContainer` 로 올라온다.
-            #expect(throws: SwiftDataError.loadIssueModelContainer) {
+            // 앱 스키마로는 열리지 않는다 — CoreData 134504는 OS에 따라 서로 다른 SwiftData 오류로 올라온다.
+            do {
                 try ModelContainer(
                     for: AppStoreSchema.schema,
                     migrationPlan: DrawingDataMigrationPlan.self,
                     configurations: ModelConfiguration(url: url)
                 )
+                Issue.record("앱 스키마가 더 새 V7 저장소를 열었다")
+            } catch let error as SwiftDataError {
+                let isUnknownDataStoreSchema: Bool
+                // `unknownDataStoreSchema` 는 iOS 27 SDK(Swift 6.4)에만 있다 — 제품 코드 `isLegacySchemaMismatch` 와 같은 조건.
+                #if compiler(>=6.4)
+                if #available(iOS 27, *) {
+                    isUnknownDataStoreSchema = error == .unknownDataStoreSchema
+                } else {
+                    isUnknownDataStoreSchema = false
+                }
+                #else
+                isUnknownDataStoreSchema = false
+                #endif
+                #expect(error == .loadIssueModelContainer || isUnknownDataStoreSchema, "예상하지 못한 SwiftData 오류: \(error)")
+            } catch {
+                Issue.record("예상하지 못한 오류: \(error)")
             }
             // 이전 폴백은 실패하지 않는다.
             _ = try StoreFixture.openV1Only(at: url)
@@ -258,7 +274,11 @@ struct LocalStoreLoadFailureTesting {
 
     /// 들어가면 안 되는 이유 — V1 전용 컨테이너는 `BibleDrawing` 을 모른다. 크래시하지도 오류를 내지도 않아 "저장됨" 처럼 보인다.
     /// iOS 26.2 시뮬레이터 실측이다. SwiftData 가 달라져 저장이 던지게 되면 이 기대를 고치고 MIG-F1 기록도 고친다.
-    @Test("V1 전용 컨테이너에서는 필사 조회가 비고, 저장은 오류 없이 끝나지만 다시 읽히지 않는다")
+    @Test("V1 전용 컨테이너에서는 필사 조회가 비고, 저장은 오류 없이 끝나지만 다시 읽히지 않는다", .enabled(
+        if: ProcessInfo.processInfo.operatingSystemVersion.majorVersion == 18
+            || ProcessInfo.processInfo.operatingSystemVersion.majorVersion == 26,
+        "이 no-op 동작은 iOS 18.6 · 26.2에서 관측했다. iOS 17은 같은 호출에서 SwiftData가 trap 한다."
+    ))
     func v1OnlyContainerDropsDrawingSavesSilently() async throws {
         try await withStore { url in
             let container = try StoreFixture.openV1Only(at: url)
@@ -406,17 +426,17 @@ struct LocalStoreLoadFailureTesting {
         }
     }
 
-    @Test("열지 못한 저장소의 처리 — V1 폴백은 확인된 1.0.x 저장소이면서 loadIssue 일 때만이다")
+    @Test("열지 못한 저장소의 처리 — 확인된 1.0.x와 스키마 불일치에서만 V1 폴백한다")
     func planTable() {
-        #expect(LocalStoreLoader.plan(for: .unversionedLegacy, isLoadIssue: true) == .fallbackToV1)
-        #expect(LocalStoreLoader.plan(for: .unversionedLegacy, isLoadIssue: false) == .block(.openFailed))
+        #expect(LocalStoreLoader.plan(for: .unversionedLegacy, isLegacySchemaMismatch: true) == .fallbackToV1)
+        #expect(LocalStoreLoader.plan(for: .unversionedLegacy, isLegacySchemaMismatch: false) == .block(.openFailed))
         // ★ 이전 구현이 V1 폴백으로 필사를 지우던 경우다.
-        #expect(LocalStoreLoader.plan(for: .unknown, isLoadIssue: true) == .block(.unknownVersion))
+        #expect(LocalStoreLoader.plan(for: .unknown, isLegacySchemaMismatch: true) == .block(.unknownVersion))
         // 아는 버전인데 열지 못했다 — V1 과 맞는 저장소도 폴백하지 않는다. 폴백해도 할 일이 없고 재실행 안내만 되풀이된다.
-        #expect(LocalStoreLoader.plan(for: .known(Schema.Version(1, 0, 0)), isLoadIssue: true) == .block(.openFailed))
-        #expect(LocalStoreLoader.plan(for: .known(Schema.Version(5, 0, 0)), isLoadIssue: true) == .block(.openFailed))
-        #expect(LocalStoreLoader.plan(for: .missing, isLoadIssue: true) == .block(.openFailed))
-        #expect(LocalStoreLoader.plan(for: .unreadable, isLoadIssue: true) == .block(.unreadable))
+        #expect(LocalStoreLoader.plan(for: .known(Schema.Version(1, 0, 0)), isLegacySchemaMismatch: true) == .block(.openFailed))
+        #expect(LocalStoreLoader.plan(for: .known(Schema.Version(5, 0, 0)), isLegacySchemaMismatch: true) == .block(.openFailed))
+        #expect(LocalStoreLoader.plan(for: .missing, isLegacySchemaMismatch: true) == .block(.openFailed))
+        #expect(LocalStoreLoader.plan(for: .unreadable, isLegacySchemaMismatch: true) == .block(.unreadable))
     }
 
     @Test("막았을 때 앱이 쥐는 컨테이너는 메모리에만 있고 CloudKit 에 붙지 않는다")

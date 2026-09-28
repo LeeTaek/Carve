@@ -184,27 +184,40 @@ struct StrokeOwnershipResolver: Sendable {
     /// 여기서도 열거는 `drawing.strokes` 다 (§7-2). 한 원본에서 갈라진 조각들은 원본 path 를 공유해 앵커가 서로 같으므로,
     /// 집합은 보통 원소 하나다. 조각 하나만 움직이면 집합이 달라져 그룹 전체가 재귀속된다 — 소유권의 단위가 키이기 때문이다.
     private struct AnchorIndex {
-        private let anchors: [StrokeIdentityKey: Set<CGPoint>]
+        private let anchors: [StrokeIdentityKey: Set<AnchorPoint>]
 
         init(_ drawing: PKDrawing, anchor: (PKStroke) -> CGPoint?) {
-            var anchors: [StrokeIdentityKey: Set<CGPoint>] = [:]
+            var anchors: [StrokeIdentityKey: Set<AnchorPoint>] = [:]
             for stroke in drawing.strokes {
                 guard let point = anchor(stroke) else { continue }
-                anchors[StrokeIdentityKey(stroke: stroke), default: []].insert(point)
+                anchors[StrokeIdentityKey(stroke: stroke), default: []].insert(AnchorPoint(point))
             }
             self.anchors = anchors
         }
 
         /// 이전 세대에 같은 키가 있었고 그 앵커 집합이 달라졌는가. 키가 없었으면 "움직였다" 가 아니다(승계할 것이 없다).
-        func hasMoved(_ key: StrokeIdentityKey, to current: Set<CGPoint>) -> Bool {
+        func hasMoved(_ key: StrokeIdentityKey, to current: Set<AnchorPoint>) -> Bool {
             guard let previous = anchors[key] else { return false }
             return previous != current
         }
     }
 
+    /// iOS 17에서도 Hashable 인 좌표 값. CGPoint 자체의 Hashable 은 iOS 18부터 제공된다.
+    private struct AnchorPoint: Hashable {
+        let x: CGFloat
+        let y: CGFloat
+
+        init(_ point: CGPoint) {
+            x = point.x
+            y = point.y
+        }
+    }
+
     /// 획 묶음의 앵커 집합. 앵커를 얻지 못하는 획(control point 없음)은 빠진다.
-    private func anchors(of strokes: [PKStroke]) -> Set<CGPoint> {
-        Set(strokes.compactMap { anchorPoint(of: $0) })
+    private func anchors(of strokes: [PKStroke]) -> Set<AnchorPoint> {
+        Set(strokes.compactMap { stroke in
+            anchorPoint(of: stroke).map(AnchorPoint.init)
+        })
     }
 
     /// 같은 `StrokeIdentityKey` 를 공유하는 stroke 묶음.

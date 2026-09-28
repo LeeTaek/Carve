@@ -82,6 +82,16 @@ public struct VerseDrawingSnapshot: Equatable, Sendable {
     public var hasVersionedLayout: Bool {
         drawingVersion == 3 && metadata != nil
     }
+
+    /// 이 행의 내용 지문. 비운 행(`lineData == nil`)이면 nil — 빈 절과 같다.
+    ///
+    /// 초안의 지문(`VerseDraft.contentFingerprint`)과 **같은 규칙**으로 만든다 — 편집 화면과 복구 화면(④)이 같은 값을 견준다.
+    public var contentFingerprint: String? {
+        guard let lineData else { return nil }
+        return VerseContentFingerprint.make(
+            lineData: lineData, drawingVersion: drawingVersion, layoutMetadataBlob: try? metadata?.encodedBlob()
+        )
+    }
 }
 
 // MARK: - 저장 명령 (설계 §5 · §8-2 · §8-7)

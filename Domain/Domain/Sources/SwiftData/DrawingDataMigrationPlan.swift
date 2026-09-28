@@ -18,6 +18,32 @@ enum MigrationPlanV1Only: SchemaMigrationPlan {
     static var stages: [MigrationStage] { [] }
 }
 
+/// 사용자 정의 migration 경계를 넘길 값만 보관한다.
+/// source context에서 destination SwiftData 모델을 만들면 iOS 17에서 아직 등록되지 않은 모델로 취급된다.
+private struct V1DrawingMigrationValue: Sendable {
+    let id: String?
+    let titleName: String?
+    let titleChapter: Int?
+    let verse: Int?
+    let creationDate: Date?
+    let updateDate: Date?
+    let lineData: Data?
+
+    func makeV2Drawing() -> DrawingSchemaV2.BibleDrawing {
+        let drawing = DrawingSchemaV2.BibleDrawing()
+        drawing.id = id
+        drawing.titleName = titleName
+        drawing.titleChapter = titleChapter
+        drawing.translation = .NKRV
+        drawing.drawingVersion = 1
+        drawing.verse = verse
+        drawing.creationDate = creationDate
+        drawing.updateDate = updateDate
+        drawing.lineData = lineData
+        return drawing
+    }
+}
+
 
 /// BibleDrawing 관련 SwiftData Schema(V1~V5) 마이그레이션 플랜
 /// V1 -> V2: DrawingVO -> BibleDrawing 모델명 및 속성 변경 (Custom)
@@ -29,13 +55,13 @@ enum DrawingDataMigrationPlan: SchemaMigrationPlan {
         [DrawingSchemaV1.self, DrawingSchemaV2.self, DrawingSchemaV3.self, DrawingSchemaV4.self, DrawingSchemaV5.self, DrawingSchemaV6.self]
     }
 
-    private static var updatedDrawings: [DrawingSchemaV2.BibleDrawing] = []
+    private static var updatedDrawings: [V1DrawingMigrationValue] = []
 
     static let migrationV1toV2 = MigrationStage.custom(
         fromVersion: DrawingSchemaV1.self,
         toVersion: DrawingSchemaV2.self,
         willMigrate: { context in
-            /// 기존 V1 DrawingVO 전체를 로드한 뒤, 유효한 드로잉만 필터링하여 V2.BibleDrawing으로 매핑.
+            /// 기존 V1 DrawingVO에서 값만 추출한다. destination 모델은 didMigrate의 context에서 만든다.
             let drawings = try context.fetch(FetchDescriptor<DrawingSchemaV1.DrawingVO>())
             updatedDrawings = drawings
                 .filter { drawing in        // drawing이 비어있으면 제거
@@ -47,8 +73,7 @@ enum DrawingDataMigrationPlan: SchemaMigrationPlan {
                     }
                 }
                 .map { old in
-                let new = DrawingSchemaV2.BibleDrawing()
-                new.id = {
+                let id = {
                     if let title = old.titleName,
                        let chapter = old.titleChapter,
                        let verse = old.section,
@@ -59,20 +84,23 @@ enum DrawingDataMigrationPlan: SchemaMigrationPlan {
                         return old.id
                     }
                 }()
-                new.titleName = old.titleName
-                new.titleChapter = old.titleChapter
-                new.translation = .NKRV
-                new.drawingVersion = 1
-                new.verse = old.section
-                new.creationDate = old.creationDate
-                new.updateDate = old.updateDate
-                new.lineData = old.lineData
-                return new
+                return V1DrawingMigrationValue(
+                    id: id,
+                    titleName: old.titleName,
+                    titleChapter: old.titleChapter,
+                    verse: old.section,
+                    creationDate: old.creationDate,
+                    updateDate: old.updateDate,
+                    lineData: old.lineData
+                )
             }
             try context.save()
         },
         didMigrate: { context in
-            updatedDrawings.forEach { context.insert($0) }
+            defer { updatedDrawings = [] }
+            updatedDrawings
+                .map { $0.makeV2Drawing() }
+                .forEach { context.insert($0) }
             try context.save()
         }
     )
@@ -129,6 +157,24 @@ enum DrawingDataMigrationPlan: SchemaMigrationPlan {
             migrationV3toV4,
             migrationV4toV5,
             migrationV5toV6
+        ]
+    }
+}
+
+/// V2 이상 저장소용 migration plan.
+/// iOS 17 SwiftData는 V2 저장소를 열 때 V1 사용자 정의 단계를 포함한 전체 plan에서
+/// 원본 버전을 찾지 못한다(134504). 확인된 V2 저장소부터 마지막 단계까지만 선언한다.
+enum DrawingDataMigrationPlanFromV2: SchemaMigrationPlan {
+    static var schemas: [VersionedSchema.Type] {
+        [DrawingSchemaV2.self, DrawingSchemaV3.self, DrawingSchemaV4.self, DrawingSchemaV5.self, DrawingSchemaV6.self]
+    }
+
+    static var stages: [MigrationStage] {
+        [
+            DrawingDataMigrationPlan.migrationV2toV3,
+            DrawingDataMigrationPlan.migrationV3toV4,
+            DrawingDataMigrationPlan.migrationV4toV5,
+            DrawingDataMigrationPlan.migrationV5toV6
         ]
     }
 }

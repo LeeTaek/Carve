@@ -130,6 +130,28 @@ extension SwiftDatabaseActor {
             throw DrawingRepositoryError.staleStoreGeneration
         }
         do {
+            // 주소 오류와 metadata 인코딩 실패는 쓰기 전에 모두 찾는다. iOS 17 SwiftData 의
+            // rollback 은 외부 저장 Data 를 가진 기존 모델의 메모리 값을 복원하지 못할 수 있다.
+            var introducedRowIDs: Set<String> = []
+            for mutation in mutations {
+                switch mutation {
+                case .create(let verse, let rowID, _, let metadata):
+                    _ = try encode(metadata, verse: verse)
+                    introducedRowIDs.insert(rowID.raw)
+
+                case .replace(let verse, let rowID, _, let metadata):
+                    _ = try encode(metadata, verse: verse)
+                    guard try introducedRowIDs.contains(rowID.raw)
+                            || drawingRow(rowID: rowID, chapter: chapter) != nil else {
+                        throw DrawingRepositoryError.rowNotFound(rowID)
+                    }
+                    introducedRowIDs.insert(rowID.raw)
+
+                case .clear(_, let rowID):
+                    introducedRowIDs.insert(rowID.raw)
+                }
+            }
+
             for mutation in mutations {
                 switch mutation {
                 case .create(let verse, let rowID, let data, let metadata):

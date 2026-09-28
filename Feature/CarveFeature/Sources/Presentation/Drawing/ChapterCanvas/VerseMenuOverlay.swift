@@ -28,6 +28,8 @@ struct VerseMenuOverlay: View {
     let onImage: () -> Void
     let onWidget: () -> Void
     let onErase: () -> Void
+    /// 이 절에 보이지 않게 남은 필기를 보러 간다(설정 → 남은 필기).
+    let onDrafts: () -> Void
     let onDismiss: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -39,7 +41,7 @@ struct VerseMenuOverlay: View {
     private static let cornerRadius: CGFloat = 16
 
     private enum Item: CaseIterable {
-        case favorite, history, image, widget, erase
+        case favorite, history, image, widget, drafts, erase
     }
 
     private var items: [Item] {
@@ -48,6 +50,8 @@ struct VerseMenuOverlay: View {
             case .favorite: menu.availability.canFavorite
             case .history: menu.availability.canViewHistory
             case .erase: menu.availability.canErase
+            // 그 절에 보이지 않게 남은 필기가 있을 때만(정책 §12-6 ④ — 절 번호 옆 표시나 팝업은 쓰지 않는다).
+            case .drafts: menu.availability.hiddenDraftCount > 0
             case .image, .widget: true
             }
         }
@@ -139,6 +143,7 @@ struct VerseMenuOverlay: View {
             case .history: onHistory()
             case .image: onImage()
             case .widget: onWidget()
+            case .drafts: onDrafts()
             case .erase: onErase()
             }
         } label: {
@@ -166,6 +171,7 @@ struct VerseMenuOverlay: View {
         case .history: "verseMenu.history"
         case .image: "verseMenu.image"
         case .widget: "verseMenu.widget"
+        case .drafts: "verseMenu.drafts"
         case .erase: "verseMenu.erase"
         }
     }
@@ -176,6 +182,7 @@ struct VerseMenuOverlay: View {
         case .history: .history
         case .image: .photo
         case .widget: .widget
+        case .drafts: .more
         case .erase: .trash
         }
     }
@@ -186,6 +193,7 @@ struct VerseMenuOverlay: View {
         case .history: Text("이전 필사 내용 보기")
         case .image: Text("이미지 저장")
         case .widget: Text("위젯에 추가")
+        case .drafts: Text("남은 필기 \(menu.availability.hiddenDraftCount)")
         case .erase: Text("지우기")
         }
     }
