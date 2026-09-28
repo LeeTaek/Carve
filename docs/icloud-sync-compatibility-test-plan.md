@@ -2782,3 +2782,5 @@ develop 머지 전에 `claude/2-0-0-chart-di` 를 먼저 합치고(차트 의존
 | `DrawingQuarantine` · `InstallationID` · 복구 사본 폴더 · 쓰지 않는 보조 함수 | 제품 코드에서 호출하는 곳이 없다. C14 분리 게이트(`EraseJobRule.quarantine` 등)는 이후 버전 근거로 남긴다 |
 
 시험 18개가 함께 빠졌다. **전체 회귀(Xcode 26.3):** iPadOS 26.2 · 18.6 각 **1060 passed · 0 failed · 6 skipped · 4 expected (1070)**, 17.5 **1059 · 0 · 7 · 4 (1070)**. 무계정 재실행 안내 UI 시험(`TEST_RUNNER_CARVE_RECONNECT_SMOKE=1`) 17.5 · 18.6 각 1/1.
+
+**develop 머지 뒤(머지 커밋, 양쪽 유지):** 26.2 · 18.6 각 **1069 · 0 · 6 · 4 (1079)**, 17.5 **1068 · 0 · 7 · 4 (1079)** — 브랜치 1060 + develop 신규 시험 9. 재실행 안내 UI 시험 17.5 · 18.6 각 1/1. 17.5 에서는 처음에 develop 의 `CanvasLightAppearanceTesting` N-Canvas 시험이 컨테이너 없이 `BibleDrawing` 을 만들어 iOS 17 SwiftData 에서 멈췄다(`failed to find a currently active container`, 이 스위트만 돌려도 재현). 인메모리 컨테이너를 먼저 만들도록 시험을 고친 뒤의 수치다.
