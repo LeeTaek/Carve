@@ -53,9 +53,6 @@ public final class PersistentCloudKitContainer: ObservableObject {
         return CKContainer(identifier: containerId.id).privateCloudDatabase
     }()
     
-    /// 필사 데이터를 조회/저장하기 위해 주입된 SwiftData 래퍼.
-    @Dependency(\.drawingData) private var drawingDatabase
-    
     /// CloudKit 동기화 진행 상태.
     ///
     /// - Important: **기준 시간이 지난 것과 실패한 것을 같은 상태로 두지 않는다**(정책 §3).
