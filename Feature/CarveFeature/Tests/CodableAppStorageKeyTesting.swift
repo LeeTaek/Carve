@@ -16,6 +16,13 @@ private struct SampleSetting: Codable, Equatable, Sendable {
     var size: Int
 }
 
+/// 키를 만든 곳의 의존성 문맥에만 있는 객체 — 키가 그 문맥을 붙잡는지 본다(runtime 의 ModelContainer 대역).
+private final class DependencyProbe: Sendable {}
+
+private enum DependencyProbeKey: TestDependencyKey {
+    static let testValue: DependencyProbe? = nil
+}
+
 /// 구독이 받은 값과 그 값을 받은 스레드
 private struct Delivery: Equatable, Sendable {
     let value: SampleSetting?
@@ -99,6 +106,38 @@ struct CodableAppStorageKeyTesting {
 
         #expect(received.value.isEmpty)
         #expect(defaults.data(forKey: sampleKey) == (try JSONEncoder().encode(SampleSetting(size: 2))))
+    }
+
+    /// Sharing 은 키를 전역 공유 참조 · 알림 구독에 오래 둔다. 키가 만든 곳의 의존성 문맥을 붙잡으면 보류 runtime 을 놓아도
+    /// 그 ModelContainer 가 해제되지 않아 실행 중 재연결이 local-only 로 되돌아갔다(2026-09-28 iPadOS 18.6 실측).
+    @Test("키는 만든 곳의 의존성 문맥을 붙잡지 않고 저장소만 보관한다")
+    func keyDoesNotRetainCreationDependencies() throws {
+        let suite = "CodableAppStorageKeyTesting.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        weak var weakProbe: DependencyProbe?
+        let key: CodableAppStorageKey<SampleSetting> = {
+            let probe = DependencyProbe()
+            weakProbe = probe
+            return withDependencies {
+                $0.defaultAppStorage = defaults
+                $0[DependencyProbeKey.self] = probe
+            } operation: {
+                CodableAppStorageKey<SampleSetting>(sampleKey)
+            }
+        }()
+        withExtendedLifetime(key) {
+            #expect(weakProbe == nil, "키가 만든 곳의 의존성 문맥을 붙잡고 있다")
+        }
+
+        // 저장소는 만든 곳의 것을 그대로 쓴다.
+        let otherSuite = suite + ".other"
+        let other = try #require(UserDefaults(suiteName: otherSuite))
+        defer { other.removePersistentDomain(forName: otherSuite) }
+        let sameStore = withDependencies { $0.defaultAppStorage = defaults } operation: { CodableAppStorageKey<SampleSetting>(sampleKey) }
+        let otherStore = withDependencies { $0.defaultAppStorage = other } operation: { CodableAppStorageKey<SampleSetting>(sampleKey) }
+        #expect(key.id == sameStore.id)
+        #expect(key.id != otherStore.id)
     }
 
     private func subscribe(in defaults: UserDefaults, received: LockIsolated<[Delivery]>) -> SharedSubscription {

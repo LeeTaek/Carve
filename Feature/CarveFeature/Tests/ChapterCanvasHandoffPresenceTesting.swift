@@ -463,3 +463,50 @@ struct ChapterCanvasHandoffPresenceTesting: EditSessionTestHelpers {
         await end(store, environment)
     }
 }
+
+/// 이 스위트가 막는 것: 로그인 뒤 활성화가 함께 만든 세션 다시 읽기와 연결 요청이 겹칠 때 요청을 거절해, 실행 중 연결이 끝나지 않는 것.
+@Suite("편집 세션 — 로그인 뒤 hold 연결 준비")
+@MainActor
+struct ChapterCanvasLoginReconnectTesting: EditSessionTestHelpers {
+    /// 로그인 뒤 앱이 활성화되면 편집 환경 변화(세션을 새 근거로 다시 읽기)와 재연결 요청이 함께 온다. 다시 읽는 중이라고 거절하면
+    /// 실행 중 연결이 끝나지 않았다(2026-09-28 iPadOS 18.6 실측 — 「이 Canvas는 소유 확인 보류 상태가 아닙니다」).
+    @Test("로그인으로 세션을 다시 읽는 중에 온 hold 재연결 요청은 거절하지 않고, 다시 읽은 뒤 정확한 인계를 거쳐 완료한다")
+    func storeReconnectWaitsForLoginReload() async throws {
+        let spy = RepositorySpy()
+        let environment = ControlledEditEnvironment(DrawingEditEnvironment(
+            accountState: .noAccount, serverWork: nil, knowledge: EraseEpochKnowledge(), connectionHeld: true
+        ))
+        let store = makeStore(spy: spy, results: [], environment: environment, drafts: RecordingDraftStore(), clock: TestClock())
+        await composeAndSubscribe(store, environment)
+        await attachCanvas(store)
+
+        // 앱 밖에서 로그인했다 — 계정과 저장소 소유 근거는 확인됐지만 runtime 은 아직 보류다.
+        let loggedIn = DrawingEditEnvironment(
+            accountState: .confirmed(accountA), serverWork: AccountServerWorkToken(scope: accountA, generation: 1),
+            knowledge: EraseEpochKnowledge(), storeOwnership: accountA, connectionHeld: true
+        )
+        spy.holdNextLoadCall()
+        environment.change(to: loggedIn)
+        await store.receive(\.editEnvironmentChanged)
+        #expect(store.state.isReloading)
+
+        let requestID = UUID(912)
+        await store.send(.prepareForStoreReconnect(requestID))
+        #expect(store.state.storeReconnectRequestID == requestID, "다시 읽는 중이라고 거절했다")
+        #expect(store.state.storeReconnectHandoffToken == nil)
+        #expect(!store.state.isInputEnabled)
+
+        // 다시 읽기가 끝나면 새 근거의 세션에서 인계를 요청한다.
+        spy.releaseLoad()
+        await store.receive(\.drawingsLoaded)
+        #expect(store.state.editEnvironment == loggedIn)
+        let token = try #require(store.state.storeReconnectHandoffToken)
+        #expect(token == store.state.handoffToken)
+
+        await store.send(.editHandoffCompleted(token: token))
+        await store.receive(.delegate(.storeReconnectReady(requestID)))
+        #expect(store.state.storeReconnectReadyID == requestID)
+        await store.send(.cancelStoreReconnect(requestID))
+        await end(store, environment)
+    }
+}

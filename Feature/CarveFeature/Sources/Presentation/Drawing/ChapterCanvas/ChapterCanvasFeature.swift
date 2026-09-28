@@ -190,6 +190,8 @@ public struct ChapterCanvasFeature {
         /// 동일 요청의 안전한 저장 완료를 부모에 알린 ID.
         public var storeReconnectReadyID: UUID?
         var storeReconnectHandoffToken: Int?
+        /// 연결 준비가 세션 닫기 · 다시 읽기가 끝나기를 기다린다. 끝나면 `settleStoreReconnect` 가 인계를 시작한다.
+        var storeReconnectAwaitsSettling = false
         /// 화면에 있는 캔버스(컨트롤러)와 그 캔버스가 표시하는 세대(아직 표시 전이면 `Int.max`). 없으면 인계를 기다리지 않는다 — 있으면 응답이
         /// 늦어도 완료로 보지 않는다. 늦은 보고는 캔버스가 표시하는 세대로만 오므로, 모든 캔버스가 더 새 세대를 표시해야 닫은 문맥을 놓는다.
         var attachedCanvases: [UUID: Int] = [:]
@@ -400,7 +402,11 @@ public struct ChapterCanvasFeature {
                 return beginLoad(state: &state, chapter: chapter, expectedVerseCount: expectedVerseCount)
 
             case .drawingsLoaded(let requestID, let environment, let result, let drafts):
-                return finishLoad(state: &state, requestID: requestID, environment: environment, result: result, drafts: drafts)
+                // 다시 읽기가 끝나기를 기다리던 연결 준비를 잇는다.
+                return .merge(
+                    finishLoad(state: &state, requestID: requestID, environment: environment, result: result, drafts: drafts),
+                    settleStoreReconnect(state: &state)
+                )
 
             case .retryLoad:
                 guard state.blockingLoadFailure != nil else { return .none }

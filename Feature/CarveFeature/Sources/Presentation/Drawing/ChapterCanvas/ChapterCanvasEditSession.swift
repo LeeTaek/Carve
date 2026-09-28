@@ -58,6 +58,17 @@ extension ChapterCanvasFeature.State {
 
     /// 화면에 캔버스가 있는가 — 있으면 인계 응답을 기다린다.
     var hasCanvas: Bool { !attachedCanvases.isEmpty }
+
+    /// 초안으로 남기지 못해 「다시 시도」를 기다리는 닫기인가 — 스스로 풀리지 않는다.
+    var isSessionEndFailed: Bool {
+        if case .failed? = sessionEnd?.phase { return true }
+        return false
+    }
+
+    /// 계정 변화로 세션을 닫거나 다시 읽는 중인가 — 끝나면 스스로 풀린다. 연결 준비는 이 동안 거절하지 않고 기다린다.
+    var isSettlingForStoreReconnect: Bool {
+        (sessionEnd != nil && !isSessionEndFailed) || isReloading
+    }
 }
 
 extension ChapterCanvasFeature {
@@ -82,11 +93,23 @@ extension ChapterCanvasFeature {
                 reconnectTimeout(requestID)
             )
         }
-        guard state.editEnvironment.connectionHeld, state.sessionEnd == nil, state.eraseTask == nil, !state.isReloading else {
+        guard state.editEnvironment.connectionHeld, state.eraseTask == nil, !state.isSessionEndFailed else {
             return .send(.delegate(.storeReconnectFailed(requestID, "이 Canvas는 소유 확인 보류 상태가 아닙니다.")))
         }
         state.storeReconnectRequestID = requestID
         state.storeReconnectReadyID = nil
+        guard !state.isSettlingForStoreReconnect else {
+            // 로그인 뒤 활성화는 편집 환경 변화(세션 닫기 · 다시 읽기)와 이 요청을 함께 만든다. 거절하면 실행 중 연결이 끝나지 않는다
+            // (2026-09-28 iPadOS 18.6 실측) — 끝나기를 기다렸다가 `settleStoreReconnect` 가 인계부터 잇는다. 시한은 그대로 건다.
+            state.storeReconnectHandoffToken = nil
+            state.storeReconnectAwaitsSettling = true
+            return reconnectTimeout(requestID)
+        }
+        return beginStoreReconnectHandoff(state: &state, requestID: requestID)
+    }
+
+    /// 연결 준비의 인계를 시작한다 — 캔버스가 있으면 뷰의 응답을, 없으면 저장 결과를 기다린다.
+    private func beginStoreReconnectHandoff(state: inout State, requestID: UUID) -> Effect<Action> {
         if state.hasCanvas {
             state.handoffToken += 1
             state.storeReconnectHandoffToken = state.handoffToken
@@ -121,6 +144,7 @@ extension ChapterCanvasFeature {
         state.storeReconnectRequestID = nil
         state.storeReconnectReadyID = nil
         state.storeReconnectHandoffToken = nil
+        state.storeReconnectAwaitsSettling = false
         return .cancel(id: CanvasEditSessionCancelID.storeReconnect)
     }
 
@@ -137,6 +161,7 @@ extension ChapterCanvasFeature {
         guard state.storeReconnectRequestID == requestID, state.storeReconnectReadyID != requestID else { return .none }
         state.storeReconnectRequestID = nil
         state.storeReconnectHandoffToken = nil
+        state.storeReconnectAwaitsSettling = false
         return .merge(
             .cancel(id: CanvasEditSessionCancelID.storeReconnect),
             .send(.delegate(.storeReconnectFailed(requestID, message)))
@@ -146,8 +171,20 @@ extension ChapterCanvasFeature {
     /// 초안까지 내구적으로 기록된 hold 편집은 pendingMutations에 남아도 안전하다. 저장 실패/초안 실패는 완료로 보지 않는다.
     func settleStoreReconnect(state: inout State) -> Effect<Action> {
         guard let requestID = state.storeReconnectRequestID,
-              state.storeReconnectReadyID != requestID,
-              state.storeReconnectHandoffToken == nil else { return .none }
+              state.storeReconnectReadyID != requestID else { return .none }
+        if state.storeReconnectAwaitsSettling {
+            // 세션 닫기 · 다시 읽기가 끝났으면 그때의 근거로 인계를 시작한다. 닫기가 초안 저장에 실패했으면 이어 가지 않는다.
+            guard !state.isSettlingForStoreReconnect else { return .none }
+            state.storeReconnectAwaitsSettling = false
+            if state.isSessionEndFailed {
+                return failStoreReconnect(state: &state, requestID: requestID, message: "로컬 초안을 저장하지 못했습니다. 필기는 화면과 대기열에 남아 있습니다.")
+            }
+            guard state.editEnvironment.connectionHeld, state.eraseTask == nil else {
+                return failStoreReconnect(state: &state, requestID: requestID, message: "소유 확인 보류 상태가 바뀌어 연결 준비를 중단했습니다. 필기는 현재 runtime에 보존했습니다.")
+            }
+            return beginStoreReconnectHandoff(state: &state, requestID: requestID)
+        }
+        guard state.storeReconnectHandoffToken == nil else { return .none }
         guard state.editEnvironment.connectionHeld, state.sessionEnd == nil else {
             return failStoreReconnect(state: &state, requestID: requestID, message: "소유 확인 보류 상태가 바뀌어 연결 준비를 중단했습니다. 필기는 현재 runtime에 보존했습니다.")
         }

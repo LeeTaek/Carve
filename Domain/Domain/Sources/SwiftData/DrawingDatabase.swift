@@ -17,7 +17,10 @@ public struct DrawingDatabase: Sendable {
     public typealias Item = BibleDrawing
     @Dependency(\.createSwiftDataActor) public var actor
     @Dependency(\.analyticsClient) private var analyticsClient
-    
+
+    /// 앱은 runtime 마다 만들어 넘긴다 — `liveValue` 는 처음 읽힌 runtime 의 의존성 문맥을 품고 전역에 남는다.
+    public init() {}
+
     // MARK: - verse 단위 BibleDrawing
     
     /// 한 장의 필사 데이터를 모두 불러옴
