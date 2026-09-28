@@ -54,13 +54,15 @@ func fixedTimeDependencies(_ dependencies: inout DependencyValues) {
     dependencies.continuousClock = ImmediateClock()
 }
 
-/// 과도기용: 지금과 같이 실제 현재 시각과 실제 시계를 쓴다. 테스트를 고정 시각으로 옮기면 지운다.
+/// 실제 현재 시각과 실제 시계를 쓴다. State 기본값 · State 계산 프로퍼티처럼 제품 코드가 `Date()` 를 직접 읽는
+/// 경로를 검증할 때만 쓴다. 새 테스트는 `fixedTimeDependencies` 를 쓴다.
 func liveTimeDependencies(_ dependencies: inout DependencyValues) {
     dependencies.date = .constant(Date())
     dependencies.continuousClock = ContinuousClock()
 }
 
-/// 오늘 자정에서 `offset` 일 떨어진 날의 자정을 돌려준다.
+/// 실제 오늘 자정에서 `offset` 일 떨어진 날의 자정을 돌려준다. State 기본값 · State 계산 프로퍼티처럼
+/// 제품 코드가 `Date()` 를 직접 읽는 경로를 검증할 때만 쓴다. 새 테스트는 `fixedChartDay` 를 쓴다.
 func chartDay(_ offset: Int) -> Date {
     let calendar = Calendar.current
     let today = calendar.startOfDay(for: Date())
