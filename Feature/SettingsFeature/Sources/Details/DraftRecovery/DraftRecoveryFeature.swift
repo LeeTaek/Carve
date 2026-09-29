@@ -524,6 +524,9 @@ public enum DraftRecoveryCopy {
         case .otherBasis: "다른 계정 근거"
         case .newerDraftShown: "더 새 초안이 보임"
         case .undisplayable: "표시하지 못함"
+        case .beforeConnection: "iCloud 연결 전에 쓴 필기"
+        case .savedEarlier: "예전에 저장한 필기"
+        case .inHistory: "이미 저장된 필기"
         }
     }
 
@@ -542,6 +545,12 @@ public enum DraftRecoveryCopy {
             "같은 절에 더 늦게 쓴 초안이 있어 그쪽이 화면에 보여요. 이 필기도 지우지 않고 남겨 둬요."
         case .undisplayable:
             "이 필기를 놓을 자리 정보(좌표)를 읽지 못해 자동으로 표시하지 못해요. 필기는 그대로 남아 있어요."
+        case .beforeConnection:
+            "이 필기를 쓸 때는 iCloud 계정을 확인할 수 없었어요. 현재 필사에 자동으로 반영하지 않았어요."
+        case .savedEarlier:
+            "저장을 마친 뒤 같은 절을 이어서 고친 예전 필기예요. 지우지 않고 남겨 두었어요."
+        case .inHistory:
+            "같은 내용이 현재 필사나 이전 필사 기록에 이미 있어요. 지우지 않고 남겨 두었어요."
         }
     }
 

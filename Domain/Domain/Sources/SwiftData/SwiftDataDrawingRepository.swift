@@ -45,6 +45,16 @@ public struct SwiftDataDrawingRepository: DrawingRepository {
     }
 }
 
+extension SwiftDataDrawingRepository: DrawingVerseImporting {
+    public func importVerse(
+        _ command: VerseDrawingImportCommand,
+        chapter: BibleChapter,
+        generation: DrawingStoreGeneration
+    ) async throws -> VerseDrawingImportOutcome {
+        try await actor.importVerseDrawing(command, chapter: chapter, generation: generation, now: Date())
+    }
+}
+
 // MARK: - actor 안의 트랜잭션
 
 extension SwiftDatabaseActor {

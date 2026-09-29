@@ -95,7 +95,7 @@ public struct DrawingEditEnvironment: Equatable, Sendable {
 ///
 /// 소유가 확인된 유효 환경에서만 쓴다. 로그아웃 · 미확인 상태의 직접 동기화 쓰기는 계속 막는다.
 /// 메뉴만이 아니라 실제 쓰기 직전에 다시 본다.
-public enum SyncedWriteBlock: Equatable, Sendable {
+public enum SyncedWriteBlock: Hashable, Sendable {
     /// 로그인하지 않았다.
     case signedOut
     /// 계정을 확인하는 중이거나 확인하지 못했다.

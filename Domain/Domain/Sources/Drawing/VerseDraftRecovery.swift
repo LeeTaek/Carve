@@ -36,10 +36,15 @@ public struct VerseDraftRecoveryPlan: Equatable, Sendable {
     /// `kept` 가운데 **화면에 겹칠 수 없는** 초안 — 잉크는 있는데 좌표 정보(레이아웃 메타데이터)를 읽지 못해 어디에 놓을지 모른다
     /// (2026-09-21 후속 리뷰 P0-2b). 겹치지 않되 목록(④)이 표시 실패 사유와 함께 알린다. 잉크는 그대로 남는다.
     public var undisplayable: [VerseDraft] = []
+    /// `kept` 가운데 **내용이 이미 저장소에 있었던** 초안 — 확인할 필요 없이 보관만 하는 예전 필기(사용자 결정 2026-09-29).
+    /// 저장을 마친 뒤 그 절을 이어 고친 예전 수정본(넣은 지문에 자기 내용이 있다)이거나, 같은 내용이 저장소의 어느 행(지금 필사 · 이전 필사
+    /// 기록)에 있다. 「확인이 필요한 필기」 의 수 · 절 메뉴 수에 넣지 않고 목록 아래에 접어 둔다. **파일은 그대로 남는다.**
+    /// 되살릴 수 있는 초안(`recoverable`)은 저장했던 내용이라도 저장소에서 사라졌으므로 여기 들지 않는다(같은 내용이 저장소에 있을 때만 든다).
+    public var archived: [VerseDraft] = []
 
     public init(
         shown: [VerseDraft] = [], showOnly: Set<VerseDraftKey> = [], settled: [VerseDraft] = [], kept: [VerseDraft] = [],
-        uncertain: [VerseDraft] = [], recoverable: [VerseDraft] = [], undisplayable: [VerseDraft] = []
+        uncertain: [VerseDraft] = [], recoverable: [VerseDraft] = [], undisplayable: [VerseDraft] = [], archived: [VerseDraft] = []
     ) {
         self.shown = shown
         self.showOnly = showOnly
@@ -48,6 +53,13 @@ public struct VerseDraftRecoveryPlan: Equatable, Sendable {
         self.uncertain = uncertain
         self.recoverable = recoverable
         self.undisplayable = undisplayable
+        self.archived = archived
+    }
+
+    /// 사용자가 확인해야 하는 초안 — 자동으로 표시되지 않고(`kept`), 보관만 하는 예전 필기(`archived`)가 아닌 것. 절 메뉴의
+    /// 「확인이 필요한 필기 N」 과 목록의 수가 이것이다.
+    public var needsConfirmation: [VerseDraft] {
+        kept.filter { !archived.contains($0) }
     }
 }
 
@@ -72,6 +84,9 @@ public struct VerseDraftStoreView: Equatable, Sendable {
     public let verseContent: [Int: String]
     /// 행마다의 지금 내용. 대표가 아닌 행(보관 · 비운 행)도 든다 — 초안이 보낸 행을 그대로 찾는다.
     public let rows: [BibleDrawingRowID: VerseDraftStoreRow]
+    /// 절마다 저장소의 **모든 행**(대표 · 이전 필사 기록)이 든 내용 지문. 비운 행은 들지 않는다 — 같은 내용이 이미 저장소에 있는 초안을
+    /// 보관만 하는 예전 필기로 가른다(`VerseDraftRecoveryPlan.archived`).
+    public let history: [Int: Set<String>]
 
     public init(snapshots: [VerseDrawingSnapshot]) {
         let representatives = snapshots.representativesByVerse()
@@ -81,6 +96,12 @@ public struct VerseDraftStoreView: Equatable, Sendable {
             snapshots.map { ($0.rowID, VerseDraftStoreRow(contentFingerprint: $0.contentFingerprint)) },
             uniquingKeysWith: { first, _ in first }
         )
+        var history: [Int: Set<String>] = [:]
+        for snapshot in snapshots {
+            guard let fingerprint = snapshot.contentFingerprint else { continue }
+            history[snapshot.verse, default: []].insert(fingerprint)
+        }
+        self.history = history
     }
 }
 
@@ -136,13 +157,15 @@ public enum VerseDraftRecoveryRule {
     ///   - sessionID: 지금 편집 세션. 없으면 모든 초안이 다른 세션의 것이다.
     ///   - storedRevisions: 행마다 지금 세션이 저장소 저장까지 마친 가장 새 revision.
     ///   - storeRows: 이 장의 저장소에 있는 행(대표 · 보관 · 빈 행 모두)과 그 내용.
+    ///   - storeHistory: 절마다 저장소의 모든 행이 든 내용 지문(`VerseDraftStoreView.history`) — 보관만 하는 예전 필기를 가른다.
     public static func plan(
         drafts: [VerseDraft],
         storeContent: [Int: String],
         environment: DrawingEditEnvironment,
         sessionID: String?,
         storedRevisions: [BibleDrawingRowID: Int] = [:],
-        storeRows: [BibleDrawingRowID: VerseDraftStoreRow] = [:]
+        storeRows: [BibleDrawingRowID: VerseDraftStoreRow] = [:],
+        storeHistory: [Int: Set<String>] = [:]
     ) -> VerseDraftRecoveryPlan {
         var plan = VerseDraftRecoveryPlan()
         let byVerse = Dictionary(grouping: drafts, by: \.key.verse)
@@ -207,7 +230,25 @@ public enum VerseDraftRecoveryRule {
             if latest.continuation == .inherit { plan.showOnly.insert(latest.draft.key) }
             plan.kept.append(contentsOf: candidates.map(\.draft).filter { $0 != latest.draft })
         }
+        // 보이지 않고 남긴 것 가운데 내용이 이미 저장소에 있었던 것 — 확인할 필요 없이 보관만 한다(사용자 결정 2026-09-29).
+        plan.archived = plan.kept.filter { draft in
+            !plan.undisplayable.contains(draft) && holdsSavedContent(
+                draft, history: storeHistory[draft.key.verse], recoverable: plan.recoverable.contains(draft)
+            )
+        }
         return plan
+    }
+
+    /// 이 초안의 내용이 **이미 저장소에 있었는가** — 같은 내용이 그 절의 어느 행(지금 필사 · 이전 필사 기록)에 있거나, 저장을 마친 내용
+    /// (넣은 지문에 자기 내용이 있다)인데 그 뒤 그 절이 이어 고쳐졌다.
+    ///
+    /// 뒤의 것은 다른 기기가 같은 절을 **모르는 채 동시에** 고쳐 덮은 경우와 가려지지 않는다 — 그 경우도 보관만 한다(2.0.0 의 알려진 제한,
+    /// 사용자 결정 2026-09-29: 목록 아래에 접어 두고 펼치면 견주고 가져올 수 있다). 되살릴 수 있는 초안은 그 행이 앞선 내용으로 돌아와 이 내용이
+    /// 저장소에서 사라졌으므로 제외한다.
+    static func holdsSavedContent(_ draft: VerseDraft, history: Set<String>?, recoverable: Bool) -> Bool {
+        guard let content = draft.contentFingerprint else { return false }
+        if history?.contains(content) == true { return true }
+        return !recoverable && draft.storeState == .stored && draft.sentFingerprints?.contains(content) == true
     }
 
     /// 이 초안을 화면에 **겹칠 수 있는가** — 비운 절이거나, 잉크와 그 좌표 정보(레이아웃 메타데이터)를 읽을 수 있다.
@@ -263,6 +304,9 @@ public enum VerseDraftRecoveryRule {
     }
 
     static func standing(of draft: VerseDraft, verseContent: String?, rows: [BibleDrawingRowID: VerseDraftStoreRow]) -> Standing {
+        // 사용자가 「확인이 필요한 필기」 에서 가져왔다 — 그 행이 남아 있는 동안은 역할이 끝났다. 그 뒤 그 절을 이어 고친 것은 사용자의 편집이다.
+        // 행이 사라졌으면(전송 전 계정 전환 — F29) 기록을 믿지 않고 아래 규칙으로 다시 판정한다.
+        if let imported = draft.imported, rows[imported.rowID] != nil { return .settled }
         guard let state = draft.storeState else {
             // 저장소로 보낸 적 없다 — 내용이 이미 그 절의 대표 내용이면 역할이 끝났다.
             return draft.contentFingerprint == verseContent ? .settled : .candidate
@@ -320,5 +364,85 @@ public enum VerseDraftRecoveryRule {
         case .awaitingAccountConfirmation, .preserveOnly:
             return .inherit
         }
+    }
+}
+
+// MARK: - 연결 전 필기 (정책 §12-6 ④ 가져오기, 2026-09-29)
+
+/// 연결 전 필기를 지금 저장소와 견준 결과. 편집 화면의 판정(`VerseDraftRecoveryRule.plan`)에 들지 않는 초안이라 따로 가른다.
+public struct VerseDraftImportPlan: Equatable, Sendable {
+    /// 가져오기를 기다린다 — 지금 필사와 다르다. 「확인이 필요한 필기」 에 오른다.
+    public var awaiting: [VerseDraft] = []
+    /// 좌표 정보가 없어 넣을 수 없다 — 목록이 제한과 함께 알린다.
+    public var undisplayable: [VerseDraft] = []
+    /// 같은 내용이 이미 저장소에 있다(이전 필사 기록) — 보관만 하는 예전 필기.
+    public var archived: [VerseDraft] = []
+    /// 역할이 끝났다 — 지금 필사와 같거나 이미 가져왔다. 목록에 넣지 않는다(파일은 남는다).
+    public var settled: [VerseDraft] = []
+
+    public init(awaiting: [VerseDraft] = [], undisplayable: [VerseDraft] = [], archived: [VerseDraft] = [], settled: [VerseDraft] = []) {
+        self.awaiting = awaiting
+        self.undisplayable = undisplayable
+        self.archived = archived
+        self.settled = settled
+    }
+
+    /// 사용자가 확인해야 하는 것 — 절 메뉴 · 목록의 수에 든다.
+    public var needsConfirmation: [VerseDraft] { awaiting + undisplayable }
+}
+
+public extension VerseDraftRecoveryRule {
+    /// 확인된 계정 환경에서 **가져오기를 기다리는 연결 전 필기**인가 — 로그인하지 않은 동안 쓴 필기, 참고할 계정 없이 확인 전에 쓴 필기
+    /// (사용자 결정 2026-09-29).
+    ///
+    /// 편집 화면에는 오르지 않는다(`reachesScreen` 과 겹치지 않는다) — 어느 계정의 필기인지 확인하지 못했으므로 자동으로 귀속하지 않고,
+    /// 「확인이 필요한 필기」 가 지금 필사와 견주어 보이며 사용자가 고른 것만 지금 계정으로 가져온다. **다른 계정을 참고하던 확인 전 필기와 다른
+    /// 계정 묶음은 여기 들지 않는다** — 다른 사람의 필기일 수 있어 그 계정으로 돌아왔을 때 연다(P0-1).
+    static func awaitsImport(_ draft: VerseDraft, environment: DrawingEditEnvironment) -> Bool {
+        guard case .confirmed = environment.accountBasis else { return false }
+        switch draft.account {
+        case .localOnly, .unverified(hint: nil): return true
+        case .unverified, .confirmed: return false
+        }
+    }
+
+    /// 이 환경에서 한 장의 연결 전 필기 — 연결 전 묶음(`beforeConnectionDraftScopes`)을 읽어 가져오기를 기다리는 초안만 남긴다.
+    /// - Parameter read: 한 묶음의 이 장 초안. 읽지 못하면 던진다 — 부르는 쪽이 그 실패를 어떻게 다룰지 정한다.
+    static func beforeConnectionDrafts(
+        environment: DrawingEditEnvironment,
+        read: (AccountScope) async throws -> [VerseDraft]
+    ) async throws -> [ScopedVerseDraft] {
+        var drafts: [ScopedVerseDraft] = []
+        for scope in environment.beforeConnectionDraftScopes {
+            for draft in try await read(scope) where awaitsImport(draft, environment: environment) {
+                drafts.append(ScopedVerseDraft(scope: scope, draft: draft))
+            }
+        }
+        return drafts
+    }
+
+    /// 연결 전 필기를 지금 저장소와 견준다.
+    ///
+    /// - 가져온 기록이 있고 그 행이 남아 있으면, 또는 지금 필사와 같으면 **역할이 끝났다**(목록에 넣지 않는다).
+    /// - 좌표 정보가 없으면 넣을 수 없다 — 표시 실패로 알린다(P0-2b 와 같은 판정).
+    /// - 같은 내용이 이전 필사 기록에 있으면 보관만 하는 예전 필기다.
+    /// - 그 밖은 가져오기를 기다린다.
+    static func importPlan(drafts: [VerseDraft], view: VerseDraftStoreView) -> VerseDraftImportPlan {
+        var plan = VerseDraftImportPlan()
+        for draft in drafts {
+            let verse = draft.key.verse
+            if let imported = draft.imported, view.rows[imported.rowID] != nil {
+                plan.settled.append(draft)
+            } else if draft.contentFingerprint == view.verseContent[verse] {
+                plan.settled.append(draft)
+            } else if !isDisplayable(draft) {
+                plan.undisplayable.append(draft)
+            } else if let content = draft.contentFingerprint, view.history[verse]?.contains(content) == true {
+                plan.archived.append(draft)
+            } else {
+                plan.awaiting.append(draft)
+            }
+        }
+        return plan
     }
 }
