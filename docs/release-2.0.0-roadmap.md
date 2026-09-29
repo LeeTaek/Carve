@@ -18,7 +18,7 @@
 | 필사 이전 · 동기화 필수 관문 | ✅ 개발 환경에서 통과 | 업데이트 무유실 · 옛 무계정 필기의 첫 로그인 전송 · 시간차 양방향 동기화 · 실패 시 보존. 시뮬레이터 · Development CloudKit · Debug 실기기(iPadOS 27.2) 범위. **Production 환경은 미확인** — [인계](./release-2.0.0-migration-sync-handoff.md) · [출시 범위](./release-2.0.0-migration-sync-scope.md) |
 | 자동 회귀 | ⚠️ Xcode 26.3 만 최신 | 2026-09-29 develop, Xcode 26.3: iPadOS 26.2 · 18.6 각 1112, 17.5 1111 통과, 실패 0(각 총 1122). **Xcode 27 은 09-25 코드까지만** 여섯 runtime 통과 — 현재 코드는 미실행 |
 | 출시 후보 빌드 | ✅ 경로 확인 | 사용자 확인(09-29): Xcode Cloud Xcode 27 환경에서 TestFlight 까지 배포되고 빌드 번호는 223 으로 올라간다. 아래는 당시 기록 — iOS 27 SwiftData 1.0.x 폴백(`LocalStoreLoader` 의 `#if compiler(>=6.4)`)이 Xcode 26.x 빌드에서 빠지므로 **후보는 Xcode 27 로 만든다.** Xcode Cloud 워크플로는 09-25 확인 당시 26.6 · 26.3 이었다. 기존 TestFlight `2.0.0 (220)` 은 Xcode 26.6 빌드라 후보가 아니다 |
-| 배포 서명 · Production | ⛔ 미완 | App Store 배포 프로필 · App Group 포털 등록 · CloudKit Production 스키마 배포 · TestFlight 실기기 업데이트 확인 |
+| 배포 서명 · Production | ⚠️ 진행 중 | 개발자 포털 App Group · iCloud 연결 확인, CloudKit Production 스키마 배포 완료(09-29, §7 차단 5). 남은 것: TestFlight 실기기 업데이트 확인(Production 첫 확인) |
 | App Store 제출 요건 | ⚠️ 진행 중 | 개인정보 매니페스트 File Timestamp 사유 누락은 09-29 수정(§7 차단 1). IAP 첨부 · 스토어 자료 미완 |
 | 기능 실기기 검증 | ⚠️ 일부 | 위젯 · 이미지 저장 · 광고 제거 구매 · 동의 폼 · 본문 모양 iCloud 백업은 시뮬레이터 · 단위 시험까지 |
 
@@ -333,7 +333,7 @@ TestFlight에서는 후보 빌드 설치·기존 상태를 가진 앱의 업데�
 - [x] **2. Xcode 27 빌드 · TestFlight 경로.** 사용자 확인(2026-09-29): Xcode Cloud 를 Xcode 27 환경으로 올리면 TestFlight 배포까지 된다. 최종 후보의 커밋 · 빌드 번호는 제출 때 적는다. 현재 코드의 Xcode 27 전체 회귀는 남아 있다(권장).
 - [x] **3. 빌드 번호.** 사용자 확인(2026-09-29): Cloud 빌드는 223 으로 올라간다 — 1 로 되돌아가는 경로는 실제로 타지 않는다.
 - [ ] **4. 배포 서명.** Apple Distribution 인증서 · App Store 프로필, 개발자 포털에 App Group `group.kr.co.carve.leetaek` 등록(앱 · 위젯). Archive 의 entitlements 에 App Group · `ubiquity-kvstore-identifier` · `icloud-container-environment = Production` · 컨테이너 `iCloud.Carve.SwiftData.iCloud` 가 있는지 `codesign -d --entitlements` 로 본다.
-- [ ] **5. CloudKit Production 스키마 배포.** Development 의 새 레코드 타입 · 필드(`CD_FavoriteVerse` 등 V5 · V6)를 Production 에 배포한다. Production 스키마는 지울 수 없으니 Development 스키마가 최종인지 먼저 본다.
+- [x] **5. CloudKit Production 스키마 배포 (2026-09-29).** 운영 컨테이너 ID 를 빌드 인자로만 덮은 Debug 빌드를 새 iPadOS 26.2 시뮬레이터에서 돌려 Development 를 채웠다 — 즐겨찾기 · 필기 · 지우기 · 전체 삭제 · 필기 있는 절 즐겨찾기, export 전부 성공 · `CKError` 0. `CD_FavoriteVerse`(`favoriteID` · `titleName` · `titleChapter` · `verse` · `translation` · `createdDate` · `sentence` · `lineData`)와 `CD_BibleDrawing`(V4 필드 12개)을 확인했고, 231KB 필기도 레코드 안(`CD_lineData`)으로 가서 `CD_lineData_ckAsset`(두 타입) · `CD_layoutMetadataData_ckAsset`(`CD_BibleDrawing`)은 사용자가 콘솔에서 직접 추가했다. 사용자가 Production 에 배포했다. 2.0.0 이 만들지 않는 V6 타입 `CD_VerseDrawingVersion` · `CD_DrawingEraseEpoch` 와 값이 늘 nil 인 `CD_FavoriteVerse.knownEraseEpochs` 는 배포하지 않았다 — 2.1 에서 쓰기 시작할 때 배포한다.
 - [ ] **6. TestFlight 후보로 실기기 업데이트.** App Store 1.3.0 이 설치된(로그인 · 필사 있는) iPad 에 후보를 덮어 설치해 필사 보존 · 재실행 연결 · 다른 iPad 수신을 확인한다. **Production 환경에서 이전 · 동기화를 보는 첫 확인이다.**
 - [ ] **7. 광고 제거 IAP.** `kr.co.carve.leetaek.adfree` 는 첫 IAP 라 2.0.0 버전 페이지의 인앱 구매 항목에서 함께 제출한다. 상품 상태 「제출 준비 완료」, 유료 앱 계약 활성, 가격(잠정 약 3달러) 확정, TestFlight 샌드박스 구매 · 복원 확인.
 - [ ] **8. 스토어 자료.** 스크린샷 · 설명 · 개인정보 라벨(AdMob · Firebase 가 수집하는 항목) · 버전 설명이 실제 기능 · 알려진 제한과 일치.
