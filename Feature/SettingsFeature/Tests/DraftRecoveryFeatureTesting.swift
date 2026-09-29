@@ -266,13 +266,14 @@ struct DraftRecoveryFeatureTesting {
         #expect(bucket.items.allSatisfy { $0.ink == nil })
         #expect(bucket.unreadableFiles.isEmpty)
         #expect(reader.reads.value.isEmpty)
-        // 분류한 적 없는 수를 "자동으로 표시되지 않는 것" 으로 부르지 않는다.
+        // 분류한 적 없는 수를 "확인이 필요한 필기" 로 부르지 않는다.
         #expect(bucket.inaccessibleCount == 1)
         #expect(store.state.hiddenCount == 0)
+        #expect(store.state.pendingCount == 0)
         #expect(store.state.unopenedCount == 1)
         let detail = DraftRecoveryCopy.bucketDetail(bucket)
-        #expect(detail.contains("초안 1개"))
-        #expect(!detail.contains("자동으로 표시되지 않는"))
+        #expect(detail.contains("필기 1개"))
+        #expect(!detail.contains("확인이 필요한"))
         // 그 묶음의 파일은 이 계정에서 다루지 않는다.
         await store.send(.view(.askRemoveUnreadable(Self.accountA)))
         #expect(store.state.pendingRemoval == nil)
@@ -447,14 +448,27 @@ struct DraftRecoveryFeatureTesting {
         #expect(store.state.buckets.first?.title == "로그인하지 않은 동안")
     }
 
-    /// 목록의 기준은 "그 장을 다시 열어도 자동으로 표시되지 않는 초안" 이다(2026-09-21 후속 리뷰 확정). 열린 캔버스에 지금 겹쳐 보이는지가 아니다.
-    @Test("목록이 모으는 것을 「자동으로 표시되지 않는 필사 초안」 으로 말하고, 「화면에 보이지 않는」 이라 하지 않는다")
-    func copySaysNotAutomaticallyShown() {
-        #expect(DraftRecoveryCopy.introduction.contains("자동으로 표시되지 않는 필사 초안"))
-        #expect(DraftRecoveryCopy.totalLine(draftCount: 3, draftBytes: 0, hiddenCount: 1).hasSuffix("자동으로 표시되지 않는 것 1개"))
-        for text in [DraftRecoveryCopy.introduction, DraftRecoveryCopy.nothingHidden, DraftRecoveryCopy.reasonDetail(.storeMoved)] {
+    /// 화면 이름과 첫 설명은 앱이 무엇을 했는지(따로 보관함)가 아니라 **사용자가 왜 봐야 하는지**를 말한다(2026-09-29). 목록의 기준은 여전히
+    /// "그 장을 다시 열어도 자동으로 표시되지 않는 필기" 다 — 열린 캔버스에 지금 겹쳐 보이는지가 아니다(2026-09-21 후속 리뷰 확정).
+    @Test("화면은 「확인이 필요한 필기」 로 부르고, 왜 자동으로 반영하지 않았는지와 무엇을 하면 되는지를 먼저 말한다 — 백업이 아니라는 것도")
+    func copySaysWhyItNeedsConfirmation() {
+        #expect(DraftRecoveryCopy.title == "확인이 필요한 필기")
+        #expect(DraftRecoveryCopy.introduction.contains("현재 필사에 반영됐는지 확인이 필요한 내용"))
+        #expect(DraftRecoveryCopy.introduction.contains("자동으로 반영하지 않았어요"))
+        #expect(DraftRecoveryCopy.guidance.contains("사용할 내용을 선택해 주세요"))
+        #expect(DraftRecoveryCopy.storageNote.contains("iCloud 백업을 뜻하지 않아요"))
+        #expect(DraftRecoveryCopy.totalLine(draftCount: 3, draftBytes: 0).contains("남겨 둔 필기 3개"))
+        // 항목마다 그 항목의 까닭만 — 연결 전 필기의 설명이 다른 까닭을 말하지 않는다.
+        #expect(DraftRecoveryCopy.reasonTitle(.beforeConnection) == "iCloud 연결 전에 쓴 필기")
+        #expect(!DraftRecoveryCopy.reasonDetail(.beforeConnection).contains("저장된 내용이 바뀌었"))
+        #expect(DraftRecoveryCopy.reasonTitle(.storeMoved) == "현재 필사와 내용이 달라요")
+        #expect(!DraftRecoveryCopy.reasonDetail(.storeMoved).contains("iCloud 계정을 확인할 수 없었"))
+        for text in [DraftRecoveryCopy.introduction, DraftRecoveryCopy.nothingPending, DraftRecoveryCopy.reasonDetail(.storeMoved)] {
             #expect(!text.contains("화면에 보이지 않"))
         }
+        // 보관만 하는 예전 필기는 확인할 필요가 없다고 말하고, 넣을 수 없는 필기는 그 제한을 말한다.
+        #expect(DraftRecoveryCopy.reasonDetail(.savedEarlier).contains("확인할 필요는 없지만"))
+        #expect(DraftRecoveryCopy.reasonDetail(.undisplayable).contains("넣을 수 없어요"))
     }
 
     @Test("묶음을 펼쳤다 접는다")
