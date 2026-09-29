@@ -13,6 +13,7 @@
 
 @testable import Domain
 import Foundation
+import SQLite3
 import SwiftData
 import Testing
 
@@ -119,6 +120,7 @@ private enum StoreFixture {
         row.addedInV7 = "v7"
         context.insert(row)
         try context.save()
+        try settleWAL(at: url)
     }
 
     /// V7 스키마로 다시 열어 필사 행을 읽는다.
@@ -183,6 +185,7 @@ private enum StoreFixture {
         row.memo = "확인되지 않은 모양"
         context.insert(row)
         try context.save()
+        try settleWAL(at: url)
     }
 
     /// 반례 저장소를 자기 스키마로 다시 열어 행 수와 잉크를 읽는다.
@@ -199,6 +202,33 @@ private enum StoreFixture {
         let context = ModelContext(container)
         context.insert(DrawingVO(bibleTitle: chapter, verse: 1, lineData: RealLegacyLineData.data))
         try context.save()
+    }
+
+    /// 시드가 WAL 에 남긴 페이지를 본체로 옮기고 WAL 을 비운다.
+    ///
+    /// 시드 컨테이너는 함수가 끝난 뒤에 늦게 닫힌다. 그 사이에 `storeBytes` 로 기준을 뜨면 WAL 이 남아 있다가,
+    /// 로더가 연 연결이 닫히며 체크포인트해 본체 바이트가 바뀐다 — 내용은 같은데 바이트 비교가 실패한다
+    /// (2026-09-29 Xcode Cloud, 이 맥 iPadOS 26.2 150회 중 1회 재현: WAL 57712B → 0B). 기준을 뜨기 전에 여기서 비워 둔다.
+    static func settleWAL(at url: URL) throws {
+        var handle: OpaquePointer?
+        guard sqlite3_open_v2(url.path, &handle, SQLITE_OPEN_READWRITE, nil) == SQLITE_OK, let db = handle else {
+            throw FixtureError.checkpoint("열기 실패")
+        }
+        defer { sqlite3_close(db) }
+        sqlite3_busy_timeout(db, 5_000)
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "PRAGMA wal_checkpoint(TRUNCATE);", -1, &statement, nil) == SQLITE_OK else {
+            throw FixtureError.checkpoint(String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(statement) }
+        // 결과 행의 첫 열이 busy 다. 다른 연결이 막으면 SQLITE_OK 여도 1 이 오므로 따로 본다.
+        guard sqlite3_step(statement) == SQLITE_ROW, sqlite3_column_int(statement, 0) == 0 else {
+            throw FixtureError.checkpoint("체크포인트가 끝나지 않았다")
+        }
+    }
+
+    enum FixtureError: Error {
+        case checkpoint(String)
     }
 
     /// 저장소 본체와 WAL 의 바이트.
