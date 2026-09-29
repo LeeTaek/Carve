@@ -9,6 +9,7 @@
 import CarveToolkit
 import CoreGraphics
 import Domain
+import SwiftData
 
 import ComposableArchitecture
 
@@ -27,6 +28,8 @@ public struct VerseDrawingHistoryFeature {
         public var hasLoaded = false
         /// 롱탭한 절 행의 창 좌표(시안 E2 — 팝오버를 그 절 아래에 붙인다). 없으면 화면 가운데에 띄운다.
         public var anchorFrame: CGRect?
+        /// 회차 바꾸기를 동기화 저장소에 쓰지 못한 사유(정책 §12-6 결정 1). 있으면 바꾸지 않았다는 안내를 띄운다.
+        public var restoreBlock: SyncedWriteBlock?
 
         public static let initialState = State(title: .init(title: .genesis, chapter: 1),
                                                verse: 1)
@@ -38,6 +41,7 @@ public struct VerseDrawingHistoryFeature {
         }
     }
     @Dependency(\.drawingData) var drawingContext
+    @Dependency(\.drawingEditEnvironment) var drawingEditEnvironment
     
     public enum Action: ViewAction {
         case view(View)
@@ -45,6 +49,8 @@ public struct VerseDrawingHistoryFeature {
         case setDrawings([BibleDrawing])
         /// 선택 여부를 상위로 전달: 팝업 닫기 위한 목적, 선택한 drawing 전달
         case setPresentDrawing(BibleDrawing)
+        /// 고른 회차를 동기화 저장소에 써도 되는지 본 결과. 사유가 있으면 쓰지 않는다(정책 §12-6 결정 1).
+        case restoreChecked(PersistentIdentifier, SyncedWriteBlock?)
         
         public enum View {
             /// 성경 절에 대한 필사 기록을 가져옴
@@ -58,6 +64,7 @@ public struct VerseDrawingHistoryFeature {
         Reduce { state, action in
             switch action {
             case .view(.fetchDrawings):
+                state.restoreBlock = nil
                 return fetchDrawings(state: &state)
                 
             case .setDrawings(let drawings):
@@ -78,6 +85,21 @@ public struct VerseDrawingHistoryFeature {
                 return .none
                 
             case .view(.selectDrawing(let drawing)):
+                // 회차 바꾸기는 동기화 저장소(`BibleDrawing.isPresent`)를 바꾼다 — 쓰기 직전에 소유를 확인한다.
+                // 모델을 `@Sendable` 클로저에 붙잡지 않도록 ID 만 넘긴다.
+                let presentID = drawing.persistentModelID
+                return .run { [drawingEditEnvironment] send in
+                    await send(.restoreChecked(presentID, SyncedWriteBlock.check(await drawingEditEnvironment.current())))
+                }
+
+            case let .restoreChecked(presentID, block):
+                if let block {
+                    Log.error("이전 필사 기록 — 동기화 저장소에 쓰지 않고 막았다", "\(block)")
+                    state.restoreBlock = block
+                    return .none
+                }
+                state.restoreBlock = nil
+                guard let drawing = state.drawings.first(where: { $0.persistentModelID == presentID }) else { return .none }
                 return handleSelectDrawing(state: &state, drawing: drawing)
                 
             default: return .none

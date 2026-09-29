@@ -14,15 +14,14 @@ struct DailyRecordChartStateTesting {
     @Test("가장 오래된 주에서 큰 드래그도 짧은 반동 후 같은 주와 Y축으로 복귀한다")
     @MainActor
     func oldestWeekBouncesWithoutPaging() async {
-        let today = Calendar.current.startOfDay(for: Date())
-        let start = Calendar.current.date(byAdding: .day, value: -27, to: today)!
-        let lower = Calendar.current.date(byAdding: .day, value: -30, to: today)!
+        let start = fixedChartDay(-27)
+        let lower = fixedChartDay(-30)
         var state = DailyRecordChartFeature.State(lowerBoundDate: lower, scrollPosition: start)
         state.pageWidth = 600
         state.yScale = 0...20
         let store = TestStore(initialState: state) {
             DailyRecordChartFeature()
-        }
+        } withDependencies: { fixedTimeDependencies(&$0) }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
         await store.send(.view(.dragChanged(translationX: 1_000)))

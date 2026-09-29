@@ -53,9 +53,6 @@ public final class PersistentCloudKitContainer: ObservableObject {
         return CKContainer(identifier: containerId.id).privateCloudDatabase
     }()
     
-    /// 필사 데이터를 조회/저장하기 위해 주입된 SwiftData 래퍼.
-    @Dependency(\.drawingData) private var drawingDatabase
-    
     /// CloudKit 동기화 진행 상태.
     ///
     /// - Important: **기준 시간이 지난 것과 실패한 것을 같은 상태로 두지 않는다**(정책 §3).
@@ -84,18 +81,21 @@ public final class PersistentCloudKitContainer: ObservableObject {
         /// 로컬 저장소를 쓸 수 없다. CloudKit 을 기다리지 않고 **들어가지 않는다** (정책 §3 표 4행).
         /// 오프라인 · 계정 문제(`failed`)와 다른 축이다.
         case storeUnavailable(LocalStoreFailure)
+        /// C14 게이트가 미러링 연결을 **보류**했다 — 저장소는 앱 스키마로, CloudKit 없이 열려 있다(정책 §12-6 C14 ③).
+        /// 들어가되 이 실행은 이 기기에만 저장한다. 기다릴 CloudKit 이 없다. 자동으로 풀리지 않는다.
+        case connectionHeld(LegacySeparationHold)
 
         /// 아직 결론이 나지 않아 **관찰이 이어지는** 상태인가. 진행 표시를 켤지 정하는 데 쓴다.
         /// `stillWaiting` 은 제한 시간이 지났을 뿐 관찰이 끝난 것이 아니므로 여기 포함된다.
         public var isInProgress: Bool {
             switch self {
             case .idle, .syncing, .migration, .stillWaiting: true
-            case .syncCompleted, .migrationCompleted, .migrationEndedWithoutImport, .failed, .storeUnavailable: false
+            case .syncCompleted, .migrationCompleted, .migrationEndedWithoutImport, .failed, .storeUnavailable, .connectionHeld: false
             }
         }
     }
     
-    init() {
+    public init() {
         // 현재 장 Fetch
         if let titleData = UserDefaults.standard.data(forKey: "title"),
            let decodedTitle = try? JSONDecoder().decode(BibleChapter.self, from: titleData) {
@@ -177,8 +177,8 @@ public final class PersistentCloudKitContainer: ObservableObject {
             return initialWaitLimit.migration
         case .syncing, .stillWaiting:
             return initialWaitLimit.normal
-        case .syncCompleted, .migrationCompleted, .migrationEndedWithoutImport, .failed, .storeUnavailable:
-            // `storeUnavailable` 은 컨테이너를 만들 때 정해진다. 기다릴 CloudKit 도 조회할 계정도 없다.
+        case .syncCompleted, .migrationCompleted, .migrationEndedWithoutImport, .failed, .storeUnavailable, .connectionHeld:
+            // `storeUnavailable` · `connectionHeld` 는 컨테이너를 만들 때 정해진다. 기다릴 CloudKit 이 없다.
             Log.debug("초기 대기 — 대기를 시작하기 전에 결론이 났다", "\(syncState)")
             return nil
         }
@@ -206,7 +206,7 @@ public final class PersistentCloudKitContainer: ObservableObject {
         case .syncCompleted: .migrationCompleted
         case .failed(let reason): .migrationEndedWithoutImport(reason)
         case .stillWaiting: .migrationEndedWithoutImport(nil)
-        case .idle, .syncing, .migration, .migrationCompleted, .migrationEndedWithoutImport, .storeUnavailable: outcome
+        case .idle, .syncing, .migration, .migrationCompleted, .migrationEndedWithoutImport, .storeUnavailable, .connectionHeld: outcome
         }
     }
 
@@ -294,7 +294,16 @@ public final class PersistentCloudKitContainer: ObservableObject {
     ///
     /// 이미 결론이 난 뒤에도 늦게 도착한 import 는 반영한다 — `stillWaiting` 으로 먼저 진입한 사용자에게
     /// 원격 필사가 나중에 도착할 수 있기 때문이다 (정책 §3-1).
+    ///
+    /// **확인된 오류(`failed`)로 멈춘 뒤에도 import 가 성공하면 받은 것이다** — 결론을 `syncCompleted` 로 바꾼다(2026-09-21 후속 리뷰 2차).
+    /// 초기 복원 화면은 오류에서 들어가지 않고 기다리므로(`LaunchWaitRule`), 바꾸지 않으면 실제로 필사를 받았는데도 오류 안내에 머물러
+    /// "import 성공 후 진입" 을 지키지 못한다. 마이그레이션 결론 · 저장소를 쓸 수 없는 상태는 그대로 둔다 — 재실행 요구 · 막힘이다(MIG-F1).
     private func applyToInitialWait(_ event: CloudSyncEvent) {
+        if case .failed = syncState, CloudSyncStateRule.isAwaitedImportSuccess(event) {
+            Log.info("초기 대기 — 오류로 멈춘 뒤 import 가 성공했다. 받은 것으로 결론을 바꾼다", "\(syncState)")
+            syncState = .syncCompleted
+            return
+        }
         guard syncState.isInProgress else { return }
         let outcome: CloudSyncState
         if CloudSyncStateRule.isAwaitedImportSuccess(event) {

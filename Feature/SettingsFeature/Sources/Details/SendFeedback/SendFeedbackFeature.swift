@@ -28,7 +28,23 @@ public struct SendFeedbackFeature {
         public var isOnFileImporter: Bool = false
         public var agreeToDefaultNotice: Bool = false
         public var agreeToGetDeviceInfo: Bool = false
-        public var popupMessage: String = ""
+        /// 이 iPad 가 메일을 보낼 수 있는가(메일 앱에 계정이 설정돼 있는가). 화면이 뜰 때 보고, 보내기 직전에 다시 본다. 모르는 동안은 nil.
+        public var canSendMail: Bool?
+
+        /// 아직 채우지 않은 필수 항목 중 첫째 — 제목 · 내용 · 필수 동의 차례로 본다. 모두 채웠으면 nil.
+        /// 공백만 적은 것은 채운 것으로 보지 않는다. 내용은 기본 머리(「- 문의 내용:」) 뒤에 적은 것만 센다.
+        public var missingRequirement: Requirement? {
+            if feedbackInfo.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return .title }
+            let template = UserFeedback.initialState.body
+            let body = feedbackInfo.body
+            let written = body.hasPrefix(template) ? body.dropFirst(template.count) : Substring(body)
+            if written.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return .body }
+            if !agreeToDefaultNotice || !agreeToGetDeviceInfo { return .agreements }
+            return nil
+        }
+
+        /// 필수 항목을 모두 채웠는가 — 보내기 버튼은 이때만 켜진다.
+        public var isFormComplete: Bool { missingRequirement == nil }
     }
     public enum Action: ViewAction {
         case path(PresentationAction<Path.Action>)
@@ -43,6 +59,8 @@ public struct SendFeedbackFeature {
         
         @CasePathable
         public enum View {
+            /// 화면이 떴다 — 메일을 보낼 수 있는지 본다.
+            case onAppear
             case setTitle(String)
             case setBody(String)
             case setAttachment(AttachmentType?)
@@ -54,9 +72,13 @@ public struct SendFeedbackFeature {
         }
     }
     
+    @Dependency(\.mailComposeAvailability) private var mailAvailability
+
     public var body: some Reducer<State, Action> {
         Reduce { state, action in
             switch action {
+            case .view(.onAppear):
+                state.canSendMail = MainActor.assumeIsolated { mailAvailability.canSendMail() }
             case .setFeedbackType(let type):
                 state.feedbackInfo.feedbackType = type
             case .view(.setTitle(let title)):
@@ -113,33 +135,21 @@ public struct SendFeedbackFeature {
             case .view(.togglePrivacyAgreement):
                 state.agreeToGetDeviceInfo.toggle()
             case .sendFeedback:
-                if MFMailComposeViewController.canSendMail() {
+                // 보내기 직전에 다시 본다 — 화면을 연 뒤 설정 앱에서 메일 계정을 추가했을 수 있다.
+                let canSendMail = MainActor.assumeIsolated { mailAvailability.canSendMail() }
+                state.canSendMail = canSendMail
+                if canSendMail {
                     state.path = .email(.init(mailInfo: state.feedbackInfo))
                 } else {
-                    Log.debug("이메일을 보낼 수 없음")
+                    // 조용히 넘어가지 않는다 — 누른 사람은 보내졌는지 모른다. 왜 못 보내는지와 대안을 알린다.
+                    Log.debug("이메일을 보낼 수 없음 — 메일 계정이 없다")
+                    state.path = .popup(Self.mailUnavailablePopup)
                 }
+            case .path(.presented(.popup(.view(.confirm)))), .path(.presented(.popup(.view(.cancel)))):
+                state.path = nil
             case .view(.isEnableSendButton):
-                if state.feedbackInfo.title.isEmpty {
-                    state.popupMessage = "문의 제목을 입력해주세요."
-                    return .none
-                }
-                if state.feedbackInfo.body.hasPrefix("- 문의 내용:") {
-                    let remainIsEmpty = state.feedbackInfo.body.dropFirst(8).isEmpty
-                    if remainIsEmpty {
-                        state.popupMessage = "문의 내용을 입력해주세요."
-                        return .none
-                    }
-                } else {
-                    if state.feedbackInfo.body.isEmpty {
-                        state.popupMessage = "문의 내용을 입력해주세요."
-                        return .none
-                    }
-                }
-                if !state.agreeToDefaultNotice || !state.agreeToGetDeviceInfo {
-                    state.popupMessage = "필수 동의 항목을 체크해주세요."
-                    return .none
-                }
-                state.popupMessage = ""
+                // 버튼은 필수 항목을 모두 채워야 켜진다 — 그 전에 들어온 누름은 보내지 않는다.
+                guard state.isFormComplete else { return .none }
                 return .run { send in
                     await send(.sendFeedback)
                 }
@@ -152,6 +162,30 @@ public struct SendFeedbackFeature {
 }
 
 extension SendFeedbackFeature {
+    /// 메일 계정이 없어 보낼 수 없을 때의 안내(설정의 알림 대화상자, 시안 F2).
+    static let mailUnavailablePopup = PopupFeature.State(
+        title: "메일을 보낼 수 없어요",
+        body: "이 iPad에 메일 계정이 설정돼 있지 않아요.",
+        hint: "설정 앱의 메일에서 계정을 추가한 뒤 다시 보내 주세요. App Store 리뷰로 의견을 남겨 주셔도 돼요.",
+        confirmTitle: "확인"
+    )
+
+    /// 보내기 전에 채워야 하는 항목.
+    public enum Requirement: Hashable, Sendable {
+        case title
+        case body
+        case agreements
+
+        /// 보내기 버튼 아래 안내 — 버튼이 왜 꺼져 있는지와 무엇을 채울지 알린다.
+        public var hint: String {
+            switch self {
+            case .title: "보내려면 제목을 적어 주세요."
+            case .body: "보내려면 내용을 적어 주세요."
+            case .agreements: "보내려면 필수 항목에 모두 동의해 주세요."
+            }
+        }
+    }
+
     public enum AttachmentType: String, CaseIterable {
         case photo = "사진 보관함"
         case file = "파일 선택"
@@ -166,6 +200,32 @@ extension SendFeedbackFeature {
     @Reducer
     public enum Path {
         case email(MailComposeFeature)
+        /// 메일을 보낼 수 없다는 안내.
+        case popup(PopupFeature)
+    }
+}
+
+/// 이 기기가 메일을 보낼 수 있는가 — 메일 앱에 계정이 설정돼 있어야 한다. 시험이 바꿔 끼울 수 있게 경계로 나눈다.
+/// `MFMailComposeViewController` 가 메인 액터에 묶여 있어 메인 액터에서만 부른다(리듀서는 스토어가 메인 액터에서 돌린다).
+public struct MailComposeAvailabilityClient: Sendable {
+    public var canSendMail: @MainActor @Sendable () -> Bool
+
+    public init(canSendMail: @escaping @MainActor @Sendable () -> Bool) {
+        self.canSendMail = canSendMail
+    }
+}
+
+extension MailComposeAvailabilityClient: DependencyKey {
+    public static let liveValue = Self(canSendMail: { MFMailComposeViewController.canSendMail() })
+    public static let testValue = Self(canSendMail: { true })
+    public static let previewValue = Self(canSendMail: { true })
+}
+
+public extension DependencyValues {
+    /// 메일을 보낼 수 있는가.
+    var mailComposeAvailability: MailComposeAvailabilityClient {
+        get { self[MailComposeAvailabilityClient.self] }
+        set { self[MailComposeAvailabilityClient.self] = newValue }
     }
 }
 

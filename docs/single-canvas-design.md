@@ -1,6 +1,6 @@
 # CarveFeature 단일 Canvas 전환 설계
 
-> **상태 (rev.34 · 2026-09-09):** Phase 0A~3 구현 및 `develop` 병합 완료. 단일 Canvas 기본값은 **on** (`SingleCanvasFlag.defaultValue = true`)입니다. 2026-09-15 부터 앱을 켤 때 기존 저장값을 설치당 한 번 지워 기존 사용자도 기본값을 따르게 하고(`SingleCanvasFlag.resetStoredValueOnce(in:)`), 그 뒤에 끈 값은 유지합니다.
+> **상태 (rev.37 · 2026-09-29):** Phase 0A~3 구현 및 `develop` 병합 완료. 단일 Canvas 기본값은 **on** (`SingleCanvasFlag.defaultValue = true`)입니다. 2026-09-15 부터 앱을 켤 때 기존 저장값을 설치당 한 번 지워 기존 사용자도 기본값을 따르게 하고(`SingleCanvasFlag.resetStoredValueOnce(in:)`), 그 뒤에 끈 값은 유지합니다.
 > **2.0.0 작업 순서와 출시 범위는 [로드맵](./release-2.0.0-roadmap.md)을 기준으로 합니다.** Phase 4(구 구조 제거)는 출시 후 안정화 과제입니다.
 > D9 의 실제 통과·미수행 범위는 [런북 §6-9 · §8-7](./phase-0a-d-device-test.md)에 남깁니다. 미보유 구기기·120Hz 검증을 출시 선행 조건으로 두지 않습니다.
 >
@@ -12,8 +12,8 @@
 > ⚠️ **그 밖에 살아 있는 항목:** **R20**(회전 시 전이 메모리 peak 1.8 GiB — 저메모리 기기 미검증) · **R17**(Δ 가 R16 계열 미검출) · **R18**(N-Canvas 신규 행이 v1) · **R22**(팔레트 폭). 전부 §16 "남은 것".
 > D9-1 · D9-2 · D9-3-1·2·4 · D9-4-1·4 · **D9-5** · **D9-6**(R23·R24 수정 후 재검증) · D9-7-1·3·4 · D9-8 · **D9-CK②·③** 통과. **D9-7-2 만 ❓ 미수행**(Pencil 입력이 필요해 자동화 불가) (런북 §8-7).
 > ⚠️ Δ 0.00 은 실제 필기 표시의 정상 판정이 **아닙니다** — 계측은 "값이 도달했는가" 만 말합니다 (§20-16).
-> [D9 H 분석](./single-canvas-rotation-display-investigation.md) · [실기기 조작](./device-debugging-cli.md).
-> 회귀 기준선 **312** (§19-4-2). 대상: `Feature/CarveFeature`, `Feature/SettingsFeature`, `Domain`.
+> D9 H 분석(삭제된 문서 — 커밋 `bc0a2e35` 의 `docs/single-canvas-rotation-display-investigation.md`) · [실기기 조작](./device-debugging-cli.md).
+> 회귀 기준선 **1112** (2026-09-29 설정 「의견 보내기」 · 「앱 버전」, §19-4-2). 대상: `Carve-Workspace` 의 테스트 타깃 전부 — `App/CarveApp` UI 테스트는 시뮬레이터에서 건너뜁니다. 현재 값은 [AGENTS.md](../AGENTS.md) 「공통 명령어」와 같게 둡니다.
 >
 > **읽는 법.** §1~§17 이 설계이고 §18~§20 은 실측·변경 기록입니다. 절 번호는 코드 주석과 AGENTS.md 가 참조하므로 **바꾸지 않습니다.**
 > 결정이 끝난 항목은 결정만 남기고 논의 과정은 지웠습니다 (rev.19 · rev.25 정리). 과정이 필요하면 git 이력(`git log -- docs/single-canvas-design.md`)을 보십시오.
@@ -37,7 +37,7 @@
 | 23 | D9 H 회전 표시 결함 원인 분리 · Debug A/B 왕복 통과 · **정식 수정 미적용** · 기준선 296 | §19-4-2 · §20-15 · 런북 rev.8 |
 | 24 | **D9 H 정식 수정** — 표시용 획 재구성 승격 · 실기기 3왕복 + 양성 대조 통과 · 기준선 302. **§6 잔여 검증은 남음** | §19-4-2 · §20-16 |
 | 25 | 문서 정리 (런북 rev.10) — 낡은 상태 서술 정정 · 살아 있는 항목(D9 H · E-4 · R17 · R18 · R19)을 §16 에 모음 · rev.19 원칙으로 과정 압축 | §16 · §20-15 |
-| 26 | **D9 H · E-4 종결** — 조사 §6 잔여 5건 실기기 수행(글꼴/행간 · 스크롤 중 회전 · 좌우 필사 · 편집 저장 왕복 · 회전 직전 flush · 긴 장 성능). 매 항목 양성 대조 동반. ⛔ **그 과정에서 N-Canvas 롤백 경로의 선재 결함 R23 · R24 발견 — 기본 활성화 차단.** 성능 R20 · R21, UI R22 추가. 기준선 302 유지 | §16 · 런북 §8-7 · [조사 §3·§6](./single-canvas-rotation-display-investigation.md) |
+| 26 | **D9 H · E-4 종결** — 조사 §6 잔여 5건 실기기 수행(글꼴/행간 · 스크롤 중 회전 · 좌우 필사 · 편집 저장 왕복 · 회전 직전 flush · 긴 장 성능). 매 항목 양성 대조 동반. ⛔ **그 과정에서 N-Canvas 롤백 경로의 선재 결함 R23 · R24 발견 — 기본 활성화 차단.** 성능 R20 · R21, UI R22 추가. 기준선 302 유지 | §16 · 런북 §8-7 · 조사 §3·§6(삭제된 문서 — 커밋 `bc0a2e35` 의 `docs/single-canvas-rotation-display-investigation.md`) |
 | 27 | **R23 수정** — flag off 로 장을 열기만 해도 v3 절이 v2 로 강등되던 결함을 `isApplyingDrawing` 억제로 닫음(설계 §10-3 준수). 회귀 2건 · 변이 확인 · 실기기 170행 불변. **기준선 302 → 304.** ⛔ **R24 는 별개 결함으로 남음** | §16 · §19-4-2 · 런북 §8-7 |
 | 28 | **R24 수정** — 같은 장 재로드가 기하 실측을 버려 ① 잉크 미표시 ② 실측 높이 → 예측식 후퇴(R13 재발) ③ Δ 안전망 실명을 함께 만들던 결함을 닫음. 회귀 4건 · 변이 확인 · 실기기 재확인. **기준선 304 → 308.** **D9-6 은 ✅ 통과로 복귀** | §6 · §16 · §19-4-2 · 런북 §8-7 |
 | 29 | **R21 종결** — 같은 절차로 N-Canvas 를 재어 비교. 단일 Canvas 가 정점 ~435 MiB · 안정 ~440 MiB **더 가볍다**(N-Canvas 는 스크롤할수록 캔버스가 쌓임). D5 와의 차이는 절차 차이였다. 코드 변경 없음, 기준선 308 유지 | §16 · 런북 §8-7 D9-8 |
@@ -45,7 +45,10 @@
 | 31 | **R26 수정** — 장 전환에서 이전 본문 컬럼을 놓는다. 긴 장을 떠난 뒤 **945 → 124.4 MB**. 회전 전이는 콘텐츠 넓이에 비례함을 실측(짧은 장은 전이 0). 기준선 310 → **312** | §5 · §16 · 런북 §8-7 |
 | 32 | **D9-CK③ 완료** — CloudKit 운영 컨테이너에 `CD_layoutMetadataData` · `CD_rowUUID` 승격. 배포 전 죽은 필드 3개와 `CD_BiblePageDrawing` 정리. **기본 활성화 하드 블로커 해소.** R27 · R28 신설 | §10-1-a · §16 · 런북 §8-7 |
 | 33 | **롤백된 옛 단일 Canvas 구현 제거** — `CombinedCanvasFeature`·`CombinedCanvasView` 967줄. 살아 있는 참조가 0건이었고 삭제 후 312 통과. 낡은 deprecation 문구도 실제 대체재(단일 Canvas / `delegatesUndoToCanvas`)로 정정 | §11 · §16 |
-| **34** | **2.0.0 문서 정리** — 기본 on · D9 최신 판정 동기화. 과거 측정 기록은 보존하고 미보유 기기 검증을 출시 후 관측으로 분류. 신규 로드맵 연결 | §16 · §17 · [로드맵](./release-2.0.0-roadmap.md) |
+| 34 | **2.0.0 문서 정리** — 기본 on · D9 최신 판정 동기화. 과거 측정 기록은 보존하고 미보유 기기 검증을 출시 후 관측으로 분류. 신규 로드맵 연결 | §16 · §17 · [로드맵](./release-2.0.0-roadmap.md) |
+| 35 | **회귀 기준선 갱신** — rev.31 이후 병합된 작업의 시험이 §19-4-2 에 반영되지 않았던 것을 2026-09-28 develop 머지 뒤 실측으로 바로잡음. 요약 줄 · 런북 · 로드맵의 312 표기도 현재 기준선으로 맞춤. 설계 변경 없음. 기준선 312 → **1069** | §19-4-2 |
+| 36 | **회귀 기준선 갱신** — 「확인이 필요한 필기」 가져오기([정책 §12-6 ④](./icloud-sync-and-backup-policy.md)) 시험 34 추가. 단일 Canvas 설계 변경 없음(캔버스는 절 메뉴 수 · 설정에서 넣은 필기의 반영만 바뀜). 기준선 1069 → **1103** | §19-4-2 |
+| **37** | **회귀 기준선 갱신** — 설정 「의견 보내기」(필수 항목 전 보내기 막기 · 메일 계정 안내) · 「앱 버전」 시험 9 추가. 단일 Canvas 설계 변경 없음. 기준선 1103 → **1112**. 개정 36 에서 올리지 않은 상태 줄의 rev 도 맞춤 | §19-4-2 |
 
 ---
 
@@ -1133,8 +1136,8 @@ D9 에서 이 시차를 결함으로 오독했습니다 (E-4). 경위는 런북 
 | 항목 | 값 |
 |---|---|
 | tuist | `PATH` 기본값(4.44.3)과 다르므로 반드시 `mise x -- tuist …` |
-| iPad 시뮬레이터 런타임 | iOS 26.2 하나뿐. iOS 17/18 iPad 런타임 없음 → "저사양 iOS 17 iPad" 리스크는 시뮬레이터로 보완 불가 |
-| 툴체인 | **Xcode 26.3 이 아니면 빌드되지 않음** — TCA 1.20.2 가 Swift 6.3.3 에서 컴파일 실패 (AGENTS.md) |
+| iPad 시뮬레이터 런타임 | **이 S0 측정 당시** iOS 26.2 하나뿐이었다. 이후 2026-09-24 별도 Mac에서 iOS 17.5·18.6·26.2·26.4·26.5·27.0 runtime을 확인했다. iPad mini (6th generation) iOS 17.5 전체 회귀는 legacy migration 수정 후 998 통과·0 실패·6 skip·4 expected failure로 통과했다. iOS 17.0 및 실기기 경로는 미검증 (현재 목록은 AGENTS.md) |
+| 툴체인 | **역사적 관측:** 당시 TCA 1.20.2 는 Swift 6.3.3 컴파일에 실패했다. TCA는 이후 1.26.2로 바뀌었다. Xcode 27.0 최초 generic-project F60은 XCFramework 서명 확인 단계에서 중단됐지만, Tuist workspace를 다시 생성한 후 Debug iPad simulator build와 여섯 runtime 전체 회귀가 통과해 그 실패는 재현되지 않았다. Xcode 26.3은 과거 전체 회귀 비교 기준으로만 보존한다. live CloudKit proof와 배포 Archive·TestFlight는 별도 미검증이다(AGENTS.md · 로드맵 §4 TECH-0) |
 
 ### 18-2. S0-2 — 테스트 기준선
 
@@ -1145,7 +1148,7 @@ rev.8 시점 **57/57** (DomainTest 31 · CarveFeatureTest 8 · CarveToolkitTest 
 **측정 방법 (재측정 시 그대로 반복)**
 
 ```
-메모리  /usr/bin/footprint <pid>   (vmmap 은 이 머신에서 권한 오류 — 같은 Physical footprint 지표. ps RSS 는 부적합)
+메모리 /usr/bin/footprint <pid> (이 기록의 측정 Mac에서는 vmmap 권한 오류 — 같은 Physical footprint 지표. ps RSS 는 부적합; 다른 Mac에서는 다시 확인)
 CPU     ps -o time= 누적 CPU time 델타, 0.25 s 샘플링
 장 지정  simctl uninstall 로 컨테이너를 비운 뒤 설치 → defaults write … title -data <BibleChapter JSON hex> → 로그 "ChapterLayout 완성" 으로 확인
         (앱이 한 번 장을 바꾸면 Saved Application State 가 시드를 무시한다)
@@ -1247,7 +1250,10 @@ peak **363.6 MB** · 최종 정지 **109.7 MB** · CPU > 90% 샘플 47 / 188. **
 | 26 | 304 | R23 회귀 2 (① 프로그램 대입은 v3 를 강등하지 않는다 ② 사용자 편집 콜백은 그대로 저장된다 — 억제 과잉 방지). 실측 내역: Swift Testing 302 + XCTest 2. 변이 테스트로 억제 제거 시 `drawingVersion → 2` · `metadata → nil` 실패 확인 |
 | 28 | 308 | R24 회귀 4 (`ChapterLayoutReloadTesting`: 같은 장 유지 · 다른 장 폐기 · 절 목록 변경 시 폐기 · 실측 높이 유지). Swift Testing 306 + XCTest 2 |
 | 30 | 310 | 단일 Canvas 기본 전환 회귀 2 (토글 미조작 사용자가 기본값을 본다 · 명시적 off 가 유지된다). Swift Testing 308 + XCTest 2 |
-| **31** | **312** | **현재 실측 기준선** — R26 회귀 2 (같은 장은 컬럼을 놓지 않는다 · 장이 바뀌면 놓는다). Swift Testing 310 + XCTest 2 |
+| 31 | 312 | 당시 기준선 — R26 회귀 2 (같은 장은 컬럼을 놓지 않는다 · 장이 바뀌면 놓는다). Swift Testing 310 + XCTest 2 |
+| 35 | 1069 | 당시 기준선 (2026-09-28 develop 머지 뒤) — 전체 1079 · 통과 1069 · 실패 0 · 건너뜀 6(`CarveAppUITests`) · expected failure 4. rev.31 이후 병합된 작업의 시험이 이 표에 빠져 있던 것을 바로잡는다. 같은 빌드로 iPadOS 18.6 1069 · 17.5 1068. 이후 갱신은 [AGENTS.md](../AGENTS.md) 「공통 명령어」와 이 표에 함께 적는다 |
+| 36 | 1103 | 당시 기준선 (2026-09-29, 브랜치 `feat/draft-recovery-import`) — 전체 1113 · 통과 1103 · 실패 0 · 건너뜀 6(`CarveAppUITests`) · expected failure 4. 「확인이 필요한 필기」 가져오기 34(Domain 23 — 판정 10 · 저장 트랜잭션 6 · 가져온 기록 1 · 목록 · 가져오기 6, SettingsFeature 6, CarveFeature 5). 같은 빌드로 iPadOS 18.6 1103 · 17.5 1102(건너뜀 7) |
+| **37** | **1112** | **현재 실측 기준선** (2026-09-29, 브랜치 `feat/draft-recovery-import`) — 전체 1122 · 통과 1112 · 실패 0 · 건너뜀 6(`CarveAppUITests`) · expected failure 4. 설정 「의견 보내기」 9(SettingsFeature — 필수 항목 판정 · 누름 5, 메일 가능 여부 4). 같은 빌드로 iPadOS 18.6 1112 · 17.5 1111(건너뜀 7) |
 
 통과한 실행에서도 PencilKit 필기인식 권한 `com.apple.corehandwriting -1003`와 CoreData persistent history 정리 로그가 관찰됐습니다. 모든 `error:`를 노이즈로 취급하지 말고, 명령 종료 코드·실행 테스트 수·실패 내용을 함께 확인합니다. rev.16 클린 빌드에서 `UIComponentsTest` 의 테스트 타깃 의존성 누락을 고쳤습니다.
 
@@ -1308,7 +1314,7 @@ Debug 전용, 파일 단위 `#if DEBUG`. `Feature/CarveFeature/Sources/Debug/Can
 | `-CanvasScrollSpikeMode A` / `B` · `-CanvasScrollSpikeAuto` · `-CanvasScrollSpikeJump <pt>` | 모드 · 8개 시나리오 무인 · 지정 offset 정지 |
 | `-CanvasScrollSpikeLeftHanded` · `-CanvasScrollSpikeNarrow` · `-CanvasScrollSpikeAnyInput` · `-CanvasScrollSpikeNormalizeA` | 기준 4 · 3 · 정책 · A 정규화 |
 
-**환경 제약 2건 (고치지 않음):** 시뮬레이터 터치 주입 도구가 `xcode-select` 설정 때문에 사용 불가 — 해소하려면 `sudo xcode-select` 로 시스템 설정을 바꿔야 해서 하지 않았습니다 (fling · 탭/롱프레스 미검증) · `vmmap` 권한 오류 (A/B 상대 메모리 미측정). 결과는 §11.
+**이 실험 당시의 환경 제약 2건:** 당시 `xcode-select`가 가리킨 도구 때문에 시뮬레이터 터치 주입을 쓸 수 없어 시스템 설정을 바꾸지 않았다(fling · 탭/롱프레스 미검증) · 해당 Mac에서 `vmmap` 권한 오류가 나 A/B 상대 메모리를 측정하지 못했다. 이는 현재 Mac의 일반 제약으로 단정하지 않는다. 2026-09-24 현재 별도 Mac의 기본 Xcode는 27.0이고 `simctl` 목록 조회와 Device Hub 사용이 확인됐다. 실제 입력·메모리 측정 가능 여부는 기기와 명령별로 다시 검증한다. 결과는 §11.
 
 ### 20-5. `b68b6101` — Phase 1 V4 additive schema
 
@@ -1504,7 +1510,7 @@ Phase 3 이후 처음으로 **제품 코드의 단일 Canvas 경로를 실기기
 
 2026-09-08, iPad mini(A17 Pro) / iPadOS 27.0 beta `24A5408d` / USB / Xcode 26.3. **원인을 좁힌 세션**이고 수정은 다음 rev(§20-16)입니다.
 
-**남길 결론 셋** — 나머지 경위는 [분석 문서](./single-canvas-rotation-display-investigation.md) §2~§3 과 git 이력에 있습니다.
+**남길 결론 셋** — 나머지 경위는 분석 문서(삭제된 문서 — 커밋 `bc0a2e35` 의 `docs/single-canvas-rotation-display-investigation.md`) §2~§3 과 git 이력에 있습니다.
 
 1. **데이터는 도착했는데 화면만 낡았습니다.** 가로→세로→가로에서 Store/전달/applied 세대가 2→3→4 로 일치했고 44개 획의 경계·변환·seed·point 수도 최종 디코딩과 일치했지만 화면은 이전 합성 상태였습니다.
 2. **표시 교체 방식만 바꿔도 정상화됩니다.** 일반 redraw 와 같은 drawing 재대입은 무효, 빈 drawing 경유 복원과 같은 공개 속성의 새 `PKStroke` 생성은 정상화 → 기존 획 재사용에 따른 PencilKit 렌더 캐시/표시 갱신 경로가 유력합니다 (Apple 내부 구현은 확인하지 않았습니다).
@@ -1520,7 +1526,7 @@ Phase 3 이후 처음으로 **제품 코드의 단일 Canvas 경로를 실기기
 
 > ⚠️ **알려진 부작용 — 지우개 조각 절이 1회 재저장됩니다.** `mask != nil` 인 획을 재구성하면 파생값 `maskedPathRanges` 가 재계산되며 미세하게 달라집니다(실측 차이 약 6.7e-4). `StrokeContentSignature` 는 반올림을 금지하므로(§7-2 — D7 재발 방지) 그 절이 한 번 dirty 로 잡혀 `.replace` 가 한 번 나갑니다. **저장 내용(획 수·좌표·`StrokeIdentityKey`·`ownership.map`)은 원본과 동일하고**, 그 결과로 다시 합성·재구성하면 mutation 이 없는 **고정점**이라 회전마다 되풀이되지 않습니다. 다만 `updateDate` 가 바뀌므로 히스토리 순서·주간 통계에 영향이 있을 수 있습니다.
 
-**실기기 A/B 로 인과를 확인했습니다** (2026-09-08, iPad mini A17 Pro / iPadOS 27.0 beta). 인자 없이 가로↔세로 **3왕복 전부 정상**, `-CanvasReuseStrokesOnApply`(Debug opt-out)로 **결함 재현**. **계측은 두 실행이 구분되지 않고 화면 판정만 갈립니다** — `store/delivered/applied` 일치, canvas bounds 기대값과 동일, `offset`·`zoom`·`transform` 동일, 컨트롤러 동일. 상세는 [D9 H 분석](./single-canvas-rotation-display-investigation.md) §3.
+**실기기 A/B 로 인과를 확인했습니다** (2026-09-08, iPad mini A17 Pro / iPadOS 27.0 beta). 인자 없이 가로↔세로 **3왕복 전부 정상**, `-CanvasReuseStrokesOnApply`(Debug opt-out)로 **결함 재현**. **계측은 두 실행이 구분되지 않고 화면 판정만 갈립니다** — `store/delivered/applied` 일치, canvas bounds 기대값과 동일, `offset`·`zoom`·`transform` 동일, 컨트롤러 동일. 상세는 D9 H 분석(삭제된 문서 — 커밋 `bc0a2e35` 의 `docs/single-canvas-rotation-display-investigation.md`) §3.
 
 **이것이 계측의 한계를 다시 보여줍니다.** `Δ max` · `compose SYNC` · `org` · `legInk` · `applied` · 렌더 완료 콜백 — 전부 "값이 도달했는가" 만 말하고 "화면이 그것인가" 는 말하지 못했습니다. 이 결함은 **사람이 화면을 봐야만** 판정됩니다. 시뮬레이터 테스트도 데이터·계약만 고정하고 PencilKit 의 화면 캐시 자체는 검출하지 못합니다.
 

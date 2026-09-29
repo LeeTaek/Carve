@@ -53,6 +53,9 @@ public final class FileEraseStateStore: @unchecked Sendable {
         self.fileManager = fileManager
     }
 
+    /// 시험이 파일 위치를 찾을 때 쓴다.
+    var areaForTesting: EraseStateArea { area }
+
     // MARK: - K(기기)
 
     /// 읽기는 잠그지 않는다 — 쓰기가 늘 파일을 통째로 바꿔 넣으므로(`DurableFile`) 반쯤 쓴 값을 읽을 일이 없다.

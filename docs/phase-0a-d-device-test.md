@@ -12,10 +12,10 @@
 > ⚠️ **인자 의미 주의.** `-CanvasFreshStrokesOnApply` 는 사라졌고, `-CanvasReuseStrokesOnApply` 는
 > **수정을 끄고 결함을 재현하는** Debug opt-out 입니다. **기본 검증은 인자 없이** 돕니다.
 >
-> · 대상 문서: [설계](./single-canvas-design.md) §11 / §13 / §16 / §18 / §19 · [D9 H 분석](./single-canvas-rotation-display-investigation.md) · [실기기 CLI 조작](./device-debugging-cli.md)
+> · 대상 문서: [설계](./single-canvas-design.md) §11 / §13 / §16 / §18 / §19 · D9 H 분석(삭제된 문서 — 커밋 `bc0a2e35` 의 `docs/single-canvas-rotation-display-investigation.md`) · [실기기 CLI 조작](./device-debugging-cli.md)
 > · 대상 기기: **iPad mini (A17 Pro)** — 지금까지의 **모든 실기기 결과는 이 한 대의 것**입니다.
 >   ⚠️ **iPad Air (M2) 는 통째로 미수행**이며 D5-5(기기 간 유의차)와 D6 이 거기 걸려 있습니다 (설계 §13 사각지대).
-> · 회귀 기준선 **312** (설계 §19-4-2). **아래 기록에 남은 265 · 296 등은 그 시점의 이력이며 현재 기준선이 아닙니다.**
+> · 회귀 기준선은 [AGENTS.md](../AGENTS.md) 「공통 명령어」를 따릅니다(이력은 설계 §19-4-2). **아래 기록에 남은 265 · 296 · 312 등은 그 시점의 이력이며 현재 기준선이 아닙니다.**
 
 ---
 
@@ -101,16 +101,15 @@
 ### 1-2. 도구 실측 — ⚠️ rev.1 시점의 머신 기록입니다
 
 원래 표는 *"설치된 Xcode 는 `/Applications/Xcode-beta.app` 하나뿐 = 27.0 beta"* 로 적었으나,
-**실제 실기기 세션(rev.3 · rev.5 이후)은 전부 Xcode 26.3 으로 수행**됐습니다. 그 사이 26.3 이 설치된 것으로 보이나
-**언제 어떻게인지는 확인하지 않았습니다** (§10-2 C3). **현재 머신의 실측값은 §6-9 D9-0 입니다.**
+**기록된 실제 실기기 세션(rev.3 · rev.5 이후)은 Xcode 26.3 으로 수행**됐습니다. 당시 머신의 설치 경위는 확인하지 않았습니다(§10-2 C3). 2026-09-24 현재 작업 Mac은 macOS 27.2 / Xcode 27.0 기본 선택이며, 별도 Device Hub와 simulator runtime 목록이 보입니다. 최신 머신 정보는 [AGENTS.md](../AGENTS.md), §6-9 D9-0 수치는 해당 측정 당시의 값이므로 새 Mac에서 재측정 없이 현재 성능으로 일반화하지 않습니다.
 
 **머신이 바뀌어도 다시 확인해야 할 것:**
 
 | 항목 | 기준값 | 확인 |
 |---|---|---|
-| `xcode-select -p` · `xcodebuild -version` | **Xcode 26.3 (17C529)** — 다른 버전은 빌드되지 않습니다 (AGENTS.md 툴체인 제약) | 머신마다 경로가 다릅니다. **하드코딩 금지** |
+| `xcode-select -p` · `xcodebuild -version` | **현행 기기·출시 후보 검증 대상은 Xcode 27.0 (27A266a)**. 2026-09-24 현재 macOS 27.2에서 선택돼 있다. 최초 generic simulator 앱 빌드의 제3자 XCFramework 서명 중단(F60)은 workspace 재검증에서 재현되지 않았다. Xcode 26.3 (17C529)은 과거 회귀 결과 비교용 | 머신마다 경로가 다르므로 실행 때 경로·버전을 확인한다. 기본 선택된 Xcode를 우선 사용하며, 26.3 비교 때만 `DEVELOPER_DIR`를 명시한다. **경로 하드코딩 금지** |
 | tuist | **4.208.0** — `PATH` 기본값과 다르므로 반드시 `mise x -- tuist …` | `mise x -- tuist version` |
-| iPad 시뮬레이터 런타임 | 검증은 **iPad** destination 으로만 (AGENTS.md). iOS 17/18 iPad 런타임은 없어 "저사양 iOS 17 iPad" 리스크는 시뮬레이터로 보완 불가 | `xcrun simctl list devices available` |
+| iPad 시뮬레이터 런타임 | 2026-09-24 현재 iOS 17.5·18.6·26.2·26.4·26.5·27.0이 있다. iPad mini (6th generation) iOS 17.5 전체 회귀는 migration 수정 후 998 통과·0 실패·6 skip·4 expected failure였다. iOS 17.0 직접 시험과 실기기 입력 검증은 별도 미수행이다. 검증은 **iPad** destination 으로만 (AGENTS.md) | `xcrun simctl list devices available` — sandbox에서 Xcode 26.3을 지정할 때는 CoreSimulator 권한 오류를 확인하고, 필요하면 승인된 CLI 재실행 사용 |
 | **`sqlite3`** ★ | `/usr/bin/sqlite3` 3.54.0 — `median()` 집계까지 사용 가능. **§6-1 D8 추출의 핵심 도구** | ✅ 실행 확인 |
 | **`plutil`** ★ | `/usr/bin/plutil` — `-extract '<공백 포함 키>' raw -o -` 로 바이너리 plist 값을 꺼낼 수 있음 | ✅ 모의 plist 로 실행 확인 |
 | `shasum` / `xxd` / `file` / `ditto` / `python3` | 전부 `/usr/bin/` 에 존재 | ✅ `which` 확인 |
@@ -1322,7 +1321,7 @@ codesign -d --entitlements - \
 > ⚠️ 남은 위험: **R25**(롱프레스 메뉴 교체 — 데이터 위험) · **R22**(팔레트 폭) · **R20**(저메모리 미검증) · **R27**(기존 행 rowUUID 부재) · **R28**(혼재 버전). **D9-7-2 ❓ 미수행**(Pencil 필요) (§8-7).
 >
 > ✅ **D9 H(회전 표시)는 종결됐습니다** — 분석 §6 잔여 검증 5건 완료.
-> 완료 기준은 [분석 문서 §6](./single-canvas-rotation-display-investigation.md), CLI 회전·A/B 는 [조작 절차](./device-debugging-cli.md).
+> 완료 기준은 분석 문서 §6(삭제된 문서 — 커밋 `bc0a2e35` 의 `docs/single-canvas-rotation-display-investigation.md`), CLI 회전·A/B 는 [조작 절차](./device-debugging-cli.md).
 > ⚠️ **`-CanvasReuseStrokesOnApply` 는 수정을 끄는 opt-out 입니다** — 그 실행에서 결함이 재현되는 것이 정상이고,
 > **기본 검증은 인자 없이** 돕니다. 비교 모드 결과를 기본 경로 결과로 기록하지 마십시오.
 
@@ -1354,7 +1353,7 @@ rev.3 세션의 머신(macOS 27 beta)과 다릅니다. 아래는 **이번 머신
 | **`transportType`** ★ | **`wired`** | ✅ **§7-3-a ① 충족.** Wi-Fi 면 Instruments 기록이 1.1초에 끊기고 데이터도 유실 |
 | `developerModeStatus` | `enabled` | ✅ |
 | 서명 | `Apple Development: LEE TAEKSEONG (4XGUH223QX)` 유효 | ✅ 폐기된 인증서(`5M7X3FV4SS`)가 함께 있으니 서명 실패 시 여기를 의심 |
-| 회귀 기준선 | **312** (설계 §19-4-2) | ⚠️ 이 표가 작성될 당시(rev.5)는 265 였습니다. **줄어들면 회귀입니다** |
+| 회귀 기준선 | [AGENTS.md](../AGENTS.md) 「공통 명령어」 (이력은 설계 §19-4-2) | ⚠️ 이 표가 작성될 당시(rev.5)는 265 였습니다. **줄어들면 회귀입니다** |
 
 ```bash
 # 이번 머신의 전제 (AGENTS.md 의 Xcode-26.3.0.app 경로가 아님)
@@ -2131,7 +2130,7 @@ settle 대기 시간        (§18-3 은 cold launch 후 8초)
 | flag 경로 | 실행 인자 / 설정 토글 (D9-6 은 토글) |
 | 백업 (§2-4) | ❓ 미기록 |
 | 실기기 빌드·설치·실행 | ✅ 성공 |
-| 회귀 기준선 | **312** (설계 §19-4-2). ⚠️ 아래 기록에 남은 265 · 296 은 그 시점의 이력입니다 |
+| 회귀 기준선 | [AGENTS.md](../AGENTS.md) 「공통 명령어」 (이력은 설계 §19-4-2). ⚠️ 아래 기록에 남은 265 · 296 · 312 는 그 시점의 이력입니다 |
 
 **D9-0-c 스모크 — 실행 결과 (진행 중) ★ 결함 1건**
 
@@ -2280,7 +2279,7 @@ settle 대기 시간        (§18-3 은 cold launch 후 8초)
 
 | # | 미해결 |
 |---|---|
-| 1 | **같은 코드가 시뮬레이터(iOS 26.2)에서는 Δ 0.00, 실기기(iOS 27.0 beta)에서는 87.50.** 이 머신에 iPad iOS 27 시뮬레이터 런타임이 없어 격리 불가 — 아래 **R14** |
+| 1 | **당시 같은 코드가 시뮬레이터(iOS 26.2)에서는 Δ 0.00, 실기기(iOS 27.0 beta)에서는 87.50이었다.** 관측 시점에는 iPad iOS 27 simulator runtime이 없어 격리하지 못했다. 2026-09-24 현재 별도 Mac에 iOS 27.0 runtime이 보이지만 이 R14 경로를 새 Mac에서 재현하지는 않았다 — 아래 **R14** |
 | 2 | 폰트·폭 무관한 **절당 정확히 0.5pt** 의 출처 (0.5pt = @2x 의 1픽셀). ❓ 미규명 — 실측 승격으로 무해해졌을 뿐입니다 |
 
 **D9-0-c 스모크 — R13 수정 후 재검증 (rev.6) ★ 통과**
@@ -2303,7 +2302,7 @@ settle 대기 시간        (§18-3 은 cold launch 후 8초)
 |---|---|---|---|
 | **R13** | ✅ **종결** — 빌더의 행 높이 예측이 절당 0.5pt 씩 실측과 어긋나 176절 87.5pt 누적. 방향·폰트·경로 무관, 장 길이에 선형. **행 높이를 실측 입력으로 승격**해 닫았다 (Δ 87.50 → **0.00**) | 허용치 상향은 G3 포기라 선택지가 아니었다 | 설계 **§20-14** |
 | **R16** | ✅ **종결** — `columnHeight` 미초기화 → 1335.78pt. `fixedSize` 로 닫고 실기기 4건 통과 (위 블록) | **Phase 3 단일 Canvas 전용.** 잉크 좌표계가 깨지므로 R13 보다 우선이었다 | 설계 **§11 · §20-13** |
-| **R14** | ⚠️ **같은 코드가 시뮬레이터(iOS 26.2)에서는 Δ 0.00, 실기기(iOS 27.0 beta)에서는 절당 0.5pt.** 이 머신에 iPad iOS 27 시뮬레이터 런타임이 없어 격리 불가 | 빌더가 행 높이를 **예측**(`lineCount × lineSpace`)하는 한 **OS 판올림마다 재발**한다. 나머지 파이프라인은 전부 실측인데 높이만 모델이다 | 설계 §6-3 — **구조적 논점** |
+| **R14** | ⚠️ **당시 같은 코드가 시뮬레이터(iOS 26.2)에서는 Δ 0.00, 실기기(iOS 27.0 beta)에서는 절당 0.5pt였다.** 관측 당시 iPad iOS 27 simulator runtime이 없어 격리하지 못했다. 현재 별도 Mac에 runtime이 있으나 새 simulator·툴체인에서 재현하지 않았다 | 빌더가 행 높이를 **예측**(`lineCount × lineSpace`)하는 한 **OS 판올림마다 재발**할 수 있다. 나머지 파이프라인은 전부 실측인데 높이만 모델이다 | 설계 §6-3 — **구조적 논점** |
 | **R15** | ✅ **Phase 2 의 Δ 오버레이가 정확히 이걸 잡으라고 만든 것이고, 잡았다.** 오버레이가 없었다면 "장 하단에서 필기가 이상하다" 는 재현 어려운 제보로 왔을 것 | Phase 2 계측 투자에 대한 사후 근거 | 설계 §20-8 |
 
 **D9-0-c 스모크 — 아직 안 채운 칸**
@@ -2453,9 +2452,9 @@ N-Canvas 는 행이 뷰포트에 들어올 때마다 `PKCanvasView` 를 만들�
 
 | # | 발견 | 영향 | 반영할 곳 |
 |---|---|---|---|
-| **D9 H** | ✅ **정식 수정 적용 + 실기기 A/B 통과** (`f64a7d79`). 인자 없이 가로↔세로 **3왕복 전부 정상**, `-CanvasReuseStrokesOnApply` 로 **결함 재현**(양성 대조). 계측은 두 실행이 구분되지 않고 화면 판정만 갈린다 | ✅ **후속 검증 완료로 종결** — 조사 §6 및 이 절 상단 최신 판정 참조. 회전 메모리 비용은 별개 R20으로 추적 | [분석](./single-canvas-rotation-display-investigation.md) §3 · [조작 절차](./device-debugging-cli.md) · 설계 **§20-16** |
+| **D9 H** | ✅ **정식 수정 적용 + 실기기 A/B 통과** (`f64a7d79`). 인자 없이 가로↔세로 **3왕복 전부 정상**, `-CanvasReuseStrokesOnApply` 로 **결함 재현**(양성 대조). 계측은 두 실행이 구분되지 않고 화면 판정만 갈린다 | ✅ **후속 검증 완료로 종결** — 조사 §6 및 이 절 상단 최신 판정 참조. 회전 메모리 비용은 별개 R20으로 추적 | 분석(삭제된 문서 — 커밋 `bc0a2e35` 의 `docs/single-canvas-rotation-display-investigation.md`) §3 · [조작 절차](./device-debugging-cli.md) · 설계 **§20-16** |
 | **R18** | ⚠️ **N-Canvas 가 새로 만드는 행이 v2 가 아니라 v1(모델 기본값)로 저장된다.** 같은 함수가 기존 v3 행을 편집할 때는 v2 로 정확히 내린다 ([CanvasFeature.swift:81](../Feature/CarveFeature/Sources/Presentation/Drawing/Canvas/CanvasFeature.swift:81)) | **배치에는 영향 없음** — 코덱이 v1·v2 를 똑같이 `writingRect` 원점으로 옮긴다. 문제는 **라벨**이다: "1.2.0 절대좌표"(진짜 legacy)와 오늘 N-Canvas 로 그린 행이 `legacyVerses` 한 통에 들어가 진단에서 구별되지 않는다. **E-4 오독의 직접 원인** | 저장 경로 별건 |
-| **E-4** | ✅ **종결 — 결함 아님. D9 H 와 같은 결함이었다.** 2026-09-08 실기기 A/B: 세로 고정 상태에서 글꼴·행간만 바꾸자 **v1(120편 2·4절)·v3(120편 1절) 잉크가 모두 본문을 따라갔다.** `-CanvasReuseStrokesOnApply` 대조에서는 **제자리에 남아 결함이 재현**됐고, 두 실행의 계측(`store/delivered/applied` 일치 · `storeDiff=0` · `expected==canvas` · 합성 bounds 갱신)은 구분되지 않았다 | §8-7 이 세운 가설(폰트 변경과 회전이 같은 `.id` 자극)이 실측으로 확인됐다. rev.22 의 "v1 이라서" 설명은 성립하지 않는다 — **v1 잉크도 정상 경로에서는 따라간다.** `f64a7d79` 이 처방이다 | [D9 H 분석 §3](./single-canvas-rotation-display-investigation.md) · 설계 §16 |
+| **E-4** | ✅ **종결 — 결함 아님. D9 H 와 같은 결함이었다.** 2026-09-08 실기기 A/B: 세로 고정 상태에서 글꼴·행간만 바꾸자 **v1(120편 2·4절)·v3(120편 1절) 잉크가 모두 본문을 따라갔다.** `-CanvasReuseStrokesOnApply` 대조에서는 **제자리에 남아 결함이 재현**됐고, 두 실행의 계측(`store/delivered/applied` 일치 · `storeDiff=0` · `expected==canvas` · 합성 bounds 갱신)은 구분되지 않았다 | §8-7 이 세운 가설(폰트 변경과 회전이 같은 `.id` 자극)이 실측으로 확인됐다. rev.22 의 "v1 이라서" 설명은 성립하지 않는다 — **v1 잉크도 정상 경로에서는 따라간다.** `f64a7d79` 이 처방이다 | D9 H 분석 §3(삭제된 문서 — 커밋 `bc0a2e35` 의 `docs/single-canvas-rotation-display-investigation.md`) · 설계 §16 |
 | **R17** | ⚠️ **`Δ max` 가 R16 계열을 더 이상 검출하지 못한다** — 레이아웃이 실측 높이를 따라가 예측 == 실측이 되기 때문. `.fixedSize` 가 빠진 빌드가 장 전환 Δ 0.00 을 표시하는 것으로 실증 | 실기기 계측의 진단 범위 축소. 대체 절차가 필요 | **런북 §6-9 D9-0-d (신설)** · 설계 §15 · §20-14 |
 | **R27** ⚠️ | **`CD_rowUUID` 가 Production 스키마에 없었다 (2026-09-09 배포로 해소).** V4 는 새 행을 만들 때마다 `rowUUID` 를 쓰는데 서버 스키마에 필드가 없어 **그 값이 CloudKit 으로 올라가지 못했다.** 단일 Canvas 와 무관한 선재 문제이며, 이번 승격으로 앞으로는 올라간다 | ⚠️ **이미 만들어진 행들의 `rowUUID` 는 여전히 서버에 없다.** 저장 경로는 rowUUID 로 행을 찾으므로(`requireDrawingRow`) 다른 기기에 도착한 행이 `rowUUID == nil` 로 보이면 **절당 행이 중복 생성될 여지**가 있다. 기기 2대 동기화로 중복 유무를 확인해야 한다 (미수행). ⚠️ **범위 확대 (COMPAT-0, 2026-09-09):** 출시본 1.3.0 (`49f2dc27`) 은 **스키마 V3 로 `rowUUID` 필드가 없어** 앞으로도 발급하지 못한다 — 구버전이 쓰이는 동안 rowUUID 없는 행이 계속 생긴다 | 설계 §8-7 · §10-1-a · [데이터 호환성 결정](./data-compatibility-decision.md) §4-1 |
 | **R28** ⛔ | **혼재 버전에서 구버전 기기가 v3 행을 잘못 다룬다 — 2026-09-09 git 확인으로 severity 상향.** `displayTransform`(v3 를 `firstUnderlineY` 만큼 내려 표시)과 **v3→v2 강등**이 둘 다 `24e9818e`(Phase 3, **미출시**)에 들어왔다. ~~출시본은 V4 스키마(`b68b6101`)까지만 있어~~ ⚠️ **정정 (COMPAT-0, 2026-09-09):** 실제 출시본은 **1.3.0 (177) · 2026-03-23 · `49f2dc27` · 스키마 V3** 다. **판정은 유지** — V3 에도 `drawingVersion` 이 있고 출시본은 편집 시 그 값을 쓰지 않는다. 근거: [데이터 호환성 결정](./data-compatibility-decision.md) §3. | **① 보기만 하면**: v3 행이 한 줄쯤 위로 밀려 보인다 (데이터 무사). **② 구버전에서 편집하면**: `lineData` 를 캔버스 로컬로 덮어쓰면서 **`drawingVersion` 은 3 으로 남긴다** → **좌표와 라벨이 어긋난 행**이 되고 새 기기에서도 그 절이 어긋난다. 새 기기에서 재편집하면 정상 v3 로 복구되므로 영구 손실은 아니다. ⚠️ 조건은 **기기 2대 + 한쪽 미업데이트 + 양쪽 필기**로 좁다. 완화책: 단계적 출시 / 최소 버전 게이트 / 감수 — **출시 전 결정 필요** | 설계 §10-1 · §10-2 · §10-3 |

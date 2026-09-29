@@ -1,0 +1,400 @@
+//
+//  DrawingEditEnvironment.swift
+//  Domain
+//
+//  Created by Claude on 9/18/26.
+//  Copyright © 2026 leetaek. All rights reserved.
+//
+
+import CarveToolkit
+import CloudKit
+import Dependencies
+import Foundation
+
+/// 편집이 기대는 환경 — 계정 상태 · 서버 작업 표 · `K(기기)` (정책 §12-6 구현 순서 ①).
+///
+/// 절 편집을 시작할 때 이 값으로 편집 문맥(`VerseEditContext`)을 고정하고, 바뀌면 문맥을 다시 판정한다.
+public struct DrawingEditEnvironment: Equatable, Sendable {
+    public var accountState: AccountScopeState
+    /// 확인된 계정일 때만 있다.
+    public var serverWork: AccountServerWorkToken?
+    /// 지금 계정 근거의 `K(기기)`. 확인 전이면 마지막 확인 범위의 것(표시 · 문맥용 — 그동안 K 는 갱신하지 않는다),
+    /// 로그인 안 함이면 이 기기 전용 범위의 것이다.
+    ///
+    /// **nil 은 읽지 못했다는 뜻이다** — 빈 집합(기준점 없음)과 다르다. 빈 집합으로 읽으면 삭제 사실을 잊은 환경이 된다.
+    /// 읽지 못한 동안은 편집을 보존하되, 그 K 에 기대는 귀속 · 확정 · 정리는 하지 않는다.
+    public var knowledge: EraseEpochKnowledge?
+    /// 이 환경을 읽은 계정 확인 세대. 같은 세대 안에서 읽은 상태 · 표 · K 만 한 환경으로 묶는다.
+    public var generation: UInt64
+    /// 로컬 저장소의 내용이 어느 계정의 것인지에 대한 **근거**. 확인된 계정과 저장소 내용의 소유자는 별개다 — 계정 확인이 끝나도
+    /// 저장소에는 이전 계정의 필사가 남아 있을 수 있다(7차 리뷰). 근거가 이 계정과 같을 때만 편집을 귀속한다.
+    ///
+    /// 확인된 계정과 같은 값이어도 그 자체가 아니라 별도 근거로 검증된 경우에만 채운다. 최초 빈 저장소,
+    /// 계정 연결이 없던 1.3.0 V3 원본, 또는 현재 계정 private DB 와 대조된 미러링 저장소가 근거가 될 수 있다.
+    /// 근거가 없거나 읽지 못하면 nil 이고, 기존 필사는 그 계정에 귀속하지 않는다.
+    public var storeOwnership: AccountScope?
+    /// 이 기기의 로컬 삭제 세대(`LocalPreservationWriter`). 초안 · 격리 쓰기는 이 값을 들고 가고, 그 뒤 전체 삭제가 있었으면 거절된다.
+    public var eraseGeneration: UInt64
+    /// 저장소 소유 근거가 **시험용 주입**이다(`StoreOwnershipInjection`, DEBUG 전용) — 소유 증명이 아니다. 이 환경에서 쓴 초안에 남아,
+    /// 주입 없는 실행은 그 초안의 소유 근거를 없는 것으로 읽는다.
+    public var ownershipInjected: Bool
+    /// 이번 실행의 미러링 연결이 C14 게이트로 **보류**됐다(정책 §12-6 C14 ③). 독립된 쓰기 차단 사유다 — 소유 근거가 생겨도 풀리지 않는다.
+    public var connectionHeld: Bool
+
+    public init(
+        accountState: AccountScopeState,
+        serverWork: AccountServerWorkToken?,
+        knowledge: EraseEpochKnowledge?,
+        generation: UInt64 = 0,
+        storeOwnership: AccountScope? = nil,
+        eraseGeneration: UInt64 = 0,
+        ownershipInjected: Bool = false,
+        connectionHeld: Bool = false
+    ) {
+        self.accountState = accountState
+        self.serverWork = serverWork
+        self.knowledge = knowledge
+        self.generation = generation
+        self.storeOwnership = storeOwnership
+        self.eraseGeneration = eraseGeneration
+        self.ownershipInjected = ownershipInjected
+        self.connectionHeld = connectionHeld
+    }
+
+    /// 이 환경에서 절 편집을 시작할 때의 계정 근거.
+    public var accountBasis: VerseEditAccountBasis {
+        switch accountState {
+        case .confirmed:
+            // 확인됨이면 표가 늘 있다. 없으면(경쟁으로 그 사이 무효가 됐다) 확인 전으로 다룬다.
+            serverWork.map { .confirmed($0) } ?? .unverified(hint: nil)
+        case .noAccount:
+            .localOnly
+        case .unconfirmed(let hint):
+            .unverified(hint: hint)
+        }
+    }
+
+    /// 이번 실행은 연결을 보류했지만 지금 계정으로 저장소 소유가 확인됐다 — **앱을 다시 열면 연결된다.**
+    /// 2.0.0 은 실행 중에 저장소 연결을 바꾸지 않는다(2026-09-28 결정 — 실행 중 교체는 옛 컨테이너가 해제되지 않아 끝나지 않았다).
+    /// 로그인만으로는 아니다: 소유 근거가 그 계정이어야 한다. 시험용 주입은 근거가 아니다.
+    public var connectsOnRelaunch: Bool {
+        guard connectionHeld, !ownershipInjected, case .confirmed(let scope) = accountState else { return false }
+        return storeOwnership == scope
+    }
+
+    /// 확인 전 · 아무 정보도 없는 환경 — 서버 작업을 하지 않는 쪽이 기본이다. K 도 모른다.
+    public static let unknown = DrawingEditEnvironment(
+        accountState: .unconfirmed(lastConfirmed: nil),
+        serverWork: nil,
+        knowledge: nil
+    )
+}
+
+/// 캔버스 초안 밖에서 동기화 저장소(`BibleDrawing` · `FavoriteVerse`)에 바로 쓰는 경로를 막는 사유 — 즐겨찾기 추가 · 해제 · 되돌리기,
+/// 위젯에 담으며 즐겨찾기로 보관, N-Canvas 저장 (정책 §12-6 결정 1, 2026-09-18).
+///
+/// 소유가 확인된 유효 환경에서만 쓴다. 로그아웃 · 미확인 상태의 직접 동기화 쓰기는 계속 막는다.
+/// 메뉴만이 아니라 실제 쓰기 직전에 다시 본다.
+public enum SyncedWriteBlock: Hashable, Sendable {
+    /// 로그인하지 않았다.
+    case signedOut
+    /// 계정을 확인하는 중이거나 확인하지 못했다.
+    case accountUnconfirmed
+    /// 이 기기의 저장소가 지금 계정의 것이라는 근거가 없다.
+    case ownershipUnverified
+    /// 삭제 기준점(K)을 읽지 못했다.
+    case knowledgeUnreadable
+    /// 그 절의 필기가 **다른 출처**다 — 다른 계정 · 확인 전에 쓴 초안을 이어 보고 있다. 환경이 아니라 절 단위 사유라 `check(_:)` 가 아니라
+    /// 부르는 쪽(캔버스 상태)이 판정한다. 그 잉크를 지금 계정의 동기화 저장소로 옮기면 계정 간 가져오기가 된다(④ 의 명시적 가져오기 전까지).
+    case verseFromOtherSession
+    /// 이번 실행의 미러링 연결이 **보류**됐다(정책 §12-6 C14 ③ · D2). 저장소는 CloudKit 없이 열려 있고, 여기 쓴 것은 이 기기에만 남는다.
+    /// 계정 · 소유 근거와 **독립된** 사유다 — 가장 먼저 보고, 소유 근거가 생겨도 풀리지 않는다.
+    case connectionHeld
+
+    /// 이 환경에서 동기화 저장소에 바로 써도 되는가. 막으면 그 사유, 되면 nil.
+    public static func check(_ environment: DrawingEditEnvironment) -> SyncedWriteBlock? {
+        guard !environment.connectionHeld else { return .connectionHeld }
+        switch environment.accountState {
+        case .noAccount:
+            return .signedOut
+        case .unconfirmed:
+            return .accountUnconfirmed
+        case .confirmed(let scope):
+            guard environment.serverWork != nil else { return .accountUnconfirmed }
+            guard environment.knowledge != nil else { return .knowledgeUnreadable }
+            guard environment.storeOwnership == scope else { return .ownershipUnverified }
+            return nil
+        }
+    }
+}
+
+#if DEBUG
+/// ACC-1 2차 전용 — 확인된 계정이면 저장소 소유 근거를 그 계정으로 **가정**한다(테스트 계획 §3-2). **소유 증명이 아니다** — 판정 뒤의 경로
+/// (저장소 쓰기 · 이어 쓰기 · 전환 때 초안 보존)를 재현할 뿐이다. DEBUG 빌드 · 시뮬레이터 · 시험(dev) 컨테이너 · 실행 인자가 모두 맞을 때만
+/// 켜진다. 이 판정과 앱의 분기는 `#if DEBUG` 안이라 **Release 에는 켜는 경로가 없다** — 환경 쪽 분기(`injectsOwnership`)는 남지만 값이 늘 false 다(11차 리뷰 P2).
+public enum StoreOwnershipInjection {
+    public static let launchArgument = "-ACC1InjectStoreOwnership"
+
+    public static func isEnabled(containerID: ContainerID, arguments: [String] = ProcessInfo.processInfo.arguments) -> Bool {
+        #if targetEnvironment(simulator)
+        return arguments.contains(launchArgument) && containerID.localDBPath == "Carve.dev.sqlite"
+        #else
+        return false
+        #endif
+    }
+}
+#endif
+
+public protocol DrawingEditEnvironmentClient: Sendable {
+    /// 지금 환경.
+    func current() async -> DrawingEditEnvironment
+    /// 편집 문맥이 든 표가 아직 유효한가.
+    func isCurrent(_ token: AccountServerWorkToken) async -> Bool
+    /// 환경이 바뀌었을 수 있다(계정 변경 알림 · 재확인 끝 · K 갱신). 받으면 `current()` 로 다시 읽고 문맥을 판정한다.
+    func changes() -> AsyncStream<Void>
+}
+
+/// 확인된 계정과 이 기기의 동기화 저장소를 안전하게 연결하는 근거 제공자.
+/// 계정 확인 자체는 저장소의 소유 증명이 아니므로, 구현은 독립된 저장소 근거를 확인한 뒤에만 범위를 돌려준다.
+public protocol StoreOwnershipProofClient: Sendable {
+    func ownership(for scope: AccountScope) async -> AccountScope?
+}
+
+/// 기본값은 실패 닫힘이다. 소유 근거 제공자가 없으면 계정 확인만으로 저장소 쓰기를 열지 않는다.
+public struct UnverifiedStoreOwnershipProofClient: StoreOwnershipProofClient {
+    public init() {}
+    public func ownership(for scope: AccountScope) async -> AccountScope? { nil }
+}
+
+/// 앱이 쓰는 구현. 시작할 때 계정을 확인하고, 계정 변경 알림을 받으면 서버 작업을 막은 뒤 다시 확인한다.
+///
+/// - **환경은 한 확인 세대 안에서 읽는다.** 제공자에게서 상태 · 표 · 세대를 한 번에 받고(`AccountScopeProvider.snapshot`),
+///   그 범위의 K 를 읽은 뒤 세대가 그대로인지 확인한다. 바뀌었으면 다시 읽고, 계속 바뀌면 확인 대기 환경을 준다.
+/// - **알림 콜백 안에서 동기로 막는다.** 콜백이 돌아온 뒤 제공자를 무효화하기까지의 틈에도 옛 표가 쓰이지 않게,
+///   그 사이에는 `isCurrent` 가 거짓이고 `current()` 가 확인 대기 환경을 준다.
+public final class LiveDrawingEditEnvironment: DrawingEditEnvironmentClient, @unchecked Sendable {
+    private let provider: AccountScopeProvider
+    private let stateStore: FileEraseStateStore
+    private let localPreservation: LocalPreservationWriter?
+    private let holdState: LegacySeparationHoldState?
+    /// 앱의 저장소 소유 근거 제공자. 계정 상태와 별도로 저장소 근거가 확인돼야 범위를 돌려준다.
+    private let ownershipProof: any StoreOwnershipProofClient
+    /// 시험용 소유 주입(`StoreOwnershipInjection`, DEBUG 전용).
+    private let injectsOwnership: Bool
+    private let notificationCenter: NotificationCenter
+    private let lock = NSLock()
+    private var subscribers: [UUID: AsyncStream<Void>.Continuation] = [:]
+    private var observation: (any NSObjectProtocol)?
+    /// 받았지만 아직 제공자에 반영하지 못한 계정 변경 알림 수.
+    private var unappliedNotifications = 0
+
+    /// 한 번에 읽는 시도 횟수. 계정이 계속 바뀌면 확인 대기로 둔다.
+    static let maxSnapshotAttempts = 3
+
+    public init(
+        identity: any CloudAccountIdentityClient,
+        containerID: String,
+        stateStore: FileEraseStateStore,
+        localPreservation: LocalPreservationWriter? = nil,
+        holdState: LegacySeparationHoldState? = nil,
+        ownershipProof: any StoreOwnershipProofClient = UnverifiedStoreOwnershipProofClient(),
+        notificationCenter: NotificationCenter = .default,
+        injectsOwnership: Bool = false
+    ) {
+        self.provider = AccountScopeProvider(identity: identity, containerID: containerID, stateStore: stateStore)
+        self.stateStore = stateStore
+        self.localPreservation = localPreservation
+        self.holdState = holdState
+        self.ownershipProof = ownershipProof
+        self.notificationCenter = notificationCenter
+        self.injectsOwnership = injectsOwnership
+    }
+
+    deinit {
+        if let observation { notificationCenter.removeObserver(observation) }
+        if let activationObservation { notificationCenter.removeObserver(activationObservation) }
+    }
+
+    /// 앱이 다시 활성화됐다는 알림 이름(`UIApplication.didBecomeActiveNotification`). Domain 이 UIKit 을 들이지 않게 이름으로 받는다.
+    static let didBecomeActiveNotification = Notification.Name("UIApplicationDidBecomeActiveNotification")
+    private var activationObservation: (any NSObjectProtocol)?
+
+    /// 계정 변경 알림을 구독하고 계정을 확인한다. 앱이 시작할 때 한 번 부른다.
+    public func start() async {
+        lock.lock()
+        if observation == nil {
+            // ★ 알림을 **동기로** 구독한다 — 확인하는 동안 온 알림을 놓치지 않는다.
+            observation = notificationCenter.addObserver(forName: .CKAccountChanged, object: nil, queue: nil) { [weak self] _ in
+                self?.accountChangeNotified()
+            }
+            // 확인하지 못한 채 머물지 않게, 앱이 다시 활성화되면 다시 확인한다(7차 리뷰).
+            activationObservation = notificationCenter.addObserver(forName: Self.didBecomeActiveNotification, object: nil, queue: nil) {
+                [weak self] _ in
+                guard let self else { return }
+                Task { await self.reevaluate() }
+            }
+        }
+        lock.unlock()
+        await provider.refresh()
+        notifySubscribers()
+    }
+
+    /// 확인하지 못한 상태면 다시 확인하고, 어느 쪽이든 구독자에게 다시 판정하게 알린다.
+    func reevaluate() async {
+        if case .unconfirmed = await provider.state {
+            await provider.refresh()
+        }
+        notifySubscribers()
+    }
+
+    /// 알림 콜백 — **여기서 동기로** 막고 알린 뒤, 제공자 무효화 · 재확인은 뒤이어 한다.
+    func accountChangeNotified() {
+        lock.lock()
+        unappliedNotifications += 1
+        lock.unlock()
+        notifySubscribers()
+        Task { await self.applyAccountChange() }
+    }
+
+    private func applyAccountChange() async {
+        await provider.invalidate()
+        lock.lock()
+        unappliedNotifications -= 1
+        lock.unlock()
+        notifySubscribers()
+        await provider.refresh()
+        notifySubscribers()
+    }
+
+    private var hasUnappliedNotification: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return unappliedNotifications > 0
+    }
+
+    public func current() async -> DrawingEditEnvironment {
+        // C14 연결 보류 — 컨테이너를 만들 때 정해지고 이 실행 동안 바뀌지 않는다. 어느 환경에나 그대로 실린다.
+        @Dependency(\.legacySeparationHoldState) var dependencyHoldState
+        let connectionHeld = (holdState ?? dependencyHoldState).isHeld
+        for _ in 0..<Self.maxSnapshotAttempts {
+            guard !hasUnappliedNotification else { break }
+            let snapshot = await provider.snapshot()
+            let eraseGeneration = await localPreservation?.currentGeneration() ?? 0
+            let knowledge = readKnowledge(for: snapshot.state)
+            let storeOwnership: AccountScope?
+            if case .confirmed(let scope) = snapshot.state, snapshot.token != nil {
+                storeOwnership = injectsOwnership ? scope : await ownershipProof.ownership(for: scope)
+            } else {
+                storeOwnership = nil
+            }
+            // K 를 읽는 사이 계정 · 로컬 삭제 세대가 바뀌지 않았어야 한 환경이다.
+            let sameErase = (await localPreservation?.currentGeneration() ?? 0) == eraseGeneration
+            if await provider.isGeneration(snapshot.generation), sameErase, !hasUnappliedNotification {
+                return DrawingEditEnvironment(
+                    accountState: snapshot.state, serverWork: snapshot.token, knowledge: knowledge, generation: snapshot.generation,
+                    storeOwnership: storeOwnership, eraseGeneration: eraseGeneration, ownershipInjected: injectsOwnership && storeOwnership != nil,
+                    connectionHeld: connectionHeld
+                )
+            }
+        }
+        // 계정이 바뀌는 중이다 — 표 없이 확인 대기로 둔다. K 도 이 세대의 것이라 말할 수 없다.
+        let snapshot = await provider.snapshot()
+        return DrawingEditEnvironment(
+            accountState: .unconfirmed(lastConfirmed: snapshot.state.lastConfirmedHint),
+            serverWork: nil,
+            knowledge: nil,
+            generation: snapshot.generation,
+            eraseGeneration: await localPreservation?.currentGeneration() ?? 0,
+            connectionHeld: connectionHeld
+        )
+    }
+
+    /// 상태에 맞는 범위의 K. 파일이 없으면 빈 집합(기준점 없음), **읽지 못하면 nil** 이다.
+    private func readKnowledge(for state: AccountScopeState) -> EraseEpochKnowledge? {
+        let scope: AccountScope? = switch state {
+        case .confirmed(let scope): scope
+        case .noAccount: .localOnly
+        case .unconfirmed(let hint): hint
+        }
+        // 확인한 적이 없는 기기 — 받은 기준점이 없다.
+        guard let scope else { return EraseEpochKnowledge() }
+        do {
+            return try stateStore.knowledge(for: scope)
+        } catch {
+            Log.error("편집 환경 — K(기기)를 읽지 못했다. 빈 집합으로 두지 않는다", "\(error)")
+            return nil
+        }
+    }
+
+    /// 표가 아직 유효한가. 기다리는 사이 알림이 들어왔을 수 있어 **돌려주기 직전에 다시 본다.** 돌려준 뒤의 변경까지 막는 것은
+    /// 저장 진입 경계의 몫이다 — 저장소 쓰기가 같은 직렬화 경계 안에서 표를 다시 확인한다(③).
+    public func isCurrent(_ token: AccountServerWorkToken) async -> Bool {
+        guard !hasUnappliedNotification else { return false }
+        let current = await provider.isCurrent(token)
+        return current && !hasUnappliedNotification
+    }
+
+    public func changes() -> AsyncStream<Void> {
+        let id = UUID()
+        return AsyncStream { continuation in
+            lock.lock()
+            subscribers[id] = continuation
+            lock.unlock()
+            continuation.onTermination = { [weak self] _ in
+                guard let self else { return }
+                self.lock.lock()
+                self.subscribers.removeValue(forKey: id)
+                self.lock.unlock()
+            }
+        }
+    }
+
+    private func notifySubscribers() {
+        lock.lock()
+        let continuations = Array(subscribers.values)
+        lock.unlock()
+        continuations.forEach { $0.yield() }
+    }
+}
+
+/// 정해 둔 환경을 돌려주는 구현. 변화 알림은 곧바로 끝난다 — 시험의 효과가 남지 않게.
+public struct StubDrawingEditEnvironment: DrawingEditEnvironmentClient {
+    private let environment: DrawingEditEnvironment
+
+    public init(_ environment: DrawingEditEnvironment) {
+        self.environment = environment
+    }
+
+    public func current() async -> DrawingEditEnvironment { environment }
+    public func isCurrent(_ token: AccountServerWorkToken) async -> Bool { environment.serverWork == token }
+    public func changes() -> AsyncStream<Void> { AsyncStream { $0.finish() } }
+}
+
+private enum DrawingEditEnvironmentKey: DependencyKey {
+    /// 앱이 `LiveDrawingEditEnvironment` 와 저장소 소유 근거 제공자를 주입한다. 기본값은 확인 전 환경이다.
+    static let liveValue: any DrawingEditEnvironmentClient = StubDrawingEditEnvironment(.unknown)
+    /// 시험 기본값 — **소유가 확인된 유효 환경**. 저장 경로 시험이 계정 근거와 무관하게 저장소 저장을 보게 한다.
+    /// 확인 전 · 보존만 · 초안 전용 동작은 시험이 환경을 직접 준다.
+    static let testValue: any DrawingEditEnvironmentClient = StubDrawingEditEnvironment(.ownedForTesting)
+}
+
+public extension DrawingEditEnvironment {
+    /// 시험용 — 확인된 계정에 저장소 소유 근거까지 있는 유효 환경. 앱은 쓰지 않는다.
+    static let ownedForTesting: DrawingEditEnvironment = {
+        let scope = AccountScope(key: "acct-testing")
+        return DrawingEditEnvironment(
+            accountState: .confirmed(scope),
+            serverWork: AccountServerWorkToken(scope: scope, generation: 1),
+            knowledge: EraseEpochKnowledge(),
+            storeOwnership: scope
+        )
+    }()
+}
+
+public extension DependencyValues {
+    /// 편집이 기대는 계정 · K 환경.
+    var drawingEditEnvironment: any DrawingEditEnvironmentClient {
+        get { self[DrawingEditEnvironmentKey.self] }
+        set { self[DrawingEditEnvironmentKey.self] = newValue }
+    }
+}

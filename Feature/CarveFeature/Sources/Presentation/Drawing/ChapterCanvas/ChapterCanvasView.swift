@@ -28,6 +28,8 @@ struct ChapterCanvasView: UIViewControllerRepresentable {
         var redoRequestVersion: Int
         var scrollRequest: ChapterCanvasFeature.State.ScrollRequest?
         var layout: ChapterLayout?
+        /// 인계 요청 토큰 — 바뀌면 컨트롤러가 미보고 편집을 보고하고 끝났다고 알린다(정책 §12-6 구현 순서 ②).
+        var handoffToken: Int
 
         init(_ state: ChapterCanvasFeature.State) {
             renderedData = state.renderedData
@@ -38,6 +40,7 @@ struct ChapterCanvasView: UIViewControllerRepresentable {
             redoRequestVersion = state.redoRequestVersion
             scrollRequest = state.scrollRequest
             layout = state.layout
+            handoffToken = state.handoffToken
         }
     }
 
@@ -82,7 +85,14 @@ struct ChapterCanvasView: UIViewControllerRepresentable {
             }
         }
         #endif
+        // 캔버스가 있는 동안에는 편집 세션을 닫을 때 인계를 기다린다(정책 §12-6 구현 순서 ②).
+        controller.announceAttached()
         return controller
+    }
+
+    /// 캔버스가 화면에서 빠진다(사이드바가 상세 화면을 가림 등) — 미보고 편집부터 보고하고 떨어졌다고 알린다.
+    static func dismantleUIViewController(_ controller: ChapterCanvasController, coordinator: Coordinator) {
+        controller.detach()
     }
 
     func updateUIViewController(_ controller: ChapterCanvasController, context: Context) {
@@ -106,7 +116,8 @@ struct ChapterCanvasView: UIViewControllerRepresentable {
             undoRequestVersion: display.undoRequestVersion,
             redoRequestVersion: display.redoRequestVersion,
             scrollRequest: display.scrollRequest,
-            layout: display.layout
+            layout: display.layout,
+            handoffToken: display.handoffToken
         ))
     }
 
@@ -175,6 +186,14 @@ struct ChapterCanvasView: UIViewControllerRepresentable {
                 onScroll(previous, current)
             case let .menuRequested(point, anchor, verseFrame):
                 store.send(.verseMenuRequested(at: point, anchor: anchor, verseFrame: verseFrame))
+            case .handoffCompleted(let token):
+                store.send(.editHandoffCompleted(token: token))
+            case .attached(let id):
+                store.send(.canvasAttached(id: id))
+            case .detached(let id):
+                store.send(.canvasDetached(id: id))
+            case let .displayed(id, revision):
+                store.send(.canvasDisplayed(id: id, revision: revision))
             }
         }
     }

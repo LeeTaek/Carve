@@ -28,6 +28,8 @@ extension CarveDetailFeature {
         case limitReached
         /// 담지 못했다.
         case failed
+        /// 즐겨찾기로 보관해야 하는데 동기화 저장소에 쓰지 않고 막았다(정책 §12-6 결정 1). 위젯에도 담지 않았다.
+        case blocked(SyncedWriteBlock)
     }
 
     /// 필사 화면 아래 위젯 안내.
@@ -40,6 +42,8 @@ extension CarveDetailFeature {
         case limitReached
         /// 담지 못했다. 「다시 시도」 는 같은 절을 다시 보낸다.
         case failed(WidgetDisplayRequest)
+        /// 즐겨찾기로 보관할 수 없어 담지 않았다 — 사유를 보인다.
+        case blocked(SyncedWriteBlock)
     }
 
     /// 위젯에 담기 요청 한 번. 실패하면 이 값 그대로 다시 시도한다.
@@ -80,6 +84,9 @@ extension CarveDetailFeature {
 
             case .failed:
                 return showWidgetNotice(state: &state, .failed(request), duration: Self.widgetFailureNoticeDuration)
+
+            case .blocked(let block):
+                return showWidgetNotice(state: &state, .blocked(block), duration: Self.widgetFailureNoticeDuration)
             }
 
         case .widgetNoticeExpired:
@@ -107,6 +114,10 @@ extension CarveDetailFeature {
     private func startWidgetAdd(state: inout State, _ request: WidgetDisplayRequest) -> Effect<Action> {
         // 담는 동안 다시 누르면 무시한다 — 같은 절을 두 번 보관하지 않게.
         guard !state.isAddingToWidget, let chapter = state.favoriteChapter else { return .none }
+        // 보이기만 하는 초안을 이어 보는 절이다 — 보관은 그 잉크를 즐겨찾기(동기화)로 옮기는 일이라 막는다(11차 리뷰 P0-2).
+        guard !state.usesSingleCanvas || !state.chapterCanvas.inheritsOtherSessionInk(verse: request.verse) else {
+            return showWidgetNotice(state: &state, .blocked(.verseFromOtherSession), duration: Self.widgetNoticeDuration)
+        }
         let key = FavoriteVerseKey(chapter: chapter, verse: request.verse)
         let sentence = state.sentenceWithDrawingState.first { $0.sentence.verse == request.verse }?.sentence.sentenceScript ?? ""
         let createdDate = date.now
@@ -118,7 +129,7 @@ extension CarveDetailFeature {
             .cancel(id: CancelID.widgetNotice),
             .cancel(id: CancelID.favoriteNotice),
             .cancel(id: CancelID.imageSaveNotice),
-            .run { [favoriteRepository, widgetVerseClient] send in
+            .run { [favoriteRepository, widgetVerseClient, drawingEditEnvironment] send in
                 do {
                     let selection = await widgetVerseClient.selection()
                     guard !selection.contains(key) else {
@@ -136,6 +147,11 @@ extension CarveDetailFeature {
                         key: key, sentence: sentence, lineData: request.ink, createdDate: createdDate
                     )
                     if stored == nil {
+                        // 즐겨찾기로 새로 보관하는 것은 동기화 저장소 쓰기다 — 소유가 확인되지 않았으면 담지 않는다(정책 §12-6 결정 1).
+                        if let block = SyncedWriteBlock.check(await drawingEditEnvironment.current()) {
+                            await send(.widgetAddFinished(request, .blocked(block)))
+                            return
+                        }
                         try await favoriteRepository.save(favorite)
                     }
                     try await widgetVerseClient.add(favorite)

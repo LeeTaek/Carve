@@ -2,7 +2,7 @@
 
 > 이 문서는 CLI 조작 절차입니다. 최신 검증 판정은 [런북 §8-7](./phase-0a-d-device-test.md), 출시 범위와 작업 순서는 [2.0.0 로드맵](./release-2.0.0-roadmap.md)을 따릅니다.
 
-2026-09-08에 실제 실행한 CLI 중심 절차다. 대상은 iPad이며 테스트에 Xcode MCP를 사용하지 않는다. D9 H 결과·구현안은 [회전 표시 결함 조사](./single-canvas-rotation-display-investigation.md), 일반 백업·성능·필기 검증은 [실기기 런북](./phase-0a-d-device-test.md)을 따른다.
+2026-09-08에 실제 실행한 CLI 중심 절차다. 대상은 iPad이며 테스트에 Xcode MCP를 사용하지 않는다. D9 H 결과·구현안은 회전 표시 결함 조사(삭제된 문서 — 커밋 `bc0a2e35` 의 `docs/single-canvas-rotation-display-investigation.md`), 일반 백업·성능·필기 검증은 [실기기 런북](./phase-0a-d-device-test.md)을 따른다.
 
 > ⚠️ **2026-09-08 인자 의미가 바뀌었습니다.** 표시용 획 재구성이 **정식 경로**가 됐으므로
 > (`f64a7d79`) 예전의 `-CanvasFreshStrokesOnApply` 는 사라졌습니다. 지금 남은
@@ -22,7 +22,7 @@ xcrun devicectl device orientation set --help
 xcrun devicectl device process launch --help
 ```
 
-빌드는 **Xcode 26.3 / 17C529**를 사용한다. 이번 Mac에서는 `/Applications/Xcode.app/Contents/Developer`가 이미 선택돼 있어 `DEVELOPER_DIR`를 지정하지 않았다. 다른 버전이 선택된 머신에서만 실제로 설치된 26.3 경로를 찾아 지정한다. Tuist는 반드시 `mise x -- tuist`로 실행한다.
+현행 기기 빌드·출시 후보 자격 확인은 **현재 선택된 Xcode 27.0 / macOS 27.2**를 사용한다. **현재 Mac 스냅샷(2026-09-24)**의 기본 `xcode-select` 경로는 `/Applications/Xcode.app/Contents/Developer`다. 최초 F60의 generic-project 빌드는 제3자 XCFramework 서명 확인 단계에서 소스 컴파일 전에 실패했다. Tuist workspace를 갱신한 뒤 Xcode 27 `Carve-Workspace` Debug iPad simulator 빌드와 iPadOS 17.5·18.6·26.2·26.4·26.5·27.0 전체 회귀가 통과해 해당 실패는 workspace 경로에서 재현되지 않았다. iPadOS 17.5 로그에는 테스트 failure/runtime warning이 아닌 임시 SQLite fixture 경고가 있어 정리 수명 원인 분석을 후속으로 남겼다. 개별 `-project CarveApp` 호출의 SwiftPM 모듈 의존성 오류와 XCFramework artifact의 읽기 전용 서명 상태 이상은 별도 관측이며 서로의 인과관계는 미확정이다. Xcode 26.3 / 17C529는 기존 회귀 결과와 비교할 때만 별도 `DEVELOPER_DIR`로 지정하며 Xcode 27 검증을 대신하지 않는다. `simctl` 목록 조회와 Device Hub 실행은 확인했으며 Device Hub는 기기 확인·수동 스모크에 쓰고 자동 빌드·검증은 CLI로 수행한다. `devicectl`의 개별 동작은 명령별로 확인한다. Tuist는 반드시 `mise x -- tuist`로 실행한다.
 
 아래 변수를 설정한다. 새 터미널을 열면 다시 설정해야 한다. UUID에는 위 목록에서 **iPad mini(A17 Pro)**의 Identifier를 넣고, iPhone을 고르지 않는다.
 
@@ -38,7 +38,7 @@ xcrun devicectl device info lockState --device "$CARVE_DEVICE_ID"
 
 `transportType: wired`, Developer Mode, 기기 잠금을 확인한다. 이번 실측은 iPad mini(A17 Pro), iPadOS 27.0 beta `24A5408d`, USB였다. Instruments 기록은 USB가 필수다. `devicectl`의 CoreDevice UUID와 `xcodebuild`/`xctrace`의 하드웨어 UDID를 섞지 않는다. 하드웨어 UDID가 필요하면 `xcrun xctrace list devices`로 확인한다.
 
-Codex 샌드박스에서는 CoreDevice 초기화 timeout이나 CoreSimulator connection invalid가 발생했다. 같은 명령을 도구의 `sandbox_permissions: require_escalated`로 재실행해 해결했다. 이를 곧바로 기기·OS 고장으로 판정하거나 시스템 설정을 바꾸지 않는다. `mise` 캐시 접근 실패도 같은 방식으로 재실행했다.
+이전 실행에서는 CoreDevice 초기화 timeout, CoreSimulator connection invalid, `mise` 상태 접근 오류가 있었고 일부는 재실행으로 해결했다. 2026-09-24 현재 기본 Xcode 27의 `simctl` runtime·device 목록은 일반 CLI 호출에서 성공했다. Xcode 26.3을 지정한 runtime 조회는 sandbox에서 CoreSimulatorService와 사용자 로그 경로 오류를 냈지만, 권한을 높인 read-only 재실행은 성공했다. 이것이 `devicectl`의 모든 동작까지 보증하지는 않는다. 오류는 명령·Xcode 선택·sandbox·서비스별로 구분하고 곧바로 기기·OS 고장으로 판단하거나 시스템 설정을 바꾸지 않는다.
 
 ## 2. 빌드와 업데이트 설치
 
@@ -50,7 +50,7 @@ xcodebuild build -workspace Carve.xcworkspace -scheme CarveApp \
   > "$CARVE_DEVICE_LOGS/build.log" 2>&1
 ```
 
-명령 종료 코드와 `BUILD SUCCEEDED`를 확인한 뒤 설치한다. 위 `/tmp` 빌드 경로는 재사용 가능한 예시다. 조사 당시에는 이미 있던 `/Users/leetaek/carve-build/device` 캐시를 재사용했으며 이 경로를 다른 머신에 하드코딩할 필요는 없다.
+명령 종료 코드와 `BUILD SUCCEEDED`를 확인한 뒤 설치한다. 이 절차는 실행 시 선택된 Xcode를 사용하므로 Xcode 버전과 SDK를 결과에 기록한다. 위 `/tmp` 빌드 경로는 재사용 가능한 예시다. 조사 당시에는 이미 있던 `<빌드 캐시 경로>` 캐시를 재사용했으며 이 경로를 다른 머신에 하드코딩할 필요는 없다.
 
 ```bash
 xcrun devicectl device install app --device "$CARVE_DEVICE_ID" \
@@ -126,7 +126,7 @@ xcrun devicectl device orientation set --device "$CARVE_DEVICE_ID" landscapeLeft
 
 ### 화면 캡처와 GUI의 범위
 
-**2026-09-08 16:54에 실제 iPad 화면 캡처와 HUD 판독에 성공했다.** 초기 조사 당시에는 버튼만 확인했지만 후속 확인에서 아래 절차를 끝까지 검증했다.
+**2026-09-08 16:54에 Xcode의 Devices and Simulators 창으로 실제 iPad 화면 캡처와 HUD 판독에 성공했다.** 그 절차는 당시 Xcode GUI를 대상으로 아래처럼 검증했다. 2026-09-24 현재 Mac에는 별도 Device Hub 앱이 실행 중이며 Device Hub에서 iPadOS 18.6 simulator와 iPadOS 27.2 실기기가 보인다. 이 환경 확인에서는 기기 목록과 선택 화면만 읽었고 Device Hub 캡처 동작은 아직 검증하지 않았다. 아래 Xcode 메뉴 경로는 9/8 당시의 검증 기록으로 유지한다.
 
 1. CUA의 `cua.getApp('com.apple.dt.Xcode')`로 Xcode를 선택하고 최신 AX 상태를 읽는다.
 2. **Window → Devices and Simulators → 연결된 iPad 선택 → Take Screenshot**을 클릭한다. iPhone이 함께 연결돼 있으므로 기기 이름과 모델을 확인한다.
@@ -182,7 +182,7 @@ xcrun devicectl device process launch --device "$CARVE_DEVICE_ID" \
   > "$CARVE_DEVICE_LOGS/reuse-apply.log" 2>&1
 ```
 
-§4대로 가로 → 세로 → 가로를 수행한다. **이 모드에서는 필기가 밀리는 결함이 재현돼야 정상이다** — 수정을 끄는 opt-out 이기 때문이다. 기본 검증(인자 없음)이 정상이고 이 모드가 결함을 재현하면 양성 대조가 성립한다. 2026-09-08 A/B 에서 실제로 그렇게 나왔다 ([조사 문서](./single-canvas-rotation-display-investigation.md) §3).
+§4대로 가로 → 세로 → 가로를 수행한다. **이 모드에서는 필기가 밀리는 결함이 재현돼야 정상이다** — 수정을 끄는 opt-out 이기 때문이다. 기본 검증(인자 없음)이 정상이고 이 모드가 결함을 재현하면 양성 대조가 성립한다. 2026-09-08 A/B 에서 실제로 그렇게 나왔다 (조사 문서(삭제된 문서 — 커밋 `bc0a2e35` 의 `docs/single-canvas-rotation-display-investigation.md`) §3).
 
 `--console` 프로세스에 Ctrl-C를 보내면 신호가 앱으로 전달될 수 있다(`process launch --help`). 이번에는 **콘솔 없이 앱을 다시 실행**해 이전 수집을 끝내고 비교 모드의 앱을 남겼다.
 

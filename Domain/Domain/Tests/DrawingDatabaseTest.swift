@@ -22,6 +22,8 @@ final class DrawingDatabaseTest: XCTestCase {
     
     func test_actor_insert() async throws {
         // given
+        // iOS 17 SwiftData 는 모델 초기화 전에 해당 스키마의 컨테이너가 만들어져 있어야 한다.
+        let actor = self.actor
         let drawing = BibleDrawing.init(bibleTitle: .initialState, verse: 1)
         
         // when

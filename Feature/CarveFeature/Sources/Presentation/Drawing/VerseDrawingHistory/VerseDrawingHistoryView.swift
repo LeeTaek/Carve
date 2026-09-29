@@ -8,7 +8,6 @@
 
 import Domain
 import SwiftUI
-import PencilKit
 
 import ComposableArchitecture
 import UIComponents
@@ -39,6 +38,26 @@ public struct VerseDrawingHistoryView: View {
             content
 
             CarveDivider()
+            footer
+        }
+        .onAppear {
+            send(.fetchDrawings)
+        }
+        .onChange(of: store.restoreBlock) { _, block in
+            guard let block else { return }
+            AccessibilityNotification.Announcement(Self.blockedMessage(block)).post()
+        }
+    }
+
+    /// 아래 안내 — 쓰지 못하고 막았으면 그 사유를 그 자리에 보인다(정책 §12-6 결정 1). 다시 눌러도 같은 사유라 「다시 시도」 를 두지 않는다.
+    @ViewBuilder
+    private var footer: some View {
+        if let block = store.restoreBlock {
+            CarveStatusMessage(.failure, message: Self.blockedMessage(block))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, CarveSpacing.large)
+                .padding(.vertical, CarveSpacing.small)
+        } else {
             VStack(alignment: .leading, spacing: 2) {
                 Text("회차를 선택하면 바로 그 필사로 바뀌어요.")
                 Text("다른 회차는 지워지지 않고 그대로 남아요.")
@@ -49,9 +68,10 @@ public struct VerseDrawingHistoryView: View {
             .padding(.horizontal, CarveSpacing.large)
             .padding(.vertical, CarveSpacing.small)
         }
-        .onAppear {
-            send(.fetchDrawings)
-        }
+    }
+
+    static func blockedMessage(_ block: SyncedWriteBlock) -> String {
+        "이 회차로 바꾸지 않았어요. " + block.reasonText
     }
 
     @ViewBuilder
@@ -85,7 +105,7 @@ public struct VerseDrawingHistoryView: View {
     @ViewBuilder
     private func row(for drawing: BibleDrawing) -> some View {
         let isCurrent = drawing.isPresent == true
-        if let image = Self.thumbnail(of: drawing.lineData) {
+        if let image = CarveInkThumbnail.image(of: drawing.lineData) {
             Button {
                 send(.selectDrawing(drawing))
             } label: {
@@ -146,20 +166,6 @@ public struct VerseDrawingHistoryView: View {
             in: RoundedRectangle(cornerRadius: CarveRadius.control, style: .continuous)
         )
         .contentShape(Rectangle())
-    }
-
-    /// 회차 썸네일 — 필기 범위를 고정 폭에 비율을 지켜 줄인다(시안 E2).
-    ///
-    /// 종이 위 필기라 라이트 외관으로 그린다. 다크 외관으로 그리면 PencilKit 이 잉크 색을 바꿔 저장된 색과 달라진다.
-    static func thumbnail(of data: Data?) -> UIImage? {
-        guard let data, let drawing = try? PKDrawing(data: data), !drawing.strokes.isEmpty else { return nil }
-        let bounds = drawing.bounds.insetBy(dx: -4, dy: -4)
-        guard bounds.width > 0, bounds.height > 0 else { return nil }
-        var image: UIImage?
-        UITraitCollection(userInterfaceStyle: .light).performAsCurrent {
-            image = drawing.image(from: bounds, scale: 2)
-        }
-        return image
     }
 
     static func dateText(_ date: Date?) -> String {

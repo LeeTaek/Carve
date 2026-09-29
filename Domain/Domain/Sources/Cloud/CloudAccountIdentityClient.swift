@@ -30,11 +30,19 @@ public protocol CloudAccountIdentityClient: Sendable {
 ///
 /// `FileManager.ubiquityIdentityToken` 은 쓰지 않는다 — iCloud Drive 를 끄면 CloudKit 이 동작해도 nil 이라 계정 식별로 쓸 수 없다.
 public struct CloudKitAccountIdentityClient: CloudAccountIdentityClient {
-    public init() { }
+    private let containerID: String?
+
+    /// - Parameter containerID: 조회할 CloudKit 컨테이너. 앱 시작처럼 의존성 문맥 밖에서 부르는 곳은 **반드시 넘긴다** —
+    ///   생략하면 호출할 때의 `containerId` 의존성을 읽는데, 문맥 밖에서는 기본 컨테이너를 보게 되고 사용자 레코드 이름은
+    ///   컨테이너마다 다르다.
+    public init(containerID: String? = nil) {
+        self.containerID = containerID
+    }
 
     public func currentIdentity() async -> CloudAccountIdentity {
         @Dependency(\.containerId) var containerId
-        let container = containerId.id.isEmpty ? CKContainer.default() : CKContainer(identifier: containerId.id)
+        let identifier = containerID ?? containerId.id
+        let container = identifier.isEmpty ? CKContainer.default() : CKContainer(identifier: identifier)
         do {
             switch try await container.accountStatus() {
             case .available:

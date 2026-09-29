@@ -30,7 +30,7 @@ struct WidgetNoticeView: View {
         switch notice {
         case .added, .alreadyAdded:
             CarveStatusMessage(.success, message: message)
-        case .limitReached:
+        case .limitReached, .blocked:
             CarveStatusMessage(.failure, message: message)
         case .failed:
             CarveStatusMessage(.failure, message: message, onRetry: onRetry)
@@ -47,6 +47,8 @@ struct WidgetNoticeView: View {
             "위젯에는 \(WidgetVerseLimit.maximum)개까지 담을 수 있어요"
         case .failed:
             "위젯에 담지 못했어요"
+        case .blocked(let block):
+            "위젯에 담지 않았어요. " + block.reasonText
         }
     }
 }

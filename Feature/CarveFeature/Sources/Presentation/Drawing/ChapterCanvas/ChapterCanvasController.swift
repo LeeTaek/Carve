@@ -69,6 +69,12 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
         case scrolled(previous: CGFloat, current: CGFloat)
         /// 손가락 롱프레스로 절 메뉴를 요청했다(시안 E1). `point` 는 content 좌표, `anchor` · `verseFrame` 은 창 좌표다.
         case menuRequested(at: CGPoint, anchor: CGPoint, verseFrame: CGRect)
+        /// 인계를 마쳤다 — 이 토큰을 요청받기 전까지의 편집은 모두 보고했다(정책 §12-6 구현 순서 ②).
+        case handoffCompleted(token: Int)
+        /// 캔버스가 화면에 붙었다 · 떨어졌다(미보고 편집 · 받아 둔 인계를 먼저 보고한 뒤) · 새 세대를 표시했다(이전 세대의 마지막 획을 먼저 보고한 뒤).
+        case attached(UUID)
+        case detached(UUID)
+        case displayed(UUID, revision: Int)
     }
 
     /// 뷰가 매 업데이트마다 넘기는 표시 상태.
@@ -85,6 +91,8 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
         var scrollRequest: ChapterCanvasFeature.State.ScrollRequest?
         /// 스크롤 요청을 content y 로 바꿔 줄 레이아웃 (없으면 요청을 보류).
         var layout: ChapterLayout?
+        /// 인계 요청 토큰. 바뀌면 미보고 편집을 보고하고 `handoffCompleted` 로 알린다.
+        var handoffToken: Int = 0
     }
 
     var onEvent: (@MainActor (Event) -> Void)?
@@ -103,6 +111,15 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
     var memoryProbe: ChapterCanvasMemoryProbe?
     #endif
     private var appliedUndoVersion = 0
+    /// 이 캔버스를 Feature 가 가리키는 이름 — 붙고 떨어지는 것을 알린다(`Event.attached` · `.detached`).
+    let instanceID = UUID()
+    /// 첫 표시 상태를 받았는가. 새 캔버스는 그때의 인계 토큰을 받아 두기만 한다.
+    private var hasAppliedConfiguration = false
+    private var appliedHandoffToken = 0
+    /// 요청받았지만 아직 마치지 못한 인계. 획을 긋는 중이면 그 획이 반영된 뒤에 마친다.
+    private var pendingHandoffToken: Int?
+    /// 획이 끝나 반영을 기다린 뒤 인계를 마치는 작업(`scheduleHandoffCompletion`).
+    private var handoffTask: Task<Void, Never>?
     private var appliedRedoVersion = 0
     private var appliedScrollToken = 0
     private var appliedTopInset: CGFloat = -1
@@ -204,7 +221,7 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
 
     // MARK: 밖에서 들어오는 갱신
 
-    /// 텍스트 컬럼을 교체한다. 높이는 컬럼이 스스로 보고한다 (`setColumnHeight`).
+    /// 컬럼이 `onGeometryChange` 로 보고한 자기 높이.
     func setColumnHeight(_ height: CGFloat) {
         guard height != columnHeight else { return }
         columnHeight = height
@@ -212,6 +229,18 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
     }
 
     func apply(_ configuration: Configuration) {
+        if !hasAppliedConfiguration {
+            // 새 캔버스는 보고할 편집이 없다 — 지금 토큰은 받아 두기만 한다(빈 응답이 다른 캔버스의 편집 구간을 닫지 않게).
+            hasAppliedConfiguration = true
+            appliedHandoffToken = configuration.handoffToken
+        }
+        // 인계 요청은 입력을 막기 **전에** 받는다 — 세션을 닫으며 입력을 막으면 긋던 획이 끝나는데, 그보다 먼저 요청을 받아 두어야
+        // 그 획이 반영될 때까지 기다린 뒤 마친다(`canvasViewDidEndUsingTool`). 마치는 것은 이 갱신의 Undo/Redo 를 수행한 뒤다.
+        let handoffRequested = configuration.handoffToken != appliedHandoffToken
+        if handoffRequested {
+            appliedHandoffToken = configuration.handoffToken
+            registerHandoff(configuration.handoffToken)
+        }
         canvas.drawingGestureRecognizer.isEnabled = configuration.isInputEnabled
         probeLasso(tool: configuration.tool)
         canvas.tool = configuration.tool
@@ -246,6 +275,7 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
             appliedRedoVersion = configuration.redoRequestVersion
             performHistory(.redo)
         }
+        if handoffRequested { completeHandoffIfIdle() }
 
         if let request = configuration.scrollRequest, request.token != appliedScrollToken, let layout = configuration.layout {
             appliedScrollToken = request.token
@@ -266,7 +296,7 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
 
     private func applyDrawing(_ data: Data?, replacingGeneration previousGeneration: Int) {
         // 내용을 바꾸기 전에, 아직 보고하지 않은 편집을 이전 세대 번호로 보고한다 (장 전환 직전의 마지막 획, §8-5).
-        flushUnreportedEdit(generation: previousGeneration)
+        flushUnreportedEdit(generation: previousGeneration, displaying: appliedRevision)
 
         let drawing: PKDrawing
         if let data, !data.isEmpty, let decoded = try? PKDrawing(data: data) {
@@ -294,18 +324,6 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
         // 뷰 갱신 도중에 관찰 상태를 바꾸면 같은 턴에 예약된 갱신이 함께 무너져 **다음 세대의 `apply` 가 오지 않을 수** 있다
         // (D9 — 회전 뒤 화면이 이전 합성에 머무는 증상). 바로 위 `flushUnreportedEdit` 이 이미 같은 이유로 미룬다.
         reportUndoState(deferred: true)
-    }
-
-    /// 미보고 변경을 지금 캔버스 내용으로 보고한다. 이벤트는 다음 턴에 보낸다 — 뷰 갱신(`updateUIViewController`) 도중에
-    /// 액션을 보내지 않기 위함이며, 세대 번호를 들고 가므로 늦게 도착해도 Feature 가 자기 세대의 문맥으로 계산한다.
-    private func flushUnreportedEdit(generation: Int) {
-        trailingEditTask?.cancel()
-        guard hasUnreportedChange else { return }
-        hasUnreportedChange = false
-        let snapshot = makeSnapshot(generation: generation)
-        Task { @MainActor [weak self] in
-            self?.onEvent?(.editEnded(snapshot))
-        }
     }
 
     private func makeSnapshot(generation: Int) -> CanvasEditSnapshot {
@@ -378,9 +396,12 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
         probeLasso("didBeginUsingTool")
         isUsingTool = true
         // 직전 획의 trailing 보고가 이 획 도중에 나가면 isEditing 이 풀려 보류된 레이아웃이 획 중간에 적용된다.
-        // 취소하고, 미보고 변경(hasUnreportedChange)은 이 도구 사용이 끝난 뒤 함께 보고한다.
+        // 취소하고, 미보고 변경(hasUnreportedChange)은 이 도구 사용이 끝난 뒤 함께 보고한다. 인계를 마치려고 기다리던 것도 같다 —
+        // 이 획이 끝나면 `canvasViewDidEndUsingTool` 이 다시 예약한다.
         trailingEditTask?.cancel()
         cancelCheckTask?.cancel()
+        handoffTask?.cancel()
+        handoffTask = nil
         onEvent?(.editBegan)
     }
 
@@ -388,6 +409,11 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
         probeLasso("didEndUsingTool")
         isUsingTool = false
         cancelCheckTask?.cancel()
+        if pendingHandoffToken != nil {
+            // 인계를 기다리는 중에 획이 끝났다. PencilKit 은 이 알림 뒤에 획을 반영하므로(§7-5) 반영될 시간을 두고 마친다.
+            scheduleHandoffCompletion()
+            return
+        }
         if hasUnreportedChange {
             // 직전 획의 보고가 이 획 시작에 취소됐다. 이번 획이 변경을 만들면 canvasViewDrawingDidChange 가 다시 예약하므로
             // 마지막 변경까지 한 번에 보고되고, 변경이 없었다면(탭 등) 여기서 예약한 보고가 직전 획을 실어 나간다.
@@ -487,52 +513,6 @@ extension ChapterCanvasController {
     }
 }
 
-// MARK: - 표시용 획 재구성 (D9 H)
-
-extension ChapterCanvasController {
-
-    /// 표시용으로 **획을 새로 만든** drawing. 잉크·좌표·마스크·seed·생성 시각을 그대로 옮기므로 내용은 입력과 동등하다.
-    ///
-    /// 회전 뒤 재합성에서 데이터는 캔버스까지 정상 도착하는데 화면만 이전 렌더에 머무는 결함이 있었다 (D9 H).
-    /// 실기기 실험에서 `setNeedsDisplay` 와 **같은 drawing 재대입은 효과가 없었고**, 빈 drawing 을 거친 복원과
-    /// **같은 공개 속성으로 만든 새 획**만 정상화됐다. 기존 획에서 파생된 표현을 재사용하는 경로를 끊는 것이 요점이다.
-    /// 프레임워크 내부 캐시 키를 확인한 것은 아니므로 OS 버전 조건이나 캐시 결함 탐지 분기는 두지 않는다.
-    ///
-    /// **보존 범위 (iOS 26 SDK 감사).** `PKStroke` 에서 값을 지정할 수 있는 공개 속성은
-    /// `ink` · `path` · `transform` · `mask` · `randomSeed` 다섯뿐이고 전부 그대로 넘긴다.
-    /// `renderBounds` · `maskedPathRanges` · `requiredContentVersion` 은 그 다섯에서 파생되는 읽기 전용 값이라 옮길 것이 없다.
-    /// `path` 는 통째로 넘겨 `creationDate` 와 control point(그 안의 `secondaryScale` · `threshold` 포함)를 유지한다.
-    /// `StrokeIdentityKey` 는 seed + 생성 시각 + point 수만 쓰므로 **소유권 승계가 그대로 유지된다** (§7-2).
-    /// `PKStroke` 의 내부 식별자는 소유권 키로 쓰지 않는다.
-    ///
-    /// 빈 drawing 은 그대로 돌려준다 — 빈 장·디코드 실패의 기존 처리를 바꾸지 않는다.
-    /// - Parameter drawing: 디코드한 표시 대상.
-    /// - Returns: 같은 내용의 새 획으로 이루어진 drawing.
-    static func freshDrawingForDisplay(_ drawing: PKDrawing) -> PKDrawing {
-        let strokes = drawing.strokes
-        guard !strokes.isEmpty else { return drawing }
-        return PKDrawing(strokes: strokes.map { stroke in
-            PKStroke(
-                ink: stroke.ink,
-                path: stroke.path,
-                transform: stroke.transform,
-                mask: stroke.mask,
-                randomSeed: stroke.randomSeed
-            )
-        })
-    }
-
-    #if DEBUG
-    /// 실기기에서 **수정 전 동작**을 다시 보기 위한 Debug 전용 opt-out (`-CanvasReuseStrokesOnApply`).
-    ///
-    /// 정식 경로는 위 재구성이다. 이 인자는 결함을 재현하는 쪽이며, 회전 왕복 A/B 와 긴 장 성능 비교를
-    /// 같은 빌드에서 하기 위해서만 남긴다. 실행당 한 번 읽는다 — `apply` 마다 인자를 훑지 않는다.
-    static let reusesStrokesOnApply = ProcessInfo.processInfo.arguments.contains("-CanvasReuseStrokesOnApply")
-    #else
-    static let reusesStrokesOnApply = false
-    #endif
-}
-
 #if DEBUG
 extension ChapterCanvasController {
     /// 명시적인 진단 명령으로만 표시를 갱신한다. 편집 중에는 실행하지 않고 저장 액션을 보내지 않는다.
@@ -588,8 +568,6 @@ extension ChapterCanvasController {
         if let chapter { hostedChapter = chapter }
         host.rootView = column
     }
-
-    /// 컬럼이 `onGeometryChange` 로 보고한 자기 높이.
 }
 
 // MARK: - 롱프레스 메뉴 (§8-7 · R25 · UI-2)
@@ -673,5 +651,105 @@ extension ChapterCanvasController {
         #if DEBUG
         lassoProbe?.recordToolAssignment(tool)
         #endif
+    }
+}
+
+// MARK: - 인계 (정책 §12-6 구현 순서 ②)
+
+extension ChapterCanvasController {
+    /// 세션을 닫거나 비활성화될 때의 인계 요청을 받아 둔다 — 마치는 것은 같은 갱신의 Undo/Redo 뒤(`completeHandoffIfIdle`)나 획이 끝난 뒤다.
+    /// **다시 요청받았는데 그리기 인식기가 멎어 있으면** 도구 종료 알림을 놓친 것이다 — 끝난 것으로 두고 획이 반영될 시간을 둔 뒤 마친다.
+    /// 긴 획이면 인식기가 움직이는 중이라 계속 기다린다(Feature 는 캔버스가 있는 동안 닫지 않고 다시 요청한다).
+    fileprivate func registerHandoff(_ token: Int) {
+        let isRepeat = pendingHandoffToken != nil
+        pendingHandoffToken = token
+        guard isRepeat, isUsingTool, handoffTask == nil, !isDrawingGestureActive else { return }
+        isUsingTool = false
+        scheduleHandoffCompletion()
+    }
+
+    /// 받아 둔 인계를 지금 마칠 수 있으면 마친다 — 획을 긋는 중이거나 획의 반영을 기다리는 중이면 그쪽이 마친다.
+    fileprivate func completeHandoffIfIdle() {
+        guard pendingHandoffToken != nil, !isUsingTool, handoffTask == nil else { return }
+        completeHandoff()
+    }
+
+    /// 획이 끝났다 — PencilKit 이 그 획을 반영할 시간(`editSettleInterval`)을 두고 인계를 마친다.
+    func scheduleHandoffCompletion() {
+        handoffTask?.cancel()
+        handoffTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(self?.editSettleInterval ?? 0.3))
+            guard let self, !Task.isCancelled else { return }
+            self.completeHandoff()
+        }
+    }
+
+    /// 획을 긋는 중인가 — 그리기 인식기가 움직이고 있다(`runDisplayExperiment` 와 같은 판정).
+    private var isDrawingGestureActive: Bool {
+        [.began, .changed].contains(canvas.drawingGestureRecognizer.state)
+    }
+
+    fileprivate func completeHandoff() {
+        guard let token = pendingHandoffToken else { return }
+        pendingHandoffToken = nil
+        handoffTask?.cancel()
+        handoffTask = nil
+        trailingEditTask?.cancel()
+        cancelCheckTask?.cancel()
+        let snapshot = hasUnreportedChange ? makeSnapshot(generation: appliedRevision) : nil
+        hasUnreportedChange = false
+        // 다음 턴에 한 Task 로 차례로 보낸다(편집이 인계 완료보다 먼저). 보고할 변경이 없으면 열려 있을 수 있는 편집 구간을 닫는다.
+        // 이벤트 통로를 붙잡아 둔다 — 그 사이 캔버스가 사라져도 보고를 잃지 않는다.
+        let onEvent = onEvent
+        Task { @MainActor in
+            onEvent?(snapshot.map { Event.editEnded($0) } ?? Event.editCancelled)
+            onEvent?(.handoffCompleted(token: token))
+        }
+    }
+
+    /// 미보고 변경을 지금 캔버스 내용(이전 세대)으로 보고하고 새 세대를 표시했다고 알린다 — 한 Task 에서 차례로 보내 이전 세대의 마지막 획이 먼저
+    /// 도착한다(Feature 는 붙은 캔버스가 모두 더 새 세대를 표시한 뒤에야 닫은 세션의 문맥을 놓는다). 뷰 갱신 도중에 액션을 보내지 않게 다음 턴에
+    /// 보내고, 캔버스가 먼저 사라져도 잃지 않게 이벤트 통로를 붙잡는다.
+    fileprivate func flushUnreportedEdit(generation: Int, displaying revision: Int) {
+        trailingEditTask?.cancel()
+        let snapshot = hasUnreportedChange ? makeSnapshot(generation: generation) : nil
+        hasUnreportedChange = false
+        let onEvent = onEvent
+        let id = instanceID
+        Task { @MainActor in
+            if let snapshot { onEvent?(.editEnded(snapshot)) }
+            onEvent?(.displayed(id, revision: revision))
+        }
+    }
+
+    /// 캔버스가 붙었다고 알린다(`makeUIViewController`). 뷰 갱신 도중에 액션을 보내지 않게 다음 턴에 보낸다.
+    func announceAttached() {
+        let onEvent = onEvent
+        let id = instanceID
+        Task { @MainActor in
+            onEvent?(.attached(id))
+        }
+    }
+
+    /// 캔버스가 화면에서 빠진다(`dismantleUIViewController`) — 미보고 편집 · 받아 둔 인계부터 보고하고 떨어졌다고 알린다. Feature 는 캔버스가
+    /// 없으면 인계를 기다리지 않으므로 이것이 이 캔버스의 마지막 보고다. 컨트롤러가 곧 사라지므로 이벤트 통로를 붙잡아 다음 턴에 보낸다.
+    func detach() {
+        trailingEditTask?.cancel()
+        cancelCheckTask?.cancel()
+        handoffTask?.cancel()
+        handoffTask = nil
+        let snapshot = hasUnreportedChange ? makeSnapshot(generation: appliedRevision) : nil
+        hasUnreportedChange = false
+        isUsingTool = false
+        let token = pendingHandoffToken
+        pendingHandoffToken = nil
+        let onEvent = onEvent
+        let id = instanceID
+        Task { @MainActor in
+            // 보고할 변경이 없으면 열려 있을 수 있는 편집 구간을 닫는다 — 캔버스가 없으면 그 구간을 닫을 곳이 없다.
+            onEvent?(snapshot.map { Event.editEnded($0) } ?? Event.editCancelled)
+            if let token { onEvent?(.handoffCompleted(token: token)) }
+            onEvent?(.detached(id))
+        }
     }
 }

@@ -42,6 +42,7 @@ struct RawStoreSnapshotTesting {
             context.insert(BibleDrawing(bibleTitle: chapter, verse: 2, lineData: ink, rowUUID: "row-2"))
         }
         try context.save()
+        try V4StoreHarness.settleWAL(at: url)
     }
 
     /// 저장소 본체와 WAL 의 바이트. `-shm` 은 읽기만 해도 바뀌는 공유 메모리 색인이라 비교하지 않는다.
@@ -86,6 +87,28 @@ struct RawStoreSnapshotTesting {
             #expect(FileManager.default.fileExists(atPath: snapshot.appendingPathComponent("manifest.json").path))
             let rows = try drawingsInSnapshot(snapshot, scratch: directory.appendingPathComponent("scratch", isDirectory: true))
             #expect(rows == ["row-1": RealLegacyLineData.data])
+        }
+    }
+
+    @Test("소유 증거로 읽는 완료 사본은 매니페스트의 모든 파일 지문이 맞아야 한다")
+    func completedSnapshotsRequireMatchingManifest() async throws {
+        try await withDirectory { directory in
+            let url = V4StoreHarness.storeURL(in: directory)
+            try seedStore(at: url)
+            let area = area(in: directory)
+            guard case .success(.created(let snapshot)) = RawStoreSnapshot.takeIfNeeded(storeURL: url, area: area) else {
+                Issue.record("원시 사본을 만들지 못했다")
+                return
+            }
+
+            #expect(RawStoreSnapshot.completedSnapshotStores(in: area).count == 1)
+
+            let storeCopy = snapshot.appendingPathComponent(area.storeFileName)
+            var changedBytes = try Data(contentsOf: storeCopy)
+            changedBytes[changedBytes.startIndex] ^= 1
+            try changedBytes.write(to: storeCopy)
+
+            #expect(RawStoreSnapshot.completedSnapshotStores(in: area).isEmpty)
         }
     }
 
@@ -238,7 +261,12 @@ struct RawStoreSnapshotTesting {
             _ = RawStoreSnapshot.takeIfNeeded(storeURL: url, area: area)
             try #require(snapshotFolders(in: area).count == 1)
             let harness = try RepositoryHarness()
-            let eraser = SwiftDataDrawingDataEraser(actor: harness.actor, preservationArea: { area })
+            let eraseArea = EraseStateArea(
+                root: directory.appendingPathComponent("EraseState", isDirectory: true),
+                storeFileName: "Carve.sqlite"
+            )
+            let writer = LocalPreservationWriter(area: area, eraseState: eraseArea)
+            let eraser = SwiftDataDrawingDataEraser(actor: harness.actor, localPreservation: { writer })
 
             #expect(await eraser.eraseAll() == .completed)
             #expect(!FileManager.default.fileExists(atPath: area.storeDirectory.path))
@@ -254,7 +282,12 @@ struct RawStoreSnapshotTesting {
             try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: area.root.path)
             defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: area.root.path) }
             let harness = try RepositoryHarness()
-            let eraser = SwiftDataDrawingDataEraser(actor: harness.actor, preservationArea: { area })
+            let eraseArea = EraseStateArea(
+                root: directory.appendingPathComponent("EraseState", isDirectory: true),
+                storeFileName: "Carve.sqlite"
+            )
+            let writer = LocalPreservationWriter(area: area, eraseState: eraseArea)
+            let eraser = SwiftDataDrawingDataEraser(actor: harness.actor, localPreservation: { writer })
 
             #expect(await eraser.eraseAll() == .partiallyFailed)
         }
