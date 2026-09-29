@@ -1,41 +1,43 @@
 # Carve 2.0.0 로드맵
 
-작성: 2026-09-17 · 현행 상태 갱신: 2026-09-28 · 목표 버전: **2.0.0** · 출시 판정: **보류**(배포 관문 남음)
+작성: 2026-09-17 · 현행 상태 갱신: 2026-09-29 · 목표 버전: **2.0.0** · 출시 판정: **보류 — 배포 관문 미통과**(§7 「출시 차단」)
 
 ## 1. 목표와 현재 위치
 
 > **더 편안하게 성경을 필사하고, 내가 쓴 말씀을 이미지와 위젯으로 곁에 두는 Carve 2.0.0.**
 
-단일 Canvas 전환을 바탕으로 필사 도구와 차트의 사용성을 개선하고, 업데이트 안내와 일관된 디자인, 절 이미지 저장·필사 위젯, 앱 성격에 맞는 수익화 모델을 갖춰 2.0.0으로 출시한다. 출시일은 아직 정하지 않았다.
+단일 Canvas 전환을 바탕으로 필사 도구와 차트의 사용성을 개선하고, 업데이트 안내와 일관된 디자인, 절 이미지 저장·필사 위젯, 광고 제거 구매를 갖춰 2.0.0으로 출시한다. 출시일은 정하지 않았다. 2026-09-17 결정대로 추가 기능은 2.1.0으로 넘기고 이미 구현한 기능의 마감과 데이터 보존을 우선한다(§7).
 
-- 단일 Canvas 전환은 `develop`에 병합됐으며 기본값은 on이다. 사용자의 명시적 off 설정은 유지된다.
-- Production CloudKit 스키마 승격과 주요 전환 결함 수정은 기존 기록상 완료됐다.
-- 앱 메타데이터는 2.0.0 (build 1)이다. 기존 Xcode Cloud TestFlight `2.0.0 (220)`은 물리 기기 설치와 사용자 확인으로 배포 이력이 확인됐지만, Xcode Cloud report상 Xcode `26.6 (17F113)` / macOS `26.3 (25D125)`에서 만든 빌드다. 이는 Xcode 27 후보 배포 자격을 증명하지 않는다. Xcode 27 배포 서명 Archive/export·Production entitlement·TestFlight 후보 검증은 남았다.
-- 파일 제외 없는 전체 회귀의 Xcode 26.3 기록은 비교용으로 유지한다. **Xcode 27.0 / macOS 27.2에서는 Tuist workspace iPad simulator Debug build와 iPadOS 17.5(998 통과·4 expected failure·6 skip), 18.6·26.2·26.4·26.5(각 999 통과·4 expected failure·5 skip), 27.0(998 통과·4 expected failure·6 skip) 전체 회귀가 통과했다.** 여섯 runtime 모두 총 1008건, unexpected failure 0이다. 17.5 전체 로그에는 임시 migration/store fixture의 SQLite unlink/open-FD 경고가 있으나 xcresult에는 failure/runtime warning이 없다. 최초 iPadOS 27.0 전체 실행에서 보인 SwiftData 네 실패는 새 `unknownDataStoreSchema` 오류를 확인된 1.0.x metadata shape에 한해 처리한 뒤 해결됐다. 첫 수정 후 전체 run의 SQLite fixture 잠금 한 건은 reader suite 31/31과 후속 전체 회귀에서 재현되지 않았다. 기존 F60 XCFramework `ProcessXCFramework` 실패도 workspace 빌드에서 재현되지 않았다. 2026-09-25에는 Xcode 27 iPadOS 26.5 ACC sandbox clone의 기존 private-store proof가 통과했다(20/20 record name hash 일치, pending 0, 동일 inventory 재조회); production CloudKit proof는 아니다. 같은 날 cloud-backed V3 row 20개를 가져온 historical 1.3.0(1) clone을 새 Xcode 27 2.0.0 앱으로 업데이트해 integrity `ok`, 20개 drawing/metadata row, pending export 0, payload·record-name set 일치, `currentPrivateCloudRecords`를 확인했고 두 focused Domain suite 37/37도 통과했다. historical 1.3.0 bundle은 Xcode 27에서 재빌드하지 않았다. iPadOS 18.6 no-account V3 synthetic 한 행의 Xcode 27 local migration도 298B payload와 Preservation snapshot을 보존했다. 후속 read-only CanvasDisplayProbe는 fetch 후 store·canvas의 동일 1획과 diff 0을 확인했고 Device Hub 확대 화면에서 Genesis 1:1 획과 1→2→1 이동 뒤 표시를 관찰했다. 이 단일 오프라인 표본의 최초 화면 미통과 기록은 철회한다. 새 iPadOS 26.5 no-account 1.3.0 V3 synthetic Genesis 1:31 행은 첫 로그인 뒤 Core Data export 성공, pending 0, 별도 peer clone의 사전 부재→사후 동일 payload 수신까지 확인했다. 후속 Device Hub peer reader에서도 Page Down 키로 31절 필기 한 줄을 확인했고, 관찰 후 read-only store hash·pending은 그대로였다. 이는 수동 스모크이며 자동화 결과와 분리한다. 새 remote inventory hash는 독립 수집하지 않았고 physical iPad 수신은 미확인이다. Xcode 27 앱 빌드에서 의미 미확인 CoreData migration marker가 생성됐고 Xcode 27 simulator SDK 검색에서도 정의는 확인되지 않았다. 첫 login 시 앱 로그는 기존 Genesis 1:10–12의 8개 22B row를 undecodable로 표시했다. 이후 같은 보존 snapshot bytes를 raw `PKDrawing(data:)`로 읽은 격리 harness에서는 macOS 27.2·iPadOS 26.5·27.0 모두 decode 성공·0 strokes였다. 따라서 플랫폼별 PencilKit 실패는 재현되지 않았고, 앱 composition 경고와 raw API 결과의 불일치 및 사용자 화면 영향은 미확정이다. **출시 판정은 여전히 NO-GO**다. iOS 18 marker 의미·proof, iOS 17 ownership·iOS 17.0 직접 시험, production CloudKit proof, App Store 배포 서명 Archive/export·Production entitlement·TestFlight가 남았다. 312는 TCA 업데이트 당시의 **과거 기준선**이다.
+이 절은 **현재 상태만** 적는다. 날짜별 실험 경위(09-25 Xcode 27 회귀 · ACC clone proof · Genesis 1:10–12 decode 조사 등)는 이 문서의 git 이력(`8e0fa408` 이전 판)과 [호환성 시험 계획](./icloud-sync-compatibility-test-plan.md)에 있다.
 
-### 2026-09-25 기준 출시 상태
+### 2026-09-29 기준 출시 상태
 
-| 판정 | 현재 상태 | 다음 확인 |
+| 영역 | 상태 | 근거 · 다음 확인 |
 |---|---|---|
-| **보류: 필사 이전·동기화** | 2026-09-28 기준 필수 관문(업데이트 무유실 · 옛 무계정 필기의 첫 로그인 전송 · 시간차 양방향 동기화 · 실패 시 보존)은 시뮬레이터 · Development CloudKit · Debug 실기기(iPadOS 27.2) 범위에서 통과했다. 로그인 뒤 연결은 앱 재실행으로 하고, 판독 허용 OS는 17 · 18 · 26 · 27이다. 재실행 때 소유를 매번 다시 증명하던 결함(27 전부 · 빈 저장소 · 대응 전 종료 행 · 오프라인 필기)은 수정 후 재검증했다. 상세는 [인계](./release-2.0.0-migration-sync-handoff.md)와 [출시 범위](./release-2.0.0-migration-sync-scope.md). | Xcode 27 후보 빌드와 전체 회귀, 배포 서명 · Production 스키마 · TestFlight 실기기 업데이트 확인 |
-| **NO-GO: 배포 후보** | Xcode 27 workspace Debug simulator build와 iPadOS 17.5·18.6·26.2·26.4·26.5·27.0 전체 자동 회귀는 통과했다. iOS 27 SwiftData 처리 수정은 여섯 runtime의 focused migration suite에서 모두 통과했다. Release configuration simulator build는 서명되지 않았다. 별도로 Xcode 27 generic iOS Release Archive는 Apple Development identity와 Development profile로 생성됐고 `codesign --verify --deep --strict`가 통과했다. 기존 Xcode Cloud TestFlight `2.0.0 (220)`은 기기 설치와 사용자 확인으로 배포가 확인됐지만 Xcode `26.6` / macOS `26.3` 결과다. Cloud report의 TestFlight Internal Testing 단계는 확인 당시 `Running / In Progress`였다. 이는 Xcode 27 후보 배포가 아니다. 현재 Apple Distribution identity와 App Store profile은 없다. Xcode 27 계정 로그인 후 Apple Development identity가 유효해졌고 2026-09-25 Debug physical iPad build 및 `codesign --verify --deep --strict`는 통과했다. 다만 signed app에 CloudKit environment entitlement가 없고 embedded Development profile은 Development·Production environment를 모두 허용한다. Apple 문서상 이 entitlement가 런타임 CloudKit environment를 선택하므로 Production 접근을 배제할 수 없어 설치하지 않았다. 물리 smoke는 미실행이다 | Development-only CloudKit environment가 확인되는 서명 산출물을 확보한 뒤 물리 iPad smoke; 별도로 Apple Distribution identity·App Store profile을 확보해 Archive/export·Production entitlement·해당 후보 TestFlight 검증 |
-| **미완료: 기능·운영 검증** | 이미지·위젯·광고 제거 등은 구현됐으나 실기기·배포 설정·구매·스토어 자료 검증이 남았다 | 아래 §7 체크리스트 |
+| 범위 | ✅ 확정 | 2026-09-17 사용자 결정. §7 「범위」 |
+| 필사 이전 · 동기화 필수 관문 | ✅ 개발 환경에서 통과 | 업데이트 무유실 · 옛 무계정 필기의 첫 로그인 전송 · 시간차 양방향 동기화 · 실패 시 보존. 시뮬레이터 · Development CloudKit · Debug 실기기(iPadOS 27.2) 범위. **Production 환경은 미확인** — [인계](./release-2.0.0-migration-sync-handoff.md) · [출시 범위](./release-2.0.0-migration-sync-scope.md) |
+| 자동 회귀 | ⚠️ Xcode 26.3 만 최신 | 2026-09-29 develop, Xcode 26.3: iPadOS 26.2 · 18.6 각 1112, 17.5 1111 통과, 실패 0(각 총 1122). **Xcode 27 은 09-25 코드까지만** 여섯 runtime 통과 — 현재 코드는 미실행 |
+| 출시 후보 빌드 | ✅ 경로 확인 | 사용자 확인(09-29): Xcode Cloud Xcode 27 환경에서 TestFlight 까지 배포되고 빌드 번호는 223 으로 올라간다. 아래는 당시 기록 — iOS 27 SwiftData 1.0.x 폴백(`LocalStoreLoader` 의 `#if compiler(>=6.4)`)이 Xcode 26.x 빌드에서 빠지므로 **후보는 Xcode 27 로 만든다.** Xcode Cloud 워크플로는 09-25 확인 당시 26.6 · 26.3 이었다. 기존 TestFlight `2.0.0 (220)` 은 Xcode 26.6 빌드라 후보가 아니다 |
+| 배포 서명 · Production | ⛔ 미완 | App Store 배포 프로필 · App Group 포털 등록 · CloudKit Production 스키마 배포 · TestFlight 실기기 업데이트 확인 |
+| App Store 제출 요건 | ⚠️ 진행 중 | 개인정보 매니페스트 File Timestamp 사유 누락은 09-29 수정(§7 차단 1). IAP 첨부 · 스토어 자료 미완 |
+| 기능 실기기 검증 | ⚠️ 일부 | 위젯 · 이미지 저장 · 광고 제거 구매 · 동의 폼 · 본문 모양 iCloud 백업은 시뮬레이터 · 단위 시험까지 |
 
-아래 초기 트랙 표와 날짜가 붙은 실험 기록은 진행 경위를 보존한다. **현재 판정은 이 상태 표, §7, 이전·동기화 출시 범위 문서를 우선한다.**
+아래 §3~§6 의 트랙 표와 날짜가 붙은 기록은 진행 경위를 보존한다. **현재 판정은 이 표와 §7 을 따른다.**
 
 ## 2. 문서 역할과 상태 관리
 
 | 문서 | 관리할 내용 |
 |---|---|
-| 이 로드맵 | 제품 방향, 우선순위, 브랜치 범위, 출시 후 관측, 미결정 사항 |
+| 이 로드맵 | 제품 방향, 우선순위, 출시 상태와 체크리스트, 출시 후 관측 |
+| [필사 이전·iCloud 출시 범위](./release-2.0.0-migration-sync-scope.md) · [인계](./release-2.0.0-migration-sync-handoff.md) | 이전·동기화의 보장 범위와 현재 상태 · 남은 관문 |
+| [호환성 시험 계획](./icloud-sync-compatibility-test-plan.md) | 실행 증거(명령 · 수치 · 한계) |
+| [동기화·백업 정책](./icloud-sync-and-backup-policy.md) | 시작 화면 · 초안 · 분리 설계와 결정 |
 | [단일 Canvas 설계](./single-canvas-design.md) | 아키텍처 결정, 데이터 계약, 위험 ID, 회귀 기준선 |
-| [실기기 런북](./phase-0a-d-device-test.md) | 실행 절차와 실제 관측·통과·실패·미수행 결과 |
-| [회전 표시 조사](./single-canvas-rotation-display-investigation.md) | 종결된 D9 H의 원인과 재현·검증 근거 |
-| [CLI 조작](./device-debugging-cli.md) | 기기 설치·로그·표시 진단 방법 |
-| [데이터 호환성 결정](./data-compatibility-decision.md) | COMPAT-0의 조사 근거, R27·R28·번역본 귀속의 선택지와 미확인 항목 |
-| [위젯 위험 확인](./widget-feasibility.md) | WIDGET-0의 관측 근거, 위젯에 필요한 설정과 제약, WIDGET에 넘기는 결정 |
+| [실기기 런북](./phase-0a-d-device-test.md) · [CLI 조작](./device-debugging-cli.md) | 실기기 절차와 관측 결과, 기기 설치 · 로그 · 표시 진단 방법 |
+| [데이터 호환성 결정](./data-compatibility-decision.md) | COMPAT-0 의 조사 근거, R27 · R28 · 번역본 귀속 |
+| [디자인 방향](./design/ui-design-direction.md) · [올가미 설계](./lasso-design.md) | 색 토큰 · 시안 결정, 올가미 소유권 규칙 |
 
-과거 실패 기록이나 당시 수치를 최신 결과로 덮어쓰지 않는다. 현재 상태 요약과 최신 판정만 동기화한다. 구현 완료·검증 통과·출시 후 관측·알려진 제한·결정 필요를 구별한다. 미검증 항목을 통과로 바꾸거나 이 문서 작성만으로 위험 수용이 결정됐다고 간주하지 않는다.
+종결된 조사 문서(D9 H 회전 표시 조사, WIDGET-0 위젯 위험 확인)는 2026-09-29 에 지웠다. 링크 자리에 마지막 커밋을 적어 두었다.
 
 ## 3. 작업 트랙과 선행 조건
 
@@ -51,7 +53,7 @@
 | DESIGN-0 / `codex/design-direction` | 레퍼런스, 공통 색상·타이포·간격, 필사·이미지·위젯 시안 방향 | 없음 | 출처·채택 이유와 우선 화면 방향 확정. 작은 결함 수정은 이 결정을 기다리지 않음 |
 | ADS-0 / `codex/monetization-plan` | AdMob 차단 설정·실적을 함께 조사, 모델·가격·노출 위치 결정 | 콘솔 접근 | 조사 결과 기록, 광고 제거 구매/광고 확대/확대 이월 중 선택. 기존 광고 안전 조치는 즉시 별도 진행 가능. **결정 (2026-09-14): 광고 확대 + 광고 제거 일회성 구매**(§4). 민감 카테고리 차단은 콘솔에 설정했다(사용자). ❓ 기존 차트 광고의 노출·수익 확인은 미수행 — 광고 제거 가격을 정할 때 본다 |
 | COMPAT-0 / `codex/canvas-compatibility-plan` | R27·R28과 **번역본별 행 귀속**을 한자리에서 결정. 셋 다 "행을 무엇으로 식별·해석하는가" 문제라 따로 결정하지 않는다 | 기존 전환 기록 | ⏸ **보류 종료 (2026-09-09)** — [데이터 호환성 결정](./data-compatibility-decision.md). ✅ 출시본 확정(1.3.0 (177)·`49f2dc27`·스키마 V3)으로 기존 "출시본은 V4" 전제를 정정. R27 대응(D2)·구버전 쓰기의 V4 필드 보존(D6)은 **기기 한 대 미확보로 검증 이월**, R28(D3)은 **알려진 위험으로 유지하고 대응은 SCOPE 에서 결정**, 번역본 귀속(D4)은 **정책부터 정리하고 저장 변경은 확인 결과에 맞춰 진행**. 최소 버전 게이트는 구버전에 그 코드가 없어 R28 대응이 되지 못함을 확인 |
-| ~~WIDGET-0~~ ✅ / `codex/widget-feasibility` | 새 타깃·공유 저장·서명·앱 진입 가능성의 작은 검증 | 없음 | ✅ **가능 확인 완료 (2026-09-10)** — [위젯 위험 확인](./widget-feasibility.md). 시뮬레이터에서 타깃 추가·App Group 읽기·위젯 탭 딥링크를 끝까지 관측했고 회귀 343 유지. ⚠️ **다크 모드에서 깨지는 것을 확인**(§4) · 위젯 이미지에 **면적 상한**이 있어 초과하면 조용히 플레이스홀더가 된다. ⛔ **실기기와 배포 서명은 미확인** — App Group 은 개발자 포털 등록이 필요하고 계정 변경이라 수행하지 않았다. 스파이크는 `50b4296c` 에 남기고 제품 경로에서는 되돌렸다 |
+| ~~WIDGET-0~~ ✅ / `codex/widget-feasibility` | 새 타깃·공유 저장·서명·앱 진입 가능성의 작은 검증 | 없음 | ✅ **가능 확인 완료 (2026-09-10)** — 위젯 위험 확인(삭제된 문서 — 커밋 `91084e97` 의 `docs/widget-feasibility.md`). 시뮬레이터에서 타깃 추가·App Group 읽기·위젯 탭 딥링크를 끝까지 관측했고 회귀 343 유지. ⚠️ **다크 모드에서 깨지는 것을 확인**(§4) · 위젯 이미지에 **면적 상한**이 있어 초과하면 조용히 플레이스홀더가 된다. ⛔ **실기기와 배포 서명은 미확인** — App Group 은 개발자 포털 등록이 필요하고 계정 변경이라 수행하지 않았다. 스파이크는 `50b4296c` 에 남기고 제품 경로에서는 되돌렸다 |
 
 위젯 위험 확인은 작은 검증용 구현을 포함할 수 있다. 임시 코드를 제품에 그대로 남기지 않고 재사용 여부를 결정한다. 이 단계에서도 실제 기기 검증을 못 했으면 이유와 미확인 범위를 기록한다.
 
@@ -142,11 +144,11 @@ A 트랙에서도 저장·삭제 위험을 차트 뒤로 고정하지 않는다.
 
 위젯 크기와 긴 절 표현 방향은 DESIGN-0·WIDGET-0에서 일찍 정하고 DESIGN-1에서 마감한다. 임의로 글자를 지나치게 축소하거나 잘라 전체 내용처럼 보여주지 않는다. 앱 재실행·위젯 미지정·이미지 교체·이미지 생성 실패를 확인한다. 위젯을 탭해 앱으로 돌아와도 현재 편집 내용을 유실하지 않아야 한다.
 
-⚠️ **WIDGET-0에서 두 가지가 추가로 확인됐다 (2026-09-10).** ① **위젯은 앱 Info.plist의 `UIUserInterfaceStyle: Light`를 상속하지 않는다.** 홈 화면의 라이트/다크를 따라가며, 위젯 자신의 Info.plist에 같은 키를 넣어도 무효다. "지정 당시 이미지"를 흰 배경 전제로 렌더하면 다크에서 검은 카드 위에 흰 사각형이 뜬다. 배경을 명시 색으로 칠하고 뷰에서 colorScheme을 다뤄야 한다. **위젯 완료 기준에 라이트·다크 양쪽 확인을 포함한다.** ② **WidgetKit은 위젯에 넣는 이미지의 면적에 상한을 둔다** — 초과하면 앱은 정상인데 위젯만 조용히 플레이스홀더로 남는다. 사진 저장용 원본을 위젯에 그대로 줄 수 없으므로 IMAGE-CORE가 위젯용 축소 사본을 함께 만들지 결정한다. 근거는 [위젯 위험 확인](./widget-feasibility.md) §2·§4.
+⚠️ **WIDGET-0에서 두 가지가 추가로 확인됐다 (2026-09-10).** ① **위젯은 앱 Info.plist의 `UIUserInterfaceStyle: Light`를 상속하지 않는다.** 홈 화면의 라이트/다크를 따라가며, 위젯 자신의 Info.plist에 같은 키를 넣어도 무효다. "지정 당시 이미지"를 흰 배경 전제로 렌더하면 다크에서 검은 카드 위에 흰 사각형이 뜬다. 배경을 명시 색으로 칠하고 뷰에서 colorScheme을 다뤄야 한다. **위젯 완료 기준에 라이트·다크 양쪽 확인을 포함한다.** ② **WidgetKit은 위젯에 넣는 이미지의 면적에 상한을 둔다** — 초과하면 앱은 정상인데 위젯만 조용히 플레이스홀더로 남는다. 사진 저장용 원본을 위젯에 그대로 줄 수 없으므로 IMAGE-CORE가 위젯용 축소 사본을 함께 만들지 결정한다. 근거는 위젯 위험 확인(삭제된 문서 — 커밋 `91084e97` 의 `docs/widget-feasibility.md`) §2·§4.
 
 **현행 삭제·위젯 정책:** 「지우기」는 이전 필사 기록을 보존하고, 즐겨찾기·위젯의 지정 당시 사본도 유지한다. 즐겨찾기를 해제하면 위젯 선택에서도 빠진다. 최종 후보에서 이 경로를 확인한다.
 
-위젯 타깃과 App Group 공유 저장은 코드에 추가됐다. 위젯에는 SwiftData·CloudKit을 링크하지 않는다. **App Group `group.kr.co.carve.leetaek`의 개발자 포털 등록과 배포 서명 확인은 남아 있다.** 필요한 설정 목록은 [위젯 위험 확인](./widget-feasibility.md) §5를 따른다.
+위젯 타깃과 App Group 공유 저장은 코드에 추가됐다. 위젯에는 SwiftData·CloudKit을 링크하지 않는다. **App Group `group.kr.co.carve.leetaek`의 개발자 포털 등록과 배포 서명 확인은 남아 있다.** 필요한 설정 목록은 위젯 위험 확인(삭제된 문서 — 커밋 `91084e97` 의 `docs/widget-feasibility.md`) §5를 따른다.
 
 **즐겨찾기 (2026-09-15 추가).** 절 메뉴 첫 항목 `즐겨찾기에 추가 | 즐겨찾기 해제`, 절 번호 아래 별 표시, 사이드바 별 버튼과 목록(시안 N1~N5, [UI 방향](./design/ui-design-direction.md) §5). 결정 두 가지:
 
@@ -314,64 +316,51 @@ TestFlight에서는 후보 빌드 설치·기존 상태를 가진 앱의 업데�
 
 ## 7. 최소 범위·출시 기준
 
-**필사 이전·동기화 범위 갱신(2026-09-22, 구현 상태 갱신 2026-09-23):** [2.0.0 필사 이전·iCloud 출시 범위](./release-2.0.0-migration-sync-scope.md)를 이 영역의 최신 결정으로 적용한다. 실제 1.3.0 V3 필사의 업데이트 무유실, 무계정 1.3.0 필기의 2.0.0 첫 로그인 후 전송·다른 iPad 수신, 통상적인 시간차 동기화가 출시 관문이다. C14 분리·명시적 가져오기·행 삭제 전체와 동시 같은 절 편집의 완전한 충돌 보존은 이번 출시 관문에서 제외한다. 아래 2026-09-17 표·체크리스트에서 이와 충돌하는 과거 범위 문장은 당시 기록이며, 이 결정이 우선한다. 다른 제품 기능·배포 조건은 그대로 남는다. `CloudKitStoreOwnershipProofClient`를 production 환경에 연결했지만 reader는 iOS 26만 허용한다. iOS 18.6 V3에서 의미를 확인하지 못한 migration marker가 관측됐고 iOS 17 최소 지원 경로도 검증되지 않아 전체 판정은 NO-GO다.
+2026-09-29 에 다시 썼다. 이전 판의 날짜별 판정 문장(판독 허용 OS `[26]`, 09-25 NO-GO 근거, 2026-09-17 리뷰 순서표)은 git 이력에 있다. 필사 이전·동기화의 세부 판정은 [출시 범위](./release-2.0.0-migration-sync-scope.md)가 우선한다.
 
-### 범위 경계
-
-**2026-09-17 사용자 결정 — 2.0.0을 먼저 출시해 사용자 피드백을 받는다.** 추가 기능과 전면 디자인 개편은 2.1.0으로 이월하고, 이미 구현한 핵심 기능의 마감과 데이터 보존·업데이트 호환성 검증을 우선한다. 아래 최신 범위가 앞선 트랙 표의 예정·결정 대기보다 우선한다. 실제 배포는 출시 후보 검증 후 진행한다.
+### 범위 (2026-09-17 사용자 결정)
 
 | 구분 | 범위 |
 |---|---|
-| 현재 합의한 2.0.0 핵심 범위 | 단일 Canvas, 필사 도구·메뉴·차트 결함 수정, 저장 실패 안내·데이터 설정 오류/설명 보완, 절 롱탭 네 메뉴·이미지 저장·지정 당시 필사 위젯, 업데이트 안내·짧은 도움말, 기존 광고 안전 설정 |
-| 2.1.0 이월 | 영어 성경(BIBLE-EN), 추가 화면의 전면 디자인 개편, 신규 수익화 확대. 이미 구현한 광고·광고 제거는 추가 확장 없이 구매·복원·동의와 배포 설정을 검증한다 |
-| 기술 기반 업데이트 | TECH-0: TCA 1.26.2 적용. 현행 주 검증 대상은 macOS 27.2 / Xcode 27.0이다. Tuist workspace iPad simulator build와 iPadOS 17.5·18.6·26.2·26.4·26.5·27.0 full regression 통과(각 1008건, 예기치 않은 실패 0). iOS 27.0 runtime은 SwiftData `.unknownDataStoreSchema` 처리 수정 후 통과했다. 최초 cancellation timing 실패는 재현되지 않았고, 첫 수정 후 SQLite fixture 잠금 1건은 reader suite·후속 full run에서 재현되지 않았다. 17.5 전체 로그에 임시 SQLite fixture 경고 382건이 있으나 xcresult failure/runtime warning은 없고 원인은 미확정이다. 기존 F60 `ProcessXCFramework` 실패는 재현되지 않았다. artifact 서명 이상과 개별 `-project` SwiftPM module dependency 오류는 별개 관측으로, 인과관계는 미확정이다. Device Hub의 새 iPadOS 27.0 simulator reader 표시·인접 장 이동은 CloudKit proof가 아니다. Xcode 27 iPadOS 26.5 ACC sandbox clone의 existing private-store proof는 별도 기록에서 통과했으며 production CloudKit proof로 확대하지 않는다. Xcode 26.3 회귀는 비교 근거로 보존하고 보유 iPad 실기기 smoke·App Store 배포 서명 Archive/export·Production entitlement·TestFlight는 추가 검증한다 |
-| 기본 완성도 | 핵심 화면의 가독성·접근성·일관성·화면 적응, 데이터 호환성 대응 결정과 필요한 보완, 통합 검증·베타·운영 준비 |
-| 2.0.0 마감 원칙 | 새 기능 추가를 멈추고 핵심 기능의 오류·가독성·접근성·배포 설정을 마무리한다. 사용자 피드백으로 2.1.0 세부 우선순위를 조정한다 |
-| 별도 합의 없이는 이월하지 않는 범위 | 절 메뉴·이미지 저장·필사 위젯. 이번에 합의한 목표이므로 일정 압박만으로 제외하지 않음 |
-| 후속 버전 | **2.1.0 — 필사 백업·불러오기(암호화 포함, 광고 제거 구매에 포함), 영어 성경, 추가 디자인 개편.** 그 밖의 Phase 4, 전체 장/PDF, 목표·알림 확장은 피드백에 따라 후속 범위를 정한다. 충돌 보존에 필요한 버전·초안 구조는 아래 안전성 판단과 별개로 자동 이월하지 않는다 |
+| 2.0.0 핵심 | 단일 Canvas, 필사 도구 · 메뉴 · 차트 결함 수정, 저장 실패 안내 · 데이터 설정 오류/설명 보완, 절 롱탭 메뉴 · 이미지 저장 · 필사 위젯 · 즐겨찾기, 업데이트 안내 · 짧은 도움말, 광고 안전 설정과 이미 구현한 광고 제거 구매, 필사 이전 · iCloud 동기화 보장 |
+| 이월 없이 지킬 것 | 절 메뉴 · 이미지 저장 · 필사 위젯 — 일정 압박만으로 빼지 않는다 |
+| 2.1.0 이월 | 필사 백업 · 불러오기(광고 제거에 포함), 영어 성경(BIBLE-EN), 추가 디자인 개편, 수익화 확대 |
+| 출시 조건이 아닌 것 | 구기기 · 120Hz 직접 검증, 동시 같은 절 편집의 완전한 충돌 보존, C14 분리 · 명시적 가져오기 |
 
-메이저 버전을 기능 개수로 채우지 않는다. 현재 최소 범위는 위 핵심 범위와 기본 완성도이며, 일정 변경이 필요하면 구현 전에 범위 결정을 기록한다. 구기기·120Hz 직접 검증은 출시 조건이 아니다.
+### 출시 차단 — 모두 닫아야 배포한다
 
-**다음 작업 순서(2026-09-25 당시 기록 — 현재 순서는 [인계](./release-2.0.0-migration-sync-handoff.md)의 「남은 관문」):** ① 물리 iPad mini (A17 Pro)는 iPadOS 27.2에서 연결됐고 TestFlight `2.0.0 (220)`이 설치돼 있다. 사용자가 교체를 승인했다. Xcode 27 계정 로그인 뒤 Apple Development identity가 유효해 Debug physical iPad build와 strict code-signature 검증은 통과했다. 그러나 signed app의 CloudKit environment entitlement가 없고 Development profile은 Development·Production을 모두 허용해 Production endpoint 접근을 배제할 수 없으므로 아직 설치·실행하지 않았다. Development-only environment가 확인되는 산출물을 확보한 뒤 Device Hub 수동 smoke를 한다. 이는 자동 회귀·CloudKit proof와 별도다. ② App Store 배포 서명 Archive/export·Production entitlement·TestFlight를 검증한다. ③ iOS 18 marker 의미·iOS 17 소유 판정·직접 회귀를 해결하고 기존 historical V3 sample의 server inventory와 physical peer, current-identity sample의 physical iPad 수신을 확인한다([판정표](./release-2.0.0-migration-sync-scope.md)). ④ Genesis 1:10–12 decode 경고를 조사한 뒤 이미지·위젯·광고 제거, 저장·삭제 실패 및 화면 적응을 실기기에서 검증한다. ⑤ 같은 후보로 스토어 자료·심사 순으로 확인한다. 2026-09-17의 CK-A 실험·R27·R28 관측은 [호환성 시험 계획](./icloud-sync-compatibility-test-plan.md)에 보존한다.
+- [x] **1. 개인정보 매니페스트 (2026-09-29 수정).** 2.0.0 에서 새로 쓴 `FileManager.attributesOfItem`(`RecoveryCopyStore` · `RawStoreSnapshot` · `CloudKitStoreOwnershipProofClient`, 1.3.0 에는 없었다)에 맞춰 `PrivacyInfo.xcprivacy` 에 `NSPrivacyAccessedAPICategoryFileTimestamp` + `C617.1` 을 선언했다. 값이 빈 문자열이던 `NSPrivacyCollectedDataTypes` 두 항목은 지웠다(수집 항목은 App Store Connect 개인정보 라벨로 신고한다).
+- [x] **2. Xcode 27 빌드 · TestFlight 경로.** 사용자 확인(2026-09-29): Xcode Cloud 를 Xcode 27 환경으로 올리면 TestFlight 배포까지 된다. 최종 후보의 커밋 · 빌드 번호는 제출 때 적는다. 현재 코드의 Xcode 27 전체 회귀는 남아 있다(권장).
+- [x] **3. 빌드 번호.** 사용자 확인(2026-09-29): Cloud 빌드는 223 으로 올라간다 — 1 로 되돌아가는 경로는 실제로 타지 않는다.
+- [ ] **4. 배포 서명.** Apple Distribution 인증서 · App Store 프로필, 개발자 포털에 App Group `group.kr.co.carve.leetaek` 등록(앱 · 위젯). Archive 의 entitlements 에 App Group · `ubiquity-kvstore-identifier` · `icloud-container-environment = Production` · 컨테이너 `iCloud.Carve.SwiftData.iCloud` 가 있는지 `codesign -d --entitlements` 로 본다.
+- [ ] **5. CloudKit Production 스키마 배포.** Development 의 새 레코드 타입 · 필드(`CD_FavoriteVerse` 등 V5 · V6)를 Production 에 배포한다. Production 스키마는 지울 수 없으니 Development 스키마가 최종인지 먼저 본다.
+- [ ] **6. TestFlight 후보로 실기기 업데이트.** App Store 1.3.0 이 설치된(로그인 · 필사 있는) iPad 에 후보를 덮어 설치해 필사 보존 · 재실행 연결 · 다른 iPad 수신을 확인한다. **Production 환경에서 이전 · 동기화를 보는 첫 확인이다.**
+- [ ] **7. 광고 제거 IAP.** `kr.co.carve.leetaek.adfree` 는 첫 IAP 라 2.0.0 버전 페이지의 인앱 구매 항목에서 함께 제출한다. 상품 상태 「제출 준비 완료」, 유료 앱 계약 활성, 가격(잠정 약 3달러) 확정, TestFlight 샌드박스 구매 · 복원 확인.
+- [ ] **8. 스토어 자료.** 스크린샷 · 설명 · 개인정보 라벨(AdMob · Firebase 가 수집하는 항목) · 버전 설명이 실제 기능 · 알려진 제한과 일치.
 
-**이월로 해소되지 않는 출시 조건:** R27·R28·U4의 대응 판단, 늦은 import와 편집의 보존, 로컬 저장소 준비 실패·V1 폴백의 편집 진입, 저장·삭제 실패는 확인되지 않은 채 통과로 처리하지 않는다. 시작 화면 선택지와 불변 버전·초안의 최소 구현 범위는 이 검증 결과로 확정한다. 이번 범위 축소는 데이터 유실 위험 수용이나 해당 보호 기능의 일괄 이월을 뜻하지 않는다.
+### 출시 전 권장 — 막지는 않지만 확인 또는 수용을 적는다
 
-### 동기화·저장 안전 — 남은 순서 (2026-09-17 리뷰)
+- [ ] 실기기: 위젯(라이트 · 다크, 탭 이동, 정시 전환, 익스텐션 메모리), 이미지 저장(Pencil · 긴 절 · 소제목 절), UMP 동의 폼, 본문 모양 iCloud 백업의 재설치 복원, 저장 실패 · 삭제 실패 안내.
+- [ ] UI-1 · UI-2 · SAVE-1 · SAVE-2 · CHART 의 실기기 손조작(회전 · 좁은 창 · 왼손 모드 포함).
+- [ ] 1.3.x 에서 올라온 사용자에게는 패치노트가 자동으로 뜨지 않는다 — `lastSeenAppVersion` 이 2.0.0 에서 생긴 키라 이전 값이 nil 이다(`AppCoordinatorFeature.swift` 의 `previousVersion` 판정). 첫 사용 안내는 따로 뜬다. 그대로 둘지, 로컬 필사가 있는 nil 을 업데이트로 볼지 정한다.
+- [ ] Xcode Cloud 의 `swiftlint = "latest"`(`.mise.toml`)는 고정되지 않아 후보 빌드가 재현되지 않을 수 있다.
+- [ ] 출시 방식(단계적 출시 여부) · 중단 판단자 · MetricKit 수신 확인 계획(§6).
 
-외부 코드 리뷰가 제안한 우선순위를 그대로 따른다. 코드·문서만 읽은 리뷰이며, 아래 ✅ 는 이 저장소의 커밋과 단위 테스트 근거다(실기기 확인 아님).
+### 알려진 제한 — 출시 안내와 문의 대응에 반영
 
-| 순서 | 항목 | 상태 |
-|---|---|---|
-| 1. 출시 전 우선 해결 | **단일 Canvas 의 주요 삭제 경쟁 경로 보완**(늦은 완료 응답 · 삭제 뒤 실행되는 저장 · 삭제 뒤 다시 읽기 실패), 위젯 실패의 완료 오표시, 삭제 실패 안내의 단정, Undo/Redo 저장 오표시, 관찰 초기화 경쟁과 오류 분류(조회 중 취소 포함), 실패 종류별 누적 | ✅ 2026-09-17 (`a518e918` ~ `4854e609`, 2차 리뷰 반영 포함). **전체 저장·삭제 안전성 완료가 아니다** — N-Canvas 롤백 경로는 세대를 거치지 않고, 실기기 경쟁은 재현하지 못했다. 실기기(dev)에서는 시작 화면 결론 · 설정 동기화 활동 · 전체 삭제 성공 경로만 확인했다(DEV-ICLOUD-1) |
-| 2. 출시 범위 결정과 함께 | 초기 진입 정책, 편집 중 원격 변경 보호, 불변 버전·초안 내구성, 구버전 호환성(R27·R28·U4) | **현재 갱신:** 초기 복원에서 「먼저 시작하기」·계속 기다리기와 늦은 도착 안내를 구현했다(2026-09-21). 동시 같은 절 편집·구신 혼용의 완전한 충돌 보존은 [2.0.0 필수 보장](./release-2.0.0-migration-sync-scope.md)에서 제외한 알려진 제한이다. U4는 관측 범위에서 보존, R28 표시 어긋남과 R27 중복은 재현됐으며 최종 후보 검증·안내가 남았다 |
-| 3. 그다음 표시 검증 | 저장 상태 캡션의 깜빡임·가독성, 시작 화면 문구, 설정의 동기화 활동 화면 | 미검증 |
-| 추가 — 호환성 | 계정 전환 뒤 로컬 필사의 귀속·전송 정책(전용 계정 필요) · 로컬 저장소 준비 실패와 V1 폴백 상태에서 편집 진입 차단(계정 없이 가능) · 필사 칸 폭(`writingWidth`) 계산이 바뀌는 업데이트 뒤 기존 필사 위치 — **업데이트 데이터 호환성 검증**으로 분류 | **편집 진입 차단(MIG-F1)은 1차 수정 · 리뷰 반영 진행 중 (2026-09-17, `fix/mig-f1-store-load-failure`)** — 모르는 모델 · 손상 저장소는 V1 폴백 없이 막고, V1 폴백 상태는 재실행을 요구한다. 단위 테스트와 전용 임시 시뮬레이터(iCloud 미로그인)에서 수정 전 실패 · 수정 후 통과를 확인했고 실기기 · 계정 있는 상태는 미확인이다([테스트 계획](./icloud-sync-compatibility-test-plan.md) §5-1 MIG-F1). 계정 전환 · 필사 칸 폭은 미착수 |
-| 추가 — 테스트 공백 | 시작 화면이 종료 요청을 한 번만 보내는지, root 전환 뒤 늦게 온 동기화 이벤트 | 미착수 |
+- 두 iPad 에서 같은 절을 서로 모르게 동시에 고치면 나중 쓰기가 덮는다(F15).
+- 1.3.0 과 섞어 쓰면 중복 행(R27) · 1.3.0 에서 더한 획의 표시 어긋남(R28)이 생긴다.
+- 로그인한 뒤 iCloud 연결은 앱을 완전히 종료하고 다시 열어야 한다.
+- 다른 기기의 변경은 실행 · 앱 복귀 때 받는다 — 푸시 entitlement(`aps-environment`)가 없다. 1.3.0 부터 같다.
+- iPadOS 27 의 무계정 1.3.0 저장소 모양은 관측하지 못해 연결을 보류한다(필기는 로컬 초안에 쓴다). iPadOS 17.0 은 직접 시험하지 않았다(17.5 로 확인).
+- Genesis 1:10–12 의 22B 행 decode 경고는 원인 미확정이다. 덮어쓰지 않는 것은 확인했다.
 
-[테스트 계획](./icloud-sync-compatibility-test-plan.md)의 단계 C 는 전체를 외부 조건으로 묶지 않는다 — 로컬 초안 종료·저장 실패·중복 복구는 계정 없이 시험할 수 있고, 원격 수신을 결합하는 케이스만 전용 계정·폐기 가능한 컨테이너를 기다린다.
+### 완료
 
-### 출시 체크리스트
-
-- [~] **최신 필사 이전·동기화 출시 관문(2026-09-22):** [범위와 판정표](./release-2.0.0-migration-sync-scope.md)에 따라 실제 1.3.0 V3 필기의 로그인·무계정 업데이트 무유실, 무계정 필기의 첫 로그인 뒤 서버·다른 iPad 수신, 시간차 양방향 동기화, 실패 시 원본 보존을 **최종 후보 빌드**로 확인한다. 2026-09-25 Xcode 27 iPadOS 26.5 no-account V3 synthetic row의 first-login export와 다른 simulator 수신은 제한 범위에서 확인했다. 기존 무계정 V3 sample의 독립 server inventory hash, 새 current-identity sample의 independent peer import·physical iPad, Genesis 1:10–12 decode 경고, iOS 18/17 ownership 및 signed distribution은 남아 있어 gate는 닫지 않는다. 현행 C14 연결 보류를 통과로 간주하지 않는다. 동시 같은 절 편집·구신 혼용의 알려진 제한을 출시 판단과 안내에 기록한다.
-- [x] 단일 Canvas 전환 `develop` 병합 및 문서상 최신 상태 정리.
-- [ ] UI-1·UI-2·SAVE-1·SAVE-2·CHART의 동작과 실패 경로 검증.
-- [~] 시작 화면 선택지 — 초기 복원에서 「먼저 시작하기」를 제공하고 기다리기는 화면에 머무는 방식으로 구현했다(2026-09-21). 늦게 도착한 필사는 열린 장에 반영하거나 알리는 경로가 있다. 최종 후보에서 실제 지연 수신·편집 충돌을 검증한다([동기화 정책 §3-1](./icloud-sync-and-backup-policy.md)).
-- [ ] 절 이미지 저장·필사 위젯 및 삭제/이전 기록/위젯 사본 정책 확정·검증. **위젯은 라이트·다크 양쪽에서 확인한다** — WIDGET-0에서 다크 깨짐을 확인했다.
-- [ ] 필사 위젯 — **개발자 포털에 App Group `group.kr.co.carve.leetaek` 등록**(WIDGET-0 에서 미수행)과 배포 서명 확인, 홈 화면에서 라이트 · 다크 표시(`systemMedium` 하나만 낸다), 위젯 탭 이동, 필기 없는 말씀과 긴 절 확인. **여러 말씀을 담았을 때 정시마다 넘어가는지와 익스텐션 메모리**(필기 그림 6장)도 실기기에서 본다. 코드는 2026-09-16 추가.
-- [ ] 절 이미지 저장 — 실기기에서 Apple Pencil 필기 · 긴 절 · 소제목 있는 절 · 절 경계를 넘는 획이 이미지에 맞게 담기는지와 사진 앱 표시를 확인. 코드는 2026-09-15 추가. 전용 임시 시뮬레이터(임시 UI 테스트, 확인 뒤 삭제)에서 필기 있는 절 · 필기 없는 절 저장, 사진 추가 권한 창 문구, 권한 거부 확인창까지는 확인했다.
-- [~] WIDGET-0 — 타깃·공유 저장·딥링크 가능 확인 완료(§3-1). **실기기 동작과 배포 서명(App Group 개발자 포털 등록)은 미확인이며 WIDGET에서 처리한다.**
-- [ ] 즐겨찾기 — **CloudKit 운영 컨테이너에 `CD_FavoriteVerse` 레코드 타입 배포**(Production 에서는 지울 수 없다) 후 두 기기 동기화·해제·실행 취소 확인. 코드(SwiftData V5)는 2026-09-15 추가, 실기기·CloudKit 왕복은 미검증.
-- [ ] 본문 모양 iCloud 백업 — **아카이브(배포 서명)에 `com.apple.developer.ubiquity-kvstore-identifier` 가 들어가는지** 확인하고, 실기기에서 바꾸기 → 앱 삭제 → 재설치로 되살아나는지와 설정을 바꾼 다른 기기가 덮이지 않는지 확인. 코드는 2026-09-15 추가. 시뮬레이터(iCloud 로그인 없음)에서 글꼴 바꾸기 → 앱 삭제 → 재설치 시 되살아나는 것은 확인했다(기기 키-값 저장소에 남은 값을 실행 때 읽음). 실기기 iCloud 왕복 · 늦게 내려온 백업 · 배포 서명은 미검증.
-- [~] 짧은 도움말·첫 사용 안내·패치노트 화면은 구현됐다. 실제 2.0.0 기능·알려진 제한과 패치노트 문구를 대조하고 접근성·화면 적응을 실기기에서 확인한다.
-- [ ] ADS-1 검증, 광고 화면(사이드바 K3 · 헤더 K2)과 광고 제거 구매 구현·검증. 수익화 방향은 2026-09-14 결정(§4).
-- [ ] COMPAT-0·1에서 R27·R28 근거·대응·남는 제한을 기록. 결정 필요 상태를 출시까지 방치하지 않음. ⏸ **COMPAT-0은 2026-09-09 보류 종료** — 출시본은 확정(1.3.0·V3)했으나 R27·U4 검증은 기기 미확보로 이월했고 R28 대응은 SCOPE에서 정한다. **SCOPE에서 이월 상태를 그대로 통과시키지 않고 다시 판단한다.** **2026-09-17:** 시뮬레이터 왕복으로 U4 보존 · R28 실측 · R27 재현 · 편집 충돌 유실 재현(2.0.0 끼리 포함)([데이터 호환성 결정](./data-compatibility-decision.md) §5-2).
-- [x] BIBLE-EN은 2.1.0으로 이월(2026-09-17 사용자 결정). 판본·권리·번역본별 데이터 귀속과 검증은 그 구현 전에 진행한다.
-- [~] TECH-0 — TCA 1.26.2 적용과 Xcode 26.3 회귀 비교 결과 확보. 현행 주 검증 대상은 macOS 27.2 / Xcode 27.0이다. workspace Debug build와 iPadOS 17.5·18.6·26.2·26.4·26.5·27.0 full regression은 통과했다. iOS 27 SwiftData `.unknownDataStoreSchema` 대응은 metadata가 확인된 1.0.x store에만 적용하며 focused migration suite와 전체 회귀를 여섯 runtime에서 검증했다. 새 iPadOS 27.0 simulator의 reader 표시와 인접 장 이동 smoke도 별도 기록했다. 물리 iPad 교체는 사용자가 승인했다. 로그인 후 Debug physical build와 strict 서명 검증은 통과했으나 signed app의 CloudKit environment entitlement가 빠져 있고 Development profile은 Development·Production을 모두 허용하므로 설치·실행은 보류했다. local Development Release Archive 생성·서명 확인은 통과했지만 App Store 배포 서명·export·Production entitlement·TestFlight는 미검증이다. F60의 기존 XCFramework 서명 실패는 workspace build에서 재현되지 않았다. 개별 `-project` module 오류 및 XCFramework의 read-only 서명 상태 이상과 그 인과관계는 미확정으로 기록한다.
-- [~] SCOPE의 필사 이전·동기화 보장과 2.1.0 이월 범위는 확정했다. 앱 메타데이터는 2.0.0 (build 1)이지만 후보 소스·커밋·배포 빌드는 아직 고정되지 않았다.
-- [~] AGENTS.md 기준선 이상의 전체 회귀 통과(2026-09-28 develop 머지 뒤 Xcode 26.3 1069 통과, 이 코드의 Xcode 27 회귀는 미실행), mini·Air 통합 스모크와 TestFlight 확인. **Xcode 26.3의 과거 전체 회귀(2026-09-24):** 미완성 `LegacyRowCorrespondence.swift` 초안을 소스 경로 밖에 보관한 뒤 파일 제외 없이 iPadOS 17.5에서 998 passed·4 expected failures·6 skipped·0 failed, iPadOS 18.6·26.2에서 각각 999 passed·4 expected failures·5 skipped·0 failed를 확인했다. 이는 Xcode 26.3 비교 기록이다. **Xcode 27 후속 전체 회귀(2026-09-25):** 여섯 runtime에서 17.5 998/4/6, 18.6·26.2·26.4·26.5 각 999/4/5, 27.0 998/4/6 (통과/expected failure/skip; 각 총 1008, 실패 0)로 확인했다. iOS 17.5 로그의 임시 SQLite fixture 경고는 xcresult failure/runtime warning으로 집계되지 않았으며 원인은 미확정이다. 9/23에 26.2 Air까지 이전 전체 회귀가 통과했고, 18.6 mini·26.2 Air blank/no-account 앱은 FirstRunGuide까지 표시했다. 2.0.0 (build 1) Release configuration simulator compile도 성공했으나 unsigned이며 archive/TestFlight가 아니다. 최신 Xcode 27 결과 경로와 실행 범위는 [호환성 시험 계획](./icloud-sync-compatibility-test-plan.md#xcode-27-전체-회귀-추가-runtime-2026-09-25)에 기록했다. 제한적 iPadOS 27.0 reader 표시·인접 장 이동 smoke는 별도 기록했으나, 필기 입력·저장 smoke, live CloudKit strict-proof, 배포 서명·archive, TestFlight는 미완료.
-- [ ] 최종 스크린샷·설명·NEWS·구매/개인정보 표시와 후보 기능 일치, 필요한 심사 완료.
-- [ ] 출시 방식·담당자·지표 조회·중단/핫픽스 판단과 사용자 안내 경로 마련.
-- [ ] 사용자 출시 요청에 따라 검증한 빌드 배포 및 운영 기록 시작.
+- [x] 범위 확정과 BIBLE-EN 2.1.0 이월(2026-09-17).
+- [x] 단일 Canvas `develop` 병합, 기본값 on.
+- [x] 필사 이전 · 동기화 필수 관문 — 개발 환경 범위(위 「출시 상태」).
+- [x] 2026-09-29 코드 점검: Debug 전용 실행 인자 · HUD · 로그는 Release 에서 막혀 있다. 광고 단위 ID 는 Release 에서 실제 ID(빌드 설정 분기), 로컬 StoreKit 설정은 `CarveApp-StoreKit` 스킴에만 연결, 앱 · 위젯 버전 2.0.0 일치, 패치노트 2.0 문구 있음, 판독 허용 OS `[17, 18, 26, 27]`.
 
 ## 8. 작업 기록과 프로젝트 규칙
 

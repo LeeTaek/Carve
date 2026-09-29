@@ -12,7 +12,7 @@
 > ⚠️ **그 밖에 살아 있는 항목:** **R20**(회전 시 전이 메모리 peak 1.8 GiB — 저메모리 기기 미검증) · **R17**(Δ 가 R16 계열 미검출) · **R18**(N-Canvas 신규 행이 v1) · **R22**(팔레트 폭). 전부 §16 "남은 것".
 > D9-1 · D9-2 · D9-3-1·2·4 · D9-4-1·4 · **D9-5** · **D9-6**(R23·R24 수정 후 재검증) · D9-7-1·3·4 · D9-8 · **D9-CK②·③** 통과. **D9-7-2 만 ❓ 미수행**(Pencil 입력이 필요해 자동화 불가) (런북 §8-7).
 > ⚠️ Δ 0.00 은 실제 필기 표시의 정상 판정이 **아닙니다** — 계측은 "값이 도달했는가" 만 말합니다 (§20-16).
-> [D9 H 분석](./single-canvas-rotation-display-investigation.md) · [실기기 조작](./device-debugging-cli.md).
+> D9 H 분석(삭제된 문서 — 커밋 `bc0a2e35` 의 `docs/single-canvas-rotation-display-investigation.md`) · [실기기 조작](./device-debugging-cli.md).
 > 회귀 기준선 **1112** (2026-09-29 설정 「의견 보내기」 · 「앱 버전」, §19-4-2). 대상: `Carve-Workspace` 의 테스트 타깃 전부 — `App/CarveApp` UI 테스트는 시뮬레이터에서 건너뜁니다. 현재 값은 [AGENTS.md](../AGENTS.md) 「공통 명령어」와 같게 둡니다.
 >
 > **읽는 법.** §1~§17 이 설계이고 §18~§20 은 실측·변경 기록입니다. 절 번호는 코드 주석과 AGENTS.md 가 참조하므로 **바꾸지 않습니다.**
@@ -37,7 +37,7 @@
 | 23 | D9 H 회전 표시 결함 원인 분리 · Debug A/B 왕복 통과 · **정식 수정 미적용** · 기준선 296 | §19-4-2 · §20-15 · 런북 rev.8 |
 | 24 | **D9 H 정식 수정** — 표시용 획 재구성 승격 · 실기기 3왕복 + 양성 대조 통과 · 기준선 302. **§6 잔여 검증은 남음** | §19-4-2 · §20-16 |
 | 25 | 문서 정리 (런북 rev.10) — 낡은 상태 서술 정정 · 살아 있는 항목(D9 H · E-4 · R17 · R18 · R19)을 §16 에 모음 · rev.19 원칙으로 과정 압축 | §16 · §20-15 |
-| 26 | **D9 H · E-4 종결** — 조사 §6 잔여 5건 실기기 수행(글꼴/행간 · 스크롤 중 회전 · 좌우 필사 · 편집 저장 왕복 · 회전 직전 flush · 긴 장 성능). 매 항목 양성 대조 동반. ⛔ **그 과정에서 N-Canvas 롤백 경로의 선재 결함 R23 · R24 발견 — 기본 활성화 차단.** 성능 R20 · R21, UI R22 추가. 기준선 302 유지 | §16 · 런북 §8-7 · [조사 §3·§6](./single-canvas-rotation-display-investigation.md) |
+| 26 | **D9 H · E-4 종결** — 조사 §6 잔여 5건 실기기 수행(글꼴/행간 · 스크롤 중 회전 · 좌우 필사 · 편집 저장 왕복 · 회전 직전 flush · 긴 장 성능). 매 항목 양성 대조 동반. ⛔ **그 과정에서 N-Canvas 롤백 경로의 선재 결함 R23 · R24 발견 — 기본 활성화 차단.** 성능 R20 · R21, UI R22 추가. 기준선 302 유지 | §16 · 런북 §8-7 · 조사 §3·§6(삭제된 문서 — 커밋 `bc0a2e35` 의 `docs/single-canvas-rotation-display-investigation.md`) |
 | 27 | **R23 수정** — flag off 로 장을 열기만 해도 v3 절이 v2 로 강등되던 결함을 `isApplyingDrawing` 억제로 닫음(설계 §10-3 준수). 회귀 2건 · 변이 확인 · 실기기 170행 불변. **기준선 302 → 304.** ⛔ **R24 는 별개 결함으로 남음** | §16 · §19-4-2 · 런북 §8-7 |
 | 28 | **R24 수정** — 같은 장 재로드가 기하 실측을 버려 ① 잉크 미표시 ② 실측 높이 → 예측식 후퇴(R13 재발) ③ Δ 안전망 실명을 함께 만들던 결함을 닫음. 회귀 4건 · 변이 확인 · 실기기 재확인. **기준선 304 → 308.** **D9-6 은 ✅ 통과로 복귀** | §6 · §16 · §19-4-2 · 런북 §8-7 |
 | 29 | **R21 종결** — 같은 절차로 N-Canvas 를 재어 비교. 단일 Canvas 가 정점 ~435 MiB · 안정 ~440 MiB **더 가볍다**(N-Canvas 는 스크롤할수록 캔버스가 쌓임). D5 와의 차이는 절차 차이였다. 코드 변경 없음, 기준선 308 유지 | §16 · 런북 §8-7 D9-8 |
@@ -1510,7 +1510,7 @@ Phase 3 이후 처음으로 **제품 코드의 단일 Canvas 경로를 실기기
 
 2026-09-08, iPad mini(A17 Pro) / iPadOS 27.0 beta `24A5408d` / USB / Xcode 26.3. **원인을 좁힌 세션**이고 수정은 다음 rev(§20-16)입니다.
 
-**남길 결론 셋** — 나머지 경위는 [분석 문서](./single-canvas-rotation-display-investigation.md) §2~§3 과 git 이력에 있습니다.
+**남길 결론 셋** — 나머지 경위는 분석 문서(삭제된 문서 — 커밋 `bc0a2e35` 의 `docs/single-canvas-rotation-display-investigation.md`) §2~§3 과 git 이력에 있습니다.
 
 1. **데이터는 도착했는데 화면만 낡았습니다.** 가로→세로→가로에서 Store/전달/applied 세대가 2→3→4 로 일치했고 44개 획의 경계·변환·seed·point 수도 최종 디코딩과 일치했지만 화면은 이전 합성 상태였습니다.
 2. **표시 교체 방식만 바꿔도 정상화됩니다.** 일반 redraw 와 같은 drawing 재대입은 무효, 빈 drawing 경유 복원과 같은 공개 속성의 새 `PKStroke` 생성은 정상화 → 기존 획 재사용에 따른 PencilKit 렌더 캐시/표시 갱신 경로가 유력합니다 (Apple 내부 구현은 확인하지 않았습니다).
@@ -1526,7 +1526,7 @@ Phase 3 이후 처음으로 **제품 코드의 단일 Canvas 경로를 실기기
 
 > ⚠️ **알려진 부작용 — 지우개 조각 절이 1회 재저장됩니다.** `mask != nil` 인 획을 재구성하면 파생값 `maskedPathRanges` 가 재계산되며 미세하게 달라집니다(실측 차이 약 6.7e-4). `StrokeContentSignature` 는 반올림을 금지하므로(§7-2 — D7 재발 방지) 그 절이 한 번 dirty 로 잡혀 `.replace` 가 한 번 나갑니다. **저장 내용(획 수·좌표·`StrokeIdentityKey`·`ownership.map`)은 원본과 동일하고**, 그 결과로 다시 합성·재구성하면 mutation 이 없는 **고정점**이라 회전마다 되풀이되지 않습니다. 다만 `updateDate` 가 바뀌므로 히스토리 순서·주간 통계에 영향이 있을 수 있습니다.
 
-**실기기 A/B 로 인과를 확인했습니다** (2026-09-08, iPad mini A17 Pro / iPadOS 27.0 beta). 인자 없이 가로↔세로 **3왕복 전부 정상**, `-CanvasReuseStrokesOnApply`(Debug opt-out)로 **결함 재현**. **계측은 두 실행이 구분되지 않고 화면 판정만 갈립니다** — `store/delivered/applied` 일치, canvas bounds 기대값과 동일, `offset`·`zoom`·`transform` 동일, 컨트롤러 동일. 상세는 [D9 H 분석](./single-canvas-rotation-display-investigation.md) §3.
+**실기기 A/B 로 인과를 확인했습니다** (2026-09-08, iPad mini A17 Pro / iPadOS 27.0 beta). 인자 없이 가로↔세로 **3왕복 전부 정상**, `-CanvasReuseStrokesOnApply`(Debug opt-out)로 **결함 재현**. **계측은 두 실행이 구분되지 않고 화면 판정만 갈립니다** — `store/delivered/applied` 일치, canvas bounds 기대값과 동일, `offset`·`zoom`·`transform` 동일, 컨트롤러 동일. 상세는 D9 H 분석(삭제된 문서 — 커밋 `bc0a2e35` 의 `docs/single-canvas-rotation-display-investigation.md`) §3.
 
 **이것이 계측의 한계를 다시 보여줍니다.** `Δ max` · `compose SYNC` · `org` · `legInk` · `applied` · 렌더 완료 콜백 — 전부 "값이 도달했는가" 만 말하고 "화면이 그것인가" 는 말하지 못했습니다. 이 결함은 **사람이 화면을 봐야만** 판정됩니다. 시뮬레이터 테스트도 데이터·계약만 고정하고 PencilKit 의 화면 캐시 자체는 검출하지 못합니다.
 

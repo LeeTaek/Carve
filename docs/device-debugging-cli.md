@@ -2,7 +2,7 @@
 
 > 이 문서는 CLI 조작 절차입니다. 최신 검증 판정은 [런북 §8-7](./phase-0a-d-device-test.md), 출시 범위와 작업 순서는 [2.0.0 로드맵](./release-2.0.0-roadmap.md)을 따릅니다.
 
-2026-09-08에 실제 실행한 CLI 중심 절차다. 대상은 iPad이며 테스트에 Xcode MCP를 사용하지 않는다. D9 H 결과·구현안은 [회전 표시 결함 조사](./single-canvas-rotation-display-investigation.md), 일반 백업·성능·필기 검증은 [실기기 런북](./phase-0a-d-device-test.md)을 따른다.
+2026-09-08에 실제 실행한 CLI 중심 절차다. 대상은 iPad이며 테스트에 Xcode MCP를 사용하지 않는다. D9 H 결과·구현안은 회전 표시 결함 조사(삭제된 문서 — 커밋 `bc0a2e35` 의 `docs/single-canvas-rotation-display-investigation.md`), 일반 백업·성능·필기 검증은 [실기기 런북](./phase-0a-d-device-test.md)을 따른다.
 
 > ⚠️ **2026-09-08 인자 의미가 바뀌었습니다.** 표시용 획 재구성이 **정식 경로**가 됐으므로
 > (`f64a7d79`) 예전의 `-CanvasFreshStrokesOnApply` 는 사라졌습니다. 지금 남은
@@ -182,7 +182,7 @@ xcrun devicectl device process launch --device "$CARVE_DEVICE_ID" \
   > "$CARVE_DEVICE_LOGS/reuse-apply.log" 2>&1
 ```
 
-§4대로 가로 → 세로 → 가로를 수행한다. **이 모드에서는 필기가 밀리는 결함이 재현돼야 정상이다** — 수정을 끄는 opt-out 이기 때문이다. 기본 검증(인자 없음)이 정상이고 이 모드가 결함을 재현하면 양성 대조가 성립한다. 2026-09-08 A/B 에서 실제로 그렇게 나왔다 ([조사 문서](./single-canvas-rotation-display-investigation.md) §3).
+§4대로 가로 → 세로 → 가로를 수행한다. **이 모드에서는 필기가 밀리는 결함이 재현돼야 정상이다** — 수정을 끄는 opt-out 이기 때문이다. 기본 검증(인자 없음)이 정상이고 이 모드가 결함을 재현하면 양성 대조가 성립한다. 2026-09-08 A/B 에서 실제로 그렇게 나왔다 (조사 문서(삭제된 문서 — 커밋 `bc0a2e35` 의 `docs/single-canvas-rotation-display-investigation.md`) §3).
 
 `--console` 프로세스에 Ctrl-C를 보내면 신호가 앱으로 전달될 수 있다(`process launch --help`). 이번에는 **콘솔 없이 앱을 다시 실행**해 이전 수집을 끝내고 비교 모드의 앱을 남겼다.
 

@@ -12,7 +12,7 @@
 > ⚠️ **인자 의미 주의.** `-CanvasFreshStrokesOnApply` 는 사라졌고, `-CanvasReuseStrokesOnApply` 는
 > **수정을 끄고 결함을 재현하는** Debug opt-out 입니다. **기본 검증은 인자 없이** 돕니다.
 >
-> · 대상 문서: [설계](./single-canvas-design.md) §11 / §13 / §16 / §18 / §19 · [D9 H 분석](./single-canvas-rotation-display-investigation.md) · [실기기 CLI 조작](./device-debugging-cli.md)
+> · 대상 문서: [설계](./single-canvas-design.md) §11 / §13 / §16 / §18 / §19 · D9 H 분석(삭제된 문서 — 커밋 `bc0a2e35` 의 `docs/single-canvas-rotation-display-investigation.md`) · [실기기 CLI 조작](./device-debugging-cli.md)
 > · 대상 기기: **iPad mini (A17 Pro)** — 지금까지의 **모든 실기기 결과는 이 한 대의 것**입니다.
 >   ⚠️ **iPad Air (M2) 는 통째로 미수행**이며 D5-5(기기 간 유의차)와 D6 이 거기 걸려 있습니다 (설계 §13 사각지대).
 > · 회귀 기준선은 [AGENTS.md](../AGENTS.md) 「공통 명령어」를 따릅니다(이력은 설계 §19-4-2). **아래 기록에 남은 265 · 296 · 312 등은 그 시점의 이력이며 현재 기준선이 아닙니다.**
@@ -1321,7 +1321,7 @@ codesign -d --entitlements - \
 > ⚠️ 남은 위험: **R25**(롱프레스 메뉴 교체 — 데이터 위험) · **R22**(팔레트 폭) · **R20**(저메모리 미검증) · **R27**(기존 행 rowUUID 부재) · **R28**(혼재 버전). **D9-7-2 ❓ 미수행**(Pencil 필요) (§8-7).
 >
 > ✅ **D9 H(회전 표시)는 종결됐습니다** — 분석 §6 잔여 검증 5건 완료.
-> 완료 기준은 [분석 문서 §6](./single-canvas-rotation-display-investigation.md), CLI 회전·A/B 는 [조작 절차](./device-debugging-cli.md).
+> 완료 기준은 분석 문서 §6(삭제된 문서 — 커밋 `bc0a2e35` 의 `docs/single-canvas-rotation-display-investigation.md`), CLI 회전·A/B 는 [조작 절차](./device-debugging-cli.md).
 > ⚠️ **`-CanvasReuseStrokesOnApply` 는 수정을 끄는 opt-out 입니다** — 그 실행에서 결함이 재현되는 것이 정상이고,
 > **기본 검증은 인자 없이** 돕니다. 비교 모드 결과를 기본 경로 결과로 기록하지 마십시오.
 
@@ -2452,9 +2452,9 @@ N-Canvas 는 행이 뷰포트에 들어올 때마다 `PKCanvasView` 를 만들�
 
 | # | 발견 | 영향 | 반영할 곳 |
 |---|---|---|---|
-| **D9 H** | ✅ **정식 수정 적용 + 실기기 A/B 통과** (`f64a7d79`). 인자 없이 가로↔세로 **3왕복 전부 정상**, `-CanvasReuseStrokesOnApply` 로 **결함 재현**(양성 대조). 계측은 두 실행이 구분되지 않고 화면 판정만 갈린다 | ✅ **후속 검증 완료로 종결** — 조사 §6 및 이 절 상단 최신 판정 참조. 회전 메모리 비용은 별개 R20으로 추적 | [분석](./single-canvas-rotation-display-investigation.md) §3 · [조작 절차](./device-debugging-cli.md) · 설계 **§20-16** |
+| **D9 H** | ✅ **정식 수정 적용 + 실기기 A/B 통과** (`f64a7d79`). 인자 없이 가로↔세로 **3왕복 전부 정상**, `-CanvasReuseStrokesOnApply` 로 **결함 재현**(양성 대조). 계측은 두 실행이 구분되지 않고 화면 판정만 갈린다 | ✅ **후속 검증 완료로 종결** — 조사 §6 및 이 절 상단 최신 판정 참조. 회전 메모리 비용은 별개 R20으로 추적 | 분석(삭제된 문서 — 커밋 `bc0a2e35` 의 `docs/single-canvas-rotation-display-investigation.md`) §3 · [조작 절차](./device-debugging-cli.md) · 설계 **§20-16** |
 | **R18** | ⚠️ **N-Canvas 가 새로 만드는 행이 v2 가 아니라 v1(모델 기본값)로 저장된다.** 같은 함수가 기존 v3 행을 편집할 때는 v2 로 정확히 내린다 ([CanvasFeature.swift:81](../Feature/CarveFeature/Sources/Presentation/Drawing/Canvas/CanvasFeature.swift:81)) | **배치에는 영향 없음** — 코덱이 v1·v2 를 똑같이 `writingRect` 원점으로 옮긴다. 문제는 **라벨**이다: "1.2.0 절대좌표"(진짜 legacy)와 오늘 N-Canvas 로 그린 행이 `legacyVerses` 한 통에 들어가 진단에서 구별되지 않는다. **E-4 오독의 직접 원인** | 저장 경로 별건 |
-| **E-4** | ✅ **종결 — 결함 아님. D9 H 와 같은 결함이었다.** 2026-09-08 실기기 A/B: 세로 고정 상태에서 글꼴·행간만 바꾸자 **v1(120편 2·4절)·v3(120편 1절) 잉크가 모두 본문을 따라갔다.** `-CanvasReuseStrokesOnApply` 대조에서는 **제자리에 남아 결함이 재현**됐고, 두 실행의 계측(`store/delivered/applied` 일치 · `storeDiff=0` · `expected==canvas` · 합성 bounds 갱신)은 구분되지 않았다 | §8-7 이 세운 가설(폰트 변경과 회전이 같은 `.id` 자극)이 실측으로 확인됐다. rev.22 의 "v1 이라서" 설명은 성립하지 않는다 — **v1 잉크도 정상 경로에서는 따라간다.** `f64a7d79` 이 처방이다 | [D9 H 분석 §3](./single-canvas-rotation-display-investigation.md) · 설계 §16 |
+| **E-4** | ✅ **종결 — 결함 아님. D9 H 와 같은 결함이었다.** 2026-09-08 실기기 A/B: 세로 고정 상태에서 글꼴·행간만 바꾸자 **v1(120편 2·4절)·v3(120편 1절) 잉크가 모두 본문을 따라갔다.** `-CanvasReuseStrokesOnApply` 대조에서는 **제자리에 남아 결함이 재현**됐고, 두 실행의 계측(`store/delivered/applied` 일치 · `storeDiff=0` · `expected==canvas` · 합성 bounds 갱신)은 구분되지 않았다 | §8-7 이 세운 가설(폰트 변경과 회전이 같은 `.id` 자극)이 실측으로 확인됐다. rev.22 의 "v1 이라서" 설명은 성립하지 않는다 — **v1 잉크도 정상 경로에서는 따라간다.** `f64a7d79` 이 처방이다 | D9 H 분석 §3(삭제된 문서 — 커밋 `bc0a2e35` 의 `docs/single-canvas-rotation-display-investigation.md`) · 설계 §16 |
 | **R17** | ⚠️ **`Δ max` 가 R16 계열을 더 이상 검출하지 못한다** — 레이아웃이 실측 높이를 따라가 예측 == 실측이 되기 때문. `.fixedSize` 가 빠진 빌드가 장 전환 Δ 0.00 을 표시하는 것으로 실증 | 실기기 계측의 진단 범위 축소. 대체 절차가 필요 | **런북 §6-9 D9-0-d (신설)** · 설계 §15 · §20-14 |
 | **R27** ⚠️ | **`CD_rowUUID` 가 Production 스키마에 없었다 (2026-09-09 배포로 해소).** V4 는 새 행을 만들 때마다 `rowUUID` 를 쓰는데 서버 스키마에 필드가 없어 **그 값이 CloudKit 으로 올라가지 못했다.** 단일 Canvas 와 무관한 선재 문제이며, 이번 승격으로 앞으로는 올라간다 | ⚠️ **이미 만들어진 행들의 `rowUUID` 는 여전히 서버에 없다.** 저장 경로는 rowUUID 로 행을 찾으므로(`requireDrawingRow`) 다른 기기에 도착한 행이 `rowUUID == nil` 로 보이면 **절당 행이 중복 생성될 여지**가 있다. 기기 2대 동기화로 중복 유무를 확인해야 한다 (미수행). ⚠️ **범위 확대 (COMPAT-0, 2026-09-09):** 출시본 1.3.0 (`49f2dc27`) 은 **스키마 V3 로 `rowUUID` 필드가 없어** 앞으로도 발급하지 못한다 — 구버전이 쓰이는 동안 rowUUID 없는 행이 계속 생긴다 | 설계 §8-7 · §10-1-a · [데이터 호환성 결정](./data-compatibility-decision.md) §4-1 |
 | **R28** ⛔ | **혼재 버전에서 구버전 기기가 v3 행을 잘못 다룬다 — 2026-09-09 git 확인으로 severity 상향.** `displayTransform`(v3 를 `firstUnderlineY` 만큼 내려 표시)과 **v3→v2 강등**이 둘 다 `24e9818e`(Phase 3, **미출시**)에 들어왔다. ~~출시본은 V4 스키마(`b68b6101`)까지만 있어~~ ⚠️ **정정 (COMPAT-0, 2026-09-09):** 실제 출시본은 **1.3.0 (177) · 2026-03-23 · `49f2dc27` · 스키마 V3** 다. **판정은 유지** — V3 에도 `drawingVersion` 이 있고 출시본은 편집 시 그 값을 쓰지 않는다. 근거: [데이터 호환성 결정](./data-compatibility-decision.md) §3. | **① 보기만 하면**: v3 행이 한 줄쯤 위로 밀려 보인다 (데이터 무사). **② 구버전에서 편집하면**: `lineData` 를 캔버스 로컬로 덮어쓰면서 **`drawingVersion` 은 3 으로 남긴다** → **좌표와 라벨이 어긋난 행**이 되고 새 기기에서도 그 절이 어긋난다. 새 기기에서 재편집하면 정상 v3 로 복구되므로 영구 손실은 아니다. ⚠️ 조건은 **기기 2대 + 한쪽 미업데이트 + 양쪽 필기**로 좁다. 완화책: 단계적 출시 / 최소 버전 게이트 / 감수 — **출시 전 결정 필요** | 설계 §10-1 · §10-2 · §10-3 |
