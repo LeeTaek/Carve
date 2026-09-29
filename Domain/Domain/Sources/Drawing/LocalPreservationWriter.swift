@@ -77,6 +77,9 @@ public struct VerseDraft: Codable, Equatable, Sendable {
     /// (ACC-1 2차 ⑪ — 전송 전 수정이 사라지고 서버 내용이 돌아온다) 그 뒤 편집을 남의 변경과 구분하지 못해 감췄다. 이 목록이 있으면
     /// 돌아온 행이 내가 넣었던 내용인지 가려, 그 뒤 revision 을 유일한 사본으로 이어 보인다.
     public var sentFingerprints: [String]?
+    /// 사용자가 「확인이 필요한 필기」 에서 이 초안을 현재 필사로 가져온 기록(정책 §12-6 ④ 가져오기, 2026-09-29). 그 행이 저장소에 남아 있는
+    /// 동안 이 초안은 역할이 끝났다(`VerseDraftRecoveryRule.standing`). nil 이면 가져온 적 없다.
+    public var imported: VerseDraftImport?
 
     public init(
         key: VerseDraftKey,
@@ -94,7 +97,8 @@ public struct VerseDraft: Codable, Equatable, Sendable {
         savedAt: Date,
         storeState: VerseDraftStoreState? = nil,
         ownershipInjected: Bool? = nil,
-        sentFingerprints: [String]? = nil
+        sentFingerprints: [String]? = nil,
+        imported: VerseDraftImport? = nil
     ) {
         self.key = key
         self.revision = revision
@@ -112,6 +116,7 @@ public struct VerseDraft: Codable, Equatable, Sendable {
         self.storeState = storeState
         self.ownershipInjected = ownershipInjected
         self.sentFingerprints = sentFingerprints
+        self.imported = imported
     }
 
     /// 이 초안이 든 내용의 지문. 비운 절(`lineData == nil`)이면 nil — 저장소의 빈 절과 같다.
@@ -177,6 +182,14 @@ public extension DrawingEditEnvironment {
         let scope = accountBasis.preservationScope
         guard case .confirmed = accountBasis else { return [scope] }
         return [scope, .unverified]
+    }
+
+    /// 편집 화면은 읽지 않지만 「확인이 필요한 필기」 가 **가져오기를 위해 여는** 묶음 — 확인된 계정일 때만, 연결 전에 쓴 필기가 있는
+    /// 묶음(로그인하지 않은 동안 · 계정을 확인하지 못한 동안)이다(사용자 결정 2026-09-29). 그 안에서도 연결 전 필기만 연다
+    /// (`VerseDraftRecoveryRule.awaitsImport`) — 다른 계정을 참고하던 확인 전 필기는 그 계정으로 돌아왔을 때 연다(P0-1).
+    var beforeConnectionDraftScopes: [AccountScope] {
+        guard case .confirmed = accountBasis else { return [] }
+        return [.localOnly, .unverified]
     }
 
     /// 이 환경에서 쓰는 초안의 출처.
@@ -318,6 +331,10 @@ public actor LocalPreservationWriter {
                 if existing.revision > draft.revision { return .written }
                 // 앞선 revision 이 저장소에 넣은 내용의 지문을 이어받는다 — 이 키의 "무엇을 넣었는지" 기록은 revision 을 넘어 이어진다.
                 carried = (existing.sentFingerprints ?? []) + carried
+                // 같은 revision · 같은 내용을 다시 쓰면(저장 재시도) 가져온 기록을 잃지 않는다. 새 revision 은 가져온 적 없는 내용이다.
+                if existing.revision == draft.revision, existing.contentFingerprint == draft.contentFingerprint, draft.imported == nil {
+                    draft.imported = existing.imported
+                }
             } catch {
                 // 같은 키의 초안을 읽지 못한다 — 덮지 않고 옆으로 옮겨 남긴다(`.json` 이 아니라 읽기에서 빠진다). 복구는 ④ 에서 다룬다.
                 let aside = url.deletingPathExtension().appendingPathExtension("\(Self.unreadableMarker)\(UUID().uuidString)")
@@ -380,6 +397,23 @@ public actor LocalPreservationWriter {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         try DurableFile.write(try encoder.encode(existing), to: url)
+    }
+
+    /// 사용자가 이 초안을 현재 필사로 가져왔다는 기록을 남긴다(「확인이 필요한 필기」 의 가져오기). **지우지 않는다** — 전송 전에 계정이
+    /// 바뀌면 미러링이 가져온 행을 지우고 되살리지 않는다(ACC-1 F29). 그때 이 초안이 유일한 사본이다.
+    ///
+    /// **그 revision 일 때만** 남긴다 — 그 사이 더 새 revision 이 쓰였으면 그 내용은 가져오지 않았다. 지금 세대의 파일만 바꾼다.
+    /// - Returns: 기록을 남겼으면 true. 파일이 없거나 · 다른 revision 이거나 · 전체 삭제 전 세대면 false.
+    @discardableResult
+    public func markDraftImported(_ key: VerseDraftKey, scope: AccountScope, revision: Int, record: VerseDraftImport) throws -> Bool {
+        let current = try requireGeneration()
+        let url = draftURL(key, scope: scope)
+        guard var existing = try? readDraft(at: url), existing.eraseGeneration == current, existing.revision == revision else { return false }
+        existing.imported = record
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        try DurableFile.write(try encoder.encode(existing), to: url)
+        return true
     }
 
     /// 한 묶음의 초안들. 지금 세대의 것만 준다. 초안 파일을 하나라도 읽지 · 풀지 못하면 던진다.

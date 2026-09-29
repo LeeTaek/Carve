@@ -2,7 +2,8 @@
 //  DraftRecoveryFeature.swift
 //  SettingsFeature
 //
-//  설정 → 「남은 필기」. 그 장을 다시 열어도 자동으로 표시되지 않는 초안을 보고 · 견주는 한 자리 (정책 §12-6 구현 순서 ④).
+//  설정 → 「확인이 필요한 필기」. 이 iPad 에 따로 남겨 둔 필기를 현재 필사와 견주고, 사용자가 고른 것을 현재 필사에 넣는 자리
+//  (정책 §12-6 구현 순서 ④, 가져오기 2026-09-29).
 //
 
 import CarveToolkit
@@ -11,90 +12,38 @@ import Foundation
 
 import ComposableArchitecture
 
-/// 이 기기에 남아, 그 장을 다시 열어도 **자동으로 표시되지 않는 필사 초안**을 보이는 화면(2026-09-21 후속 리뷰 확정 기준).
+/// 이 iPad 에 남아, 그 장을 다시 열어도 **자동으로 표시되지 않는 필기**를 보이고 · 견주고 · 고른 것을 현재 필사에 넣는 화면.
 ///
-/// - **읽기 전용이다**(사용자 결정 2026-09-21). 개수 · 용량 · 목록 · 출처까지 보이고, 되살리기 · 귀속 동의는 ③ 의 버전 쓰기와 같은 시기에
-///   붙인다. 그동안에도 파일은 지우지 않는다 — 보이지 않는다는 것이 사라졌다는 뜻이 아니다.
-/// - **판정은 편집 화면과 같은 규칙 · 같은 입력**을 쓴다(`VerseDraftRecoveryQuery`). 자동으로 표시되는 초안과 이미 저장소에 든 초안은 목록에
-///   넣지 않는다.
-/// - 다른 계정 묶음은 **저장소와 대조하지 않고** 세어 보이기만 한다. 그 계정으로 돌아왔을 때 연다.
+/// - **자동으로 합치지 않는다 — 절마다 견주고 고른다**(2026-09-29). 계정이 확인됐다는 이유만으로 연결 전 필기를 그 계정의 것으로 보거나, 다른
+///   기기에서 받은 필기를 덮지 않는다. 넣기 · 바꾸기는 사용자가 고른 절 하나만 하고, 바꿔도 지금 필기는 이전 필사 기록으로 남는다.
+/// - **완료는 저장이 끝난 뒤에만** 알린다. 넣기 직전에 환경 · 초안 · 지금 필기를 다시 보고(`VerseDraftImporter`), 견준 뒤 바뀌었으면 다시 견주게
+///   한다. 실패하면 지금 필기도 이 필기도 그대로다.
+/// - **판정은 편집 화면과 같은 규칙 · 같은 입력**을 쓴다(`VerseDraftRecoveryQuery`). 자동으로 표시되는 필기와 이미 반영된 필기는 목록에 넣지 않고,
+///   내용이 이미 저장소에 있었던 예전 필기는 확인이 필요한 것과 나눠 접어 둔다(사용자 결정 2026-09-29).
+/// - 다른 계정 묶음은 **저장소와 대조하지 않고** 세어 보이기만 한다. 그 계정으로 돌아왔을 때 연다(P0-1). 연결 전 필기(로그인하지 않은 동안 ·
+///   참고할 계정 없이 확인 전)는 확인된 계정에서 열어 가져올 수 있다.
 @Reducer
 public struct DraftRecoveryFeature {
     public init() { }
-
-    /// 한 계정 묶음. 화면이 보는 값만 든다.
-    public struct Bucket: Hashable, Identifiable {
-        public var scope: AccountScope
-        public var id: String { scope.key }
-        /// 사람이 읽는 이름 — 지금 계정 · 계정 미확인 · 이 기기 전용 · 다른 계정.
-        public var title: String
-        public var draftCount: Int
-        public var draftBytes: Int64
-        /// 읽지 못해 옆으로 옮긴 파일 — 되살릴 수 없고 보관만 한다. 내보내고 지울 수 있는 **유일한** 것이다.
-        public var unreadableCount: Int
-        public var unreadableBytes: Int64
-        /// 그 파일들의 자리 — 내보내기로 넘긴다.
-        public var unreadableFiles: [URL]
-        /// 저장소와 대조했는가. 아니면 분류 없이 **수 · 용량만** 보인다 — 상세(잉크 · 자리 · 파일 자리)를 만들지 않는다(P0-1).
-        public var comparedWithStore: Bool
-        /// 지금 계정에서 **열어 보지 않은** 초안 수 — 대조하지 않은 묶음은 전부, 대조한 묶음은 다른 계정을 참고하던 확인 전 초안.
-        /// 분류한 적 없는 수다 — "자동으로 표시되지 않는 것" 으로 부르지 않는다.
-        public var inaccessibleCount: Int
-        /// 이 묶음을 아예 읽지 못했다 — **초안이 없다는 뜻이 아니다.**
-        public var readFailed: Bool
-        /// 자동으로 표시되지 않는 초안들. 최근에 쓴 것부터.
-        public var items: [Item]
-        /// 대조하지 못한 장 이름 — 그 장의 초안은 세어졌지만 분류하지 못했다.
-        public var unreadChapters: [String]
-    }
-
-    /// 목록의 한 줄.
-    public struct Item: Hashable, Identifiable {
-        public var id: String
-        /// "창세기 1:3".
-        public var place: String
-        /// 비교할 때 이 장만 읽는다.
-        public var chapter: BibleChapter
-        public var verse: Int
-        public var savedAt: Date
-        public var reason: VerseDraftRecoveryReason
-        /// 그때의 계정 근거 한 줄.
-        public var provenance: String
-        /// 소유 근거가 시험용 주입이었다(DEBUG 전용) — 소유 증명이 아니다.
-        public var injected: Bool
-        /// 미리보기용 필기 바이트. 비운 절이면 nil.
-        public var ink: Data?
-        /// 그 절의 지금 필기가 언제 바뀌었는가. 대조하지 않은 묶음이면 nil.
-        public var currentUpdatedAt: Date?
-        /// 그 절이 지금 비어 있는가. 대조하지 않은 묶음이면 nil.
-        public var currentIsEmpty: Bool?
-    }
-
-    /// 견주기 — 지금 필기와 보관된 것. **바꾸지 않는다**(읽기 전용 단계).
-    public struct Comparison: Hashable {
-        public var itemID: String
-        public var isLoading: Bool = true
-        /// 그 절의 지금 필기. nil 이면 지금 그 절에는 필기가 없다.
-        public var currentInk: Data?
-        public var currentUpdatedAt: Date?
-        /// 지금 필기를 읽지 못했다 — 없다는 뜻이 아니다.
-        public var failure: String?
-    }
 
     /// 조회 결과가 기댄 계정 근거 — **이 도장이 지금과 다르면 그 결과(목록 상세 · 비교)를 버린다**(2026-09-21 후속 리뷰 P0-1).
     ///
     /// 접근 제한 · 계정이 바뀐 뒤의 무효화 · 늦은 응답 버리기 · 견주기 전후 재확인을 따로 만들지 않고 이 한 장치로 덮는다. 편집 환경이 초안을
     /// 적는 묶음(어느 묶음을 저장소와 대조하는가)과 참고하는 계정(확인 전 초안 가운데 무엇을 여는가), 계정 확인 세대를 든다 — 같은 계정이라도
-    /// 다시 확인했으면 앞선 조회를 믿지 않는다.
+    /// 다시 확인했으면 앞선 조회를 믿지 않는다. 동기화 저장소에 쓸 수 있는가(`importBlock`)도 든다 — 소유 근거 · 연결 보류가 바뀌면 넣기 버튼의
+    /// 근거가 바뀐다.
     public struct Stamp: Hashable, Sendable {
         public let scope: AccountScope
         public let account: AccountScope?
         public let generation: UInt64
+        /// 지금 현재 필사에 넣을 수 없는 사유. nil 이면 넣을 수 있다 — 넣기 직전에 한 번 더 본다(`VerseDraftImporter`).
+        public let importBlock: SyncedWriteBlock?
 
         public init(_ environment: DrawingEditEnvironment) {
             scope = environment.accountBasis.preservationScope
             account = environment.accountBasis.referencedAccount
             generation = environment.generation
+            importBlock = SyncedWriteBlock.check(environment)
         }
     }
 
@@ -106,13 +55,21 @@ public struct DraftRecoveryFeature {
         public var stamp: Stamp?
         /// 마지막으로 시작한 조회의 번호 — 그보다 앞선 조회의 응답은 버린다.
         public var loadSequence = 0
-        /// 이 기기의 보존 영역을 열지 못했다 — **초안이 없다는 뜻이 아니다.**
+        /// 이 기기의 보존 영역을 열지 못했다 — **필기가 없다는 뜻이 아니다.**
         public var failure: String?
         public var buckets: [Bucket] = []
         /// 펼쳐 본 묶음.
         public var opened: AccountScope?
-        /// 펼쳐 견주는 중인 초안.
+        /// 「보관만 하는 예전 필기」 를 펼친 묶음.
+        public var archivedOpened: Set<AccountScope> = []
+        /// 펼쳐 견주는 중인 필기.
         public var comparison: Comparison?
+        /// 지웠던 내용이 다시 들어갈 수 있어 **한 번 더 묻는 중**인 주의 — 견주고 있는 필기의 것.
+        public var pendingCaution: VerseDraftImportCheck.Caution?
+        /// 넣는 중인 필기. 끝나기 전에는 다른 필기를 넣지 않는다.
+        public var importingItemID: String?
+        /// 방금 가져오기의 결과.
+        public var importMessage: ImportMessage?
         /// 읽지 못한 파일 지우기를 묻는 중인 묶음.
         public var pendingRemoval: AccountScope?
         /// 방금 지운 결과 한 줄.
@@ -122,21 +79,26 @@ public struct DraftRecoveryFeature {
         public var totalDraftBytes: Int64 { buckets.reduce(0) { $0 + $1.draftBytes } }
         public var totalUnreadableCount: Int { buckets.reduce(0) { $0 + $1.unreadableCount } }
         public var totalUnreadableBytes: Int64 { buckets.reduce(0) { $0 + $1.unreadableBytes } }
-        /// 그중 그 장을 다시 열어도 **자동으로 표시되지 않는** 초안 — 나머지는 자동으로 표시되거나 이미 저장된 것이거나, 지금 계정에서 열어 보지
-        /// 않은 것(`unopenedCount`)이다.
+        /// 목록에 오른 필기 — 확인이 필요한 것과 보관만 하는 예전 필기. 나머지는 자동으로 표시되거나 이미 반영된 것이거나, 지금 계정에서 열어
+        /// 보지 않은 것(`unopenedCount`)이다.
         public var hiddenCount: Int { buckets.reduce(0) { $0 + $1.items.count } }
-        /// 지금 계정에서 열어 보지 않아 **분류하지 않은** 초안.
+        /// 확인이 필요한 필기 — 절 메뉴의 「확인이 필요한 필기 N」 과 같은 판정이다.
+        public var pendingCount: Int { buckets.reduce(0) { $0 + $1.pendingItems.count } }
+        /// 보관만 하는 예전 필기.
+        public var archivedCount: Int { buckets.reduce(0) { $0 + $1.archivedItems.count } }
+        /// 지금 계정에서 열어 보지 않아 **분류하지 않은** 필기.
         public var unopenedCount: Int { buckets.reduce(0) { $0 + $1.inaccessibleCount } }
+        /// 지금 현재 필사에 넣을 수 없는 사유. 목록을 읽기 전이면 nil 이지만 넣기 버튼도 없다.
+        public var importBlock: SyncedWriteBlock? { stamp?.importBlock }
+
         /// 그 묶음의 파일(읽지 못한 파일 내보내기 · 지우기)을 다루는가 — 지금 근거로 저장소와 대조한 묶음만(P0-1).
         func opensFiles(in scope: AccountScope) -> Bool {
             buckets.contains { $0.scope == scope && $0.comparedWithStore }
         }
 
-        /// 사용자가 판단할 것이 있는가 — 되살릴 수 있음 · 저장 완료 불확실 · 표시하지 못함.
-        public var needsAttentionCount: Int {
-            buckets.reduce(0) { count, bucket in
-                count + bucket.items.count { $0.reason == .recoverable || $0.reason == .uncertain || $0.reason == .undisplayable }
-            }
+        /// 지금 근거로 불러와 **대조한 묶음**의 필기.
+        func comparableItem(id: String) -> Item? {
+            buckets.lazy.filter(\.comparedWithStore).flatMap(\.items).first { $0.id == id }
         }
     }
 
@@ -148,9 +110,13 @@ public struct DraftRecoveryFeature {
         /// 편집 환경의 계정 근거가 바뀌었을 수 있다 — 도장이 다르면 앞선 근거로 불러온 목록 · 비교를 버리고 다시 읽는다.
         case environmentChanged(Stamp)
 
-        /// 그 절의 지금 필기를 읽었다 — `stamp` 의 근거로.
-        case currentLoaded(itemID: String, stamp: Stamp, ink: Data?, updatedAt: Date?)
+        /// 그 절의 지금 필기를 읽었다 — `stamp` 의 근거로. `check` 는 넣으면 무엇이 되는가(남겨 둔 필기를 다시 읽어 판정한다).
+        case currentLoaded(itemID: String, stamp: Stamp, ink: Data?, updatedAt: Date?, check: VerseDraftImportCheck? = nil)
         case currentFailed(itemID: String, stamp: Stamp, String)
+        /// 견주려고 다시 읽었더니 그 필기가 바뀌었거나 사라졌다 — 목록을 다시 읽는다.
+        case draftChanged(itemID: String, stamp: Stamp)
+        /// 넣기 · 바꾸기의 결과.
+        case imported(itemID: String, place: String, Result<VerseDraftImporter.Result, ImportFailure>)
         /// 읽지 못한 파일을 지웠다(또는 지우지 못했다).
         case removedUnreadable(String)
 
@@ -161,8 +127,18 @@ public struct DraftRecoveryFeature {
             case reload
             /// 묶음을 펼치거나 접는다.
             case open(AccountScope?)
-            /// 초안을 지금 필기와 견주어 본다(다시 누르면 접는다).
+            /// 「보관만 하는 예전 필기」 를 펼치거나 접는다.
+            case toggleArchived(AccountScope)
+            /// 필기를 지금 필기와 견주어 본다(다시 누르면 접는다).
             case compare(Item)
+            /// 「나중에 확인하기」 — 견주기를 접는다. 필기는 그대로 남는다.
+            case closeComparison
+            /// 견주고 있는 필기를 넣는다(넣기 · 바꾸기). 지웠던 내용이 다시 들어갈 수 있으면 먼저 묻는다.
+            case importTapped
+            /// 물은 주의를 확인했다 — 그래도 넣는다.
+            case cautionConfirmed
+            /// 물은 주의를 닫는다 — 넣지 않는다.
+            case cautionCancelled
             /// 읽지 못한 파일 지우기를 묻는다(nil 이면 묻기를 닫는다).
             case askRemoveUnreadable(AccountScope?)
             /// 묻고 받은 뒤 실제로 지운다 — **읽지 못한 파일만**이다.
@@ -170,12 +146,16 @@ public struct DraftRecoveryFeature {
         }
     }
 
-    @Dependency(\.verseDraftRecoveryReader) private var reader
+    @Dependency(\.verseDraftRecoveryReader) var reader
     @Dependency(\.verseDraftUnreadableCleaner) private var cleaner
-    @Dependency(\.drawingRepository) private var repository
-    @Dependency(\.drawingEditEnvironment) private var editEnvironment
+    @Dependency(\.drawingRepository) var repository
+    @Dependency(\.drawingEditEnvironment) var editEnvironment
+    @Dependency(\.drawingVerseImporter) var verseImporter
+    @Dependency(\.verseDraftImportMarker) var importMarker
+    @Dependency(\.localDrawingChanges) var localChanges
+    @Dependency(\.date) var date
 
-    private enum CancelID {
+    enum CancelID {
         case environment
         case load
         case compare
@@ -196,32 +176,54 @@ public struct DraftRecoveryFeature {
                 return startLoad(&state)
             case .environmentChanged(let stamp):
                 guard stamp != state.stamp else { return .none }
-                Log.info("남은 필기 — 계정 근거가 바뀌었다. 불러온 목록 · 비교를 버리고 다시 읽는다")
+                Log.info("확인이 필요한 필기 — 계정 근거가 바뀌었다. 불러온 목록 · 비교를 버리고 다시 읽는다")
                 invalidate(&state, for: stamp)
                 return .merge(.cancel(id: CancelID.compare), startLoad(&state))
             case .view(.open(let scope)):
                 state.opened = state.opened == scope ? nil : scope
-                state.comparison = nil
+                closeComparison(&state)
+            case .view(.toggleArchived(let scope)):
+                if state.archivedOpened.remove(scope) == nil { state.archivedOpened.insert(scope) }
             case .view(.compare(let item)):
+                // 넣는 중에는 견줄 필기를 바꾸지 않는다 — 그 결과가 어느 필기의 것인지 흐려진다.
+                guard state.importingItemID == nil else { return .none }
                 guard state.comparison?.itemID != item.id else {
-                    state.comparison = nil
+                    closeComparison(&state)
                     return .cancel(id: CancelID.compare)
                 }
                 // 지금 근거로 불러온, 저장소와 대조한 묶음의 항목만 견준다.
-                guard let stamp = state.stamp,
-                      state.buckets.contains(where: { $0.comparedWithStore && $0.items.contains { $0.id == item.id } }) else { return .none }
+                guard let stamp = state.stamp, state.comparableItem(id: item.id) != nil else { return .none }
                 state.comparison = Comparison(itemID: item.id)
+                state.pendingCaution = nil
                 return compare(item, stamp: stamp)
-            case .currentLoaded(let itemID, let stamp, let ink, let updatedAt):
+            case .view(.closeComparison):
+                guard state.importingItemID == nil else { return .none }
+                closeComparison(&state)
+                return .cancel(id: CancelID.compare)
+            case .currentLoaded(let itemID, let stamp, let ink, let updatedAt, let check):
                 // 다른 근거로 읽은 필기는 담지 않는다 — 계정이 바뀐 뒤 늦게 온 응답이다.
                 guard stamp == state.stamp, state.comparison?.itemID == itemID else { return .none }
                 state.comparison?.isLoading = false
                 state.comparison?.currentInk = ink
                 state.comparison?.currentUpdatedAt = updatedAt
+                state.comparison?.check = check
             case .currentFailed(let itemID, let stamp, let message):
                 guard stamp == state.stamp, state.comparison?.itemID == itemID else { return .none }
                 state.comparison?.isLoading = false
                 state.comparison?.failure = message
+            case .draftChanged(let itemID, let stamp):
+                guard stamp == state.stamp, state.comparison?.itemID == itemID else { return .none }
+                closeComparison(&state)
+                state.importMessage = ImportMessage(text: DraftRecoveryCopy.draftChanged, needsAttention: true)
+                return startLoad(&state)
+            case .view(.importTapped):
+                return importTapped(&state)
+            case .view(.cautionConfirmed):
+                return cautionConfirmed(&state)
+            case .view(.cautionCancelled):
+                state.pendingCaution = nil
+            case .imported(let itemID, let place, let result):
+                return finishImport(&state, itemID: itemID, place: place, result: result)
             case .view(.askRemoveUnreadable(let scope)):
                 // 대조한 묶음의 파일만 다룬다 — 지금 계정에서 열어 보지 않는 묶음은 수 · 용량만 보인다(P0-1).
                 guard scope.map({ state.opensFiles(in: $0) }) ?? true else { return .none }
@@ -246,7 +248,7 @@ public struct DraftRecoveryFeature {
                 state.isLoading = false
                 state.buckets = buckets
                 if let comparison = state.comparison, !buckets.contains(where: { $0.items.contains { $0.id == comparison.itemID } }) {
-                    state.comparison = nil
+                    closeComparison(&state)
                 }
                 if let opened = state.opened, !buckets.contains(where: { $0.scope == opened }) {
                     state.opened = nil
@@ -256,7 +258,7 @@ public struct DraftRecoveryFeature {
                 state.isLoading = false
                 state.failure = message
                 state.buckets = []
-                state.comparison = nil
+                closeComparison(&state)
             }
             return .none
         }
@@ -267,14 +269,23 @@ public struct DraftRecoveryFeature {
         state.stamp = stamp
         state.buckets = []
         state.opened = nil
-        state.comparison = nil
+        state.archivedOpened = []
+        closeComparison(&state)
+        state.importingItemID = nil
+        state.importMessage = nil
         state.pendingRemoval = nil
         state.removalResult = nil
         state.failure = nil
     }
 
+    /// 견주기를 접는다 — 물은 주의도 함께 닫는다.
+    func closeComparison(_ state: inout State) {
+        state.comparison = nil
+        state.pendingCaution = nil
+    }
+
     /// 새 조회를 시작한다. 앞선 조회는 끊고, 그 응답이 와도 번호가 달라 버린다.
-    private func startLoad(_ state: inout State) -> Effect<Action> {
+    func startLoad(_ state: inout State) -> Effect<Action> {
         state.loadSequence += 1
         state.isLoading = true
         state.failure = nil
@@ -291,13 +302,13 @@ public struct DraftRecoveryFeature {
         .cancellable(id: CancelID.environment, cancelInFlight: true)
     }
 
-    /// 묶음마다 조회한다. **한 묶음을 읽지 못해도 나머지는 보인다** — 목록 전체를 막으면 멀쩡한 초안까지 보이지 않는다.
+    /// 묶음마다 조회한다. **한 묶음을 읽지 못해도 나머지는 보인다** — 목록 전체를 막으면 멀쩡한 필기까지 보이지 않는다.
     ///
     /// 조회 **전후로** 계정 근거를 본다 — 그 사이 바뀌었으면 결과를 내지 않고 새 근거로 다시 읽게 알린다(P0-1).
     private func load(sequence: Int) -> Effect<Action> {
         .run { [reader, repository, editEnvironment] send in
             guard let reader else {
-                await send(.failed(sequence: sequence, "이 기기의 보존 영역을 열지 못했어요. 앱을 다시 켜 보세요."))
+                await send(.failed(sequence: sequence, "이 iPad의 보존 영역을 열지 못했어요. 앱을 다시 켜 보세요."))
                 return
             }
             let environment = await editEnvironment.current()
@@ -307,8 +318,8 @@ public struct DraftRecoveryFeature {
             do {
                 scopes = try await reader.draftBuckets()
             } catch {
-                Log.error("남은 필기 — 묶음 목록을 읽지 못했다", "\(error)")
-                await send(.failed(sequence: sequence, "이 기기에 남은 필기를 읽지 못했어요. 파일은 그대로 있어요."))
+                Log.error("확인이 필요한 필기 — 묶음 목록을 읽지 못했다", "\(error)")
+                await send(.failed(sequence: sequence, "이 iPad에 남겨 둔 필기를 읽지 못했어요. 파일은 그대로 있어요."))
                 return
             }
             var buckets: [Bucket] = []
@@ -320,13 +331,13 @@ public struct DraftRecoveryFeature {
                     let files = inventory.comparedWithStore ? (try? await reader.unreadableDraftFiles(in: scope)) ?? [] : []
                     buckets.append(Bucket(inventory, files: files, environment: environment))
                 } catch {
-                    Log.error("남은 필기 — 이 묶음을 읽지 못했다", scope.key, "\(error)")
+                    Log.error("확인이 필요한 필기 — 이 묶음을 읽지 못했다", scope.key, "\(error)")
                     buckets.append(Bucket(unreadable: scope, environment: environment))
                 }
             }
             let after = Stamp(await editEnvironment.current())
             guard after == stamp else {
-                Log.info("남은 필기 — 조회하는 사이 계정 근거가 바뀌었다. 이 결과를 버리고 다시 읽는다")
+                Log.info("확인이 필요한 필기 — 조회하는 사이 계정 근거가 바뀌었다. 이 결과를 버리고 다시 읽는다")
                 await send(.environmentChanged(after))
                 return
             }
@@ -336,48 +347,18 @@ public struct DraftRecoveryFeature {
         .cancellable(id: CancelID.load, cancelInFlight: true)
     }
 
-    /// 견줄 때 그 장만 읽는다 — 목록은 지금 필기의 바이트를 들고 있지 않다. 읽기 **전후로** 계정 근거가 목록의 것과 같은지 본다(P0-1).
-    private func compare(_ item: Item, stamp: Stamp) -> Effect<Action> {
-        .run { [reader, repository, editEnvironment] send in
-            guard let reader else {
-                await send(.currentFailed(itemID: item.id, stamp: stamp, "이 기기의 보존 영역을 열지 못했어요."))
-                return
-            }
-            let before = Stamp(await editEnvironment.current())
-            guard before == stamp else {
-                await send(.environmentChanged(before))
-                return
-            }
-            do {
-                let current = try await VerseDraftRecoveryQuery(reader: reader, repository: repository)
-                    .currentVerse(chapter: item.chapter, verse: item.verse)
-                let after = Stamp(await editEnvironment.current())
-                guard after == stamp else {
-                    // 읽는 사이 계정이 바뀌었다 — 읽은 필기는 다른 계정의 저장소 내용일 수 있다. 내지 않는다.
-                    await send(.environmentChanged(after))
-                    return
-                }
-                await send(.currentLoaded(itemID: item.id, stamp: stamp, ink: current?.lineData, updatedAt: current?.updateDate))
-            } catch {
-                Log.error("남은 필기 — 지금 필기를 읽지 못했다", item.place, "\(error)")
-                await send(.currentFailed(itemID: item.id, stamp: stamp, "지금 그 절의 필기를 읽지 못했어요. 없다는 뜻은 아니에요."))
-            }
-        }
-        .cancellable(id: CancelID.compare, cancelInFlight: true)
-    }
-
-    /// **읽지 못한 파일만** 지운다. 초안을 지우는 길은 이 화면에 없다(사용자 결정 2026-09-21).
+    /// **읽지 못한 파일만** 지운다. 필기를 지우는 길은 이 화면에 없다(사용자 결정 2026-09-21).
     private func removeUnreadable(in scope: AccountScope) -> Effect<Action> {
         .run { [cleaner] send in
             guard let cleaner else {
-                await send(.removedUnreadable("이 기기의 보존 영역을 열지 못해 지우지 못했어요."))
+                await send(.removedUnreadable("이 iPad의 보존 영역을 열지 못해 지우지 못했어요."))
                 return
             }
             do {
                 let removed = try await cleaner.removeUnreadableDraftFiles(in: scope)
                 await send(.removedUnreadable("읽지 못한 파일 \(removed)개를 지웠어요."))
             } catch {
-                Log.error("남은 필기 — 읽지 못한 파일을 지우지 못했다", scope.key, "\(error)")
+                Log.error("확인이 필요한 필기 — 읽지 못한 파일을 지우지 못했다", scope.key, "\(error)")
                 await send(.removedUnreadable("읽지 못한 파일을 지우지 못했어요. 파일은 그대로 있어요."))
             }
         }
@@ -386,6 +367,95 @@ public struct DraftRecoveryFeature {
     private static func order(_ lhs: Bucket, _ rhs: Bucket) -> Bool {
         if lhs.comparedWithStore != rhs.comparedWithStore { return lhs.comparedWithStore }
         return lhs.scope.key < rhs.scope.key
+    }
+}
+
+// MARK: - 화면의 값
+
+extension DraftRecoveryFeature {
+    /// 한 계정 묶음. 화면이 보는 값만 든다.
+    public struct Bucket: Hashable, Identifiable {
+        public var scope: AccountScope
+        public var id: String { scope.key }
+        /// 사람이 읽는 이름 — 지금 계정 · 계정을 확인하지 못한 동안 · 로그인하지 않은 동안 · 다른 계정.
+        public var title: String
+        public var draftCount: Int
+        public var draftBytes: Int64
+        /// 읽지 못해 옆으로 옮긴 파일 — 넣을 수 없고 보관만 한다. 내보내고 지울 수 있는 **유일한** 것이다.
+        public var unreadableCount: Int
+        public var unreadableBytes: Int64
+        /// 그 파일들의 자리 — 내보내기로 넘긴다.
+        public var unreadableFiles: [URL]
+        /// 저장소와 대조했는가. 아니면 분류 없이 **수 · 용량만** 보인다 — 상세(잉크 · 자리 · 파일 자리)를 만들지 않는다(P0-1).
+        public var comparedWithStore: Bool
+        /// 지금 계정에서 **열어 보지 않은** 필기 수 — 대조하지 않은 묶음은 전부, 대조한 묶음은 다른 계정을 참고하던 확인 전 필기.
+        /// 분류한 적 없는 수다 — "확인이 필요한 필기" 로 부르지 않는다.
+        public var inaccessibleCount: Int
+        /// 이 묶음을 아예 읽지 못했다 — **필기가 없다는 뜻이 아니다.**
+        public var readFailed: Bool
+        /// 자동으로 표시되지 않는 필기들. 최근에 쓴 것부터. 확인이 필요한 것과 보관만 하는 예전 필기가 함께 든다.
+        public var items: [Item]
+        /// 대조하지 못한 장 이름 — 그 장의 필기는 세어졌지만 분류하지 못했다.
+        public var unreadChapters: [String]
+
+        /// 확인이 필요한 필기.
+        public var pendingItems: [Item] { items.filter(\.needsConfirmation) }
+        /// 보관만 하는 예전 필기 — 목록 아래에 접어 둔다.
+        public var archivedItems: [Item] { items.filter { !$0.needsConfirmation } }
+    }
+
+    /// 목록의 한 줄.
+    public struct Item: Hashable, Identifiable {
+        public var id: String
+        /// "창세기 1:3".
+        public var place: String
+        /// 비교할 때 이 장만 읽는다.
+        public var chapter: BibleChapter
+        public var verse: Int
+        /// 가져올 때 그 초안을 다시 찾는다 — 묶음 · 키 · 사용자가 본 revision.
+        public var scope: AccountScope
+        public var key: VerseDraftKey
+        public var revision: Int
+        public var savedAt: Date
+        public var reason: VerseDraftRecoveryReason
+        /// 그때의 계정 근거 한 줄.
+        public var provenance: String
+        /// 소유 근거가 시험용 주입이었다(DEBUG 전용) — 소유 증명이 아니다.
+        public var injected: Bool
+        /// 미리보기용 필기 바이트. 비운 절이면 nil.
+        public var ink: Data?
+        /// 그 절의 지금 필기가 언제 바뀌었는가. 대조하지 않은 묶음이면 nil.
+        public var currentUpdatedAt: Date?
+        /// 그 절이 지금 비어 있는가. 대조하지 않은 묶음이면 nil.
+        public var currentIsEmpty: Bool?
+
+        /// 사용자가 확인해야 하는가. 아니면 보관만 하는 예전 필기다.
+        public var needsConfirmation: Bool { reason.needsConfirmation }
+    }
+
+    /// 견주기 — 지금 필기와 남겨 둔 필기, 그리고 넣으면 무엇이 되는가.
+    public struct Comparison: Hashable {
+        public var itemID: String
+        public var isLoading: Bool = true
+        /// 그 절의 지금 필기. nil 이면 지금 그 절에는 필기가 없다.
+        public var currentInk: Data?
+        public var currentUpdatedAt: Date?
+        /// 지금 필기를 읽지 못했다 — 없다는 뜻이 아니다.
+        public var failure: String?
+        /// 넣으면 무엇이 되는가(넣기 · 바꾸기 · 이미 반영됨 · 넣을 수 없음)와 한 번 더 물을 주의. 견주기 전에는 없다.
+        public var check: VerseDraftImportCheck?
+    }
+
+    /// 가져오기 결과 한 줄.
+    public struct ImportMessage: Hashable {
+        public var text: String
+        /// 넣지 못했다 · 다시 확인해야 한다 — 강조한다.
+        public var needsAttention: Bool
+    }
+
+    /// 가져오기 실패 — 저장소 · 보존 영역을 읽거나 쓰지 못했다. 필기는 그대로다.
+    public struct ImportFailure: Error, Hashable {
+        public var message: String
     }
 }
 
@@ -404,7 +474,7 @@ extension DraftRecoveryFeature.Bucket {
             comparedWithStore: inventory.comparedWithStore,
             inaccessibleCount: inventory.inaccessibleCount,
             readFailed: false,
-            items: inventory.entries.map { DraftRecoveryFeature.Item($0, environment: environment) },
+            items: inventory.entries.map { DraftRecoveryFeature.Item($0, scope: inventory.scope, environment: environment) },
             unreadChapters: inventory.unreadChapters.map { "\($0.title.koreanTitle()) \($0.chapter)장" }
         )
     }
@@ -420,13 +490,16 @@ extension DraftRecoveryFeature.Bucket {
 }
 
 extension DraftRecoveryFeature.Item {
-    init(_ entry: VerseDraftRecoveryEntry, environment: DrawingEditEnvironment) {
+    init(_ entry: VerseDraftRecoveryEntry, scope: AccountScope, environment: DrawingEditEnvironment) {
         let key = entry.draft.key
         self.init(
-            id: "\(key.sessionID)/\(key.title)/\(key.chapter)/\(key.verse)",
+            id: "\(scope.key)/\(key.sessionID)/\(key.title)/\(key.chapter)/\(key.verse)",
             place: DraftRecoveryCopy.place(key),
             chapter: BibleChapter(title: BibleTitle(rawValue: key.title) ?? .genesis, chapter: key.chapter),
             verse: key.verse,
+            scope: scope,
+            key: key,
+            revision: entry.draft.revision,
             savedAt: entry.draft.savedAt,
             reason: entry.reason,
             provenance: DraftRecoveryCopy.provenance(of: entry.draft, environment: environment),
@@ -435,130 +508,5 @@ extension DraftRecoveryFeature.Item {
             currentUpdatedAt: entry.current?.updatedAt,
             currentIsEmpty: entry.current.map(\.isEmpty)
         )
-    }
-}
-
-// MARK: - 문구
-
-/// 화면 문구를 한곳에 둔다 — 같은 사실을 화면마다 다르게 말하지 않게.
-public enum DraftRecoveryCopy {
-    /// 목록이 모으는 것 — **"그 장을 다시 열어도 자동으로 표시되지 않는 필사 초안"**(2026-09-21 후속 리뷰 확정). 열린 캔버스의 일시적 상태가
-    /// 아니라 다시 열었을 때를 기준으로 삼는다. 이전 문구("화면에 보이지 않는 것")는 지금 캔버스에 겹쳐 보이는 초안까지 떠올리게 했다.
-    public static let hiddenKind = "자동으로 표시되지 않는 필사 초안"
-
-    /// 화면 첫 줄.
-    public static let introduction = "이 기기에 남아 있는 필사 초안이에요. 그중 그 장을 다시 열어도 **\(hiddenKind)**을 여기서 찾아볼 수 있어요."
-
-    /// 전체 요약 — 파일 수와 "자동으로 표시되지 않는 것" 을 따로 적는다. 같은 수로 뭉뚱그리면 표시되는 초안까지 사라진 것처럼 읽힌다.
-    public static func totalLine(draftCount: Int, draftBytes: Int64, hiddenCount: Int) -> String {
-        "초안 \(draftCount)개 · \(bytesText(draftBytes)) · 자동으로 표시되지 않는 것 \(hiddenCount)개"
-    }
-
-    /// 대조한 묶음에 목록이 비었을 때.
-    public static let nothingHidden = "남은 초안은 모두 그 장을 열면 자동으로 표시되거나 이미 저장된 것이에요."
-
-    /// 지금 계정에서 열어 보지 않는 묶음 — **수 · 용량만** 말한다(2026-09-21 후속 리뷰 P0-1).
-    public static let notOpenedBucket = "이 묶음은 지금 계정에서 열어 보지 않아요. 개수와 용량만 보이고, 그 계정으로 돌아오면 자세히 볼 수 있어요. 파일은 그대로 있어요."
-
-    /// 대조한 묶음 안의, 다른 계정을 참고하던 확인 전 초안.
-    public static func otherHintNote(_ count: Int) -> String {
-        "다른 계정을 참고하던 초안 \(count)개는 여기서 열어 보지 않아요. 그 계정으로 돌아오면 볼 수 있어요. 파일은 그대로 있어요."
-    }
-
-    /// 전체 요약에 덧붙이는 한 줄 — 분류하지 않은 수는 따로 말한다.
-    public static func unopenedLine(_ count: Int) -> String {
-        "지금 계정에서 열어 보지 않은 초안 \(count)개는 분류하지 않았어요."
-    }
-
-    /// 묶음 카드 한 줄. **분류한 적 없는 수를 "자동으로 표시되지 않는 것" 이라 부르지 않는다**(P0-1) — 지금 계정에서 열어 보지 않는 묶음은
-    /// 수 · 용량만 말한다.
-    public static func bucketDetail(_ bucket: DraftRecoveryFeature.Bucket) -> String {
-        if bucket.readFailed { return "읽지 못했어요 · 파일은 그대로 있어요" }
-        var parts = ["초안 \(bucket.draftCount)개 · \(bytesText(bucket.draftBytes))"]
-        if bucket.unreadableCount > 0 { parts.append("읽지 못한 파일 \(bucket.unreadableCount)개") }
-        guard bucket.comparedWithStore else {
-            parts.append("지금 계정에서는 열어 보지 않아요")
-            return parts.joined(separator: " · ")
-        }
-        parts.append(bucket.items.isEmpty ? "자동으로 표시되지 않는 것 없음" : "자동으로 표시되지 않는 것 \(bucket.items.count)개")
-        if bucket.inaccessibleCount > 0 { parts.append("다른 계정을 참고하던 초안 \(bucket.inaccessibleCount)개") }
-        return parts.joined(separator: " · ")
-    }
-
-    /// 묶음 이름. **로그인하지 않은 동안 · 계정을 확인하지 못한 동안을 먼저 가린다** — 로그아웃 상태에서는 이 기기 전용 묶음이
-    /// "지금 근거의 묶음" 이라 「지금 계정」 으로 읽히는데, 그때는 계정이 없다(2026-09-21 기기 확인).
-    public static func bucketTitle(_ scope: AccountScope, environment: DrawingEditEnvironment) -> String {
-        switch scope {
-        case .unverified: return "계정을 확인하지 못한 동안"
-        case .localOnly: return "로그인하지 않은 동안"
-        default: return scope == environment.accountBasis.preservationScope ? "지금 계정" : "다른 계정 · \(scope.key.suffix(6))"
-        }
-    }
-
-    /// 그때의 계정 근거 한 줄. **귀속을 올리지 않는다** — 다른 근거의 초안을 지금 계정의 것처럼 쓰지 않는다.
-    public static func provenance(of draft: VerseDraft, environment: DrawingEditEnvironment) -> String {
-        let reference = environment.accountBasis.referencedAccount
-        var text: String
-        switch draft.account {
-        case .confirmed(let token):
-            text = token.scope == reference ? "이 계정에서 씀" : "다른 계정에서 씀"
-        case .unverified(let hint):
-            if hint == nil {
-                text = "계정을 확인하기 전에 씀"
-            } else {
-                text = hint == reference ? "계정을 확인하기 전에 씀 · 이 계정을 참고" : "계정을 확인하기 전에 씀 · 다른 계정을 참고"
-            }
-        case .localOnly:
-            text = "로그인하지 않고 씀"
-        }
-        // K 를 읽지 못한 채 쓴 초안은 알려진 삭제보다 앞인지 가릴 수 없다 — 그 사실을 숨기지 않는다.
-        if draft.knownEpochs == nil { text += " · 삭제 기준점을 모름" }
-        return text
-    }
-
-    public static func reasonTitle(_ reason: VerseDraftRecoveryReason) -> String {
-        switch reason {
-        case .recoverable: "되살릴 수 있음"
-        case .uncertain: "저장 완료 불확실"
-        case .storeMoved: "다른 내용이 들어옴"
-        case .otherBasis: "다른 계정 근거"
-        case .newerDraftShown: "더 새 초안이 보임"
-        case .undisplayable: "표시하지 못함"
-        }
-    }
-
-    public static func reasonDetail(_ reason: VerseDraftRecoveryReason) -> String {
-        switch reason {
-        case .recoverable:
-            "저장소의 그 절이 앞서 넣은 내용으로 돌아왔어요. 그 뒤에 쓴 이 필기는 이 기기에만 있어요."
-        case .uncertain:
-            "저장소로 보내던 중에 앱이 끝났고, 그 절은 그 뒤로 바뀌었어요. 들어갔는지 가릴 수 없어 그대로 남겨 둬요."
-        case .storeMoved:
-            "이 필기를 쓴 뒤 그 절에 다른 내용이 들어왔어요. 겹쳐 보이면 그 내용을 가리게 돼 자동으로 표시하지 않아요."
-        case .otherBasis:
-            // 다른 계정의 초안은 여기 오르지 않는다(수만 센다, P0-1). 남는 것은 같은 계정에서 삭제 기록 근거가 달라진 초안이다.
-            "이 필기를 쓸 때의 삭제 기록 근거가 지금과 달라 자동으로 표시하지 않아요. 지금 필사로 자동으로 가져오지 않아요."
-        case .newerDraftShown:
-            "같은 절에 더 늦게 쓴 초안이 있어 그쪽이 화면에 보여요. 이 필기도 지우지 않고 남겨 둬요."
-        case .undisplayable:
-            "이 필기를 놓을 자리 정보(좌표)를 읽지 못해 자동으로 표시하지 못해요. 필기는 그대로 남아 있어요."
-        }
-    }
-
-    /// "창세기 1:3". 책 이름을 읽지 못하면(모르는 원본 이름) 그 값을 그대로 보인다 — 어디인지 숨기지 않는다.
-    public static func place(_ key: VerseDraftKey) -> String {
-        let title = BibleTitle(rawValue: key.title)?.koreanTitle() ?? key.title
-        return "\(title) \(key.chapter):\(key.verse)"
-    }
-
-    public static func dateText(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ko_KR")
-        formatter.dateFormat = "yyyy년 M월 d일 HH:mm"
-        return formatter.string(from: date)
-    }
-
-    public static func bytesText(_ bytes: Int64) -> String {
-        bytes.formatted(.byteCount(style: .file))
     }
 }

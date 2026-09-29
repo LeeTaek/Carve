@@ -93,6 +93,26 @@ public struct AppCoordinatorView: View {
                 .accessibilityIdentifier("relaunchGuidance")
             }
         }
+        .overlay {
+            // 연결 전에 쓴 필기가 있다 — 막지 않고 한 번 알린다. 넣기는 설정에서 절마다 견주고 고른 것만 한다(2026-09-29).
+            if store.beforeConnectionNotice != nil, store.patchnote == nil, store.settings == nil, !store.showsRelaunchGuidance {
+                VStack(spacing: 16) {
+                    Text("iCloud에 연결하기 전에 이 iPad에서 쓴 필기가 있어요")
+                    Text("현재 필사에 넣을 내용을 확인해 주세요.")
+                        .font(.caption)
+                        .multilineTextAlignment(.center)
+                    HStack(spacing: 12) {
+                        Button("나중에") { store.send(.beforeConnectionNoticeDismissed) }
+                        Button("필기 확인하기") { store.send(.beforeConnectionNoticeReviewTapped) }
+                            .buttonStyle(.borderedProminent)
+                    }
+                }
+                .padding(24)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("beforeConnectionNotice")
+            }
+        }
         // 이 창의 오버레이 · 팝오버까지 같은 모드를 따른다. 필사 영역은 모드와 무관하게 라이트로 그린다(결정 8-1 안 1).
         .preferredColorScheme(appearanceMode.colorScheme)
     }

@@ -26,7 +26,9 @@ import ComposableArchitecture
 ///   것**이다 — 내 저장은 도착이 아니지만, 내가 저장한 행이라도 원격이 바꾸거나 지우면 도착이다(행을 통째로 빼지 않는다, 2026-09-21 후속 리뷰 2차).
 /// - **「확인하기」 는 앱을 다시 연 것과 같다.** 지금 필기를 보존한 뒤(인계 · 초안 · 저장이 끝나기를 기다림) 저장소와 초안을 다시 읽고, **읽은
 ///   뒤에야** 이 세션을 닫아 그 초안들을 다른 세션의 초안으로 다시 판정한다(`VerseDraftRecoveryRule`). 기준이 달라진 초안은 조용히 숨기지 않고
-///   「남은 필기」 로 잇는다. 다시 읽지 못하면 세션도 화면도 그대로다. 자동 병합 · 새 복구 기능은 없다.
+///   「확인이 필요한 필기」 로 잇는다. 다시 읽지 못하면 세션도 화면도 그대로다. 자동 병합은 없다.
+/// - **설정에서 넣은 필기도 같은 길로 반영한다**(`LocalDrawingChange`, 2026-09-29). 사용자가 이 장에 넣으라고 고른 것이라, 편집한 장이면
+///   「확인하기」 를 기다리지 않고 곧바로 확인하기와 같은 일을 한다 — 지금 필기를 보존한 뒤 다시 읽는다.
 struct ArrivalState: Equatable, Sendable {
     enum Intent: Equatable, Sendable {
         /// 도착했다 — 이 장이 바뀌었는지 보고, 편집하지 않은 장이면 자동으로 반영한다.
@@ -60,9 +62,11 @@ struct ArrivalState: Equatable, Sendable {
     var storeBaseline: [VerseDrawingSnapshot]?
     /// 「확인하기」 직전 이 장에 보이던 초안 — 다시 읽은 뒤 자동으로 표시되지 않게 된 것을 센다.
     var displayedDrafts: Set<VerseDraftKey> = []
+    /// 이 확인은 설정의 넣기(`LocalDrawingChange`)가 불렀다 — 편집한 장이어도 묻지 않고 확인하기로 잇는다.
+    var localImport = false
 }
 
-/// 도착 안내 — 사라지지 않고 할 일이 끝날 때까지 남는다(「남은 필기」 안내만 닫을 수 있다).
+/// 도착 안내 — 사라지지 않고 할 일이 끝날 때까지 남는다(「필기 확인하기」 안내만 닫을 수 있다).
 enum ArrivalNotice: Equatable, Sendable {
     /// 편집한 장에 다른 필사가 도착했다 — 「확인하기」.
     case arrived
@@ -70,15 +74,15 @@ enum ArrivalNotice: Equatable, Sendable {
     case confirming
     /// 도착한 필사를 다시 읽지 못했다 — 지금 화면 · 초안은 그대로다. 「다시 시도」 는 같은 일을 다시 한다.
     case reloadFailed(ArrivalState.Intent)
-    /// 다시 읽었더니 이 기기의 초안 N개가 자동으로 표시되지 않는다 — 「남은 필기 보기」.
+    /// 다시 읽었더니 이 기기의 초안 N개가 자동으로 표시되지 않는다 — 「필기 확인하기」.
     case draftsHidden(count: Int)
 
     var message: String {
         switch self {
         case .arrived: "다른 필사가 도착했어요"
-        case .confirming: "지금 필기를 보존하고 도착한 필사를 읽는 중이에요"
-        case .reloadFailed: "도착한 필사를 불러오지 못했어요. 지금 화면과 필기는 그대로예요"
-        case .draftsHidden(let count): "이 기기에서 쓴 필기 \(count)개는 도착한 필사와 기준이 달라 자동으로 표시하지 않아요"
+        case .confirming: "지금 필기를 보존하고 새로 들어온 필사를 읽는 중이에요"
+        case .reloadFailed: "새로 들어온 필사를 불러오지 못했어요. 지금 화면과 필기는 그대로예요"
+        case .draftsHidden(let count): "이 iPad에서 쓴 필기 \(count)개는 새로 들어온 필사와 기준이 달라 자동으로 표시하지 않아요"
         }
     }
 
@@ -88,13 +92,14 @@ enum ArrivalNotice: Equatable, Sendable {
         case .arrived: "확인하기"
         case .confirming: nil
         case .reloadFailed: "다시 시도"
-        case .draftsHidden: "남은 필기 보기"
+        case .draftsHidden: "필기 확인하기"
         }
     }
 }
 
 enum CanvasArrivalCancelID: Hashable {
     case arrivals
+    case localChanges
 }
 
 extension ChapterCanvasFeature.State {
@@ -133,6 +138,7 @@ extension ChapterCanvasFeature {
     func reduceArrival(state: inout State, action: Action) -> Effect<Action> {
         switch action {
         case .importArrived(let date): importArrived(state: &state, at: date)
+        case .localDrawingChanged(let change): localDrawingChanged(state: &state, change: change)
         case let .arrivalChecked(requestID, result): arrivalChecked(state: &state, requestID: requestID, result: result)
         case .arrivalNoticeTapped: arrivalNoticeTapped(state: &state)
         case .arrivalNoticeDismissed: arrivalNoticeDismissed(state: &state)
@@ -148,6 +154,24 @@ extension ChapterCanvasFeature {
             }
         }
         .cancellable(id: CanvasArrivalCancelID.arrivals, cancelInFlight: true)
+    }
+
+    /// 필사 화면 밖(설정 → 확인이 필요한 필기)의 넣기를 구독한다. 장을 불러올 때마다 다시 건다.
+    func observeLocalChanges() -> Effect<Action> {
+        @Dependency(\.localDrawingChanges) var localChanges
+        return .run { [localChanges] send in
+            for await change in localChanges.changes() {
+                await send(.localDrawingChanged(change))
+            }
+        }
+        .cancellable(id: CanvasArrivalCancelID.localChanges, cancelInFlight: true)
+    }
+
+    /// 설정에서 한 장에 필기를 넣었다 — 이 장이면 도착한 필사처럼 다시 읽어 반영한다. 다른 장은 열 때 저장소를 읽으므로 할 일이 없다.
+    func localDrawingChanged(state: inout State, change: LocalDrawingChange) -> Effect<Action> {
+        guard change.chapter == state.chapter else { return .none }
+        state.arrival.localImport = true
+        return importArrived(state: &state, at: change.date)
     }
 
     /// iCloud 에서 받은 필사가 저장소에 들어왔을 수 있다.
@@ -215,6 +239,9 @@ extension ChapterCanvasFeature {
     func arrivalChecked(state: inout State, requestID: UUID, result: Result<DrawingChapterLoad, DrawingLoadFailure>) -> Effect<Action> {
         guard case .checking(let current, let persisted) = state.arrival.phase, current == requestID else { return .none }
         state.arrival.phase = .idle
+        // 설정의 넣기가 부른 확인인가 — 이번 확인에서 한 번만 쓴다.
+        let localImport = state.arrival.localImport
+        state.arrival.localImport = false
         switch result {
         case .failure(let failure):
             // 확인하지 못했다 — 화면 · 초안은 그대로 두고 알린다. 「다시 시도」 는 확인부터 다시 한다.
@@ -227,11 +254,13 @@ extension ChapterCanvasFeature {
                 // 읽는 사이 이 세션이 저장소에 썼다 — 읽은 것은 그 저장 전, 기준은 그 저장 뒤라 견주면 내 저장을 도착으로 읽는다. 다시 확인한다.
                 state.arrival.arrivedAgain = false
                 state.arrival.phase = .waiting(.check)
+                state.arrival.localImport = localImport
                 return .none
             }
             let changed = loaded.generation != state.storeGeneration || Self.storeChanged(loaded.snapshots, since: state.arrival.storeBaseline)
             guard changed else {
-                // 이 장은 그대로다 — 다른 장의 필사가 도착했다. 아무것도 하지 않는다.
+                // 이 장은 그대로다 — 다른 장의 필사가 도착했다. 아무것도 하지 않는다. 사이에 또 온 알림을 다시 볼 때는 설정의 넣기였는지도 잇는다.
+                if state.arrival.arrivedAgain { state.arrival.localImport = localImport }
                 rearmIfArrivedAgain(state: &state)
                 return .none
             }
@@ -240,9 +269,17 @@ extension ChapterCanvasFeature {
             guard state.isQuietForArrival(.check) else {
                 // 확인하는 사이 편집이 시작됐다 — 멎은 뒤 다시 본다.
                 state.arrival.phase = .waiting(.check)
+                state.arrival.localImport = localImport
                 return .none
             }
             guard state.showsOnlyStore else {
+                if localImport {
+                    // 사용자가 설정에서 이 장에 넣으라고 골랐다 — 묻지 않고 「확인하기」 와 같은 일을 한다: 지금 필기를 보존한 뒤 다시 읽는다.
+                    Log.info("도착 반영 — 설정에서 넣은 필기가 편집한 장에 들어왔다. 지금 필기를 보존한 뒤 다시 읽는다")
+                    state.arrival.notice = .confirming
+                    state.arrival.phase = .waiting(.confirm)
+                    return continueArrival(state: &state)
+                }
                 // 편집했거나 초안이 겹쳐 보이는 장 — 자동으로 바꾸지 않는다(사용자 결정).
                 Log.info("도착 반영 — 편집한 장에 다른 필사가 도착했다. 바꾸지 않고 알린다", "\(state.chapter.title.rawValue).\(state.chapter.chapter)")
                 if state.arrival.notice != .confirming { state.arrival.notice = .arrived }
@@ -268,7 +305,7 @@ extension ChapterCanvasFeature {
             if state.arrival.phase == .idle { state.arrival.phase = .waiting(.check) }
             return continueArrival(state: &state)
         case .draftsHidden:
-            // 자동으로 표시되지 않게 된 초안을 보는 자리 — 설정 → 「남은 필기」(읽기 전용).
+            // 자동으로 표시되지 않게 된 초안을 보는 자리 — 설정 → 「확인이 필요한 필기」.
             state.arrival.notice = nil
             return .send(.delegate(.draftRecoveryRequested))
         case .confirming, nil:
@@ -276,7 +313,7 @@ extension ChapterCanvasFeature {
         }
     }
 
-    /// 도착 안내를 닫는다 — 「남은 필기」 안내만 닫을 수 있다. 할 일이 남은 안내(확인하기 · 다시 시도)는 남긴다.
+    /// 도착 안내를 닫는다 — 「필기 확인하기」 안내만 닫을 수 있다. 할 일이 남은 안내(확인하기 · 다시 시도)는 남긴다.
     func arrivalNoticeDismissed(state: inout State) -> Effect<Action> {
         if case .draftsHidden = state.arrival.notice { state.arrival.notice = nil }
         return .none
@@ -285,7 +322,7 @@ extension ChapterCanvasFeature {
     /// 도착한 필사로 다시 읽는다. 입력은 다시 읽는 동안 닫힌다(`isReloading`).
     private func startArrivalReload(state: inout State, intent: ArrivalState.Intent) -> Effect<Action> {
         if intent == .confirm {
-            // 「확인하기」 직전 이 장에 보이던 초안 — 다시 읽은 뒤 자동으로 표시되지 않게 된 것을 「남은 필기」 로 잇는다.
+            // 「확인하기」 직전 이 장에 보이던 초안 — 다시 읽은 뒤 자동으로 표시되지 않게 된 것을 「확인이 필요한 필기」 로 잇는다.
             state.arrival.displayedDrafts = state.displayedDraftKeys
         }
         let effect = startReload(state: &state)
@@ -324,10 +361,10 @@ extension ChapterCanvasFeature {
         }
         switch intent {
         case .check:
-            // 자동 반영을 마쳤다. 앞서 확인하기가 남긴 「남은 필기」 안내는 그대로 둔다.
+            // 자동 반영을 마쳤다. 앞서 확인하기가 남긴 「필기 확인하기」 안내는 그대로 둔다.
             if state.arrival.notice == .reloadFailed(.check) { state.arrival.notice = nil }
         case .confirm:
-            // 기준이 달라져 자동으로 표시되지 않게 된 내 초안 — 조용히 숨기지 않고 「남은 필기」 로 잇는다.
+            // 기준이 달라져 자동으로 표시되지 않게 된 내 초안 — 조용히 숨기지 않고 「확인이 필요한 필기」 로 잇는다.
             let hidden = state.arrival.displayedDrafts.intersection(state.drafts.hiddenKeys).count
             state.arrival.notice = hidden > 0 ? .draftsHidden(count: hidden) : nil
         }

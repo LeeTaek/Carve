@@ -292,7 +292,7 @@ public struct ChapterCanvasFeature {
             requestID: UUID,
             environment: DrawingEditEnvironment,
             Result<DrawingChapterLoad, DrawingLoadFailure>,
-            drafts: [VerseDraft] = []
+            drafts: [VerseDraft] = [], awaitingImport: [VerseDraft] = []
         )
         /// 조회에 실패해 합성하지 못한 장을 다시 읽는다 — 첫 조회 실패, 전부 지운 뒤의 재조회 실패.
         case retryLoad
@@ -325,11 +325,13 @@ public struct ChapterCanvasFeature {
         case draftsSaved(requestID: UUID, saved: [SavedDraft], failure: DraftSaveFailure?)
         /// iCloud 에서 받은 필사가 저장소에 들어왔을 수 있다 — import 성공 시각(P0-3).
         case importArrived(at: Date)
+        /// 필사 화면 밖(설정 → 확인이 필요한 필기)이 저장소의 한 장에 필기를 넣었다 — 그 장이면 다시 읽어 반영한다(2026-09-29).
+        case localDrawingChanged(LocalDrawingChange)
         /// 도착 확인 조회의 결과 — 저장소만 다시 읽어 이 장이 바뀌었는지 본다.
         case arrivalChecked(requestID: UUID, Result<DrawingChapterLoad, DrawingLoadFailure>)
-        /// 도착 안내의 버튼 — 「확인하기」 · 「다시 시도」 · 「남은 필기 보기」.
+        /// 도착 안내의 버튼 — 「확인하기」 · 「다시 시도」 · 「필기 확인하기」.
         case arrivalNoticeTapped
-        /// 도착 안내 닫기(「남은 필기」 안내만).
+        /// 도착 안내 닫기(「필기 확인하기」 안내만).
         case arrivalNoticeDismissed
         /// 히스토리에서 다른 회차를 선택해 `isPresent` 가 바뀐 뒤. mutation 을 만들지 않고 다시 합성한다 (§8-7).
         case verseRowRestored(verse: Int, rowID: BibleDrawingRowID)
@@ -353,7 +355,7 @@ public struct ChapterCanvasFeature {
         case verseMenuImageTapped
         /// 절 메뉴의 「위젯에 표시」(시안 N6).
         case verseMenuWidgetTapped
-        /// 절 메뉴의 「남은 필기 N」 — 이 절에 보이지 않게 남은 초안을 보러 간다(정책 §12-6 ④).
+        /// 절 메뉴의 「확인이 필요한 필기 N」 — 이 절에 보이지 않게 남은 필기를 보러 간다(정책 §12-6 ④).
         case verseMenuDraftsTapped
         /// 절 메뉴의 「지우기」.
         case verseMenuEraseTapped
@@ -386,8 +388,8 @@ public struct ChapterCanvasFeature {
             case .load(let chapter, let expectedVerseCount):
                 return beginLoad(state: &state, chapter: chapter, expectedVerseCount: expectedVerseCount)
 
-            case .drawingsLoaded(let requestID, let environment, let result, let drafts):
-                return finishLoad(state: &state, requestID: requestID, environment: environment, result: result, drafts: drafts)
+            case .drawingsLoaded(let requestID, let environment, let result, let drafts, let awaitingImport):
+                return finishLoad(state: &state, requestID: requestID, environment: environment, result: result, drafts: drafts, awaitingImport: awaitingImport)
 
             case .retryLoad:
                 guard state.blockingLoadFailure != nil else { return .none }
@@ -491,7 +493,7 @@ public struct ChapterCanvasFeature {
             case .draftsSaved(let requestID, let saved, let failure):
                 return finishDraftSave(state: &state, requestID: requestID, saved: saved, failure: failure)
 
-            case .importArrived, .arrivalChecked, .arrivalNoticeTapped, .arrivalNoticeDismissed:
+            case .importArrived, .localDrawingChanged, .arrivalChecked, .arrivalNoticeTapped, .arrivalNoticeDismissed:
                 return reduceArrival(state: &state, action: action)
 
             case .verseRowRestored:
@@ -611,7 +613,8 @@ extension ChapterCanvasFeature {
             requestLoad(state: &state),
             startSaveIfPossible(state: &state, allowRetry: true),
             observeEditEnvironment(),
-            observeArrivals()
+            observeArrivals(),
+            observeLocalChanges()
         )
     }
 
@@ -639,7 +642,10 @@ extension ChapterCanvasFeature {
                     await send(.editEnvironmentChanged(after))
                 }
                 let drafts = try await Self.loadDrafts(from: draftStore, environment: environment, chapter: chapter)
-                await send(.drawingsLoaded(requestID: requestID, environment: environment, .success(loaded), drafts: drafts))
+                let awaiting = await Self.loadBeforeConnectionDrafts(from: draftStore, environment: environment, chapter: chapter)
+                await send(.drawingsLoaded(
+                    requestID: requestID, environment: environment, .success(loaded), drafts: drafts, awaitingImport: awaiting
+                ))
             } catch {
                 // 초안을 읽지 못한 실패(`source: .drafts`)는 그대로 옮긴다.
                 let failure = error as? DrawingLoadFailure ?? DrawingLoadFailure(message: "\(error)")
@@ -653,7 +659,8 @@ extension ChapterCanvasFeature {
         requestID: UUID,
         environment: DrawingEditEnvironment,
         result: Result<DrawingChapterLoad, DrawingLoadFailure>,
-        drafts: [VerseDraft]
+        drafts: [VerseDraft],
+        awaitingImport: [VerseDraft]
     ) -> Effect<Action> {
         // 이전 장(또는 이전 요청)의 결과는 폐기한다 (§6-4).
         guard requestID == state.loadRequestID else { return .none }
@@ -675,7 +682,7 @@ extension ChapterCanvasFeature {
             // 도착한 필사의 「확인하기」 — 읽었고 지금 합성할 수 있으면 이 세션을 닫아, 이 세션의 초안까지 다른 세션의 초안으로 다시 판정한다(P0-3).
             closeSessionForArrival(state: &state, requestID: requestID)
             // 저장소 내용 위에 남은 초안을 겹친다 — 초안 전용 세션의 필기는 저장소에 없고 초안에만 있다(§12-6 구현 순서 ②).
-            state.loadedDrawings = recoverDrafts(state: &state, snapshots: loaded.snapshots, drafts: drafts)
+            state.loadedDrawings = recoverDrafts(state: &state, snapshots: loaded.snapshots, drafts: drafts, awaitingImport: awaitingImport)
             state.loadFailure = nil
             if state.isReloading, !state.isSettledForReload {
                 // 재조회 결과가 아직 저장 중인 편집 · 긋는 중인 획보다 앞선다. 정리되면 다시 읽는다 — 지금 합성하면 그 편집이 화면에서 빠진다.

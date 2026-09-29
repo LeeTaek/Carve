@@ -59,8 +59,8 @@ xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace \
 mise x -- swiftlint lint --quiet --config .swiftlint.yml <파일들>
 ```
 
-- **전체 회귀 기준선 (2026-09-28 develop 머지 뒤, Xcode 26.3, `Carve-Workspace`):** iPadOS 26.2 · 18.6 각 1069 통과, 17.5 1068 통과,
-  실패 0 (각 총 1079). **통과 수가 줄면 회귀다** — 수치를 낮추는 것은 테스트를 의도적으로 지운 커밋에서만 한다.
+- **전체 회귀 기준선 (2026-09-29 설정 「의견 보내기」 · 「앱 버전」, Xcode 26.3, `Carve-Workspace`):** iPadOS 26.2 · 18.6 각 1112 통과, 17.5 1111 통과,
+  실패 0 (각 총 1122). **통과 수가 줄면 회귀다** — 수치를 낮추는 것은 테스트를 의도적으로 지운 커밋에서만 한다.
   기준선을 고칠 때는 `docs/single-canvas-design.md` 의 요약 줄(「회귀 기준선 **N**」)과 §19-4-2 이력 표도 같은 값으로 고친다.
 - SwiftLint 주의: `identifier_name` 최소 길이 **2** (`x`/`y`/`id` 만 예외),
   `line_length` 180, `type_body_length` 300.

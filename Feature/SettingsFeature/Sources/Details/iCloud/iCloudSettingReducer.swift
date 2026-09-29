@@ -299,9 +299,9 @@ extension CloudSettingsFeature {
         ]
         switch remainingDrafts {
         case .some(let remaining) where remaining > 0:
-            lines.append("이 기기의 필사 초안 \(remaining)개도 모두 지워져요(다른 계정에서 쓴 것 · 읽지 못한 파일 포함).")
+            lines.append("이 iPad에 남겨 둔 필기 \(remaining)개도 모두 지워져요(확인이 필요한 필기 · 다른 계정에서 쓴 것 · 읽지 못한 파일 포함).")
         case .none:
-            lines.append("이 기기의 필사 초안도 모두 지워져요(다른 계정에서 쓴 것 · 읽지 못한 파일 포함).")
+            lines.append("이 iPad에 남겨 둔 필기도 모두 지워져요(확인이 필요한 필기 · 다른 계정에서 쓴 것 · 읽지 못한 파일 포함).")
         default:
             break
         }

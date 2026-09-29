@@ -65,7 +65,8 @@ struct CloudSettingsEraseCopyTesting {
     @Test("남은 초안이 있으면 문구가 그 수까지 말한다 — 자동으로 표시되는 것 · 다른 계정 · 읽지 못한 파일까지 모두라는 것도")
     func bodyMentionsRemainingDrafts() {
         let body = CloudSettingsFeature.eraseConfirmBody(remainingDrafts: 13)
-        #expect(body.contains("이 기기의 필사 초안 13개도 모두 지워져요"))
+        #expect(body.contains("이 iPad에 남겨 둔 필기 13개도 모두 지워져요"))
+        #expect(body.contains("확인이 필요한 필기"))
         #expect(body.contains("다른 계정에서 쓴 것 · 읽지 못한 파일 포함"))
         // 센 것은 "보이지 않는 것" 만이 아니다 — 그렇게 말하지 않는다(P1-4).
         #expect(!body.contains("보이지 않"))
@@ -74,13 +75,13 @@ struct CloudSettingsEraseCopyTesting {
     @Test("남은 초안을 세지 못했으면 수 없이 말하되 빼지 않는다")
     func bodyMentionsDraftsWithoutCountWhenUnknown() {
         let body = CloudSettingsFeature.eraseConfirmBody(remainingDrafts: nil)
-        #expect(body.contains("이 기기의 필사 초안도 모두 지워져요"))
+        #expect(body.contains("이 iPad에 남겨 둔 필기도 모두 지워져요"))
     }
 
     @Test("남은 초안이 없으면 그 줄을 넣지 않는다")
     func bodyOmitsDraftLineWhenNone() {
         let body = CloudSettingsFeature.eraseConfirmBody(remainingDrafts: 0)
-        #expect(!body.contains("초안"))
+        #expect(!body.contains("남겨 둔 필기"))
         #expect(body.contains("모든 장의 필기와 이전 필사 기록이 지워져요"))
     }
 
@@ -118,7 +119,7 @@ struct CloudSettingsEraseCopyTesting {
         let draftFiles = files().filter { $0.hasSuffix(".json") || $0.contains(".unreadable-") }
         #expect(counted == 4)
         #expect(counted == draftFiles.count)
-        #expect(CloudSettingsFeature.eraseConfirmBody(remainingDrafts: counted).contains("필사 초안 \(counted)개"))
+        #expect(CloudSettingsFeature.eraseConfirmBody(remainingDrafts: counted).contains("남겨 둔 필기 \(counted)개"))
 
         try await writer.eraseAllLocal()
         #expect(files().isEmpty)

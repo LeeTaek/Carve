@@ -375,7 +375,7 @@ extension ChapterCanvasArrivalTesting {
         #expect(drafts.stored(in: accountA) == [mine])
         #expect(store.state.drafts.hiddenCounts == [1: 1])
         #expect(store.state.arrival.notice == .draftsHidden(count: 1))
-        #expect(store.state.arrival.notice?.actionTitle == "남은 필기 보기")
+        #expect(store.state.arrival.notice?.actionTitle == "필기 확인하기")
         #expect(store.state.isInputEnabled)
 
         await store.send(.arrivalNoticeTapped)

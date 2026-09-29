@@ -57,10 +57,11 @@ struct DraftSessionState: Equatable, Sendable {
     var inherited: [DraftVerse: VerseDraftProvenance] = [:]
     /// 저장소에 없고 초안에만 있는 행. 저장소에 쓸 때는 `replace` 가 아니라 `create` 로 보낸다.
     var draftOnlyRowIDs: Set<BibleDrawingRowID> = []
-    /// 절마다 **자동으로 표시되지 않고 남은** 초안 수(`VerseDraftRecoveryPlan.kept` — 표시 실패 포함). 절 메뉴가 「남은 필기 N」 을 띄울
-    /// 근거다 — 복구 화면(④)이 그 절에서 보일 것과 같은 수다. 불러올 때마다 다시 센다.
+    /// 절마다 **확인이 필요한** 필기 수 — 자동으로 표시되지 않고 남은 초안(`VerseDraftRecoveryPlan.needsConfirmation` — 표시 실패 포함,
+    /// 보관만 하는 예전 필기 제외)과 가져오기를 기다리는 연결 전 필기(`VerseDraftImportPlan.needsConfirmation`). 절 메뉴가 「확인이 필요한 필기 N」
+    /// 을 띄울 근거다 — 「확인이 필요한 필기」 화면이 그 절에서 보일 것과 같은 수다. 불러올 때마다 다시 센다.
     var hiddenCounts: [Int: Int] = [:]
-    /// 이 장에서 자동으로 표시되지 않고 남은 초안 — 도착한 필사의 「확인하기」 뒤 새로 감춰진 것을 센다(P0-3).
+    /// 이 장에서 자동으로 표시되지 않고 남은, 확인이 필요한 초안 — 도착한 필사의 「확인하기」 뒤 새로 감춰진 것을 센다(P0-3).
     var hiddenKeys: Set<VerseDraftKey> = []
 }
 
@@ -433,13 +434,13 @@ extension ChapterCanvasFeature {
     }
 
     /// 초안에 남길 좌표 정보. **인코딩하지 못해도 잉크는 남긴다** — 그 획의 사본은 이 초안뿐일 수 있다(초안이 먼저다). 그런 초안은 겹칠 수 없어
-    /// 캔버스 · 「남은 필기」 가 같은 판정(`VerseDraftRecoveryRule.isDisplayable`)으로 **표시 실패**로 알린다. 조용히 넘기지 않는다(2026-09-21
+    /// 캔버스 · 「확인이 필요한 필기」 가 같은 판정(`VerseDraftRecoveryRule.isDisplayable`)으로 **표시 실패**로 알린다. 조용히 넘기지 않는다(2026-09-21
     /// 후속 리뷰 P0-2b — 예전에는 `try?` 로 좌표 없는 초안이 생겨도 기록이 없었고, 그 초안은 어디에도 보이지 않았다).
     static func draftMetadataBlob(_ metadata: DrawingLayoutMetadata, verse: Int) -> Data? {
         do {
             return try metadata.encodedBlob()
         } catch {
-            Log.error("단일 Canvas — 초안의 좌표 정보를 인코딩하지 못했다. 잉크만 남기고, 이 초안은 「남은 필기」 에 표시 실패로 오른다",
+            Log.error("단일 Canvas — 초안의 좌표 정보를 인코딩하지 못했다. 잉크만 남기고, 이 초안은 「확인이 필요한 필기」 에 표시 실패로 오른다",
                       "verse=\(verse)", "\(error)")
             return nil
         }
@@ -548,10 +549,37 @@ extension ChapterCanvasFeature {
         return drafts
     }
 
+    /// 이 장의 **연결 전 필기** — 확인된 계정에서, 로그인하지 않은 동안 · 참고할 계정 없이 확인 전에 쓴 필기(2026-09-29). 화면에 겹치지 않고
+    /// 절 메뉴의 「확인이 필요한 필기 N」 에만 센다 — 사용자가 「확인이 필요한 필기」 에서 견주고 골라야 지금 계정으로 들어간다.
+    ///
+    /// **읽지 못해도 장을 막지 않는다.** 이 묶음에는 이 환경이 쓰지 않으므로(편집은 지금 계정 · 이어 보인 초안의 출처로만 남는다) 보이지 않는
+    /// 초안 위에 덮일 일이 없다 — 절 메뉴 수에서만 빠지고, 설정 화면이 그 실패를 따로 알린다.
+    static func loadBeforeConnectionDrafts(
+        from store: (any VerseDraftStore)?,
+        environment: DrawingEditEnvironment,
+        chapter: BibleChapter
+    ) async -> [VerseDraft] {
+        guard let store, !environment.beforeConnectionDraftScopes.isEmpty else { return [] }
+        do {
+            return try await VerseDraftRecoveryRule.beforeConnectionDrafts(environment: environment) { scope in
+                try await store.drafts(in: scope, chapter: chapter, translation: .NKRV)
+            }.map(\.draft)
+        } catch {
+            Log.error("단일 Canvas — 연결 전 필기를 읽지 못했다. 절 메뉴 수에서만 빠진다", "\(error)")
+            return []
+        }
+    }
+
     /// 조회한 저장소 내용 위에 남은 초안을 겹친다 — 지금 세션의 초안과, 이어 보여도 되는 다른 세션의 초안(`VerseDraftRecoveryRule`).
     /// 이 장의 절 기준도 여기서 잡는다. 이미 편집한 절의 기준은 바꾸지 않는다(`drafts.bases`). **초안은 지우지 않는다** — 같은 내용이라
     /// 겹치지 않는 초안도 남긴다(ACC-1 F29).
-    func recoverDrafts(state: inout State, snapshots: [VerseDrawingSnapshot], drafts: [VerseDraft]) -> [VerseDrawingSnapshot] {
+    /// - Parameter awaitingImport: 이 장의 연결 전 필기(`loadBeforeConnectionDrafts`) — 겹치지 않고 절 메뉴 수에만 센다.
+    func recoverDrafts(
+        state: inout State,
+        snapshots: [VerseDrawingSnapshot],
+        drafts: [VerseDraft],
+        awaitingImport: [VerseDraft] = []
+    ) -> [VerseDrawingSnapshot] {
         let chapter = state.chapter
         // 이 장에서 이 세션이 아직 편집하지 않은 절의 기준 · 이어 보인 초안은 이번 조회로 다시 정한다. 앞선 조회의 것이 남으면 이제 보이지 않는
         // 초안을 이어받아 지우거나 그 출처를 잇는다.
@@ -573,11 +601,13 @@ extension ChapterCanvasFeature {
         }
         let plan = VerseDraftRecoveryRule.plan(
             drafts: drafts, storeContent: view.verseContent, environment: state.editEnvironment, sessionID: state.drafts.sessionID,
-            storedRevisions: state.drafts.storedRevisions, storeRows: view.rows
+            storedRevisions: state.drafts.storedRevisions, storeRows: view.rows, storeHistory: view.history
         )
-        // 절 메뉴가 「남은 필기 N」 을 띄울 근거 — 복구 화면(④)이 그 절에서 보일 것과 같은 수다.
-        state.drafts.hiddenCounts = Dictionary(grouping: plan.kept, by: { $0.key.verse }).mapValues(\.count)
-        state.drafts.hiddenKeys = Set(plan.kept.map(\.key))
+        // 절 메뉴가 「확인이 필요한 필기 N」 을 띄울 근거 — 「확인이 필요한 필기」 화면이 그 절에서 보일 것과 같은 수다. 보관만 하는 예전 필기는
+        // 세지 않고(사용자 결정 2026-09-29), 가져오기를 기다리는 연결 전 필기는 센다.
+        let pending = plan.needsConfirmation + VerseDraftRecoveryRule.importPlan(drafts: awaitingImport, view: view).needsConfirmation
+        state.drafts.hiddenCounts = Dictionary(grouping: pending, by: { $0.key.verse }).mapValues(\.count)
+        state.drafts.hiddenKeys = Set(plan.needsConfirmation.map(\.key))
         // 늦게 도착한 필사를 가릴 기준 — 이번에 읽은 저장소 내용 그대로(P0-3). 그 뒤 이 세션이 저장소에 쓴 것은 `finishSave` 가 겹친다.
         state.arrival.storeBaseline = snapshots
         var mutations: [VerseDrawingMutation] = []
