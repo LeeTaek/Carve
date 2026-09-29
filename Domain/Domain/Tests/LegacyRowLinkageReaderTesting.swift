@@ -358,6 +358,7 @@ struct LegacyRowLinkageReaderTesting {
         try withStore { url in
             try LinkageFixture.link(url, entity: .bibleDrawing, primaryKey: 1)
             try LinkageFixture.addIdentityKeys(url)
+            try V4StoreHarness.settleWAL(at: url)
             let before = fingerprints(url)
 
             let reading = reader.judge(storeAt: url)
@@ -402,11 +403,13 @@ struct LegacyRowLinkageReaderTesting {
 
     // MARK: 도우미
 
+    /// 본체와 WAL 의 바이트. `-shm` 은 읽기만 해도 바뀌는 공유 메모리 색인이라 보지 않고, 없는 WAL 은 빈 WAL 과 같게 본다 —
+    /// 시드 컨테이너가 늦게 닫히며 빈 WAL · `-shm` 을 지울 수 있다(`V4StoreHarness.settleWAL`).
     private func fingerprints(_ url: URL) -> [String: Data] {
         var result: [String: Data] = [:]
-        for suffix in ["", "-wal", "-shm"] {
+        for suffix in ["", "-wal"] {
             let file = URL(fileURLWithPath: url.path + suffix)
-            if let data = try? Data(contentsOf: file) { result[file.lastPathComponent] = data }
+            result[file.lastPathComponent] = (try? Data(contentsOf: file)) ?? Data()
         }
         return result
     }

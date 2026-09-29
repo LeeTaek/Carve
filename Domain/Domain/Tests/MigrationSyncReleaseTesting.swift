@@ -196,6 +196,7 @@ struct MigrationSyncReleaseTesting {
         context.insert(verse)
         context.insert(page)
         try context.save()
+        try V4StoreHarness.settleWAL(at: url)
     }
 }
 

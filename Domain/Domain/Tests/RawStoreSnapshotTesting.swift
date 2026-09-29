@@ -42,6 +42,7 @@ struct RawStoreSnapshotTesting {
             context.insert(BibleDrawing(bibleTitle: chapter, verse: 2, lineData: ink, rowUUID: "row-2"))
         }
         try context.save()
+        try V4StoreHarness.settleWAL(at: url)
     }
 
     /// 저장소 본체와 WAL 의 바이트. `-shm` 은 읽기만 해도 바뀌는 공유 메모리 색인이라 비교하지 않는다.

@@ -17,6 +17,7 @@
 @testable import Domain
 import Foundation
 import PencilKit
+import SQLite3
 import SwiftData
 import Testing
 
@@ -62,6 +63,35 @@ enum V4StoreHarness {
 
     static func storeURL(in directory: URL) -> URL {
         directory.appendingPathComponent("Carve.sqlite")
+    }
+
+    /// 시드가 WAL 에 남긴 페이지를 본체로 옮기고 WAL 을 비운다. 파일 바이트를 기준으로 뜨는 시험은 시드 직후에 부른다.
+    ///
+    /// 시드에 쓴 `ModelContainer` 의 SQLite 연결은 함수가 끝난 뒤 **늦게** 닫힐 수 있다. 그 사이에 기준을 뜨면 WAL 이 남아 있다가
+    /// 늦게 닫히는 연결이 체크포인트해 본체 바이트가 바뀐다 — 내용은 같은데 바이트 비교가 실패한다. 원시 사본 · 로더는 원본을
+    /// 복사만 하므로 제품 동작이 아니다(2026-09-29 Xcode Cloud 세 스위트 실패, 이 맥 CPU 부하 반복에서 재현 — WAL 57712B → 0B).
+    /// WAL 을 비워 두면 늦게 닫혀도 옮길 것이 없다.
+    static func settleWAL(at url: URL) throws {
+        var handle: OpaquePointer?
+        guard sqlite3_open_v2(url.path, &handle, SQLITE_OPEN_READWRITE, nil) == SQLITE_OK, let db = handle else {
+            sqlite3_close(handle)
+            throw HarnessError.checkpoint("열기 실패")
+        }
+        defer { sqlite3_close(db) }
+        sqlite3_busy_timeout(db, 5_000)
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "PRAGMA wal_checkpoint(TRUNCATE);", -1, &statement, nil) == SQLITE_OK else {
+            throw HarnessError.checkpoint(String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(statement) }
+        // 결과 행의 첫 열이 busy 다. 다른 연결이 막으면 SQLITE_OK 여도 1 이 오므로 따로 본다.
+        guard sqlite3_step(statement) == SQLITE_ROW, sqlite3_column_int(statement, 0) == 0 else {
+            throw HarnessError.checkpoint("체크포인트가 끝나지 않았다")
+        }
+    }
+
+    enum HarnessError: Error {
+        case checkpoint(String)
     }
 
     /// **앱과 동일한 방식**으로 컨테이너를 연다 — 지금 앱의 스키마는 V5(V4 엔티티 + 즐겨찾기)다.
