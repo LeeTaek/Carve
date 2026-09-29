@@ -15,6 +15,12 @@ import WidgetKit
 /// 누르면 그 절의 필사 화면으로 들어간다.
 struct VerseWidgetView: View {
     let entry: VerseWidgetEntry
+    @Environment(\.widgetFamily) private var family
+
+    /// 크게 · 아주 크게. 필기 없는 본문을 더 큰 글자로 더 많이 보여 준다.
+    private var isLarge: Bool {
+        family == .systemLarge || family == .systemExtraLarge
+    }
 
     var body: some View {
         content
@@ -38,16 +44,17 @@ struct VerseWidgetView: View {
                 .foregroundStyle(VerseWidgetPalette.secondary)
 
             if let handwriting = entry.handwriting {
+                // 필기 그림은 획 경계로 잘라 두었으므로 남는 폭을 양옆에 나눠 가운데에 둔다.
                 Image(uiImage: handwriting)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             } else {
                 // 필기 없이 말씀만 즐겨찾기한 경우.
                 Text(payload.sentence)
-                    .font(.system(size: 15))
+                    .font(.system(size: isLarge ? 20 : 15))
                     .foregroundStyle(VerseWidgetPalette.ink)
-                    .lineLimit(3)
+                    .lineLimit(isLarge ? 8 : 3)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
 

@@ -31,8 +31,9 @@ struct VerseWidget: Widget {
         }
         .configurationDisplayName("말씀")
         .description("즐겨찾기에서 고른 말씀을 홈 화면에 띄워요. 여러 개를 고르면 한 시간에 하나씩 돌아가며 보여 줘요.")
-        // 작게(systemSmall)는 말씀 한 줄도 좁아 빼고 중간만 낸다(2026-09-16 사용자 확인).
-        .supportedFamilies([.systemMedium])
+        // 작게(systemSmall)는 말씀 한 줄도 좁아 뺀다(2026-09-16 사용자 확인).
+        // 중간은 필기가 작아 읽기 어려워 크게 · 아주 크게를 더한다(2026-09-29 사용자 요청).
+        .supportedFamilies([.systemMedium, .systemLarge, .systemExtraLarge])
     }
 }
 
