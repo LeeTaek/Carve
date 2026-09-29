@@ -226,6 +226,8 @@ private struct AppStartupView: View {
             $0.modelContainer = modelContainer
             $0.createSwiftDataActor = database
             $0.drawingRepository = SwiftDataDrawingRepository(actor: database)
+            // 「확인이 필요한 필기」 의 가져오기 — 같은 actor 로 쓴다(저장소 세대 · 트랜잭션이 편집 화면과 같은 경계다).
+            $0.drawingVerseImporter = SwiftDataDrawingRepository(actor: database)
             $0.favoriteVerseRepository = SwiftDataFavoriteVerseRepository(actor: database)
             // `@Dependency` 를 저장한 기본값도 처음 읽힌 runtime 문맥을 전역 캐시에 남긴다. 여기서(runtime 밖 문맥) 만들어 넘긴다.
             $0.drawingData = DrawingDatabase()
@@ -243,6 +245,9 @@ private struct AppStartupView: View {
             $0.verseDraftStore = localPreservation
             $0.verseDraftRecoveryReader = localPreservation
             $0.verseDraftUnreadableCleaner = localPreservation
+            $0.verseDraftImportMarker = localPreservation
+            // 설정에서 넣은 필기를 그 아래 열린 필사 화면에 알린다 — 둘이 같은 인스턴스를 봐야 한다.
+            $0.localDrawingChanges = LiveLocalDrawingChangeClient()
             $0.photoLibraryClient = PhotoKitLibraryClient()
             $0.widgetVerseClient = AppGroupWidgetVerseClient()
             $0.analyticsClient = FirebaseAnalyticsClient()

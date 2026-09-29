@@ -24,6 +24,10 @@ public struct AppCoordinatorFeature {
         public var showsRelaunchGuidance = false
         /// 이번 실행에서 재실행 안내를 이미 띄웠다. 닫은 뒤 다시 띄우지 않는다 — 설정의 iCloud 화면은 계속 같은 안내를 보인다.
         var didShowRelaunchGuidance = false
+        /// iCloud 에 연결된 뒤 가져올 **연결 전 필기** 수 — 있으면 필사 화면 위에 막지 않는 안내를 띄운다(2026-09-29, 실행마다 한 번).
+        public var beforeConnectionNotice: Int?
+        /// 이번 실행에서 연결 전 필기 안내를 이미 띄웠다. 「나중에」 로 닫으면 다음 실행까지 다시 띄우지 않는다.
+        var didShowBeforeConnectionNotice = false
         /// 현재 루트 화면 (트리기반)
         @Presents public var root: Root.State? = .launchProgress(.initialState)
         /// 업데이트 패치노트 표시 상태
@@ -66,8 +70,10 @@ public struct AppCoordinatorFeature {
     @Dependency(\.analyticsClient) private var analyticsClient
     @Dependency(\.legacySeparationHoldState) private var holdState
     @Dependency(\.drawingEditEnvironment) private var editEnvironment
+    @Dependency(\.verseDraftRecoveryReader) private var draftReader
+    @Dependency(\.drawingRepository) private var drawingRepository
 
-    private enum CancelID { case relaunchGuidance }
+    private enum CancelID { case relaunchGuidance, beforeConnection }
     
     public enum Action {
         case root(PresentationAction<Root.Action>)
@@ -82,6 +88,12 @@ public struct AppCoordinatorFeature {
         case connectionEnvironmentChanged(DrawingEditEnvironment)
         /// 재실행 안내를 닫았다.
         case relaunchGuidanceDismissed
+        /// 동기화 저장소에 쓸 수 있게 됐고, 가져올 연결 전 필기가 있다.
+        case beforeConnectionDraftsFound(Int)
+        /// 연결 전 필기 안내의 「필기 확인하기」 — 설정의 「확인이 필요한 필기」 를 연다.
+        case beforeConnectionNoticeReviewTapped
+        /// 연결 전 필기 안내의 「나중에」 — 필기는 그대로 남는다.
+        case beforeConnectionNoticeDismissed
     }
     
     @Reducer
@@ -119,6 +131,35 @@ public struct AppCoordinatorFeature {
         .cancellable(id: CancelID.relaunchGuidance, cancelInFlight: true)
     }
 
+    /// 이 실행에서 동기화 저장소에 쓸 수 있게 되면(계정 · 소유 확인), 가져오기를 기다리는 **연결 전 필기**를 센다(2026-09-29).
+    ///
+    /// 계정이 확인됐다는 이유만으로 그 필기를 지금 계정에 넣지 않는다 — 수만 세어 안내하고, 넣기는 사용자가 견주고 고른 절만 한다. 연결을 보류한
+    /// 실행(C14)은 이번 실행 동안 쓸 수 없으므로 세지 않는다 — 앱을 다시 열어 연결되면 그때 안내한다.
+    private func observeBeforeConnectionDrafts() -> Effect<Action> {
+        .run { [editEnvironment, draftReader, drawingRepository] send in
+            guard let draftReader else { return }
+            // 먼저 구독하고 읽는다 — 읽은 뒤 · 구독 전에 쓸 수 있게 된 것을 놓치지 않는다.
+            let changes = editEnvironment.changes()
+            var environment = await editEnvironment.current()
+            if SyncedWriteBlock.check(environment) != nil {
+                guard !environment.connectionHeld else { return }
+                var ready = false
+                for await _ in changes {
+                    environment = await editEnvironment.current()
+                    if SyncedWriteBlock.check(environment) == nil {
+                        ready = true
+                        break
+                    }
+                }
+                guard ready else { return }
+            }
+            let found = await VerseDraftRecoveryQuery(reader: draftReader, repository: drawingRepository)
+                .beforeConnectionCount(environment: environment)
+            if found > 0 { await send(.beforeConnectionDraftsFound(found)) }
+        }
+        .cancellable(id: CancelID.beforeConnection, cancelInFlight: true)
+    }
+
     public var body: some Reducer<State, Action> {
         /// 자식 Feature에서 올라오는 액션을 기반으로 루트 화면 전환을 수행하는 Reducer.
         /// - Note: LaunchProgress의 `.syncCompleted`, Carve의 `.moveToSetting,
@@ -140,7 +181,8 @@ public struct AppCoordinatorFeature {
                     state.patchnote = .initialState
                 }
                 // 보류 중이면 로그인 · 소유가 확인되는지 지켜보다가 재실행을 안내한다. 연결을 기다리는 로딩은 띄우지 않는다.
-                let guidance: Effect<Action> = holdState.isHeld ? observeRelaunchGuidance() : .none
+                // 연결된 실행이면 가져오기를 기다리는 연결 전 필기가 있는지 보고 안내한다(2026-09-29).
+                let guidance: Effect<Action> = holdState.isHeld ? observeRelaunchGuidance() : observeBeforeConnectionDrafts()
                 // 위젯을 눌러 시작했다면 필사 화면이 준비된 지금 그 절로 간다.
                 if let verse = state.pendingWidgetVerse {
                     state.pendingWidgetVerse = nil
@@ -157,6 +199,20 @@ public struct AppCoordinatorFeature {
             case .relaunchGuidanceDismissed:
                 state.showsRelaunchGuidance = false
 
+            case .beforeConnectionDraftsFound(let count):
+                // 실행마다 한 번 — 「나중에」 로 닫은 뒤 이 실행에서는 다시 띄우지 않는다. 설정 · 절 메뉴로는 언제든 들어간다.
+                guard !state.didShowBeforeConnectionNotice else { break }
+                state.didShowBeforeConnectionNotice = true
+                state.beforeConnectionNotice = count
+
+            case .beforeConnectionNoticeReviewTapped:
+                state.beforeConnectionNotice = nil
+                state.settings = SettingsFeature.State.initialState(path: .draftRecovery(.initialState))
+                return .send(.root(.presented(.carve(.view(.closeNavigationBar)))))
+
+            case .beforeConnectionNoticeDismissed:
+                state.beforeConnectionNotice = nil
+
             case .openedURL(let url):
                 guard let verse = Self.verse(from: url) else { break }
                 // 위젯에서 들어왔다 — 설정 · 다른 화면을 닫고 그 절을 연다.
@@ -172,7 +228,7 @@ public struct AppCoordinatorFeature {
             case .root(.presented(.carve(.view(.moveToSetting)))):
                 state.settings = .initialState
 
-            // 절 메뉴의 「남은 필기 N」 — 설정을 그 자리로 연다(정책 §12-6 ④). 되살리지 않고 보여 주기만 한다.
+            // 절 메뉴의 「확인이 필요한 필기 N」 · 도착 안내의 「필기 확인하기」 — 설정을 그 자리로 연다(정책 §12-6 ④).
             case .root(.presented(.carve(.scope(.carveDetailAction(
                 .scope(.chapterCanvasAction(.delegate(.draftRecoveryRequested)))
             ))))):
