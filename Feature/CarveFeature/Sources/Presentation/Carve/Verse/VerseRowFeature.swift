@@ -38,6 +38,7 @@ public struct VerseRowFeature {
             self.sentence = sentence
             self.verseTextState = .init(chapterTitle: sentence.chapterTitle,
                                        verse: sentence.verse,
+                                       verseEnd: sentence.verseEnd,
                                        sentence: sentence.sentenceScript)
             self.drewHistoryState = .init(title: sentence.title, verse: sentence.verse)
         }

@@ -133,4 +133,68 @@ struct BibleVerseParsingTesting {
         #expect(verse.verse == 0)
         #expect(verse.sentenceScript == "하나님이 세상을 이처럼 사랑하사")
     }
+
+    @Test("소제목 안 참조(대상 1:5-23)는 절 번호로 읽지 않는다")
+    func ignoresReferenceInsideHeading() {
+        let verse = BibleVerse(
+            title: BibleChapter(title: .genesis, chapter: 10),
+            sentence: "10:1 <노아의 아들들의 족보(대상 1:5-23)> 노아의 아들 셈과 함과 야벳의 족보는 이러하니라"
+        )
+
+        #expect(verse.verse == 1)
+        #expect(verse.chapterTitle == "노아의 아들들의 족보(대상 1:5-23)")
+        #expect(verse.sentenceScript == "노아의 아들 셈과 함과 야벳의 족보는 이러하니라")
+    }
+
+    @Test("합쳐진 절(6:18-19)은 앞 번호를 절로, 뒤 번호를 끝 절로 두고 본문에 범위를 남기지 않는다")
+    func parsesMergedVerseRange() {
+        let verse = BibleVerse(
+            title: BibleChapter(title: .deuteronomy, chapter: 6),
+            sentence: "6:18-19 여호와께서 보시기에 정직하고 선량한 일을 행하라"
+        )
+
+        #expect(verse.verse == 18)
+        #expect(verse.verseEnd == 19)
+        #expect(verse.sentenceScript == "여호와께서 보시기에 정직하고 선량한 일을 행하라")
+    }
+
+    @Test("합쳐진 절 뒤의 소제목도 뽑는다(시 92:1-3)")
+    func parsesHeadingAfterMergedVerseRange() {
+        let verse = BibleVerse(
+            title: BibleChapter(title: .psalms, chapter: 92),
+            sentence: "92:1-3 <안식일의 찬송 시> 지존자여 십현금과 비파와 수금으로"
+        )
+
+        #expect(verse.verse == 1)
+        #expect(verse.verseEnd == 3)
+        #expect(verse.chapterTitle == "안식일의 찬송 시")
+        #expect(verse.sentenceScript == "지존자여 십현금과 비파와 수금으로")
+    }
+
+    @Test("보통 절은 끝 절 번호가 없다")
+    func singleVerseHasNoVerseEnd() {
+        let verse = BibleVerse(title: BibleChapter(title: .john, chapter: 3), sentence: "3:16 하나님이 세상을 이처럼 사랑하사")
+
+        #expect(verse.verseEnd == nil)
+    }
+
+    @Test("절 번호 없이 이어지는 줄은 장 접두어를 지우고, 가운데 소제목 양옆 본문을 공백 하나로 잇는다")
+    func parsesContinuationLineWithoutVerseNumber() {
+        let verse = BibleVerse(
+            title: BibleChapter(title: .genesis, chapter: 35),
+            sentence: "35:야곱의 <야곱의 아들들(대상 2:1-2)> 아들은 열둘이라"
+        )
+
+        #expect(verse.verse == 0)
+        #expect(verse.chapterTitle == "야곱의 아들들(대상 2:1-2)")
+        #expect(verse.sentenceScript == "야곱의 아들은 열둘이라")
+    }
+
+    @Test("장절 뒤 본문 안 참조 숫자는 본문으로 둔다")
+    func keepsReferenceLikeTextInsideBody() {
+        let verse = BibleVerse(title: BibleChapter(title: .john, chapter: 3), sentence: "3:16 3:17 에 이어진다")
+
+        #expect(verse.verse == 16)
+        #expect(verse.sentenceScript == "3:17 에 이어진다")
+    }
 }

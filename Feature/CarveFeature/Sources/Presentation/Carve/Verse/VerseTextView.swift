@@ -49,11 +49,14 @@ public struct VerseTextView: View {
 
     /// 절 번호 — 첫 줄 기준선보다 글자 크기의 0.9 배 위(시안 20pt 본문에서 18pt 위).
     /// `offset` 은 배치를 바꾸지 않으므로 행 높이 · 밑줄 실측에 영향이 없다.
-    private func verseNumberView(_ verse: Int) -> some View {
+    private func verseNumberView(_ verse: Int, verseEnd: Int?) -> some View {
         let fontSize = store.sentenceSetting.fontSize
-        return Text(String(format: "%02d", verse))
+        return Text(Self.verseNumberText(verse: verse, verseEnd: verseEnd))
             .font(.system(size: max(11, fontSize * 0.55)))
             .monospacedDigit()
+            // 합쳐진 절(`18-19`)도 번호 칸 안에 한 줄로 둔다.
+            .lineLimit(1)
+            .minimumScaleFactor(0.6)
             .foregroundStyle(CarveColor.Paper.accent)
             .frame(width: Self.verseNumberGutter, alignment: .leading)
             .offset(y: -fontSize * 0.9)
@@ -64,8 +67,15 @@ public struct VerseTextView: View {
                 }
             }
             // 실기기 UI 테스트가 「1절」 이라는 이름으로 번호를 찾는다 — 즐겨찾기는 이름이 아니라 값으로 알린다.
-            .accessibilityLabel("\(verse)절")
+            .accessibilityLabel(verseEnd.map { "\(verse)-\($0)절" } ?? "\(verse)절")
             .accessibilityValue(isFavorite ? "즐겨찾기" : "")
+    }
+
+    /// 절 번호 표기. 두 자리로 맞추고, 합쳐진 절은 범위로 쓴다(`06`, `18-19`).
+    static func verseNumberText(verse: Int, verseEnd: Int?) -> String {
+        let start = String(format: "%02d", verse)
+        guard let verseEnd else { return start }
+        return start + "-" + String(format: "%02d", verseEnd)
     }
 
     /// 즐겨찾기 표시 — 절 번호 칸 안, 첫 줄 기준선 아래(시안 N2: 20pt 본문에서 기준선 13pt 아래 · 16pt 별).
@@ -86,7 +96,7 @@ public struct VerseTextView: View {
         let sentenceSetting = store.sentenceSetting
 
         return HStack(alignment: .firstTextBaseline, spacing: 0) {
-            verseNumberView(store.verse)
+            verseNumberView(store.verse, verseEnd: store.verseEnd)
 
             Text(store.sentence)
                 .id(store.preferenceVersion)

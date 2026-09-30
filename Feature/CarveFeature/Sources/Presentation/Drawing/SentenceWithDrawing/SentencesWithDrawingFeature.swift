@@ -32,6 +32,7 @@ public struct SentencesWithDrawingFeature {
             self.sentence = sentence
             self.sentenceState = .init(chapterTitle: sentence.chapterTitle,
                                        verse: sentence.verse,
+                                       verseEnd: sentence.verseEnd,
                                        sentence: sentence.sentenceScript)
             self.canvasState = .init(sentence: sentence, drawing: drawing)
             self.drewHistoryState = .init(title: sentence.title, verse: sentence.verse)

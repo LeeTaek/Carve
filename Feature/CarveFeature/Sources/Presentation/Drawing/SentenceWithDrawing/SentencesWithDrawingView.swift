@@ -156,6 +156,12 @@ public struct SentencesWithDrawingView: View, Equatable {
             .font(.system(size: 22))
             .fontWeight(.heavy)
             .foregroundStyle(CarveColor.Paper.text)
+            .multilineTextAlignment(.center)
+            // 행이 `touchIgnoringContextMenu` 의 중첩 호스팅 안이라 폭 제안 없이 한 줄 폭을 쓴다 — 시편 60편처럼 긴 소제목이
+            // 양옆 화면 밖으로 나갔다. 종이 바깥 여백 안의 컬럼 폭에서 줄바꿈하고, 늘어난 높이는 위 `onGeometryChange` 가 잰다.
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, margins.outer)
+            .frame(width: halfWidth * 2)
     }
     
     /// 필기 가이드 — 본문 줄마다 한 줄(시안 M1 · M2 실선 `Paper.guide`).

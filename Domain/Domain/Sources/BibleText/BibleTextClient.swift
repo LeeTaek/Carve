@@ -46,19 +46,8 @@ struct ResourceBibleTextClient: BibleTextClient {
                 encoding: String.Encoding(rawValue: encodingEUCKR)
             )
 
-            return try bible.components(separatedBy: "\r")
-                .filter {
-                    guard let num = $0.components(separatedBy: ":").first,
-                          let first = Int(num) else {
-                        throw BibleTextClientError.chapterConvertError
-                    }
-                    return first == chapter.chapter
-                }
-                .map { sentence in
-                    BibleVerse(title: chapter, sentence: sentence)
-                }
-        } catch let error as BibleTextClientError {
-            throw error
+            // 절 번호 없이 이어지는 줄 · 합쳐진 절 · 시편 권 표시는 파서가 앞 절 · 소제목으로 정리한다.
+            return BibleChapterTextParser.verses(in: bible, chapter: chapter)
         } catch {
             throw BibleTextClientError.fetchSentenceError
         }

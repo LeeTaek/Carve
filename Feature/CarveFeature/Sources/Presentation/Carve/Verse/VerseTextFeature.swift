@@ -25,6 +25,8 @@ public struct VerseTextFeature {
         public var chapterTitle: String?
         /// 성경 절
         public let verse: Int
+        /// 합쳐진 절의 마지막 절 번호(`18-19` 의 19). 보통의 절은 nil.
+        public let verseEnd: Int?
         /// 성경 문장
         public let sentence: String
         /// 각 텍스트 라인의 하단 Offset
@@ -38,11 +40,13 @@ public struct VerseTextFeature {
         public init(
             chapterTitle: String?,
             verse: Int,
+            verseEnd: Int? = nil,
             sentence: String
         ) {
             self.id = String(verse) + sentence
             self.chapterTitle = chapterTitle
             self.verse = verse
+            self.verseEnd = verseEnd
             self.sentence = sentence
         }
         

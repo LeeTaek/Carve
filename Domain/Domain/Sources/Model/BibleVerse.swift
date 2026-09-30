@@ -8,7 +8,6 @@
 
 
 import Foundation
-import RegexBuilder
 
 /// 성경 제목/장, (선택적인) 소제목, 절 번호, 본문 텍스트 등 본문 데이터 모델.
 public struct BibleVerse: Equatable, Sendable {
@@ -16,8 +15,10 @@ public struct BibleVerse: Equatable, Sendable {
     public var title: BibleChapter
     /// 장 앞에 붙는 소제목(예: "아브라함의 믿음")을 저장하는 필드.
     public var chapterTitle: String?
-    /// 절(verse)
+    /// 절(verse). 필사 · 즐겨찾기의 저장 키다. 합쳐진 절(`18-19`)은 앞 번호다.
     public var verse: Int
+    /// 두 절 이상이 한 줄로 합쳐진 절의 마지막 절 번호(`신 6:18-19` 의 19). 보통의 절은 nil.
+    public var verseEnd: Int?
     /// 절 본문 텍스트.
     public var sentenceScript: String
 
@@ -31,16 +32,19 @@ public struct BibleVerse: Equatable, Sendable {
         title: BibleChapter,
         chapterTitle: String? = nil,
         verse: Int,
+        verseEnd: Int? = nil,
         sentence: String
     ) {
         self.title = title
         self.chapterTitle = chapterTitle
         self.verse = verse
+        self.verseEnd = verseEnd
         self.sentenceScript = sentence
     }
 
-    /// 한 줄의 원시 문자열에서 장 제목/절 번호/본문을 파싱하여 BibleVerse를 초기화.
-    /// 문자열에서 "숫자:숫자" 패턴과 "<소제목>" 패턴을 인식하여 분리.
+    /// 한 줄의 원시 문자열에서 소제목/절 번호/본문을 파싱하여 BibleVerse를 초기화.
+    /// 참조(`장:절`, `장:절-절`)는 줄 맨 앞(앞에 `<소제목>` 이 있으면 그 뒤)에서만 읽는다 — 소제목 안 `(대상 1:5-23)` 을 절 번호로 잡지 않는다.
+    /// 장 단위로 이어지는 줄까지 다루려면 `BibleChapterTextParser` 를 쓴다.
     /// - Parameters:
     ///   - title: 성경 책 정보를 담은 TitleVO.
     ///   - chapterTitle: 외부에서 전달받은 기본 소제목.
@@ -50,48 +54,12 @@ public struct BibleVerse: Equatable, Sendable {
         chapterTitle: String? = nil,
         sentence: String
     ) {
+        let line = BibleTextLine(sentence)
         self.title = title
-        var resolvedChapterTitle = chapterTitle
-        var chapter: Int?
-        var sentenceScript: String = sentence
-        
-        // <소제목> 형식의 문자열을 찾기 위한 정규식.
-        let titlePattern = Regex {
-            "<"
-            Capture {
-                ZeroOrMore(.any, .reluctant)
-            }
-            ">"
-        }
-        
-        // "장:절" 형식에서 절 번호를 추출하기 위한 정규식. (예: 3:16 → 16)
-        let chapterPattern = Regex {
-            OneOrMore(.digit)
-            ":"
-            Capture {
-                OneOrMore(.digit)
-            }
-        }
-        
-        // 먼저 "장:절" 패턴을 찾아 절 번호를 추출하고, 해당 부분을 문자열에서 제거.
-        if let match = try? chapterPattern.firstMatch(in: sentenceScript) {
-            let (_, chapterNum) = match.output
-            chapter = Int(chapterNum)
-            sentenceScript.removeSubrange(match.range)
-            sentenceScript = sentenceScript.trimmingCharacters(in: .whitespacesAndNewlines)
-        }
-        
-        // 이후 <소제목> 패턴을 찾아 소제목을 추출하고, 해당 부분을 문자열에서 제거.
-        if let match = try? titlePattern.firstMatch(in: sentenceScript) {
-            let (_, chapterTitleString) = match.output
-            resolvedChapterTitle = String(chapterTitleString)
-            sentenceScript.removeSubrange(match.range)
-            sentenceScript = sentenceScript.trimmingCharacters(in: .whitespacesAndNewlines)
-        }
-       
-        self.chapterTitle = resolvedChapterTitle
-        self.verse = chapter ?? 0
-        self.sentenceScript = sentenceScript
+        self.chapterTitle = line.heading ?? chapterTitle
+        self.verse = line.verse ?? 0
+        self.verseEnd = line.verseEnd
+        self.sentenceScript = line.text
     }
 
 }
