@@ -26,9 +26,19 @@ public struct HelpView: View {
                     .foregroundStyle(CarveColor.secondary)
 
                 helpSection(
-                    title: "두 손가락으로 스크롤",
-                    body: "Apple Pencil은 필사에 쓰고, 화면은 손가락으로 밀어 올려요. 한 손가락으로도 스크롤할 수 있어요."
-                )
+                    title: "손가락으로 스크롤",
+                    body: "Apple Pencil은 필사에 쓰고, 화면은 손가락으로 밀어 올려요."
+                ) {
+                    // 손가락 필사 허용은 설정 패널이 아니라 필사 화면 위 본문 설정에 있다 — 그 버튼 모양을 문장 첫머리에 보여 준다.
+                    CarveIconBadgeParagraph(
+                        .textFormat,
+                        text: Text("\(Text("(본문 설정)").font(.caption2))에서 「손가락 필사 허용」을 켜면 손가락으로도 필사할 수 있어요. 이때는 두 손가락으로 스크롤해요.")
+                    )
+                    .font(CarveTypography.caption)
+                    .foregroundStyle(CarveColor.secondary)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("필사 화면 위 본문 설정에서 「손가락 필사 허용」을 켜면 손가락으로도 필사할 수 있어요. 이때는 두 손가락으로 스크롤해요.")
+                }
                 indentedDivider
                 helpSection(
                     title: "절을 길게 눌러 메뉴 열기",
@@ -66,6 +76,11 @@ public struct HelpView: View {
     }
 
     private func helpSection(title: String, body: String) -> some View {
+        helpSection(title: title, body: body) { EmptyView() }
+    }
+
+    /// 도움말 한 항목. `hint` 는 본문 아래에 붙는 보충 줄이다.
+    private func helpSection<Hint: View>(title: String, body: String, @ViewBuilder hint: () -> Hint) -> some View {
         HStack(alignment: .top, spacing: CarveSpacing.medium) {
             Image(systemName: "questionmark.circle")
                 .font(CarveTypography.title)
@@ -80,6 +95,7 @@ public struct HelpView: View {
                     .font(CarveTypography.caption)
                     .foregroundStyle(CarveColor.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+                hint()
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }

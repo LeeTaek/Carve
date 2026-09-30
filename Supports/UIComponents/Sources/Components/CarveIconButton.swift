@@ -70,6 +70,79 @@ public struct CarveIconButton: View {
     }
 }
 
+/// 떠 있는 아이콘 버튼을 가리키는 작은 표식. 안내 문장에서 「이 버튼」 을 보여 줄 때 쓰고, 누를 수 없다.
+///
+/// ``CarveIconButton`` 의 `floating` 과 같은 모서리 비율로 그리고, 한 변은 캡션 한 줄에 들어가는 크기다.
+/// 그림은 헤더(24/44)보다 크게 넣어 둘레 글자 높이와 맞춘다. 무엇인지는 둘레 문장이 말하므로 VoiceOver 에서는 숨긴다.
+///
+/// ⚠️ 유리를 그대로 쓰지 않는다. 유리 패널(설정) 안에서는 유리가 바탕보다 어두운 납작한 회색으로 그려져,
+///    종이 위 헤더 버튼(밝은 면 · 옅은 그림자)과 달라 보였다(iOS 26.2, 2026-09-30). 유리를 쓰는 조건에서는 그 모습을
+///    직접 칠하고, 헤더도 불투명해지는 조건(iOS 26 미만 · 투명도 줄이기 · 대비 늘리기)에서는 헤더와 같은 표면을 쓴다.
+public struct CarveIconBadge: View {
+    /// 한 변의 기본값(캡션 기준). ``CarveIconBadgeParagraph`` 가 표식 자리를 비울 때도 쓴다.
+    static let baseSide: CGFloat = 20
+
+    private let icon: CarveIcon
+    /// 한 변. 캡션 글자와 함께 커진다.
+    @ScaledMetric(relativeTo: .caption) private var side: CGFloat = CarveIconBadge.baseSide
+
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorSchemeContrast) private var contrast
+
+    public init(_ icon: CarveIcon) {
+        self.icon = icon
+    }
+
+    public var body: some View {
+        let shape = RoundedRectangle(cornerRadius: CarveRadius.control * side / CarveSize.minimumHitTarget, style: .continuous)
+        let glyph = icon.image
+            .resizable()
+            .frame(width: side * 0.7, height: side * 0.7)
+            .foregroundStyle(CarveColor.ink)
+            .frame(width: side, height: side)
+
+        Group {
+            if #available(iOS 26.0, *), allowsGlass(reduceTransparency: reduceTransparency, contrast: contrast) {
+                glyph
+                    .background(colorScheme == .dark ? CarveColor.surface : CarveColor.canvas, in: shape)
+                    .shadow(color: .black.opacity(colorScheme == .dark ? 0.4 : 0.14), radius: 2, y: 1)
+            } else {
+                glyph.carveSurface(.floatingControl, in: shape)
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+/// 버튼 표식으로 시작하는 문단. 표식 뒤로 첫 줄이 이어지고, 둘째 줄부터는 표식 아래 왼쪽 끝에서 시작한다.
+///
+/// `Text` 안에는 뷰를 넣을 수 없어, 첫 줄 앞에 표식 폭만큼 빈 자리를 두고 그 자리에 표식을 겹친다.
+/// 표식은 첫 줄 한글 가운데에 맞추고, 위아래로 넘치는 만큼 줄 간격을 조금 띄운다. 글꼴 · 색 · 접근성 이름은 부르는 쪽에서 준다.
+public struct CarveIconBadgeParagraph: View {
+    private let icon: CarveIcon
+    private let text: Text
+    /// 표식 한 변. ``CarveIconBadge`` 와 같은 값 · 같은 기준으로 커진다.
+    @ScaledMetric(relativeTo: .caption) private var side: CGFloat = CarveIconBadge.baseSide
+    /// 기준선에서 한글 가운데까지의 높이.
+    @ScaledMetric(relativeTo: .caption) private var midline: CGFloat = 4
+
+    public init(_ icon: CarveIcon, text: Text) {
+        self.icon = icon
+        self.text = text
+    }
+
+    public var body: some View {
+        ZStack(alignment: Alignment(horizontal: .leading, vertical: .firstTextBaseline)) {
+            Text("\(Image(size: CGSize(width: side + CarveSpacing.xxSmall, height: 1)) { _ in })\(text)")
+                .lineSpacing(2)
+                .fixedSize(horizontal: false, vertical: true)
+            CarveIconBadge(icon)
+                .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + midline }
+        }
+    }
+}
+
 private struct CarveIconButtonStyle: ButtonStyle {
     let isSelected: Bool
     let background: CarveIconButton.Background

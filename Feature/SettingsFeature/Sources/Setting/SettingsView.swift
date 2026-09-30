@@ -100,10 +100,20 @@ public struct SettingsView: View {
         .safeAreaInset(edge: .bottom) {
             VStack(alignment: .leading, spacing: CarveSpacing.xxSmall) {
                 CarveDivider()
-                Text("본문 글꼴·크기·줄 간격은\n필사 화면 위 「가가」에서 바꿔요.")
-                    .font(CarveTypography.caption)
-                    .foregroundStyle(CarveColor.secondary)
-                    .padding(.horizontal, CarveSpacing.small)
+                // 글자로 「가가」 라고 쓰면 무엇을 가리키는지 알기 어려워 헤더의 본문 설정 버튼 모양을 그대로 보여 준다.
+                VStack(alignment: .leading, spacing: CarveSpacing.xxSmall) {
+                    Text("본문 글꼴·크기·줄 간격은")
+                    HStack(spacing: CarveSpacing.xxSmall) {
+                        Text("필사 화면 위")
+                        CarveIconBadge(.textFormat)
+                        Text("\(Text("(본문 설정)").font(.caption2))에서 바꿔요.")
+                    }
+                }
+                .font(CarveTypography.caption)
+                .foregroundStyle(CarveColor.secondary)
+                .padding(.horizontal, CarveSpacing.small)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("본문 글꼴·크기·줄 간격은 필사 화면 위 본문 설정에서 바꿔요.")
             }
             .padding(.bottom, CarveSpacing.small)
             .background(CarveColor.surface)

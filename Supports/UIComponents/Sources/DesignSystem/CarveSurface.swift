@@ -73,7 +73,7 @@ public extension View {
 }
 
 /// 유리를 쓸 수 있는 접근성 조건. 투명도 줄이기 · 대비 늘리기에서는 불투명 표면이다.
-private func allowsGlass(reduceTransparency: Bool, contrast: ColorSchemeContrast) -> Bool {
+func allowsGlass(reduceTransparency: Bool, contrast: ColorSchemeContrast) -> Bool {
     !reduceTransparency && contrast != .increased
 }
 
