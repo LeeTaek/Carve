@@ -23,7 +23,7 @@ let settings: Settings = .settings(
         .automaticCodeSigning(devTeam: "H4MSW7FUBB")
         .otherLinkerFlags(["-all_load -Objc"])
         .debugInformationFormat(.dwarfWithDsym)
-        .marketingVersion("2.0.0")
+        .marketingVersion("2.0.1")
         .currentProjectVersion("1")
         .merging([
             "ENABLE_USER_SCRIPT_SANDBOXING": "YES",
