@@ -17,7 +17,10 @@ public struct DrawingDatabase: Sendable {
     public typealias Item = BibleDrawing
     @Dependency(\.createSwiftDataActor) public var actor
     @Dependency(\.analyticsClient) private var analyticsClient
-    
+
+    /// 앱은 runtime 마다 만들어 넘긴다 — `liveValue` 는 처음 읽힌 runtime 의 의존성 문맥을 품고 전역에 남는다.
+    public init() {}
+
     // MARK: - verse 단위 BibleDrawing
     
     /// 한 장의 필사 데이터를 모두 불러옴
@@ -34,18 +37,6 @@ public struct DrawingDatabase: Sendable {
         let descriptor = FetchDescriptor(predicate: predicate,
                                          sortBy: [SortDescriptor(\.verse)])
         let storedDrawing: [BibleDrawing] = try await actor.fetch(descriptor)
-        return storedDrawing
-    }
-    
-    /// 내부 helper: updateDrawing 에서만 사용되며, id 기준 단건 조회용
-    private func fetch(drawing: BibleDrawing) async throws -> BibleDrawing? {
-        let id = drawing.id
-        let predicate = #Predicate<BibleDrawing> {
-            $0.id == id
-        }
-        let descriptor = FetchDescriptor(predicate: predicate,
-                                         sortBy: [SortDescriptor(\.verse)])
-        let storedDrawing: BibleDrawing? = try await actor.fetch(descriptor).first
         return storedDrawing
     }
     
@@ -186,6 +177,21 @@ public struct DrawingDatabase: Sendable {
     ///   - fullLineData: 페이지 전체 기준 PKDrawing.dataRepresentation()
     ///   - drawingVersion: 좌표계/인코딩 버전을 나타내는 버전 값
     ///   - updateDate: 업데이트 일시 (기본값: 현재 시각)
+    /// ⛔ **되살리기 전에 CloudKit 스키마부터 보십시오 (2026-09-09).**
+    ///
+    /// 이 경로는 **호출부가 없습니다.** 유일한 읽기(`fetchPageDrawing`)도 주석 처리된
+    /// `CombinedCanvasFeature` 에만 있어 실행되지 않고, D8 실측상 실데이터도 0행이었습니다.
+    /// 그래서 단일 Canvas 배포 준비 중 **CloudKit 의 `CD_BiblePageDrawing` 레코드 타입을 지웠습니다** —
+    /// 그대로 두면 Production 에 영구히 들어가는데(CloudKit 은 Production 에서 타입을 지울 수 없습니다)
+    /// 아무도 쓰지 않는 것이었기 때문입니다.
+    ///
+    /// ⚠️ **그래서 지금 이 함수를 부르면 Production 에 없는 레코드 타입을 쓰게 됩니다.**
+    /// 로컬 저장은 되지만 CloudKit 동기화가 조용히 실패하고, 원인을 여기와 연결짓기 어렵습니다.
+    /// 되살리려면 **CloudKit Dashboard 에서 레코드 타입을 다시 만들어 Production 으로 배포한 뒤** 쓰십시오
+    /// (절차: 런북 §6-9 D9-CK).
+    ///
+    /// 모델(`BiblePageDrawing`)은 아직 스키마에 등록돼 있습니다 — 엔티티 제거는 V5 마이그레이션이
+    /// 필요해 **Phase 4** 로 미뤄 뒀습니다 (설계 §10-1).
     public func upsertPageDrawing(
         chapter: BibleChapter,
         fullLineData: Data,
@@ -221,25 +227,16 @@ public struct DrawingDatabase: Sendable {
         }
     }
     
-    public func updateDrawing(drawing: BibleDrawing) async throws {
+    /// N-Canvas의 행 단위 변경을 저장한다.
+    ///
+    /// SwiftData 모델은 actor 경계를 넘기지 않고, 호출부가 미리 만든 Sendable 요청만 전달한다.
+    /// 기존 행의 `isPresent`와 `rowUUID`는 유지하며 신규 행은 선발급된 `rowID`를 그대로 사용한다(§8-7).
+    public func updateDrawing(request: LegacyDrawingSaveRequest) async throws {
         do {
-            if (try await fetch(drawing: drawing)) != nil {
-                try await actor.update(drawing.id) { (oldValue: BibleDrawing) async in
-                    oldValue.lineData = drawing.lineData
-                    oldValue.updateDate = drawing.updateDate
-                }
-            } else {
-                try await actor.insert(drawing)
-            }
-            Log.debug("update drawing", drawing.id ?? "")
+            try await actor.upsertLegacyDrawing(request)
+            Log.debug("update drawing", request.rowID.raw)
         } catch {
             Log.error("failed to update drawing", error)
-        }
-    }
-    
-    public func updateDrawings(drawings: [BibleDrawing]) async throws {
-        for drawing in drawings {
-            try await updateDrawing(drawing: drawing)
         }
     }
     
@@ -276,6 +273,77 @@ public struct DrawingDatabase: Sendable {
         descriptor.fetchLimit = limit
 
         return try await actor.fetch(descriptor)
+    }
+
+    /// 성경 한 권의 장별 필사 기록을 요약한다 — 탐색 장 목록이 필사한 장을 칠하고 기본 장을 고를 때 쓴다.
+    /// - Parameter title: 대상 성경.
+    /// - Returns: 획이 남은 장과 그중 가장 최근에 필사한 장.
+    public func fetchDrawingRecord(title: BibleTitle) async throws -> BibleTitleDrawingRecord {
+        try await actor.fetchDrawingRecord(title: title)
+    }
+}
+
+extension SwiftDatabaseActor {
+    /// 성경 한 권의 행을 훑어 획이 있는 장과 가장 최근에 필사한 장을 구한다.
+    ///
+    /// SwiftData 모델은 actor 밖으로 내보내지 않고 요약 값만 돌려준다. 획 판정은 `DrawingContentRule` 을 따른다 —
+    /// 지우기로 비운 행과 지우개로 전부 지운 행은 기록이 아니고, 보관 행(`isPresent == false`)은 원래 필사 시각을 지닌 기록이다.
+    /// 판정마다 `PKDrawing` 을 디코딩하므로 `updateDate` 최신순으로 훑으며 이미 기록을 확인한 장의 행은 건너뛴다.
+    /// - Parameter title: 대상 성경.
+    /// - Returns: 필사 기록 요약.
+    public func fetchDrawingRecord(title: BibleTitle) throws -> BibleTitleDrawingRecord {
+        let titleName = title.rawValue
+        let predicate = #Predicate<BibleDrawing> { $0.titleName == titleName }
+        let descriptor = FetchDescriptor(
+            predicate: predicate,
+            sortBy: [SortDescriptor(\.updateDate, order: .reverse)]
+        )
+        var record = BibleTitleDrawingRecord()
+        for row in try modelContext.fetch(descriptor) {
+            guard let chapter = row.titleChapter,
+                  !record.drawnChapters.contains(chapter),
+                  DrawingContentRule.hasStrokes(row.lineData) else { continue }
+            record.drawnChapters.insert(chapter)
+            // 최신순으로 훑으므로 처음 확인한 장이 가장 최근에 필사한 장이다.
+            if record.latestChapter == nil {
+                record.latestChapter = chapter
+            }
+        }
+        return record
+    }
+
+    /// N-Canvas 저장 요청을 행 주소로 upsert하고 한 번 저장한다.
+    /// - Parameter request: SwiftData 모델을 포함하지 않는 행 단위 저장 값.
+    public func upsertLegacyDrawing(_ request: LegacyDrawingSaveRequest) throws {
+        let rawRowID = request.rowID.raw
+        let titleName = request.chapter.title.rawValue
+        let chapterNumber = request.chapter.chapter
+        let predicate = #Predicate<BibleDrawing> {
+            $0.titleName == titleName && $0.titleChapter == chapterNumber
+                && ($0.rowUUID == rawRowID || $0.id == rawRowID)
+        }
+        var descriptor = FetchDescriptor(predicate: predicate)
+        descriptor.fetchLimit = 1
+
+        if let stored = try modelContext.fetch(descriptor).first {
+            stored.lineData = request.lineData
+            stored.updateDate = request.updateDate
+            // 좌표 형식 표식과 metadata도 함께 옮긴다(설계 §10-3 flag off 경로).
+            stored.drawingVersion = request.drawingVersion
+            stored.layoutMetadataData = request.layoutMetadataData
+        } else {
+            let stored = BibleDrawing(
+                bibleTitle: request.chapter,
+                verse: request.verse,
+                lineData: request.lineData,
+                updateDate: request.updateDate,
+                layoutMetadataData: request.layoutMetadataData,
+                rowUUID: rawRowID
+            )
+            stored.drawingVersion = request.drawingVersion
+            modelContext.insert(stored)
+        }
+        try modelContext.save()
     }
 }
 

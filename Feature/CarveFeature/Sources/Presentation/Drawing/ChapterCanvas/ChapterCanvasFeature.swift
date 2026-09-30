@@ -1,0 +1,923 @@
+//
+//  ChapterCanvasFeature.swift
+//  CarveFeature
+//
+//  Created by Claude on 9/6/26.
+//  Copyright © 2026 leetaek. All rights reserved.
+//
+
+import CarveToolkit
+import CoreGraphics
+import Domain
+import Foundation
+
+import ComposableArchitecture
+
+// MARK: - 편집 계약 DTO (설계 §5 · §8-1)
+
+/// 편집 종료 시점 스냅샷 (PencilKit 타입 없음).
+public struct CanvasEditSnapshot: Equatable, Sendable {
+    /// 편집 직후 캔버스 content 좌표 drawing.
+    let drawingData: Data
+    /// 변경 영역. 디버그 표시용이며 저장 계산에는 쓰지 않는다.
+    let dirtyBounds: CGRect?
+    let reason: EditReason
+    /// 이 편집이 이루어진 캔버스 내용의 **세대** — 편집 당시 캔버스가 표시하던 `renderedRevision`.
+    ///
+    /// 장 전환이나 재합성 뒤에 도착한 편집을 새 내용 기준으로 계산하면 다른 장에 저장되거나(오저장) 큐가 막힌다.
+    /// Feature 는 이 값으로 편집을 자기 세대의 문맥(현재 또는 `retiredSession`)에서 계산하고, 어느 쪽도 아니면 버린다 (rev.17).
+    let generation: Int
+}
+
+public enum EditReason: Equatable, Sendable { case ink, erase, lasso, undo, redo }
+
+/// 저장 중 도착한 최신 편집을 보호하기 위해 revision 과 장을 함께 보관한다 (§8-3).
+struct PendingDrawingMutation: Equatable, Sendable {
+    let revision: Int
+    /// 이 명령이 속한 장. 장 전환 직후에도 이전 장의 미저장분을 올바른 장에 저장하기 위함이다 (§8-5).
+    let chapter: BibleChapter
+    let mutation: VerseDrawingMutation
+}
+
+enum SaveStatus: Equatable, Sendable {
+    case idle
+    case saving(revision: Int, requestID: UUID)
+    case failed(revision: Int, retryCount: Int)
+}
+
+/// 조회 실패. `Error` 는 Equatable 이 아니라 메시지만 옮긴다.
+public struct DrawingLoadFailure: Error, Equatable, Sendable {
+    enum Source: Equatable, Sendable {
+        /// 저장소(`BibleDrawing`)를 읽지 못했다.
+        case store
+        /// 이 기기의 초안을 읽지 못했다 — 보이지 않는 초안 위에 새 초안을 덮지 않게 입력을 막는다(§12-6 구현 순서 ②).
+        case drafts
+    }
+
+    let message: String
+    var source: Source = .store
+}
+
+/// 편집을 계산하는 문맥 — **합성 시점**의 레이아웃·`columnOrigin`·활성 행·소유권·기준 drawing.
+///
+/// 큐에 남은 편집은 캔버스가 그 편집 당시 표시하던 내용(세대) 기준으로 계산해야 한다. 장이 바뀌면 현재 상태는 새 장으로
+/// 덮이므로, 이전 장의 문맥은 `retiredSession` 으로 물려 두어 늦게 도착한 편집(코덱 진행 중 · trailing 보고)을 자기 장으로 저장한다.
+struct EditSession: Equatable, Sendable {
+    let generation: Int
+    let chapter: BibleChapter
+    let layout: ChapterLayout
+    let columnOrigin: CGPoint
+    var activeRowIDs: [Int: BibleDrawingRowID]
+    var ownership: OwnershipSnapshot
+    var baselineData: Data
+    /// 이 문맥의 편집이 속한 초안 세션(`DraftSessionState.epoch`). 세션을 닫은 뒤 늦게 온 편집은 그 세션의 초안이 된다.
+    let draftEpoch: Int
+}
+
+// MARK: - Feature
+
+/// 장(chapter)당 하나인 단일 Canvas 의 상태·저장 orchestration (설계 §4).
+///
+/// **PencilKit 타입을 모른다** (P9). 캔버스 내용은 `Data`, 소유권은 `OwnershipSnapshot`, 저장은 `VerseDrawingMutation` 이다.
+///
+/// ## 흐름 (§8-8)
+///
+/// ```
+/// load → drawingsLoaded ┐
+///        layoutCompleted ┴→ composeIfReady (§6-4 게이트) → renderedData / ownership / activeRowIDs
+/// editBegan → isEditing (layout · columnOrigin · 복원 재합성 보류)
+/// editEnded(generation) → 세대 확인 → editQueue → 코덱 (한 번에 하나: 다음 편집의 before = 이전 편집의 결과)
+///   → mutationsPrepared → ownership 승계 · 신규 rowID 예약 · pendingMutations 에 rowID 키로 coalescing
+///   → 저장은 동시에 하나 (saveStatus) → saveFinished → revision 이 같은 항목만 제거 → 다음 batch
+/// 실패 → 화면 유지 + 큐 보존 + 다음 편집/flush/장 전환 에서 재시도 (§8-4)
+/// ```
+///
+/// ## 재합성 규칙
+///
+/// 레이아웃·`columnOrigin` 변경과 히스토리 복원은 **미저장분을 먼저 저장한 뒤 DB 에서 다시 합성**한다 (`reloadAfterSettling`).
+/// 그 사이 저장이나 재조회가 실패하면 입력을 영원히 잠그는 대신, **마지막으로 알고 있는 DB 내용(`loadedDrawings`) 위에
+/// 미저장분(`pendingMutations`)을 겹쳐** 지금 합성한다. 합성은 언제나 `DB 내용 ⊕ 미저장분` 이므로 잉크가 화면에서 사라지지 않고,
+/// 성공한 저장은 `loadedDrawings` 에도 반영해 두 값의 합이 항상 현재 내용이 되게 한다.
+@Reducer
+public struct ChapterCanvasFeature {
+    @ObservableState
+    public struct State: Equatable {
+        var chapter: BibleChapter
+
+        // §6-4 — 도착 순서가 보장되지 않는 두 입력과 게이트
+        var expectedVerseCount: Int?
+        var layout: ChapterLayout?
+        /// 마지막으로 알고 있는 이 장의 DB 내용. 성공한 저장을 겹쳐 두므로 재조회 없이도 현재 내용의 근거가 된다.
+        var loadedDrawings: [VerseDrawingSnapshot]?
+        /// 지금 들고 있는 모든 것(합성한 잉크 · 미저장분 · 물러난 장의 편집)이 기준으로 삼은 저장소 세대. 저장은 이 세대로 보낸다.
+        /// 첫 조회에서 정하고, 전부 지워진 뒤의 정리(`clearAfterExternalDelete`)가 내려놓으면 다음 조회에서 다시 정한다.
+        /// 그 밖의 조회는 덮어쓰지 않는다 — 장 전환은 이전 장 미저장분을 들고 가고, 다른 세대가 오면 정리로 이어진다(`finishLoad`).
+        var storeGeneration: DrawingStoreGeneration?
+        var loadRequestID: UUID?
+        var loadFailure: DrawingLoadFailure?
+        /// 캔버스 content 좌표 = layout 좌표 + columnOrigin (§5). 값은 호스팅이 준다.
+        var columnOrigin: CGPoint = .zero
+        /// 예측 좌표와 실제 렌더의 Δ 안전망 판정 (설계 §14 — D9 R13). `CarveDetailFeature` 가 실측에서 계산해 넘긴다.
+        /// **합성·저장에는 관여하지 않는다** — `isDrawingInputEnabled` 하나만 읽는다.
+        var layoutDelta: LayoutDeltaVerdict?
+
+        // 합성 결과
+        var renderedData: Data?
+        /// 캔버스 내용의 세대. 합성마다, 그리고 **장 진입마다** 오른다 — 뷰는 이 값이 바뀔 때만 캔버스를 교체한다.
+        var renderedRevision = 0
+        /// 합성에 쓴 레이아웃·`columnOrigin`. 큐의 편집은 이 기준으로 계산한다 (`layout`·`columnOrigin` 은 다음 합성용 최신값).
+        var renderedLayout: ChapterLayout?
+        var renderedColumnOrigin: CGPoint = .zero
+        var ownership: OwnershipSnapshot?
+        var activeRowIDs: [Int: BibleDrawingRowID] = [:]
+        var layoutMismatchVerses: Set<Int> = []
+        var legacyVerses: Set<Int> = []
+        /// 디코드하지 못한 행의 절. 활성 행에서 빠져 있어 다음 편집은 새 행으로 간다 (`DrawingCodec`).
+        var undecodableVerses: Set<Int> = []
+        /// 이번 합성에서 legacy 로 배치된 잉크의 content 좌표 bounds (D9 진단, HUD `legInk`).
+        /// `columnOrigin` 이 결과 좌표까지 실제로 갔는지를 상태가 아니라 **좌표**로 확인하는 값이다.
+        var legacyInkBounds: CGRect?
+        /// 마지막 편집 스냅샷의 `dirtyBounds`(content 좌표)와 그 상단이 속한 절. 디버그 오버레이 표시용이며 저장 계산에 쓰지 않는다.
+        var lastDirtyBounds: CGRect?
+        var lastEditedVerse: Int?
+
+        // §8-1 편집 계약
+        var editRevision = 0
+        var persistedRevision = 0
+        /// 필사 데이터가 밖에서 전부 지워진 시점의 `editRevision`. 그 뒤에 쓴 것이 없으면 "저장됨" 이라고 말하지 않는다.
+        var editRevisionAtClear = 0
+        var isEditing = false
+        /// 편집 중 도착한 변경. pencil-up 뒤에 한 번에 적용한다 — 획 도중 재합성하면 획이 사라진다.
+        var pendingLayout: ChapterLayout?
+        var pendingColumnOrigin: CGPoint?
+        var pendingReload = false
+        /// pencil-up 순서의 처리 대기 편집. 코덱은 한 번에 하나만 돈다.
+        var editQueue: [QueuedEdit] = []
+        var isPreparingEdit = false
+        /// 코덱이 마지막으로 처리한 캔버스 내용 — 다음 편집의 before.
+        var baselineData: Data?
+        /// 장 전환으로 물러난 이전 장의 편집 문맥. 늦게 도착한 이전 장 편집을 자기 장 기준으로 계산해 저장한다.
+        var retiredSession: EditSession?
+
+        // §8-3 저장 대기열
+        var pendingMutations: [BibleDrawingRowID: PendingDrawingMutation] = [:]
+        var saveStatus: SaveStatus = .idle
+        /// 성공 없이 이어진 저장 실패 횟수. 재시도가 `.saving` 을 거치므로 `saveStatus` 만으로는 누적되지 않아 따로 센다.
+        var consecutiveSaveFailures = 0
+        /// 지금 저장 중인 batch 의 rowID → revision. 성공 시 같은 revision 인 항목만 제거한다 (§8-3 5번).
+        var inFlightBatch: [BibleDrawingRowID: Int] = [:]
+        /// 지금 저장 중인 batch 의 내용과 장. 성공하면 `loadedDrawings` 에 겹쳐 DB 내용을 따라가게 한다.
+        var inFlightMutations: [VerseDrawingMutation] = []
+        var inFlightChapter: BibleChapter?
+        /// 미저장분이 전부 저장되면 DB 에서 다시 합성한다 (레이아웃 변경 · 복원).
+        var reloadWhenSettled = false
+        var isReloading = false
+
+        // §12-6 구현 순서 ① — 편집 세션의 계정 · K 근거
+
+        /// 이 세션(불러온 뒤의 편집 전체)이 기댄 편집 환경. 불러올 때 정하고, 바뀌면 세션을 닫고 다시 불러오며 새로 정한다.
+        var editEnvironment: DrawingEditEnvironment = .unknown
+        /// 무효가 된 세션을 닫는 중 — 입력 · 저장을 막고 미저장분을 초안으로 남긴 뒤 다시 연다.
+        var sessionEnd: EditSessionEnd?
+        /// 지금 세션의 근거가 최신 환경에서 어떤지. `.valid` 일 때만 저장소에도 쓴다(`persistsToStore`).
+        var sessionValidity: VerseEditContextValidity = .preserveOnly(.accountUnverifiedAtStart)
+        /// 계정을 확인하는 중에 읽은 조회 결과를 버렸다 — 같은 계정으로 확인되면 다시 읽는다.
+        var reloadAfterAccountCheck = false
+        /// 뷰에 보내는 인계 요청 토큰. 올리면 뷰가 미보고 편집을 보고하고 `editHandoffCompleted` 로 알린다.
+        var handoffToken = 0
+        /// 화면에 있는 캔버스(컨트롤러)와 그 캔버스가 표시하는 세대(아직 표시 전이면 `Int.max`). 없으면 인계를 기다리지 않는다 — 있으면 응답이
+        /// 늦어도 완료로 보지 않는다. 늦은 보고는 캔버스가 표시하는 세대로만 오므로, 모든 캔버스가 더 새 세대를 표시해야 닫은 문맥을 놓는다.
+        var attachedCanvases: [UUID: Int] = [:]
+
+        // §12-6 구현 순서 ② — 절 초안
+
+        /// 이 편집 세션의 초안 기록. 근거가 바뀌어 세션을 새로 열면 통째로 비운다(`resetDraftSession`).
+        var drafts = DraftSessionState()
+        /// 닫은 초안 세션 — 인계 뒤 늦게 온 그 세션의 편집을 그 세션의 초안으로 남긴다(`closeDraftSession`).
+        var closedDrafts = ClosedDraftSessions()
+
+        /// 늦게 도착한 필사를 이 장에 반영하는 상태(2026-09-21 후속 리뷰 P0-3, `ChapterCanvasArrivalFeature.swift`).
+        var arrival = ArrivalState()
+
+        // UI-2 지우기 (보관 후 초기화)
+
+        /// 진행 중이거나 실패한 지우기 작업. 진행 중에는 입력·중복 지우기·재합성을 막는다.
+        var eraseTask: VerseEraseTask?
+        /// 지우기 확인창(권·장·절 포함)과 실패 안내를 함께 쓰는 알림.
+        @Presents var eraseAlert: AlertState<Action.EraseAlert>?
+        /// 떠 있는 절 롱탭 메뉴(시안 E1). nil 이면 닫혀 있다.
+        var verseMenu: ChapterCanvasVerseMenu?
+        /// 메뉴에서 기록을 고른 절의 행(창 좌표). 기록 팝오버가 그 절 아래에 붙는다(시안 E2).
+        var historyAnchorFrame: CGRect?
+
+        /// 헤더 팔레트가 읽는 undo/redo 가능 여부 — `PencilPalatteFeature` 와 같은 in-memory 키를 공유한다.
+        @Shared(.inMemory("canUndo")) var canUndo: Bool = false
+        @Shared(.inMemory("canRedo")) var canRedo: Bool = false
+        /// 뷰가 캔버스의 undoManager 에 undo/redo 를 수행하도록 하는 요청 카운터.
+        var undoRequestVersion = 0
+        var redoRequestVersion = 0
+        /// 특정 절로 스크롤 요청 (차트 등 외부 진입). 토큰이 바뀔 때만 뷰가 수행한다.
+        var scrollRequest: ScrollRequest?
+        /// 스크롤 요청 토큰. **장이 바뀌어도 초기화하지 않는다** — 뷰가 마지막으로 수행한 토큰과 겹치면 요청이 무시된다.
+        var scrollRequestToken = 0
+
+        struct QueuedEdit: Equatable, Sendable {
+            let revision: Int
+            let snapshot: CanvasEditSnapshot
+        }
+
+        struct ScrollRequest: Equatable, Sendable {
+            let verse: Int
+            let token: Int
+        }
+
+        init(chapter: BibleChapter) {
+            self.chapter = chapter
+        }
+
+        var isComposed: Bool { renderedData != nil }
+        /// 입력을 막는 조회 실패. 화면이 안내와 「다시 시도」(`retryLoad`)를 띄운다 — 합성하지 못한 장, 이 기기의 초안을 읽지 못함, 세션을 새로
+        /// 연 뒤라 다시 합성할 근거(같은 세션의 마지막으로 알던 내용)가 없음. 그 밖의 재조회 실패는 마지막으로 알던 내용으로 이미 복구했다.
+        var blockingLoadFailure: DrawingLoadFailure? {
+            guard let loadFailure else { return nil }
+            return !isComposed || loadFailure.source == .drafts || loadedDrawings == nil ? loadFailure : nil
+        }
+        /// §6-2 입력 게이트 — 합성이 끝났고, 다시 합성하지도 지우지도 않는 중일 때만 입력을 받는다.
+        var isInputEnabled: Bool { isComposed && !isReloading && !isErasing && sessionEnd == nil && blockingLoadFailure == nil }
+        /// 지우기가 실제로 도는 중인가. `.failed` 는 **포함하지 않는다** — 실패하면 잠금을 풀고 필기를 그대로 쓰게 둔다.
+        var isErasing: Bool {
+            switch eraseTask?.phase {
+            case .flushing, .archiving: true
+            case .failed, nil: false
+            }
+        }
+        /// **새 획 입력만** 여는 게이트 (설계 §14 — D9 안전망). 캔버스의 `drawingGestureRecognizer` 하나가 읽는다.
+        ///
+        /// 레이아웃이 실제 렌더와 한 줄 이상 어긋나면(`LayoutDeltaVerdict.blocksInput`) 그 상태의 새 획은
+        /// 잘못된 절에 귀속되므로 받지 않는다. **합성·표시·저장·flush·복원은 그대로 돈다** — 그 경로들은
+        /// `isComposed` / `isReloading` / `isFullyPersisted` 만 보므로 이 값과 무관하다.
+        /// 여기서 게이트를 `isReady`(§6-4 합성 게이트)로 올리면 기존 잉크가 안 보이거나 미저장분이 유실될 수 있다.
+        var isDrawingInputEnabled: Bool { isInputEnabled && layoutDelta?.blocksInput != true }
+        /// 미저장 여부의 판정 기준 (§8-3). `persistedRevision` 이 아니라 큐가 비었는가로 본다.
+        var isFullyPersisted: Bool {
+            pendingMutations.isEmpty && saveStatus == .idle && editQueue.isEmpty && !isPreparingEdit && !isSavingDrafts
+        }
+
+        /// 현재 세대의 편집 문맥. 합성 전에는 없다.
+        var currentSession: EditSession? {
+            guard renderedData != nil,
+                  let layout = renderedLayout,
+                  let ownership,
+                  let baselineData else { return nil }
+            return EditSession(
+                generation: renderedRevision, chapter: chapter, layout: layout, columnOrigin: renderedColumnOrigin,
+                activeRowIDs: activeRowIDs, ownership: ownership, baselineData: baselineData, draftEpoch: drafts.epoch
+            )
+        }
+
+        /// 세대 번호가 가리키는 편집 문맥 — 현재 세대 · 물러난 세대 · 닫은 세션의 세대. 어느 것도 아니면 nil — 그 편집은 계산할 기준이 없다.
+        func session(for generation: Int) -> EditSession? {
+            if generation == renderedRevision { return currentSession }
+            if let retiredSession, retiredSession.generation == generation { return retiredSession }
+            return closedDrafts.contexts.first { $0.generation == generation }
+        }
+    }
+
+    public enum Action: Equatable {
+        /// 장 진입. 이전 장의 미저장분은 버리지 않고 자기 장으로 저장된다.
+        case load(chapter: BibleChapter, expectedVerseCount: Int)
+        /// 조회 결과. `environment` 는 **조회할 때의** 편집 환경이다 — 결과가 어느 계정 · K 근거로 읽은 것인지 함께 든다.
+        /// `drafts` 는 그 환경의 계정 근거 묶음에 남은 이 장의 초안이다.
+        case drawingsLoaded(
+            requestID: UUID,
+            environment: DrawingEditEnvironment,
+            Result<DrawingChapterLoad, DrawingLoadFailure>,
+            drafts: [VerseDraft] = [], awaitingImport: [VerseDraft] = []
+        )
+        /// 조회에 실패해 합성하지 못한 장을 다시 읽는다 — 첫 조회 실패, 전부 지운 뒤의 재조회 실패.
+        case retryLoad
+        case layoutCompleted(ChapterLayout)
+        case columnOriginChanged(CGPoint)
+        /// 예측 좌표와 실제 렌더의 Δ 안전망 판정이 갱신됐다 (§14 — D9 R13). 새 입력만 좌우한다.
+        case layoutDeltaEvaluated(LayoutDeltaVerdict?)
+
+        case editBegan
+        case editEnded(CanvasEditSnapshot)
+        /// 도구는 댔지만 drawing 이 바뀌지 않은 경우 (탭 등). 보류된 변경을 적용한다.
+        case editCancelled
+        case mutationsPrepared(revision: Int, DrawingEditResult)
+        case saveFinished(requestID: UUID, revision: Int, failure: DrawingRepositoryError?)
+        /// 장 전환 · 백그라운드 진입 시 대기열 저장 (§8-5). 실패했던 저장의 재시도이기도 하다.
+        case flushPending
+        /// 밖에서 필사 데이터가 전부 지워졌다 (설정 → 「모든 필사 데이터 삭제」).
+        case drawingDataCleared
+        /// 편집 환경(계정 · K)이 바뀌었을 수 있다 (§12-6 구현 순서 ①).
+        case editEnvironmentChanged(DrawingEditEnvironment)
+        /// 뷰가 인계를 마쳤다 — 그 토큰의 요청 전까지의 편집은 모두 보고됐다.
+        case editHandoffCompleted(token: Int)
+        /// 닫는 세션이 뷰의 인계 응답을 기다린 시한이 지났다. `id` 는 닫는 세션이다. 캔버스가 있으면 다시 요청한다.
+        case sessionHandoffTimedOut(id: String)
+        /// 캔버스가 화면에 붙었다 · 떨어졌다(미보고 편집을 먼저 보고한 뒤) · 새 세대를 표시했다(이전 세대의 마지막 획을 먼저 보고한 뒤).
+        case canvasAttached(id: UUID)
+        case canvasDetached(id: UUID)
+        case canvasDisplayed(id: UUID, revision: Int)
+        /// 초안 저장 결과. 지금 도는 초안 저장(`requestID`)의 응답만 받는다.
+        case draftsSaved(requestID: UUID, saved: [SavedDraft], failure: DraftSaveFailure?)
+        /// iCloud 에서 받은 필사가 저장소에 들어왔을 수 있다 — import 성공 시각(P0-3).
+        case importArrived(at: Date)
+        /// 필사 화면 밖(설정 → 확인이 필요한 필기)이 저장소의 한 장에 필기를 넣었다 — 그 장이면 다시 읽어 반영한다(2026-09-29).
+        case localDrawingChanged(LocalDrawingChange)
+        /// 도착 확인 조회의 결과 — 저장소만 다시 읽어 이 장이 바뀌었는지 본다.
+        case arrivalChecked(requestID: UUID, Result<DrawingChapterLoad, DrawingLoadFailure>)
+        /// 도착 안내의 버튼 — 「확인하기」 · 「다시 시도」 · 「필기 확인하기」.
+        case arrivalNoticeTapped
+        /// 도착 안내 닫기(「필기 확인하기」 안내만).
+        case arrivalNoticeDismissed
+        /// 히스토리에서 다른 회차를 선택해 `isPresent` 가 바뀐 뒤. mutation 을 만들지 않고 다시 합성한다 (§8-7).
+        case verseRowRestored(verse: Int, rowID: BibleDrawingRowID)
+        case undoStateChanged(canUndo: Bool, canRedo: Bool)
+        case undoTapped
+        case redoTapped
+        case scrollToVerse(Int)
+        /// 캔버스를 길게 눌러 그 자리(content 좌표)의 절 필사 기록을 요청 (§8-7 히스토리 UI, B 구조).
+        case historyRequested(at: CGPoint)
+        /// 롱프레스 메뉴의 "지우기" — 그 자리(content 좌표)의 절을 보관 후 초기화한다 (UI-2). 먼저 확인창을 띄운다.
+        case eraseRequested(at: CGPoint)
+        /// 손가락 롱프레스 — 그 절의 메뉴를 연다(시안 E1). `anchor` · `verseFrame` 은 창 좌표다.
+        case verseMenuRequested(at: CGPoint, anchor: CGPoint, verseFrame: CGRect)
+        /// 절 메뉴를 닫는다 — 가림막을 누르거나 항목을 골랐다.
+        case verseMenuDismissed
+        /// 절 메뉴의 「즐겨찾기에 추가」 · 「즐겨찾기 해제」(시안 N1).
+        case verseMenuFavoriteTapped
+        /// 절 메뉴의 「이전 필사 내용 보기」.
+        case verseMenuHistoryTapped
+        /// 절 메뉴의 「이미지 저장」(시안 G1).
+        case verseMenuImageTapped
+        /// 절 메뉴의 「위젯에 표시」(시안 N6).
+        case verseMenuWidgetTapped
+        /// 절 메뉴의 「확인이 필요한 필기 N」 — 이 절에 보이지 않게 남은 필기를 보러 간다(정책 §12-6 ④).
+        case verseMenuDraftsTapped
+        /// 절 메뉴의 「지우기」.
+        case verseMenuEraseTapped
+        case eraseAlert(PresentationAction<EraseAlert>)
+        /// 보관+초기화 트랜잭션의 결과. 성공하면 `outcome`, 실패하면 `failure` 가 온다.
+        case eraseFinished(outcome: VerseDrawingArchiveOutcome?, failure: DrawingRepositoryError?)
+        case delegate(Delegate)
+
+        /// 지우기 확인창·실패 안내의 버튼.
+        public enum EraseAlert: Equatable, Sendable {
+            /// 확인창에서 "지우기" 를 눌렀다.
+            case confirm(verse: Int)
+            /// 실패 안내에서 "다시 시도" 를 눌렀다. **같은 보관 rowID 로** 다시 시도한다.
+            case retry
+        }
+    }
+
+    @Dependency(\.drawingCodec) var codec
+    @Dependency(\.drawingRepository) var repository
+    @Dependency(\.uuid) var uuid
+    @Dependency(\.date) var date
+    @Dependency(\.drawingEditEnvironment) var editEnvironment
+    @Dependency(\.verseDraftStore) var draftStore
+    @Dependency(\.continuousClock) var clock
+    @Dependency(\.cloudImportArrivals) var arrivals
+
+    public var body: some Reducer<State, Action> {
+        Reduce { state, action in
+            switch action {
+            case .load(let chapter, let expectedVerseCount):
+                return beginLoad(state: &state, chapter: chapter, expectedVerseCount: expectedVerseCount)
+
+            case .drawingsLoaded(let requestID, let environment, let result, let drafts, let awaitingImport):
+                return finishLoad(state: &state, requestID: requestID, environment: environment, result: result, drafts: drafts, awaitingImport: awaitingImport)
+
+            case .retryLoad:
+                guard state.blockingLoadFailure != nil else { return .none }
+                state.loadFailure = nil
+                return requestLoad(state: &state)
+
+            case .layoutCompleted(let layout):
+                if state.isEditing {
+                    state.pendingLayout = layout
+                    return .none
+                }
+                return applyLayout(state: &state, layout: layout)
+
+            case .columnOriginChanged(let origin):
+                if state.isEditing {
+                    // 획 도중 재합성하면 그 획이 화면에서 사라지고, 큐에 남은 편집이 새 기준으로 계산된다. pencil-up 뒤로 미룬다.
+                    state.pendingColumnOrigin = origin == state.columnOrigin ? nil : origin
+                    return .none
+                }
+                return applyColumnOrigin(state: &state, origin: origin)
+
+            case .layoutDeltaEvaluated(let verdict):
+                // 편집 중에도 곧바로 반영한다 — 이 값은 재합성을 일으키지 않고 새 획 입력만 좌우하므로
+                // 그리던 획이 사라지지 않는다 (`layoutCompleted` / `columnOriginChanged` 와 다른 점).
+                let previous = state.layoutDelta
+                state.layoutDelta = verdict
+                LayoutDeltaVerdict.logIfNoteworthy(previous: previous, current: verdict, chapter: state.chapter)
+                return .none
+
+            case .editBegan:
+                state.isEditing = true
+                return .none
+
+            case .editCancelled:
+                state.isEditing = false
+                return .merge(applyDeferredChanges(state: &state), resumeSessionEndIfDraining(state: &state), settleAfterEdit(state: &state))
+
+            case .editEnded(let snapshot):
+                state.isEditing = false
+                if state.eraseTask?.phase == .archiving {
+                    // 보관 트랜잭션이 도는 중에 도착한 편집. 이 편집의 before 는 지우기 **이전** 내용이므로 받아들이면
+                    // 그 절의 획을 활성 행에 다시 써 사용자가 확인한 지우기를 되돌린다. 입력은 확인 시점부터 잠겨 있으므로
+                    // 여기 오는 것은 그 사이(≈트랜잭션 한 번)의 늦은 보고뿐이다. 세대가 맞지 않는 편집과 같이 버린다.
+                    Log.error("단일 Canvas — 지우기(보관+초기화) 중 도착한 편집을 버린다",
+                              "generation=\(snapshot.generation)", "verse=\(state.eraseTask?.verse ?? -1)")
+                    return .none
+                }
+                var effects: [Effect<Action>] = []
+                if let session = state.session(for: snapshot.generation) {
+                    state.editRevision += 1
+                    state.editQueue.append(State.QueuedEdit(revision: state.editRevision, snapshot: snapshot))
+                    state.lastDirtyBounds = snapshot.dirtyBounds
+                    state.lastEditedVerse = snapshot.dirtyBounds.flatMap { bounds in
+                        session.layout.verse(containing: CGPoint(
+                            x: min(max(bounds.minX - session.columnOrigin.x, 0), session.layout.writingWidth),
+                            y: bounds.minY - session.columnOrigin.y
+                        ))
+                    }
+                    effects.append(drainEditQueue(state: &state))
+                } else {
+                    // 계산할 기준이 없는 세대 — 장이 두 번 바뀌었거나 재합성 뒤에 도착했다. 새 내용 기준으로 처리하면 오저장이다.
+                    Log.error("단일 Canvas — 세대가 맞지 않는 편집을 버린다",
+                              "generation=\(snapshot.generation)", "rendered=\(state.renderedRevision)")
+                }
+                effects.append(applyDeferredChanges(state: &state))
+                effects.append(resumeSessionEndIfDraining(state: &state))
+                effects.append(settleAfterEdit(state: &state))
+                return .merge(effects)
+
+            case .mutationsPrepared(let revision, let result):
+                let finished = finishEdit(state: &state, revision: revision, result: result)
+                return .merge(finished, resumeSessionEndIfDraining(state: &state))
+
+            case .saveFinished(let requestID, let revision, let failure):
+                return finishSave(state: &state, requestID: requestID, revision: revision, failure: failure)
+
+            case .flushPending:
+                if state.sessionEnd != nil {
+                    // 무효가 된 세션을 닫는 중에는 저장하지 않는다. 초안으로 남기지 못했다면 이것이 「다시 시도」다.
+                    return retrySessionEnd(state: &state)
+                }
+                // 비활성화 · 다시 시도 — 뷰에도 인계를 요청해 디바운스 안의 마지막 획까지 보고받는다(§12-6 구현 순서 ②).
+                state.handoffToken += 1
+                return startSaveIfPossible(state: &state, allowRetry: true)
+
+            case .drawingDataCleared:
+                return clearAfterExternalDelete(state: &state)
+
+            case .editEnvironmentChanged(let latest):
+                return editEnvironmentChanged(state: &state, latest: latest)
+
+            case .editHandoffCompleted(let token):
+                return .merge(editHandoffCompleted(state: &state, token: token), arrivalHandoffCompleted(state: &state, token: token))
+
+            case .sessionHandoffTimedOut(let id):
+                return sessionHandoffTimedOut(state: &state, id: id)
+
+            case .canvasAttached, .canvasDetached, .canvasDisplayed:
+                return reduceCanvasPresence(state: &state, action: action)
+
+            case .draftsSaved(let requestID, let saved, let failure):
+                return finishDraftSave(state: &state, requestID: requestID, saved: saved, failure: failure)
+
+            case .importArrived, .localDrawingChanged, .arrivalChecked, .arrivalNoticeTapped, .arrivalNoticeDismissed:
+                return reduceArrival(state: &state, action: action)
+
+            case .verseRowRestored:
+                // isPresent 이전은 호출부(히스토리 시트)가 이미 DB 에 반영했다. 여기서는 mutation 없이 다시 합성만 한다.
+                if state.isEditing {
+                    state.pendingReload = true
+                    return .none
+                }
+                return reloadAfterSettling(state: &state)
+
+            case .undoStateChanged(let canUndo, let canRedo):
+                state.$canUndo.withLock { $0 = canUndo }
+                state.$canRedo.withLock { $0 = canRedo }
+                return .none
+
+            case .undoTapped:
+                guard state.isInputEnabled, state.canUndo else { return .none }
+                state.undoRequestVersion += 1
+                return .none
+
+            case .redoTapped:
+                guard state.isInputEnabled, state.canRedo else { return .none }
+                state.redoRequestVersion += 1
+                return .none
+
+            case .scrollToVerse(let verse):
+                state.scrollRequestToken += 1
+                state.scrollRequest = State.ScrollRequest(verse: verse, token: state.scrollRequestToken)
+                return .none
+
+            case .historyRequested(let point):
+                guard let verse = Self.verse(at: point, state: state) else { return .none }
+                return .send(.delegate(.showHistory(verse: verse)))
+
+            case .eraseRequested(let point):
+                // 진행 중이거나 실패해 안내 중인 지우기가 있으면 새로 열지 않는다 (중복 지우기 방지).
+                guard state.eraseTask == nil, let verse = Self.verse(at: point, state: state) else { return .none }
+                state.eraseAlert = Self.confirmEraseAlert(chapter: state.chapter, verse: verse)
+                return .none
+
+            case .verseMenuRequested, .verseMenuDismissed, .verseMenuFavoriteTapped, .verseMenuHistoryTapped, .verseMenuImageTapped,
+                 .verseMenuWidgetTapped, .verseMenuDraftsTapped, .verseMenuEraseTapped:
+                return reduceVerseMenu(state: &state, action: action)
+
+            case .eraseAlert(.presented(.confirm(let verse))):
+                return beginErase(state: &state, verse: verse)
+
+            case .eraseAlert(.presented(.retry)):
+                return retryErase(state: &state)
+
+            case .eraseAlert(.dismiss):
+                // 실패 안내를 닫으면 그 작업은 끝난다 — 필기는 그대로 남고, 다시 지우려면 메뉴에서 새로 시작한다.
+                if state.eraseTask?.phase == .failed { state.eraseTask = nil }
+                return .none
+
+            case .eraseFinished(let outcome, let failure):
+                return finishErase(state: &state, outcome: outcome, failure: failure)
+
+            case .delegate:
+                return .none
+            }
+        }
+        .ifLet(\.$eraseAlert, action: \.eraseAlert)
+        // 늦게 도착한 필사 — 획 · 저장 · 인계가 멎는 순간을 따로 세지 않고, 어느 액션 뒤든 조용해졌으면 이어 간다(P0-3).
+        Reduce { state, _ in continueArrival(state: &state) }
+    }
+}
+
+// MARK: - 조회 · 합성 (§6-4)
+
+extension ChapterCanvasFeature {
+    private func beginLoad(state: inout State, chapter: BibleChapter, expectedVerseCount: Int) -> Effect<Action> {
+        // 이전 장의 편집 문맥을 물려 둔다 — 큐·코덱·trailing 보고에 남은 이전 장 편집을 자기 장 기준으로 마저 계산해 저장하기 위함 (§8-5).
+        // 이전 장이 합성되지 못했다면(빠른 연속 전환) 그 전 문맥을 그대로 둔다.
+        if let retiring = state.currentSession {
+            state.retiredSession = retiring
+        }
+        // 이전 장의 미저장분은 pendingMutations 에 장 정보와 함께 남아 있으므로 여기서 버리지 않는다. 큐의 편집도 세대로 골라내므로 남긴다.
+        state.chapter = chapter
+        state.expectedVerseCount = expectedVerseCount
+        state.layout = nil
+        state.pendingLayout = nil
+        state.pendingColumnOrigin = nil
+        // 안전망 판정은 장마다 새로 낸다 — 이전 장의 Δ 로 새 장의 입력을 막지 않는다 (§14 이월 상태 감사).
+        state.layoutDelta = nil
+        state.pendingReload = false
+        state.loadedDrawings = nil
+        state.loadFailure = nil
+        state.renderedData = nil
+        // 세대를 올려 뷰가 빈 캔버스를 즉시 표시하게 한다 — 이전 장 잉크가 새 장 본문 위에 남지 않게.
+        state.renderedRevision += 1
+        state.renderedLayout = nil
+        // 이전 장의 절 메뉴는 좌표가 맞지 않으므로 닫는다.
+        state.verseMenu = nil
+        state.ownership = nil
+        state.activeRowIDs = [:]
+        state.layoutMismatchVerses = []
+        state.legacyVerses = []
+        state.undecodableVerses = []
+        state.legacyInkBounds = nil
+        state.lastDirtyBounds = nil
+        state.lastEditedVerse = nil
+        state.baselineData = nil
+        state.isEditing = false
+        state.isReloading = false
+        state.reloadWhenSettled = false
+        // 진행 중이던 지우기는 이전 장의 활성 행을 가리키므로 새 장으로 이어가지 않는다 (§14 이월 상태 감사).
+        state.eraseTask = nil
+        state.eraseAlert = nil
+        state.scrollRequest = nil
+        state.$canUndo.withLock { $0 = false }
+        state.$canRedo.withLock { $0 = false }
+        // 도착 반영은 장마다 새로 — 새 장은 지금 저장소를 읽는다. 이전 장의 안내 · 확인은 끝낸다(늦게 온 응답은 요청 ID 로 버린다).
+        state.arrival = ArrivalState()
+        // 장 전환은 flush 지점이다 (§8-5). 실패해 남아 있던 이전 장 batch 를 여기서 다시 시도한다.
+        return .merge(
+            requestLoad(state: &state),
+            startSaveIfPossible(state: &state, allowRetry: true),
+            observeEditEnvironment(),
+            observeArrivals(),
+            observeLocalChanges()
+        )
+    }
+
+    /// - Note: `private` 이 아닌 이유는 편집 세션(`ChapterCanvasEditSession.swift`)이 새 환경으로 조회를 다시 요청하기 때문이다.
+    func requestLoad(state: inout State) -> Effect<Action> {
+        let requestID = uuid()
+        state.loadRequestID = requestID
+        // 이 조회가 시작되기 전에 끝난 import 는 이 조회에 들어 있다. 도착 반영의 다시 읽기가 미뤄져 새로 나가는 조회면 그것을 따라간다.
+        state.arrival.loadStartedAt = date.now
+        followArrivalReload(state: &state, requestID: requestID)
+        let chapter = state.chapter
+        let knownEnvironment = state.editEnvironment
+        return .run { [repository, editEnvironment, draftStore] send in
+            // 불러오는 내용이 기댈 환경을 먼저 확인한다. 바뀐 경우에만 알린다 — 세션 판정은 리듀서가 한다.
+            let environment = await editEnvironment.current()
+            if environment != knownEnvironment {
+                await send(.editEnvironmentChanged(environment))
+            }
+            do {
+                let loaded = try await repository.load(chapter: chapter)
+                // 조회하는 사이 환경이 바뀌었으면 결과보다 **먼저** 알린다. 세션이 바뀌면 이 조회는 새 요청으로 대체돼 결과가 버려진다 —
+                // 옛 계정 · K 로 읽은 내용을 새 세션 아래 합성하지 않는다(6차 리뷰 4).
+                let after = await editEnvironment.current()
+                if after != environment {
+                    await send(.editEnvironmentChanged(after))
+                }
+                let drafts = try await Self.loadDrafts(from: draftStore, environment: environment, chapter: chapter)
+                let awaiting = await Self.loadBeforeConnectionDrafts(from: draftStore, environment: environment, chapter: chapter)
+                await send(.drawingsLoaded(
+                    requestID: requestID, environment: environment, .success(loaded), drafts: drafts, awaitingImport: awaiting
+                ))
+            } catch {
+                // 초안을 읽지 못한 실패(`source: .drafts`)는 그대로 옮긴다.
+                let failure = error as? DrawingLoadFailure ?? DrawingLoadFailure(message: "\(error)")
+                await send(.drawingsLoaded(requestID: requestID, environment: environment, .failure(failure)))
+            }
+        }
+    }
+
+    private func finishLoad(
+        state: inout State,
+        requestID: UUID,
+        environment: DrawingEditEnvironment,
+        result: Result<DrawingChapterLoad, DrawingLoadFailure>,
+        drafts: [VerseDraft],
+        awaitingImport: [VerseDraft]
+    ) -> Effect<Action> {
+        // 이전 장(또는 이전 요청)의 결과는 폐기한다 (§6-4).
+        guard requestID == state.loadRequestID else { return .none }
+        // 한 세션은 한 근거(계정 상태 · K · 소유 근거)로 읽은 내용만 든다 — 다른 근거의 결과를 지금 세션에 섞지 않는다 (§12-6 구현 순서 ①).
+        if !Self.hasSameBasis(environment, state.editEnvironment),
+           let effect = resolveLoadBasisMismatch(state: &state, loadedUnder: environment) {
+            return effect
+        }
+        switch result {
+        case .success(let loaded):
+            if let base = state.storeGeneration, base != loaded.generation {
+                // ★ 이 화면이 삭제 소식을 받기 전에 필사 데이터가 전부 지워졌다. 들고 있는 잉크 · 미저장분의 기준이 사라졌으므로
+                //   이 결과로 합성하지 않고 삭제 뒤처리부터 한다 — 그러지 않으면 지운 데이터 기준의 편집이 새 세대로 저장된다.
+                Log.error("단일 Canvas — 조회 사이에 필사 데이터가 전부 지워졌다. 미저장분을 버리고 다시 읽는다",
+                          "기준 세대=\(base.raw)", "조회 세대=\(loaded.generation.raw)")
+                return clearAfterExternalDelete(state: &state)
+            }
+            state.storeGeneration = loaded.generation
+            // 도착한 필사의 「확인하기」 — 읽었고 지금 합성할 수 있으면 이 세션을 닫아, 이 세션의 초안까지 다른 세션의 초안으로 다시 판정한다(P0-3).
+            closeSessionForArrival(state: &state, requestID: requestID)
+            // 저장소 내용 위에 남은 초안을 겹친다 — 초안 전용 세션의 필기는 저장소에 없고 초안에만 있다(§12-6 구현 순서 ②).
+            state.loadedDrawings = recoverDrafts(state: &state, snapshots: loaded.snapshots, drafts: drafts, awaitingImport: awaitingImport)
+            state.loadFailure = nil
+            if state.isReloading, !state.isSettledForReload {
+                // 재조회 결과가 아직 저장 중인 편집 · 긋는 중인 획보다 앞선다. 정리되면 다시 읽는다 — 지금 합성하면 그 편집이 화면에서 빠진다.
+                state.reloadWhenSettled = true
+                return .none
+            }
+        case .failure(let failure):
+            state.loadFailure = failure
+            // 도착 반영의 다시 읽기였다면 지금 화면 · 초안을 그대로 두고 「다시 시도」 를 알린다(P0-3).
+            finishArrivalReload(state: &state, requestID: requestID, succeeded: false)
+            guard failure.source == .store, state.isReloading, state.loadedDrawings != nil, state.storeGeneration != nil else {
+                // 기준(내용과 세대)이 없다 — 첫 조회 실패 · 전부 지운 뒤 · 세션을 새로 연 뒤의 재조회 실패다. 빈 장으로 합성하면 기존 행 위에
+                // 새 행이 생기고, 세대 없이 연 입력의 필기는 저장되지 않는다. 또는 이 기기의 초안을 읽지 못했다 — 마지막으로 알던 내용으로도
+                // 열지 않는다(보이지 않는 초안 위에 새 초안이 덮이지 않게). 게이트를 닫아 두고 `retryLoad` 를 기다린다.
+                return .none
+            }
+            // 재조회 실패 — 입력을 영원히 잠그는 대신 마지막으로 알고 있는 내용으로 다시 합성한다 (성공한 저장은 이미 겹쳐져 있다).
+            Log.error("단일 Canvas 재조회 실패 — 마지막으로 알고 있는 내용으로 합성", failure.message)
+            recoverFromReloadFailure(state: &state)
+            return .none
+        }
+        composeIfReady(state: &state)
+        // 합성했다(다시 읽기가 끝났다) — 도착 반영의 다시 읽기였다면 마무리한다.
+        if !state.isReloading { finishArrivalReload(state: &state, requestID: requestID, succeeded: true) }
+        return .none
+    }
+
+    /// 재합성 대기 중 저장·재조회가 실패했을 때의 출구 — `DB 내용 ⊕ 미저장분` 으로 지금 합성해 입력을 다시 연다.
+    ///
+    /// 코덱이 편집을 계산하는 중이면 미룬다. 지금 합성하면 그 결과가 세대를 잃는다. 큐가 비는 `finishEdit` 이
+    /// 저장을 다시 시도하고, 그 실패가 여기로 돌아온다.
+    func recoverFromReloadFailure(state: inout State) {
+        guard state.editQueue.isEmpty, !state.isPreparingEdit else {
+            state.reloadWhenSettled = true
+            return
+        }
+        composeIfReady(state: &state)
+    }
+
+    private func applyLayout(state: inout State, layout: ChapterLayout) -> Effect<Action> {
+        guard layout != state.layout else { return .none }
+        state.layout = layout
+        return state.isComposed ? reloadAfterSettling(state: &state) : composeAndReturn(state: &state)
+    }
+
+    private func applyColumnOrigin(state: inout State, origin: CGPoint) -> Effect<Action> {
+        guard origin != state.columnOrigin else { return .none }
+        state.columnOrigin = origin
+        return state.isComposed ? reloadAfterSettling(state: &state) : composeAndReturn(state: &state)
+    }
+
+    /// 편집 중 보류해 둔 레이아웃 · `columnOrigin` · 복원 재합성을 pencil-up 뒤에 **한 번에** 적용한다.
+    private func applyDeferredChanges(state: inout State) -> Effect<Action> {
+        var changed = false
+        if let layout = state.pendingLayout {
+            state.pendingLayout = nil
+            if layout != state.layout {
+                state.layout = layout
+                changed = true
+            }
+        }
+        if let origin = state.pendingColumnOrigin {
+            state.pendingColumnOrigin = nil
+            if origin != state.columnOrigin {
+                state.columnOrigin = origin
+                changed = true
+            }
+        }
+        let reload = state.pendingReload
+        state.pendingReload = false
+        guard changed || reload else { return .none }
+        return state.isComposed ? reloadAfterSettling(state: &state) : composeAndReturn(state: &state)
+    }
+
+    private func composeAndReturn(state: inout State) -> Effect<Action> {
+        composeIfReady(state: &state)
+        return .none
+    }
+
+    /// §6-4 의 `composeIfReady`. 양쪽 입력이 모두 있고 §6-2 게이트를 통과할 때만 합성한다.
+    ///
+    /// 합성 입력은 `DB 내용 ⊕ 이 장의 미저장분` 이다. 저장이 실패한 채 장을 떠났다 돌아와도, 재합성 중 저장이 실패해도
+    /// 미저장 잉크가 화면에서 사라지지 않는다. 미저장 행이 대표 행이 되므로 `activeRowIDs` 도 그 행을 가리킨다.
+    private func composeIfReady(state: inout State) {
+        // 저장소 세대 없이 합성하지 않는다 — 합성이 입력을 열고, 그 입력의 필기는 세대가 있어야 저장된다.
+        guard let layout = state.layout,
+              let loaded = state.loadedDrawings,
+              state.storeGeneration != nil,
+              let expected = state.expectedVerseCount,
+              layout.satisfiesCompositionGate(expectedVerseCount: expected) else { return }
+
+        let unsaved = state.pendingMutations.values
+            .filter { $0.chapter == state.chapter }
+            .sorted { $0.revision < $1.revision }
+            .map(\.mutation)
+        let snapshots = overlay(loaded, with: unsaved)
+        let composed = codec.compose(snapshots, layout, state.columnOrigin)
+        // 지금까지의 문맥을 물려 둔다 — 캔버스 교체 직전에 보고된(이전 세대) 편집을 옛 기준으로 계산하기 위함.
+        if let retiring = state.currentSession {
+            state.retiredSession = retiring
+        }
+        state.renderedData = composed.data
+        state.renderedRevision += 1
+        state.renderedLayout = layout
+        state.renderedColumnOrigin = state.columnOrigin
+        state.ownership = composed.ownership
+        state.activeRowIDs = composed.activeRowIDs
+        state.layoutMismatchVerses = composed.layoutMismatchVerses
+        state.legacyVerses = composed.legacyVerses
+        state.undecodableVerses = composed.undecodableVerses
+        state.legacyInkBounds = composed.legacyInkBounds
+        state.baselineData = composed.data
+        state.isReloading = false
+        if !composed.undecodableVerses.isEmpty {
+            Log.error("단일 Canvas — 디코드할 수 없는 필사 행. 표시·활성 행에서 제외, 다음 편집은 새 행으로",
+                      "\(state.chapter.title.rawValue).\(state.chapter.chapter)",
+                      "verses=\(composed.undecodableVerses.sorted())")
+        }
+    }
+
+    /// 미저장분이 전부 저장된 뒤 DB 에서 다시 합성한다. 저장할 것이 없으면 즉시 다시 읽는다.
+    ///
+    /// - Note: `private` 이 아닌 이유는 지우기(`ChapterCanvasEraseFeature.swift`)가 같은 진입점을 쓰기 때문이다.
+    ///         `startSaveIfPossible` · `settleIfNeeded` 도 같다.
+    func reloadAfterSettling(state: inout State) -> Effect<Action> {
+        state.reloadWhenSettled = true
+        state.isReloading = true
+        // 지우기가 도는 중이면 재조회를 시작하지 않는다 — 보관 트랜잭션과 겹치면 지우기 이전 내용으로 합성될 수 있다.
+        // 예약(`reloadWhenSettled`)은 남으므로 `finishErase` 뒤에 수행된다.
+        if state.isSettledForReload, !state.isErasing {
+            return startReload(state: &state)
+        }
+        return startSaveIfPossible(state: &state, allowRetry: true)
+    }
+
+    func startReload(state: inout State) -> Effect<Action> {
+        state.reloadWhenSettled = false
+        state.isReloading = true
+        // `loadedDrawings` 는 비우지 않는다 — 재조회가 실패하면 그것이 마지막 근거다.
+        return requestLoad(state: &state)
+    }
+}
+
+// MARK: - 편집 (§8-1 · §8-2)
+
+extension ChapterCanvasFeature {
+    /// 큐의 첫 편집을 자기 세대의 문맥으로 코덱에 보낸다. 한 번에 하나만 — 다음 편집의 before 는 이 편집의 결과다.
+    ///
+    /// 재합성 대기 중(`isReloading`)에도 돈다. 재조회는 큐가 빌 때까지 시작하지 않으므로(`isFullyPersisted`)
+    /// 기준(`baselineData`)은 아직 유효하고, 여기서 막으면 큐와 재조회가 서로를 기다린다.
+    func drainEditQueue(state: inout State) -> Effect<Action> {
+        guard !state.isPreparingEdit else { return .none }
+        while let next = state.editQueue.first {
+            guard let session = state.session(for: next.snapshot.generation) else {
+                Log.error("단일 Canvas — 계산 기준이 사라진 편집을 버린다",
+                          "generation=\(next.snapshot.generation)", "revision=\(next.revision)")
+                state.editQueue.removeFirst()
+                continue
+            }
+            state.isPreparingEdit = true
+            let context = DrawingEditContext(
+                layout: session.layout, columnOrigin: session.columnOrigin, activeRowIDs: session.activeRowIDs
+            )
+            let before = session.baselineData
+            let ownership = session.ownership
+            let after = next.snapshot.drawingData
+            let revision = next.revision
+            return .run { [codec] send in
+                let result = codec.mutations(before, ownership, after, context)
+                await send(.mutationsPrepared(revision: revision, result))
+            }
+        }
+        return .none
+    }
+
+    private func finishEdit(state: inout State, revision: Int, result: DrawingEditResult) -> Effect<Action> {
+        state.isPreparingEdit = false
+        guard let index = state.editQueue.firstIndex(where: { $0.revision == revision }) else {
+            return drainEditQueue(state: &state)
+        }
+        let processed = state.editQueue.remove(at: index)
+        let generation = processed.snapshot.generation
+
+        // 결과를 자기 세대의 문맥에 반영한다 — §8-7 신규 행의 rowID 는 즉시 예약해 다음 편집이 같은 행으로 가게 한다.
+        let chapter: BibleChapter
+        if generation == state.renderedRevision {
+            state.baselineData = processed.snapshot.drawingData
+            state.ownership = result.ownership
+            for (verse, rowID) in result.issuedRowIDs {
+                state.activeRowIDs[verse] = rowID
+            }
+            chapter = state.chapter
+        } else if var retired = state.retiredSession, retired.generation == generation {
+            retired.baselineData = processed.snapshot.drawingData
+            retired.ownership = result.ownership
+            for (verse, rowID) in result.issuedRowIDs {
+                retired.activeRowIDs[verse] = rowID
+            }
+            state.retiredSession = retired
+            chapter = retired.chapter
+            if chapter == state.chapter {
+                // 같은 장의 이전 세대 편집 — 저장은 되지만 지금 화면(새 합성)에는 없다. 저장이 끝나면 다시 읽어 화면에 올린다.
+                state.reloadWhenSettled = true
+            }
+        } else if let index = state.closedDrafts.contexts.firstIndex(where: { $0.generation == generation }) {
+            // 닫은 세션의 세대 — 인계를 마친 뒤 늦게 왔다. 그 세션의 초안으로 남기고 저장소 · 새 세션에 섞지 않는다(§12-6 구현 순서 ②).
+            let late = finishLateEdit(
+                state: &state, contextIndex: index, drawingData: processed.snapshot.drawingData, revision: revision, result: result
+            )
+            return .merge(late, drainEditQueue(state: &state))
+        } else {
+            // 코덱이 도는 사이 세대가 두 번 바뀌었다. 결과를 어느 장에도 귀속시킬 수 없다.
+            Log.error("단일 Canvas — 결과의 세대가 사라져 편집을 버린다", "generation=\(generation)", "revision=\(revision)")
+            return drainEditQueue(state: &state)
+        }
+
+        // §8-3 — rowID 키 last-wins. 더 최신 revision 이 이미 있으면 덮지 않는다.
+        for mutation in result.mutations {
+            let key = mutation.rowID
+            // 이 세션이 이 절을 처음 편집한다 — 지금 보던 기준을 초안에 붙여 둔다(§12-6 구현 순서 ②).
+            let place = DraftVerse(chapter: chapter, verse: mutation.verse)
+            if state.drafts.bases[place] == nil {
+                state.drafts.bases[place] = state.drafts.loadedBases[place] ?? .empty
+            }
+            var merged = Self.targetingStore(mutation, draftOnlyRowIDs: state.drafts.draftOnlyRowIDs)
+            if let existing = state.pendingMutations[key] {
+                if existing.revision > revision { continue }
+                merged = Self.coalesce(existing: existing.mutation, incoming: merged)
+            }
+            state.pendingMutations[key] = PendingDrawingMutation(revision: revision, chapter: chapter, mutation: merged)
+        }
+
+        return .merge(
+            drainEditQueue(state: &state),
+            startSaveIfPossible(state: &state, allowRetry: true)
+        )
+    }
+}

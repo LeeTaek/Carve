@@ -25,15 +25,6 @@ extension View {
         
     }
     
-    /// 선택 여부에 따라 텍스트 색상/스타일을 변경하는 Picker 전용 텍스트 스타일 Modifier.
-    func pickerTextStyle(isSelected: Bool, selectionColor: Color = .teal) -> some View {
-        modifier(PickerStyle(isSelected: isSelected, selectionColor: selectionColor))
-    }
-    
-    /// 선택된 뷰에 애니메이션 효과.
-    func animationEffect(isSelected: Bool, id: String, in namespace: Namespace.ID) -> some View {
-        modifier(AnimationEffect(isSelected: isSelected, id: id, namespace: namespace))
-    }
 }
 
 /// ScrollView 내 콘텐츠의 Y offset 측정하고, 변경 시 콜백을 호출하는 ViewModifier.
@@ -74,20 +65,5 @@ struct HeaderBoundsKey: PreferenceKey {
     static var defaultValue: Anchor<CGRect>?
     static func reduce(value: inout Anchor<CGRect>?, nextValue: () -> Anchor<CGRect>?) {
         value = nextValue()
-    }
-}
-
-/// 선택 상태에 따라 matchedGeometryEffect를 적용하는 ViewModifier.
-struct AnimationEffect: ViewModifier {
-    var isSelected = true
-    var id: String
-    var namespace: Namespace.ID
-    
-    func body(content: Content) -> some View {
-        if isSelected {
-            content.matchedGeometryEffect(id: id, in: namespace)
-        } else {
-            content
-        }
     }
 }

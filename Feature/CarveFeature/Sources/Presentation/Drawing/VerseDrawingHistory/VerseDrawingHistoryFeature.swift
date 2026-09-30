@@ -1,5 +1,5 @@
 //
-//  SentenceDrewHistoryListFeature.swift
+//  VerseDrawingHistoryFeature.swift
 //  FeatureCarve
 //
 //  Created by 이택성 on 7/4/25.
@@ -7,7 +7,9 @@
 //
 
 import CarveToolkit
+import CoreGraphics
 import Domain
+import SwiftData
 
 import ComposableArchitecture
 
@@ -22,6 +24,12 @@ public struct VerseDrawingHistoryFeature {
         public var verse: Int
         /// 해당 절에 대한 필사 기록 목록
         public var drawings: [BibleDrawing] = []
+        /// 목록을 한 번이라도 받았는지. 조회 전 빈 목록을 "기록 없음" 으로 깜빡이지 않게 한다.
+        public var hasLoaded = false
+        /// 롱탭한 절 행의 창 좌표(시안 E2 — 팝오버를 그 절 아래에 붙인다). 없으면 화면 가운데에 띄운다.
+        public var anchorFrame: CGRect?
+        /// 회차 바꾸기를 동기화 저장소에 쓰지 못한 사유(정책 §12-6 결정 1). 있으면 바꾸지 않았다는 안내를 띄운다.
+        public var restoreBlock: SyncedWriteBlock?
 
         public static let initialState = State(title: .init(title: .genesis, chapter: 1),
                                                verse: 1)
@@ -33,6 +41,7 @@ public struct VerseDrawingHistoryFeature {
         }
     }
     @Dependency(\.drawingData) var drawingContext
+    @Dependency(\.drawingEditEnvironment) var drawingEditEnvironment
     
     public enum Action: ViewAction {
         case view(View)
@@ -40,6 +49,8 @@ public struct VerseDrawingHistoryFeature {
         case setDrawings([BibleDrawing])
         /// 선택 여부를 상위로 전달: 팝업 닫기 위한 목적, 선택한 drawing 전달
         case setPresentDrawing(BibleDrawing)
+        /// 고른 회차를 동기화 저장소에 써도 되는지 본 결과. 사유가 있으면 쓰지 않는다(정책 §12-6 결정 1).
+        case restoreChecked(PersistentIdentifier, SyncedWriteBlock?)
         
         public enum View {
             /// 성경 절에 대한 필사 기록을 가져옴
@@ -53,13 +64,42 @@ public struct VerseDrawingHistoryFeature {
         Reduce { state, action in
             switch action {
             case .view(.fetchDrawings):
+                state.restoreBlock = nil
                 return fetchDrawings(state: &state)
                 
             case .setDrawings(let drawings):
-                state.drawings = drawings
+                // **빈 행은 목록에서만 숨긴다** (설계 §8-7 · `historyRows()`). 목록 상태에 들어오는 길목이 여기 하나뿐이라
+                // 여기서 거르면 어떤 경로로 채워도 빈 행이 남지 않는다.
+                //
+                // UI-2 의 "지우기" 는 활성 행을 비우고 `updateDate` 를 `now` 로 찍는다. 거르지 않으면 지울 때마다
+                // 목록 **맨 위**에 내용 없는 행이 와서 "불러올 수 없는 필사 데이터입니다." 로 그려지고 진짜 보관본이
+                // 그 아래로 밀린다.
+                //
+                // ⚠️ 거르는 곳은 **목록뿐이다.** 저장소의 `fetchDrawings(chapter:verse:)` 는 그대로 둔다 —
+                // `updateDrawings(requests:)` 와 `updatePresentDrawing(chapter:verse:presentID:)` 이 같은 조회를 쓰고,
+                // 거기서 빈 활성 행이 빠지면 대표가 과거 회차로 승격돼 지운 획이 되살아난다. 회차를 고를 때도
+                // `updatePresentDrawing` 이 DB 의 **모든 행**을 다시 읽어 `isPresent` 를 옮기므로, 목록에서 뺀 빈 행의
+                // 표시도 정상적으로 내려간다.
+                state.drawings = drawings.historyRows()
+                state.hasLoaded = true
                 return .none
                 
             case .view(.selectDrawing(let drawing)):
+                // 회차 바꾸기는 동기화 저장소(`BibleDrawing.isPresent`)를 바꾼다 — 쓰기 직전에 소유를 확인한다.
+                // 모델을 `@Sendable` 클로저에 붙잡지 않도록 ID 만 넘긴다.
+                let presentID = drawing.persistentModelID
+                return .run { [drawingEditEnvironment] send in
+                    await send(.restoreChecked(presentID, SyncedWriteBlock.check(await drawingEditEnvironment.current())))
+                }
+
+            case let .restoreChecked(presentID, block):
+                if let block {
+                    Log.error("이전 필사 기록 — 동기화 저장소에 쓰지 않고 막았다", "\(block)")
+                    state.restoreBlock = block
+                    return .none
+                }
+                state.restoreBlock = nil
+                guard let drawing = state.drawings.first(where: { $0.persistentModelID == presentID }) else { return .none }
                 return handleSelectDrawing(state: &state, drawing: drawing)
                 
             default: return .none
@@ -70,6 +110,8 @@ public struct VerseDrawingHistoryFeature {
 
 extension VerseDrawingHistoryFeature {
     /// 현재 절에 대한 필사 기록들을 비동기로 조회하고, 결과를 setDrawings 액션으로 반영.
+    ///
+    /// 조회는 저장소가 주는 **모든 행** 그대로다. 빈 행을 거르는 것은 `setDrawings` 한 곳이다 (§8-7).
     private func fetchDrawings(state: inout State) -> Effect<Action> {
         let title = state.title
         let verse = state.verse
@@ -93,13 +135,17 @@ extension VerseDrawingHistoryFeature {
         let title = state.title
         let verse = state.verse
         let presentID = drawing.persistentModelID
-        return .run { send in
-            await drawingContext.updatePresentDrawing(
-                chapter: title,
-                verse: verse,
-                presentID: presentID
-            )
-            await send(.setPresentDrawing(drawing))
-        }
+        // 저장이 끝난 뒤 상위에 알리는 순서는 그대로 두되,
+        // @Sendable 클로저가 모델(drawing)을 붙잡지 않도록 전달은 .send 로 분리한다.
+        return .concatenate(
+            .run { _ in
+                await drawingContext.updatePresentDrawing(
+                    chapter: title,
+                    verse: verse,
+                    presentID: presentID
+                )
+            },
+            .send(.setPresentDrawing(drawing))
+        )
     }
 }

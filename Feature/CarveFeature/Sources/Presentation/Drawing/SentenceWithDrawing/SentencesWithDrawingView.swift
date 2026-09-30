@@ -10,34 +10,82 @@ import SwiftUI
 import CarveToolkit
 
 import ComposableArchitecture
+import UIComponents
 
 @ViewAction(for: SentencesWithDrawingFeature.self)
-public struct SentencesWithDrawingView: View {
+public struct SentencesWithDrawingView: View, Equatable {
+    /// 부모 재평가 시 body 생략 판정 (`.equatable()`). 클로저는 비교할 수 없으므로 제외하고,
+    /// 자식 store 는 TCA 가 id 별로 캐시하는 같은 인스턴스이므로 참조 동일성으로 비교한다.
+    /// 행 자신의 상태 변화는 store 관찰로 따로 갱신되므로 이 비교와 무관하다.
+    public static func == (lhs: SentencesWithDrawingView, rhs: SentencesWithDrawingView) -> Bool {
+        lhs.store === rhs.store
+            && lhs.halfWidth == rhs.halfWidth
+            && lhs.isLayoutReady == rhs.isLayoutReady
+            && lhs.isCanvasActive == rhs.isCanvasActive
+            && lhs.isFavorite == rhs.isFavorite
+    }
+
     @Bindable public var store: StoreOf<SentencesWithDrawingFeature>
     @Binding private var halfWidth: CGFloat
-    
+    /// 설계 §6-2 입력 게이트. 장 레이아웃이 완성되기 전에는 캔버스 입력을 막는다 (Phase 2).
+    private let isLayoutReady: Bool
+    /// `PKCanvasView` 를 실제로 만들지 여부 (Phase 2 — 캔버스 지연 생성).
+    ///
+    /// 텍스트·밑줄·frame 실측은 이 값과 무관하게 항상 일어나므로 장 레이아웃은 전 절에 대해 완성된다.
+    /// false 인 동안은 같은 크기의 빈 자리만 차지한다 — 행 높이는 텍스트가 정하므로 배치가 바뀌지 않는다.
+    private let isCanvasActive: Bool
+    /// 즐겨찾기한 절인가 — 절 번호 아래 별 표시(시안 N2). 상위(`CarveDetailFeature.favoriteVerses`)가 준다.
+    private let isFavorite: Bool
+
+    /// 1절의 상단 여백. 캔버스 **안**의 여백이라 레이아웃에서는 `VerseLayoutInput.topPadding` 이 된다.
     private var topDrawingInset: CGFloat {
-        store.sentence.verse == 1 ? 25 : 0
+        ChapterLayoutHosting.topPadding(forVerse: store.sentence.verse)
+    }
+    /// 종이 여백(시안 M1 · M2). 행 폭(= 컬럼 폭)으로 가로 · 세로를 가른다.
+    private var margins: ChapterLayoutHosting.PageMargins {
+        ChapterLayoutHosting.pageMargins(contentWidth: halfWidth * 2)
     }
     let onUnderlineLayoutChange: (VerseRowFeature.State.ID, Text.LayoutKey.Value) -> Void
+    /// 소제목 높이 실측 → 상위(`CarveDetailFeature`)로 전달. 레이아웃의 `leadingInset` 이 된다.
+    let onTitleHeightChange: (VerseRowFeature.State.ID, CGFloat) -> Void
+    /// 캔버스 영역의 실측 frame(**행 안** `ChapterLayoutHosting.rowCoordinateSpaceName` 좌표) → 상위로 전달. 레이아웃 검증용.
+    /// 행 자체의 frame 은 상위가 바깥 트리에서 재어 더한다 (중첩 호스팅 때문 — `rowCoordinateSpaceName` 참조).
+    let onCanvasFrameInRowChange: (VerseRowFeature.State.ID, CGRect) -> Void
 
     
     public init(
         store: StoreOf<SentencesWithDrawingFeature>,
         halfWidth: Binding<CGFloat>,
-        onUnderlineLayoutChange: @escaping (VerseRowFeature.State.ID, Text.LayoutKey.Value) -> Void
+        isLayoutReady: Bool = true,
+        isCanvasActive: Bool = true,
+        isFavorite: Bool = false,
+        onUnderlineLayoutChange: @escaping (VerseRowFeature.State.ID, Text.LayoutKey.Value) -> Void,
+        onTitleHeightChange: @escaping (VerseRowFeature.State.ID, CGFloat) -> Void = { _, _ in },
+        onCanvasFrameInRowChange: @escaping (VerseRowFeature.State.ID, CGRect) -> Void = { _, _ in }
     ) {
         self.store = store
         self._halfWidth = halfWidth
+        self.isLayoutReady = isLayoutReady
+        self.isCanvasActive = isCanvasActive
+        self.isFavorite = isFavorite
         self.onUnderlineLayoutChange = onUnderlineLayoutChange
+        self.onTitleHeightChange = onTitleHeightChange
+        self.onCanvasFrameInRowChange = onCanvasFrameInRowChange
     }
     
     public var body: some View {
-        VStack {
+        // 간격은 전부 `ChapterLayoutHosting` 상수로 명시한다 — `ChapterLayoutBuilder` 가 같은 값으로 좌표를 예측한다.
+        VStack(spacing: ChapterLayoutHosting.titleSpacing) {
             if store.sentenceState.chapterTitle != nil {
                 chapterTitleView
+                    .onGeometryChange(for: CGFloat.self) { proxy in
+                        proxy.size.height
+                    } action: { height in
+                        onTitleHeightChange(store.id, height)
+                    }
             }
-            HStack(alignment: .top) {
+            // 원문 반쪽 | 필기 반쪽이 컬럼 폭을 정확히 나눈다. 필기 반쪽 폭이 곧 `writingWidth` 다.
+            HStack(alignment: .top, spacing: 0) {
                 if store.isLeftHanded {
                     // 왼손잡이
                     canvasView
@@ -49,8 +97,10 @@ public struct SentencesWithDrawingView: View {
                 }
             }
             .animation(.easeInOut(duration: 0.3), value: store.isLeftHanded)
-            .padding(.vertical, 2)
+            .padding(.vertical, ChapterLayoutHosting.rowVerticalPadding)
         }
+        // 행 안 실측의 기준 공간. 아래 touchIgnoringContextMenu 의 중첩 호스팅 안쪽이라 바깥 공간은 보이지 않는다.
+        .coordinateSpace(name: ChapterLayoutHosting.rowCoordinateSpaceName)
         .touchIgnoringContextMenu(ignoringType: .pencil) {
             UIMenu(children: [
                 UIAction(title: "이전 필사 내용 보기") {_ in send(.presentDrewHistory(true)) }
@@ -68,44 +118,65 @@ public struct SentencesWithDrawingView: View {
         VerseTextView(
             store: self.store.scope(state: \.sentenceState,
                                     action: \.scope.sentenceAction),
+            isFavorite: isFavorite,
             onLayoutChange: { layout in
                 onUnderlineLayoutChange(store.id, layout)
             }
         )
-        .frame(width: halfWidth * 0.95, alignment: .leading)
+        // 바깥쪽은 종이 여백, 필기 열 쪽은 가운데 여백. 절 번호 칸은 `VerseTextView` 안에 있다.
+        .padding(.leading, store.isLeftHanded ? margins.gutter : margins.outer)
+        .padding(.trailing, store.isLeftHanded ? margins.outer : margins.gutter)
+        .frame(width: halfWidth, alignment: .leading)
         .padding(.top, topDrawingInset)
     }
     
     private var canvasView: some View {
         ZStack {
             underLineView
-            CanvasView(
-                store: self.store.scope(state: \.canvasState,
-                                        action: \.scope.canvasAction)
-            )
+            if isCanvasActive {
+                CanvasView(
+                    store: self.store.scope(state: \.canvasState,
+                                            action: \.scope.canvasAction),
+                    isInputEnabled: isLayoutReady
+                )
+            } else {
+                Color.clear
+            }
         }
         .frame(width: halfWidth, alignment: .topTrailing)
+        .onGeometryChange(for: CGRect.self) { proxy in
+            proxy.frame(in: .named(ChapterLayoutHosting.rowCoordinateSpaceName))
+        } action: { frame in
+            onCanvasFrameInRowChange(store.id, frame)
+        }
     }
     
     private var chapterTitleView: some View {
         Text(store.sentenceState.chapterTitle ?? "")
             .font(.system(size: 22))
             .fontWeight(.heavy)
+            .foregroundStyle(CarveColor.Paper.text)
     }
     
+    /// 필기 가이드 — 본문 줄마다 한 줄(시안 M1 · M2 실선 `Paper.guide`).
+    ///
+    /// 가이드는 **장식**이다. 캔버스(필기 가능 영역 · 저장 좌표 기준)는 반쪽 전체이고, 가이드만 시안의 필기 열
+    /// (가운데 여백 ~ 바깥 여백)에 그린다. 그래서 여백을 바꿔도 기존 필기의 크기 · 위치는 변하지 않는다.
     private var underLineView: some View {
         let underlineOffsets = store.sentenceState.underlineOffsets
-        
+
         return Canvas { context, size in
             for y in underlineOffsets {
                 var path = Path()
                 path.move(to: CGPoint(x: 0, y: y + topDrawingInset))
                 path.addLine(to: CGPoint(x: size.width, y: y + topDrawingInset))
-                context.stroke(path, with: .color(.gray), style: StrokeStyle(lineWidth: 1, dash: [5]))
+                context.stroke(path, with: .color(CarveColor.Paper.guide), lineWidth: 1)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .padding(.horizontal, 20)
+        .padding(.leading, store.isLeftHanded ? margins.outer : margins.gutter)
+        .padding(.trailing, store.isLeftHanded ? margins.gutter : margins.outer)
+        .accessibilityHidden(true)
     }
     
 }
@@ -117,11 +188,15 @@ public struct SentencesWithDrawingView: View {
         }
     @Previewable @State var halfWidth = UIScreen().bounds.width / 2
     
-    SentencesWithDrawingView(store: store, halfWidth: $halfWidth) { _, layout in
-        let offsets =  VerseTextFeature.makeUnderlineOffsets(
-            from: layout,
-            sentenceSetting: store.sentenceState.sentenceSetting
-        )
-        store.send(.scope(.sentenceAction(.setUnderlineOffsets(offsets))))
-    }
+    SentencesWithDrawingView(
+        store: store,
+        halfWidth: $halfWidth,
+        onUnderlineLayoutChange: { _, layout in
+            let offsets =  VerseTextFeature.makeUnderlineOffsets(
+                from: layout,
+                sentenceSetting: store.sentenceState.sentenceSetting
+            )
+            store.send(.scope(.sentenceAction(.setUnderlineOffsets(offsets))))
+        }
+    )
 }

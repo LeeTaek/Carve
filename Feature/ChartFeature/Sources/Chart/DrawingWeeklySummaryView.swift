@@ -8,7 +8,6 @@
 
 import SwiftUI
 import UIComponents
-import CarveToolkit
 
 import ComposableArchitecture
 
@@ -21,33 +20,35 @@ public struct DrawingWeeklySummaryView: View {
     }
 
     public var body: some View {
-        LazyVGrid(
-            columns: tileColumns,
-            alignment: .leading,
-            spacing: 16
-        ) {
-            TileCard(title: "최근 필사 내역") {
-                latestDrawingHistoryTile
-            }
-
-            TileCard(title: "표시 중인 주 평균") {
-                weeklyAverageTile
-            }
-
-            TileCard(title: "표시 중인 주 최고 장") {
-                topChapterTile
-            }
-
-            if !store.adSlotState.isLoading {
-                TileCard(title: "스폰서") {
-                    sponsorAdTile
+        VStack(alignment: .leading, spacing: 16) {
+            LazyVGrid(
+                columns: tileColumns,
+                alignment: .leading,
+                spacing: 16
+            ) {
+                TileCard(title: "한 주 동안") {
+                    latestDrawingHistoryTile
                 }
-                .transition(.opacity)
+
+                TileCard(title: "하루 평균") {
+                    weeklyAverageTile
+                }
+
+                TileCard(title: "가장 많이 쓴 장") {
+                    topChapterTile
+                }
+            }
+
+            // 광고가 실제로 온 뒤에만 둔다. 로드 중 · 실패에는 빈 자리를 남기지 않는다(시안 K4).
+            // 16:9 미디어를 120pt 로 그리기에 타일 한 칸은 좁아 한 줄 전체 폭 가로형 카드로 둔다.
+            if store.adSlotState.hasAd {
+                sponsorAdCard
+                    .transition(.opacity)
             }
         }
         .animation(
             .spring(response: 0.35, dampingFraction: 0.9),
-            value: !store.adSlotState.isLoading
+            value: store.adSlotState.hasAd
         )
         .onAppear {
             send(.onAppear)
@@ -57,7 +58,7 @@ public struct DrawingWeeklySummaryView: View {
     private var tileColumns: [GridItem] {
         [
             GridItem(
-                .adaptive(minimum: 220, maximum: 420),
+                .adaptive(minimum: 240, maximum: 420),
                 spacing: 12,
                 alignment: .topLeading
             )
@@ -66,27 +67,17 @@ public struct DrawingWeeklySummaryView: View {
 
     private var latestDrawingHistoryTile: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("한 주 동안")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
             Text("\(store.weekTotalCount)절")
-                .font(.title3)
-                .foregroundStyle(Color.Brand.ink)
+                .font(.title2)
+                .foregroundStyle(CarveColor.ink)
                 .monospacedDigit()
 
             Text("최근")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(CarveTypography.caption)
+                .foregroundStyle(CarveColor.secondary)
                 .padding(.top, 6)
 
             recentVersesList
-
-            Spacer(minLength: 0)
-
-            Text("필사하셨어요")
-                .font(.caption)
-                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
@@ -101,8 +92,9 @@ public struct DrawingWeeklySummaryView: View {
                     } label: {
                         Text("• \(item.message)")
                     }
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(CarveTypography.label)
+                    .foregroundStyle(CarveColor.ink)
+                    .buttonStyle(.plain)
                     .lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -113,26 +105,17 @@ public struct DrawingWeeklySummaryView: View {
 
     private var weeklyAverageTile: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("평균")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            Text("\(store.weekAverageCount)절/일")
-                .font(.title3)
-                .foregroundStyle(Color.Brand.ink)
+            Text("\(store.weekAverageText)절")
+                .font(.title2)
+                .foregroundStyle(CarveColor.ink)
                 .monospacedDigit()
 
-            Text("최근")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            Text("최근 장")
+                .font(CarveTypography.caption)
+                .foregroundStyle(CarveColor.secondary)
                 .padding(.top, 6)
 
             recentChaptersList
-            Spacer(minLength: 0)
-
-            Text("필사하셨어요")
-                .font(.caption)
-                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
@@ -150,8 +133,9 @@ public struct DrawingWeeklySummaryView: View {
                     } label: {
                         Text("• \(item.title.koreanTitle()) \(item.chapter)장")
                     }
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(CarveTypography.label)
+                    .foregroundStyle(CarveColor.ink)
+                    .buttonStyle(.plain)
                     .lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -162,10 +146,6 @@ public struct DrawingWeeklySummaryView: View {
 
     private var topChapterTile: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("이번 주")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
             if let topChapter = store.topChapter {
                 Button {
                     send(.topChapterTapped)
@@ -173,11 +153,11 @@ public struct DrawingWeeklySummaryView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("\(topChapter.chapter.title.koreanTitle()) \(topChapter.chapter.chapter)장")
                             .font(.title3)
-                            .foregroundStyle(Color.Brand.ink)
+                            .foregroundStyle(CarveColor.ink)
                             .lineLimit(2)
                         Text("\(topChapter.count)절")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .font(CarveTypography.label)
+                            .foregroundStyle(CarveColor.secondary)
                             .monospacedDigit()
                     }
                 }
@@ -185,25 +165,37 @@ public struct DrawingWeeklySummaryView: View {
             } else {
                 Text("기록 없음")
                     .font(.title3)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(CarveColor.secondary)
             }
 
             Spacer(minLength: 0)
 
-            Text("(절 수 기준)")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            if store.topChapter != nil {
+                Button("이어서 쓰기") {
+                    send(.topChapterTapped)
+                }
+                .font(CarveTypography.label)
+                .foregroundStyle(CarveColor.accent)
+                .buttonStyle(.plain)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
-    private var sponsorAdTile: some View {
+    /// 차트 스폰서 카드. 미디어가 120pt 아래로 눌리지 않도록 높이를 고정하고, 바탕은 타일과 같은 표면을 쓴다.
+    private var sponsorAdCard: some View {
         AdSlotView(
             store: store.scope(
                 state: \.adSlotState,
                 action: \.adSlot
             )
         )
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity)
+        .frame(height: NativeAdMetrics.chartHeight)
+        .carveSurface(
+            .panel,
+            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 }

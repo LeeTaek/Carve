@@ -51,7 +51,10 @@ public struct DrawingChartFeature {
         }
     }
     
-    @Dependency(\.drawingData) var drawingData
+    /// 기간별 · 최근 필사 활동을 읽는다.
+    @Dependency(\.drawingActivityRepository) var drawingActivityRepository
+    /// 조회 범위의 기준이 되는 오늘을 읽는다.
+    @Dependency(\.date) var date
     
     public enum Action: ViewAction, BindableAction {
         case binding(BindingAction<State>)
@@ -61,11 +64,22 @@ public struct DrawingChartFeature {
         case endAppending
         case dailyRecordChart(DailyRecordChartFeature.Action)
         case drawingWeeklySummary(DrawingWeeklySummaryFeature.Action)
+        case delegate(Delegate)
         
         public enum View {
+            /// 빈 상태에서 필사 화면으로 돌아가려 할 때 발생한다.
+            case backToWriting
+            /// 차트 진입 시 데이터를 불러오기 위해 발생한다.
             case fetchData
+            /// 과거 데이터가 더 필요할 때 발생한다.
             case loadMoreBefore(Date)
+            /// 차트의 날짜 막대를 선택했을 때 발생한다.
             case tapSymbol(Date)
+        }
+
+        public enum Delegate {
+            /// 차트를 닫고 필사 화면으로 돌아가도록 부모에 알린다.
+            case backToWriting
         }
     }
     
@@ -83,6 +97,9 @@ public struct DrawingChartFeature {
             
             Reduce { state, action in
                 switch action {
+                case .view(.backToWriting):
+                    return .send(.delegate(.backToWriting))
+
                 case .view(.fetchData):
                     return handleFetchData()
                     
@@ -142,20 +159,21 @@ extension DrawingChartFeature {
         return .none
     }
     
+    /// 오늘(`date.now`)부터 30일치 기록과 최근 필사 항목을 불러온다.
     private func handleFetchData() -> Effect<Action> {
         let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
+        let today = calendar.startOfDay(for: date.now)
         let start = calendar.date(byAdding: .day, value: -29, to: today)!
         let end = calendar.date(byAdding: .day, value: 1, to: today)!
         let range = DateInterval(start: start, end: end)
         let days = (0..<30).compactMap { offset in
             calendar.date(byAdding: .day, value: offset, to: start)
         }
-        let drawingData = self.drawingData
+        let drawingActivityRepository = self.drawingActivityRepository
         
         return .run { send in
-            let drawings = try await drawingData.fetchDrawings(in: range)
-            let groupedByDay: [Date: [BibleDrawing]] = Dictionary(grouping: drawings) { drawing in
+            let drawings = try await drawingActivityRepository.activities(in: range)
+            let groupedByDay: [Date: [DrawingActivity]] = Dictionary(grouping: drawings) { drawing in
                 calendar.startOfDay(for: drawing.updateDate ?? today)
             }
             let dailyRecords: [DailyRecord] = days
@@ -184,7 +202,7 @@ extension DrawingChartFeature {
             
             await send(.setFetchedDailyData(dailyRecords: dailyRecords, chapterCountsByDay: chapterCountsByDay))
             
-            let recentDrawings = try await drawingData.fetchRecentDrawings(limit: 5)
+            let recentDrawings = try await drawingActivityRepository.recentActivities(limit: 5)
             let sorted = recentDrawings.sorted { ($0.updateDate ?? .distantPast) > ($1.updateDate ?? .distantPast) }
             
             let recentVerses: [RecentVerseItem] = sorted.compactMap { drawing in
@@ -274,16 +292,16 @@ extension DrawingChartFeature {
             return .send(.endAppending)
         }
         
-        let drawingData = self.drawingData
+        let drawingActivityRepository = self.drawingActivityRepository
         let existingRecords = state.dailyRecordChart.records
         let existingChapterCountsByDay = state.chapterCountsByDay
         
         return .run { send in
             let weekEnd = cal.date(byAdding: .day, value: 7, to: previousWeekStart)!
             let range = DateInterval(start: previousWeekStart, end: weekEnd)
-            let drawings = try await drawingData.fetchDrawings(in: range)
+            let drawings = try await drawingActivityRepository.activities(in: range)
             
-            let groupedByDay: [Date: [BibleDrawing]] = Dictionary(grouping: drawings) { drawing in
+            let groupedByDay: [Date: [DrawingActivity]] = Dictionary(grouping: drawings) { drawing in
                 cal.startOfDay(for: drawing.updateDate ?? previousWeekStart)
             }
             

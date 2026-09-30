@@ -6,9 +6,11 @@
 //  Copyright © 2024 leetaek. All rights reserved.
 //
 
+import Domain
 import SwiftUI
 
 import ComposableArchitecture
+import UIComponents
 
 @ViewAction(for: CloudSettingsFeature.self)
 public struct CloudSettingView: View {
@@ -18,30 +20,169 @@ public struct CloudSettingView: View {
         self.store = store
     }
     
-    public var body: some View {
-        ZStack {
-            List {
-                Section(
-                    header: Text("iCloud"),
-                    footer: Text("필사한 정보를 개인 계정 iCloud를 통해 백업할지 결정합니다. 사용하지 않는 경우 앱 삭제와 함께 필사 내용이 삭제됩니다.\n끄기 옵션은 추후에 업데이트를 통해 제공되며, 설정앱의 iCloud 항목에서 제거할 수 있습니다.")
-                ) {
-                    Toggle(isOn: $store.iCloudIsOn.sending(\.setiCloud)) {
-                        Text("iCloud를 저장공간으로 사용")
-                    }
-                    .disabled(true)
+    /// 계정 상태 한 줄에 쓸 문구. 아직 확인 중이면 본문이 없다.
+    private struct AccountStatusCopy {
+        let title: String
+        let detail: String
+        /// 확인 중에는 흐리게 — 아직 결론이 아니라는 뜻이다.
+        var isPending: Bool { detail.isEmpty }
+    }
+
+    private var accountStatusCopy: AccountStatusCopy {
+        switch store.availability {
+        case .checking:
+            AccountStatusCopy(title: "iCloud 상태를 확인하는 중이에요", detail: "")
+        case .available where store.connectionHold != nil:
+            // 로그인과 연결을 섞지 않는다 — 이번 실행은 보류라 아직 주고받지 않는다(아래 보류 안내가 까닭과 할 일을 말한다).
+            AccountStatusCopy(title: "iCloud에 로그인돼 있어요", detail: "아직 이 기기의 필사는 iCloud와 연결되지 않았어요.")
+        case .available:
+            AccountStatusCopy(title: "iCloud에 연결돼 있어요", detail: "필사가 같은 계정의 다른 기기로 전해져요.")
+        case .noAccount:
+            AccountStatusCopy(title: "iCloud에 로그인돼 있지 않아요", detail: "지금은 이 기기에만 저장돼요.")
+        case .restricted:
+            AccountStatusCopy(title: "iCloud 사용이 제한돼 있어요", detail: "기기 설정에서 허용해야 동기화할 수 있어요.")
+        case .unknown:
+            // 확인 실패와 "계정 없음" 을 같은 문구로 쓰지 않는다.
+            AccountStatusCopy(title: "iCloud 상태를 확인하지 못했어요", detail: "계정이 없다는 뜻은 아니에요. 잠시 뒤 다시 열어 보세요.")
+        }
+    }
+
+    /// 지금 확인된 계정 상태 한 줄. **확인 전에는 연결됐다고 쓰지 않는다.**
+    @ViewBuilder
+    private var accountStatusRow: some View {
+        let copy = accountStatusCopy
+        VStack(alignment: .leading, spacing: CarveSpacing.xSmall) {
+            Text(copy.title)
+                .font(CarveTypography.body)
+                .foregroundStyle(copy.isPending ? CarveColor.secondary : CarveColor.ink)
+            if !copy.detail.isEmpty {
+                Text(copy.detail)
+                    .font(CarveTypography.caption)
+                    .foregroundStyle(CarveColor.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// 이번 실행의 동기화 활동 한 줄. **이번 실행**에 한정된 기록임을 문구에 드러낸다.
+    @ViewBuilder
+    private var syncActivityRow: some View {
+        VStack(alignment: .leading, spacing: CarveSpacing.xSmall) {
+            switch store.activity.summary {
+            case .noRecord:
+                activityLine("이번 실행에서는 아직 주고받은 기록이 없어요", emphasized: false)
+            case .running:
+                activityLine("동기화하는 중이에요", emphasized: false)
+            case .failed(let failures):
+                // 해결되지 않은 실패를 모두 보인다 — 하나만 보이면 나머지가 해결된 것처럼 읽힌다.
+                ForEach(failures, id: \.self) { failure in
+                    activityLine(failureText(failure), emphasized: true)
                 }
-                
-                Button {
-                    send(.databaseIsEmpty)
-                }label: {
-                    Text("모든 필사 데이터 삭제")
-                        .foregroundStyle(.red)
-                        .frame(maxWidth: .infinity, alignment: .center)
+            case .succeeded(let lastImport, let lastExport):
+                if let lastImport {
+                    activityLine("마지막으로 받음 · \(lastImport.formatted(.relative(presentation: .named)))", emphasized: false)
                 }
-                .popover(item: $store.scope(state: \.path?.popup, action: \.path.popup)) { store in
-                    PopupView(store: store)
+                if let lastExport {
+                    activityLine("마지막으로 올림 · \(lastExport.formatted(.relative(presentation: .named)))", emphasized: false)
                 }
             }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// 연결 보류 한 줄 — 지금은 이 기기에만 저장된다는 것 · 까닭 · 앱을 다시 열어야 한다는 것.
+    /// 실행 중에 다시 연결하지 않으므로 「다시 시도」 · 로딩 표시를 두지 않는다(2026-09-28 결정).
+    private func holdRow(_ hold: LegacySeparationHold) -> some View {
+        let copy = CloudSettingsFeature.holdCopy(
+            hold, availability: store.availability, connectsOnRelaunch: store.connectsOnRelaunch
+        )
+        return VStack(alignment: .leading, spacing: CarveSpacing.xSmall) {
+            Text(copy.title)
+                .font(CarveTypography.body)
+                .foregroundStyle(CarveColor.ink)
+                .accessibilityIdentifier("cloudSettings.connectionHeld")
+            Text(copy.detail)
+                .font(CarveTypography.caption)
+                .foregroundStyle(store.connectsOnRelaunch ? CarveColor.ink : CarveColor.secondary)
+                .accessibilityIdentifier("cloudSettings.connectionHeldDetail")
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func activityLine(_ text: String, emphasized: Bool) -> some View {
+        Text(text)
+            .font(CarveTypography.caption)
+            .foregroundStyle(emphasized ? CarveColor.ink : CarveColor.secondary)
+    }
+
+    /// 받지 못한 것과 올리지 못한 것은 사용자에게 뜻이 다르다.
+    private func failureText(_ failure: CloudSyncFailure) -> String {
+        switch failure {
+        case .accountUnavailable: "iCloud 계정을 확인해 주세요"
+        case .accountCheckFailed: "iCloud 계정 상태를 확인하지 못했어요"
+        case .importFailed: "iCloud에서 필사를 받아오지 못했어요"
+        case .exportFailed: "필사를 iCloud에 올리지 못했어요 · 이 기기에는 저장돼 있어요"
+        case .setupFailed: "iCloud 동기화를 준비하지 못했어요"
+        case .unknown: "동기화 중 문제가 생겼어요"
+        }
+    }
+
+    public var body: some View {
+        ZStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: CarveSpacing.large) {
+                    Text("iCloud")
+                        .font(CarveTypography.sectionTitle)
+                        .foregroundStyle(CarveColor.secondary)
+
+                    // 조작할 수 없는 토글을 켜 둔 채로 보여 주지 않는다. 지금 확인된 계정 상태를 그대로 적는다.
+                    accountStatusRow
+
+                    // C14 연결 보류 — 계정이 있어도 이 실행은 이 기기에만 저장한다(정책 §12-6 C14 ③). 까닭과 재실행 안내를 적는다.
+                    if let hold = store.connectionHold {
+                        holdRow(hold)
+                    } else if store.availability.canSync {
+                        // 계정을 쓸 수 있을 때만 — 계정이 없으면 주고받을 수 없으므로 활동을 말할 것이 없다.
+                        syncActivityRow
+                    }
+
+                    CarveDivider()
+
+                    VStack(alignment: .leading, spacing: CarveSpacing.xSmall) {
+                        Text("필사한 내용을 iCloud로 기기 사이에 동기화해요.")
+                            .foregroundStyle(CarveColor.ink)
+                        // 동기화를 백업이라고 부르지 않는다 — 지운 것도 함께 전해진다.
+                        Text("백업과는 달라요. 한 기기에서 지우면 다른 기기에서도 사라져요.")
+                        Text("iCloud 사용 여부는 기기의 설정 앱에서 바꿀 수 있어요.")
+                    }
+                    .font(CarveTypography.body)
+                    .foregroundStyle(CarveColor.secondary)
+
+                    CarveDivider()
+
+                    VStack(alignment: .leading, spacing: CarveSpacing.small) {
+                        Text("위험한 동작")
+                            .font(CarveTypography.sectionTitle)
+                            .foregroundStyle(CarveColor.secondary)
+
+                        Button {
+                            send(.databaseIsEmpty)
+                        } label: {
+                            Text("모든 필사 데이터 삭제")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.carve(.destructive, fillsWidth: true))
+
+                        Text("모든 장의 필사 기록이 사라져요. 되돌릴 수 없어요.")
+                            .font(CarveTypography.caption)
+                            .foregroundStyle(CarveColor.secondary)
+                    }
+                }
+                .padding(CarveSpacing.large)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background(CarveColor.surface)
             
             if store.isLoading {
                 Color.black.opacity(0.2)
@@ -56,8 +197,12 @@ public struct CloudSettingView: View {
                     )
             }
         }
-        .disabled(store.isLoading) // 로딩 중에는 조작 막기
-        .navigationTitle("iCloud 설정")
+        .disabled(store.isLoading)
+        .onAppear { send(.onAppear) }
+        .onDisappear { send(.onDisappear) }
+        // 시안 F2 는 확인 대화상자를 화면 가운데에 띄우고 뒤를 가린다. 팝오버는 버튼에 붙어 한쪽으로 뜨므로
+        // 전체를 덮는 표현으로 바꾼다 — 바탕은 `PopupView` 가 직접 그린다.
+        .settingsPopup($store.scope(state: \.path?.popup, action: \.path.popup))
     }
     
         

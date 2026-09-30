@@ -26,13 +26,22 @@ public struct SentenceSetting: Sendable, Codable, Equatable, Hashable {
     /// 한 화면(혹은 한 절)을 구성할 때 사용할 줄 수(line count).
     public var lineCount: Int
     
+    /// 본문 설정을 저장하는 `UserDefaults` 키.
+    ///
+    /// 화면들이 `@Shared(.appStorage(...))` 로 읽고 쓰고, 실행 때 iCloud 백업을 되살리는 `SentenceSettingCloudBackup` 도 같은 키에 쓴다.
+    public static let appStorageKey = "sentenceSetting"
+
+    /// 처음 실행한 사용자의 본문 설정이자 「본문 모양 초기화」 값.
+    ///
+    /// `@Shared(.appStorage("sentenceSetting"))`(`CodableAppStorageKey`)가 첫 로드 때 이 값을 저장하므로,
+    /// 값을 바꿔도 이미 앱을 실행한 사용자의 설정은 바뀌지 않는다.
     public static let initialState = SentenceSetting(
         lineSpace: 30,
         fontSize: 20,
         traking: 1,
         baseLineHeight: 20,
         textHeight: .zero,
-        fontFamily: .gothic,
+        fontFamily: .myeongjo,
         lineCount: 3
     )
     
@@ -55,13 +64,29 @@ public struct SentenceSetting: Sendable, Codable, Equatable, Hashable {
     }
 }
 
+public extension SentenceSetting {
+    /// 줄 거리(pitch) — 한 줄의 글꼴 높이 + 줄 간격. 본문 줄 · 필기 가이드 · 줄 띠(band)가 모두 이 값으로 떨어진다.
+    ///
+    /// 2.0 에서 `lineSpace` 의 뜻을 "줄 거리" 에서 "줄 사이 빈 공간" 으로 바꿨다(디자인 문서 3-2 · 시안 M1 · M2 · 큰 글꼴).
+    /// 저장값은 그대로이고, 저장된 필기는 저장 당시 밑줄을 기준으로 새 밑줄에 재배치된다(단일 Canvas 설계 §9-2).
+    var linePitch: CGFloat {
+        fontFamily.font(size: fontSize).lineHeight + max(0, lineSpace)
+    }
+
+    /// 본문 블록의 위아래 여백 — 줄 간격의 절반. 첫 줄 위와 마지막 줄 아래에도 줄 사이와 같은 간격이 생긴다.
+    var textVerticalPadding: CGFloat {
+        max(0, lineSpace) / 2
+    }
+}
+
 /// 문장 설정에서 사용할 수 있는 폰트.
 /// 실제 폰트 리소스(ResourcesFontFamily)를 매핑하여 UIKit 폰트로 변환.
 public enum FontCase: String, CaseIterable, Sendable, Codable {
-    /// 나눔고딕.
-    case gothic = "NanumGothic"
+    // 선언 순서가 `allCases` 순서라 본문 설정의 글꼴 선택지도 이 순서로 보인다. 저장값은 rawValue 라 순서와 무관하다.
     /// 나눔명조.
     case myeongjo = "NanumMyeongjo"
+    /// 나눔고딕.
+    case gothic = "NanumGothic"
     /// 나눔꽃내음.
     case flower = "NanumFlowerScent"
         

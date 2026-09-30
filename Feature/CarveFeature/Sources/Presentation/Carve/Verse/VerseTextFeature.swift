@@ -33,7 +33,7 @@ public struct VerseTextFeature {
         public var preferenceVersion: UUID = .init()
         
         /// 문장 폰트 등 설정
-        @Shared(.appStorage("sentenceSetting")) public var sentenceSetting: SentenceSetting = .initialState
+        @Shared(.appStorage(SentenceSetting.appStorageKey)) public var sentenceSetting: SentenceSetting = .initialState
         
         public init(
             chapterTitle: String?,
@@ -56,7 +56,7 @@ public struct VerseTextFeature {
     
     public enum Action {
         /// 각 라인의 밑줄 Offset을 상태에 반영하는 액션.
-        /// 밑줄 offset 계산 및 갱신은 Feature(CarveDetailFeature)의 .view(.underlineLayoutChanged)`에서 수행,
+        /// 밑줄 offset 계산은 View(`CarveDetailView`)가, 상태 갱신은 `CarveDetailFeature` 의 `.view(.verseGeometryMeasured)` 가 수행,
         /// 이 액션은 주로 Preview 환경에서 레이아웃 변경 결과를 직접 상태에 주입할 때 사용.
         case setUnderlineOffsets([CGFloat])
     }
@@ -86,6 +86,9 @@ public struct VerseTextFeature {
         let uiFont = sentenceSetting.fontFamily.font(size: fontSize)
         let descender = uiFont.descender.magnitude
         
-        return layoutLines.map { $0.origin.y + descender }
+        // 텍스트 레이아웃 좌표는 `Text` 자신의 것이라, 블록 위 여백(`textVerticalPadding`)을 더해 행 좌표로 옮긴다.
+        // 이 값이 밑줄(가이드)과 레이아웃 anchor 가 되므로, 빼면 가이드가 본문 줄보다 여백만큼 위에 그려진다.
+        let topPadding = sentenceSetting.textVerticalPadding
+        return layoutLines.map { $0.origin.y + descender + topPadding }
     }
 }

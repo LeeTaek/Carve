@@ -13,13 +13,7 @@ import SwiftData
 import PencilKit
 import Foundation
 
-import Dependencies
-
 final class DrawingDatabaseTesting {
-    @Dependency(\.createSwiftDataActor) var actor
-    @Dependency(\.drawingData) var drawingContext
-
-    
     init() async throws {
     }
     
@@ -28,6 +22,12 @@ final class DrawingDatabaseTesting {
     
     @Test func actorInsert() async throws {
         // given
+        // 테스트 간 공유되는 dependency 컨테이너 대신 이 테스트 전용 컨테이너를 쓴다.
+        let container = try ModelContainer(
+            for: AppStoreSchema.schema,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let actor = SwiftDatabaseActor(modelContainer: container)
         let drawing = BibleDrawing.init(bibleTitle: .initialState, verse: 1)
         // when
         try await actor.insert(drawing)
@@ -41,50 +41,50 @@ final class DrawingDatabaseTesting {
         
     @Test func migrationV1toV2() async throws {
         // given
+        let directory = try V4StoreHarness.makeStoreDirectory()
+        defer { V4StoreHarness.removeStoreDirectory(directory) }
         let title = BibleChapter.init(title: .genesis, chapter: 1)
         let section = 1
-        let drawing = DrawingSchemaV1.DrawingVO(bibleTitle: title,
-                                                section: section,
-                                                lineData: makeMockDrawingWithStroke())
-
-        let url = URL.applicationSupportDirectory.appending(path: "MigrationTest.sqlite")
+        let url = V4StoreHarness.storeURL(in: directory)
         let config = ModelConfiguration(url: url)
-        var container = try ModelContainer(for: DrawingSchemaV1.DrawingVO.self,
-                                           configurations: config)
-        var context = ModelContext(container)
-        context.insert(drawing)
-        try context.save()
-        
         let titmeName = title.title.rawValue
         let chapter = title.chapter
-        
-        let predicate = #Predicate<DrawingSchemaV1.DrawingVO> {
-            $0.titleName == titmeName &&
-            $0.titleChapter == chapter
-        }
-        let descriptor = FetchDescriptor(predicate: predicate,
-                                         sortBy: [SortDescriptor(\.section)])
-        let fetchedDrawing = try context.fetch(descriptor).first
-        
-        
-        // when
-        container = try ModelContainer(for: DrawingSchemaV2.BibleDrawing.self,
-                                       migrationPlan: DrawingDataMigrationPlan.self,
-                                       configurations: config)
-        context = ModelContext(container)
-        let predicateV2 = #Predicate<DrawingSchemaV2.BibleDrawing> {
-            $0.titleName == titmeName &&
-            $0.titleChapter == chapter
-        }
-        let descriptorV2 = FetchDescriptor(predicate: predicateV2,
-                                     sortBy: [SortDescriptor(\.verse)])
-        let migrationFetchedDrawing = try context.fetch(descriptorV2).first
-        
-        // then
-        #expect(fetchedDrawing?.lineData == migrationFetchedDrawing?.lineData)
 
-        // teardown
-        try await actor.deleteAll(BibleDrawing.self)
+        let originalData: Data? = try {
+            let container = try ModelContainer(
+                for: Schema(versionedSchema: DrawingSchemaV1.self),
+                configurations: config
+            )
+            let context = ModelContext(container)
+            context.insert(DrawingSchemaV1.DrawingVO(
+                bibleTitle: title,
+                section: section,
+                lineData: makeMockDrawingWithStroke()
+            ))
+            try context.save()
+
+            let predicate = #Predicate<DrawingSchemaV1.DrawingVO> {
+                $0.titleName == titmeName && $0.titleChapter == chapter
+            }
+            let descriptor = FetchDescriptor(predicate: predicate, sortBy: [SortDescriptor(\.section)])
+            return try context.fetch(descriptor).first?.lineData
+        }()
+
+        let migratedData: Data? = try {
+            let container = try ModelContainer(
+                for: AppStoreSchema.schema,
+                migrationPlan: DrawingDataMigrationPlan.self,
+                configurations: config
+            )
+            let context = ModelContext(container)
+            let predicate = #Predicate<BibleDrawing> {
+                $0.titleName == titmeName && $0.titleChapter == chapter
+            }
+            let descriptor = FetchDescriptor(predicate: predicate, sortBy: [SortDescriptor(\.verse)])
+            return try context.fetch(descriptor).first?.lineData
+        }()
+
+        #expect(originalData == migratedData)
     }
     
     

@@ -28,4 +28,4 @@ public struct PencilPalatte: Codable, Sendable {
 }
 
 /// PencilKit의 InkType을 Codable로 확장, PencilPalatte를 JSON으로 저장/복원할 때 사용.
-extension PKInkingTool.InkType: Codable { }
+extension PKInkingTool.InkType: @retroactive Codable { }

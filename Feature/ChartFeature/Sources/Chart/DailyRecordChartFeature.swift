@@ -25,9 +25,14 @@ public struct DailyRecordChartFeature {
     
     public enum PageMove: Equatable { case prev, stay, next }
     private enum CancelID { case paging, yScale }
+
+    /// 이동 가능 범위의 상한(오늘)을 정하는 현재 시각이다.
+    @Dependency(\.date) var date
+    /// 페이지 전환 · Y축 축소 지연을 기다리는 시계다.
+    @Dependency(\.continuousClock) var clock
     
     @ObservableState
-    public struct State {
+    public struct State: Equatable {
         static let initialState = Self()
         var records: [DailyRecord] = []
         var lowerBoundDate: Date = .distantPast
@@ -36,8 +41,69 @@ public struct DailyRecordChartFeature {
         var pageWidth: CGFloat = 0
         var dragX: CGFloat = 0
         var isScrolling: Bool = false
+        /// 페이지 전환 애니메이션 중 중복 드래그와 이동을 막는다.
+        var isPaging: Bool = false
         var pages: [ChartPage] = []
         var yScale: ClosedRange<Double> = 0...1
+
+        /// 현재 조회 범위에 실제 필사 기록이 하나라도 있는지 나타낸다.
+        var hasWrittenRecord: Bool {
+            records.contains(where: \.hasDrawing)
+        }
+
+        /// 현재 화면에 표시하는 7일 범위의 시작일이다.
+        var visibleStartDate: Date {
+            pages[safe: 1]?.start ?? scrollPosition.alignToDay()
+        }
+
+        /// 현재 화면에 표시하는 7일 범위의 마지막 날이다.
+        var visibleEndDate: Date {
+            pages[safe: 1]?.end ?? visibleStartDate.addDays(DailyRecordChartFeature.pageDays - 1)
+        }
+
+        /// 과거 7일로 이동할 수 있는지 나타낸다.
+        var canMoveToPreviousWeek: Bool {
+            visibleStartDate.addDays(-DailyRecordChartFeature.pageDays) >= lowerBoundDate.alignToDay()
+        }
+
+        /// 오늘을 포함하는 최신 7일 범위보다 앞으로 이동하지 않도록 제한한다.
+        var canMoveToNextWeek: Bool {
+            let today = Calendar.current.startOfDay(for: Date())
+            return visibleStartDate.addDays(DailyRecordChartFeature.pageDays)
+                <= today.addDays(-(DailyRecordChartFeature.pageDays - 1))
+        }
+
+        /// VoiceOver가 막대를 하나씩 탐색하지 않아도 주간 흐름을 알 수 있는 요약이다.
+        var accessibilitySummary: String {
+            let calendar = Calendar.current
+            let start = visibleStartDate
+            let end = visibleEndDate
+            let entries = records.filter { record in
+                let day = calendar.startOfDay(for: record.date)
+                return start <= day && day <= end
+            }
+            let total = entries.reduce(0) { $0 + $1.count }
+            let average = Double(total) / Double(DailyRecordChartFeature.pageDays)
+            let maximum = entries.map(\.count).max() ?? 0
+            let zeroDayCount = DailyRecordChartFeature.pageDays - entries.filter(\.hasDrawing).count
+            let maximumDate = entries
+                .filter { $0.count == maximum && maximum > 0 }
+                .map(\.date)
+                .min()
+
+            let range = "\(start.chartMonthDayText)부터 \(end.chartMonthDayText)까지"
+            let maximumText = maximumDate.map { "가장 많은 날은 \($0.chartMonthDayText) \(maximum)절" }
+                ?? "가장 많은 날은 없어요"
+            let zeroDayText: String
+            switch zeroDayCount {
+            case 0: zeroDayText = "기록 없는 날은 없어요"
+            case 1: zeroDayText = "없는 날은 하루"
+            case 2: zeroDayText = "없는 날은 이틀"
+            default: zeroDayText = "없는 날은 \(zeroDayCount)일"
+            }
+
+            return "차트. \(range). 하루에 필사한 절 수. 모두 \(total)절, 하루 평균 \(average.formatted(.number.precision(.fractionLength(1))))절. \(maximumText), \(zeroDayText)."
+        }
         
         init(
             records: [DailyRecord] = [],
@@ -61,9 +127,17 @@ public struct DailyRecordChartFeature {
         case applyYScale(ClosedRange<Double>)
         
         public enum View {
+            /// 이전 7일 버튼을 눌렀을 때 발생한다.
+            case previousWeekTapped
+            /// 다음 7일 버튼을 눌렀을 때 발생한다.
+            case nextWeekTapped
+            /// 차트 폭을 처음 측정했을 때 발생한다.
             case onAppear(width: CGFloat)
+            /// 회전 등으로 차트 폭이 바뀌었을 때 발생한다.
             case widthChanged(CGFloat)
+            /// 주간 차트를 드래그하는 동안 발생한다.
             case dragChanged(translationX: CGFloat)
+            /// 주간 차트 드래그가 끝났을 때 발생한다.
             case dragEnded(translationX: CGFloat)
         }
     }
@@ -103,6 +177,14 @@ public struct DailyRecordChartFeature {
                     state.yScale = range
                 }
                 return .none
+
+            case .view(.previousWeekTapped):
+                guard state.canMoveToPreviousWeek else { return .none }
+                return .send(.commitMove(.prev))
+
+            case .view(.nextWeekTapped):
+                guard state.canMoveToNextWeek else { return .none }
+                return .send(.commitMove(.next))
                 
             case .view(.onAppear(let width)):
                 state.pageWidth = width
@@ -113,11 +195,12 @@ public struct DailyRecordChartFeature {
                 return .none
                 
             case .view(.dragChanged(let translationX)):
+                guard !state.isPaging else { return .none }
                 state.isScrolling = true
                 state.selectedDate = nil
 
-                let upperBoundDate = Calendar.current.startOfDay(for: Date())
-                let maxOverscroll = min(120, state.pageWidth * 0.22)
+                let upperBoundDate = Calendar.current.startOfDay(for: date.now)
+                let maxOverscroll = min(32, state.pageWidth * 0.08)
 
                 if translationX > 0, !canMove(.prev, state: state, upperBoundDate: upperBoundDate) {
                     state.dragX = rubberBand(translationX, maxOverscroll: maxOverscroll)
@@ -140,8 +223,9 @@ public struct DailyRecordChartFeature {
                 return .none
                 
             case .view(.dragEnded(let translationX)):
+                guard !state.isPaging else { return .none }
                 let threshold: CGFloat = max(60, state.pageWidth * 0.15)
-                let upperBoundDate = Calendar.current.startOfDay(for: Date())
+                let upperBoundDate = Calendar.current.startOfDay(for: date.now)
                 
                 let move: PageMove = {
                     if translationX > threshold {
@@ -164,7 +248,7 @@ extension DailyRecordChartFeature {
         let aligned = state.scrollPosition.alignToDay()
         
         if force || state.pages.isEmpty || state.pages[safe: visiblePageIndex]?.start != aligned {
-            let upperBoundDate = Calendar.current.startOfDay(for: Date())
+            let upperBoundDate = Calendar.current.startOfDay(for: date.now)
             state.pages = make3Pages(
                 anchorStart: aligned,
                 records: state.records,
@@ -275,6 +359,8 @@ extension DailyRecordChartFeature {
     }
     
     private func handleCommitMove(_ state: inout State, move: PageMove) -> Effect<Action> {
+        guard !state.isPaging else { return .none }
+        let move = canMove(move, state: state, upperBoundDate: Calendar.current.startOfDay(for: date.now)) ? move : .stay
         guard move != .stay else {
             withAnimation(.interactiveSpring(response: 0.25, dampingFraction: 0.85)) {
                 state.dragX = 0
@@ -283,6 +369,7 @@ extension DailyRecordChartFeature {
             return .none
         }
 
+        state.isPaging = true
         let targetDelta: CGFloat = {
             switch move {
             case .prev: return state.pageWidth
@@ -296,14 +383,15 @@ extension DailyRecordChartFeature {
         }
 
         return .run { send in
-            try? await Task.sleep(nanoseconds: 240_000_000)
+            try await clock.sleep(for: .milliseconds(240))
             await send(.finishMove(move))
         }
         .cancellable(id: CancelID.paging, cancelInFlight: true)
     }
 
     private func handleFinishMove(_ state: inout State, move: PageMove) -> Effect<Action> {
-        let upperBoundDate = Calendar.current.startOfDay(for: Date())
+        state.isPaging = false
+        let upperBoundDate = Calendar.current.startOfDay(for: date.now)
         
         let currentStart = state.pages[safe: visiblePageIndex]?.start ?? state.scrollPosition.alignToDay()
         let newAnchor: Date = {
@@ -343,7 +431,7 @@ extension DailyRecordChartFeature {
                 state.isScrolling = false
                 
                 return .run { send in
-                    try? await Task.sleep(nanoseconds: 40_000_000)
+                    try await clock.sleep(for: .milliseconds(40))
                     await send(.applyYScale(target))
                 }
                 .cancellable(id: CancelID.yScale, cancelInFlight: true)

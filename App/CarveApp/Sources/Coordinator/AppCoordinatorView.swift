@@ -8,8 +8,10 @@
 
 import CarveFeature
 import ChartFeature
+import ClientInterfaces
 import SettingsFeature
 import SwiftUI
+import UIComponents
 
 import ComposableArchitecture
 
@@ -18,6 +20,8 @@ import ComposableArchitecture
 ///  Settings / Charts(예정) 은 Stack 기반 네비게이션으로 구현.
 public struct AppCoordinatorView: View {
     @Bindable private var store: StoreOf<AppCoordinatorFeature>
+    /// 설정 > 화면 모드에서 고른 값. 설정 화면이 쓰고 여기서는 읽기만 한다.
+    @SharedReader(.appearanceMode) private var appearanceMode: AppearanceMode
     
     public init(store: StoreOf<AppCoordinatorFeature>) {
         self.store = store
@@ -50,11 +54,77 @@ public struct AppCoordinatorView: View {
         } destination: { store in
             // push destination - Stack 기반
             switch store.case {
-            case .settings(let store):
-                SettingsView(store: store)
             case .chart(let store):
                 DrawingChartView(store: store)
+            case .favorites(let store):
+                FavoriteListView(store: store)
             }
+        }
+        .allowsHitTesting(store.patchnote == nil && store.settings == nil)
+        .accessibilityHidden(store.patchnote != nil || store.settings != nil)
+        .overlay {
+            if let settingsStore = store.scope(state: \.settings, action: \.settings.presented) {
+                ZStack {
+                    CarveColor.scrim
+                        .ignoresSafeArea()
+                    SettingsView(store: settingsStore)
+                        .padding(60)
+                }
+            }
+        }
+        .overlay {
+            if let patchnoteStore = store.scope(state: \.patchnote, action: \.patchnote.presented) {
+                PatchnoteView(store: patchnoteStore)
+            }
+        }
+        .overlay {
+            if store.showsRelaunchGuidance {
+                // 로그인 완료와 연결 완료를 구분한다 — 이 실행은 계속 이 기기에만 저장한다. 기다릴 것이 없으므로 로딩을 띄우지 않는다.
+                VStack(spacing: 16) {
+                    Text("iCloud 로그인을 확인했어요")
+                    Text("아직 이 기기의 필사는 iCloud와 연결되지 않았어요.\n\(CloudSettingsFeature.relaunchToConnect)")
+                        .font(.caption)
+                        .multilineTextAlignment(.center)
+                    Button("확인") { store.send(.relaunchGuidanceDismissed) }
+                }
+                .padding(24)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("relaunchGuidance")
+            }
+        }
+        .overlay {
+            // 연결 전에 쓴 필기가 있다 — 막지 않고 한 번 알린다. 넣기는 설정에서 절마다 견주고 고른 것만 한다(2026-09-29).
+            if store.beforeConnectionNotice != nil, store.patchnote == nil, store.settings == nil, !store.showsRelaunchGuidance {
+                VStack(spacing: 16) {
+                    Text("iCloud에 연결하기 전에 이 iPad에서 쓴 필기가 있어요")
+                    Text("현재 필사에 넣을 내용을 확인해 주세요.")
+                        .font(.caption)
+                        .multilineTextAlignment(.center)
+                    HStack(spacing: 12) {
+                        Button("나중에") { store.send(.beforeConnectionNoticeDismissed) }
+                        Button("필기 확인하기") { store.send(.beforeConnectionNoticeReviewTapped) }
+                            .buttonStyle(.borderedProminent)
+                    }
+                }
+                .padding(24)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("beforeConnectionNotice")
+            }
+        }
+        // 이 창의 오버레이 · 팝오버까지 같은 모드를 따른다. 필사 영역은 모드와 무관하게 라이트로 그린다(결정 8-1 안 1).
+        .preferredColorScheme(appearanceMode.colorScheme)
+    }
+}
+
+private extension AppearanceMode {
+    /// `nil` 이면 기기의 라이트 · 다크 설정을 따른다.
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .system: nil
+        case .light: .light
+        case .dark: .dark
         }
     }
 }

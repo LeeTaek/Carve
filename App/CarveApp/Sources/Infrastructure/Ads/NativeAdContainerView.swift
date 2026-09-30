@@ -14,20 +14,22 @@ import UIComponents
 /// AdMob Native 광고를 표시하기 위한 컨테이너 뷰.
 /// - `NativeAdView(GMA)`에 asset view들을 등록하고, `populate(with:)`에서 광고 내용을 주입.
 /// - `MediaView(GMA)`는 GoogleMobileAds 타입이므로 이 컨테이너에서만 생성/관리.
+///   이미지를 그리지 않는 레이아웃(사이드바 · 헤더)에는 두지 않는다.
 final class NativeAdContainerView: NativeAdView {
     /// 앱 공용 레이아웃(순수 UIKit)
-    private let contentView = NativeAdContentView()
+    private let contentView: NativeAdContentView
     /// 동영상/이미지 등 미디어 영역
-    private let mediaAssetView = MediaView()
+    private let mediaAssetView: MediaView?
 
-    override init(frame: CGRect) {
-        super.init(frame: frame)
+    init(style: NativeAdContentView.Style) {
+        contentView = NativeAdContentView(style: style)
+        mediaAssetView = style.showsMedia ? MediaView() : nil
+        super.init(frame: .zero)
         setup()
     }
 
     required init?(coder: NSCoder) {
-        super.init(coder: coder)
-        setup()
+        nil
     }
 
     private func setup() {
@@ -41,19 +43,31 @@ final class NativeAdContainerView: NativeAdView {
         ])
 
         // MediaView는 컨테이너 만든 뒤 contentView의 자리뷰에 붙임
-        contentView.mediaContainerView.addSubview(mediaAssetView)
-        mediaAssetView.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            mediaAssetView.topAnchor.constraint(equalTo: contentView.mediaContainerView.topAnchor),
-            mediaAssetView.leadingAnchor.constraint(equalTo: contentView.mediaContainerView.leadingAnchor),
-            mediaAssetView.trailingAnchor.constraint(equalTo: contentView.mediaContainerView.trailingAnchor),
-            mediaAssetView.bottomAnchor.constraint(equalTo: contentView.mediaContainerView.bottomAnchor)
-        ])
+        if let mediaAssetView {
+            contentView.mediaContainerView.addSubview(mediaAssetView)
+            mediaAssetView.translatesAutoresizingMaskIntoConstraints = false
+            // 소재의 고유 크기가 자리 크기(16:9 · 120pt)를 밀어내지 않게 한다.
+            [NSLayoutConstraint.Axis.horizontal, .vertical].forEach { axis in
+                mediaAssetView.setContentHuggingPriority(.defaultLow, for: axis)
+                mediaAssetView.setContentCompressionResistancePriority(.defaultLow, for: axis)
+            }
+            NSLayoutConstraint.activate([
+                mediaAssetView.topAnchor.constraint(equalTo: contentView.mediaContainerView.topAnchor),
+                mediaAssetView.leadingAnchor.constraint(equalTo: contentView.mediaContainerView.leadingAnchor),
+                mediaAssetView.trailingAnchor.constraint(equalTo: contentView.mediaContainerView.trailingAnchor),
+                mediaAssetView.bottomAnchor.constraint(equalTo: contentView.mediaContainerView.bottomAnchor)
+            ])
+            mediaView = mediaAssetView
+        }
+
+        // SDK가 터치를 처리하도록(버튼 터치 이벤트를 앱이 가로채지 않게). 등록하기 전에 꺼야 SDK 경고가 나지 않는다.
+        contentView.callToActionButton.isUserInteractionEnabled = false
 
         // asset view 등록
-        mediaView = mediaAssetView
         headlineView = contentView.headlineLabel
-        bodyView = contentView.bodyLabel
+        if contentView.style.showsBody {
+            bodyView = contentView.bodyLabel
+        }
         iconView = contentView.iconImageView
         callToActionView = contentView.callToActionButton
     }
@@ -63,7 +77,7 @@ final class NativeAdContainerView: NativeAdView {
 
         contentView.headlineLabel.text = nativeAd.headline
 
-        if let body = nativeAd.body {
+        if contentView.style.showsBody, let body = nativeAd.body {
             contentView.bodyLabel.text = body
             contentView.bodyLabel.isHidden = false
         } else {
@@ -79,14 +93,8 @@ final class NativeAdContainerView: NativeAdView {
             contentView.iconImageView.isHidden = true
         }
 
-        mediaAssetView.mediaContent = nativeAd.mediaContent
-        if let callToAction = nativeAd.callToAction {
-            contentView.callToActionButton.setTitle(callToAction, for: .normal)
-            contentView.callToActionButton.isHidden = false
-        } else {
-            contentView.callToActionButton.setTitle(nil, for: .normal)
-            contentView.callToActionButton.isHidden = true
-        }
+        mediaAssetView?.mediaContent = nativeAd.mediaContent
+        contentView.setCallToAction(nativeAd.callToAction)
 
         // SDK가 터치를 처리하도록(버튼 터치 이벤트를 앱이 가로채지 않게)
         contentView.callToActionButton.isUserInteractionEnabled = false

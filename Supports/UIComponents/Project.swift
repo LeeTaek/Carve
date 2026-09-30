@@ -13,8 +13,9 @@ let projectName = "UIComponents"
 let dependencies: [TargetDependency] = [
     .TCAArchitecture,
     .ClientInterfaces,
-    .CarveToolkit
-        
+    .CarveToolkit,
+    // 디자인 토큰(색·아이콘)을 직접 읽는다. CarveToolkit 을 거친 전이 의존에 기대지 않는다.
+    .Resources
 ]
 
 let script: [TargetScript] = [.swiftLint]
@@ -28,7 +29,7 @@ let settings: Settings = .settings(
 
 let target: [Target] = [
     .makeFrameworkTarget(projName: projectName, target: .debug, script: script, dependencies: dependencies),
-    .makeTestTarget(projName: projectName, target: .debug, script: script)
+    .makeTestTarget(projName: projectName, target: .debug, script: script, dependencies: [.target(name: projectName)])
 ]
 
 let project = Project.makeModule(
