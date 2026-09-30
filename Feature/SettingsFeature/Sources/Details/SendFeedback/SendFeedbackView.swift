@@ -71,10 +71,7 @@ public struct SendFeedbackView: View {
             MailComposeView(store: store)
         }
         // 메일을 보낼 수 없다는 안내 — iCloud 전체 삭제 확인과 같은 설정 대화상자(시안 F2)로 띄운다.
-        .fullScreenCover(item: $store.scope(state: \.path?.popup, action: \.path.popup)) { store in
-            PopupView(store: store)
-                .presentationBackground(.clear)
-        }
+        .settingsPopup($store.scope(state: \.path?.popup, action: \.path.popup))
     }
 
     /// 이 iPad 에 메일 계정이 없다 — 다 적은 뒤에야 알지 않도록 먼저 말한다. 보내기를 누르면 같은 안내를 대화상자로 띄운다.

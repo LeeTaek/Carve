@@ -202,10 +202,7 @@ public struct CloudSettingView: View {
         .onDisappear { send(.onDisappear) }
         // 시안 F2 는 확인 대화상자를 화면 가운데에 띄우고 뒤를 가린다. 팝오버는 버튼에 붙어 한쪽으로 뜨므로
         // 전체를 덮는 표현으로 바꾼다 — 바탕은 `PopupView` 가 직접 그린다.
-        .fullScreenCover(item: $store.scope(state: \.path?.popup, action: \.path.popup)) { store in
-            PopupView(store: store)
-                .presentationBackground(.clear)
-        }
+        .settingsPopup($store.scope(state: \.path?.popup, action: \.path.popup))
     }
     
         
