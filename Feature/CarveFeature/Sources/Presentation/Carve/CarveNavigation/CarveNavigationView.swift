@@ -22,6 +22,8 @@ public struct CarveNavigationView: View {
     @State private var testament: Testament
     /// 구약 · 신약이 각자 기억하는 목록의 첫 행. 두 구분의 스크롤을 분리한다.
     @State private var listAnchors: [Testament: BibleTitle] = [:]
+    /// 장 목록 ScrollView 의 높이. 선택한 장으로 옮길 때 목록 끝을 넘지 않는 위치를 고르는 데 쓴다.
+    @State private var chapterListHeight: CGFloat = 0
     
     public init(store: StoreOf<CarveNavigationFeature>) {
         self.store = store
@@ -151,7 +153,10 @@ public struct CarveNavigationView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVGrid(
-                    columns: Array(repeating: GridItem(.fixed(CarveSize.minimumHitTarget), spacing: CarveSpacing.xSmall), count: 5),
+                    columns: Array(
+                        repeating: GridItem(.fixed(CarveSize.minimumHitTarget), spacing: CarveSpacing.xSmall),
+                        count: Self.chapterColumnCount
+                    ),
                     spacing: CarveSpacing.xSmall
                 ) {
                     ForEach(1...browsingTitle.lastChapter, id: \.self) { chapter in
@@ -160,16 +165,22 @@ public struct CarveNavigationView: View {
                     }
                 }
                 .padding(CarveSpacing.large)
+                .id(Self.chapterGridID)
             }
-            .onAppear {
-                if let chapter = store.selectedChapter {
-                    proxy.scrollTo(chapter, anchor: .center)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+                // 높이를 알아야 끝을 넘지 않는 위치를 고를 수 있으므로, 처음 높이를 받을 때 선택한 장으로 옮긴다.
+                let isFirstLayout = chapterListHeight == 0
+                chapterListHeight = height
+                if isFirstLayout {
+                    scrollToSelectedChapter(proxy)
                 }
             }
-            .onChange(of: store.selectedChapter) { _, chapter in
+            .onAppear {
+                scrollToSelectedChapter(proxy)
+            }
+            .onChange(of: store.selectedChapter) { _, _ in
                 // 성경을 고르면 필사 기록을 받은 뒤 정해진 기본 장으로 옮긴다.
-                guard let chapter else { return }
-                proxy.scrollTo(chapter, anchor: .center)
+                scrollToSelectedChapter(proxy)
             }
         }
         // 성경을 고른 직후 필사 기록을 읽는 동안은 선택한 장이 없어 성경 이름만 보인다.
@@ -189,6 +200,19 @@ public struct CarveNavigationView: View {
         ) { store in
             DrewLogView(store: store)
                 .toolbar(.visible, for: .navigationBar)
+        }
+    }
+
+    /// 선택한 장이 보이도록 장 목록을 옮긴다.
+    private func scrollToSelectedChapter(_ proxy: ScrollViewProxy) {
+        guard let chapter = store.selectedChapter, chapterListHeight > 0 else { return }
+        switch Self.chapterListScroll(to: chapter, lastChapter: browsingTitle.lastChapter, viewportHeight: chapterListHeight) {
+        case .top:
+            proxy.scrollTo(Self.chapterGridID, anchor: .top)
+        case .bottom:
+            proxy.scrollTo(Self.chapterGridID, anchor: .bottom)
+        case .center(let chapter):
+            proxy.scrollTo(chapter, anchor: .center)
         }
     }
 
@@ -263,6 +287,41 @@ public struct CarveNavigationView: View {
         .accessibilityLabel("\(chapter)장")
         .accessibilityValue(isDrawn ? "필사 기록 있음" : "")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+}
+
+/// 장 목록을 선택한 장으로 옮기는 방법.
+enum ChapterListScroll: Equatable {
+    /// 목록 맨 위. 장이 첫 화면 안에 있거나 목록이 한 화면에 들어온다.
+    case top
+    /// 목록 맨 아래. 장이 마지막 화면 안에 있다.
+    case bottom
+    /// 장을 가운데로.
+    case center(Int)
+}
+
+extension CarveNavigationView {
+    static let chapterColumnCount = 5
+    /// 장 그리드 전체의 스크롤 id. 목록 맨 위 · 맨 아래로 옮길 때 쓴다.
+    static let chapterGridID = "chapterGrid"
+
+    /// 선택한 장을 가운데로 맞추되, 그러려면 목록 끝을 넘어야 하는 장은 그 끝에 붙인다.
+    ///
+    /// iPadOS 27.2 는 `scrollTo(_:anchor: .center)` 를 목록 끝에서 멈추지 않는다. 맨 위 장(창세기 1장 등)을 가운데로 맞추면
+    /// 목록이 위로 당겨진 채 남아 큰 제목과 장 목록이 함께 아래로 내려앉고, 한 번 스크롤해야 제자리로 돌아온다(26.x 는 끝에서 멈춘다).
+    /// 레이아웃 차이(큰 제목 높이 등)를 감안해 끝에서 한 행 안쪽까지는 끝에 붙인다.
+    static func chapterListScroll(to chapter: Int, lastChapter: Int, viewportHeight: CGFloat) -> ChapterListScroll {
+        let rowPitch = CarveSize.minimumHitTarget + CarveSpacing.xSmall
+        let row = CGFloat((chapter - 1) / chapterColumnCount)
+        let rowCount = CGFloat((lastChapter + chapterColumnCount - 1) / chapterColumnCount)
+        let contentHeight = CarveSpacing.large * 2 + rowCount * rowPitch - CarveSpacing.xSmall
+        guard contentHeight > viewportHeight else { return .top }
+
+        let rowCenter = CarveSpacing.large + row * rowPitch + CarveSize.minimumHitTarget / 2
+        let centeredOffset = rowCenter - viewportHeight / 2
+        if centeredOffset <= rowPitch { return .top }
+        if centeredOffset >= contentHeight - viewportHeight - rowPitch { return .bottom }
+        return .center(chapter)
     }
 }
 

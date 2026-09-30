@@ -84,6 +84,8 @@ public struct FirstRunGuideView: View {
                 .foregroundStyle(CarveColor.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
+        // 페이지 TabView 는 페이지를 가운데에 둔다. 위에 붙여 본문 길이와 상관없이 제목 위치를 고정한다.
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     private static let guides: [(title: String, body: String)] = [

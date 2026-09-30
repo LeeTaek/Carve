@@ -153,3 +153,28 @@ struct CarveNavigationFeatureTesting {
         #expect(state.selectedChapter == nil)
     }
 }
+
+/// 장 목록을 선택한 장으로 옮길 때 목록 끝을 넘지 않는다(iPadOS 27.2 가로에서 제목과 목록이 내려앉던 문제).
+struct ChapterListScrollTesting {
+    @Test("맨 위 장은 가운데로 맞추지 않고 목록 맨 위에 둔다")
+    func firstRowsStayAtTop() {
+        #expect(CarveNavigationView.chapterListScroll(to: 1, lastChapter: 150, viewportHeight: 600) == .top)
+        #expect(CarveNavigationView.chapterListScroll(to: 10, lastChapter: 150, viewportHeight: 600) == .top)
+    }
+
+    @Test("중간 장은 가운데로 맞춘다")
+    func middleChapterIsCentered() {
+        #expect(CarveNavigationView.chapterListScroll(to: 60, lastChapter: 150, viewportHeight: 600) == .center(60))
+    }
+
+    @Test("마지막 화면 안의 장은 목록 맨 아래에 둔다")
+    func lastRowsStickToBottom() {
+        #expect(CarveNavigationView.chapterListScroll(to: 150, lastChapter: 150, viewportHeight: 600) == .bottom)
+        #expect(CarveNavigationView.chapterListScroll(to: 50, lastChapter: 50, viewportHeight: 400) == .bottom)
+    }
+
+    @Test("목록이 한 화면에 들어오면 맨 위에 둔다")
+    func shortListStaysAtTop() {
+        #expect(CarveNavigationView.chapterListScroll(to: 50, lastChapter: 50, viewportHeight: 600) == .top)
+    }
+}
