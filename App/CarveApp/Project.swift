@@ -51,6 +51,7 @@ let settings: Settings = .settings(
 
 let targets: [Target] = [
     // 실기기 터치 자동화 (D9-5 · D9-7). Pencil 입력은 범위 밖이다 — .pencilOnly 라 합성 터치가 무시된다.
+    // 광고 제거 StoreKit 시험(시뮬레이터)은 로컬 StoreKit 설정을 이 번들에서 읽는다 — 앱 번들에는 넣지 않는다.
     .target(
         name: "\(projectName)UITests",
         destinations: [.iPad],
@@ -59,6 +60,7 @@ let targets: [Target] = [
         deploymentTargets: .iOS("17.0"),
         infoPlist: .default,
         sources: ["UITests/**"],
+        resources: ["Support/Carve.storekit"],
         dependencies: [.target(name: projectName)]
     ),
     // 위젯(시안 N6~N9). 앱이 이 타깃에 의존해야 Tuist 가 PlugIns 에 임베드한다 (WIDGET-0 §1).
@@ -90,11 +92,16 @@ let targets: [Target] = [
 ]
 
 
-/// 시뮬레이터에서 광고 제거 구매를 시험하는 스킴. 실행(Run)만 로컬 StoreKit 설정(`Support/Carve.storekit`)을 쓴다.
+/// 시뮬레이터에서 광고 제거 구매를 시험하는 스킴. 실행(Run)은 로컬 StoreKit 설정(`Support/Carve.storekit`)을 쓴다.
+/// 테스트는 `RemoveAdsStoreKitUITests` 를 켠다(`CARVE_STOREKIT_UITEST=1`) — 표준 `Carve-Workspace` 실행에서는 건너뛴다.
 /// Xcode Cloud · 아카이브는 자동 생성되는 `CarveApp` 스킴을 그대로 쓰므로 StoreKit 설정이 섞이지 않는다.
 let storeKitScheme: Scheme = .scheme(
     name: "\(projectName)-StoreKit",
     buildAction: .buildAction(targets: [.target(projectName)]),
+    testAction: .targets(
+        [.testableTarget(target: .target("\(projectName)UITests"))],
+        arguments: .arguments(environmentVariables: ["CARVE_STOREKIT_UITEST": "1"])
+    ),
     runAction: .runAction(
         configuration: .debug,
         executable: .target(projectName),

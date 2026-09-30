@@ -226,6 +226,8 @@ public struct PencilPalatteDockView: View {
     private let expand: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// 손가락 필사 허용(본문 설정). 펼친 팔레트 아래 조작 안내가 이 값을 따른다.
+    @Shared(.appStorage("allowFingerDrawing")) private var allowFingerDrawing: Bool = false
     /// 화면에 그리는 펼침 상태. 리듀서가 바꾼 `isExpanded` 를 `withAnimation` 으로 옮겨 받아 폭 변화를 한 트랜잭션으로 묶는다.
     @State private var isShowingExpanded: Bool
 
@@ -329,7 +331,7 @@ public struct PencilPalatteDockView: View {
     private func caption(expandedWidth: CGFloat) -> some View {
         ZStack {
             if isShowingExpanded {
-                Text("두 손가락으로 스크롤 · Apple Pencil로 필사")
+                Text(gestureGuide)
                     .transition(.opacity)
             } else {
                 Text("\(compactToolName) · \(store.pencilConfig.lineWidth / 4, specifier: "%.1f") mm")
@@ -345,6 +347,11 @@ public struct PencilPalatteDockView: View {
             height: Self.captionHeight
         )
         .accessibilityHidden(true)
+    }
+
+    /// 펼친 팔레트 아래 조작 안내. 손가락 필사를 허용하면 한 손가락은 필기라 스크롤은 두 손가락이 된다.
+    private var gestureGuide: String {
+        allowFingerDrawing ? "두 손가락으로 스크롤 · 손가락으로 필사" : "손가락으로 스크롤 · Apple Pencil로 필사"
     }
 
     private var compactToolButton: some View {
