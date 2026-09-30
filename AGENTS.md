@@ -60,7 +60,7 @@ mise x -- swiftlint lint --quiet --config .swiftlint.yml <파일들>
 ```
 
 - **전체 회귀 기준선 (2026-09-29 설정 「의견 보내기」 · 「앱 버전」, Xcode 26.3, `Carve-Workspace`):** iPadOS 26.2 · 18.6 각 1112 통과, 17.5 1111 통과,
-  실패 0 (각 총 1122). **통과 수가 줄면 회귀다** — 수치를 낮추는 것은 테스트를 의도적으로 지운 커밋에서만 한다.
+  실패 0 (각 총 1122 — 2026-09-30 부터는 기본으로 건너뛰는 `RemoveAdsStoreKitUITests` 2개가 더해져 총 1124). **통과 수가 줄면 회귀다** — 수치를 낮추는 것은 테스트를 의도적으로 지운 커밋에서만 한다.
   기준선을 고칠 때는 `docs/single-canvas-design.md` 의 요약 줄(「회귀 기준선 **N**」)과 §19-4-2 이력 표도 같은 값으로 고친다.
 - SwiftLint 주의: `identifier_name` 최소 길이 **2** (`x`/`y`/`id` 만 예외),
   `line_length` 180, `type_body_length` 300.
@@ -122,6 +122,9 @@ mise x -- swiftlint lint --quiet --config .swiftlint.yml <파일들>
   `-SingleCanvas`(단일 Canvas 경로 강제 — Phase 3 flag `singleCanvasEnabled` 와 같은 효과, 기본은 단일 Canvas. 앱 안에서는 **설정 > 필사 캔버스** 토글, 키는 Domain `SingleCanvasFlag`).
 - **표시 진단 인자(Debug 전용, 주로 실기기).** `-CanvasDisplayProbe`(읽기 전용 상태·drawing 샘플링) · `-CanvasDisplayExperiments`(원격 실험 명령 수신) ·
   ⚠️ **`-CanvasReuseStrokesOnApply` 는 D9 H 수정을 끄고 결함을 재현하는 opt-out** 이다 — 기본 검증은 이 인자 **없이** 돈다. 절차는 `docs/device-debugging-cli.md`.
+- **광고 제거 구매 · 복원은 `CarveApp-StoreKit` 스킴의 테스트로 본다** — `xcodebuild test -scheme CarveApp-StoreKit -destination <iPad 시뮬레이터> -only-testing:CarveAppUITests/RemoveAdsStoreKitUITests`.
+  스킴이 `CARVE_STOREKIT_UITEST=1` 을 넣고 UI 테스트 번들의 `Support/Carve.storekit` 으로 `SKTestSession` 을 연다. 표준 `Carve-Workspace` 실행에서는 건너뛴다.
+  로컬 StoreKit 은 앱을 지우면 거래도 지우고, `buyProduct` 는 대상 앱이 한 번 떠 있어야 한다(설치 직후 실행 전에는 `unknown`).
 - **장 지정 시드는 저장된 앱 상태에 밀린다.** 앱이 한 번 장을 바꾼 뒤에는 컨테이너의
   `Library/Saved Application State` 가 마지막 장을 복원해, `title` 을 어느 plist 에 써도 무시된다
   (Phase 2 에서 시편 120편이 뜨는 무효 측정을 여러 번 했다). **`xcrun simctl uninstall <UDID> kr.co.carve.leetaek` 로
