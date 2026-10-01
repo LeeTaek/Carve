@@ -47,7 +47,7 @@ final class CarveDeviceSmokeUITests: XCTestCase {
             throw XCTSkip("CARVE_RECONNECT_SMOKE=1인 별도 무계정 iPad에서만 실행")
         }
         let app = XCUIApplication()
-        app.launchArguments = ["-hasSeenFirstRunGuide", "YES", "-SingleCanvas"]
+        app.launchArguments = [LaunchArgument.hasSeenFirstRunGuide, "YES", LaunchArgument.singleCanvas]
             + startChapterArguments(bookFile: "1-01Genesis.txt", chapter: 22)
         app.launch()
         if app.buttons["건너뛰기"].waitForExistence(timeout: 10) {
@@ -73,7 +73,7 @@ final class CarveDeviceSmokeUITests: XCTestCase {
     func testCaptureChapterAndAccessibilityTree() throws {
         try skipUnlessPhysicalDevice()
         let app = XCUIApplication()
-        app.launchArguments = ["-SingleCanvas", "-ChapterLayoutOverlay"]
+        app.launchArguments = [LaunchArgument.singleCanvas, LaunchArgument.chapterLayoutOverlay]
         app.launch()
 
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30), "앱이 전면으로 오지 않았다")

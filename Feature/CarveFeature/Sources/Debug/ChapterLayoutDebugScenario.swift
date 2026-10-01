@@ -23,8 +23,8 @@ import ComposableArchitecture
 /// | `-ChapterLayoutAutoScroll` | settle 8 s 뒤 1 s 간격으로 11단계에 걸쳐 마지막 절까지 스크롤 (§18-3 (C) "flick 11회" 근사) |
 /// | `-ChapterLayoutAutoNext` | settle 8 s 뒤 다음 장으로 이동 (§18-3 (B) "장 전환 진입") |
 enum ChapterLayoutDebugScenario {
-    static let scrollArgument = "-ChapterLayoutAutoScroll"
-    static let nextChapterArgument = "-ChapterLayoutAutoNext"
+    static let scrollArgument = LaunchArgument.chapterLayoutAutoScroll
+    static let nextChapterArgument = LaunchArgument.chapterLayoutAutoNext
 
     static var isScrollEnabled: Bool { ProcessInfo.processInfo.arguments.contains(scrollArgument) }
     static var isNextChapterEnabled: Bool { ProcessInfo.processInfo.arguments.contains(nextChapterArgument) }

@@ -101,13 +101,13 @@ extension XCTestCase {
     ///   - bookFile: `BibleTitle` 의 rawValue (예: 시편 `1-19Psalms.txt`).
     ///   - chapter: 장 번호.
     func startChapterArguments(bookFile: String, chapter: Int) -> [String] {
-        ["-UITestChapter", "{\"title\":\"\(bookFile)\",\"chapter\":\(chapter)}"]
+        [LaunchArgument.uiTestChapter, "{\"title\":\"\(bookFile)\",\"chapter\":\(chapter)}"]
     }
 
     /// 오버레이를 켠 채 앱을 띄운다.
     func launchCarve(singleCanvas: Bool = true, extra: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = (singleCanvas ? ["-SingleCanvas"] : []) + ["-ChapterLayoutOverlay"] + extra
+        app.launchArguments = (singleCanvas ? [LaunchArgument.singleCanvas] : []) + [LaunchArgument.chapterLayoutOverlay] + extra
         app.launch()
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30), "앱이 전면으로 오지 않았다")
         return app

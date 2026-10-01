@@ -22,7 +22,7 @@ import ComposableArchitecture
 /// |---|---|
 /// | `-UITestChapter <BibleChapter JSON>` | Store 를 만들기 전에 시작 장을 저장한다. 예: `{"title":"1-19Psalms.txt","chapter":119}` |
 public enum UITestLaunchChapter {
-    public static let argument = "-UITestChapter"
+    public static let argument = LaunchArgument.uiTestChapter
 
     /// 인자에서 시작 장을 읽는다. 인자가 없거나 값이 장이 아니면 nil.
     static func chapter(in arguments: [String]) -> BibleChapter? {

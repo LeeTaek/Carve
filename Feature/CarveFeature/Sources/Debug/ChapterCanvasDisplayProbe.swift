@@ -1,6 +1,7 @@
 // Copyright © 2026 leetaek. All rights reserved.
 
 #if DEBUG
+import CarveToolkit
 import Foundation
 import notify
 import PencilKit
@@ -26,7 +27,7 @@ final class ChapterCanvasDisplayProbe {
         self.controller = controller
         self.expected = expected
         print("CanvasDisplay create controller=\(identity)")
-        if ProcessInfo.processInfo.arguments.contains("-CanvasDisplayExperiments") {
+        if ProcessInfo.processInfo.arguments.contains(LaunchArgument.canvasDisplayExperiments) {
             for name in ["redraw", "reassign", "clear", "fresh"] {
                 var token: Int32 = 0
                 guard notify_register_check("kr.co.carve.canvas-probe.\(name)", &token) == NOTIFY_STATUS_OK else { continue }
