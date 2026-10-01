@@ -94,7 +94,7 @@ struct CodableAppStorageKeyTesting {
         let shared = withDependencies {
             $0.defaultAppStorage = defaults
         } operation: {
-            Shared(wrappedValue: SampleSetting(size: 1), .appStorage(sampleKey))
+            Shared(wrappedValue: SampleSetting(size: 1), .codableAppStorage(sampleKey))
         }
         let received = LockIsolated<[Delivery]>([])
         let subscription = subscribe(in: defaults, received: received)
