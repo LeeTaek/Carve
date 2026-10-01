@@ -9,6 +9,7 @@
 
 ## 아키텍처
 - 기존의 TCA + MicroArchitecture 구조를 따른다.
+- 아키텍처 규칙 원문은 `.codex/skills/carve-rulebook/`(`SKILL.md` 와 `references/`)이고, 모듈 안 경계(리듀서의 PencilKit · UIKit 타입 · 직접 시각 읽기, Feature 의 SwiftData, Domain 의 UI import)는 `.swiftlint.yml` `custom_rules` 가 error 로 검사한다.
 - 현재 모듈 경계를 유지하는 작고 국소적인 변경을 우선한다.
 - 작업과 무관한 광범위한 리팩토링은 피한다.
 
