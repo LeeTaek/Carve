@@ -8,7 +8,6 @@
 
 import Foundation
 import SwiftData
-import PencilKit
 
 /// 모델에 버전이 할당되지 않았을 경우(1.1.0 버전 이전) 사용하는 MigrationPlan
 enum MigrationPlanV1Only: SchemaMigrationPlan {

@@ -9,6 +9,7 @@
 
 ## 아키텍처
 - 기존의 TCA + MicroArchitecture 구조를 따른다.
+- 아키텍처 규칙 원문은 `.codex/skills/carve-rulebook/`(`SKILL.md` 와 `references/`)이고, 모듈 안 경계(리듀서의 PencilKit · UIKit 타입 · 직접 시각 읽기, Feature 의 SwiftData, Domain 의 UI import)는 `.swiftlint.yml` `custom_rules` 가 error 로 검사한다.
 - 현재 모듈 경계를 유지하는 작고 국소적인 변경을 우선한다.
 - 작업과 무관한 광범위한 리팩토링은 피한다.
 
@@ -29,7 +30,9 @@
 | CarveToolkit | `Supports/CarveToolkit` | Logger · 리듀서 액션 · UIKit 브리지 | Resources |
 | Resources | `Shared/Resources` | 에셋 · 폰트 | — |
 
-- 모듈마다 `Framework` 타깃 하나와 `<모듈>Test` 하나다. ClientInterfaces · Resources 는 테스트 타깃이 없고, App 은 UI 테스트(`CarveAppUITests`)만 있다. Interface · Testing · Example 타깃은 없다.
+- 모듈마다 `Framework` 타깃 하나와 `<모듈>Test` 하나다. ClientInterfaces · Resources 는 테스트 타깃이 없다. Interface · Testing · Example 타깃은 없다.
+- App 에는 호스트 앱 없는 단위 테스트 `CarveAppTest` 와 UI 테스트 `CarveAppUITests` 가 있다. `CarveAppTest` 는 앱 타깃에 의존하지 않고
+  `AppCoordinatorFeature` · `LaunchProgressFeature` · `VerseWidgetPayload` 소스를 함께 컴파일한다 — 앱 타깃에 새로 만든 파일은 이 시험에 들어가지 않으므로, 코디네이터가 쓰는 타입은 그 파일 안이나 Feature · Supports 모듈에 둔다.
 - 새 타깃은 `Plugins/ProjectDescriptionHelpers` 의 `makeModule` · `makeFrameworkTarget` · `makeTestTarget` 으로 만든다.
 - Tuist 매니페스트(`Project.swift` · `Workspace.swift` · `Tuist.swift` · `Tuist/`)는 여러 작업이 함께 건드리는 공유 파일이다.
 
@@ -129,6 +132,8 @@ mise x -- swiftlint lint --quiet --config .swiftlint.yml <파일들>
 - ⚠️ **`-CanvasReuseStrokesOnApply` 는 D9 H 수정을 끄고 결함을 재현하는 opt-out 이다** — 기본 검증은 이 인자 **없이** 돈다.
 - **Instruments 기록 중에는 `pgrep`/`pkill` 로 프로세스를 건드리지 않는다** — 트레이스가 메타데이터 없이 저장돼 `xctrace export` 가 실패한다.
 - 광고 제거 구매 · 복원은 `CarveApp-StoreKit` 스킴의 `RemoveAdsStoreKitUITests` 로 본다. 표준 `Carve-Workspace` 실행에서는 건너뛴다.
+- **UI 테스트 · 시뮬레이터 확인은 화면을 탭으로 찾아가지 않고 실행 인자로 연다** — `-UITestRoute <경로>`(`navigation` · `chart` · `favorites` · `settings[/<하위>]` · `verse/<절>`)와
+  억제 스위치 `-UITestSkipFirstRunGuide` · `-UITestSkipPatchnote` · `-UITestNoAds`(모두 Debug 전용). 전체 목록은 `LaunchArgument`, 쓰는 법은 위 문서의 「화면 바로 열기」 절.
 
 ## 변경 정책
 - 변경은 최소 범위로 유지한다.

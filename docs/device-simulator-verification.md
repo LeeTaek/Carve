@@ -29,8 +29,51 @@
   앱 좌표 원점이 화면 원점이라 `app.coordinate` 에 창 크기 비율을 더한 좌표가 창 위치만큼 어긋난다 (2026-09-15 창 y=177 에서 헤더 위를 눌러 실패).
   사이드바(즐겨찾기 · 차트 · 설정)는 **가로에서도 접혀 있을 수 있다** — 「즐겨찾기」 가 트리에 없으면 먼저 「사이드바 보기」 버튼을 누른다 (2026-09-16).
   **새로 만든 시뮬레이터는 첫 실행 안내(FirstRunGuideView)가 롱탭을 먹는다** — 절을 누르기 전에 「건너뛰기」 버튼이 있으면 먼저 누른다 (2026-09-16).
+  UI 테스트는 아래 「화면 바로 열기 · 억제 스위치」 의 `-UITestSkipFirstRunGuide` 로 안내를 처음부터 띄우지 않는다.
 - 기록 중에는 **`pgrep`/`pkill` 로 프로세스를 건드리지 않는다.** 마무리 단계에 끼어들면
   트레이스가 템플릿 메타데이터 없이 저장되어 `xctrace export` 가 실패한다.
+
+## 화면 바로 열기 · 억제 스위치 (Debug 실행 인자)
+
+UI 테스트 · 시뮬레이터 확인은 화면을 탭으로 찾아가지 않고 실행 인자로 연다. 세로 · 가로 · 사이드바 접힘마다 길이 달라
+(「성경 탐색 열기」 → 「사이드바 보기」 → 「앱 설정」 → 목록 올리기) 탭 단계가 시험을 깨뜨렸다 (2026-10-01 도입).
+인자 이름은 `LaunchArgument`(`Supports/CarveToolkit/Sources/LaunchArgument/LaunchArgument.swift`)에 모여 있다. 모두 Debug 빌드에서만 읽고, Release 에서는 효과가 없다.
+
+**`-UITestRoute <경로>`** — 시작 화면이 끝나 필사 화면에 들어간 직후(위젯으로 연 절과 같은 때) 그 화면을 연다.
+
+| 경로 | 여는 화면 |
+|---|---|
+| `navigation` | 성경 탐색 — 헤더 제목을 누른 것처럼 탐색 열을 모두 연다. 세로에서는 시스템이 성경 목록 열을 접어 둘 수 있다(「사이드바 보기」) |
+| `chart` · `favorites` | 기록 차트 · 즐겨찾기 목록을 필사 화면 위에 쌓는다 |
+| `settings` | 설정의 첫 화면(iCloud) |
+| `settings/<하위>` | 설정의 그 화면 — `icloud` · `draftRecovery` · `canvas` · `widget` · `appearance` · `help` · `patchnote` · `sendFeedback` · `appVersion` · `removeAds` |
+| `verse/<절 번호>` | 시작 장의 그 절. 장은 `-UITestChapter`(없으면 마지막으로 연 장)로 정한다 |
+
+- 이름은 대소문자를 가리지 않는다. 모르는 경로 · 빠진 값 · 1 보다 작은 절은 로그 `UITEST 화면 경로를 읽지 못해 무시함` 만 남기고 무시한다 — 앱은 경로 없이 시작한다.
+- **시작 화면은 건너뛰지 않는다.** 새 설치의 복원 대기에서 「먼저 시작하기」 가 보이면 시험이 누른다(`RemoveAdsStoreKitUITests.openRemoveAds`). 재실행 요구 · 막힘이면 경로는 열리지 않는다.
+- 코드: 경로 값과 여는 곳은 `AppCoordinatorFeature.UITestRoute` · `openPendingLaunchRoute`(대기 값 `State.pendingLaunchRoute`), 읽는 곳은 `App.swift` 의 `UITestLaunchOptions.read`. 시험은 `App/CarveApp/Tests/AppCoordinatorLaunchRouteTesting.swift`.
+
+**억제 스위치** — 화면을 가리는 것을 끈다. 앱 진입점이 Store 를 만들기 전에 저장한다(`AppCoordinatorFeature.applyLaunchSuppression`, `-UITestChapter` 와 같은 방식).
+
+| 인자 | 하는 일 |
+|---|---|
+| `-UITestSkipFirstRunGuide` | 첫 실행 안내를 띄우지 않는다 — `hasSeenFirstRunGuide` 를 true 로 저장한다. 옛 `-hasSeenFirstRunGuide YES` 는 문자열로 들어가 `@Shared` 의 Bool 로 읽히지 않을 수 있어 대신한다 |
+| `-UITestSkipPatchnote` | 업데이트 패치노트를 띄우지 않는다 — **앞서 들어간 설치**의 `lastSeenAppVersion` 만 지금 버전으로 바꾼다. 새 설치(값 없음)는 그대로 둔다 — 원래 패치노트가 뜨지 않고, 시작 화면이 이 값으로 새 설치(복원 대기 · 「먼저 시작하기」)를 가리기 때문이다 |
+| `-UITestNoAds` | 네이티브 광고를 요청하지 않는다 — `nativeAdClient` 를 광고 제거를 산 것과 같은 실패를 돌려주는 스텁(`UITestNoAdsClient`)으로 넣어 Debug 시험 광고의 「AdMob native ad validator」 팝업(`Dismiss`)이 뜨지 않는다. 광고 자리가 비므로 광고 배치를 보는 확인에는 쓰지 않는다 |
+
+쓰는 법:
+
+```bash
+# 시뮬레이터 — 설정 › 광고 제거로 바로 연다
+xcrun simctl launch <UDID> kr.co.carve.leetaek -UITestRoute settings/removeAds -UITestSkipFirstRunGuide -UITestSkipPatchnote -UITestNoAds
+# 시뮬레이터 — 요한복음 3장 16절
+xcrun simctl launch <UDID> kr.co.carve.leetaek -UITestChapter '{"title":"2-04John.txt","chapter":3}' -UITestRoute verse/16
+# 실기기 — 앱 인자는 `--` 뒤에 둔다
+xcrun devicectl device process launch --device <id> kr.co.carve.leetaek -- -UITestRoute chart -UITestSkipFirstRunGuide
+```
+
+UI 테스트는 `CarveUITestSupport` 의 도우미를 쓴다 — `app.launchArguments = routeArguments("settings/removeAds") + suppressionArguments`
+(`suppressionArguments` 는 세 억제 스위치, 시작 장은 `startChapterArguments`). 같은 `XCUIApplication` 을 `terminate()` 뒤 `launch()` 해도 같은 인자로 뜬다.
 
 ## 시뮬레이터 측정
 

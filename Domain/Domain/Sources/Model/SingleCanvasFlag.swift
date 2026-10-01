@@ -6,6 +6,7 @@
 //  Copyright © 2026 leetaek. All rights reserved.
 //
 
+import CarveToolkit
 import Foundation
 
 /// 단일 Canvas(설계 §13 Phase 3) feature flag 의 저장 키 (§10-3 — flag off 가 유일한 롤백 수단).
@@ -23,8 +24,8 @@ public enum SingleCanvasFlag {
     /// 무조건 `false` 라서, 두 곳이 따로 기본값을 갖고 있으면 **앱은 단일 Canvas 로 도는데 설정 화면은 OFF 로 보이는**
     /// 불일치가 생긴다 (설계 §10-3).
     public static let defaultValue = true
-    /// Debug 빌드에서 flag 와 같은 효과를 내는 실행 인자 (`xcrun simctl launch … -SingleCanvas`).
-    public static let debugLaunchArgument = "-SingleCanvas"
+    /// Debug 빌드에서 flag 와 같은 효과를 내는 실행 인자 (`xcrun simctl launch … -SingleCanvas`). 이름은 `LaunchArgument.singleCanvas` 가 갖는다.
+    public static let debugLaunchArgument = LaunchArgument.singleCanvas
     /// 기존 저장값을 지웠는지 기록하는 `UserDefaults` 키 (`resetStoredValueOnce(in:)`).
     public static let storedValueResetKey = "singleCanvasStoredValueReset"
 

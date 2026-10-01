@@ -6,6 +6,7 @@
 //  Copyright © 2026 leetaek. All rights reserved.
 //
 
+import CarveToolkit
 import Foundation
 import PencilKit
 
@@ -49,7 +50,7 @@ extension ChapterCanvasController {
     ///
     /// 정식 경로는 위 재구성이다. 이 인자는 결함을 재현하는 쪽이며, 회전 왕복 A/B 와 긴 장 성능 비교를
     /// 같은 빌드에서 하기 위해서만 남긴다. 실행당 한 번 읽는다 — `apply` 마다 인자를 훑지 않는다.
-    static let reusesStrokesOnApply = ProcessInfo.processInfo.arguments.contains("-CanvasReuseStrokesOnApply")
+    static let reusesStrokesOnApply = ProcessInfo.processInfo.arguments.contains(LaunchArgument.canvasReuseStrokesOnApply)
     #else
     static let reusesStrokesOnApply = false
     #endif

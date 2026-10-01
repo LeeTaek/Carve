@@ -13,6 +13,7 @@
 2) **Inter-feature**: Feature 간 이동은 AppCoordinator가 root/path를 조작하여 처리한다.
 3) Feature가 외부로 전달할 것은 “화면 전환”이 아니라 **이동 요청 이벤트(event)** 이다.
 4) AppCoordinator는 child 이벤트를 관찰해 **root 교체 또는 path push/pop**만 수행한다.
+- 기계 검사: lint 없음 — Feature 끼리 import 하지 않는 것은 Tuist 매니페스트의 `dependencies` 가 정하고, 이동은 `AppCoordinatorFeature` 시험으로 본다(testing.md).
 
 ---
 
