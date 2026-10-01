@@ -7,7 +7,7 @@
 //
 
 import CarveToolkit
-import SwiftUI
+import Foundation
 import SwiftData
 import ClientInterfaces
 
