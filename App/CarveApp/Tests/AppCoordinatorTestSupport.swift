@@ -32,6 +32,7 @@ extension AppCoordinatorFeature.State: Equatable {
             && lhs.beforeConnectionNotice == rhs.beforeConnectionNotice
             && lhs.didShowBeforeConnectionNotice == rhs.didShowBeforeConnectionNotice
             && lhs.pendingWidgetVerse == rhs.pendingWidgetVerse
+            && lhs.pendingLaunchRoute == rhs.pendingLaunchRoute
     }
 }
 
@@ -165,14 +166,17 @@ enum CoordinatorFixture {
     }
 
     /// 시작 화면에 있는 코디네이터. `lastSeenAppVersion` 은 이 설치가 마지막으로 본 버전이다 — nil 이면 처음 들어간다.
+    /// `launchRoute` 는 앱 진입점이 `-UITestRoute` 에서 읽어 넣어 둔 화면이다.
     /// - Important: `makeCoordinatorStore` 의 초기 상태 자리에서 만든다. 그래야 @Shared 가 그 시험의 UserDefaults 에 붙는다.
     static func launching(
         _ launch: LaunchProgressFeature.State = launchReadyToEnter(),
-        lastSeenAppVersion: String? = nil
+        lastSeenAppVersion: String? = nil,
+        launchRoute: AppCoordinatorFeature.UITestRoute? = nil
     ) -> AppCoordinatorFeature.State {
         var state = AppCoordinatorFeature.State()
         state.root = .launchProgress(launch)
         state.$lastSeenAppVersion.withLock { $0 = lastSeenAppVersion }
+        state.pendingLaunchRoute = launchRoute
         return state
     }
 

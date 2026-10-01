@@ -47,7 +47,7 @@ final class CarveDeviceSmokeUITests: XCTestCase {
             throw XCTSkip("CARVE_RECONNECT_SMOKE=1인 별도 무계정 iPad에서만 실행")
         }
         let app = XCUIApplication()
-        app.launchArguments = [LaunchArgument.hasSeenFirstRunGuide, "YES", LaunchArgument.singleCanvas]
+        app.launchArguments = [LaunchArgument.uiTestSkipFirstRunGuide, LaunchArgument.singleCanvas]
             + startChapterArguments(bookFile: "1-01Genesis.txt", chapter: 22)
         app.launch()
         if app.buttons["건너뛰기"].waitForExistence(timeout: 10) {

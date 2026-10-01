@@ -11,6 +11,7 @@
 //  - 설정은 이 번들에 넣은 `Support/Carve.storekit` 이다 — 상품 ID · 가격을 앱 실행 설정과 한 곳에서 관리한다.
 //  - 로컬 StoreKit 은 앱을 지우면 거래도 지운다. 재설치는 흉내 낼 수 없어 「앱을 끈 사이 산 구매를 다시 열어 알아보는지」로 대신한다.
 //  - 이미 산 상태에서는 「구매 복원」 버튼이 숨는다. 「복원 성공 → 구매함」 전환은 `RemoveAdsFeatureTesting` 단위 시험이 맡는다.
+//  - 설정 › 광고 제거는 실행 인자 `-UITestRoute settings/removeAds` 로 바로 연다. 첫 안내 · 패치노트 · 시험 광고(검증기 팝업)는 억제 스위치로 끈다.
 //
 
 import StoreKit
@@ -87,7 +88,6 @@ final class RemoveAdsStoreKitUITests: XCTestCase {
         expect(app, contains: "복원할 구매 내역이 없어요", step: "07-refunded-not-restored")
 
         // 8. 앱에서 사면 구매함이 된다.
-        dismissAdValidator(app)
         app.buttons["구매"].tap()
         expect(app, contains: "광고 없이 쓰는 중", step: "08-purchased")
 
@@ -115,76 +115,34 @@ final class RemoveAdsStoreKitUITests: XCTestCase {
 
     // MARK: - 도구
 
+    /// 설정 › 광고 제거로 바로 여는 인자로 띄운다. 같은 앱을 다시 띄워도(`app.launch()`) 같은 인자로 뜬다.
     private func launch() -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = [LaunchArgument.hasSeenFirstRunGuide, "YES"]
+        app.launchArguments = routeArguments("settings/removeAds") + suppressionArguments
         app.launch()
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30), "앱이 전면으로 오지 않았다")
         return app
     }
 
-    /// 설정 › 광고 제거를 연다. 세로 iPad 에서 앱 설정은 성경 목록 사이드바 아래 버튼 줄에 있다.
-    /// 본문 → 「성경 탐색 열기」(장 목록 열) → 「사이드바 보기」(성경 목록 열) → 「앱 설정」(시트) → 목록을 올려 「광고 제거」.
+    /// 광고 제거 화면이 뜰 때까지 기다린다. 화면은 실행 인자(`-UITestRoute settings/removeAds`)가 시작 화면이 끝난 뒤 연다.
+    /// 새 설치 복원 대기의 「먼저 시작하기」 는 경로가 건너뛰지 않으므로 보이면 누른다.
     private func openRemoveAds(_ app: XCUIApplication) {
-        if app.buttons["건너뛰기"].waitForExistence(timeout: 5) {
-            app.buttons["건너뛰기"].tap()
-        }
-        if app.buttons["먼저 시작하기"].waitForExistence(timeout: 3) {
-            app.buttons["먼저 시작하기"].tap()
-        }
-        let settings = app.buttons["앱 설정"]
-        if settings.waitForExistence(timeout: 3) == false {
-            let explore = app.buttons["성경 탐색 열기"]
-            guard explore.waitForExistence(timeout: 60) else {
-                fail(app, "open-explore", "본문 화면이 뜨지 않았다")
-                return
+        let screen = labelContains(app, "광고가 모두 사라져요")
+        let startFirst = app.buttons["먼저 시작하기"]
+        let opened = poll(timeout: 60) {
+            if startFirst.exists, startFirst.isHittable {
+                startFirst.tap()
             }
-            dismissAdValidator(app)
-            explore.tap()
-            let sidebar = app.buttons["사이드바 보기"]
-            if sidebar.waitForExistence(timeout: 10) {
-                dismissAdValidator(app)
-                sidebar.tap()
-            }
+            return screen.exists
         }
-        guard settings.waitForExistence(timeout: 10) else {
-            fail(app, "open-app-settings", "앱 설정 버튼이 없다")
-            return
-        }
-        dismissAdValidator(app)
-        settings.tap()
-
-        // 설정 목록(「사이드바」)은 화면 밖 행을 만들지 않는다 — 「광고」 섹션이 보일 때까지 올린다.
-        let list = app.collectionViews["사이드바"]
-        guard list.waitForExistence(timeout: 10) else {
-            fail(app, "open-settings", "설정 목록이 없다")
-            return
-        }
-        let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "광고 제거")).firstMatch
-        var swipes = 0
-        while row.exists == false || row.isHittable == false, swipes < 6 {
-            list.swipeUp()
-            swipes += 1
-        }
-        guard row.exists else {
-            fail(app, "open-remove-ads", "설정에 광고 제거가 없다")
-            return
-        }
-        row.tap()
-    }
-
-    /// Debug 의 Google 시험 네이티브 광고가 띄우는 「AdMob native ad validator」 팝업을 닫는다.
-    private func dismissAdValidator(_ app: XCUIApplication) {
-        let dismiss = app.buttons["Dismiss"]
-        if dismiss.exists, dismiss.isHittable {
-            dismiss.tap()
+        if opened == false {
+            fail(app, "open-remove-ads", "광고 제거 화면이 뜨지 않았다")
         }
     }
 
     private func tapRestore(_ app: XCUIApplication) {
         let restore = app.buttons["구매 복원"]
         XCTAssertTrue(restore.waitForExistence(timeout: 10), "구매 복원 버튼이 없다")
-        dismissAdValidator(app)
         restore.tap()
         usleep(500_000)
     }

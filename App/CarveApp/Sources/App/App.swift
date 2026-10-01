@@ -27,6 +27,8 @@ struct CarveApp: App {
     private let adConsent: AdConsentCoordinator
     /// 실행 뒤에 도착하는 본문 모양 iCloud 백업도 받도록 앱 수명 동안 유지한다.
     private let sentenceSettingBackup: SentenceSettingCloudBackup
+    /// 화면 바로 열기 · 광고 억제(Debug 실행 인자). Release 에서는 늘 빈 값이다.
+    private let uiTestLaunch: UITestLaunchOptions
 
     init() {
         let purchaseClient = StoreKitPurchaseClient()
@@ -39,6 +41,9 @@ struct CarveApp: App {
 
         #if DEBUG
         UITestLaunchChapter.apply()
+        uiTestLaunch = UITestLaunchOptions.read()
+        #else
+        uiTestLaunch = UITestLaunchOptions()
         #endif
 
         let containerID = Self.makeContainerID()
@@ -69,7 +74,8 @@ struct CarveApp: App {
             purchaseClient: purchaseClient,
             nativeAdClient: nativeAdClient,
             adConsent: adConsent,
-            sentenceSettingBackup: sentenceSettingBackup
+            sentenceSettingBackup: sentenceSettingBackup,
+            uiTestLaunch: uiTestLaunch
         )
     }
 
@@ -84,6 +90,50 @@ private struct AppRuntime {
     let store: StoreOf<AppCoordinatorFeature>
 }
 
+/// 화면 바로 열기 · 억제 스위치(`LaunchArgument` 의 `-UITest…`) 가운데 Store 를 만들 때 쓰는 값.
+///
+/// Debug 빌드에서만 앱 시작 때 실행 인자에서 한 번 읽는다 — Release 에서는 늘 빈 값이라 아무것도 바꾸지 않는다.
+/// 경로의 뜻은 `AppCoordinatorFeature.UITestRoute`, 쓰는 법은 `docs/device-simulator-verification.md` 에 있다.
+private struct UITestLaunchOptions {
+    /// `-UITestRoute` — 시작 화면이 끝나면 코디네이터가 열 화면.
+    var route: AppCoordinatorFeature.UITestRoute?
+    /// `-UITestNoAds` — 네이티브 광고를 요청하지 않는다.
+    var suppressesAds = false
+
+    #if DEBUG
+    /// 실행 인자를 읽는다. 첫 실행 안내 · 패치노트 억제는 Store 를 만들기 전인 지금 저장해 둔다.
+    static func read(arguments: [String] = ProcessInfo.processInfo.arguments) -> Self {
+        @Dependency(\.appVersion) var appVersion
+        AppCoordinatorFeature.applyLaunchSuppression(arguments: arguments, appVersion: appVersion)
+        return Self(
+            route: AppCoordinatorFeature.UITestRoute.parse(arguments: arguments),
+            suppressesAds: arguments.contains(LaunchArgument.uiTestNoAds)
+        )
+    }
+    #endif
+}
+
+#if DEBUG
+/// `-UITestNoAds` 의 광고 클라이언트 — 광고를 요청하지 않는다(Debug 전용).
+///
+/// Debug 의 Google 시험 네이티브 광고는 「AdMob native ad validator」 팝업을 띄워 UI 테스트의 탭을 가린다.
+/// 광고 제거를 산 것과 같은 실패를 돌려주므로 광고 자리(`SponsorAdSlotFeature`)는 자리를 비운다.
+private struct UITestNoAdsClient: NativeAdClient {
+    @MainActor
+    func load(placement: NativeAdPlacement, adUnitId: String) async throws(NativeAdClientError) -> NativeAdToken {
+        throw .adFree
+    }
+
+    @MainActor
+    func view(for token: NativeAdToken) -> UIView? {
+        nil
+    }
+
+    @MainActor
+    func invalidate(token: NativeAdToken) {}
+}
+#endif
+
 /// 계정 확인과 저장소 소유 증명이 끝나기 전에는 `.private` ModelContainer 를 만들지 않는다.
 private struct AppStartupView: View {
     let containerID: ContainerID
@@ -91,6 +141,7 @@ private struct AppStartupView: View {
     let nativeAdClient: any NativeAdClient
     let adConsent: AdConsentCoordinator
     let sentenceSettingBackup: any SentenceSettingBackupClient
+    let uiTestLaunch: UITestLaunchOptions
 
     @State private var runtime: AppRuntime?
     @State private var didStart = false
@@ -173,7 +224,8 @@ private struct AppStartupView: View {
             purchaseClient: purchaseClient,
             sentenceSettingBackup: sentenceSettingBackup,
             drawingEditEnvironment: drawingEditEnvironment,
-            localPreservation: localPreservation
+            localPreservation: localPreservation,
+            uiTestLaunch: uiTestLaunch
         )
         Task { await drawingEditEnvironment.start() }
         runtime = AppRuntime(modelContainer: modelContainer, store: store)
@@ -217,7 +269,8 @@ private struct AppStartupView: View {
         purchaseClient: any PurchaseClient,
         sentenceSettingBackup: any SentenceSettingBackupClient,
         drawingEditEnvironment: any DrawingEditEnvironmentClient,
-        localPreservation: LocalPreservationWriter
+        localPreservation: LocalPreservationWriter,
+        uiTestLaunch: UITestLaunchOptions
     ) -> StoreOf<AppCoordinatorFeature> {
         // actor 와 그것을 쥔 저장소의 기본값(`static` liveValue)은 처음 읽힌 문맥의 컨테이너로 한 번 만들어져 전역에 남는다.
         // 기본값에 기대지 않고 이 실행이 연 컨테이너로 직접 만들어 넘긴다(2026-09-28 iPadOS 18.6 실측).
@@ -252,8 +305,17 @@ private struct AppStartupView: View {
             $0.photoLibraryClient = PhotoKitLibraryClient()
             $0.widgetVerseClient = AppGroupWidgetVerseClient()
             $0.analyticsClient = FirebaseAnalyticsClient()
+            #if DEBUG
+            // `-UITestNoAds` — 광고를 요청하지 않는다. Debug 시험 광고의 검증기 팝업이 UI 테스트를 가리지 않는다.
+            if uiTestLaunch.suppressesAds {
+                $0.nativeAdClient = UITestNoAdsClient()
+            }
+            #endif
         } operation: {
-            Store(initialState: .initialState) {
+            var initialState = AppCoordinatorFeature.State.initialState
+            // `-UITestRoute` 의 화면 — 시작 화면이 끝나면 코디네이터가 연다. Release 에서는 늘 nil 이다.
+            initialState.pendingLaunchRoute = uiTestLaunch.route
+            return Store(initialState: initialState) {
                 AppCoordinatorFeature()
             }
         }
