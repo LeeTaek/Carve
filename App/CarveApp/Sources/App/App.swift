@@ -5,6 +5,7 @@
 //  Created by 이택성 on 1/22/24.
 //
 
+import CarveToolkit
 import Domain
 import SwiftData
 import SwiftUI
@@ -50,7 +51,7 @@ struct CarveApp: App {
     var body: some Scene {
         WindowGroup {
             #if DEBUG
-            if ProcessInfo.processInfo.arguments.contains("-CanvasScrollSpike") {
+            if ProcessInfo.processInfo.arguments.contains(LaunchArgument.canvasScrollSpike) {
                 // SwiftData 사용자 저장소와 연결되지 않는 Debug 전용 레이아웃 하네스.
                 CanvasScrollSpikeView()
             } else {

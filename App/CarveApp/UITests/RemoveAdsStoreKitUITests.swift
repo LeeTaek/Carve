@@ -117,7 +117,7 @@ final class RemoveAdsStoreKitUITests: XCTestCase {
 
     private func launch() -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = ["-hasSeenFirstRunGuide", "YES"]
+        app.launchArguments = [LaunchArgument.hasSeenFirstRunGuide, "YES"]
         app.launch()
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30), "앱이 전면으로 오지 않았다")
         return app

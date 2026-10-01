@@ -6,6 +6,7 @@
 //  Copyright © 2026 leetaek. All rights reserved.
 //
 
+import CarveToolkit
 import Domain
 import PencilKit
 import SwiftUI
@@ -79,7 +80,7 @@ struct ChapterCanvasView: UIViewControllerRepresentable {
         if ProcessInfo.processInfo.arguments.contains(ChapterCanvasLassoProbe.launchArgument) {
             controller.lassoProbe = ChapterCanvasLassoProbe(canvas: controller.canvas)
         }
-        if ProcessInfo.processInfo.arguments.contains("-CanvasDisplayProbe") {
+        if ProcessInfo.processInfo.arguments.contains(LaunchArgument.canvasDisplayProbe) {
             controller.displayProbe = ChapterCanvasDisplayProbe(controller: controller) { [store] in
                 (store.renderedRevision, store.renderedData)
             }

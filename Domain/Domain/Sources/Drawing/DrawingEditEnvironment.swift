@@ -133,7 +133,7 @@ public enum SyncedWriteBlock: Hashable, Sendable {
 /// (저장소 쓰기 · 이어 쓰기 · 전환 때 초안 보존)를 재현할 뿐이다. DEBUG 빌드 · 시뮬레이터 · 시험(dev) 컨테이너 · 실행 인자가 모두 맞을 때만
 /// 켜진다. 이 판정과 앱의 분기는 `#if DEBUG` 안이라 **Release 에는 켜는 경로가 없다** — 환경 쪽 분기(`injectsOwnership`)는 남지만 값이 늘 false 다(11차 리뷰 P2).
 public enum StoreOwnershipInjection {
-    public static let launchArgument = "-ACC1InjectStoreOwnership"
+    public static let launchArgument = LaunchArgument.acc1InjectStoreOwnership
 
     public static func isEnabled(containerID: ContainerID, arguments: [String] = ProcessInfo.processInfo.arguments) -> Bool {
         #if targetEnvironment(simulator)

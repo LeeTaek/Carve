@@ -7,6 +7,7 @@
 //
 
 #if DEBUG
+import CarveToolkit
 import Domain
 import SwiftUI
 
@@ -18,7 +19,7 @@ import SwiftUI
 /// xcrun simctl launch <UDID> kr.co.carve.leetaek -ChapterLayoutOverlay
 /// ```
 enum ChapterLayoutDebugFlags {
-    static let launchArgument = "-ChapterLayoutOverlay"
+    static let launchArgument = LaunchArgument.chapterLayoutOverlay
     /// 실행 인자로 켠 경우. 프로세스 수명 동안 고정이다.
     static let isOverlayEnabled = ProcessInfo.processInfo.arguments.contains(launchArgument)
 }

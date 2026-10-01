@@ -85,7 +85,7 @@ public struct CarveDetailFeature {
         /// flag 또는 Debug 실행 인자로 단일 Canvas 를 쓸지.
         public var usesSingleCanvas: Bool {
             #if DEBUG
-            if ProcessInfo.processInfo.arguments.contains(SingleCanvasFlag.debugLaunchArgument) { return true }
+            if ProcessInfo.processInfo.arguments.contains(LaunchArgument.singleCanvas) { return true }
             #endif
             return isSingleCanvasEnabled
         }
