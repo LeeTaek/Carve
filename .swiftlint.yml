@@ -21,6 +21,7 @@ included: # 린트 과정에 포함할 파일 경로. 이 항목이 존재하면
   - App
   - Domain
   - Feature
+  - Supports
 excluded: # 린트 과정에서 무시할 파일 경로. `included`보다 우선순위 높음
 
 # 설정 가능한 룰은 이 설정 파일에서 커스터마이징 가능
@@ -62,5 +63,93 @@ nesting:
   type_level:
     warning: 3
     error: 6
+
+# 모듈 안 경계 — 규칙 원문은 .codex/skills/carve-rulebook/(SKILL.md · references/)이고, 규칙 이름은 룰북의 「기계 검사」 와 같다. 모두 error 다.
+# - 경계는 모듈이 아니라 리듀서다. 리듀서 파일 = Feature/*/Sources · App/CarveApp/Sources · Supports/UIComponents/Sources 아래
+#   *Feature.swift · *Feature+*.swift · *Reducer.swift (Derived/ 제외). 이 이름 밖의 리듀서 확장(ChapterCanvasVerseMenu.swift 등)은 리뷰로 본다.
+# - included · excluded 는 절대 파일 경로에 거는 정규식이다. regex 는 줄 앵커 · dotall 로 컴파일되므로 `.*` 를 쓰지 않는다(줄을 넘어 먹는다).
+# - 주석 · 문서 주석 · 문자열 속 이름은 excluded_match_kinds 로 판정에서 뺀다.
+# - 이행 중 예외는 규칙별 excluded 에 파일 경로로 동결한다. 늘리지 않는다 — 고치면 여기와 룰북의 「이행 중 예외」 표에서 함께 뺀다.
+# - 위 included 가 있으면 디렉터리 인자는 무시된다. 저장소 전체는 인자 없이 `mise x -- swiftlint lint --quiet --config .swiftlint.yml` 로 본다.
+custom_rules:
+  feature_no_swiftdata_import:
+    name: 'Feature 의 SwiftData import'
+    included: '/Feature/[^/]+/Sources/'
+    excluded:
+      - '/Derived/'
+      # 이행 중 예외 — 룰북 references/swiftdata.md 참조
+      - '/Feature/CarveFeature/Sources/Presentation/Drawing/VerseDrawingHistory/VerseDrawingHistoryFeature\.swift$'
+    regex: '^[ \t]*(?:@\w+(?:\([^)\n]*\))?[ \t]+)*(?:(?:public|package|internal|fileprivate|private)[ \t]+)?import[ \t]+(?:(?:typealias|struct|class|enum|protocol|let|var|func)[ \t]+)?SwiftData\b'
+    excluded_match_kinds: [comment, doccomment, string]
+    message: 'Feature 소스는 SwiftData 를 import 하지 않는다 — Domain 저장소 의존성을 부르고 DTO 를 받는다. 쓰지 않는 import 는 지운다. 룰북 .codex/skills/carve-rulebook/references/swiftdata.md'
+    severity: error
+  feature_no_swiftdata_api:
+    name: 'Feature 의 SwiftData API'
+    included: '/Feature/[^/]+/Sources/'
+    excluded:
+      - '/Derived/'
+      # 이행 중 예외 — 룰북 references/swiftdata.md 참조
+      - '/Feature/CarveFeature/Sources/Presentation/Drawing/VerseDrawingHistory/VerseDrawingHistoryFeature\.swift$'
+      - '/Feature/SettingsFeature/Sources/Details/iCloud/iCloudSettingReducer\.swift$'
+    regex: '\b(?:ModelContext|ModelContainer|FetchDescriptor|PersistentIdentifier|persistentModelID|createSwiftDataActor)\b|@Query\b|#Predicate\b'
+    excluded_match_kinds: [comment, doccomment, string]
+    message: 'Feature 소스에서 SwiftData API(ModelContext · ModelContainer · FetchDescriptor · #Predicate · @Query · PersistentIdentifier · persistentModelID)와 공유 actor createSwiftDataActor 를 쓰지 않는다 — Domain Sources/SwiftData/ 의 저장소가 DTO 를 돌려준다. 룰북 .codex/skills/carve-rulebook/references/swiftdata.md'
+    severity: error
+  reducer_no_pencilkit_import:
+    name: '리듀서의 PencilKit import'
+    included: &reducer_files '/(?:Feature/[^/]+|App/CarveApp|Supports/UIComponents)/Sources/(?:[^/]+/)*[^/]*(?:Feature(?:\+[^/]+)?|Reducer)\.swift$'
+    excluded:
+      - '/Derived/'
+      # 이행 중 예외 — 룰북 references/pencilkit.md 참조
+      - '/Feature/CarveFeature/Sources/Presentation/Carve/CarveDetail/CarveDetailFeature\.swift$'
+      - '/Feature/CarveFeature/Sources/Presentation/Drawing/Canvas/CanvasFeature\.swift$'
+      - '/Feature/CarveFeature/Sources/Presentation/Header/PencilPalatte/PencilPalatteFeature\.swift$'
+    regex: '^[ \t]*(?:@\w+(?:\([^)\n]*\))?[ \t]+)*(?:(?:public|package|internal|fileprivate|private)[ \t]+)?import[ \t]+(?:(?:typealias|struct|class|enum|protocol|let|var|func)[ \t]+)?PencilKit\b'
+    excluded_match_kinds: [comment, doccomment, string]
+    message: '리듀서 파일은 PencilKit 을 import 하지 않는다 — 캔버스 내용은 Data 와 Domain DTO 로 오가고, PencilKit 은 브리지와 Drawing/ 만 안다. 룰북 .codex/skills/carve-rulebook/references/pencilkit.md'
+    severity: error
+  reducer_no_ui_types:
+    name: '리듀서의 PencilKit · UIKit 타입'
+    included: *reducer_files
+    excluded:
+      - '/Derived/'
+      # 이행 중 예외 — 룰북 references/pencilkit.md 참조
+      - '/Feature/CarveFeature/Sources/Presentation/Carve/CarveDetail/CarveDetailFeature\.swift$'
+      - '/Feature/CarveFeature/Sources/Presentation/Carve/CarveDetail/CarveDetailFeature\+VerseImage\.swift$'
+      - '/Feature/CarveFeature/Sources/Presentation/Drawing/Canvas/CanvasFeature\.swift$'
+      - '/Feature/CarveFeature/Sources/Presentation/Header/ColorPalatte/ColorPalatteFeature\.swift$'
+      - '/Feature/CarveFeature/Sources/Presentation/Header/PencilPalatte/PencilPalatteFeature\.swift$'
+      - '/Supports/UIComponents/Sources/Ads/AdSlotFeature\.swift$'
+    regex: '\b(?:PK[A-Z]\w*|UI(?:Color|Image|Font|Application|Screen|Device|View|ViewController|Pasteboard|BezierPath|EdgeInsets|TraitCollection))\b'
+    excluded_match_kinds: [comment, doccomment, string]
+    message: '리듀서(State · Action · reduce)에 PencilKit · UIKit 타입(PK* · UIColor · UIImage · UIFont · UIApplication · UIView 등)을 두지 않는다 — Data 와 Domain 값 타입으로 오간다. 룰북 .codex/skills/carve-rulebook/references/pencilkit.md'
+    severity: error
+  domain_no_ui_framework_import:
+    name: 'Domain 의 UI 프레임워크 import'
+    included: '/Domain/Domain/Sources/'
+    excluded:
+      - '/Derived/'
+      # 이행 중 예외 — 룰북 references/pencilkit.md 참조
+      - '/Domain/Domain/Sources/Model/CodableColor\.swift$'
+      - '/Domain/Domain/Sources/Model/PencilPalatte\.swift$'
+      - '/Domain/Domain/Sources/Model/SentenceSetting\.swift$'
+    regex: '^[ \t]*(?:@\w+(?:\([^)\n]*\))?[ \t]+)*(?:(?:public|package|internal|fileprivate|private)[ \t]+)?import[ \t]+(?:(?:typealias|struct|class|enum|protocol|let|var|func)[ \t]+)?(?:UIKit|SwiftUI|PencilKit)\b'
+    excluded_match_kinds: [comment, doccomment, string]
+    message: 'Domain 소스는 UIKit · SwiftUI · PencilKit 을 import 하지 않는다 — 값 타입은 Foundation · CoreGraphics 로 둔다. 쓰지 않는 import 는 지운다. 룰북 .codex/skills/carve-rulebook/references/pencilkit.md'
+    severity: error
+  reducer_no_direct_time:
+    name: '리듀서의 직접 시각 · 기다림'
+    included: *reducer_files
+    excluded:
+      - '/Derived/'
+      # 이행 중 예외 — 룰북 references/testing.md 참조
+      - '/Feature/ChartFeature/Sources/Chart/DailyRecordChartFeature\.swift$'
+      - '/Feature/ChartFeature/Sources/Chart/DrawingChartFeature\.swift$'
+      - '/Feature/ChartFeature/Sources/Chart/DrawingWeeklySummaryFeature\.swift$'
+      - '/Feature/CarveFeature/Sources/Presentation/Drawing/Canvas/CanvasFeature\.swift$'
+    regex: '\bDate\(\)|\bDate\.now\b|\bTask\.sleep\b'
+    excluded_match_kinds: [comment, doccomment, string]
+    message: '리듀서는 Date() · Date.now · Task.sleep 대신 @Dependency(\.date) 의 date.now 와 @Dependency(\.continuousClock) 의 clock.sleep(for:) 를 쓴다(달력은 Calendar.current 그대로). 룰북 .codex/skills/carve-rulebook/references/testing.md'
+    severity: error
 
 reporter: "xcode" # 보고 유형 (xcode, json, csv, checkstyle, junit, html, emoji, markdown)

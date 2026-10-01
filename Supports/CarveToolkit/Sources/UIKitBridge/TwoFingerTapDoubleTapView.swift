@@ -28,14 +28,14 @@ struct TwoFingerTapDoubleTapView: UIViewRepresentable {
 
         // 두 손가락 더블탭용 제스처 하나만 재사용
         private lazy var gesture: UITapGestureRecognizer = {
-            let g = UITapGestureRecognizer(
+            let recognizer = UITapGestureRecognizer(
                 target: self,
                 action: #selector(handleDoubleTap(_:))
             )
-            g.numberOfTapsRequired = 2
-            g.numberOfTouchesRequired = 2
-            g.cancelsTouchesInView = false
-            return g
+            recognizer.numberOfTapsRequired = 2
+            recognizer.numberOfTouchesRequired = 2
+            recognizer.cancelsTouchesInView = false
+            return recognizer
         }()
 
         override init(frame: CGRect) {

@@ -11,7 +11,6 @@ import ClientInterfaces
 import Domain
 import Resources
 import SwiftUI
-import SwiftData
 
 import ComposableArchitecture
 import UIComponents
