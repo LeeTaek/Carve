@@ -158,7 +158,7 @@ struct SentenceSettingsBackupTesting {
         let shared = withDependencies {
             $0.defaultAppStorage = defaults
         } operation: {
-            Shared(wrappedValue: SentenceSetting.initialState, .appStorage(SentenceSetting.appStorageKey))
+            Shared(wrappedValue: SentenceSetting.initialState, .codableAppStorage(SentenceSetting.appStorageKey))
         }
 
         #expect(shared.wrappedValue == Self.chosenElsewhere)
@@ -176,7 +176,7 @@ struct SentenceSettingsBackupTesting {
         let shared = withDependencies {
             $0.defaultAppStorage = defaults
         } operation: {
-            Shared(wrappedValue: SentenceSetting.initialState, .appStorage(SentenceSetting.appStorageKey))
+            Shared(wrappedValue: SentenceSetting.initialState, .codableAppStorage(SentenceSetting.appStorageKey))
         }
         #expect(shared.wrappedValue == .initialState)
 

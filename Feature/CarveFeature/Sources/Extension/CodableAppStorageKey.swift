@@ -12,8 +12,14 @@ import UIKit
 import ComposableArchitecture
 
 /// AppStorage(UserDefaults) 기반 Codable 타입을 @Shared로 사용하기 위한 Extension
+///
+/// ⚠️ 이름을 Sharing 의 `.appStorage` 와 다르게 둔다. 같은 이름이면 Bool · Int · String 같은 기본 타입 키도 이 오버로드와
+/// Sharing 의 전용 오버로드 사이에서 컴파일러가 고르는데, Swift 6.4(Xcode 27)는 이쪽을 골라 기본 타입 값까지 JSON Data 로 저장했다.
+/// 그 빌드(2.0.0)는 1.x 가 기본 타입으로 저장한 설정을 읽지 못하고 기본값으로 덮어써, 업데이트 때 설정이 초기화됐다(2026-10-01 재현).
+/// 기본 타입은 Sharing 의 `.appStorage("키")`, Codable 구조체 · 배열 · enum 은 `.codableAppStorage("키")` 를 쓴다.
+/// 2.0.0 이 JSON 으로 남긴 기본 타입 값은 `AppStorageFormatMigration` 이 앱 시작 때 되돌린다.
 extension SharedKey {
-    public static func appStorage<Value: Codable>(_ key: String) -> Self
+    public static func codableAppStorage<Value: Codable>(_ key: String) -> Self
     where Self == CodableAppStorageKey<Value> {
         CodableAppStorageKey(key)
     }

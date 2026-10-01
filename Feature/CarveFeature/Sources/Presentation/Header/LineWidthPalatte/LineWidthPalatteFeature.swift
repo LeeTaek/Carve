@@ -20,9 +20,9 @@ import ComposableArchitecture
 public struct LineWidthPalatteFeature {
     @ObservableState
     public struct State {
-        @Shared(.appStorage("lineWidthSet")) public var lineWidths: [CGFloat] = []
+        @Shared(.codableAppStorage("lineWidthSet")) public var lineWidths: [CGFloat] = []
         @Shared(.appStorage("selectedWidthIndex")) public var selectedWidthIndex: Int = 0
-        @Shared(.appStorage("pencilConfig")) public var pencilConfig: PencilPalatte = .initialState
+        @Shared(.codableAppStorage("pencilConfig")) public var pencilConfig: PencilPalatte = .initialState
         /// 지금 조절하는 칸.
         public var index: Int
         public var lineWidth: CGFloat

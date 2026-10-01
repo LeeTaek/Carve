@@ -91,7 +91,7 @@ public struct CarveDetailFeature {
         }
         
         /// 성경 문장 출력시 자간 폰트 등 설정
-        @Shared(.appStorage(SentenceSetting.appStorageKey)) public var sentenceSetting: SentenceSetting = .initialState
+        @Shared(.codableAppStorage(SentenceSetting.appStorageKey)) public var sentenceSetting: SentenceSetting = .initialState
         /// 왼손잡이용 레이아웃 여부
         @Shared(.appStorage("isLeftHanded")) public var isLeftHanded: Bool = false
         /// 설정의 「모든 필사 데이터 삭제」가 올리는 세대. 설정과 이 화면은 서로를 모르므로 공유 값으로 잇는다.

@@ -55,7 +55,7 @@ struct ChapterCanvasView: UIViewControllerRepresentable {
     /// 스크롤 (이전, 현재) 콘텐츠 상단 y — 헤더 애니메이션용 (SwiftUI `offsetY` 와 같은 의미).
     let onScroll: (CGFloat, CGFloat) -> Void
 
-    @Shared(.appStorage("pencilConfig")) private var pencilConfig: PencilPalatte = .initialState
+    @Shared(.codableAppStorage("pencilConfig")) private var pencilConfig: PencilPalatte = .initialState
     @Shared(.appStorage("allowFingerDrawing")) private var allowFingerDrawing: Bool = false
     /// 올가미 도구 선택 (올가미 설계 §4-1). 팔레트가 쓰고 여기서 읽는다 — `canUndo` 와 같은 관용구다.
     @Shared(.inMemory("isLassoSelected")) private var isLassoSelected: Bool = false

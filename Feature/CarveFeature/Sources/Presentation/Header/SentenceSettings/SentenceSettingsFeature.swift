@@ -15,7 +15,7 @@ import ComposableArchitecture
 public struct SentenceSettingsFeature {
     @ObservableState
     public struct State {
-        @Shared(.appStorage(SentenceSetting.appStorageKey)) public var setting: SentenceSetting = .initialState
+        @Shared(.codableAppStorage(SentenceSetting.appStorageKey)) public var setting: SentenceSetting = .initialState
         @Shared(.appStorage("allowFingerDrawing")) public var allowFingerDrawing: Bool = false
         @Shared(.appStorage("isLeftHanded")) public var isLeftHanded: Bool = false
 

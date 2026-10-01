@@ -22,7 +22,7 @@
 | 팔레트 올가미 버튼 | **이미 있다.** 아이콘(`CarveIcon.lasso`)까지 있고 `.disabled(true)` + 빈 동작 — `PencilPalatteView.swift:101` |
 | 디자인 | 도구 팔레트 3번째 칸으로 확정 (`design/ui-design-direction.md` §2 · §6-1). 열린 결정은 「올가미 식별성(아이콘 교체/유지)」 하나 (§8-3) |
 | 도구 표현 | `PencilPalatte.pencilType` 하나뿐이고 `.monoline` 이 **지우개 sentinel** 이다. 올가미는 잉크 종류가 아니라 여기에 낄 수 없다 |
-| 도구 전달 | 팔레트 → `@Shared(.appStorage("pencilConfig"))` → `ChapterCanvasView.tool(for:)` → `Configuration.tool` → `canvas.tool`. 스토어를 거치지 않는다 |
+| 도구 전달 | 팔레트 → `@Shared(.codableAppStorage("pencilConfig"))` → `ChapterCanvasView.tool(for:)` → `Configuration.tool` → `canvas.tool`. 스토어를 거치지 않는다 |
 | 편집 메뉴 | `ChapterCanvasController.suppressPencilKitEditMenus()` 가 캔버스 **하위 뷰**의 `UIEditMenuInteraction` · `UIContextMenuInteraction` 을 매 레이아웃마다 제거한다 (R25) |
 
 SDK 확인(iPhoneSimulator 26.2 헤더):
