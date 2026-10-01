@@ -27,6 +27,7 @@ struct AppCoordinatorSmokeTesting {
         #expect(state.showsRelaunchGuidance == false)
         #expect(state.beforeConnectionNotice == nil)
         #expect(state.pendingWidgetVerse == nil)
+        #expect(state.pendingLaunchRoute == nil)
         #expect(state.currentScreenKey == "LaunchProgress")
         // 호스트 앱이 없다 — 이 번들을 띄운 쪽은 앱(kr.co.carve.leetaek)이 아니라 테스트 러너다.
         #expect(Bundle.main.bundleIdentifier != "kr.co.carve.leetaek")

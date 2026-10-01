@@ -15,7 +15,7 @@ import Foundation
 /// - 이 파일은 Foundation 만 import 한다. `CarveAppUITests` 가 CarveToolkit 을 링크하지 않고 이 파일을 소스로 함께 컴파일한다
 ///   (`App/CarveApp/Project.swift`) — 다른 모듈의 타입을 쓰면 UI 테스트 빌드가 깨진다.
 /// - 상수마다 주석 한 줄에 무엇을 바꾸는지 · Debug 전용인지 · 읽는 곳을 적는다. Debug 전용 인자는 읽는 쪽이 `#if DEBUG` 안에 있어 Release 에서는 효과가 없다.
-/// - 쓰는 절차(장 시드 · HUD · 표시 진단)는 `docs/device-simulator-verification.md` · `docs/device-debugging-cli.md` 에 있다.
+/// - 쓰는 절차(장 시드 · 화면 바로 열기 · HUD · 표시 진단)는 `docs/device-simulator-verification.md` · `docs/device-debugging-cli.md` 에 있다.
 public enum LaunchArgument {
 
     // MARK: - 필사 화면 경로 · 시작 장
@@ -24,6 +24,17 @@ public enum LaunchArgument {
     public static let singleCanvas = "-SingleCanvas"
     /// 뒤의 값(`BibleChapter` JSON, 예: `{"title":"1-19Psalms.txt","chapter":119}`)을 시작 장으로 저장한다. Debug 전용. 읽는 곳: `UITestLaunchChapter.apply`.
     public static let uiTestChapter = "-UITestChapter"
+
+    // MARK: - 화면 바로 열기 · 억제 스위치 (UI 테스트 · 시뮬레이터 확인)
+
+    /// 뒤의 경로(`navigation` · `chart` · `favorites` · `settings[/<하위>]` · `verse/<절>`)의 화면을 시작 화면이 끝난 뒤 연다. Debug 전용. 읽는 곳: `AppCoordinatorFeature.UITestRoute.parse`.
+    public static let uiTestRoute = "-UITestRoute"
+    /// 첫 실행 안내(`FirstRunGuideView`)를 띄우지 않는다 — 시작할 때 `hasSeenFirstRunGuide` 를 true 로 저장한다. Debug 전용. 읽는 곳: `AppCoordinatorFeature.applyLaunchSuppression`.
+    public static let uiTestSkipFirstRunGuide = "-UITestSkipFirstRunGuide"
+    /// 업데이트 패치노트를 띄우지 않는다 — 앞서 들어간 설치의 `lastSeenAppVersion` 을 지금 버전으로 저장한다. Debug 전용. 읽는 곳: `AppCoordinatorFeature.applyLaunchSuppression`.
+    public static let uiTestSkipPatchnote = "-UITestSkipPatchnote"
+    /// 네이티브 광고를 요청하지 않는다(Debug 시험 광고의 검증기 팝업이 뜨지 않는다) — `nativeAdClient` 를 스텁으로 넣는다. Debug 전용. 읽는 곳: `CarveApp`(`UITestLaunchOptions.read`).
+    public static let uiTestNoAds = "-UITestNoAds"
 
     // MARK: - 레이아웃 검증 (설계 §18-3)
 
@@ -75,6 +86,4 @@ public enum LaunchArgument {
 
     /// Firebase Analytics 디버그 모드를 켠다. 빌드 구성과 무관하다. 앱 코드가 아니라 Firebase SDK 가 읽는다 — 스킴(`App/CarveApp/Project.swift`)의 실행 인자로만 넣는다.
     public static let firDebugEnabled = "-FIRDebugEnabled"
-    /// UserDefaults 인자 도메인으로 `hasSeenFirstRunGuide` 키를 덮는다(뒤에 `YES`, 빌드 구성과 무관). 값이 문자열이라 `@Shared(.appStorage)` 의 Bool 로 읽히지 않아 효과가 없을 수 있다. 넣는 곳: UI 테스트.
-    public static let hasSeenFirstRunGuide = "-hasSeenFirstRunGuide"
 }

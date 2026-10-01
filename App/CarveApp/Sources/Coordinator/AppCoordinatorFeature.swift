@@ -6,6 +6,7 @@
 //  Copyright © 2024 leetaek. All rights reserved.
 //
 
+import CarveToolkit
 import Domain
 import SwiftUI
 import CarveFeature
@@ -40,6 +41,8 @@ public struct AppCoordinatorFeature {
         public var path: StackState<Path.State> = .init()
         /// 위젯을 눌러 앱이 시작됐을 때 필사 화면이 준비되면 이동할 절.
         var pendingWidgetVerse: BibleVerse?
+        /// `-UITestRoute` 로 받은 화면 — 필사 화면이 준비되면(위젯 보류 절과 같은 때) 연다. 실행 인자는 Debug 빌드에서만 읽으므로 Release 에서는 늘 nil 이다.
+        var pendingLaunchRoute: UITestRoute?
         // analytics key
         public var currentScreenKey: String {
             if settings != nil {
@@ -185,12 +188,14 @@ public struct AppCoordinatorFeature {
                 // 보류 중이면 로그인 · 소유가 확인되는지 지켜보다가 재실행을 안내한다. 연결을 기다리는 로딩은 띄우지 않는다.
                 // 연결된 실행이면 가져오기를 기다리는 연결 전 필기가 있는지 보고 안내한다(2026-09-29).
                 let guidance: Effect<Action> = holdState.isHeld ? observeRelaunchGuidance() : observeBeforeConnectionDrafts()
+                // `-UITestRoute`(Debug)로 받은 화면도 같은 때 연다 — 시작 화면(새 설치 복원 대기의 「먼저 시작하기」 포함)이 끝난 뒤다.
+                let launchRoute = openPendingLaunchRoute(state: &state)
                 // 위젯을 눌러 시작했다면 필사 화면이 준비된 지금 그 절로 간다.
                 if let verse = state.pendingWidgetVerse {
                     state.pendingWidgetVerse = nil
-                    return .merge(guidance, .send(.root(.presented(.carve(.moveToVerse(verse))))))
+                    return .merge(guidance, launchRoute, .send(.root(.presented(.carve(.moveToVerse(verse))))))
                 }
-                return guidance
+                return .merge(guidance, launchRoute)
 
             case .connectionEnvironmentChanged(let environment):
                 guard !state.didShowRelaunchGuidance, environment.connectsOnRelaunch else { break }
@@ -308,3 +313,146 @@ public struct AppCoordinatorFeature {
         .forEach(\.path, action: \.path)
     }
 }
+
+// MARK: - 화면 바로 열기 (`-UITestRoute`)
+
+extension AppCoordinatorFeature {
+    /// `-UITestRoute <경로>` 가 여는 화면. UI 테스트 · 시뮬레이터 확인이 탭 단계 없이 그 화면에서 시작한다.
+    ///
+    /// 앱 진입점이 Debug 빌드에서만 실행 인자를 한 번 읽어(`parse`) `State.pendingLaunchRoute` 에 넣고, 시작 화면이 끝나 필사 화면에 들어간 직후
+    /// (위젯 보류 절과 같은 때) 연다. 시작 화면 — 새 설치 복원 대기의 「먼저 시작하기」 — 은 건너뛰지 않는다.
+    ///
+    /// | 경로 | 여는 화면 |
+    /// |---|---|
+    /// | `navigation` | 성경 탐색 — 헤더 제목을 누른 것처럼 탐색 열을 모두 연다 |
+    /// | `chart` · `favorites` | 기록 차트 · 즐겨찾기 목록을 필사 화면 위에 쌓는다 |
+    /// | `settings` | 설정의 첫 화면(iCloud) |
+    /// | `settings/<하위>` | 설정의 그 화면 — `icloud` · `draftRecovery` · `canvas` · `widget` · `appearance` · `help` · `patchnote` · `sendFeedback` · `appVersion` · `removeAds` |
+    /// | `verse/<절 번호>` | 시작 장(`-UITestChapter` 또는 마지막으로 연 장)의 그 절 |
+    ///
+    /// 이름은 대소문자를 가리지 않는다. 모르는 경로는 로그만 남기고 무시한다 — 앱은 경로 없이 시작한다.
+    enum UITestRoute: Equatable, Sendable {
+        case navigation
+        case chart
+        case favorites
+        /// 설정. nil 이면 설정의 첫 화면이다.
+        case settings(SettingsFeature.SidebarItem?)
+        /// 시작 장의 절 번호(1 이상).
+        case verse(Int)
+
+        /// 경로 문자열을 읽는다. 모르는 경로 · 설정 하위 이름이나 1 보다 작은 절 번호면 nil.
+        init?(_ value: String) {
+            let parts = value.lowercased().split(separator: "/", omittingEmptySubsequences: false).map(String.init)
+            switch parts {
+            case ["navigation"]: self = .navigation
+            case ["chart"]: self = .chart
+            case ["favorites"]: self = .favorites
+            case ["settings"]: self = .settings(nil)
+            default:
+                guard parts.count == 2 else { return nil }
+                if parts[0] == "settings",
+                   let item = SettingsFeature.SidebarItem.allCases.first(where: { $0.routeName.lowercased() == parts[1] }) {
+                    self = .settings(item)
+                } else if parts[0] == "verse", let verse = Int(parts[1]), verse > 0 {
+                    self = .verse(verse)
+                } else {
+                    return nil
+                }
+            }
+        }
+    }
+
+    /// `-UITestRoute` 로 받은 화면을 연다. 필사 화면(`root == .carve`)에 막 들어간 때 부르고, 받은 경로가 없으면 아무것도 하지 않는다.
+    private func openPendingLaunchRoute(state: inout State) -> Effect<Action> {
+        guard let route = state.pendingLaunchRoute else { return .none }
+        state.pendingLaunchRoute = nil
+        switch route {
+        case .navigation:
+            // 헤더 제목을 누른 것과 같다 — 탐색 열을 모두 열고 현재 장을 고른 목록으로 시작한다. 서재 버튼은 열고 닫기를 바꾸므로 쓰지 않는다.
+            return .send(.root(.presented(.carve(.scope(.carveDetailAction(.scope(.headerAction(.view(.titleDidTapped)))))))))
+        case .chart:
+            state.path.append(.chart(.initialState))
+        case .favorites:
+            state.path.append(.favorites(.initialState))
+        case .settings(let item):
+            state.settings = item.map { SettingsFeature.State.initialState(path: $0.routePath) } ?? .initialState
+        case .verse(let verse):
+            // 장은 시작 장(`-UITestChapter` 또는 마지막으로 연 장)이다. 위젯 절처럼 본문 없이 보낸다.
+            guard case .carve(let carve)? = state.root else { return .none }
+            return .send(.root(.presented(.carve(.moveToVerse(BibleVerse(title: carve.currentTitle, verse: verse, sentence: ""))))))
+        }
+        return .none
+    }
+}
+
+private extension SettingsFeature.SidebarItem {
+    /// `-UITestRoute settings/<이름>` 의 이름.
+    var routeName: String {
+        switch self {
+        case .iCloud: "icloud"
+        case .draftRecovery: "draftRecovery"
+        case .canvas: "canvas"
+        case .widget: "widget"
+        case .appearance: "appearance"
+        case .help: "help"
+        case .patchnote: "patchnote"
+        case .sendFeedback: "sendFeedback"
+        case .appVersion: "appVersion"
+        case .removeAds: "removeAds"
+        }
+    }
+
+    /// 이 행이 여는 화면의 처음 상태. `SettingsFeature` 의 같은 표(`initialPath`)는 모듈 밖에 보이지 않아 여기에 다시 둔다.
+    var routePath: SettingsFeature.Path.State {
+        switch self {
+        case .iCloud: .iCloud(.initialState)
+        case .draftRecovery: .draftRecovery(.initialState)
+        case .canvas: .canvas(.initialState)
+        case .widget: .widget(.initialState)
+        case .appearance: .appearance(.initialState)
+        case .help: .help(.initialState)
+        case .patchnote: .patchnote(.initialState)
+        case .sendFeedback: .sendFeedback(.initialState)
+        case .appVersion: .appVersion(.initialState)
+        case .removeAds: .removeAds(.initialState)
+        }
+    }
+}
+
+#if DEBUG
+extension AppCoordinatorFeature.UITestRoute {
+    /// 실행 인자에서 경로를 읽는다(Debug 전용). 인자가 없으면 nil 이고, 값이 없거나 모르는 경로면 로그만 남기고 nil 이다 — 앱은 경로 없이 시작한다.
+    static func parse(arguments: [String]) -> Self? {
+        guard let index = arguments.firstIndex(of: LaunchArgument.uiTestRoute) else { return nil }
+        let value = arguments.indices.contains(index + 1) ? arguments[index + 1] : ""
+        guard let route = Self(value) else {
+            Log.info("UITEST 화면 경로를 읽지 못해 무시함", value)
+            return nil
+        }
+        Log.info("UITEST 화면 경로", value)
+        return route
+    }
+}
+
+extension AppCoordinatorFeature {
+    /// 억제 스위치를 저장한다(Debug 전용). 앱 진입점이 Store 를 만들기 전에 한 번 부른다 — `UITestLaunchChapter` 와 같은 방식이다.
+    ///
+    /// - `-UITestSkipFirstRunGuide`: 필사 화면(`CarveNavigationFeature`)과 같은 `@Shared(.appStorage("hasSeenFirstRunGuide"))` 를 true 로 쓴다.
+    /// - `-UITestSkipPatchnote`: **앞서 들어간 설치**의 `lastSeenAppVersion` 만 지금 버전으로 바꾼다. 비어 있는 새 설치는 원래 패치노트를 띄우지 않고,
+    ///   시작 화면이 같은 값으로 새 설치(복원 대기 · 「먼저 시작하기」)를 가리므로 그대로 둔다.
+    static func applyLaunchSuppression(arguments: [String], appVersion: String) {
+        if arguments.contains(LaunchArgument.uiTestSkipFirstRunGuide) {
+            @Shared(.appStorage("hasSeenFirstRunGuide")) var hasSeenFirstRunGuide = false
+            $hasSeenFirstRunGuide.withLock { $0 = true }
+            Log.info("UITEST 첫 실행 안내 억제")
+        }
+        if arguments.contains(LaunchArgument.uiTestSkipPatchnote) {
+            @Shared(.appStorage("lastSeenAppVersion")) var lastSeenAppVersion: String?
+            if lastSeenAppVersion != nil {
+                $lastSeenAppVersion.withLock { $0 = appVersion }
+            }
+            Log.info("UITEST 패치노트 억제", appVersion)
+        }
+    }
+}
+#endif

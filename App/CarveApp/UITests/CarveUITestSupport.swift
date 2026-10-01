@@ -104,6 +104,21 @@ extension XCTestCase {
         [LaunchArgument.uiTestChapter, "{\"title\":\"\(bookFile)\",\"chapter\":\(chapter)}"]
     }
 
+    /// 시작 화면이 끝나면 그 화면을 바로 여는 실행 인자. 앱의 `AppCoordinatorFeature.UITestRoute` 가 받는다 (Debug 전용).
+    ///
+    /// 탭으로 화면을 찾아가지 않는다 — 세로 · 가로마다 다른 길(「성경 탐색 열기」 → 「사이드바 보기」 → 「앱 설정」 → 목록 올리기)이 시험을 깨뜨렸다.
+    /// 새 설치 복원 대기의 「먼저 시작하기」 는 건너뛰지 않으므로 보이면 시험이 누른다.
+    /// - Parameter route: `navigation` · `chart` · `favorites` · `settings` · `settings/<하위>`(예: `settings/removeAds`) · `verse/<절 번호>`.
+    ///   절의 장은 `startChapterArguments` 로 정한다. 모르는 경로는 앱이 무시한다.
+    func routeArguments(_ route: String) -> [String] {
+        [LaunchArgument.uiTestRoute, route]
+    }
+
+    /// 화면을 가리는 것을 끄는 억제 스위치 — 첫 실행 안내 · 업데이트 패치노트 · 네이티브 광고(Debug 시험 광고의 검증기 팝업) (Debug 전용).
+    var suppressionArguments: [String] {
+        [LaunchArgument.uiTestSkipFirstRunGuide, LaunchArgument.uiTestSkipPatchnote, LaunchArgument.uiTestNoAds]
+    }
+
     /// 오버레이를 켠 채 앱을 띄운다.
     func launchCarve(singleCanvas: Bool = true, extra: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
