@@ -59,9 +59,33 @@ let targets: [Target] = [
         bundleId: .defaultBundleID + ".UITests",
         deploymentTargets: .iOS("17.0"),
         infoPlist: .default,
-        sources: ["UITests/**"],
+        sources: [
+            "UITests/**",
+            // 실행 인자 이름은 CarveToolkit 이 갖는다. UI 테스트는 모듈을 링크하지 않고 소스로 함께 컴파일한다.
+            "../../Supports/CarveToolkit/Sources/LaunchArgument/LaunchArgument.swift"
+        ],
         resources: ["Support/Carve.storekit"],
         dependencies: [.target(name: projectName)]
+    ),
+    // 앱 단위 테스트. 호스트 앱 없이 돈다 — 앱 타깃에 의존하지 않고, 시험할 앱 소스만 함께 컴파일한다.
+    // 앱 타깃(Sources)에 새로 만든 파일은 여기서 컴파일되지 않는다. 코디네이터가 쓰는 타입은 아래 파일 안이나 Feature · Supports 모듈에 둔다.
+    .makeTestTarget(
+        projName: projectName,
+        target: .debug,
+        testSources: [
+            "Tests/**",
+            "Sources/Coordinator/AppCoordinatorFeature.swift",
+            "Sources/App/LaunchProgressFeature.swift",
+            "Widget/Shared/VerseWidgetPayload.swift"
+        ],
+        script: [.swiftLint],
+        dependencies: [
+            .CarveFeature,
+            .ChartFeature,
+            .SettingsFeature,
+            .ClientInterfaces,
+            .TCAArchitecture
+        ]
     ),
     // 위젯(시안 N6~N9). 앱이 이 타깃에 의존해야 Tuist 가 PlugIns 에 임베드한다 (WIDGET-0 §1).
     .makeWidgetExtensionTarget(
