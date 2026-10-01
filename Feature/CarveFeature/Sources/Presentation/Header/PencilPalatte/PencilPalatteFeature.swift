@@ -19,15 +19,15 @@ public struct PencilPalatteFeature {
     public struct State {
         public var popoverPoint: CGPoint = .zero
         
-        @Shared(.appStorage("pencilConfig")) public var pencilConfig: PencilPalatte = .initialState
+        @Shared(.codableAppStorage("pencilConfig")) public var pencilConfig: PencilPalatte = .initialState
         @Shared(.appStorage("selectedColorIndex")) public var selectedColorIndex: Int = 0
         @Shared(.appStorage("selectedWidthIndex")) public var selectedWidthIndex: Int = 0
-        @Shared(.appStorage("palatteColorSet")) public var palatteColors: [CodableColor] = [
+        @Shared(.codableAppStorage("palatteColorSet")) public var palatteColors: [CodableColor] = [
             .init(color: .black),
             .init(color: .blue),
             .init(color: .red)
         ]
-        @Shared(.appStorage("lineWidthSet")) public var lineWidths: [CGFloat] = [2.0, 4.0, 6.0]
+        @Shared(.codableAppStorage("lineWidthSet")) public var lineWidths: [CGFloat] = [2.0, 4.0, 6.0]
         @Shared(.inMemory("canUndo")) public var canUndo: Bool = false
         @Shared(.inMemory("canRedo")) public var canRedo: Bool = false
         /// undo/redo 를 팔레트가 아니라 캔버스(단일 Canvas, `ChapterCanvasFeature`)가 처리한다.

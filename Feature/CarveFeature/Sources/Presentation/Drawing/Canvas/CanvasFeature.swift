@@ -32,7 +32,7 @@ public struct CanvasFeature {
         /// 단일 Canvas 는 절 행을 **첫 밑줄 원점**(`drawingVersion == 3`)으로 저장한다. flag 를 끄고 N-Canvas 로 돌아오면(§10-3)
         /// 그 행을 좌상단 원점으로 읽어 첫 밑줄만큼 위로 어긋나므로, 표시할 때 이 값만큼 내린다.
         public var firstUnderlineY: CGFloat = 0
-        @Shared(.appStorage("pencilConfig")) public var pencilConfig: PencilPalatte = .initialState
+        @Shared(.codableAppStorage("pencilConfig")) public var pencilConfig: PencilPalatte = .initialState
         @Shared(.inMemory("canUndo")) public var canUndo: Bool = false
         @Shared(.inMemory("canRedo")) public var canRedo: Bool = false
         @Shared(.appStorage("allowFingerDrawing")) public var allowFingerDrawing: Bool = false

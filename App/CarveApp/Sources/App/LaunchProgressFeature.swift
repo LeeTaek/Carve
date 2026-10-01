@@ -9,6 +9,7 @@
 import Foundation
 import Domain
 import CarveToolkit
+import CarveFeature
 
 import ComposableArchitecture
 
@@ -37,7 +38,8 @@ public struct LaunchProgressFeature {
         /// 사용자가 「먼저 시작하기」 를 눌렀다.
         public var startedFirst = false
         /// 이 설치의 초기 복원이 어떻게 끝났는지 — 한 번 정해지면 다음 실행부터 긴 대기로 돌아가지 않는다.
-        @Shared(.appStorage("initialRestoreOutcome")) var initialRestoreOutcome: InitialRestoreOutcome?
+        /// 처음부터 JSON(`CodableAppStorageKey`)으로 저장했다 — `String` raw 값 enum 이라 Sharing 의 `.appStorage` 로 바꾸면 형식이 달라진다.
+        @Shared(.codableAppStorage("initialRestoreOutcome")) var initialRestoreOutcome: InitialRestoreOutcome?
         /// 이 설치에서 앞서 들어간 적이 있는가(패치노트가 쓰는 값과 같다).
         @Shared(.appStorage("lastSeenAppVersion")) var lastSeenAppVersion: String?
         /// LaunchProgressFeature에서 사용하는 기본 초기 상태.
