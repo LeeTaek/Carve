@@ -68,6 +68,8 @@ public struct AppCoordinatorFeature {
         }
     }
     @Dependency(\.analyticsClient) private var analyticsClient
+    /// 지금 앱의 마케팅 버전 — 마지막으로 본 버전과 견주어 패치노트를 띄운다.
+    @Dependency(\.appVersion) private var appVersion
     @Dependency(\.legacySeparationHoldState) private var holdState
     @Dependency(\.drawingEditEnvironment) private var editEnvironment
     @Dependency(\.verseDraftRecoveryReader) private var draftReader
@@ -173,7 +175,7 @@ public struct AppCoordinatorFeature {
                 guard case .launchProgress(let launch)? = state.root, launch.route == .enterWriting else {
                     break
                 }
-                let currentVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+                let currentVersion = appVersion
                 let previousVersion = state.lastSeenAppVersion
                 state.$lastSeenAppVersion.withLock { $0 = currentVersion }
                 state.root = .carve(.initialState)
