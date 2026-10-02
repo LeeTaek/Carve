@@ -48,7 +48,7 @@ public struct DraftRecoveryFeature {
     }
 
     @ObservableState
-    public struct State: Hashable {
+    public struct State: Hashable, Sendable {
         public static let initialState = Self()
         public var isLoading = false
         /// 지금 들고 있는 목록 · 비교가 기댄 계정 근거. 바뀌면 목록 · 비교를 비우고 새 근거로 다시 읽는다.
@@ -374,7 +374,7 @@ public struct DraftRecoveryFeature {
 
 extension DraftRecoveryFeature {
     /// 한 계정 묶음. 화면이 보는 값만 든다.
-    public struct Bucket: Hashable, Identifiable {
+    public struct Bucket: Hashable, Identifiable, Sendable {
         public var scope: AccountScope
         public var id: String { scope.key }
         /// 사람이 읽는 이름 — 지금 계정 · 계정을 확인하지 못한 동안 · 로그인하지 않은 동안 · 다른 계정.
@@ -405,7 +405,7 @@ extension DraftRecoveryFeature {
     }
 
     /// 목록의 한 줄.
-    public struct Item: Hashable, Identifiable {
+    public struct Item: Hashable, Identifiable, Sendable {
         public var id: String
         /// "창세기 1:3".
         public var place: String
@@ -434,7 +434,7 @@ extension DraftRecoveryFeature {
     }
 
     /// 견주기 — 지금 필기와 남겨 둔 필기, 그리고 넣으면 무엇이 되는가.
-    public struct Comparison: Hashable {
+    public struct Comparison: Hashable, Sendable {
         public var itemID: String
         public var isLoading: Bool = true
         /// 그 절의 지금 필기. nil 이면 지금 그 절에는 필기가 없다.
@@ -447,7 +447,7 @@ extension DraftRecoveryFeature {
     }
 
     /// 가져오기 결과 한 줄.
-    public struct ImportMessage: Hashable {
+    public struct ImportMessage: Hashable, Sendable {
         public var text: String
         /// 넣지 못했다 · 다시 확인해야 한다 — 강조한다.
         public var needsAttention: Bool

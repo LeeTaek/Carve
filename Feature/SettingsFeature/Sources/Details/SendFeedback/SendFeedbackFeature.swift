@@ -14,12 +14,13 @@ import MessageUI
 
 import ComposableArchitecture
 
+/// 의존성만 가지므로 `Sendable` 이다 — `MainActor.assumeIsolated` 안에서 `mailAvailability` 를 그대로 쓴다.
 @Reducer
-public struct SendFeedbackFeature {
+public struct SendFeedbackFeature: Sendable {
     public init() { }
 
     @ObservableState
-    public struct State: Hashable {
+    public struct State: Hashable, Sendable {
         public static let initialState = Self()
         @Presents public var path: Path.State?
         public var feedbackInfo: UserFeedback = .initialState
@@ -230,3 +231,4 @@ public extension DependencyValues {
 }
 
 extension SendFeedbackFeature.Path.State: Hashable {}
+extension SendFeedbackFeature.Path.State: Sendable {}

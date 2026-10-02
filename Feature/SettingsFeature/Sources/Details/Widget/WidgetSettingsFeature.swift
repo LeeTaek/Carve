@@ -22,7 +22,7 @@ public struct WidgetSettingsFeature {
     public init() { }
 
     @ObservableState
-    public struct State: Hashable {
+    public struct State: Hashable, Sendable {
         public static let initialState = Self()
 
         /// 즐겨찾기 전체 — 고르는 시트(시안 N8)가 쓴다. 최근 추가순이다.
