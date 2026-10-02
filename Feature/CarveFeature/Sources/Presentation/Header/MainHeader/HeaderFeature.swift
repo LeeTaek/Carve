@@ -72,14 +72,17 @@ public struct HeaderFeature {
             case down
             case none
         }
-        public static let initialState = Self(
-            headerHeight: 0,
-            headerOffset: 0,
-            lastHeaderOffset: 0,
-            shiftOffset: 0,
-            isPaletteExpanded: false,
-            showOnlyTitle: false
-        )
+        /// 팔레트 상태(`PKInkingTool.InkType`)를 담아 Sendable 이 아니므로 저장 프로퍼티 대신 계산 프로퍼티다.
+        public static var initialState: Self {
+            Self(
+                headerHeight: 0,
+                headerOffset: 0,
+                lastHeaderOffset: 0,
+                shiftOffset: 0,
+                isPaletteExpanded: false,
+                showOnlyTitle: false
+            )
+        }
     }
     public enum Action: ViewAction {
         case headerAnimation(CGFloat, CGFloat)

@@ -19,7 +19,7 @@ import ComposableArchitecture
 public struct VerseTextFeature {
     public init() { }
     @ObservableState
-    public struct State: Identifiable {
+    public struct State: Identifiable, Sendable {
         public var id: String
         /// 성경 제목 및 장
         public var chapterTitle: String?

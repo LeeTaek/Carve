@@ -38,9 +38,12 @@ public struct SentencesWithDrawingFeature {
             self.drewHistoryState = .init(title: sentence.title, verse: sentence.verse)
         }
         
-        public static var initialState = Self(sentence: BibleVerse.initialState,
-                                               drawing: BibleDrawing.init(
-                                                bibleTitle: BibleChapter(title: .leviticus, chapter: 4), verse: 1))
+        /// @Model(`BibleDrawing`)을 담아 Sendable 이 아니므로 저장 프로퍼티 대신 계산 프로퍼티다(N-Canvas).
+        public static var initialState: Self {
+            Self(sentence: BibleVerse.initialState,
+                 drawing: BibleDrawing.init(
+                    bibleTitle: BibleChapter(title: .leviticus, chapter: 4), verse: 1))
+        }
     }
     
     public enum Action: ViewAction, CarveToolkit.ScopeAction {
@@ -81,11 +84,10 @@ public struct SentencesWithDrawingFeature {
             switch action {
             case .view(.presentDrewHistory(let isPresent)):
                 state.isPresentDrewHistory = isPresent
-            case .scope(.drewHistoryAction(.setPresentDrawing(let drawing))):
+            case .scope(.drewHistoryAction(.setPresentDrawing(let snapshot))):
                 state.isPresentDrewHistory = false
-                // 액션만 전달하는 자리라 .run 을 쓸 이유가 없다.
-                // @Sendable 클로저로 모델을 들고 들어가지 않게 .send 로 바꾼다.
-                return .send(.scope(.canvasAction(.setDrawing(drawing))))
+                // 액션만 전달하는 자리라 .run 을 쓸 이유가 없다. 고른 회차(DTO)를 캔버스가 행 모양으로 옮긴다.
+                return .send(.scope(.canvasAction(.setDrawing(snapshot))))
             default: break
                 
             }

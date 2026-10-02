@@ -17,8 +17,9 @@ import ComposableArchitecture
 @Suite("N6 — 필사 화면에서 위젯에 추가")
 @MainActor
 struct CarveDetailWidgetTesting {
-    private static let chapter = BibleChapter(title: .psalms, chapter: 23)
-    private static let key = FavoriteVerseKey(chapter: chapter, verse: 1)
+    // `LockIsolated.setValue` 의 Sendable 클로저에서 읽으므로 MainActor 에 두지 않는다(값 타입 상수).
+    private nonisolated static let chapter = BibleChapter(title: .psalms, chapter: 23)
+    private nonisolated static let key = FavoriteVerseKey(chapter: chapter, verse: 1)
     private static let sentence = "여호와는 나의 목자시니 내가 부족함이 없으리로다"
     private static let now = Date(timeIntervalSince1970: 1_000)
     private static let ink = Data([1, 2, 3])

@@ -77,9 +77,7 @@ struct DrawingErasePersistenceTesting {
         #expect(reloadedStrokes == 0)
 
         // teardown
-        for row in try await Self.fetch(chapter: chapter, verse: verse, from: actor) {
-            try await actor.delete(row)
-        }
+        try await actor.deleteVerseDrawings(chapter: chapter, verse: verse)
     }
 
     @Test("drawing 이 없으면(nil) 저장을 시도하지 않는다")
@@ -89,12 +87,15 @@ struct DrawingErasePersistenceTesting {
         let chapter = BibleChapter(title: .obadiah, chapter: 1)
         try await CarveDetailFeature().persistDrawing(nil)
 
-        let stored = try await drawingContext.fetch(chapter: chapter)
+        // 저장 경로(`drawingData`)와 같은 actor 에서 장의 행을 스냅샷으로 읽는다.
+        let stored = try await drawingContext.actor.loadDrawingSnapshots(chapter: chapter)
         #expect(stored.isEmpty)
     }
 
     // MARK: - 대표 drawing 선택
 
+    /// `setSentence` 가 N-Canvas 의 `SharedUndoManager`(MainActor)를 비우므로 MainActor 에서 리듀서를 부른다.
+    @MainActor
     @Test("전부 지운 최신 기록이 있으면 더 오래된 기록이 대표로 되살아나지 않는다")
     func erasedLatestDrawingIsChosenOverOlderStrokedDrawing() throws {
         let chapter = BibleChapter(title: .nahum, chapter: 1)
@@ -213,9 +214,10 @@ struct DrawingErasePersistenceTesting {
         return try PKDrawing(data: data).strokes.count
     }
 
-    private static func strokeCount(of drawings: [BibleDrawing]) throws -> Int {
-        guard let main = drawings.mainDrawing() else { throw Failure.missingDrawing }
-        return try strokeCount(of: main)
+    private static func strokeCount(of drawings: [VerseDrawingSnapshot]) throws -> Int {
+        guard let main = drawings.representative() else { throw Failure.missingDrawing }
+        guard let data = main.lineData else { throw Failure.missingLineData }
+        return try PKDrawing(data: data).strokes.count
     }
 
     /// 테스트 모델에서 제품 코드와 같은 N-Canvas 저장 요청을 만든다.
@@ -231,12 +233,22 @@ struct DrawingErasePersistenceTesting {
         )
     }
 
-    /// 주어진 actor(= ModelContext)에서 해당 절의 필사 기록을 읽는다.
+    /// 주어진 actor(= ModelContext)에서 해당 절의 필사 기록을 스냅샷으로 읽는다 — 모델은 actor 밖으로 나오지 않는다.
     private static func fetch(
         chapter: BibleChapter,
         verse: Int,
         from actor: SwiftDatabaseActor
-    ) async throws -> [BibleDrawing] {
+    ) async throws -> [VerseDrawingSnapshot] {
+        try await actor.verseDrawingSnapshots(chapter: chapter, verse: verse)
+    }
+}
+
+extension SwiftDatabaseActor {
+    /// 시험 정리 — 해당 절의 필사 행을 actor 안에서 지우고 저장한다. 모델을 actor 밖으로 꺼내지 않는다.
+    /// - Parameters:
+    ///   - chapter: 성경의 이름과 장.
+    ///   - verse: 절 번호.
+    func deleteVerseDrawings(chapter: BibleChapter, verse: Int) throws {
         let titleName = chapter.title.rawValue
         let titleChapter = chapter.chapter
         let predicate = #Predicate<BibleDrawing> {
@@ -244,6 +256,9 @@ struct DrawingErasePersistenceTesting {
             && $0.titleChapter == titleChapter
             && $0.verse == verse
         }
-        return try await actor.fetch(FetchDescriptor(predicate: predicate))
+        for row in try modelContext.fetch(FetchDescriptor(predicate: predicate)) {
+            modelContext.delete(row)
+        }
+        try modelContext.save()
     }
 }

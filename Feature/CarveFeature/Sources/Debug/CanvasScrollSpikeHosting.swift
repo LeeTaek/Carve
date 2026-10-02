@@ -14,6 +14,7 @@ import UIKit
 
 // MARK: - 공통 설정
 
+@MainActor
 enum SpikeCanvasSetup {
     /// A/B 공통 캔버스 설정.
     ///
@@ -159,6 +160,7 @@ struct SpikeOverlayCanvas: UIViewRepresentable {
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
+    @MainActor
     final class Coordinator {
         var appliedKey: String = ""
         let binder = SpikeGestureBinder()

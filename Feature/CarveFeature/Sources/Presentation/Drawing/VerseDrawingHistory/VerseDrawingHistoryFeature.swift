@@ -9,21 +9,20 @@
 import CarveToolkit
 import CoreGraphics
 import Domain
-import SwiftData
 
 import ComposableArchitecture
 
 @Reducer
-public struct VerseDrawingHistoryFeature {
+public struct VerseDrawingHistoryFeature: Sendable {
     @ObservableState
-    public struct State: Identifiable {
+    public struct State: Identifiable, Sendable {
         public var id: String
         /// 성경 제목, 장
         public var title: BibleChapter
         /// 성경 절
         public var verse: Int
-        /// 해당 절에 대한 필사 기록 목록
-        public var drawings: [BibleDrawing] = []
+        /// 해당 절에 대한 필사 기록 목록(행마다 스냅샷 하나)
+        public var drawings: [VerseDrawingSnapshot] = []
         /// 목록을 한 번이라도 받았는지. 조회 전 빈 목록을 "기록 없음" 으로 깜빡이지 않게 한다.
         public var hasLoaded = false
         /// 롱탭한 절 행의 창 좌표(시안 E2 — 팝오버를 그 절 아래에 붙인다). 없으면 화면 가운데에 띄운다.
@@ -46,17 +45,17 @@ public struct VerseDrawingHistoryFeature {
     public enum Action: ViewAction {
         case view(View)
         /// 필사 기록 목록 비동기로 조회하여 반영
-        case setDrawings([BibleDrawing])
-        /// 선택 여부를 상위로 전달: 팝업 닫기 위한 목적, 선택한 drawing 전달
-        case setPresentDrawing(BibleDrawing)
+        case setDrawings([VerseDrawingSnapshot])
+        /// 선택 여부를 상위로 전달: 팝업 닫기 위한 목적, 선택한 회차 전달
+        case setPresentDrawing(VerseDrawingSnapshot)
         /// 고른 회차를 동기화 저장소에 써도 되는지 본 결과. 사유가 있으면 쓰지 않는다(정책 §12-6 결정 1).
-        case restoreChecked(PersistentIdentifier, SyncedWriteBlock?)
+        case restoreChecked(BibleDrawingRowID, SyncedWriteBlock?)
         
         public enum View {
             /// 성경 절에 대한 필사 기록을 가져옴
             case fetchDrawings
             /// 선택된 필사 내용을 Canvas에 main present로 설정(canvas에서 보일)
-            case selectDrawing(BibleDrawing)
+            case selectDrawing(VerseDrawingSnapshot)
         }
     }
     
@@ -75,31 +74,33 @@ public struct VerseDrawingHistoryFeature {
                 // 목록 **맨 위**에 내용 없는 행이 와서 "불러올 수 없는 필사 데이터입니다." 로 그려지고 진짜 보관본이
                 // 그 아래로 밀린다.
                 //
-                // ⚠️ 거르는 곳은 **목록뿐이다.** 저장소의 `fetchDrawings(chapter:verse:)` 는 그대로 둔다 —
-                // `updateDrawings(requests:)` 와 `updatePresentDrawing(chapter:verse:presentID:)` 이 같은 조회를 쓰고,
+                // ⚠️ 거르는 곳은 **목록뿐이다.** 저장소의 `fetchVerseSnapshots(chapter:verse:)` 는 그대로 둔다 —
+                // `updateDrawings(requests:)` 와 `updatePresentDrawing(chapter:verse:presentRowID:)` 이 같은 행을 보고,
                 // 거기서 빈 활성 행이 빠지면 대표가 과거 회차로 승격돼 지운 획이 되살아난다. 회차를 고를 때도
                 // `updatePresentDrawing` 이 DB 의 **모든 행**을 다시 읽어 `isPresent` 를 옮기므로, 목록에서 뺀 빈 행의
                 // 표시도 정상적으로 내려간다.
-                state.drawings = drawings.historyRows()
+                //
+                // 기준은 `Array<BibleDrawing>.historyRows()` 와 같은 `DrawingContentRule.hasStrokes(_:)` 다. 순서는 조회 그대로다.
+                state.drawings = drawings.filter { DrawingContentRule.hasStrokes($0.lineData) }
                 state.hasLoaded = true
                 return .none
                 
             case .view(.selectDrawing(let drawing)):
                 // 회차 바꾸기는 동기화 저장소(`BibleDrawing.isPresent`)를 바꾼다 — 쓰기 직전에 소유를 확인한다.
-                // 모델을 `@Sendable` 클로저에 붙잡지 않도록 ID 만 넘긴다.
-                let presentID = drawing.persistentModelID
+                // 확인 결과에는 행 키만 싣고, 고를 행은 그때의 목록에서 다시 찾는다.
+                let presentRowID = drawing.rowID
                 return .run { [drawingEditEnvironment] send in
-                    await send(.restoreChecked(presentID, SyncedWriteBlock.check(await drawingEditEnvironment.current())))
+                    await send(.restoreChecked(presentRowID, SyncedWriteBlock.check(await drawingEditEnvironment.current())))
                 }
 
-            case let .restoreChecked(presentID, block):
+            case let .restoreChecked(presentRowID, block):
                 if let block {
                     Log.error("이전 필사 기록 — 동기화 저장소에 쓰지 않고 막았다", "\(block)")
                     state.restoreBlock = block
                     return .none
                 }
                 state.restoreBlock = nil
-                guard let drawing = state.drawings.first(where: { $0.persistentModelID == presentID }) else { return .none }
+                guard let drawing = state.drawings.first(where: { $0.rowID == presentRowID }) else { return .none }
                 return handleSelectDrawing(state: &state, drawing: drawing)
                 
             default: return .none
@@ -117,7 +118,7 @@ extension VerseDrawingHistoryFeature {
         let verse = state.verse
         return .run { send in
             do {
-                let fetchedDrawings = try await drawingContext.fetchDrawings(chapter: title, verse: verse)
+                let fetchedDrawings = try await drawingContext.fetchVerseSnapshots(chapter: title, verse: verse)
                 await send(.setDrawings(fetchedDrawings))
             } catch {
                 Log.error("fetched Drawing Data error", error)
@@ -126,26 +127,43 @@ extension VerseDrawingHistoryFeature {
         }
     }
     
-    /// 선택된 필사 기록을 현재 선택 상태로 표시하고, present ID를 갱신한 뒤 상위에 전달.
-    private func handleSelectDrawing(state: inout State, drawing: BibleDrawing) -> Effect<Action> {
-        // 로컬 상태에서 선택된 drawing만 isPresent = true 로 갱신
-        for index in state.drawings.indices {
-            state.drawings[index].isPresent = (state.drawings[index] == drawing)
-        }
+    /// 선택된 필사 기록을 현재 선택 상태로 표시하고, 대표 행을 갱신한 뒤 상위에 전달.
+    /// - Parameters:
+    ///   - state: 목록 상태. 고른 행만 `isPresent == true` 로 바꾼다(표시용).
+    ///   - drawing: 고른 회차.
+    /// - Returns: 저장소의 대표 행을 옮긴 뒤 `setPresentDrawing` 을 보내는 효과. 순서는 저장 → 알림이다.
+    private func handleSelectDrawing(state: inout State, drawing: VerseDrawingSnapshot) -> Effect<Action> {
+        // 로컬 상태에서 선택된 행만 isPresent = true 로 갱신
+        state.drawings = state.drawings.map { $0.withPresent($0.rowID == drawing.rowID) }
         let title = state.title
         let verse = state.verse
-        let presentID = drawing.persistentModelID
-        // 저장이 끝난 뒤 상위에 알리는 순서는 그대로 두되,
-        // @Sendable 클로저가 모델(drawing)을 붙잡지 않도록 전달은 .send 로 분리한다.
+        let presentRowID = drawing.rowID
+        let selected = drawing.withPresent(true)
+        // 저장이 끝난 뒤 상위에 알리는 순서는 그대로 둔다.
         return .concatenate(
             .run { _ in
                 await drawingContext.updatePresentDrawing(
                     chapter: title,
                     verse: verse,
-                    presentID: presentID
+                    presentRowID: presentRowID
                 )
             },
-            .send(.setPresentDrawing(drawing))
+            .send(.setPresentDrawing(selected))
+        )
+    }
+}
+
+private extension VerseDrawingSnapshot {
+    /// 대표 표시(`isPresent`)만 바꾼 사본. 스냅샷은 값이라 목록의 표시를 바꿀 때 새로 만든다.
+    func withPresent(_ isPresent: Bool) -> VerseDrawingSnapshot {
+        VerseDrawingSnapshot(
+            verse: verse,
+            rowID: rowID,
+            isPresent: isPresent,
+            updateDate: updateDate,
+            lineData: lineData,
+            drawingVersion: drawingVersion,
+            metadata: metadata
         )
     }
 }

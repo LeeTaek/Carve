@@ -480,6 +480,7 @@ struct VerseGeometryCollectorTesting {
 // MARK: - Reducer 배선
 
 @Suite("Phase 2 — CarveDetailFeature 레이아웃 측정 배선")
+@MainActor
 struct CarveDetailLayoutMeasurementTesting {
     private let chapter = BibleChapter(title: .genesis, chapter: 1)
 
