@@ -59,7 +59,8 @@ private let settingsInks: [Data] = (0..<4).map { offset in
 @Suite("설정 — 확인이 필요한 필기 · 넣기")
 @MainActor
 struct DraftRecoveryImportTesting {
-    private static let accountA = AccountScope(key: "acct-a")
+    // nonisolated 인 `owned(_:)` 의 기본 인자로 쓴다 — MainActor 격리면 기본값이 격리를 넘는다.
+    private nonisolated static let accountA = AccountScope(key: "acct-a")
     private static let chapter = BibleChapter(title: .genesis, chapter: 1)
     private static let metadata = DrawingLayoutMetadata(
         baseWritingWidth: 372, baseWritingHeight: 60, baseUnderlineAnchors: [0, 30], layoutSignature: "cl1-settings-import"

@@ -8,7 +8,21 @@ public extension SettingsDictionary {
             .merging(moduleVerifier)
             .merging(userScriptSandboxing)
             .merging(assetSymbols)
+            .merging(swift6Concurrency)
     }
+
+    /// Swift 6 동시성 검사를 언어 모드 5 그대로 켠다 — 진단은 오류가 아니라 경고로 나온다(`SWIFT_VERSION` 은 5 그대로).
+    /// - `SWIFT_STRICT_CONCURRENCY`: Sendable · actor 격리를 빠짐없이(complete) 검사한다.
+    /// - `SWIFT_UPCOMING_FEATURE_6_0`: Swift 6 에서 기본이 되는 기능(IsolatedDefaultValues · InferSendableFromCaptures ·
+    ///   DynamicActorIsolation 등)을 한꺼번에 켠다. DynamicActorIsolation 은 실행 중 actor 격리 가정 위반을 잡는다.
+    ///
+    /// `makeModule` 로 만드는 자사 프로젝트에만 붙고 의존성 프로젝트(Tuist/Package.swift)는 그대로다.
+    /// 명령줄 덮어쓰기(`xcodebuild SWIFT_UPCOMING_FEATURE_6_0=YES`)로 켜지 않는다 — 언어 모드 5 인 swift-perception 에까지 걸려
+    /// Swift 6.4 에서 TCA 컴파일이 깨진다.
+    static let swift6Concurrency: Self = [
+        "SWIFT_STRICT_CONCURRENCY": "complete",
+        "SWIFT_UPCOMING_FEATURE_6_0": "YES"
+    ]
 
     /// Asset Catalog 에서 타입 세이프한 심볼과 `Color`/`Image` 확장을 생성한다.
     /// Tuist 의 resourceSynthesizer 가 만드는 접근자와 타입 이름이 달라 충돌하지 않는다.
