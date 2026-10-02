@@ -27,6 +27,8 @@ public struct DrawingDatabase: Sendable {
     /// - Parameter chapter: 가져올 성경의 이름과 장
     /// - Returns: 해당 장의 필사 데이터
     /// - Note: `verse` 기준 오름차순 정렬(1, 2, 3, ...)로 반환
+    /// - Important: @Model 을 actor 밖으로 넘긴다. N-Canvas 는 `fetchForLegacyCanvas(chapter:)` 를 쓴다.
+    @available(*, deprecated, message: "@Model 을 actor 밖으로 넘긴다 — fetchForLegacyCanvas(chapter:) 를 쓴다")
     public func fetch(chapter: BibleChapter) async throws -> [BibleDrawing] {
         let titleName = chapter.title.rawValue
         let chapter = chapter.chapter
@@ -47,6 +49,8 @@ public struct DrawingDatabase: Sendable {
     /// - Returns: 해당 절에 저장된 모든 필사 데이터를 반환
     /// - Note: `updateDate` 기준 내림차순 정렬(가장 최근 데이터가 먼저)으로 반환되며,
     ///         비어 있을 경우 빈 배열(`[]`) 반환.
+    /// - Important: @Model 을 actor 밖으로 넘긴다. 이력 화면은 `fetchVerseSnapshots(chapter:verse:)` 를 쓴다.
+    @available(*, deprecated, message: "@Model 을 actor 밖으로 넘긴다 — fetchVerseSnapshots(chapter:verse:) 를 쓴다")
     public func fetchDrawings(chapter: BibleChapter, verse: Int) async throws -> [BibleDrawing] {
         let titleName = chapter.title.rawValue
         let chapter = chapter.chapter
@@ -62,20 +66,13 @@ public struct DrawingDatabase: Sendable {
         return storedDrawing
     }
 
-    public func fetchDrawings(date: Date) async throws -> [BibleDrawing]? {
+    /// 그날(달력 기준 하루) 고친 필사의 활동 값. 정렬하지 않는다.
+    public func fetchDrawings(date: Date) async throws -> [DrawingActivity]? {
         let calendar = Calendar.current
         let startOfDay = calendar.startOfDay(for: date)
         let endOfDay = calendar.date(byAdding: DateComponents(day: 1, second: -1), to: startOfDay)!
 
-        let predicate = #Predicate<BibleDrawing> {
-            if let updateDate = $0.updateDate {
-                  return updateDate >= startOfDay && updateDate <= endOfDay
-              } else {
-                  return false
-              }
-        }
-        let descriptor = FetchDescriptor(predicate: predicate)
-        let storedDrawing: [BibleDrawing]? = try await actor.fetch(descriptor)
+        let storedDrawing: [DrawingActivity]? = try await actor.drawingActivities(from: startOfDay, through: endOfDay)
         Log.debug("Drew Log Count:", storedDrawing?.count ?? 0 )
         return storedDrawing
     }
@@ -88,13 +85,12 @@ public struct DrawingDatabase: Sendable {
     public func updateDrawings(requests: [DrawingUpdateRequest]) async {
         for req in requests {
             do {
-                // 해당 verse 에 대한 기존 drawing fetch
-                let existing = try await fetchDrawings(chapter: req.chapter, verse: req.verse).mainDrawing()
+                // 해당 verse 의 대표 drawing 을 actor 안에서 고른다 — 모델은 actor 밖으로 나오지 않는다.
+                let existingID = try await actor.mainDrawingID(chapter: req.chapter, verse: req.verse)
 
-                if let existing {
+                if let id = existingID {
                     // 기존 데이터 업데이트
-                    let id = existing.persistentModelID
-                    try await actor.update(id) { (old: BibleDrawing) async in
+                    try await actor.update(id) { (old: BibleDrawing) in
                         old.lineData = req.updateLineData
                         old.updateDate = req.updateDate
                     }
@@ -127,6 +123,7 @@ public struct DrawingDatabase: Sendable {
     ///   - chapter: 성경의 이름과 장
     ///   - verse: 절 번호
     ///   - presentID: isPresent = true 로 표시할 Drawing의 ID
+    @available(*, deprecated, message: "PersistentIdentifier 를 Feature 에 넘긴다 — updatePresentDrawing(chapter:verse:presentRowID:) 를 쓴다")
     public func updatePresentDrawing(
         chapter: BibleChapter,
         verse: Int,
@@ -136,7 +133,7 @@ public struct DrawingDatabase: Sendable {
             let drawings = try await fetchDrawings(chapter: chapter, verse: verse)
             for drawing in drawings {
                 let id = drawing.persistentModelID
-                try await actor.update(id) { (old: BibleDrawing) async in
+                try await actor.update(id) { (old: BibleDrawing) in
                     old.isPresent = (old.persistentModelID == presentID)
                 }
             }
@@ -151,24 +148,59 @@ public struct DrawingDatabase: Sendable {
             Log.error("❌ updatePresentDrawing failed:", error)
         }
     }
-    
-    
+
+    // MARK: - 값으로 읽기 (모델은 actor 안에 둔다)
+
+    /// 해당 절의 필사 행을 스냅샷으로 모두 가져온다 — 이력 화면용.
+    /// - Parameters:
+    ///   - chapter: 해당 성경의 이름과 장
+    ///   - verse: 절 번호
+    /// - Returns: 행마다 하나. 옛 `fetchDrawings(chapter:verse:)` 와 같은 행 · 같은 순서(`updateDate` 최신순)이고, 없으면 `[]`.
+    /// - Note: 매핑은 actor 안에서 한다. 부작용 없음.
+    public func fetchVerseSnapshots(chapter: BibleChapter, verse: Int) async throws -> [VerseDrawingSnapshot] {
+        try await actor.verseDrawingSnapshots(chapter: chapter, verse: verse)
+    }
+
+    /// 특정 절에서 어떤 행이 대표(`isPresent`)인지 저장한다 — 옛 `PersistentIdentifier` 판과 같은 동작이다.
+    /// - Parameters:
+    ///   - chapter: 성경의 이름과 장
+    ///   - verse: 절 번호
+    ///   - presentRowID: `isPresent = true` 로 표시할 행의 키. 그 절의 나머지 행은 `false` 가 된다.
+    /// - Note: 실패하면 분석 이벤트와 로그만 남긴다(던지지 않는다).
+    public func updatePresentDrawing(
+        chapter: BibleChapter,
+        verse: Int,
+        presentRowID: BibleDrawingRowID
+    ) async {
+        do {
+            try await actor.markPresentDrawing(chapter: chapter, verse: verse, presentRowID: presentRowID)
+            Log.debug(" updatePresentDrawing verse:", verse)
+        } catch {
+            analyticsClient.trackErrorShown(
+                .drawingUpdatePresentFailed,
+                feature: .domain,
+                context: "DrawingDatabase.updatePresentDrawing",
+                message: error.localizedDescription
+            )
+            Log.error("❌ updatePresentDrawing failed:", error)
+        }
+    }
+
+    /// 한 장의 필사 행을 모두 불러온다 — N-Canvas 전용.
+    /// - Parameter chapter: 가져올 성경의 이름과 장
+    /// - Returns: 옛 `fetch(chapter:)` 와 같은 행(`verse` 오름차순). 이행 중 예외(N-Canvas): N-Canvas 제거 때 지운다 — 룰북 swiftdata.md
+    public func fetchForLegacyCanvas(chapter: BibleChapter) async throws -> UncheckedSendable<[BibleDrawing]> {
+        try await actor.legacyCanvasDrawings(chapter: chapter)
+    }
+
     // MARK: - Page 단위 BibleDrawing
     
     /// 한 장 전체의 페이지 단위 필사 데이터(BiblePageDrawing)를 불러옴.
     /// - Parameter chapter: 가져올 성경의 이름과 장
     /// - Returns: 해당 장의 페이지 전체 필사 데이터 (없으면 nil)
     /// - Note: 정렬 조건은 없으며, 조건에 매칭되는 첫 번째 레코드만 반환.
-    public func fetchPageDrawing(chapter: BibleChapter) async throws -> BiblePageDrawing? {
-        let titleName = chapter.title.rawValue
-        let chapter = chapter.chapter
-        let predicate = #Predicate<BiblePageDrawing> {
-            $0.titleName == titleName &&
-            $0.titleChapter == chapter
-        }
-        let descriptor = FetchDescriptor(predicate: predicate)
-        let stored: BiblePageDrawing? = try await actor.fetch(descriptor).first
-        return stored
+    public func fetchPageDrawing(chapter: BibleChapter) async throws -> BiblePageDrawingSnapshot? {
+        try await actor.pageDrawingSnapshot(chapter: chapter)
     }
     
     /// 페이지 단위 full PKDrawing 저장/업데이트
@@ -198,10 +230,9 @@ public struct DrawingDatabase: Sendable {
         updateDate: Date = .now
     ) async {
         do {
-            if let existing = try await fetchPageDrawing(chapter: chapter) {
+            if let id = try await actor.pageDrawingID(chapter: chapter) {
                 // 기존 페이지 Drawing 업데이트
-                let id = existing.persistentModelID
-                try await actor.update(id) { (old: BiblePageDrawing) async in
+                try await actor.update(id) { (old: BiblePageDrawing) in
                     old.fullLineData = fullLineData
                     old.updateDate = updateDate
                 }
@@ -240,39 +271,15 @@ public struct DrawingDatabase: Sendable {
         }
     }
     
-    /// 최근 range 사이에 업데이트 된 drawing을 최신순으로 반환
-    public func fetchDrawings(in range: DateInterval) async throws -> [BibleDrawing] {
-        let predicate = #Predicate<BibleDrawing> {
-            if let updateDate = $0.updateDate {
-                return updateDate >= range.start && updateDate < range.end
-            } else {
-                return false
-            }
-        }
-
-        let descriptor = FetchDescriptor(
-            predicate: predicate,
-            sortBy: [SortDescriptor(\.updateDate, order: .reverse)]
-        )
-
-        return try await actor.fetch(descriptor)
+    /// 최근 range 사이에 업데이트 된 drawing의 활동 값을 최신순으로 반환
+    public func fetchDrawings(in range: DateInterval) async throws -> [DrawingActivity] {
+        try await actor.drawingActivities(in: range)
     }
     
-    /// 최근 필사 Verse 리스트용 (최신순, 제한)
-    public func fetchRecentDrawings(limit: Int) async throws -> [BibleDrawing] {
+    /// 최근 필사 Verse 리스트용 활동 값 (최신순, 제한)
+    public func fetchRecentDrawings(limit: Int) async throws -> [DrawingActivity] {
         guard limit > 0 else { return [] }
-
-        let predicate = #Predicate<BibleDrawing> {
-            $0.updateDate != nil
-        }
-
-        var descriptor = FetchDescriptor(
-            predicate: predicate,
-            sortBy: [SortDescriptor(\.updateDate, order: .reverse)]
-        )
-        descriptor.fetchLimit = limit
-
-        return try await actor.fetch(descriptor)
+        return try await actor.recentDrawingActivities(limit: limit)
     }
 
     /// 성경 한 권의 장별 필사 기록을 요약한다 — 탐색 장 목록이 필사한 장을 칠하고 기본 장을 고를 때 쓴다.
@@ -349,7 +356,7 @@ extension SwiftDatabaseActor {
 
 extension DrawingDatabase: DependencyKey {
     public static let liveValue: DrawingDatabase = Self()
-    public static var testValue: DrawingDatabase = {
+    public static let testValue: DrawingDatabase = {
         let database = withDependencies {
             $0.createSwiftDataActor = .testValue
         } operation: {
@@ -357,7 +364,7 @@ extension DrawingDatabase: DependencyKey {
         }
         return database
     }()
-    public static var previewValue: DrawingDatabase = {
+    public static let previewValue: DrawingDatabase = {
         let database = withDependencies {
             $0.createSwiftDataActor = .previewValue
         } operation: {

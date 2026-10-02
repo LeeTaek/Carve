@@ -195,9 +195,9 @@ struct LegacyRowSeparationProbeTesting {
 
     private func insertRows(_ container: NSPersistentContainer, count: Int, entity: String = "BibleDrawing", id: String? = nil) throws -> [String] {
         let context = container.newBackgroundContext()
-        var made: [String] = []
-        var thrown: Error?
-        context.performAndWait {
+        // 블록이 @Sendable 이라 바깥 변수를 고치지 않고, 결과를 블록 안에서 모아 돌려받는다.
+        return try context.performAndWait {
+            var made: [String] = []
             for index in 0 ..< count {
                 let object = NSEntityDescription.insertNewObject(forEntityName: entity, into: context)
                 let known = object.entity.attributesByName.keys
@@ -222,10 +222,9 @@ struct LegacyRowSeparationProbeTesting {
                 for (key, value) in values where known.contains(key) { object.setValue(value, forKey: key) }
                 made.append("\(entity) \(identifier)")
             }
-            do { try context.save() } catch { thrown = error }
+            try context.save()
+            return made
         }
-        if let thrown { throw thrown }
-        return made
     }
 
     /// 이력 표를 비운다 — 오래전에 쓰여 이력이 정리된(또는 잘린) 무대응 행을 흉내 낸다(관문 미확인 항목 ①). 사본에서만 한다.
@@ -273,11 +272,11 @@ struct LegacyRowSeparationProbeTesting {
 
     private func deleteRows(_ container: NSPersistentContainer, state: MirroringState, select: String, count: Int, id: String? = nil) throws -> [String] {
         let context = container.newBackgroundContext()
-        var removed: [String] = []
-        var thrown: Error?
-        context.performAndWait {
+        // 블록이 @Sendable 이라 바깥 변수를 고치지 않고, 결과를 블록 안에서 모아 돌려받는다.
+        return try context.performAndWait {
+            var removed: [String] = []
             let request = NSFetchRequest<NSManagedObject>(entityName: "BibleDrawing")
-            guard let objects = try? context.fetch(request) else { return }
+            guard let objects = try? context.fetch(request) else { return removed }
             let wanted = objects.filter { object in
                 if let id { return (object.value(forKey: "id") as? String) == id }
                 guard let pk = primaryKey(of: object.objectID) else { return false }
@@ -290,10 +289,9 @@ struct LegacyRowSeparationProbeTesting {
                 removed.append("Z_PK \(pk) · id \(identifier)")
                 context.delete(object)
             }
-            do { try context.save() } catch { thrown = error }
+            try context.save()
+            return removed
         }
-        if let thrown { throw thrown }
-        return removed
     }
 
     /// 앱이 쓰는 마이그레이션 플랜으로 **CloudKit 없이** 연다 — C14 게이트가 하려는 바로 그 열기다. 열고 닫기만 한다.

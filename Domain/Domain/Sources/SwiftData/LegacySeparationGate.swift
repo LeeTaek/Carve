@@ -197,16 +197,16 @@ public struct LegacySeparationRecordStore: Sendable {
     }
 
     public let area: PreservationArea
-    private let fileManager: FileManager
+    /// `FileManager` 는 Sendable 이 아니라 저장하지 않고 공유 인스턴스를 쓴다.
+    private var fileManager: FileManager { .default }
     private static let jobFileName = "job.json"
     private static let rowsDirectoryName = "rows"
     private static let partialSuffix = ".partial"
     /// 외부 저장(`.externalStorage`)이 되는 열 — 값 앞에 `0x01`(안에 둠) · `0x02`(파일 이름) 이 붙는다.
     private static let externalColumns: Set<String> = ["ZLINEDATA", "ZLAYOUTMETADATADATA", "ZFULLLINEDATA"]
 
-    public init(area: PreservationArea, fileManager: FileManager = .default) {
+    public init(area: PreservationArea) {
         self.area = area
-        self.fileManager = fileManager
     }
 
     public var directory: URL { area.separationDirectory }
@@ -468,12 +468,12 @@ public struct LegacySeparationGate: Sendable {
 
     public var reader: LegacyRowLinkageReader
     public var records: LegacySeparationRecordStore
-    private let fileManager: FileManager
+    /// `FileManager` 는 Sendable 이 아니라 저장하지 않고 공유 인스턴스를 쓴다.
+    private var fileManager: FileManager { .default }
 
-    public init(area: PreservationArea, reader: LegacyRowLinkageReader = LegacyRowLinkageReader(), fileManager: FileManager = .default) {
+    public init(area: PreservationArea, reader: LegacyRowLinkageReader = LegacyRowLinkageReader()) {
         self.reader = reader
-        self.records = LegacySeparationRecordStore(area: area, fileManager: fileManager)
-        self.fileManager = fileManager
+        self.records = LegacySeparationRecordStore(area: area)
     }
 
     /// 저장소(이미 현재 스키마로 옮겨진 것)를 판정하고, 대응 없는 행이 있으면 보존한 뒤 결정을 돌려준다.

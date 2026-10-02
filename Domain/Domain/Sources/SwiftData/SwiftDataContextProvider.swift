@@ -14,12 +14,14 @@ import SwiftData
 import Dependencies
 
 /// CloudKit 컨테이너 식별자와 로컬 SwiftData DB 파일 경로를 관리.
-public class ContainerID {
+///
+/// 만든 뒤 바뀌지 않는 값이라 의존성(`containerId`)으로 여러 격리에서 함께 읽는다.
+public final class ContainerID: Sendable {
     /// 기본값(초기 상태)로 사용하는 ContainerID. 실제 컨테이너 ID는 앱 시작 시 주입.
-    public static var initialState = ContainerID(id: "")
-    public var id: String
+    public static let initialState = ContainerID(id: "")
+    public let id: String
     /// 로컬 SwiftData SQLite 파일 경로. dev/prod 여부에 따라 경로 설정.
-    public var localDBPath: String
+    public let localDBPath: String
     
     public init(id: String) {
         self.id = id

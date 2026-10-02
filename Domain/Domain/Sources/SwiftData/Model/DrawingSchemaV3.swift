@@ -10,7 +10,7 @@ import Foundation
 import SwiftData
 
 public enum DrawingSchemaV3: VersionedSchema {
-    public static var versionIdentifier = Schema.Version(3, 0, 0)
+    public static let versionIdentifier = Schema.Version(3, 0, 0)
     
     public static var models: [any PersistentModel.Type] {
         [BibleDrawing.self, BiblePageDrawing.self]

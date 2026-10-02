@@ -33,9 +33,7 @@ private final class CountingAccountStatus: CloudAccountStatusClient, @unchecked 
     }
 
     func availability() async -> CloudAccountAvailability {
-        lock.lock()
-        count += 1
-        lock.unlock()
+        lock.withLock { count += 1 }
         for await _ in stream { break }
         return .available
     }

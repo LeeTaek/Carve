@@ -280,7 +280,8 @@ public actor CloudKitStoreOwnershipProofClient: StoreOwnershipProofClient {
         self.preservation = preservation
         self.privateRecordLookup = CloudKitPrivateRecordLookupClient(containerID: containerID)
         self.reader = LegacyRowLinkageReader()
-        self.ledger = StoreOwnershipLedger(area: .live(localDBPath: preservation.storeFileName), fileManager: fileManager)
+        // `FileManager` 는 Sendable 이 아니라 두 actor 가 한 인스턴스를 나눠 쥘 수 없다 — 표식 장부는 자기 기본값(`.default`)을 쓴다.
+        self.ledger = StoreOwnershipLedger(area: .live(localDBPath: preservation.storeFileName))
         self.fileManager = fileManager
     }
 
@@ -299,7 +300,7 @@ public actor CloudKitStoreOwnershipProofClient: StoreOwnershipProofClient {
         self.preservation = preservation
         self.privateRecordLookup = privateRecordLookup
         self.reader = LegacyRowLinkageReader()
-        self.ledger = StoreOwnershipLedger(area: ownershipArea, fileManager: fileManager)
+        self.ledger = StoreOwnershipLedger(area: ownershipArea)
         self.fileManager = fileManager
     }
 

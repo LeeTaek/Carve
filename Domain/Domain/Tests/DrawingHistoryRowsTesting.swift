@@ -24,8 +24,8 @@ struct DrawingHistoryRowsTesting {
 
     /// 인메모리 컨테이너 하나에 actor 와 `DrawingDatabase` 를 함께 물린다.
     ///
-    /// 목록이 실제로 쓰는 조회(`DrawingDatabase.fetchDrawings(chapter:verse:)`)와 지우기
-    /// (`archiveAndResetVerseDrawing`)가 **같은 저장소**를 봐야 두 경로의 어긋남을 잡을 수 있다.
+    /// 목록이 실제로 쓰는 조회(`DrawingDatabase.fetchVerseSnapshots(chapter:verse:)` — 옛 `fetchDrawings(chapter:verse:)` 와 같은 행 · 순서)와
+    /// 지우기(`archiveAndResetVerseDrawing`)가 **같은 저장소**를 봐야 두 경로의 어긋남을 잡을 수 있다.
     private struct Harness {
         let actor: SwiftDatabaseActor
         let database: DrawingDatabase
@@ -44,8 +44,7 @@ struct DrawingHistoryRowsTesting {
             }
         }
 
-        @discardableResult
-        func seed(rowID: BibleDrawingRowID, lineData: Data?, updateDate: Date, isPresent: Bool = false) async throws -> BibleDrawing {
+        func seed(rowID: BibleDrawingRowID, lineData: Data?, updateDate: Date, isPresent: Bool = false) async throws {
             let row = BibleDrawing(
                 bibleTitle: DrawingHistoryRowsTesting.chapter,
                 verse: DrawingHistoryRowsTesting.verse,
@@ -56,7 +55,17 @@ struct DrawingHistoryRowsTesting {
             row.isPresent = isPresent
             row.drawingVersion = 3
             try await actor.insert(row)
-            return row
+        }
+
+        /// 목록 조회와 같은 조건 · 정렬(`updateDate` 최신순)로 행을 시험 문맥에서 직접 읽는다 — 모델을 actor 밖으로 받지 않는다.
+        func storedRows(in context: ModelContext) throws -> [BibleDrawing] {
+            let titleName = DrawingHistoryRowsTesting.chapter.title.rawValue
+            let chapterNumber = DrawingHistoryRowsTesting.chapter.chapter
+            let verse = DrawingHistoryRowsTesting.verse
+            let predicate = #Predicate<BibleDrawing> {
+                $0.titleName == titleName && $0.titleChapter == chapterNumber && $0.verse == verse
+            }
+            return try context.fetch(FetchDescriptor(predicate: predicate, sortBy: [SortDescriptor(\.updateDate, order: .reverse)]))
         }
     }
 
@@ -96,8 +105,12 @@ struct DrawingHistoryRowsTesting {
 
         // ① 저장소 조회는 그대로다 — 두 행 다 준다. 빈 활성 행이 `updateDate` 최신이라 **맨 위**에 온다.
         //    거르지 않으면 이 행이 "불러올 수 없는 필사 데이터입니다." 로 그려지던 자리다.
-        let rows = try await harness.database.fetchDrawings(chapter: Self.chapter, verse: Self.verse)
+        let listedSnapshots = try await harness.database.fetchVerseSnapshots(chapter: Self.chapter, verse: Self.verse)
+        let context = ModelContext(harness.actor.modelContainer)
+        let rows = try harness.storedRows(in: context)
         #expect(rows.count == 2)
+        // 목록이 쓰는 스냅샷 조회도 같은 행 · 같은 순서다.
+        #expect(listedSnapshots.map(\.rowID.raw) == rows.map(\.rowKey))
         #expect(rows.first?.rowKey == activeRowID.raw)
         #expect(rows.first?.lineData == nil)
 
@@ -142,8 +155,11 @@ struct DrawingHistoryRowsTesting {
         try await harness.seed(rowID: BibleDrawingRowID(raw: "row-nil"), lineData: nil,
                                updateDate: Date(timeIntervalSince1970: 100))
 
-        let rows = try await harness.database.fetchDrawings(chapter: Self.chapter, verse: Self.verse)
+        let listedSnapshots = try await harness.database.fetchVerseSnapshots(chapter: Self.chapter, verse: Self.verse)
+        let context = ModelContext(harness.actor.modelContainer)
+        let rows = try harness.storedRows(in: context)
         #expect(rows.count == 5)
+        #expect(listedSnapshots.map(\.rowID.raw) == rows.map(\.rowKey))
 
         let listed = rows.historyRows()
         #expect(listed.map(\.rowKey) == [newerInk.raw, olderInk.raw])

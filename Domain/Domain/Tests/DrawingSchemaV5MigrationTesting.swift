@@ -76,7 +76,7 @@ struct DrawingSchemaV5MigrationTesting {
         let container = try V4StoreHarness.openV4(at: directory)
         let actor = SwiftDatabaseActor(modelContainer: container)
 
-        let rows: [BibleDrawing] = try await actor.fetch(FetchDescriptor<BibleDrawing>())
+        let rows: [BibleDrawing] = try ModelContext(container).fetch(FetchDescriptor<BibleDrawing>())
         #expect(rows.count == 1)
         let row = try #require(rows.first)
         #expect(row.rowKey == "row-v4")

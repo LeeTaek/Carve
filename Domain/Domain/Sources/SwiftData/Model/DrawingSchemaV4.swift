@@ -38,7 +38,7 @@ import SwiftData
 ///              V4 인 채로 남습니다. 그래서 "기존 N Canvas 경로가 V4 저장소에서 동작하는지" 를
 ///              Phase 1 에서 먼저 확보합니다.
 public enum DrawingSchemaV4: VersionedSchema {
-    public static var versionIdentifier = Schema.Version(4, 0, 0)
+    public static let versionIdentifier = Schema.Version(4, 0, 0)
 
     public static var models: [any PersistentModel.Type] {
         [BibleDrawing.self, BiblePageDrawing.self]
