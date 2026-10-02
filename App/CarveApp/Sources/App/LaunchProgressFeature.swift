@@ -112,9 +112,10 @@ public struct LaunchProgressFeature {
                     }
                 )
             case .binding:
-                return .run { send in
+                // `$syncState` 는 MainActor 에서만 읽는다 — 구독 효과를 MainActor 에서 돌린다. 받는 값 · 순서는 그대로다.
+                return .run { @MainActor send in
                     for await syncState in cloudkitContainer.$syncState.values {
-                        await send(.updateSyncState(syncState))
+                        send(.updateSyncState(syncState))
                     }
                 }
             case .modeDetermined(let mode):
