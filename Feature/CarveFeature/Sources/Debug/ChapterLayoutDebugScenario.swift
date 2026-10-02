@@ -31,7 +31,7 @@ enum ChapterLayoutDebugScenario {
 
     /// §18-3 (C) 근사. 절 목록을 11등분해 각 지점의 절이 화면 하단에 오도록 스크롤한다.
     ///
-    /// 스크롤 수단은 호출부가 준다 — N-Canvas 는 `ScrollViewProxy`, 단일 Canvas 는 `scrollToVerse` 액션.
+    /// 스크롤 수단은 호출부가 준다 — 단일 Canvas 의 `scrollToVerse` 액션.
     /// - Parameters:
     ///   - verses: 스크롤 대상 절 번호 (본문 순서).
     ///   - scrollTo: 절 하나로 스크롤하는 클로저.

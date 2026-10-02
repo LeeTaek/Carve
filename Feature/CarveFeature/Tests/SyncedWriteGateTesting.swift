@@ -16,7 +16,7 @@ import ComposableArchitecture
 @testable import CarveFeature
 
 /// 이 파일이 막는 것:
-/// - 메뉴 · 버튼만 감추고 실제 쓰기는 그대로 나가는 것 — 소유가 확인되지 않은 세션의 즐겨찾기 · 위젯 보관 · 목록 되돌리기 · N-Canvas 저장 ·
+/// - 메뉴 · 버튼만 감추고 실제 쓰기는 그대로 나가는 것 — 소유가 확인되지 않은 세션의 즐겨찾기 · 위젯 보관 · 목록 되돌리기 ·
 ///   기록 복원이 동기화 저장소에 들어가면 다음에 확인되는 계정으로 올라간다(F30)
 /// - 막았는데 화면 표시(별 · 목록 · 배지)는 바뀐 채로 남는 것
 @Suite("동기화 쓰기 게이트 — 쓰기 진입점에서 막는다")
@@ -59,7 +59,7 @@ struct SyncedWriteGateTesting {
     private static func detailState(favorites: Set<Int> = []) -> CarveDetailFeature.State {
         var state = CarveDetailFeature.State.initialState
         state.sentenceWithDrawingState = [
-            SentencesWithDrawingFeature.State(sentence: BibleVerse(title: chapter, verse: 1, sentence: sentence), drawing: nil)
+            SentencesWithDrawingFeature.State(sentence: BibleVerse(title: chapter, verse: 1, sentence: sentence))
         ]
         state.favoriteChapter = chapter
         state.favoriteVerses = favorites
@@ -83,7 +83,6 @@ struct SyncedWriteGateTesting {
             $0.drawingRepository = RepositorySpy()
             $0.drawingCodec = CanvasTestSupport.codec(results: LockIsolated([]))
             $0.uuid = .incrementing
-            $0.undoManager = SharedUndoManager()
         }
     }
 
@@ -161,47 +160,6 @@ struct SyncedWriteGateTesting {
         #expect(store.favoriteVerses.isEmpty)
     }
 
-    @Test("N-Canvas 는 확인되기 전에는 입력을 닫고 사유를 든다")
-    func nCanvasInputIsClosedUntilConfirmed() {
-        var state = Self.detailState()
-        // 처음에는 확인 전으로 막아 둔다 — 열어 두고 뒤늦게 막으면 그 사이 쓴 필기가 저장소에 들어간다.
-        #expect(state.nCanvasWriteBlock == .accountUnconfirmed)
-
-        _ = CarveDetailFeature().reduce(into: &state, action: .syncedWriteGateChanged(.signedOut))
-        #expect(state.nCanvasWriteBlock == .signedOut)
-
-        _ = CarveDetailFeature().reduce(into: &state, action: .syncedWriteGateChanged(nil))
-        #expect(state.nCanvasWriteBlock == nil)
-    }
-
-    @Test("N-Canvas 의 저장은 쓰기 직전에 막는다 — 막히면 저장소에 행이 생기지 않는다")
-    func nCanvasSaveIsBlockedAtWrite() async throws {
-        let chapter = BibleChapter(title: .nahum, chapter: 3)
-        let request = LegacyDrawingSaveRequest(
-            chapter: chapter, verse: 42, rowID: BibleDrawingRowID(raw: UUID().uuidString), lineData: Data([7]),
-            updateDate: Self.now, drawingVersion: 2, layoutMetadataData: nil
-        )
-
-        try await withDependencies {
-            $0.drawingEditEnvironment = Self.signedOut
-            $0.createSwiftDataActor = .testValue
-        } operation: {
-            try await CarveDetailFeature().persistDrawing(request)
-            @Dependency(\.drawingData) var drawingData
-            #expect(try await drawingData.fetchVerseSnapshots(chapter: chapter, verse: 42).isEmpty)
-        }
-
-        // 소유가 확인된 환경에서는 같은 요청이 저장된다 — 게이트가 저장 자체를 막는 것이 맞는지 함께 본다.
-        try await withDependencies {
-            $0.drawingEditEnvironment = StubDrawingEditEnvironment(.ownedForTesting)
-            $0.createSwiftDataActor = .testValue
-        } operation: {
-            try await CarveDetailFeature().persistDrawing(request)
-            @Dependency(\.drawingData) var drawingData
-            #expect(try await drawingData.fetchVerseSnapshots(chapter: chapter, verse: 42).count == 1)
-        }
-    }
-
     // MARK: - 절 단위 출처 (11차 리뷰 P0-2)
 
     /// 보이기만 하는 초안(다른 계정 · 확인 전)을 이어 보는 절이다. 환경은 소유가 확인됐어도 그 잉크는 이 계정의 것이 아니다.
@@ -232,7 +190,6 @@ struct SyncedWriteGateTesting {
             $0.drawingRepository = RepositorySpy()
             $0.drawingCodec = CanvasTestSupport.codec(results: LockIsolated([]))
             $0.uuid = .incrementing
-            $0.undoManager = SharedUndoManager()
         }
     }
 

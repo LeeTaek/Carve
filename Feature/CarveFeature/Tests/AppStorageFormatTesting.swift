@@ -64,22 +64,22 @@ struct AppStorageFormatTesting {
         }
     }
 
-    /// `CarveNavigationFeature` · `CarveDetailFeature` 와 같은 선언을 쓴다 — 그 State 는 다른 화면의 공유 초기 상태를 품고 있어
-    /// 시험 저장소로 따로 만들 수 없다. 설정 화면(`CanvasSettingsFeature`)은 단일 Canvas flag 를 UserDefaults 로 직접 읽고 쓴다.
+    /// `CarveNavigationFeature` 와 같은 선언을 쓴다 — 그 State 는 다른 화면의 공유 초기 상태를 품고 있어 시험 저장소로 따로 만들 수 없다.
+    /// 2.0.x 의 단일 Canvas flag 키(`"singleCanvasEnabled"`)는 2.1 에서 flag 를 지운 뒤에도 N-Canvas 제거 안내가 UserDefaults 로 직접 Bool 로 읽는다.
     @Test("첫 실행 안내 · 단일 Canvas flag 는 Bool 로 저장해 설정 화면의 UserDefaults 직접 읽기와 맞는다")
     func flagsMatchDirectUserDefaultsAccess() throws {
         try withSuite { defaults in
             withDependencies { $0.defaultAppStorage = defaults } operation: {
                 @Shared(.appStorage("hasSeenFirstRunGuide")) var hasSeenFirstRunGuide = false
-                @Shared(.appStorage(SingleCanvasFlag.appStorageKey)) var isSingleCanvasEnabled = SingleCanvasFlag.defaultValue
+                @Shared(.appStorage("singleCanvasEnabled")) var isSingleCanvasEnabled = true
                 $hasSeenFirstRunGuide.withLock { $0 = true }
                 $isSingleCanvasEnabled.withLock { $0 = false }
             }
 
             #expect(defaults.object(forKey: "hasSeenFirstRunGuide") as? Bool == true)
-            #expect(defaults.object(forKey: SingleCanvasFlag.appStorageKey) as? Bool == false)
-            #expect(defaults.object(forKey: SingleCanvasFlag.appStorageKey) != nil)
-            #expect(!defaults.bool(forKey: SingleCanvasFlag.appStorageKey))
+            #expect(defaults.object(forKey: "singleCanvasEnabled") as? Bool == false)
+            #expect(defaults.object(forKey: "singleCanvasEnabled") != nil)
+            #expect(!defaults.bool(forKey: "singleCanvasEnabled"))
         }
     }
 

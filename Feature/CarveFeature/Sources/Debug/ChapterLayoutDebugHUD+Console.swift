@@ -13,7 +13,6 @@ extension ChapterLayoutDebugHUD {
         let slackBands = measurement.reflowSlacks.map { "v\($0.verse):+\($0.extraBands)" }.joined(separator: ",")
         var fields = [
             "chapter=\(chapter)",
-            "mode=\(compose == nil ? "N-Canvas" : "SingleCanvas")",
             "gate=\(measurement.isReady ? "PASS" : "FAIL")",
             "measured=\(measurement.textMeasurements.count)/\(measurement.expectedVerseCount ?? 0)",
             "build=\(measurement.buildCount) firstMs=\(duration.map { String(format: "%.0f", $0) } ?? "—")",

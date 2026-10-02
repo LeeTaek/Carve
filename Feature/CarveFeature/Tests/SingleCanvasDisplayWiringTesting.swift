@@ -51,7 +51,6 @@ struct SingleCanvasDisplayWiringTesting {
             $0.drawingRepository = spy
             $0.drawingCodec = .liveValue
             $0.bibleTextClient = StubBibleTextClient(verseCount: 5)
-            $0.undoManager = SharedUndoManager()
             $0.uuid = .incrementing
             $0.date = .constant(Date(timeIntervalSince1970: 0))
         }
@@ -93,7 +92,6 @@ struct SingleCanvasDisplayWiringTesting {
         let suite = "SingleCanvasWiring.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
-        defaults.set(true, forKey: SingleCanvasFlag.appStorageKey)
 
         try await withDependencies {
             $0.defaultAppStorage = defaults
@@ -101,7 +99,6 @@ struct SingleCanvasDisplayWiringTesting {
             let spy = RepositorySpy()
             spy.snapshots = { _ in [Self.legacyRow()] }
             let store = makeStore(spy: spy)
-            try #require(store.usesSingleCanvas)
             let hosting = UIHostingController(rootView: CarveDetailView(store: store))
             let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 1_200, height: 800))
             window.rootViewController = hosting

@@ -12,6 +12,8 @@ import Domain
 import Foundation
 import Testing
 
+import ComposableArchitecture
+
 @testable import CarveFeature
 
 @Suite("진단 — 저장 줄 수 초과(slack) 절")
@@ -122,4 +124,96 @@ struct ChapterLayoutSlackDiagnosticsTesting {
         #expect(!snapshot.contains("slackAdjusted"))
     }
     #endif
+}
+
+// MARK: - 저장 band 수의 출처 (2.1 N-Canvas 제거 뒤)
+
+/// slack 진단의 저장 band 수(`N_saved`)는 2.0.x 까지 N-Canvas 가 읽은 행(@Model)에서 왔다. 2.1 은 그 조회를 지웠으므로
+/// **단일 Canvas 가 읽은 장의 행**(`ChapterCanvasFeature.State.loadedDrawings`)의 metadata 에서 센다.
+/// 출처를 잃으면 HUD 의 slack 이 오류 없이 늘 비게 된다 — 그것을 막는 자리다.
+@Suite("진단 — slack 의 저장 band 수는 단일 Canvas 가 읽은 행에서 온다")
+@MainActor
+struct ChapterLayoutSlackSourceTesting {
+    private let chapter = BibleChapter(title: .genesis, chapter: 1)
+
+    nonisolated private static func metadata(bands: Int) -> DrawingLayoutMetadata {
+        DrawingLayoutMetadata(
+            baseWritingWidth: 372, baseWritingHeight: CGFloat(bands) * 30,
+            baseUnderlineAnchors: (0..<bands).map { CGFloat($0) * 30 }, layoutSignature: "cl1-test"
+        )
+    }
+
+    nonisolated private static func row(
+        verse: Int, key: String, isPresent: Bool, updatedAt: TimeInterval, version: Int?, bands: Int?
+    ) -> VerseDrawingSnapshot {
+        VerseDrawingSnapshot(
+            verse: verse, rowID: BibleDrawingRowID(raw: key), isPresent: isPresent,
+            updateDate: Date(timeIntervalSince1970: updatedAt), lineData: Data([1]),
+            drawingVersion: version, metadata: bands.map(metadata(bands:))
+        )
+    }
+
+    /// 1절 legacy(metadata 없음) · 2절 v3 4줄 · 3절 대표가 metadata 없는 v2(보관된 v3 5줄은 대표가 아니다).
+    nonisolated private static func chapterRows() -> [VerseDrawingSnapshot] {
+        [
+            row(verse: 1, key: "legacy-1", isPresent: true, updatedAt: 10, version: 1, bands: nil),
+            row(verse: 2, key: "v3-2", isPresent: true, updatedAt: 20, version: 3, bands: 4),
+            row(verse: 3, key: "archived-v3-3", isPresent: false, updatedAt: 5, version: 3, bands: 5),
+            row(verse: 3, key: "current-v2-3", isPresent: true, updatedAt: 30, version: 2, bands: nil)
+        ]
+    }
+
+    @Test("저장 band 수는 절마다 대표 행의 metadata 에서만 센다 — metadata 없는 대표 · 보관 행은 세지 않는다")
+    func savedBandCountsComeFromRepresentativeMetadata() {
+        #expect(CarveDetailFeature.savedBandCounts(from: Self.chapterRows()) == [2: 4])
+        #expect(CarveDetailFeature.savedBandCounts(from: []).isEmpty)
+    }
+
+    @Test("다른 장에서 읽은 band 수는 지금 측정에 넣지 않는다 — 늦게 온 이전 장 결과")
+    func updateSavedBandCountsIgnoresOtherChapter() {
+        var measurement = ChapterLayoutMeasurement()
+        measurement.begin(chapter: chapter, verses: [1, 2], savedBandCounts: [:], now: ContinuousClock().now)
+
+        measurement.updateSavedBandCounts([1: 3], chapter: BibleChapter(title: .genesis, chapter: 2))
+        #expect(measurement.savedBandCounts.isEmpty)
+
+        measurement.updateSavedBandCounts([1: 3], chapter: chapter)
+        #expect(measurement.savedBandCounts == [1: 3])
+    }
+
+    /// 실제 `Store` 로 장을 연다 — 본문 → 캔버스 조회 → `drawingsLoaded` 의 배선이 끊기면 band 수가 조용히 비고 slack 도 사라진다.
+    @Test("장을 열면 캔버스가 읽은 행의 band 수가 측정에 들어가 HUD slack 이 보인다")
+    func hudSlackComesFromCanvasLoadedRows() async throws {
+        let spy = RepositorySpy()
+        spy.snapshots = { _ in Self.chapterRows() }
+        let store = Store(initialState: CarveDetailFeature.State(headerState: .initialState)) {
+            CarveDetailFeature()
+        } withDependencies: {
+            $0.drawingRepository = spy
+            $0.drawingCodec = CanvasTestSupport.codec(results: LockIsolated([]))
+            $0.uuid = .incrementing
+            $0.date = .constant(Date(timeIntervalSince1970: 0))
+        }
+
+        // when: 본문 3절(모두 1줄)을 받고 실측이 모인다.
+        store.send(.view(.layoutHostingChanged(writingWidth: 372)))
+        store.send(.setSentence((1...3).map { BibleVerse(title: chapter, verse: $0, sentence: "본문 \($0)") }))
+        var batch: [SentencesWithDrawingFeature.State.ID: VerseRowGeometry] = [:]
+        for verse in 1...3 {
+            batch["\(chapter.title.koreanTitle()).\(chapter.chapter).\(verse)"] = VerseRowGeometry(underlineOffsets: [30])
+        }
+        store.send(.view(.verseGeometryMeasured(batch)))
+
+        // then: 캔버스가 행을 읽자 2절의 저장 4줄이 들어오고, 텍스트 1줄보다 3줄 많은 slack 이 된다.
+        let deadline = ContinuousClock.now + .seconds(2)
+        while store.chapterLayout.savedBandCounts.isEmpty, ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(spy.loadedChapters.value.contains(chapter))
+        #expect(store.chapterLayout.savedBandCounts == [2: 4])
+        #expect(store.chapterLayout.reflowSlacks == [ChapterLayoutMeasurement.ReflowSlack(verse: 2, extraBands: 3)])
+        #if DEBUG
+        #expect(ChapterLayoutDebugHUD(measurement: store.chapterLayout, lastEdit: nil).consoleSnapshot.contains("slackBands=[v2:+3]"))
+        #endif
+    }
 }

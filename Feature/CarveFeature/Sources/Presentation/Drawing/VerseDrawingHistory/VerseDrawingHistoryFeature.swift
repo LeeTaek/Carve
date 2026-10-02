@@ -75,7 +75,7 @@ public struct VerseDrawingHistoryFeature: Sendable {
                 // 그 아래로 밀린다.
                 //
                 // ⚠️ 거르는 곳은 **목록뿐이다.** 저장소의 `fetchVerseSnapshots(chapter:verse:)` 는 그대로 둔다 —
-                // `updateDrawings(requests:)` 와 `updatePresentDrawing(chapter:verse:presentRowID:)` 이 같은 행을 보고,
+                // 캔버스의 대표 선택(`DrawingRepresentativeRule`)과 `updatePresentDrawing(chapter:verse:presentRowID:)` 이 같은 행을 보고,
                 // 거기서 빈 활성 행이 빠지면 대표가 과거 회차로 승격돼 지운 획이 되살아난다. 회차를 고를 때도
                 // `updatePresentDrawing` 이 DB 의 **모든 행**을 다시 읽어 `isPresent` 를 옮기므로, 목록에서 뺀 빈 행의
                 // 표시도 정상적으로 내려간다.

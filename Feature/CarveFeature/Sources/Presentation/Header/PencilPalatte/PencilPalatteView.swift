@@ -106,7 +106,6 @@ public struct PencilPalatteView: View {
             CarveIconButton(.lasso, accessibilityLabel: "올가미", isSelected: store.isLassoSelected, background: .plain) {
                 send(.selectLasso)
             }
-            .disabled(!store.isLassoAvailable)
             .accessibilityHint("필기를 묶어 옮깁니다")
         }
     }

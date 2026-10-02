@@ -7,7 +7,6 @@
 //
 
 import CarveToolkit
-import Domain
 import Foundation
 
 /// 2.0.0(Xcode 27 빌드)이 JSON Data 로 저장한 기본 타입 설정을 Sharing 의 기본 타입 형식으로 되돌린다.
@@ -18,7 +17,10 @@ import Foundation
 /// 2.0.0 이 처음 읽으며 기본값으로 덮어쓴 1.x 값은 되살릴 수 없다 — 이 이전은 그 뒤에 사용자가 바꾼 값을 지킨다.
 public enum AppStorageFormatMigration {
     /// 2.0.0 이 JSON 으로 쓴 Bool 키.
-    static let boolKeys = ["isLeftHanded", "allowFingerDrawing", "hasSeenFirstRunGuide", SingleCanvasFlag.appStorageKey]
+    ///
+    /// `"singleCanvasEnabled"` 는 2.0.x 의 단일 Canvas flag 키다. 2.1 은 N-Canvas 와 그 flag(`SingleCanvasFlag`)를 지웠지만
+    /// 키는 문자열로 남긴다 — 2.1 의 N-Canvas 제거 안내가 이 값을 Bool 로 읽어 flag 를 끈 사용자를 가려내므로 형식을 되돌려 둔다.
+    static let boolKeys = ["isLeftHanded", "allowFingerDrawing", "hasSeenFirstRunGuide", "singleCanvasEnabled"]
     /// 2.0.0 이 JSON 으로 쓴 Int 키.
     static let intKeys = ["selectedColorIndex", "selectedWidthIndex"]
     /// 2.0.0 이 JSON 으로 쓴 `String?` 키. JSON `null` 은 값이 없다는 뜻이라 지운다.

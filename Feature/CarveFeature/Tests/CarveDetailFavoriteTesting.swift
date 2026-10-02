@@ -92,8 +92,8 @@ struct CarveDetailFavoriteTesting {
     private static func state(favorites: Set<Int> = []) -> CarveDetailFeature.State {
         var state = CarveDetailFeature.State.initialState
         state.sentenceWithDrawingState = [
-            SentencesWithDrawingFeature.State(sentence: BibleVerse(title: chapter, verse: 1, sentence: firstVerse), drawing: nil),
-            SentencesWithDrawingFeature.State(sentence: BibleVerse(title: chapter, verse: 2, sentence: "그가 나를 푸른 초장에 누이시며"), drawing: nil)
+            SentencesWithDrawingFeature.State(sentence: BibleVerse(title: chapter, verse: 1, sentence: firstVerse)),
+            SentencesWithDrawingFeature.State(sentence: BibleVerse(title: chapter, verse: 2, sentence: "그가 나를 푸른 초장에 누이시며"))
         ]
         state.favoriteChapter = chapter
         state.favoriteVerses = favorites
@@ -114,8 +114,6 @@ struct CarveDetailFavoriteTesting {
             $0.drawingRepository = RepositorySpy()
             $0.drawingCodec = CanvasTestSupport.codec(results: LockIsolated([]))
             $0.uuid = .incrementing
-            // `setSentence` 가 `undoManager.clear()` 를 부른다 — 테스트값이 없는 의존성이라 주입한다.
-            $0.undoManager = SharedUndoManager()
         }
     }
 
@@ -205,7 +203,7 @@ struct CarveDetailFavoriteTesting {
         spy.stored.setValue([seeded])
         let store = makeStore(spy: spy, favorites: [1])
 
-        store.send(.setSentence([BibleVerse(title: other, verse: 3, sentence: "여호와의 산에 오를 자가 누구며")], []))
+        store.send(.setSentence([BibleVerse(title: other, verse: 3, sentence: "여호와의 산에 오를 자가 누구며")]))
         #expect(store.favoriteChapter == other)
         // 이전 장(23편)의 표시를 새 장 본문에 남기지 않는다.
         #expect(store.favoriteVerses.isEmpty)

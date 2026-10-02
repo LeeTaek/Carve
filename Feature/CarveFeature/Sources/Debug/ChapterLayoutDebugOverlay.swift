@@ -167,9 +167,9 @@ struct ChapterLayoutDebugHUD: View {
     let measurement: ChapterLayoutMeasurement
     /// 마지막 편집 절 번호와 그 drawing bounds (content 좌표).
     let lastEdit: (verse: Int, bounds: CGRect)?
-    /// Δ 안전망이 단일 Canvas 에 실제로 넘긴 판정 (§14 — D9 R13). N-Canvas 경로에서는 nil (안전망이 적용되지 않는다).
+    /// Δ 안전망이 단일 Canvas 에 실제로 넘긴 판정 (§14 — D9 R13). 판정할 실측이 아직 없으면 nil.
     var safetyNet: LayoutDeltaVerdict?
-    /// 캔버스가 실제로 합성에 쓴 상태 (E-4 진단). N-Canvas 경로에서는 nil.
+    /// 캔버스가 실제로 합성에 쓴 상태 (E-4 진단). 넘기지 않으면(시험 등) nil.
     var compose: CanvasComposeProbe?
 
     /// HUD와 같은 입력에서 만든 로그를 Feature에 전달한다. View는 콘솔 I/O를 하지 않는다.
@@ -278,7 +278,7 @@ struct ChapterLayoutDebugHUD: View {
 
     /// Δ 안전망의 상태 — 차단 중인지 한눈에 보이게 한다 (§14 — D9 R13).
     ///
-    /// `guard —` 는 안전망이 적용되지 않는 경로(N-Canvas)이거나 아직 판정할 실측이 없다는 뜻이다.
+    /// `guard —` 는 아직 판정할 실측이 없다는 뜻이다.
     /// `guard BLOCKED` 는 **새 입력만** 막힌 상태다 — 합성·표시·저장은 그대로 돈다.
     private var guardLine: some View {
         Group {
@@ -292,7 +292,7 @@ struct ChapterLayoutDebugHUD: View {
                     Text("limit \(fmt(safetyNet.lineSpace))pt(1줄)").foregroundStyle(.gray)
                 }
             } else {
-                Text("guard — (단일 Canvas 아님 또는 실측 대기)").foregroundStyle(.gray)
+                Text("guard — (실측 대기)").foregroundStyle(.gray)
             }
         }
     }

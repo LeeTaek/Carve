@@ -152,7 +152,7 @@ struct ChapterCanvasView: UIViewControllerRepresentable {
         )
     }
 
-    /// 팔레트 설정 → PencilKit 도구. `CanvasView` 와 같은 규칙(monoline = 지우개, §7-4 `.bitmap`)에
+    /// 팔레트 설정 → PencilKit 도구. 2.0.x N-Canvas 와 같은 규칙(monoline = 지우개, §7-4 `.bitmap`)에
     /// 올가미를 **우선하는 한 칸**으로 얹었다 (올가미 설계 §4-2). 도구 판정이 이 함수 하나뿐이라 진실이 갈라지지 않는다.
     ///
     /// 올가미도 같은 `drawingGestureRecognizer` 를 쓰므로 입력 게이트(§6-2)가 그대로 걸린다 — 별도 게이트가 필요 없다.
