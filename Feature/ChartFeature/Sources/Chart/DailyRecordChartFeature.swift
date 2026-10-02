@@ -11,7 +11,7 @@ import CarveToolkit
 
 import ComposableArchitecture
 
-struct ChartPage: Equatable {
+struct ChartPage: Equatable, Sendable {
     let start: Date
     let end: Date
     let entries: [DailyRecord]
@@ -19,11 +19,12 @@ struct ChartPage: Equatable {
 }
 
 @Reducer
-public struct DailyRecordChartFeature {
+public struct DailyRecordChartFeature: Sendable {
     static let pageDays: Int = 7
     private let visiblePageIndex = 1
     
-    public enum PageMove: Equatable { case prev, stay, next }
+    /// 페이지 전환 방향. 전환 효과가 기다린 뒤 `finishMove` 로 넘기므로 `Sendable` 이다.
+    public enum PageMove: Equatable, Sendable { case prev, stay, next }
     private enum CancelID { case paging, yScale }
 
     /// 이동 가능 범위의 상한(오늘)을 정하는 현재 시각이다.
@@ -32,7 +33,7 @@ public struct DailyRecordChartFeature {
     @Dependency(\.continuousClock) var clock
     
     @ObservableState
-    public struct State: Equatable {
+    public struct State: Equatable, Sendable {
         static let initialState = Self()
         var records: [DailyRecord] = []
         var lowerBoundDate: Date = .distantPast

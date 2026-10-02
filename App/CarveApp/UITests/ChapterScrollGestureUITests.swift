@@ -13,6 +13,8 @@
 
 import XCTest
 
+/// `XCUIApplication` · `XCUIElement` 는 MainActor 다 — 시험 클래스를 타입 단위로 MainActor 에 둔다.
+@MainActor
 final class ChapterScrollGestureUITests: XCTestCase {
 
     /// 헤더의 다음 장 버튼 식별자. 접근성 이름(「다음 장」)은 문구 변경으로 바뀌므로 식별자로 찾는다

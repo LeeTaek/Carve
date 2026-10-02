@@ -21,9 +21,9 @@ import ComposableArchitecture
 ///   (`ChapterCanvasArrivalFeature`).
 /// - 판정은 Domain 의 `LaunchWaitRule` 이 한다 — 이 모듈에는 테스트 타깃이 없다.
 @Reducer
-public struct LaunchProgressFeature {
+public struct LaunchProgressFeature: Sendable {
     @ObservableState
-    public struct State {
+    public struct State: Sendable {
         /// 재실행 안내(Alert)를 표시할지 여부.
         /// - Note: 마이그레이션 모드가 끝난 시점(`migrationCompleted` · `migrationEndedWithoutImport`)에 true로 설정
         public var shouldShowMigrationAlert: Bool = false
