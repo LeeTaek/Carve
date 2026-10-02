@@ -12,7 +12,7 @@ import ComposableArchitecture
 
 @Reducer
 public struct DrewLogFeature {
-    public struct State {
+    public struct State: Sendable {
         public static let initialState = State()
     }
     public enum Action {

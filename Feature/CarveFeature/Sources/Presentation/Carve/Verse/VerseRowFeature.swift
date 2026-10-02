@@ -15,7 +15,7 @@ import ComposableArchitecture
 @Reducer
 public struct VerseRowFeature {
     @ObservableState
-    public struct State: Identifiable, Equatable {
+    public struct State: Identifiable, Equatable, Sendable {
         public static func == (lhs: VerseRowFeature.State, rhs: VerseRowFeature.State) -> Bool {
             lhs.id == rhs.id
         }
@@ -43,7 +43,7 @@ public struct VerseRowFeature {
             self.drewHistoryState = .init(title: sentence.title, verse: sentence.verse)
         }
         
-        public static var initialState = Self(sentence: BibleVerse.initialState)
+        public static let initialState = Self(sentence: BibleVerse.initialState)
     }
     
     public enum Action: ViewAction, CarveToolkit.ScopeAction {

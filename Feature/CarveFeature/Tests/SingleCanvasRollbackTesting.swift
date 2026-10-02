@@ -104,7 +104,7 @@ struct SingleCanvasRollbackTesting {
         try await feature.persistDrawing(Self.request(for: row, chapter: chapter, verse: verse))
         let stored = try await Self.fetch(chapter: chapter, verse: verse, from: verifier)
         #expect(stored.first?.drawingVersion == 3)
-        #expect(stored.first?.layoutMetadataData != nil)
+        #expect(stored.first?.metadata != nil)
 
         // when: N-Canvas 가 편집해 v2 로 내린다.
         var state = CanvasFeature.State(sentence: BibleVerse(title: chapter, verse: verse, sentence: "가사는 버림을 당하며"), drawing: row)
@@ -115,20 +115,14 @@ struct SingleCanvasRollbackTesting {
         let reloaded = try await Self.fetch(chapter: chapter, verse: verse, from: verifier)
         #expect(reloaded.count == 1)
         #expect(reloaded.first?.drawingVersion == 2)
-        #expect(reloaded.first?.layoutMetadataData == nil)
+        #expect(reloaded.first?.metadata == nil)
 
-        for stored in try await Self.fetch(chapter: chapter, verse: verse, from: actor) {
-            try await actor.delete(stored)
-        }
+        try await actor.deleteVerseDrawings(chapter: chapter, verse: verse)
     }
 
-    private static func fetch(chapter: BibleChapter, verse: Int, from actor: SwiftDatabaseActor) async throws -> [BibleDrawing] {
-        let titleName = chapter.title.rawValue
-        let chapterNumber = chapter.chapter
-        let predicate = #Predicate<BibleDrawing> {
-            $0.titleName == titleName && $0.titleChapter == chapterNumber && $0.verse == verse
-        }
-        return try await actor.fetch(FetchDescriptor(predicate: predicate))
+    /// 해당 절의 행을 스냅샷으로 읽는다 — 모델은 actor 밖으로 나오지 않는다. 정렬은 `updateDate` 최신순이다.
+    private static func fetch(chapter: BibleChapter, verse: Int, from actor: SwiftDatabaseActor) async throws -> [VerseDrawingSnapshot] {
+        try await actor.verseDrawingSnapshots(chapter: chapter, verse: verse)
     }
 
     /// 테스트 모델에서 제품 코드와 같은 N-Canvas 저장 요청을 만든다.
@@ -142,6 +136,34 @@ struct SingleCanvasRollbackTesting {
             drawingVersion: drawing.drawingVersion,
             layoutMetadataData: drawing.layoutMetadataData
         )
+    }
+
+    // MARK: 이전 필사 기록에서 고른 회차
+
+    @Test("이력에서 고른 회차는 그 행 키 · 내용 · 좌표 형식 그대로 캔버스에 오른다 — 이어지는 편집이 고른 행에 저장된다")
+    func restoredSnapshotKeepsRowAddress() throws {
+        // @Model 을 만드는 시험은 컨테이너부터 만든다(iOS 17 — 룰북 swiftdata.md).
+        let container = try ModelContainer(for: BibleDrawing.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        defer { withExtendedLifetime(container) {} }
+        let chapter = BibleChapter(title: .micah, chapter: 6)
+        let sentence = BibleVerse(title: chapter, verse: 8, sentence: "사람아 주께서 선한 것이 무엇임을")
+        let lineData = PKDrawing(strokes: [Self.stroke()]).dataRepresentation()
+        let snapshot = VerseDrawingSnapshot(
+            verse: 8, rowID: BibleDrawingRowID(raw: "row-archived"), isPresent: true,
+            updateDate: Date(timeIntervalSince1970: 500), lineData: lineData,
+            drawingVersion: 3, metadata: CanvasTestSupport.metadata()
+        )
+
+        var state = CanvasFeature.State(sentence: sentence, drawing: nil)
+        state.firstUnderlineY = 20
+        _ = CanvasFeature().reduce(into: &state, action: .setDrawing(snapshot))
+
+        let drawing = try #require(state.drawing)
+        #expect(drawing.rowKey == "row-archived")
+        #expect(drawing.lineData == lineData)
+        #expect(drawing.drawingVersion == 3)
+        #expect(drawing.updateDate == Date(timeIntervalSince1970: 500))
+        #expect(state.displayTransform == CGAffineTransform(translationX: 0, y: 20))
     }
 
     // MARK: 디코드 불가 행
@@ -188,6 +210,8 @@ struct SingleCanvasRollbackTesting {
 
     // MARK: 팔레트 undo 위임
 
+    /// 팔레트가 N-Canvas 의 `SharedUndoManager`(MainActor)를 읽으므로 MainActor 에서 리듀서를 부른다.
+    @MainActor
     @Test("undo 가 캔버스에 위임되면 팔레트는 SharedUndoManager 값으로 공유 canUndo/canRedo 를 덮지 않는다")
     func delegatedUndoLeavesSharedFlagsAlone() {
         withDependencies {

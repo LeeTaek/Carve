@@ -14,7 +14,7 @@ import PencilKit
 import ComposableArchitecture
 
 @Reducer
-public struct PencilPalatteFeature {
+public struct PencilPalatteFeature: Sendable {
     @ObservableState
     public struct State {
         public var popoverPoint: CGPoint = .zero
@@ -58,7 +58,8 @@ public struct PencilPalatteFeature {
 
         @Presents var navigation: Destination.State?
                 
-        public static var initialState = State()
+        /// PencilKit 값(`PKInkingTool.InkType`)을 담아 Sendable 이 아니므로 저장 프로퍼티 대신 계산 프로퍼티다.
+        public static var initialState: Self { State() }
     }
     @Dependency(\.undoManager) private var undoManager
 
@@ -137,21 +138,23 @@ public struct PencilPalatteFeature {
             case .view(.undo):
                 // 단일 Canvas 경로에서는 부모(CarveDetailFeature)가 이 액션을 캔버스의 undoTapped 로 옮긴다.
                 guard !state.delegatesUndoToCanvas else { return .none }
-                undoManager.undo()
+                // N-Canvas 의 `SharedUndoManager` 는 MainActor 타입이다. 리듀서는 스토어(MainActor)에서 돈다.
+                MainActor.assumeIsolated { undoManager.undo() }
                 return .run { send in
                     await send(.setCanUndo)
                 }
             case .view(.redo):
                 guard !state.delegatesUndoToCanvas else { return .none }
-                undoManager.redo()
+                MainActor.assumeIsolated { undoManager.redo() }
                 return .run { send in
                     await send(.setCanUndo)
                 }
             case .setCanUndo:
                 // 캔버스가 처리할 때는 공유 값의 주인이 캔버스다 — SharedUndoManager 값으로 덮지 않는다.
                 guard !state.delegatesUndoToCanvas else { return .none }
-                state.$canUndo.withLock { $0 = undoManager.canUndo }
-                state.$canRedo.withLock { $0 = undoManager.canRedo }
+                let (canUndo, canRedo) = MainActor.assumeIsolated { (undoManager.canUndo, undoManager.canRedo) }
+                state.$canUndo.withLock { $0 = canUndo }
+                state.$canRedo.withLock { $0 = canRedo }
             default: break
             }
             return .none

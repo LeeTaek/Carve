@@ -54,7 +54,7 @@ struct OffsetHelper: ViewModifier {
 
 /// Y 오프셋 값을 상위 뷰로 전달하기 위한 PreferenceKey.
 struct OffsetKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
+    static let defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = nextValue()
     }
@@ -62,7 +62,7 @@ struct OffsetKey: PreferenceKey {
 
 /// 헤더 뷰의 frame(anchor)을 상위로 전달하기 위한 PreferenceKey.
 struct HeaderBoundsKey: PreferenceKey {
-    static var defaultValue: Anchor<CGRect>?
+    static let defaultValue: Anchor<CGRect>? = nil
     static func reduce(value: inout Anchor<CGRect>?, nextValue: () -> Anchor<CGRect>?) {
         value = nextValue()
     }

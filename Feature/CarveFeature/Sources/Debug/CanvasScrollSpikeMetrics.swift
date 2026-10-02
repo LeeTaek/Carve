@@ -427,6 +427,9 @@ final class CanvasScrollSpikeMetrics: ObservableObject {
 }
 
 /// `CADisplayLink`가 target을 강참조하므로 프록시로 순환 참조를 끊는다.
+///
+/// 디스플레이 링크는 메인 런루프에서 부른다 — 타입 단위로 MainActor 다.
+@MainActor
 private final class DisplayLinkProxy: NSObject {
     private weak var owner: CanvasScrollSpikeMetrics?
 
@@ -435,9 +438,7 @@ private final class DisplayLinkProxy: NSObject {
     }
 
     @objc func tick() {
-        MainActor.assumeIsolated {
-            owner?.tick()
-        }
+        owner?.tick()
     }
 }
 #endif

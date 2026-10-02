@@ -15,7 +15,7 @@ public struct FirstRunGuideFeature {
     static let pageCount = 4
 
     @ObservableState
-    public struct State: Equatable {
+    public struct State: Equatable, Sendable {
         public static let initialState = Self()
         /// 최초 안내에서 현재 표시하는 항목의 0 기반 위치다.
         public var currentPage = 0

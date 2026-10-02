@@ -15,7 +15,7 @@ import ComposableArchitecture
 
 // N-Canvas(절마다 PKCanvasView) 경로. 단일 Canvas 는 ChapterCanvasView 가 대체하며, flag off 롤백용으로 유지한다 (설계 §10-3).
 @Reducer
-public struct CanvasFeature {
+public struct CanvasFeature: Sendable {
     @ObservableState
     public struct State: Identifiable {
         public var id: String
@@ -42,9 +42,12 @@ public struct CanvasFeature {
             self.title = sentence.title
             self.verse = sentence.verse
         }
-        public static let initialState = Self(sentence: .initialState,
-                                              drawing: .init(bibleTitle: .initialState,
-                                                             verse: 1))
+        /// @Model(`BibleDrawing`)을 담아 Sendable 이 아니므로 저장 프로퍼티 대신 계산 프로퍼티다(N-Canvas).
+        public static var initialState: Self {
+            Self(sentence: .initialState,
+                 drawing: .init(bibleTitle: .initialState,
+                                verse: 1))
+        }
 
         /// 저장 좌표 → 캔버스 로컬 좌표 변환. v3(첫 밑줄 원점) 행만 첫 밑줄만큼 내리고 그 밖(legacy · v2)은 무변환이다.
         public var displayTransform: CGAffineTransform {
@@ -59,7 +62,8 @@ public struct CanvasFeature {
     public enum Action {
         case saveDrawing(PKDrawing)
         case registUndoCanvas(PKCanvasView)
-        case setDrawing(BibleDrawing)
+        /// 이전 필사 기록에서 회차를 골랐다 — 그 행을 이 절의 캔버스에 올린다.
+        case setDrawing(VerseDrawingSnapshot)
     }
 
     public var body: some Reducer<State, Action> {
@@ -89,18 +93,45 @@ public struct CanvasFeature {
                                                  lineData: newDrawing.dataRepresentation())
                 }
             case .registUndoCanvas(let canvas):
-                if undoManager.isPerformingUndoRedo {
-                    undoManager.isPerformingUndoRedo = false
-                    return .none
+                // `SharedUndoManager` · `PKCanvasView` 는 MainActor 타입이다. 리듀서는 스토어(MainActor)에서 돈다.
+                let undoState: (canUndo: Bool, canRedo: Bool)? = MainActor.assumeIsolated {
+                    if undoManager.isPerformingUndoRedo {
+                        undoManager.isPerformingUndoRedo = false
+                        return nil
+                    }
+                    undoManager.registerUndoAction(for: canvas)
+                    return (undoManager.canUndo, undoManager.canRedo)
                 }
-                undoManager.registerUndoAction(for: canvas)
-                state.$canUndo.withLock { $0 = undoManager.canUndo }
-                state.$canRedo.withLock { $0 = undoManager.canRedo }
-            case .setDrawing(let drawing):
-                state.drawing = drawing
+                guard let undoState else { return .none }
+                state.$canUndo.withLock { $0 = undoState.canUndo }
+                state.$canRedo.withLock { $0 = undoState.canRedo }
+            case .setDrawing(let snapshot):
+                state.drawing = Self.legacyDrawing(from: snapshot, chapter: state.title)
             }
             return .none
         }
     }
 
+    /// 이력 화면이 고른 행(DTO)을 N-Canvas 가 들고 쓰는 행 모양으로 옮긴다.
+    ///
+    /// 저장소의 모델은 actor 밖으로 나오지 않으므로(룰북 swiftdata.md 규칙 3 · 4) 값으로 새로 만든다. 저장소에 넣지 않는 값 운반용이다 —
+    /// 이어지는 편집은 `CarveDetailFeature.makeLegacyDrawingSaveRequest` 가 행 키(`rowKey`)로 저장하므로, 행 키를 그대로 실어
+    /// **고른 행**에 저장되게 한다(새 행이 아니다). 표시 변환(`displayTransform`)이 좌표 형식을 보므로 그것도 옮긴다.
+    /// - Parameters:
+    ///   - snapshot: 고른 회차.
+    ///   - chapter: 이 절의 성경 · 장.
+    /// - Returns: 고른 행과 같은 행 키 · 내용 · 좌표 형식을 가진 모델. 부작용 없음.
+    static func legacyDrawing(from snapshot: VerseDrawingSnapshot, chapter: BibleChapter) -> BibleDrawing {
+        let drawing = BibleDrawing(
+            bibleTitle: chapter,
+            verse: snapshot.verse,
+            lineData: snapshot.lineData,
+            updateDate: snapshot.updateDate,
+            layoutMetadataData: try? snapshot.metadata?.encodedBlob(),
+            rowUUID: snapshot.rowID.raw
+        )
+        drawing.drawingVersion = snapshot.drawingVersion
+        drawing.isPresent = snapshot.isPresent
+        return drawing
+    }
 }

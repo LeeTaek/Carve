@@ -18,7 +18,7 @@ import ComposableArchitecture
 /// 그리고 펜 설정(`pencilConfig.lineColor`). 셋을 한 자리에서 쓰지 않으면 「완료」를 눌러야만
 /// 펜에 반영되던 이전 동작으로 되돌아간다.
 @Reducer
-public struct ColorPalatteFeature {
+public struct ColorPalatteFeature: Sendable {
     @ObservableState
     public struct State {
         @Shared(.codableAppStorage("palatteColorSet")) public var palatteColors: [CodableColor] = []

@@ -451,9 +451,10 @@ private extension CarveDetailView {
     /// 헤더 스크롤 애니메이션 등 과도한 이벤트 호출을 방지하기 위한 딜레이
     func delay(
         to delay: TimeInterval = 0.1,
-        _ action: @escaping () -> Void
+        _ action: @escaping @MainActor () -> Void
     ) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: action)
+        // 메인 큐에 넘긴 클로저는 MainActor 로 돈다 — 화면 액션(`send`)을 그대로 부른다.
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { action() }
     }
 
     /// 필사 화면 바탕 — 책상(`canvas`) 위의 종이(시안 J1).
