@@ -1,17 +1,19 @@
 # 회귀 기준선
 
-> 회귀 기준선 **1175** — `Carve-Workspace` 전체 회귀의 **통과 수**(iPad mini (A17 Pro) · iPadOS 26.2). **통과 수가 줄면 회귀다.**
+> 회귀 기준선 **1186** — `Carve-Workspace` 전체 회귀의 **통과 수**(iPad mini (A17 Pro) · iPadOS 26.2). **통과 수가 줄면 회귀다.**
 > 이 파일이 기준선의 유일한 원본이다. [AGENTS.md](../AGENTS.md) · [설계 문서](./single-canvas-design.md) · [런북](./phase-0a-d-device-test.md)은 여기를 가리킨다.
 
-## 현재 값 (2026-10-01, 커밋 `8853b0ac`, Xcode 26.3)
+## 현재 값 (2026-10-02, 커밋 `795746bd`, Xcode 26.3)
 
 | iPadOS 런타임 | 통과 | 실패 | 총 |
 |---|---:|---:|---:|
-| 26.2 | 1175 | 0 | 1187 |
+| 26.2 | 1186 | 0 | 1198 |
 | 18.6 | 미측정(2026-09-29 `c3c320ad` 1112) | | |
 | 17.5 | 미측정(2026-09-29 `c3c320ad` 1111) | | |
 
 - 1112 → 1175: release/2.0.1 의 본문 파싱 시험 +22, 새 단위 테스트 타깃 `CarveAppTest`(코디네이터 화면 전환 · 화면 바로 열기 인자) +41.
+- 1175 → 1186: develop 역병합(`795746bd`)으로 들어온 설정 저장 형식 핫픽스(2.0.0 교체 빌드, main #31)의 저장 형식 · JSON 되돌림 시험 +11(CarveFeatureTest).
+  같은 커밋을 Xcode 27.0 으로는 `CarveAppTest` 와 저장 형식 시험만 돌렸다: iPadOS 26.2 52/52 통과. 수정 전 Xcode 27 에서 실패하던 `AppCoordinatorLaunchRouteTesting` 2건을 포함한다.
 - 총에는 기본으로 건너뛰는 `RemoveAdsStoreKitUITests` 2개(`CarveApp-StoreKit` 스킴에서만 돈다)가 들어 있다.
 - Xcode 27 결과는 [AGENTS.md](../AGENTS.md) 「툴체인 제약」 표에 있다.
 
@@ -30,3 +32,4 @@ rev.37(2026-09-29) 까지의 이력은 [설계 문서](./single-canvas-design.md
 | 2026-09-29 | 1112 | `c3c320ad` | 설정 「의견 보내기」 · 「앱 버전」 시험 9 추가(설계 rev.37 과 같은 값) |
 | 2026-09-30 | 1112 | `b9a8b438` | 기준선 원본을 이 파일로 옮김. 값은 그대로 |
 | 2026-10-01 | 1175 | `8853b0ac` | release/2.0.1 본문 파싱 시험 +22, `CarveAppTest` +41(AI 적합성 2차 묶음 DAG 통합 브랜치 게이트) |
+| 2026-10-02 | 1186 | `795746bd` | develop 역병합 — Xcode 27 빌드의 `.appStorage` 해석 핫픽스, 저장 형식 · JSON 되돌림 시험 +11 |
