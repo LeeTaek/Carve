@@ -8,20 +8,17 @@ public extension SettingsDictionary {
             .merging(moduleVerifier)
             .merging(userScriptSandboxing)
             .merging(assetSymbols)
-            .merging(swift6Concurrency)
     }
 
-    /// Swift 6 동시성 검사를 언어 모드 5 그대로 켠다 — 진단은 오류가 아니라 경고로 나온다(`SWIFT_VERSION` 은 5 그대로).
-    /// - `SWIFT_STRICT_CONCURRENCY`: Sendable · actor 격리를 빠짐없이(complete) 검사한다.
-    /// - `SWIFT_UPCOMING_FEATURE_6_0`: Swift 6 에서 기본이 되는 기능(IsolatedDefaultValues · InferSendableFromCaptures ·
-    ///   DynamicActorIsolation 등)을 한꺼번에 켠다. DynamicActorIsolation 은 실행 중 actor 격리 가정 위반을 잡는다.
+    /// Swift 언어 모드 6 — 동시성 검사(Sendable · actor 격리 complete, DynamicActorIsolation 등)가 오류로 나온다.
     ///
-    /// `makeModule` 로 만드는 자사 프로젝트에만 붙고 의존성 프로젝트(Tuist/Package.swift)는 그대로다.
-    /// 명령줄 덮어쓰기(`xcodebuild SWIFT_UPCOMING_FEATURE_6_0=YES`)로 켜지 않는다 — 언어 모드 5 인 swift-perception 에까지 걸려
+    /// **타깃 레벨에 넣는다.** tuist 가 타깃마다 기본 `SWIFT_VERSION`(5)을 넣으므로 프로젝트 base 에 두면 가려진다.
+    /// `makeModule` 로 만드는 자사 프로젝트의 모든 타깃(앱 · 위젯 · 모듈 · 단위 · UI 시험)에만 붙고
+    /// 의존성 프로젝트(Tuist/Package.swift)는 각 패키지의 언어 모드 그대로다.
+    /// 명령줄 덮어쓰기(`xcodebuild SWIFT_VERSION=6`)로 켜지 않는다 — 언어 모드 5 인 swift-perception 에까지 걸려
     /// Swift 6.4 에서 TCA 컴파일이 깨진다.
-    static let swift6Concurrency: Self = [
-        "SWIFT_STRICT_CONCURRENCY": "complete",
-        "SWIFT_UPCOMING_FEATURE_6_0": "YES"
+    static let swift6LanguageMode: Self = [
+        "SWIFT_VERSION": "6"
     ]
 
     /// Asset Catalog 에서 타입 세이프한 심볼과 `Color`/`Image` 확장을 생성한다.
@@ -80,6 +77,17 @@ public extension Project {
           settings.base = settings.base.merging(.xcodeRecommended)
           return settings
       }()
+      // 언어 모드 6 은 타깃마다 붙인다 — 타깃이 넘긴 settings 가 있으면 그 base 에 더한다(`swift6LanguageMode` 주석).
+      let swift6Targets: [Target] = targets.map { target in
+          var target = target
+          guard var settings = target.settings else {
+              target.settings = .settings(base: .swift6LanguageMode)
+              return target
+          }
+          settings.base = settings.base.merging(.swift6LanguageMode)
+          target.settings = settings
+          return target
+      }
 
       return Project(
         name: name,
@@ -90,7 +98,7 @@ public extension Project {
         ),
         packages: packages,
         settings: mergedSettings,
-        targets: targets,
+        targets: swift6Targets,
         schemes: schemes,
         additionalFiles: additionalFiles,
         resourceSynthesizers: resourceSynthesizers

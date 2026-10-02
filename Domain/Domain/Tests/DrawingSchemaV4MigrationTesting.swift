@@ -512,7 +512,7 @@ struct LegacyPathOnV4StoreTesting {
         }
     }
 
-    /// 절의 행을 저장소에서 직접 읽는다 — 옛 `fetchDrawings(chapter:verse:)` 와 같은 조건 · 정렬(`updateDate` 최신순).
+    /// 절의 행을 저장소에서 직접 읽는다 — `fetchVerseSnapshots(chapter:verse:)` 와 같은 조건 · 정렬(`updateDate` 최신순).
     /// 같은 컨테이너의 새 문맥이라 모델을 actor 밖으로 받지 않는다.
     private static func storedRows(of database: DrawingDatabase, verse: Int) throws -> [BibleDrawing] {
         let titleName = chapter.title.rawValue

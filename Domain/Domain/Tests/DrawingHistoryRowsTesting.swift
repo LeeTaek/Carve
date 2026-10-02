@@ -24,7 +24,7 @@ struct DrawingHistoryRowsTesting {
 
     /// 인메모리 컨테이너 하나에 actor 와 `DrawingDatabase` 를 함께 물린다.
     ///
-    /// 목록이 실제로 쓰는 조회(`DrawingDatabase.fetchVerseSnapshots(chapter:verse:)` — 옛 `fetchDrawings(chapter:verse:)` 와 같은 행 · 순서)와
+    /// 목록이 실제로 쓰는 조회(`DrawingDatabase.fetchVerseSnapshots(chapter:verse:)` — 한 절의 모든 행, `updateDate` 최신순)와
     /// 지우기(`archiveAndResetVerseDrawing`)가 **같은 저장소**를 봐야 두 경로의 어긋남을 잡을 수 있다.
     private struct Harness {
         let actor: SwiftDatabaseActor

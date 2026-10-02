@@ -24,7 +24,7 @@ public protocol DrawingRepresentativeCandidate {
 /// 3) isPresent 행이 없으면 updateDate 최신 → 동률이면 rowKey 사전순
 /// ```
 ///
-/// 이전 `mainDrawing()` 은 `first(where: isPresent)` 라 **배열 순서에 의존**했다. `fetch(chapter:)` 는 verse 로만
+/// 이전 `mainDrawing()` 은 `first(where: isPresent)` 라 **배열 순서에 의존**했다. 장 조회(지금 `fetchForLegacyCanvas(chapter:)`)는 verse 로만
 /// 정렬하므로 같은 절 안의 순서가 보장되지 않았고, CloudKit 충돌로 `isPresent == true` 행이 둘 이상이면
 /// 실행마다 다른 행이 대표가 될 수 있었다. 이 규칙은 입력 순서와 무관하다.
 public enum DrawingRepresentativeRule {

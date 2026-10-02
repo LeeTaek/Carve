@@ -251,16 +251,12 @@ struct LocalStoreLoadFailureTesting {
                 Issue.record("앱 스키마가 더 새 V7 저장소를 열었다")
             } catch let error as SwiftDataError {
                 let isUnknownDataStoreSchema: Bool
-                // `unknownDataStoreSchema` 는 iOS 27 SDK(Swift 6.4)에만 있다 — 제품 코드 `isLegacySchemaMismatch` 와 같은 조건.
-                #if compiler(>=6.4)
+                // `unknownDataStoreSchema` 는 iOS 27 부터 있다 — 제품 코드 `isLegacySchemaMismatch` 와 같은 조건.
                 if #available(iOS 27, *) {
                     isUnknownDataStoreSchema = error == .unknownDataStoreSchema
                 } else {
                     isUnknownDataStoreSchema = false
                 }
-                #else
-                isUnknownDataStoreSchema = false
-                #endif
                 #expect(error == .loadIssueModelContainer || isUnknownDataStoreSchema, "예상하지 못한 SwiftData 오류: \(error)")
             } catch {
                 Issue.record("예상하지 못한 오류: \(error)")
