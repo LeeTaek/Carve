@@ -30,18 +30,19 @@ public struct LiveCloudImportArrivalClient: CloudImportArrivalClient {
         // 받는 쪽이 한 값을 처리하는 사이 온 값을 버리지 않게 담아 둔다 — `values` 는 기다리는 소비자가 없으면 값을 버린다. 놓치면 마지막 import
         // 성공이 다음 변화까지 전해지지 않는다.
         let publisher = container.$activity.buffer(size: 16, prefetch: .keepFull, whenFull: .dropOldest)
-        return AsyncStream { continuation in
-            let task = Task {
-                var last: Date?
-                for await activity in publisher.values {
-                    guard let success = activity.lastImportSuccess, success != last else { continue }
-                    last = success
-                    continuation.yield(success)
-                }
-                continuation.finish()
+        // 관찰 Task 를 스트림을 만드는 클로저 밖에서 띄운다 — Sendable 이 아닌 publisher 를 그 클로저에 붙잡지 않고 Task 로 넘긴다(Swift 6).
+        let (stream, continuation) = AsyncStream<Date>.makeStream()
+        let task = Task {
+            var last: Date?
+            for await activity in publisher.values {
+                guard let success = activity.lastImportSuccess, success != last else { continue }
+                last = success
+                continuation.yield(success)
             }
-            continuation.onTermination = { _ in task.cancel() }
+            continuation.finish()
         }
+        continuation.onTermination = { _ in task.cancel() }
+        return stream
     }
 }
 

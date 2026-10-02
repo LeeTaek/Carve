@@ -9,7 +9,7 @@
 import Foundation
 
 /// SettingsFeature에서 사용자의 문의/피드백 정보를 전달하기 위한 모델.
-public struct UserFeedback: Equatable, Hashable {
+public struct UserFeedback: Equatable, Hashable, Sendable {
     /// 피드백의 유형: 일반 문의, 개선/제안, 기타
     public var feedbackType: FeedbackType = .inquiry
     /// 회신을 받을 사용자의 이메일 주소.
@@ -26,7 +26,7 @@ public struct UserFeedback: Equatable, Hashable {
     /// 사용자의 기기/OS 정보 등 추가 환경 정보를 문자열로 담는 필드.
     public var deviceInfo: String?
     
-    public static var initialState = Self(
+    public static let initialState = Self(
         email: "",
         title: "",
         body: "- 문의 내용:"
@@ -44,7 +44,7 @@ public struct UserFeedback: Equatable, Hashable {
         self.attachment = attachment
     }
     
-    public enum FeedbackType: String, CaseIterable {
+    public enum FeedbackType: String, CaseIterable, Sendable {
         /// 일반적인 문의/질문.
         case inquiry = "일반 문의"
         /// 기능 개선이나 새로운 아이디어 제안 피드백.

@@ -221,8 +221,9 @@ public final class LiveDrawingEditEnvironment: DrawingEditEnvironmentClient, @un
 
     /// 계정 변경 알림을 구독하고 계정을 확인한다. 앱이 시작할 때 한 번 부른다.
     public func start() async {
-        lock.lock()
-        if observation == nil {
+        // async 함수 안에서는 lock()/unlock() 대신 withLock 으로 잠근다(Swift 6).
+        lock.withLock {
+            guard observation == nil else { return }
             // ★ 알림을 **동기로** 구독한다 — 확인하는 동안 온 알림을 놓치지 않는다.
             observation = notificationCenter.addObserver(forName: .CKAccountChanged, object: nil, queue: nil) { [weak self] _ in
                 self?.accountChangeNotified()
@@ -234,7 +235,6 @@ public final class LiveDrawingEditEnvironment: DrawingEditEnvironmentClient, @un
                 Task { await self.reevaluate() }
             }
         }
-        lock.unlock()
         await provider.refresh()
         notifySubscribers()
     }
@@ -258,9 +258,7 @@ public final class LiveDrawingEditEnvironment: DrawingEditEnvironmentClient, @un
 
     private func applyAccountChange() async {
         await provider.invalidate()
-        lock.lock()
-        unappliedNotifications -= 1
-        lock.unlock()
+        lock.withLock { unappliedNotifications -= 1 }
         notifySubscribers()
         await provider.refresh()
         notifySubscribers()
