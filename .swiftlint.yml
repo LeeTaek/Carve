@@ -70,6 +70,8 @@ nesting:
 # - included · excluded 는 절대 파일 경로에 거는 정규식이다. regex 는 줄 앵커 · dotall 로 컴파일되므로 `.*` 를 쓰지 않는다(줄을 넘어 먹는다).
 # - 주석 · 문서 주석 · 문자열 속 이름은 excluded_match_kinds 로 판정에서 뺀다.
 # - 이행 중 예외는 규칙별 excluded 에 파일 경로로 동결한다. 늘리지 않는다 — 고치면 여기와 룰북의 「이행 중 예외」 표에서 함께 뺀다.
+# - 동시성 탈출구(no_nonisolated_unsafe · no_unchecked_sendable)는 리듀서가 아니라 저장소 전체(제품 · 시험)를 본다.
+#   원문과 남은 것의 이유 · 지울 조건은 룰북 references/concurrency.md 「안전하지 않은 우회 감사」 다.
 # - 위 included 가 있으면 디렉터리 인자는 무시된다. 저장소 전체는 인자 없이 `mise x -- swiftlint lint --quiet --config .swiftlint.yml` 로 본다.
 custom_rules:
   feature_no_swiftdata_import:
@@ -77,8 +79,6 @@ custom_rules:
     included: '/Feature/[^/]+/Sources/'
     excluded:
       - '/Derived/'
-      # 이행 중 예외 — 룰북 references/swiftdata.md 참조
-      - '/Feature/CarveFeature/Sources/Presentation/Drawing/VerseDrawingHistory/VerseDrawingHistoryFeature\.swift$'
     regex: '^[ \t]*(?:@\w+(?:\([^)\n]*\))?[ \t]+)*(?:(?:public|package|internal|fileprivate|private)[ \t]+)?import[ \t]+(?:(?:typealias|struct|class|enum|protocol|let|var|func)[ \t]+)?SwiftData\b'
     excluded_match_kinds: [comment, doccomment, string]
     message: 'Feature 소스는 SwiftData 를 import 하지 않는다 — Domain 저장소 의존성을 부르고 DTO 를 받는다. 쓰지 않는 import 는 지운다. 룰북 .codex/skills/carve-rulebook/references/swiftdata.md'
@@ -89,7 +89,6 @@ custom_rules:
     excluded:
       - '/Derived/'
       # 이행 중 예외 — 룰북 references/swiftdata.md 참조
-      - '/Feature/CarveFeature/Sources/Presentation/Drawing/VerseDrawingHistory/VerseDrawingHistoryFeature\.swift$'
       - '/Feature/SettingsFeature/Sources/Details/iCloud/iCloudSettingReducer\.swift$'
     regex: '\b(?:ModelContext|ModelContainer|FetchDescriptor|PersistentIdentifier|persistentModelID|createSwiftDataActor)\b|@Query\b|#Predicate\b'
     excluded_match_kinds: [comment, doccomment, string]
@@ -150,6 +149,47 @@ custom_rules:
     regex: '\bDate\(\)|\bDate\.now\b|\bTask\.sleep\b'
     excluded_match_kinds: [comment, doccomment, string]
     message: '리듀서는 Date() · Date.now · Task.sleep 대신 @Dependency(\.date) 의 date.now 와 @Dependency(\.continuousClock) 의 clock.sleep(for:) 를 쓴다(달력은 Calendar.current 그대로). 룰북 .codex/skills/carve-rulebook/references/testing.md'
+    severity: error
+  no_nonisolated_unsafe:
+    name: '동시성 탈출구 nonisolated(unsafe)'
+    excluded:
+      - '/Derived/'
+    regex: '\bnonisolated\s*\(\s*unsafe\s*\)'
+    excluded_match_kinds: [comment, doccomment, string]
+    message: 'nonisolated(unsafe) 를 쓰지 않는다 — static 상태는 static let(Sendable 이 아니면 계산 프로퍼티), 공유 가변 상태는 LockIsolated, UI 상태는 @MainActor 로 둔다. 룰북 .codex/skills/carve-rulebook/references/concurrency.md'
+    severity: error
+  no_unchecked_sendable:
+    name: '동시성 탈출구 @unchecked Sendable'
+    excluded:
+      - '/Derived/'
+      # 이행 중 예외(제품) — 룰북 references/concurrency.md 「안전하지 않은 우회 감사」 참조
+      - '/Domain/Domain/Sources/Drawing/DrawingEditEnvironment\.swift$'
+      - '/Domain/Domain/Sources/Drawing/EraseStateStore\.swift$'
+      - '/Domain/Domain/Sources/Drawing/LocalDrawingChangeClient\.swift$'
+      - '/Domain/Domain/Sources/SentenceSettingBackup/SentenceSettingCloudBackup\.swift$'
+      - '/Domain/Domain/Sources/SwiftData/LegacySeparationGate\.swift$'
+      # 이행 중 예외(시험 대역) — 룰북 references/concurrency.md 「안전하지 않은 우회 감사」 참조
+      - '/Domain/Domain/Tests/CloudInitialWaitTesting\.swift$'
+      - '/Domain/Domain/Tests/CloudObservationOrderTesting\.swift$'
+      - '/Domain/Domain/Tests/LaunchRouteTesting\.swift$'
+      - '/Domain/Domain/Tests/LegacySeparationPerformanceProbeTesting\.swift$'
+      - '/Feature/CarveFeature/Tests/CarveDetailFavoriteTesting\.swift$'
+      - '/Feature/CarveFeature/Tests/CarveDetailVerseImageTesting\.swift$'
+      - '/Feature/CarveFeature/Tests/ChapterCanvasArrivalTesting\.swift$'
+      - '/Feature/CarveFeature/Tests/ChapterCanvasEditSessionTesting\.swift$'
+      - '/Feature/CarveFeature/Tests/ChapterCanvasFeatureTesting\.swift$'
+      - '/Feature/CarveFeature/Tests/ChapterCanvasImportTesting\.swift$'
+      - '/Feature/CarveFeature/Tests/ChapterCanvasStaleSaveTesting\.swift$'
+      - '/Feature/CarveFeature/Tests/TextLayoutKeyProbeTesting\.swift$'
+      - '/Feature/CarveFeature/Tests/WidgetVerseClientSpy\.swift$'
+      - '/Feature/SettingsFeature/Tests/CloudSettingsEraseTesting\.swift$'
+      - '/Feature/SettingsFeature/Tests/CloudSettingsHoldTesting\.swift$'
+      - '/Feature/SettingsFeature/Tests/DraftRecoveryFeatureTesting\.swift$'
+      - '/Feature/SettingsFeature/Tests/DraftRecoveryImportTesting\.swift$'
+      - '/Feature/SettingsFeature/Tests/WidgetSettingsTesting\.swift$'
+    regex: '@unchecked\s+(?:Swift\.)?Sendable\b'
+    excluded_match_kinds: [comment, doccomment, string]
+    message: '@unchecked Sendable 을 새로 늘리지 않는다 — 가변 상태는 LockIsolated 로 감싸 Sendable 을 컴파일러가 확인하게 하거나, UI 타입은 타입 단위 @MainActor 로 둔다. 룰북 .codex/skills/carve-rulebook/references/concurrency.md'
     severity: error
 
 reporter: "xcode" # 보고 유형 (xcode, json, csv, checkstyle, junit, html, emoji, markdown)
