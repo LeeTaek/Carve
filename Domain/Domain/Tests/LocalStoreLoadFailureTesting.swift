@@ -22,7 +22,7 @@ import Testing
 /// 2026-09-17 수행 당시에는 이름이 V6 였다(테스트 계획 §5-1 MIG-F1). 앱이 V6 를 갖게 되면서 V7 로 옮겼다.
 /// 2.0.0 뒤의 빌드가 만든 저장소를 2.0.0 이 여는 경우(TestFlight 에서 예전 빌드를 다시 까는 경우)를 흉내 낸다.
 enum NewerStoreSchemaV7: VersionedSchema {
-    static var versionIdentifier = Schema.Version(7, 0, 0)
+    static let versionIdentifier = Schema.Version(7, 0, 0)
 
     static var models: [any PersistentModel.Type] {
         [BibleDrawing.self, DrawingSchemaV4.BiblePageDrawing.self, DrawingSchemaV5.FavoriteVerse.self]

@@ -9,6 +9,8 @@
 import Foundation
 import SwiftData
 
+import Dependencies
+
 /// 모델에 버전이 할당되지 않았을 경우(1.1.0 버전 이전) 사용하는 MigrationPlan
 enum MigrationPlanV1Only: SchemaMigrationPlan {
     static var schemas: [VersionedSchema.Type] {
@@ -54,7 +56,8 @@ enum DrawingDataMigrationPlan: SchemaMigrationPlan {
         [DrawingSchemaV1.self, DrawingSchemaV2.self, DrawingSchemaV3.self, DrawingSchemaV4.self, DrawingSchemaV5.self, DrawingSchemaV6.self]
     }
 
-    private static var updatedDrawings: [V1DrawingMigrationValue] = []
+    /// willMigrate 가 V1 행에서 뽑은 값을 didMigrate 까지 들고 있는 임시 보관. 두 단계 사이에만 값이 있다.
+    private static let updatedDrawings = LockIsolated<[V1DrawingMigrationValue]>([])
 
     static let migrationV1toV2 = MigrationStage.custom(
         fromVersion: DrawingSchemaV1.self,
@@ -62,7 +65,7 @@ enum DrawingDataMigrationPlan: SchemaMigrationPlan {
         willMigrate: { context in
             /// 기존 V1 DrawingVO에서 값만 추출한다. destination 모델은 didMigrate의 context에서 만든다.
             let drawings = try context.fetch(FetchDescriptor<DrawingSchemaV1.DrawingVO>())
-            updatedDrawings = drawings
+            let values = drawings
                 .filter { drawing in        // drawing이 비어있으면 제거
                     if drawing.lineData?.containsPKStroke == true {
                         return true
@@ -93,11 +96,12 @@ enum DrawingDataMigrationPlan: SchemaMigrationPlan {
                     lineData: old.lineData
                 )
             }
+            updatedDrawings.setValue(values)
             try context.save()
         },
         didMigrate: { context in
-            defer { updatedDrawings = [] }
-            updatedDrawings
+            defer { updatedDrawings.setValue([]) }
+            updatedDrawings.value
                 .map { $0.makeV2Drawing() }
                 .forEach { context.insert($0) }
             try context.save()

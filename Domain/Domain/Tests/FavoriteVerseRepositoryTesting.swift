@@ -25,10 +25,9 @@ struct FavoriteRepositoryHarness {
         repository = SwiftDataFavoriteVerseRepository(actor: actor)
     }
 
-    /// 저장소를 거치지 않고 센 즐겨찾기 행 수 — 중복 행이 합쳐졌는지 본다.
+    /// 저장소를 거치지 않고 센 즐겨찾기 행 수 — 중복 행이 합쳐졌는지 본다. 같은 컨테이너의 새 문맥으로 센다.
     func rowCount() async throws -> Int {
-        let rows: [FavoriteVerse] = try await actor.fetch(FetchDescriptor<FavoriteVerse>())
-        return rows.count
+        try ModelContext(actor.modelContainer).fetchCount(FetchDescriptor<FavoriteVerse>())
     }
 
     /// CloudKit 이 다른 기기에서 실어 온 행처럼 저장소를 거치지 않고 넣는다.
@@ -149,7 +148,7 @@ struct FavoriteVerseRepositoryTesting {
 
         try await harness.repository.remove(FavoriteVerseKey(chapter: Self.psalm23, verse: 1))
 
-        let drawings: [BibleDrawing] = try await harness.actor.fetch(FetchDescriptor<BibleDrawing>())
+        let drawings: [BibleDrawing] = try ModelContext(harness.actor.modelContainer).fetch(FetchDescriptor<BibleDrawing>())
         #expect(drawings.map(\.rowKey) == ["row-1"])
         #expect(drawings.first?.lineData == Data([1, 2, 3]))
         #expect(try await harness.repository.favorites().isEmpty)

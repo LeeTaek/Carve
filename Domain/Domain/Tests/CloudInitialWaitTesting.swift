@@ -52,9 +52,7 @@ private final class CancellingAccountStatus: CloudAccountStatusClient, @unchecke
     }
 
     func availability() async -> CloudAccountAvailability {
-        lock.lock()
-        let task = target
-        lock.unlock()
+        let task = lock.withLock { target }
         task?.cancel()
         return .unknown
     }

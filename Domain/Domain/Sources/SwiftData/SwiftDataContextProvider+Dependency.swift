@@ -14,9 +14,9 @@ import Dependencies
 
 /// ContainerID 주입하기 위한 DependencyKey.
 extension ContainerID: DependencyKey {
-    public static var liveValue: ContainerID = .initialState
-    public static var previewValue: ContainerID = .initialState
-    public static var testValue: ContainerID = .initialState
+    public static let liveValue: ContainerID = .initialState
+    public static let previewValue: ContainerID = .initialState
+    public static let testValue: ContainerID = .initialState
 }
 
 /// Carve에서 사용하는 SwiftData ModelContainer를 의존성으로 주입하기 위한 DependencyKey.

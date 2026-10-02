@@ -59,17 +59,20 @@ struct RepositoryHarness {
         row.id = "\(chapter.title.rawValue).\(chapter.chapter).\(verse).\(Int(updateDate.timeIntervalSince1970))"
         row.isPresent = isPresent
         row.drawingVersion = 1
+        // 모델은 actor 로 넘긴 뒤 다시 만지지 않는다 — 행 키는 넘기기 전에 읽는다.
+        let rowKey = row.rowKey
         try await actor.insert(row)
-        return row.rowKey
+        return rowKey
     }
 
+    /// 절의 행을 저장소에서 직접 읽는다 — 같은 컨테이너의 새 문맥이라 모델을 actor 밖으로 받지 않는다.
     func rows(verse: Int) async throws -> [BibleDrawing] {
         let titleName = chapter.title.rawValue
         let chapterNumber = chapter.chapter
         let predicate = #Predicate<BibleDrawing> {
             $0.titleName == titleName && $0.titleChapter == chapterNumber && $0.verse == verse
         }
-        return try await actor.fetch(FetchDescriptor(predicate: predicate))
+        return try ModelContext(actor.modelContainer).fetch(FetchDescriptor(predicate: predicate))
     }
 }
 
