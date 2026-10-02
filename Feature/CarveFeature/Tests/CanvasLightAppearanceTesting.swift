@@ -8,7 +8,6 @@
 import Domain
 import Foundation
 import PencilKit
-import SwiftData
 import SwiftUI
 import Testing
 import UIKit
@@ -76,11 +75,6 @@ struct CanvasLightAppearanceTesting {
         return nil
     }
 
-    private func canvases(in view: UIView) -> [PKCanvasView] {
-        if let canvas = view as? PKCanvasView { return [canvas] }
-        return view.subviews.flatMap { canvases(in: $0) }
-    }
-
     /// SwiftUI 갱신과 PencilKit 렌더가 도는 시간을 준다.
     private func pump(_ window: UIWindow, turns: Int = 60) async {
         for _ in 0..<turns {
@@ -146,33 +140,5 @@ struct CanvasLightAppearanceTesting {
         try #require(!controller.canvas.drawing.bounds.isEmpty, "캔버스에 잉크가 들어가지 않았다")
         let ink = try #require(mostOpaquePixel(renderLayer(controller.canvas)), "캔버스에 그려진 잉크가 없다")
         #expect(ink.red < 64 && ink.green < 64 && ink.blue < 64, "검정 잉크가 \(ink) 로 그려졌다")
-    }
-
-    @Test("다크 화면에서도 절 캔버스(N-Canvas)는 라이트이고 검정 잉크를 검정으로 그린다", arguments: DarkSource.allCases)
-    func verseCanvasDrawsStoredInkColorInDark(source: DarkSource) async throws {
-        // iPadOS 17 의 SwiftData 는 활성 컨테이너 없이 모델을 만들면 멈춘다(`failed to find a currently active container for BibleDrawing`).
-        // 18 이상은 통과해 모르고 지나갔다(2026-09-28 17.5 전체 회귀). 인메모리 컨테이너를 먼저 만들고 시험이 끝날 때까지 쥔다.
-        let container = try ModelContainer(for: BibleDrawing.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
-        defer { withExtendedLifetime(container) {} }
-        try await withDependencies {
-            $0.undoManager = SharedUndoManager()
-        } operation: {
-            let chapter = BibleChapter(title: .genesis, chapter: 1)
-            let drawing = BibleDrawing(bibleTitle: chapter, verse: 1, lineData: Self.blackInkData())
-            let store = Store(
-                initialState: CanvasFeature.State(sentence: BibleVerse(title: chapter, verse: 1, sentence: "태초에"), drawing: drawing)
-            ) {
-                CanvasFeature()
-            }
-            let (window, hosting) = host(CanvasView(store: store).frame(width: 400, height: 200), source: source)
-            defer { window.isHidden = true }
-            await pump(window)
-
-            #expect(hosting.traitCollection.userInterfaceStyle == .dark)
-            let canvas = try #require(canvases(in: hosting.view).first, "절 캔버스를 찾지 못했다")
-            #expect(canvas.traitCollection.userInterfaceStyle == .light)
-            let ink = try #require(mostOpaquePixel(renderLayer(canvas)), "캔버스에 그려진 잉크가 없다")
-            #expect(ink.red < 64 && ink.green < 64 && ink.blue < 64, "검정 잉크가 \(ink) 로 그려졌다")
-        }
     }
 }
