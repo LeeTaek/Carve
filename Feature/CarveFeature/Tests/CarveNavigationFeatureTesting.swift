@@ -155,6 +155,7 @@ struct CarveNavigationFeatureTesting {
 }
 
 /// 장 목록을 선택한 장으로 옮길 때 목록 끝을 넘지 않는다(iPadOS 27.2 가로에서 제목과 목록이 내려앉던 문제).
+@MainActor
 struct ChapterListScrollTesting {
     @Test("맨 위 장은 가운데로 맞추지 않고 목록 맨 위에 둔다")
     func firstRowsStayAtTop() {

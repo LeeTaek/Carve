@@ -15,7 +15,7 @@ public struct AppVersionFeature {
     public init() { }
     
     @ObservableState
-    public struct State: Equatable, Hashable {
+    public struct State: Equatable, Hashable, Sendable {
         public static let initialState = Self()
         public var path = StackState<Path.State>()
         public var iCloudIsOn: Bool = true
@@ -47,3 +47,4 @@ public struct AppVersionFeature {
 }
 
 extension AppVersionFeature.Path.State: Hashable {}
+extension AppVersionFeature.Path.State: Sendable {}

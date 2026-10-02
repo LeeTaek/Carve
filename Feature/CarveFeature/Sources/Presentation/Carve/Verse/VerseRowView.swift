@@ -122,7 +122,7 @@ public struct VerseRowView: View {
 }
 
 private struct VerseFramePreferenceKey: PreferenceKey {
-    static var defaultValue: CGRect = .zero
+    static let defaultValue: CGRect = .zero
     static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
         value = nextValue()
     }

@@ -12,14 +12,14 @@ import Foundation
 import ComposableArchitecture
 
 @Reducer
-public struct SentenceSettingsFeature {
+public struct SentenceSettingsFeature: Sendable {
     @ObservableState
-    public struct State {
+    public struct State: Sendable {
         @Shared(.codableAppStorage(SentenceSetting.appStorageKey)) public var setting: SentenceSetting = .initialState
         @Shared(.appStorage("allowFingerDrawing")) public var allowFingerDrawing: Bool = false
         @Shared(.appStorage("isLeftHanded")) public var isLeftHanded: Bool = false
 
-        public static var initialState: Self = .init()
+        public static let initialState: Self = .init()
     }
     /// `@Shared` 값은 `BindingReducer`로 쓸 수 없다.
     /// `Shared.wrappedValue`의 setter가 `unavailable`이라 `$store.setting` 같은 직접 바인딩은

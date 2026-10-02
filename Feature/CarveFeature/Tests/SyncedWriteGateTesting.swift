@@ -9,7 +9,6 @@ import CoreGraphics
 import Domain
 import Foundation
 import PencilKit
-import SwiftData
 import Testing
 
 import ComposableArchitecture
@@ -189,7 +188,7 @@ struct SyncedWriteGateTesting {
         } operation: {
             try await CarveDetailFeature().persistDrawing(request)
             @Dependency(\.drawingData) var drawingData
-            #expect(try await drawingData.fetchDrawings(chapter: chapter, verse: 42).isEmpty)
+            #expect(try await drawingData.fetchVerseSnapshots(chapter: chapter, verse: 42).isEmpty)
         }
 
         // 소유가 확인된 환경에서는 같은 요청이 저장된다 — 게이트가 저장 자체를 막는 것이 맞는지 함께 본다.
@@ -199,7 +198,7 @@ struct SyncedWriteGateTesting {
         } operation: {
             try await CarveDetailFeature().persistDrawing(request)
             @Dependency(\.drawingData) var drawingData
-            #expect(try await drawingData.fetchDrawings(chapter: chapter, verse: 42).count == 1)
+            #expect(try await drawingData.fetchVerseSnapshots(chapter: chapter, verse: 42).count == 1)
         }
     }
 
@@ -313,18 +312,14 @@ struct SyncedWriteGateTesting {
 
     @Test("소유가 확인되지 않으면 회차를 바꾸지 않고 사유를 보인다 — 화면의 회차 표시도 그대로다")
     func historyRestoreIsBlockedAtWrite() async throws {
-        let container = try ModelContainer(
-            for: BibleDrawing.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        let present = VerseDrawingSnapshot(
+            verse: 1, rowID: BibleDrawingRowID(raw: "row-present"), isPresent: true,
+            updateDate: Self.now, lineData: Self.ink(x: 0), drawingVersion: nil, metadata: nil
         )
-        let context = ModelContext(container)
-        let present = BibleDrawing(bibleTitle: Self.chapter, verse: 1, lineData: Self.ink(x: 0), updateDate: Self.now)
-        present.isPresent = true
-        let older = BibleDrawing(bibleTitle: Self.chapter, verse: 1, lineData: Self.ink(x: 40),
-                                 updateDate: Date(timeIntervalSince1970: 500))
-        older.isPresent = false
-        context.insert(present)
-        context.insert(older)
-        try context.save()
+        let older = VerseDrawingSnapshot(
+            verse: 1, rowID: BibleDrawingRowID(raw: "row-older"), isPresent: false,
+            updateDate: Date(timeIntervalSince1970: 500), lineData: Self.ink(x: 40), drawingVersion: nil, metadata: nil
+        )
 
         // `State` 가 Equatable 이 아니라 실제 Store 로 본다.
         let store = Store(initialState: VerseDrawingHistoryFeature.State(title: Self.chapter, verse: 1)) {
@@ -339,7 +334,8 @@ struct SyncedWriteGateTesting {
         #expect(store.restoreBlock == .signedOut)
         #expect(VerseDrawingHistoryView.blockedMessage(.signedOut).hasPrefix("이 회차로 바꾸지 않았어요"))
         // 지금 보이는 회차는 그대로다 — 목록 표시도 바꾸지 않았다.
-        #expect(store.drawings.first { $0.isPresent == true } === present)
+        #expect(store.drawings.first { $0.isPresent } == present)
+        #expect(store.drawings.representative() == present)
     }
 }
 

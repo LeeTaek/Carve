@@ -19,6 +19,7 @@ import ComposableArchitecture
 // MARK: - 도구 매핑 (§4-1 · §4-2)
 
 @Suite("올가미 — 도구 매핑")
+@MainActor
 struct LassoToolMappingTesting {
 
     @Test("올가미는 잉크 · 지우개보다 우선하는 한 칸이다")

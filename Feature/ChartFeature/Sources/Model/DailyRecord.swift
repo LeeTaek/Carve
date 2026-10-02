@@ -8,7 +8,7 @@
 
 import Foundation
 
-public struct DailyRecord: Equatable, Identifiable {
+public struct DailyRecord: Equatable, Identifiable, Sendable {
     public var id: Date { date }
     public var date: Date
     public var count: Int

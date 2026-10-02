@@ -9,7 +9,8 @@
 
 ## 아키텍처
 - 기존의 TCA + MicroArchitecture 구조를 따른다.
-- 아키텍처 규칙 원문은 `.codex/skills/carve-rulebook/`(`SKILL.md` 와 `references/`)이고, 모듈 안 경계(리듀서의 PencilKit · UIKit 타입 · 직접 시각 읽기, Feature 의 SwiftData, Domain 의 UI import)는 `.swiftlint.yml` `custom_rules` 가 error 로 검사한다.
+- 아키텍처 규칙 원문은 `.codex/skills/carve-rulebook/`(`SKILL.md` 와 `references/`)이고, 모듈 안 경계(리듀서의 PencilKit · UIKit 타입 · 직접 시각 읽기, Feature 의 SwiftData, Domain 의 UI import)와
+  동시성 탈출구(`nonisolated(unsafe)` · `@unchecked Sendable`)는 `.swiftlint.yml` `custom_rules` 가 error 로 검사한다.
 - 현재 모듈 경계를 유지하는 작고 국소적인 변경을 우선한다.
 - 작업과 무관한 광범위한 리팩토링은 피한다.
 
@@ -69,28 +70,30 @@
 
 ## 툴체인 제약 ★ 먼저 읽을 것
 
-**출시 후보 빌드와 주 검증은 Xcode 27, 회귀 비교 기준은 Xcode 26.3 (17C529 / Swift 6.2.4) 이다.**
-머신마다 설치된 Xcode 와 경로가 다르다. 실행 전에 확인하고, 결과에는 실제로 쓴 Xcode · Swift · runtime 을 적는다.
-경로를 하드코딩하지 않는다 — 없는 경로를 `DEVELOPER_DIR` 로 주면 `missing DEVELOPER_DIR path` 로 모든 명령이 죽는다.
+**주 검증과 출시 후보 빌드는 Xcode 27(Swift 6.4) 하나다. 자사 모듈은 Swift 언어 모드 6 이다.** Xcode 26.x 는 지원하지 않는다(2026-10-02 언어 모드 6 전환에서 26.3 회귀 비교 기준을 내렸다).
+머신마다 기본 Xcode 와 설치 경로가 다르다. 기본 Xcode 가 27 이 아니면 `xcode-select` 로 바꾸지 말고, Carve 명령(`xcodebuild` · `tuist` · `swift` · `xcrun`)에만
+`DEVELOPER_DIR=<Xcode 27 경로>/Contents/Developer` 를 붙인다. 경로는 실행 전에 확인하고 하드코딩하지 않는다 — 없는 경로를 `DEVELOPER_DIR` 로 주면
+`missing DEVELOPER_DIR path` 로 모든 명령이 죽는다. 결과에는 실제로 쓴 Xcode · Swift · runtime 을 적는다.
 
 ```bash
 xcode-select -p
-xcodebuild -version
-swift --version
+xcodebuild -version                                          # 27.x 가 아니면 아래에서 Xcode 27 을 찾는다
+find /Applications -maxdepth 1 -name 'Xcode*.app' -print
+DEVELOPER_DIR=<확인한 경로>/Contents/Developer xcodebuild -version   # Xcode 27.x 인지
+DEVELOPER_DIR=<확인한 경로>/Contents/Developer swift --version       # Swift 6.4 인지
 mise x -- tuist version
 xcrun simctl list runtimes
-find /Applications -maxdepth 1 -name 'Xcode*.app' -print   # 다른 Xcode 와 비교할 때만 DEVELOPER_DIR=<확인한 경로>
 ```
 
 | 버전 | 상태 |
 |---|---|
-| **Xcode 27** | 🎯 출시 후보 빌드 · 주 검증 대상. 2026-09-25 코드로 iPadOS 17.5 · 18.6 · 26.2 · 26.4 · 26.5 · 27.0 전체 회귀가 통과했다. 이후 코드는 아직 돌리지 않았다 |
-| **Xcode 26.3** | 🧪 회귀 비교 기준. 2026-09-28 전체 회귀 통과(아래 「공통 명령어」의 기준선) |
-| Xcode 26.6 | Xcode Cloud TestFlight 빌드 `2.0.0 (220)` 을 만든 툴체인이다. 로컬에서는 확인하지 않았다 |
+| **Xcode 27** (Swift 6.4) | 🎯 주 검증 · 출시 후보 빌드. 전체 회귀 기준선은 [docs/regression-baseline.md](docs/regression-baseline.md). 여러 런타임을 함께 돌린 마지막 회귀는 2026-09-25 코드(언어 모드 6 전)의 iPadOS 17.5 · 18.6 · 26.2 · 26.4 · 26.5 · 27.0 통과다 |
+| Xcode 26.x | 지원하지 않는다. 언어 모드 6 의 동시성 진단이 Swift 6.2.x 와 6.4 에서 달라 둘 다 맞추지 않는다 |
 
-- **iOS 27 SDK 에만 있는 심볼은 `#if compiler(>=6.4)` 로 감싼다.** `#available` 만으로는 Xcode 26.x 에서 컴파일이 깨진다
-  (2026-09-28 `SwiftDataError.unknownDataStoreSchema`). 26.x 로 빌드하면 그 분기(iOS 27 SwiftData 의 1.0.x 저장소 폴백)가 빠지므로
-  **출시 후보는 Xcode 27 로 만든다.**
+- **언어 모드 6:** 자사 타깃(앱 · 위젯 · Feature · Domain · Supports · 단위 · UI 시험)은 `SWIFT_VERSION = 6` 이다 — `Plugins/ProjectDescriptionHelpers` 가 넣는다.
+  의존성 타깃은 각자의 언어 모드 그대로다. 실행 중 격리 검사(SE-0423)도 켜져 있어, 시험이 `Incorrect actor executor assumption` 으로 죽으면 덮지 말고 격리를 고친다.
+  관례 · 탈출구(`nonisolated(unsafe)` 금지 · `@unchecked Sendable` 동결)와 남은 우회의 이유는 룰북 `references/concurrency.md` 다.
+- iOS 27 SDK 에만 있는 심볼은 `#available(iOS 27, *)` 판정만으로 쓴다. 최소 배포가 iOS 17 이라 런타임 판정은 그대로 필요하다.
 - 툴체인 경위는 [로드맵 §4 TECH-0](docs/release-2.0.0-roadmap.md), 실행별 수치와 한계는 [호환성 시험 계획](docs/icloud-sync-compatibility-test-plan.md)에 있다.
 
 **tuist 는 `.mise.toml` 로 4.208.0 에 고정돼 있다.** `PATH` 기본값과 다르므로 반드시
@@ -100,6 +103,7 @@ find /Applications -maxdepth 1 -name 'Xcode*.app' -print   # 다른 Xcode 와 �
 
 ```bash
 # 실행한 Xcode · Swift · runtime 을 결과에 적는다(툴체인 절).
+# 기본 Xcode 가 27 이 아니면 tuist · xcodebuild 앞에 DEVELOPER_DIR=<확인한 Xcode 27 경로>/Contents/Developer 를 붙인다.
 
 mise x -- tuist generate --no-open        # ★ .xcodeproj 는 gitignore — 클론·브랜치 전환 후 반드시 먼저
 xcodebuild test -workspace Carve.xcworkspace -scheme Carve-Workspace \

@@ -22,7 +22,7 @@ import Testing
 /// 2026-09-17 수행 당시에는 이름이 V6 였다(테스트 계획 §5-1 MIG-F1). 앱이 V6 를 갖게 되면서 V7 로 옮겼다.
 /// 2.0.0 뒤의 빌드가 만든 저장소를 2.0.0 이 여는 경우(TestFlight 에서 예전 빌드를 다시 까는 경우)를 흉내 낸다.
 enum NewerStoreSchemaV7: VersionedSchema {
-    static var versionIdentifier = Schema.Version(7, 0, 0)
+    static let versionIdentifier = Schema.Version(7, 0, 0)
 
     static var models: [any PersistentModel.Type] {
         [BibleDrawing.self, DrawingSchemaV4.BiblePageDrawing.self, DrawingSchemaV5.FavoriteVerse.self]
@@ -251,16 +251,12 @@ struct LocalStoreLoadFailureTesting {
                 Issue.record("앱 스키마가 더 새 V7 저장소를 열었다")
             } catch let error as SwiftDataError {
                 let isUnknownDataStoreSchema: Bool
-                // `unknownDataStoreSchema` 는 iOS 27 SDK(Swift 6.4)에만 있다 — 제품 코드 `isLegacySchemaMismatch` 와 같은 조건.
-                #if compiler(>=6.4)
+                // `unknownDataStoreSchema` 는 iOS 27 부터 있다 — 제품 코드 `isLegacySchemaMismatch` 와 같은 조건.
                 if #available(iOS 27, *) {
                     isUnknownDataStoreSchema = error == .unknownDataStoreSchema
                 } else {
                     isUnknownDataStoreSchema = false
                 }
-                #else
-                isUnknownDataStoreSchema = false
-                #endif
                 #expect(error == .loadIssueModelContainer || isUnknownDataStoreSchema, "예상하지 못한 SwiftData 오류: \(error)")
             } catch {
                 Issue.record("예상하지 못한 오류: \(error)")

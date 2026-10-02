@@ -9,6 +9,8 @@
 
 import XCTest
 
+/// `XCUIApplication` · `XCUIElement` 는 MainActor 다 — 시험 클래스를 타입 단위로 MainActor 에 둔다.
+@MainActor
 final class CarveDeviceSmokeUITests: XCTestCase {
 
     override func setUp() {

@@ -18,7 +18,7 @@ import UIComponents
 /// Carve 전체 네비게이션 관리 Reducer
 /// 성경 (제목/장) 선ㄴ택, Splitview, 상세화면 전환 담당
 @Reducer
-public struct CarveNavigationFeature {
+public struct CarveNavigationFeature: Sendable {
     public init() { }
     @ObservableState
     public struct State {

@@ -512,6 +512,18 @@ struct LegacyPathOnV4StoreTesting {
         }
     }
 
+    /// 절의 행을 저장소에서 직접 읽는다 — `fetchVerseSnapshots(chapter:verse:)` 와 같은 조건 · 정렬(`updateDate` 최신순).
+    /// 같은 컨테이너의 새 문맥이라 모델을 actor 밖으로 받지 않는다.
+    private static func storedRows(of database: DrawingDatabase, verse: Int) throws -> [BibleDrawing] {
+        let titleName = chapter.title.rawValue
+        let chapterNumber = chapter.chapter
+        let predicate = #Predicate<BibleDrawing> {
+            $0.titleName == titleName && $0.titleChapter == chapterNumber && $0.verse == verse
+        }
+        let descriptor = FetchDescriptor(predicate: predicate, sortBy: [SortDescriptor(\.updateDate, order: .reverse)])
+        return try ModelContext(database.actor.modelContainer).fetch(descriptor)
+    }
+
     private static func seedV3(at directory: URL) throws {
         let container = try ModelContainer(
             for: Schema([DrawingSchemaV3.BibleDrawing.self, DrawingSchemaV3.BiblePageDrawing.self]),
@@ -556,13 +568,13 @@ struct LegacyPathOnV4StoreTesting {
 
     // MARK: fetch 경로
 
-    @Test("fetch(chapter:) 가 마이그레이션된 legacy 행을 그대로 읽는다")
+    @Test("fetchForLegacyCanvas(chapter:) 가 마이그레이션된 legacy 행을 그대로 읽는다")
     func fetchChapter() async throws {
         let directory = try V4StoreHarness.makeStoreDirectory()
         defer { V4StoreHarness.removeStoreDirectory(directory) }
         let database = try Self.makeMigratedDatabase(at: directory)
 
-        let rows = try await database.fetch(chapter: Self.chapter)
+        let rows = try await database.fetchForLegacyCanvas(chapter: Self.chapter).value
         #expect(rows.count == 3)
         #expect(rows.map { $0.verse } == [1, 1, 2])
         #expect(rows.allSatisfy { $0.drawingVersion == 1 })
@@ -570,15 +582,15 @@ struct LegacyPathOnV4StoreTesting {
         #expect(rows.allSatisfy { $0.layoutMetadataData == nil })
     }
 
-    @Test("fetchDrawings(chapter:verse:) + mainDrawing() 이 대표 행을 고른다")
+    @Test("fetchVerseSnapshots(chapter:verse:) + representative() 이 대표 행을 고른다")
     func fetchVerseAndMainDrawing() async throws {
         let directory = try V4StoreHarness.makeStoreDirectory()
         defer { V4StoreHarness.removeStoreDirectory(directory) }
         let database = try Self.makeMigratedDatabase(at: directory)
 
-        let rows = try await database.fetchDrawings(chapter: Self.chapter, verse: 1)
+        let rows = try await database.fetchVerseSnapshots(chapter: Self.chapter, verse: 1)
         #expect(rows.count == 2)
-        let main = try #require(rows.mainDrawing())
+        let main = try #require(rows.representative())
         #expect(main.isPresent == true)
         #expect(main.lineData == RealLegacyLineData.data)
     }
@@ -616,7 +628,7 @@ struct LegacyPathOnV4StoreTesting {
             DrawingUpdateRequest(chapter: Self.chapter, verse: 1, updateLineData: newData, updateDate: stamp)
         ])
 
-        let rows = try await database.fetchDrawings(chapter: Self.chapter, verse: 1)
+        let rows = try Self.storedRows(of: database, verse: 1)
         let main = try #require(rows.mainDrawing())
         #expect(rows.count == 2, "회차 행이 늘어나면 안 된다 (§8-7)")
         #expect(main.lineData == newData)
@@ -639,7 +651,7 @@ struct LegacyPathOnV4StoreTesting {
             DrawingUpdateRequest(chapter: Self.chapter, verse: 9, updateLineData: newData)
         ])
 
-        let rows = try await database.fetchDrawings(chapter: Self.chapter, verse: 9)
+        let rows = try Self.storedRows(of: database, verse: 9)
         let created = try #require(rows.first)
         #expect(rows.count == 1)
         #expect(created.lineData == newData)
@@ -654,22 +666,20 @@ struct LegacyPathOnV4StoreTesting {
         defer { V4StoreHarness.removeStoreDirectory(directory) }
         let database = try Self.makeMigratedDatabase(at: directory)
 
-        let rows = try await database.fetch(chapter: Self.chapter)
-        let target = try #require(rows.first { $0.verse == 2 })
+        // N-Canvas 처럼 읽은 행의 키 · 좌표 형식에 새 내용을 실어 요청을 만든다. 읽은 모델은 고치지 않는다.
+        let target = try #require(try Self.storedRows(of: database, verse: 2).first)
         let replacement = PKDrawing().dataRepresentation()
-        target.lineData = replacement
-        target.updateDate = Date(timeIntervalSince1970: 1_743_000_000)
         try await database.updateDrawing(request: LegacyDrawingSaveRequest(
             chapter: Self.chapter,
             verse: 2,
             rowID: BibleDrawingRowID(raw: target.rowKey),
-            lineData: target.lineData,
-            updateDate: target.updateDate,
+            lineData: replacement,
+            updateDate: Date(timeIntervalSince1970: 1_743_000_000),
             drawingVersion: target.drawingVersion,
             layoutMetadataData: target.layoutMetadataData
         ))
 
-        let reloaded = try await database.fetchDrawings(chapter: Self.chapter, verse: 2)
+        let reloaded = try Self.storedRows(of: database, verse: 2)
         let stored = try #require(reloaded.first)
         #expect(stored.lineData == replacement)
         #expect(stored.drawingVersion == 1)
@@ -695,7 +705,7 @@ struct LegacyPathOnV4StoreTesting {
         try await database.updateDrawing(request: request)
         try await database.updateDrawing(request: request)
 
-        let rows = try await database.fetchDrawings(chapter: Self.chapter, verse: 10)
+        let rows = try Self.storedRows(of: database, verse: 10)
         #expect(rows.count == 1)
         #expect(rows.first?.rowUUID == rowID.raw)
         #expect(rows.first?.isPresent != true, "기존 N-Canvas 삽입 의미를 유지한다")
@@ -707,14 +717,15 @@ struct LegacyPathOnV4StoreTesting {
         defer { V4StoreHarness.removeStoreDirectory(directory) }
         let database = try Self.makeMigratedDatabase(at: directory)
 
-        let rows = try await database.fetchDrawings(chapter: Self.chapter, verse: 1)
-        let older = try #require(rows.first { $0.isPresent != true })
-        await database.updatePresentDrawing(chapter: Self.chapter, verse: 1, presentID: older.persistentModelID)
+        let rows = try await database.fetchVerseSnapshots(chapter: Self.chapter, verse: 1)
+        let older = try #require(rows.first { !$0.isPresent })
+        await database.updatePresentDrawing(chapter: Self.chapter, verse: 1, presentRowID: older.rowID)
 
-        let reloaded = try await database.fetchDrawings(chapter: Self.chapter, verse: 1)
-        let present = reloaded.filter { $0.isPresent == true }
+        let reloaded = try await database.fetchVerseSnapshots(chapter: Self.chapter, verse: 1)
+        let present = reloaded.filter(\.isPresent)
+        #expect(reloaded.count == 2)
         #expect(present.count == 1)
-        #expect(present.first?.persistentModelID == older.persistentModelID)
+        #expect(present.first?.rowID == older.rowID)
     }
 
     @Test("BiblePageDrawing upsert/fetch 경로가 V4 저장소에서 동작한다 (§10-4)")

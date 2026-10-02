@@ -13,12 +13,13 @@ import CarveToolkit
 import ComposableArchitecture
 
 @Reducer
-public struct DrawingChartFeature {
+public struct DrawingChartFeature: Sendable {
     public init() { }
     
     @ObservableState
     public struct State {
-        public static let initialState = Self()
+        /// 처음 상태. 광고 자리(`SponsorAdSlotFeature.State` 의 `UIView`)를 담아 `Sendable` 이 아니므로 저장하지 않고 매번 만든다.
+        public static var initialState: Self { Self() }
         var dailyRecordChart: DailyRecordChartFeature.State
         var drawingWeeklySummary: DrawingWeeklySummaryFeature.State = .init()
         public var earliestFetchedDate: Date = Calendar.current.startOfDay(for: Date())

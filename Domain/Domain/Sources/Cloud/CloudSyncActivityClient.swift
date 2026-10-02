@@ -24,16 +24,18 @@ public struct LiveCloudSyncActivityClient: CloudSyncActivityClient {
 
     public func activities() -> AsyncStream<CloudSyncActivity> {
         @Dependency(\.clouodKitSyncManager) var container
-        let publisher = container.$activity
-        return AsyncStream { continuation in
-            let task = Task {
-                for await value in publisher.values {
-                    continuation.yield(value)
-                }
-                continuation.finish()
+        // 관찰 Task 를 스트림을 만드는 클로저 밖에서 띄운다 — Sendable 이 아닌 publisher 를 그 클로저에 붙잡지 않는다(Swift 6).
+        // `$activity` 는 MainActor 에서만 읽으므로 Task 를 MainActor 에서 돌리고 publisher 도 그 안에서 얻는다. Combine 구독은
+        // 원래도 이 Task 안의 `values` 에서 시작했으므로 구독 시점은 같다.
+        let (stream, continuation) = AsyncStream<CloudSyncActivity>.makeStream()
+        let task = Task { @MainActor [container] in
+            for await value in container.$activity.values {
+                continuation.yield(value)
             }
-            continuation.onTermination = { _ in task.cancel() }
+            continuation.finish()
         }
+        continuation.onTermination = { _ in task.cancel() }
+        return stream
     }
 }
 

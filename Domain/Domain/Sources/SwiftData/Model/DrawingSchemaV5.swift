@@ -30,7 +30,7 @@ import SwiftData
 ///              **배포한 타입은 Production 에서 지울 수 없다.**
 /// - Important: forward-only 다 (V4 와 같다). V5 로 마이그레이션된 store 는 V4 빌드로 열 수 없다.
 public enum DrawingSchemaV5: VersionedSchema {
-    public static var versionIdentifier = Schema.Version(5, 0, 0)
+    public static let versionIdentifier = Schema.Version(5, 0, 0)
 
     public static var models: [any PersistentModel.Type] {
         [DrawingSchemaV4.BibleDrawing.self, DrawingSchemaV4.BiblePageDrawing.self, FavoriteVerse.self]

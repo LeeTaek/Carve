@@ -21,7 +21,7 @@ public struct CanvasSettingsFeature {
     public init() { }
 
     @ObservableState
-    public struct State: Hashable {
+    public struct State: Hashable, Sendable {
         public static let initialState = Self()
         /// flag 의 현재 값. 화면이 나타날 때 읽고, 토글이 바꾼다.
         public var isSingleCanvasEnabled: Bool = SingleCanvasFlag.defaultValue

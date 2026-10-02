@@ -95,7 +95,7 @@ public struct VerseDrawingHistoryView: View {
 
     private var rows: some View {
         VStack(spacing: CarveSpacing.xxSmall) {
-            ForEach(store.drawings) { drawing in
+            ForEach(store.drawings, id: \.rowID) { drawing in
                 row(for: drawing)
             }
         }
@@ -103,8 +103,8 @@ public struct VerseDrawingHistoryView: View {
     }
 
     @ViewBuilder
-    private func row(for drawing: BibleDrawing) -> some View {
-        let isCurrent = drawing.isPresent == true
+    private func row(for drawing: VerseDrawingSnapshot) -> some View {
+        let isCurrent = drawing.isPresent
         if let image = CarveInkThumbnail.image(of: drawing.lineData) {
             Button {
                 send(.selectDrawing(drawing))
@@ -135,7 +135,7 @@ public struct VerseDrawingHistoryView: View {
 
     /// 날짜 줄과 종이 카드. 지금 보이는 회차는 선택 바탕 · 체크로 표시한다.
     private func rowBody<Thumbnail: View>(
-        drawing: BibleDrawing,
+        drawing: VerseDrawingSnapshot,
         isCurrent: Bool,
         @ViewBuilder thumbnail: () -> Thumbnail
     ) -> some View {

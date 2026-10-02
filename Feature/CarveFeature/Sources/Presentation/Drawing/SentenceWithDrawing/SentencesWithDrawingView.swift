@@ -13,7 +13,7 @@ import ComposableArchitecture
 import UIComponents
 
 @ViewAction(for: SentencesWithDrawingFeature.self)
-public struct SentencesWithDrawingView: View, Equatable {
+public struct SentencesWithDrawingView: View, @MainActor Equatable {
     /// 부모 재평가 시 body 생략 판정 (`.equatable()`). 클로저는 비교할 수 없으므로 제외하고,
     /// 자식 store 는 TCA 가 id 별로 캐시하는 같은 인스턴스이므로 참조 동일성으로 비교한다.
     /// 행 자신의 상태 변화는 store 관찰로 따로 갱신되므로 이 비교와 무관하다.

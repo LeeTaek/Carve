@@ -30,9 +30,10 @@ struct BibleTitleDrawingRecordTesting {
             // 다른 성경의 기록은 섞이지 않는다.
             Self.row(.isaiah, chapter: 1, lineData: Self.strokeData, at: base + 400)
         ]
-        for row in rows {
-            try await actor.insert(row)
-        }
+        // 모델을 actor 로 넘기지 않고 같은 컨테이너의 시험 문맥으로 심는다. actor 는 저장된 행을 읽는다.
+        let context = ModelContext(actor.modelContainer)
+        rows.forEach { context.insert($0) }
+        try context.save()
 
         let record = try await database.fetchDrawingRecord(title: .songOfSongs)
 

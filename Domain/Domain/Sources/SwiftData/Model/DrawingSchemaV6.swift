@@ -30,7 +30,7 @@ import SwiftData
 /// - Important: forward-only 다. V6 로 마이그레이션된 저장소는 V5 빌드로 열 수 없다 — V5 빌드는 이 저장소를
 ///              "모르는 저장소" 로 가려 막는다(MIG-F1). **TestFlight 에 한 번 나간 뒤에는 필드를 고치지 말고 V7 로 올린다.**
 public enum DrawingSchemaV6: VersionedSchema {
-    public static var versionIdentifier = Schema.Version(6, 0, 0)
+    public static let versionIdentifier = Schema.Version(6, 0, 0)
 
     public static var models: [any PersistentModel.Type] {
         [

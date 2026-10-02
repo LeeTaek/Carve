@@ -10,6 +10,17 @@ public extension SettingsDictionary {
             .merging(assetSymbols)
     }
 
+    /// Swift 언어 모드 6 — 동시성 검사(Sendable · actor 격리 complete, DynamicActorIsolation 등)가 오류로 나온다.
+    ///
+    /// **타깃 레벨에 넣는다.** tuist 가 타깃마다 기본 `SWIFT_VERSION`(5)을 넣으므로 프로젝트 base 에 두면 가려진다.
+    /// `makeModule` 로 만드는 자사 프로젝트의 모든 타깃(앱 · 위젯 · 모듈 · 단위 · UI 시험)에만 붙고
+    /// 의존성 프로젝트(Tuist/Package.swift)는 각 패키지의 언어 모드 그대로다.
+    /// 명령줄 덮어쓰기(`xcodebuild SWIFT_VERSION=6`)로 켜지 않는다 — 언어 모드 5 인 swift-perception 에까지 걸려
+    /// Swift 6.4 에서 TCA 컴파일이 깨진다.
+    static let swift6LanguageMode: Self = [
+        "SWIFT_VERSION": "6"
+    ]
+
     /// Asset Catalog 에서 타입 세이프한 심볼과 `Color`/`Image` 확장을 생성한다.
     /// Tuist 의 resourceSynthesizer 가 만드는 접근자와 타입 이름이 달라 충돌하지 않는다.
     static let assetSymbols: Self = [
@@ -66,6 +77,17 @@ public extension Project {
           settings.base = settings.base.merging(.xcodeRecommended)
           return settings
       }()
+      // 언어 모드 6 은 타깃마다 붙인다 — 타깃이 넘긴 settings 가 있으면 그 base 에 더한다(`swift6LanguageMode` 주석).
+      let swift6Targets: [Target] = targets.map { target in
+          var target = target
+          guard var settings = target.settings else {
+              target.settings = .settings(base: .swift6LanguageMode)
+              return target
+          }
+          settings.base = settings.base.merging(.swift6LanguageMode)
+          target.settings = settings
+          return target
+      }
 
       return Project(
         name: name,
@@ -76,7 +98,7 @@ public extension Project {
         ),
         packages: packages,
         settings: mergedSettings,
-        targets: targets,
+        targets: swift6Targets,
         schemes: schemes,
         additionalFiles: additionalFiles,
         resourceSynthesizers: resourceSynthesizers

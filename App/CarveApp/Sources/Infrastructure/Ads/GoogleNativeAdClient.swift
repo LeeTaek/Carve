@@ -51,7 +51,9 @@ private extension NativeAdPlacement {
 /// GoogleMobileAds 기반 Native 광고 로더.
 /// - `load`는 AdMob의 delegate 콜백을 async/await 형태로 바꿔 사용.
 /// - 광고 제거를 사지 않았고, 광고 동의(UMP) 확인이 끝나 요청이 허용된 뒤에만 로드한다.
-final class GoogleNativeAdClient: NSObject, NativeAdClient, @unchecked Sendable {
+/// - 캐시 · 진행 중 요청은 MainActor 에서만 읽고 쓴다 — 타입 단위로 격리한다(`AdConsentCoordinator` · `StoreKitPurchaseClient` 와 같다).
+@MainActor
+final class GoogleNativeAdClient: NSObject, NativeAdClient {
     /// 광고 동의 수집과 광고 SDK 시작
     private let consent: AdConsentCoordinator
     /// 광고 제거 권한
@@ -159,7 +161,8 @@ final class GoogleNativeAdClient: NSObject, NativeAdClient, @unchecked Sendable 
     }
 }
 
-extension GoogleNativeAdClient: NativeAdLoaderDelegate {
+/// AdMob 은 로더 delegate 를 메인 스레드에서 부른다(`dispatchPrecondition` 으로 확인한다) — 콜백을 MainActor 에 둔다.
+extension GoogleNativeAdClient: @MainActor NativeAdLoaderDelegate {
     func adLoader(_ adLoader: AdLoader, didReceive nativeAd: NativeAd) {
         dispatchPrecondition(condition: .onQueue(.main))
 

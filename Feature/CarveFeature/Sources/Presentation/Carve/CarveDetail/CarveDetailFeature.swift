@@ -15,7 +15,7 @@ import PencilKit
 import ComposableArchitecture
 
 @Reducer
-public struct CarveDetailFeature {
+public struct CarveDetailFeature: Sendable {
     @ObservableState
     public struct State {
         /// 헤더 상태
@@ -99,9 +99,12 @@ public struct CarveDetailFeature {
         /// 이 화면이 마지막으로 반영한 세대. 뷰가 트리에서 빠졌다 돌아와도 놓치지 않도록 **값으로** 비교한다.
         public var seenDrawingDataRevision: Int = 0
         
-        public static let initialState = State(
-            headerState: .initialState
-        )
+        /// N-Canvas 행(@Model) · PencilKit 값을 담아 Sendable 이 아니므로 저장 프로퍼티 대신 계산 프로퍼티다.
+        public static var initialState: Self {
+            State(
+                headerState: .initialState
+            )
+        }
     }
     @Dependency(\.drawingData) var drawingContext
     @Dependency(\.bibleTextClient) var bibleTextClient
@@ -280,7 +283,8 @@ public struct CarveDetailFeature {
                     sentenceState.append(SentencesWithDrawingFeature.State(sentence: sentence, drawing: drawing))
                 }
                 state.sentenceWithDrawingState = sentenceState
-                undoManager.clear()
+                // N-Canvas 의 `SharedUndoManager` 는 MainActor 타입이다. 리듀서는 스토어(MainActor)에서 돈다.
+                MainActor.assumeIsolated { undoManager.clear() }
                 beginLayoutMeasurement(state: &state, sentences: sentences)
                 // 단일 Canvas 면 팔레트의 undo/redo 는 캔버스가 처리한다 — 팔레트가 SharedUndoManager 값으로 공유 canUndo 를 덮지 않게.
                 state.headerState.palatteSetting.delegatesUndoToCanvas = state.usesSingleCanvas
@@ -402,10 +406,10 @@ public struct CarveDetailFeature {
             case .chapterHistory(.presented(.setPresentDrawing(let drawing))):
                 // §8-7 복원 흐름 — ② isPresent 이전은 시트가 이미 DB 에 반영했다. ③ mutation 없이 다시 합성하며,
                 // 그 안에서 ① 미저장분이 먼저 저장된다 (rowID 주소지정이라 이전 활성 행의 변경도 유실되지 않는다).
-                guard let verse = state.chapterHistory?.verse else { return .none }
+                guard state.chapterHistory != nil else { return .none }
                 state.chapterHistory = nil
                 return .send(.scope(.chapterCanvasAction(
-                    .verseRowRestored(verse: drawing.verse ?? verse, rowID: BibleDrawingRowID(raw: drawing.rowKey))
+                    .verseRowRestored(verse: drawing.verse, rowID: drawing.rowID)
                 )))
 
             case .scope(.headerAction(.palatteAction(.view(.undo)))):
@@ -703,10 +707,12 @@ extension CarveDetailFeature {
         return .run { send in
             do {
                 let sentences = try bibleTextClient.fetch(chapter: title)
-                let drawings = try await drawingContext.fetch(chapter: title)
+                // 이행 중 예외(N-Canvas): N-Canvas 제거 때 지운다 — 룰북 swiftdata.md
+                // N-Canvas 는 절마다 @Model 을 들고 편집하므로 장의 행을 모델 그대로 받는다(`fetchForLegacyCanvas`).
+                let drawings = try await drawingContext.fetchForLegacyCanvas(chapter: title)
                 
                 try Task.checkCancellation()
-                await send(.setSentence(sentences, drawings))
+                await send(.setSentence(sentences, drawings.wrappedValue))
             } catch {
                 Log.error("Fetch Sentence Error")
             }

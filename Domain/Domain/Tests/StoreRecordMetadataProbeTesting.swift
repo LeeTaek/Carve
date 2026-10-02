@@ -107,9 +107,10 @@ struct StoreRecordMetadataProbeTesting {
 
     /// 엔티티마다 행을 세고, 그 행의 `recordID(for:)` 가 값을 주는지 본다.
     private func probe(_ container: NSPersistentCloudKitContainer) -> [String: (rows: Int, withRecordID: Int, sample: String?)] {
-        var report: [String: (rows: Int, withRecordID: Int, sample: String?)] = [:]
         let context = container.newBackgroundContext()
-        context.performAndWait {
+        // 블록이 @Sendable 이라 바깥 변수를 고치지 않고, 결과를 블록 안에서 모아 돌려받는다.
+        return context.performAndWait {
+            var report: [String: (rows: Int, withRecordID: Int, sample: String?)] = [:]
             for entity in container.managedObjectModel.entities {
                 guard let name = entity.name else { continue }
                 let request = NSFetchRequest<NSManagedObject>(entityName: name)
@@ -128,8 +129,8 @@ struct StoreRecordMetadataProbeTesting {
                 }
                 report[name] = (rows: objects.count, withRecordID: withID, sample: sample)
             }
+            return report
         }
-        return report
     }
 
     @Test("공개 API 로 대응을 읽을 수 있는가 — 표본이 있을 때만 돈다")

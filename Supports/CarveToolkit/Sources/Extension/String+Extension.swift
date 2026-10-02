@@ -18,24 +18,4 @@ public extension String {
          let toIndex = self.index(self.startIndex,offsetBy: range.endIndex)
          return String(self[fromIndex..<toIndex])
      }
-    
-    
-    func textHeightFrom(width: CGFloat, 
-                        fontName: String = "System Font",
-                        fontSize: CGFloat = .zero) -> CGFloat {
-#if os(macOS)
-        typealias UXFont = NSFont
-        let text: NSTextField = .init(string: self)
-        text.font = NSFont.init(name: fontName, size: fontSize)
-#else
-        typealias UXFont = UIFont
-        let text: UILabel = .init()
-        text.text = self
-        text.numberOfLines = 0
-#endif
-        
-        text.font = UXFont.init(name: fontName, size: fontSize)
-        text.lineBreakMode = .byWordWrapping
-        return text.sizeThatFits(CGSize.init(width: width, height: .infinity)).height
-    }
 }

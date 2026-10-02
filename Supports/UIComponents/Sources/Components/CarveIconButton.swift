@@ -137,8 +137,9 @@ public struct CarveIconBadgeParagraph: View {
             Text("\(Image(size: CGSize(width: side + CarveSpacing.xxSmall, height: 1)) { _ in })\(text)")
                 .lineSpacing(2)
                 .fixedSize(horizontal: false, vertical: true)
+            // 정렬 클로저는 Sendable 이라 MainActor 프로퍼티를 직접 읽지 못한다 — 값을 캡처해 넘긴다.
             CarveIconBadge(icon)
-                .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + midline }
+                .alignmentGuide(.firstTextBaseline) { [midline] in $0[VerticalAlignment.center] + midline }
         }
     }
 }
