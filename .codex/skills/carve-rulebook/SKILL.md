@@ -36,6 +36,9 @@ description: Carve(iPad 성경 필사 앱)에서 TCA + MicroArchitecture + Tuist
    - 기계 검사: `feature_no_swiftdata_import` · `feature_no_swiftdata_api`. @Model 타입(`BibleDrawing` · `FavoriteVerse`) 참조는 lint 없이 리뷰로 본다.
 5) 변수명은 최소 2글자 이상을 원칙으로 한다(`.swiftlint.yml` 의 제외 목록 `x` · `y` · `id` 등만 예외).
    - 기계 검사: SwiftLint 기본 규칙 `identifier_name`(`min_length` 2, error).
+6) 자사 모듈은 Swift 언어 모드 6 이다. State · `@Reducer` 는 `Sendable`, 공유 가변 상태는 `LockIsolated`, UI 계층 타입은 타입 단위 `@MainActor` 로 두고,
+   `nonisolated(unsafe)` 는 쓰지 않으며 `@unchecked Sendable` 은 늘리지 않는다. 관례와 남은 우회(이유 · 지울 조건)는 concurrency.md.
+   - 기계 검사: `no_nonisolated_unsafe` · `no_unchecked_sendable` — 리듀서 파일만이 아니라 저장소 전체(제품 · 시험)를 본다. `@preconcurrency` · `UncheckedSendable` · `MainActor.assumeIsolated` 는 리뷰로 본다.
 
 ## Output format (응답 포맷)
 - 결론: 추천 구조 5~10줄
@@ -49,6 +52,7 @@ description: Carve(iPad 성경 필사 앱)에서 TCA + MicroArchitecture + Tuist
 - ./references/swiftdata.md — 규칙 4: 저장소 경계 · 이행 중 예외 · iOS 17 @Model 컨테이너
 - ./references/navigation.md — Feature 안 · Feature 간 이동
 - ./references/testing.md — 시험 층 · 현재 시각과 기다림 · 의존성 testValue · TestStore 함정
+- ./references/concurrency.md — 규칙 6: 언어 모드 6 관례(State · 리듀서 · 격리) · 탈출구 · 안전하지 않은 우회 감사 표
 
 
 ## Documentation rules (Comments)

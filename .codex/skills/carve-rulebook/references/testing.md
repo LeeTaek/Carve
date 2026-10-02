@@ -47,6 +47,9 @@
 - Effect 트리거: 특정 Action이 dependency 호출을 발생시키는지
 - Cancellation: debounce/저장 작업이 취소/대체되는지(필요한 경우)
 - State 가 Equatable 이 아니면 시험 타깃 안에서만 수기 `==`(case 와 핵심 필드)를 붙이고 `exhaustivity = .off` 로 본다 — 본보기 `Feature/ChartFeature/Tests/ChartTestSupport.swift`.
+- TestStore 를 쓰는 스위트는 `@MainActor` 다(concurrency.md 관례 9).
+- 시험 대역(스파이 · 스텁) 클래스는 저장 프로퍼티를 `let` 과 `LockIsolated` 로 두고 `@unchecked Sendable` 을 붙이지 않는다 — 그러면 Sendable 을 컴파일러가 확인한다.
+  기계 검사: `no_unchecked_sendable`. 남아 있는 대역 25개는 concurrency.md 감사 표에 있고 따라 하지 않는다.
 
 ## 현재 시각과 기다림 (리듀서)
 - 규칙: 리듀서의 현재 시각은 `@Dependency(\.date) var date` 의 `date.now`, 기다림은 `@Dependency(\.continuousClock) var clock` 의 `try await clock.sleep(for:)` 다.
@@ -96,5 +99,6 @@
 - [ ] 외부 의존성은 Dependencies로 주입/대체한다
 - [ ] 현재 시각 · 기다림은 `date` · `continuousClock` 으로 고정한다
 - [ ] 새 의존성의 testValue 가 공유 SwiftData actor 를 쓰지 않는다
+- [ ] 새 시험 대역에 `@unchecked Sendable` 이 없다
 - [ ] teardown(삭제/파일 정리)을 수행한다
 - [ ] 실패 시 원인 파악이 쉽도록 Given/When/Then을 명확히 나눈다
