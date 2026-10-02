@@ -25,7 +25,7 @@ public struct BiblePageDrawingSnapshot: Equatable, Sendable {
 extension SwiftDatabaseActor {
     // MARK: 절 단위 행
 
-    /// 한 절의 행 — `updateDate` 최신순이다(옛 `DrawingDatabase.fetchDrawings(chapter:verse:)` 와 같은 조건 · 정렬).
+    /// 한 절의 행 — `updateDate` 최신순이다(`DrawingDatabase.fetchVerseSnapshots(chapter:verse:)` 가 이 조건 · 정렬로 읽는다).
     private func verseDrawings(chapter: BibleChapter, verse: Int) throws -> [BibleDrawing] {
         let titleName = chapter.title.rawValue
         let chapterNumber = chapter.chapter
@@ -77,7 +77,7 @@ extension SwiftDatabaseActor {
         try verseDrawings(chapter: chapter, verse: verse).mainDrawing()?.persistentModelID
     }
 
-    /// 한 장의 행을 절 오름차순으로 읽는다 — N-Canvas 가 장을 열 때만 쓴다(옛 `DrawingDatabase.fetch(chapter:)` 와 같은 조건 · 정렬).
+    /// 한 장의 행을 절 오름차순으로 읽는다 — N-Canvas 가 장을 열 때만 쓴다(`DrawingDatabase.fetchForLegacyCanvas(chapter:)`).
     /// - Parameter chapter: 성경의 이름과 장.
     /// - Returns: 모델 배열. 이행 중 예외(N-Canvas): N-Canvas 제거 때 지운다 — 룰북 swiftdata.md
     public func legacyCanvasDrawings(chapter: BibleChapter) throws -> UncheckedSendable<[BibleDrawing]> {
