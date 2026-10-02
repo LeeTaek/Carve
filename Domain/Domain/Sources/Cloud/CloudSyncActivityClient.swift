@@ -25,15 +25,16 @@ public struct LiveCloudSyncActivityClient: CloudSyncActivityClient {
     public func activities() -> AsyncStream<CloudSyncActivity> {
         @Dependency(\.clouodKitSyncManager) var container
         let publisher = container.$activity
-        return AsyncStream { continuation in
-            let task = Task {
-                for await value in publisher.values {
-                    continuation.yield(value)
-                }
-                continuation.finish()
+        // 관찰 Task 를 스트림을 만드는 클로저 밖에서 띄운다 — Sendable 이 아닌 publisher 를 그 클로저에 붙잡지 않고 Task 로 넘긴다(Swift 6).
+        let (stream, continuation) = AsyncStream<CloudSyncActivity>.makeStream()
+        let task = Task {
+            for await value in publisher.values {
+                continuation.yield(value)
             }
-            continuation.onTermination = { _ in task.cancel() }
+            continuation.finish()
         }
+        continuation.onTermination = { _ in task.cancel() }
+        return stream
     }
 }
 
