@@ -12,6 +12,8 @@
 
 import XCTest
 
+/// `XCUIApplication` · `XCUIElement` · `XCUIScreen` 은 MainActor 다 — 공용 도구도 MainActor 에서 부른다(시험 클래스가 모두 MainActor 다).
+@MainActor
 extension XCTestCase {
 
     /// 이 UI 테스트들은 **실기기 전용**이다.

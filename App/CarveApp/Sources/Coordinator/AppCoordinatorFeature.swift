@@ -17,10 +17,11 @@ import SettingsFeature
 import ComposableArchitecture
 
 @Reducer
-public struct AppCoordinatorFeature {
+public struct AppCoordinatorFeature: Sendable {
     @ObservableState
     public struct State {
-        public static var initialState = Self()
+        /// 처음 상태. 차트 · 설정 화면 상태(광고 자리의 `UIView` 등)를 담아 `Sendable` 이 아니므로 저장하지 않고 매번 만든다.
+        public static var initialState: Self { Self() }
         /// 보류 중 로그인과 저장소 소유가 확인됐다 — 로딩 없이 재실행을 안내한다(2026-09-28 결정).
         public var showsRelaunchGuidance = false
         /// 이번 실행에서 재실행 안내를 이미 띄웠다. 닫은 뒤 다시 띄우지 않는다 — 설정의 iCloud 화면은 계속 같은 안내를 보인다.
