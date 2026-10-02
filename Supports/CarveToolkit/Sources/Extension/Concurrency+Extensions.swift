@@ -23,7 +23,8 @@ public struct TaskTimeoutError: Error, Equatable, Sendable {
 extension Task where Success == Never, Failure == Never {
     /// 주어진 비동기 작업을 실행하고, 제한 시간이 지나면 `TaskTimeoutError` 를 던진다.
     /// 작업 자신의 오류와 취소(`CancellationError`)는 그대로 전해진다.
-    public static func withTimeout<T>(seconds: Double, operation: @escaping @Sendable () async throws -> T) async throws -> T {
+    /// 결과는 작업 그룹의 자식 작업에서 돌아오므로 `Sendable` 이어야 한다.
+    public static func withTimeout<T: Sendable>(seconds: Double, operation: @escaping @Sendable () async throws -> T) async throws -> T {
         try await withThrowingTaskGroup(of: T.self) { group in
             group.addTask {
                 try await operation()
