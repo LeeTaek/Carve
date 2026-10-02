@@ -15,7 +15,7 @@ public struct LisenceFeature {
     public init() { }
     
     @ObservableState
-    public struct State: Hashable {
+    public struct State: Hashable, Sendable {
         public static let initialState = Self()
     }
     public enum Action {

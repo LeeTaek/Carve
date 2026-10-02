@@ -12,12 +12,13 @@ import SwiftUI
 
 import ComposableArchitecture
 
+/// 의존성만 가지므로 `Sendable` 이다 — effect 안에서 `database` 등 의존성을 그대로 쓴다.
 @Reducer
-public struct CloudSettingsFeature {
+public struct CloudSettingsFeature: Sendable {
     public init() { }
     
     @ObservableState
-    public struct State: Hashable {
+    public struct State: Hashable, Sendable {
         public static let initialState = Self()
         @Presents public var path: Path.State?
         /// iCloud 계정을 쓸 수 있는지. **조회 전에는 `checking`** 이며, 확인하지 않은 상태를
@@ -331,3 +332,4 @@ extension CloudSettingsFeature {
 }
 
 extension CloudSettingsFeature.Path.State: Hashable {}
+extension CloudSettingsFeature.Path.State: Sendable {}

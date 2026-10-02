@@ -17,6 +17,7 @@ import ComposableArchitecture
 /// iCloud 에 로그인하지 않은 기기에서도 "iCloud를 저장공간으로 사용" 이 켜져 보였다는 뜻이다.
 /// 이 파일은 그 회귀를 막는다.
 @Suite("설정 — iCloud 계정 상태")
+@MainActor
 struct CloudSettingsFeatureTesting {
 
     @Test("조회하기 전에는 확인 중이다 — 연결됐다고 먼저 말하지 않는다")
@@ -33,7 +34,7 @@ struct CloudSettingsFeatureTesting {
                       .restricted,
                       .unknown])
     func onAppearReflectsAccountStatus(reported: CloudAccountAvailability) async {
-        let store = await TestStore(initialState: CloudSettingsFeature.State.initialState) {
+        let store = TestStore(initialState: CloudSettingsFeature.State.initialState) {
             CloudSettingsFeature()
         } withDependencies: {
             $0.cloudAccountStatus = StubCloudAccountStatusClient(reported)
@@ -45,7 +46,7 @@ struct CloudSettingsFeatureTesting {
 
     @Test("로그인하지 않은 기기는 동기화 가능으로 보지 않는다")
     func signedOutDeviceCannotSync() async {
-        let store = await TestStore(initialState: CloudSettingsFeature.State.initialState) {
+        let store = TestStore(initialState: CloudSettingsFeature.State.initialState) {
             CloudSettingsFeature()
         } withDependencies: {
             $0.cloudAccountStatus = StubCloudAccountStatusClient(.noAccount)
@@ -72,7 +73,7 @@ struct CloudSettingsFeatureTesting {
     func onAppearStreamsSyncActivity() async {
         let first = CloudSyncActivity(isRunning: true)
         let second = CloudSyncActivity(lastImportSuccess: Date(timeIntervalSince1970: 1_000))
-        let store = await TestStore(initialState: CloudSettingsFeature.State.initialState) {
+        let store = TestStore(initialState: CloudSettingsFeature.State.initialState) {
             CloudSettingsFeature()
         } withDependencies: {
             $0.cloudAccountStatus = StubCloudAccountStatusClient(.available)

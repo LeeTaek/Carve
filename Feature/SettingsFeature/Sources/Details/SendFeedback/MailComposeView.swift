@@ -55,7 +55,10 @@ public struct MailComposeView: UIViewControllerRepresentable {
         return store.mailInfo.body + deviceInfo
     }
     
-    public class Coordinator: NSObject, MFMailComposeViewControllerDelegate {
+    /// 메일 작성 화면의 delegate — 메인 액터에서만 쓴다. MessageUI 의 delegate 프로토콜은 격리 표기가 없지만 메인 스레드에서 불리므로
+    /// `@preconcurrency` 로 잇는다(어긋나면 실행 중 격리 검사가 잡는다).
+    @MainActor
+    public class Coordinator: NSObject, @preconcurrency MFMailComposeViewControllerDelegate {
         let store: StoreOf<MailComposeFeature>
         public init(store: StoreOf<MailComposeFeature>) {
             self.store = store

@@ -20,7 +20,7 @@ public struct AppearanceSettingsFeature {
     public init() { }
 
     @ObservableState
-    public struct State: Hashable {
+    public struct State: Hashable, Sendable {
         public static let initialState = Self()
 
         public init() { }

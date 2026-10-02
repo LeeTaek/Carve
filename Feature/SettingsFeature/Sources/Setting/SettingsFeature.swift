@@ -12,11 +12,12 @@ import Foundation
 
 import ComposableArchitecture
 
+/// 의존성만 가지므로 `Sendable` 이다 — effect 와 `MainActor.assumeIsolated` 안에서 `adConsentClient` 를 그대로 쓴다.
 @Reducer
-public struct SettingsFeature {
+public struct SettingsFeature: Sendable {
     public init() { }
     @ObservableState
-    public struct State: Equatable {
+    public struct State: Equatable, Sendable {
         public static let initialState = Self()
         @Presents public var path: Path.State? = .iCloud(.initialState)
         /// 광고 개인정보 옵션 항목을 보일지. 동의가 필요한 지역(EEA·영국·스위스 등)에서만 true.
@@ -125,6 +126,7 @@ public struct SettingsFeature {
 }
 
 extension SettingsFeature.Path.State: Hashable {}
+extension SettingsFeature.Path.State: Sendable {}
 
 extension SettingsFeature.Path.State {
     /// 이 화면을 여는 사이드바 행.
