@@ -31,6 +31,8 @@ struct CarveApp: App {
     private let uiTestLaunch: UITestLaunchOptions
 
     init() {
+        // 2.0.0(Xcode 27 빌드)이 JSON 으로 쓴 기본 타입 설정을 되돌린다 — 설정을 읽는 Store · Debug 실행 인자 처리보다 먼저.
+        AppStorageFormatMigration.restorePrimitiveValues(in: .standard)
         let purchaseClient = StoreKitPurchaseClient()
         self.purchaseClient = purchaseClient
         SingleCanvasFlag.resetStoredValueOnce(in: .standard)

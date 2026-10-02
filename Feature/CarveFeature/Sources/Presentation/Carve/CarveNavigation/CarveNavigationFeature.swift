@@ -35,7 +35,7 @@ public struct CarveNavigationFeature {
         /// content 화면에 띄우는 네비게이션 상태
         @Presents var detailNavigation: DetailDestination.State?
         /// 앱 전역에 공유하는 현재 성경 title
-        @Shared(.appStorage("title")) public var currentTitle: BibleChapter = .initialState
+        @Shared(.codableAppStorage("title")) public var currentTitle: BibleChapter = .initialState
         /// 최초 필사 안내 팝업 상태
         @Presents public var firstRunGuide: FirstRunGuideFeature.State?
         /// 최초 필사 안내를 한 번이라도 표시했는지 저장한다.

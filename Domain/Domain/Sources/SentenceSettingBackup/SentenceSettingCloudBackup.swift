@@ -29,7 +29,7 @@ extension NSUbiquitousKeyValueStore: SentenceSettingCloudStore {}
 ///   외부 변경 알림을 받을 때도 같은 조건으로 적용한다. 한 번이라도 바꾼 설치는 자기 값을 지키고 iCloud 값으로 덮지 않는다.
 /// - **이 기능 전부터 쓰던 설치**(저장된 본문 설정이 이미 있음)는 바꾼 설치로 본다. iCloud 에 백업이 없을 때만 지금 값을 한 번 올린다.
 ///
-/// 되살린 값은 `@Shared(.appStorage(SentenceSetting.appStorageKey))` 가 읽는 `UserDefaults` 에 같은 JSON 형식으로 쓴다.
+/// 되살린 값은 `@Shared(.codableAppStorage(SentenceSetting.appStorageKey))` 가 읽는 `UserDefaults` 에 같은 JSON 형식으로 쓴다.
 /// 이미 화면에 올라온 공유 상태는 `CodableAppStorageKey` 의 변경 알림 구독이 새 값으로 바꾼다.
 ///
 /// ⚠️ 앱은 본문 설정을 읽는 Store 를 만들기 **전에** `start()` 를 부른다. `@Shared(.appStorage)` 는 처음 읽을 때 기본값을 저장해서,

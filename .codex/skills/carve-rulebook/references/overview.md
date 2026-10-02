@@ -51,6 +51,17 @@
   위젯 익스텐션(`CarveWidget`)에는 매니페스트가 없다 — 위젯에서 이런 API 를 쓰게 되면 위젯에도 매니페스트를 더한다.
 - 기계 검사: 없음(리뷰).
 
+## 설정 저장 — `.appStorage` 와 `.codableAppStorage`
+- 규칙: UserDefaults 에 두는 `@Shared` 설정은 값 타입으로 키를 고른다.
+  - 기본 타입(Bool · Int · Double · String · `String?` · Date · URL · Data)은 Sharing 의 `.appStorage("키")` — UserDefaults 기본 타입으로 저장한다.
+  - Codable 구조체 · 배열 · enum 은 `.codableAppStorage("키")`(`Feature/CarveFeature/Sources/Extension/CodableAppStorageKey.swift`, JSON Data).
+  - 한 번 정한 키의 저장 형식은 바꾸지 않는다 — 바꾸면 기존 사용자 값을 읽지 못한다. Sharing 의 `.appStorage` 와 **같은 이름의 오버로드를 새로 만들지 않는다.**
+- 이유: 2.0.0 은 Carve 의 Codable 오버로드가 `appStorage` 라는 같은 이름이어서, Swift 6.4(Xcode 27)가 Bool · Int · `String?` 키까지 그쪽으로 골라 JSON 으로 저장했다.
+  1.x 가 기본 타입으로 남긴 설정을 읽지 못하고 기본값으로 덮어써, 업데이트 때 왼손잡이 · 손가락 필기 · 색 · 굵기 설정이 초기화됐다(2026-10-01 재현, 같은 코드의 Xcode 26.3 빌드는 정상).
+  2.0.0 이 JSON 으로 쓴 값은 `AppStorageFormatMigration` 이 앱 시작 때 기본 타입으로 되돌린다 — 그 목록은 2.0.0 이 쓴 키만 담는다.
+- 확인: 키를 더하거나 값 타입을 바꾸면 `AppStorageFormatTesting` 처럼 UserDefaults 에 저장되는 타입을 시험으로 고정하고 Xcode 27 로 돌린다.
+- 기계 검사: 없음(리뷰 · 저장 형식 시험 `AppStorageFormatTesting` · `AppStorageFormatMigrationTesting`).
+
 ## Output expectation
 응답은 항상:
 1) 결론(추천 구조)

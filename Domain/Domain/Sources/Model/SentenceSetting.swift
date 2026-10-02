@@ -28,12 +28,12 @@ public struct SentenceSetting: Sendable, Codable, Equatable, Hashable {
     
     /// 본문 설정을 저장하는 `UserDefaults` 키.
     ///
-    /// 화면들이 `@Shared(.appStorage(...))` 로 읽고 쓰고, 실행 때 iCloud 백업을 되살리는 `SentenceSettingCloudBackup` 도 같은 키에 쓴다.
+    /// 화면들이 `@Shared(.codableAppStorage(...))` 로 읽고 쓰고, 실행 때 iCloud 백업을 되살리는 `SentenceSettingCloudBackup` 도 같은 키에 쓴다.
     public static let appStorageKey = "sentenceSetting"
 
     /// 처음 실행한 사용자의 본문 설정이자 「본문 모양 초기화」 값.
     ///
-    /// `@Shared(.appStorage("sentenceSetting"))`(`CodableAppStorageKey`)가 첫 로드 때 이 값을 저장하므로,
+    /// `@Shared(.codableAppStorage("sentenceSetting"))`(`CodableAppStorageKey`)가 첫 로드 때 이 값을 저장하므로,
     /// 값을 바꿔도 이미 앱을 실행한 사용자의 설정은 바뀌지 않는다.
     public static let initialState = SentenceSetting(
         lineSpace: 30,

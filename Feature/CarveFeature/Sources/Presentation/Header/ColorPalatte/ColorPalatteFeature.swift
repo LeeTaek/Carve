@@ -21,9 +21,9 @@ import ComposableArchitecture
 public struct ColorPalatteFeature {
     @ObservableState
     public struct State {
-        @Shared(.appStorage("palatteColorSet")) public var palatteColors: [CodableColor] = []
+        @Shared(.codableAppStorage("palatteColorSet")) public var palatteColors: [CodableColor] = []
         @Shared(.appStorage("selectedColorIndex")) public var selectedColorIndex: Int = 0
-        @Shared(.appStorage("pencilConfig")) public var pencilConfig: PencilPalatte = .initialState
+        @Shared(.codableAppStorage("pencilConfig")) public var pencilConfig: PencilPalatte = .initialState
         /// 편집 중인 팔레트 칸.
         public var index: Int
         public var selectedColor: CodableColor
