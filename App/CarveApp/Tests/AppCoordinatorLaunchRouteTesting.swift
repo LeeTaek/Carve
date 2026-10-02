@@ -50,7 +50,7 @@ struct AppCoordinatorLaunchRouteTesting {
     @Test("설정 하위 경로는 설정 사이드바의 행마다 하나씩 있다")
     func parsesEverySettingsSubroute() {
         let names: [String: SettingsFeature.SidebarItem] = [
-            "icloud": .iCloud, "draftRecovery": .draftRecovery, "canvas": .canvas, "widget": .widget, "appearance": .appearance,
+            "icloud": .iCloud, "draftRecovery": .draftRecovery, "widget": .widget, "appearance": .appearance,
             "help": .help, "patchnote": .patchnote, "sendFeedback": .sendFeedback, "appVersion": .appVersion, "removeAds": .removeAds
         ]
         #expect(Set(names.values) == Set(SettingsFeature.SidebarItem.allCases))
@@ -72,7 +72,7 @@ struct AppCoordinatorLaunchRouteTesting {
         let app = "/Applications/Carve.app/Carve"
         #expect(Route.parse(arguments: [app]) == nil)
         #expect(Route.parse(arguments: [app, LaunchArgument.uiTestRoute, "settings/removeAds"]) == .settings(.removeAds))
-        #expect(Route.parse(arguments: [app, LaunchArgument.singleCanvas, LaunchArgument.uiTestRoute, "chart", LaunchArgument.uiTestNoAds]) == .chart)
+        #expect(Route.parse(arguments: [app, LaunchArgument.uiTestSkipFirstRunGuide, LaunchArgument.uiTestRoute, "chart", LaunchArgument.uiTestNoAds]) == .chart)
         #expect(Route.parse(arguments: [app, LaunchArgument.uiTestRoute]) == nil)
         // 값을 빠뜨리면 바로 뒤의 다른 인자를 경로로 읽지 않는다.
         #expect(Route.parse(arguments: [app, LaunchArgument.uiTestRoute, LaunchArgument.uiTestNoAds]) == nil)

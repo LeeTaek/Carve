@@ -35,7 +35,6 @@ struct CarveApp: App {
         AppStorageFormatMigration.restorePrimitiveValues(in: .standard)
         let purchaseClient = StoreKitPurchaseClient()
         self.purchaseClient = purchaseClient
-        SingleCanvasFlag.resetStoredValueOnce(in: .standard)
 
         let sentenceSettingBackup = SentenceSettingCloudBackup()
         sentenceSettingBackup.start()

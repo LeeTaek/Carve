@@ -57,8 +57,6 @@ public struct SettingsFeature: Sendable {
         case iCloud(CloudSettingsFeature)
         /// 확인이 필요한 필기 — 개수 · 용량 · 목록 · 견주기 · 현재 필사에 넣기(정책 §12-6 구현 순서 ④, 가져오기 2026-09-29).
         case draftRecovery(DraftRecoveryFeature)
-        /// 필사 캔버스 — 단일 Canvas flag 토글 (설계 §13 Phase 3 (3/3)).
-        case canvas(CanvasSettingsFeature)
         /// 위젯에 표시할 말씀(시안 N7 · N8).
         case widget(WidgetSettingsFeature)
         /// 화면 모드 — 시스템 설정 · 라이트 · 다크.
@@ -75,12 +73,11 @@ public struct SettingsFeature: Sendable {
 
     /// 사이드바 행 — 경로 상태에서 상세 화면의 상태를 빼고 어느 화면인지만 남긴 값.
     ///
-    /// ⚠️ 사이드바 `List(selection:)` 에 경로 상태를 그대로 쓰지 않는다. 행의 값이 처음 상태(`.canvas(.initialState)`)라
-    ///    상세 화면의 상태가 바뀌는 순간(필사 캔버스 토글 · 광고 제거 상품 불러오기) 선택 값과 달라져 선택 표시가 풀렸다.
+    /// ⚠️ 사이드바 `List(selection:)` 에 경로 상태를 그대로 쓰지 않는다. 행의 값이 처음 상태(`.widget(.initialState)`)라
+    ///    상세 화면의 상태가 바뀌는 순간(위젯 말씀 고르기 · 광고 제거 상품 불러오기) 선택 값과 달라져 선택 표시가 풀렸다.
     public enum SidebarItem: Hashable, CaseIterable, Sendable {
         case iCloud
         case draftRecovery
-        case canvas
         case widget
         case appearance
         case help
@@ -134,7 +131,6 @@ extension SettingsFeature.Path.State {
         switch self {
         case .iCloud: .iCloud
         case .draftRecovery: .draftRecovery
-        case .canvas: .canvas
         case .widget: .widget
         case .appearance: .appearance
         case .help: .help
@@ -152,7 +148,6 @@ extension SettingsFeature.SidebarItem {
         switch self {
         case .iCloud: .iCloud(.initialState)
         case .draftRecovery: .draftRecovery(.initialState)
-        case .canvas: .canvas(.initialState)
         case .widget: .widget(.initialState)
         case .appearance: .appearance(.initialState)
         case .help: .help(.initialState)

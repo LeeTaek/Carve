@@ -54,9 +54,6 @@ public struct SettingsView: View {
         // 선택은 경로 상태가 아니라 행으로 비교한다 — 상세 화면의 상태가 바뀌어도 선택 표시가 남는다.
         List(selection: $store.selectedSidebarItem.sending(\.selectSidebarItem)) {
             Section("필사") {
-                NavigationLink(value: SettingsFeature.SidebarItem.canvas) {
-                    sidebarRow("필사 캔버스", value: "단일")
-                }
                 NavigationLink("위젯", value: SettingsFeature.SidebarItem.widget)
             }
             Section("화면") {
@@ -145,10 +142,6 @@ public struct SettingsView: View {
         case .draftRecovery:
             if let store = store.scope(state: \.path?.draftRecovery, action: \.path.draftRecovery) {
                 DraftRecoveryView(store: store)
-            }
-        case .canvas:
-            if let store = store.scope(state: \.path?.canvas, action: \.path.canvas) {
-                CanvasSettingsView(store: store)
             }
         case .widget:
             if let store = store.scope(state: \.path?.widget, action: \.path.widget) {
