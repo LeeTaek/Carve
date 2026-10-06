@@ -199,6 +199,9 @@ public struct ChapterCanvasFeature {
         /// 늦게 도착한 필사를 이 장에 반영하는 상태(2026-09-21 후속 리뷰 P0-3, `ChapterCanvasArrivalFeature.swift`).
         var arrival = ArrivalState()
 
+        /// 마지막 백업 전 flush 요청과 그 답(설계 backup-import-design §5-2, `ChapterCanvasBackupFlushFeature.swift`). 답이 없으면 기다리는 중이다.
+        var backupFlush: BackupFlushRequest?
+
         // UI-2 지우기 (보관 후 초기화)
 
         /// 진행 중이거나 실패한 지우기 작업. 진행 중에는 입력·중복 지우기·재합성을 막는다.
@@ -309,6 +312,11 @@ public struct ChapterCanvasFeature {
         case saveFinished(requestID: UUID, revision: Int, failure: DrawingRepositoryError?)
         /// 장 전환 · 백그라운드 진입 시 대기열 저장 (§8-5). 실패했던 저장의 재시도이기도 하다.
         case flushPending
+        /// 설정의 「백업 만들기」 가 백업 전에 마지막 편집이 이 기기에 남았는지 묻는다(설계 backup-import-design §5-2 — 코디네이터가 중계).
+        /// `flushPending` 처럼 인계 · 저장을 시작하고, 정해지면 `delegate(.backupFlushFinished)` 로 한 번 답한다.
+        case backupFlushRequested(id: UUID)
+        /// 백업 전 flush 를 기다린 시한(5초)이 지났다. `id` 는 그 요청이다 — 이미 답한 요청의 늦은 알림은 버린다.
+        case backupFlushTimedOut(id: UUID)
         /// 밖에서 필사 데이터가 전부 지워졌다 (설정 → 「모든 필사 데이터 삭제」).
         case drawingDataCleared
         /// 편집 환경(계정 · K)이 바뀌었을 수 있다 (§12-6 구현 순서 ①).
@@ -464,7 +472,7 @@ public struct ChapterCanvasFeature {
                 return .merge(finished, resumeSessionEndIfDraining(state: &state))
 
             case .saveFinished(let requestID, let revision, let failure):
-                return finishSave(state: &state, requestID: requestID, revision: revision, failure: failure)
+                return .merge(finishSave(state: &state, requestID: requestID, revision: revision, failure: failure), judgeBackupFlush(state: &state))
 
             case .flushPending:
                 if state.sessionEnd != nil {
@@ -475,6 +483,9 @@ public struct ChapterCanvasFeature {
                 state.handoffToken += 1
                 return startSaveIfPossible(state: &state, allowRetry: true)
 
+            case .backupFlushRequested, .backupFlushTimedOut:
+                return reduceBackupFlush(state: &state, action: action)
+
             case .drawingDataCleared:
                 return clearAfterExternalDelete(state: &state)
 
@@ -482,16 +493,20 @@ public struct ChapterCanvasFeature {
                 return editEnvironmentChanged(state: &state, latest: latest)
 
             case .editHandoffCompleted(let token):
-                return .merge(editHandoffCompleted(state: &state, token: token), arrivalHandoffCompleted(state: &state, token: token))
+                let session = editHandoffCompleted(state: &state, token: token)
+                return .merge(session, arrivalHandoffCompleted(state: &state, token: token), backupFlushHandoffCompleted(state: &state, token: token))
 
             case .sessionHandoffTimedOut(let id):
                 return sessionHandoffTimedOut(state: &state, id: id)
 
-            case .canvasAttached, .canvasDetached, .canvasDisplayed:
+            case .canvasDetached:
+                return .merge(reduceCanvasPresence(state: &state, action: action), backupFlushCanvasDetached(state: &state))
+
+            case .canvasAttached, .canvasDisplayed:
                 return reduceCanvasPresence(state: &state, action: action)
 
             case .draftsSaved(let requestID, let saved, let failure):
-                return finishDraftSave(state: &state, requestID: requestID, saved: saved, failure: failure)
+                return .merge(finishDraftSave(state: &state, requestID: requestID, saved: saved, failure: failure), judgeBackupFlush(state: &state))
 
             case .importArrived, .localDrawingChanged, .arrivalChecked, .arrivalNoticeTapped, .arrivalNoticeDismissed:
                 return reduceArrival(state: &state, action: action)
