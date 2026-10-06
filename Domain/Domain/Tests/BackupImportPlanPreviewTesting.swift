@@ -37,7 +37,7 @@ struct BackupImportPlanPreviewTesting {
     @Test("지원 안 됨 — 판정에서 빼고 사유별로 센다")
     func unsupportedItemsAreSkippedByReason() {
         // Given — 창세기 1장에 놓이지만 해석할 수 없는 항목들
-        let unknownTranslation = Sample.item("KJV", ink: Sample.ink("kjv"), isCurrent: true, updatedAt: Sample.sep(20), translation: "KJV")
+        let unknownTranslation = Sample.item("ESV", ink: Sample.ink("esv"), isCurrent: true, updatedAt: Sample.sep(20), translation: "ESV")
         let undecodable = Sample.item("FUTURE", ink: Sample.ink("future"), isCurrent: true, updatedAt: Sample.sep(21), metadata: brokenMetadata)
         let unknownVersion = Sample.item(
             "V9", ink: Sample.ink("v9"), isCurrent: false, updatedAt: Sample.sep(5), drawingVersion: 9, metadata: nil
@@ -80,7 +80,7 @@ struct BackupImportPlanPreviewTesting {
         let pastLastChapter = Sample.item("GEN-51", ink: Sample.ink("gen51"), isCurrent: true, updatedAt: Sample.sep(1), chapter: 51)
         let chapterZero = Sample.item("GEN-0", ink: nil, isCurrent: true, updatedAt: Sample.sep(1), chapter: 0)
         let unknownBoth = Sample.item(
-            "KJV-TOB", ink: Sample.ink("kjv"), isCurrent: true, updatedAt: Sample.sep(1), translation: "KJV", book: "TOB"
+            "ESV-TOB", ink: Sample.ink("esv"), isCurrent: true, updatedAt: Sample.sep(1), translation: "ESV", book: "TOB"
         )
         let items = [unknownBook, pastLastChapter, chapterZero, unknownBoth]
 
@@ -113,7 +113,7 @@ struct BackupImportPlanPreviewTesting {
             "E3-CURRENT", ink: Sample.ink("e3"), isCurrent: true, updatedAt: Sample.sep(20), book: "EXO", chapter: 3
         )
         let unknownTranslation = Sample.item(
-            "E3-KJV", ink: Sample.ink("kjv"), isCurrent: false, updatedAt: Sample.sep(20), translation: "KJV", book: "EXO", chapter: 3
+            "E3-ESV", ink: Sample.ink("esv"), isCurrent: false, updatedAt: Sample.sep(20), translation: "ESV", book: "EXO", chapter: 3
         )
         // 어느 장에도 놓을 수 없다(unsupported)
         let unknownBook = Sample.item("TOB", ink: Sample.ink("tob"), isCurrent: true, updatedAt: Sample.sep(1), book: "TOB")
@@ -158,7 +158,7 @@ struct BackupImportPlanPreviewTesting {
         let items = [
             Sample.item("REV-22", ink: Sample.ink("rev"), isCurrent: true, updatedAt: Sample.sep(1), book: "REV", chapter: 22),
             Sample.item("GEN-10", ink: Sample.ink("gen10"), isCurrent: true, updatedAt: Sample.sep(1), chapter: 10),
-            Sample.item("MAT-5-KJV", ink: Sample.ink("kjv"), isCurrent: true, updatedAt: Sample.sep(1), translation: "KJV", book: "MAT", chapter: 5),
+            Sample.item("MAT-5-ESV", ink: Sample.ink("esv"), isCurrent: true, updatedAt: Sample.sep(1), translation: "ESV", book: "MAT", chapter: 5),
             Sample.item("GEN-2", ink: Sample.ink("gen2"), isCurrent: true, updatedAt: Sample.sep(1), chapter: 2),
             Sample.item("MAT-1", ink: Sample.ink("mat"), isCurrent: true, updatedAt: Sample.sep(1), book: "MAT")
         ]

@@ -269,7 +269,7 @@ struct BackupRestoreTransactionTesting {
             chapter: Sample.genesis2, verse: 1, sourceKey: "THERE", ink: Sample.ink("there"), isCurrent: true, createdAt: Sample.sep(1), updatedAt: Sample.sep(2)
         )
         let unknownTranslation = BackupRestoreEntry(
-            verse: 2, sourceKey: "KJV", ink: Sample.ink("kjv"), isCurrent: true, createdAt: Sample.sep(1), updatedAt: Sample.sep(2), translation: "KJV"
+            verse: 2, sourceKey: "ESV", ink: Sample.ink("esv"), isCurrent: true, createdAt: Sample.sep(1), updatedAt: Sample.sep(2), translation: "ESV"
         )
         let brokenMetadata = BackupRestoreEntry(
             verse: 3, sourceKey: "BROKEN", ink: Sample.ink("broken"), metadata: Data("깨진 메타데이터".utf8), isCurrent: true,

@@ -1,7 +1,1264 @@
 {
   "sourceLanguage" : "ko",
   "strings" : {
-
+    "%@ %lld장" : {
+      "comment" : "장 참조 — 권 이름, 장. 예: 창세기 1장 · Genesis 1",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ %2$lld"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ %lld장"
+          }
+        }
+      }
+    },
+    "%@ %lld장 %lld-%lld절" : {
+      "comment" : "절 범위 참조 — 권 이름, 장, 첫 절, 끝 절. 예: 신명기 6장 18-19절 · Deuteronomy 6:18-19",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ %2$lld:%3$lld-%4$lld"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ %lld장 %lld-%lld절"
+          }
+        }
+      }
+    },
+    "%@ %lld장 %lld절" : {
+      "comment" : "절 참조 — 권 이름, 장, 절. 예: 창세기 1장 1절 · Genesis 1:1",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ %2$lld:%3$lld"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ %lld장 %lld절"
+          }
+        }
+      }
+    },
+    "갈라디아서" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Galatians"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "갈라디아서"
+          }
+        }
+      }
+    },
+    "개역개정" : {
+      "comment" : "번역본 약칭 — 개역개정. 참조 뒤 「 · 개역개정」 · 필사 헤더에 쓴다",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "NKRV"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "개역개정"
+          }
+        }
+      }
+    },
+    "개역개정판" : {
+      "comment" : "번역본 전체 이름 — 개역개정. 한국어는 약칭과 같은 「개역개정」 이다",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New Korean Revised Version"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "개역개정"
+          }
+        }
+      }
+    },
+    "고린도전서" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 Corinthians"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "고린도전서"
+          }
+        }
+      }
+    },
+    "고린도후서" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "2 Corinthians"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "고린도후서"
+          }
+        }
+      }
+    },
+    "골로새서" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Colossians"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "골로새서"
+          }
+        }
+      }
+    },
+    "나훔" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nahum"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "나훔"
+          }
+        }
+      }
+    },
+    "누가복음" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Luke"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "누가복음"
+          }
+        }
+      }
+    },
+    "느헤미야" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nehemiah"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "느헤미야"
+          }
+        }
+      }
+    },
+    "다니엘" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Daniel"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다니엘"
+          }
+        }
+      }
+    },
+    "데살로니가전서" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 Thessalonians"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "데살로니가전서"
+          }
+        }
+      }
+    },
+    "데살로니가후서" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "2 Thessalonians"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "데살로니가후서"
+          }
+        }
+      }
+    },
+    "디도서" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Titus"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "디도서"
+          }
+        }
+      }
+    },
+    "디모데전서" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 Timothy"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "디모데전서"
+          }
+        }
+      }
+    },
+    "디모데후서" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "2 Timothy"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "디모데후서"
+          }
+        }
+      }
+    },
+    "레위기" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Leviticus"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "레위기"
+          }
+        }
+      }
+    },
+    "로마서" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Romans"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "로마서"
+          }
+        }
+      }
+    },
+    "룻기" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ruth"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "룻기"
+          }
+        }
+      }
+    },
+    "마가복음" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mark"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "마가복음"
+          }
+        }
+      }
+    },
+    "마태복음" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Matthew"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "마태복음"
+          }
+        }
+      }
+    },
+    "말라기" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Malachi"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "말라기"
+          }
+        }
+      }
+    },
+    "미가" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Micah"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "미가"
+          }
+        }
+      }
+    },
+    "민수기" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Numbers"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "민수기"
+          }
+        }
+      }
+    },
+    "베드로전서" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 Peter"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "베드로전서"
+          }
+        }
+      }
+    },
+    "베드로후서" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "2 Peter"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "베드로후서"
+          }
+        }
+      }
+    },
+    "빌레몬서" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Philemon"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "빌레몬서"
+          }
+        }
+      }
+    },
+    "빌립보서" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Philippians"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "빌립보서"
+          }
+        }
+      }
+    },
+    "사도행전" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Acts"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "사도행전"
+          }
+        }
+      }
+    },
+    "사무엘상" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 Samuel"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "사무엘상"
+          }
+        }
+      }
+    },
+    "사무엘하" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "2 Samuel"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "사무엘하"
+          }
+        }
+      }
+    },
+    "사사기" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Judges"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "사사기"
+          }
+        }
+      }
+    },
+    "스가랴" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zechariah"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "스가랴"
+          }
+        }
+      }
+    },
+    "스바냐" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zephaniah"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "스바냐"
+          }
+        }
+      }
+    },
+    "시편" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Psalms"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "시편"
+          }
+        }
+      }
+    },
+    "시편 %lld장" : {
+      "comment" : "시편 장 참조 — 장. 영어 참조는 단수 Psalm(권 목록 이름은 Psalms)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Psalm %lld"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "시편 %lld장"
+          }
+        }
+      }
+    },
+    "시편 %lld장 %lld-%lld절" : {
+      "comment" : "시편 절 범위 참조 — 장, 첫 절, 끝 절. 영어 참조는 단수 Psalm",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Psalm %1$lld:%2$lld-%3$lld"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "시편 %lld장 %lld-%lld절"
+          }
+        }
+      }
+    },
+    "시편 %lld장 %lld절" : {
+      "comment" : "시편 절 참조 — 장, 절. 영어 참조는 단수 Psalm",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Psalm %1$lld:%2$lld"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "시편 %lld장 %lld절"
+          }
+        }
+      }
+    },
+    "신명기" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deuteronomy"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "신명기"
+          }
+        }
+      }
+    },
+    "아가" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Song of Solomon"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "아가"
+          }
+        }
+      }
+    },
+    "아모스" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Amos"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "아모스"
+          }
+        }
+      }
+    },
+    "야고보서" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "James"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "야고보서"
+          }
+        }
+      }
+    },
+    "에베소서" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ephesians"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "에베소서"
+          }
+        }
+      }
+    },
+    "에스겔" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ezekiel"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "에스겔"
+          }
+        }
+      }
+    },
+    "에스더" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esther"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "에스더"
+          }
+        }
+      }
+    },
+    "에스라" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ezra"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "에스라"
+          }
+        }
+      }
+    },
+    "여호수아" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Joshua"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "여호수아"
+          }
+        }
+      }
+    },
+    "역대상" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 Chronicles"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "역대상"
+          }
+        }
+      }
+    },
+    "역대하" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "2 Chronicles"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "역대하"
+          }
+        }
+      }
+    },
+    "열왕기상" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 Kings"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "열왕기상"
+          }
+        }
+      }
+    },
+    "열왕기하" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "2 Kings"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "열왕기하"
+          }
+        }
+      }
+    },
+    "예레미야" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jeremiah"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "예레미야"
+          }
+        }
+      }
+    },
+    "예레미야 애가" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lamentations"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "예레미야 애가"
+          }
+        }
+      }
+    },
+    "오바댜" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Obadiah"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "오바댜"
+          }
+        }
+      }
+    },
+    "요나" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jonah"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "요나"
+          }
+        }
+      }
+    },
+    "요엘" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Joel"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "요엘"
+          }
+        }
+      }
+    },
+    "요한계시록" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revelation"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "요한계시록"
+          }
+        }
+      }
+    },
+    "요한복음" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "John"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "요한복음"
+          }
+        }
+      }
+    },
+    "요한삼서" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "3 John"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "요한삼서"
+          }
+        }
+      }
+    },
+    "요한이서" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "2 John"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "요한이서"
+          }
+        }
+      }
+    },
+    "요한일서" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 John"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "요한일서"
+          }
+        }
+      }
+    },
+    "욥기" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Job"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "욥기"
+          }
+        }
+      }
+    },
+    "유다서" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jude"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "유다서"
+          }
+        }
+      }
+    },
+    "이사야" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Isaiah"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이사야"
+          }
+        }
+      }
+    },
+    "잠언" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Proverbs"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "잠언"
+          }
+        }
+      }
+    },
+    "전도서" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ecclesiastes"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "전도서"
+          }
+        }
+      }
+    },
+    "창세기" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Genesis"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "창세기"
+          }
+        }
+      }
+    },
+    "출애굽기" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exodus"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "출애굽기"
+          }
+        }
+      }
+    },
+    "하박국" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Habakkuk"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "하박국"
+          }
+        }
+      }
+    },
+    "학개" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Haggai"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "학개"
+          }
+        }
+      }
+    },
+    "호세아" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hosea"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "호세아"
+          }
+        }
+      }
+    },
+    "히브리서" : {
+      "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hebrews"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "히브리서"
+          }
+        }
+      }
+    }
   },
   "version" : "1.0"
 }
