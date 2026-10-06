@@ -260,6 +260,18 @@ public struct AppCoordinatorFeature: Sendable {
             ))))):
                 state.settings = SettingsFeature.State.initialState(path: .draftRecovery(.initialState))
                 return .send(.root(.presented(.carve(.view(.closeNavigationBar)))))
+
+            // 설정의 「백업 만들기」 가 백업 전에 마지막 필기가 이 기기에 남았는지 묻는다(설계 backup-import-design §5-2 ②).
+            case .settings(.presented(.path(.presented(.backup(.export(.delegate(.canvasFlushRequested(let id)))))))):
+                return relayBackupFlushRequest(state: state, id: id)
+
+            // 필사 화면이 답했다 — 설정으로 돌려주고, 설정이 그 id 를 기다리는 「백업 만들기」 에 넘긴다(§5-2 ④).
+            case .root(.presented(.carve(.scope(.carveDetailAction(
+                .scope(.chapterCanvasAction(.delegate(.backupFlushFinished(let id, let outcome))))
+            ))))):
+                // 설정이 닫혔으면 기다리는 내보내기가 없다 — 답을 버린다.
+                guard state.settings != nil else { break }
+                return .send(.settings(.presented(.canvasFlushFinished(id: id, outcome: outcome))))
                 
             case .root(.presented(.carve(.view(.moveToChart)))):
                 state.path.append(.chart(.initialState))
@@ -333,6 +345,23 @@ public struct AppCoordinatorFeature: Sendable {
     }
 }
 
+// MARK: - 백업 전 flush 중계 (설계 backup-import-design §5-2)
+
+extension AppCoordinatorFeature {
+    /// 「백업 만들기」 의 flush 요청을 필사 화면으로 넘긴다. Feature 끼리는 서로를 모르므로 코디네이터가 잇는다.
+    ///
+    /// - 입력: 코디네이터 상태와 요청 id.
+    /// - 출력: 필사 화면이 있으면 그 캔버스로 `backupFlushRequested(id:)` — 캔버스가 같은 id 로 답한다(`delegate(.backupFlushFinished)`).
+    ///   없으면(아직 시작 화면) 지킬 편집이 없으므로 곧바로 설정에 `.durable`.
+    /// - 부작용: 없음(액션만 보낸다). 설정이 열려 있는 동안 캔버스 입력은 막혀 있어(`AppCoordinatorView.allowsHitTesting`) flush 뒤에 새 획이 끼지 않는다.
+    private func relayBackupFlushRequest(state: State, id: UUID) -> Effect<Action> {
+        guard case .carve? = state.root else {
+            return .send(.settings(.presented(.canvasFlushFinished(id: id, outcome: .durable))))
+        }
+        return .send(.root(.presented(.carve(.scope(.carveDetailAction(.scope(.chapterCanvasAction(.backupFlushRequested(id: id)))))))))
+    }
+}
+
 // MARK: - N-Canvas 제거 안내 (2.1 결정 6)
 
 extension AppCoordinatorFeature {
@@ -383,7 +412,7 @@ extension AppCoordinatorFeature {
     /// | `navigation` | 성경 탐색 — 헤더 제목을 누른 것처럼 탐색 열을 모두 연다 |
     /// | `chart` · `favorites` | 기록 차트 · 즐겨찾기 목록을 필사 화면 위에 쌓는다 |
     /// | `settings` | 설정의 첫 화면(iCloud) |
-    /// | `settings/<하위>` | 설정의 그 화면 — `icloud` · `draftRecovery` · `widget` · `appearance` · `help` · `patchnote` · `sendFeedback` · `appVersion` · `removeAds` |
+    /// | `settings/<하위>` | 설정의 그 화면 — `icloud` · `draftRecovery` · `backup` · `widget` · `appearance` · `help` · `patchnote` · `sendFeedback` · `appVersion` · `removeAds` |
     /// | `verse/<절 번호>` | 시작 장(`-UITestChapter` 또는 마지막으로 연 장)의 그 절 |
     ///
     /// 이름은 대소문자를 가리지 않는다. 모르는 경로는 로그만 남기고 무시한다 — 앱은 경로 없이 시작한다.
@@ -447,6 +476,7 @@ private extension SettingsFeature.SidebarItem {
         switch self {
         case .iCloud: "icloud"
         case .draftRecovery: "draftRecovery"
+        case .backup: "backup"
         case .widget: "widget"
         case .appearance: "appearance"
         case .help: "help"
@@ -462,6 +492,7 @@ private extension SettingsFeature.SidebarItem {
         switch self {
         case .iCloud: .iCloud(.initialState)
         case .draftRecovery: .draftRecovery(.initialState)
+        case .backup: .backup(.initialState)
         case .widget: .widget(.initialState)
         case .appearance: .appearance(.initialState)
         case .help: .help(.initialState)

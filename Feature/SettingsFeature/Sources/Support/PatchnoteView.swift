@@ -35,6 +35,7 @@ public struct PatchnoteView: View {
         }
     }
 
+    /// 설정의 패치노트 — 모든 출시를 최근 것부터 보인다.
     private var detailContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
@@ -42,16 +43,21 @@ public struct PatchnoteView: View {
                     .font(CarveTypography.sectionTitle)
                     .foregroundStyle(CarveColor.secondary)
 
-                VStack(alignment: .leading, spacing: CarveSpacing.xxSmall) {
-                    Text("새기다 2.0")
-                        .font(CarveTypography.title)
-                        .foregroundStyle(CarveColor.ink)
-                    Text("바뀐 점")
-                        .font(CarveTypography.caption)
-                        .foregroundStyle(CarveColor.secondary)
-                }
+                ForEach(PatchnoteFeature.releases) { release in
+                    if release != PatchnoteFeature.latest {
+                        CarveDivider()
+                    }
+                    VStack(alignment: .leading, spacing: CarveSpacing.xxSmall) {
+                        Text(Self.title(of: release))
+                            .font(CarveTypography.title)
+                            .foregroundStyle(CarveColor.ink)
+                        Text("바뀐 점")
+                            .font(CarveTypography.caption)
+                            .foregroundStyle(CarveColor.secondary)
+                    }
 
-                notes
+                    notes(of: release)
+                }
             }
             .padding(CarveSpacing.large)
             .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -60,10 +66,11 @@ public struct PatchnoteView: View {
         .background(CarveColor.canvas)
     }
 
+    /// 업데이트 뒤 자동으로 띄우는 창 — 이번 출시만 보인다.
     private var modalContent: some View {
-        CarveModalCard(title: "새기다 2.0", subtitle: "바뀐 점") {
+        CarveModalCard(title: Self.title(of: PatchnoteFeature.latest), subtitle: "바뀐 점") {
             VStack(alignment: .leading, spacing: 24) {
-                notes
+                notes(of: PatchnoteFeature.latest)
             }
         } actions: {
             Button {
@@ -88,27 +95,19 @@ public struct PatchnoteView: View {
         }
     }
 
+    private static func title(of release: PatchnoteFeature.Release) -> String {
+        "새기다 \(release.version)"
+    }
+
+    /// 한 출시의 바뀐 점 — 사이에 구분선을 둔다.
     @ViewBuilder
-    private var notes: some View {
-        noteSection(
-            title: "필사 화면을 정리했어요",
-            body: "도구 팔레트가 아래로 내려가고, 쓰지 않을 땐 접혀요."
-        )
-        CarveDivider()
-        noteSection(
-            title: "절을 길게 눌러보세요",
-            body: "이전 필사·이미지 저장·위젯·지우기를 한 자리에서."
-        )
-        CarveDivider()
-        noteSection(
-            title: "필사를 이미지로 남겨요",
-            body: "본문과 필기를 한 장으로 합쳐 사진에 저장해요."
-        )
-        CarveDivider()
-        noteSection(
-            title: "홈 화면 위젯",
-            body: "쓴 절을 지정하면 그 순간 모습이 위젯에 남아요."
-        )
+    private func notes(of release: PatchnoteFeature.Release) -> some View {
+        ForEach(Array(release.notes.enumerated()), id: \.offset) { index, note in
+            if index > 0 {
+                CarveDivider()
+            }
+            noteSection(title: note.title, body: note.body)
+        }
     }
 
     private func noteSection(title: String, body: String) -> some View {
