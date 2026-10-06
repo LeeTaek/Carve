@@ -93,7 +93,7 @@ struct BackupFeatureTesting {
         let latest = try #require(PatchnoteFeature.releases.first)
         #expect(latest == PatchnoteFeature.latest)
         #expect(latest.version == "2.1")
-        #expect(latest.notes.map(\.title) == ["필사 백업 · 불러오기", "필사 캔버스는 하나로"])
+        #expect(latest.notes.map(\.title) == ["필사 백업 · 불러오기", "필사 캔버스는 하나로", "본문 표시를 바로잡았어요"])
         #expect(latest.notes[0].body.contains("광고 제거 구매에 포함"))
         #expect(latest.notes[0].body.contains("불러오기는 무료"))
         // 지난 출시의 바뀐 점도 설정의 패치노트에 남는다.
