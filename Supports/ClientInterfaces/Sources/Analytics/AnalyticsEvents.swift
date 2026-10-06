@@ -41,8 +41,7 @@ public enum AnalyticsErrorId: String, Sendable, Equatable {
     case swiftDataOperationFailed = "SWIFTDATA_002"
     
     // MARK: - Drawing / Database
-    /// verse 단위 필사 업데이트 실패
-    case drawingUpdateDrawingsFailed = "DRAWING_001"
+    // DRAWING_001(verse 단위 필사 업데이트 실패)은 2.1 에서 N-Canvas 저장 경로와 함께 지웠다 — 번호를 다시 쓰지 않는다.
     /// isPresent 업데이트 실패
     case drawingUpdatePresentFailed = "DRAWING_002"
     /// page 단위 필사 upsert 실패

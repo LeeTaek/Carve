@@ -10,8 +10,6 @@ import CarveToolkit
 import Foundation
 import SwiftData
 
-import Dependencies
-
 /// 장 단위 필사(`BiblePageDrawing`) 한 행의 값. 모델을 actor 밖으로 넘기지 않으려고 옮긴다.
 ///
 /// 장 단위 경로는 호출부가 없다(`DrawingDatabase.upsertPageDrawing` 주석) — 시험만 읽는다.
@@ -70,28 +68,6 @@ extension SwiftDatabaseActor {
             row.isPresent = (row.rowKey == presentRowID.raw)
         }
         try modelContext.save()
-    }
-
-    /// 한 절의 대표 행(`mainDrawing()` 규칙) ID. 행이 없으면 nil.
-    public func mainDrawingID(chapter: BibleChapter, verse: Int) throws -> PersistentIdentifier? {
-        try verseDrawings(chapter: chapter, verse: verse).mainDrawing()?.persistentModelID
-    }
-
-    /// 한 장의 행을 절 오름차순으로 읽는다 — N-Canvas 가 장을 열 때만 쓴다(`DrawingDatabase.fetchForLegacyCanvas(chapter:)`).
-    /// - Parameter chapter: 성경의 이름과 장.
-    /// - Returns: 모델 배열. 이행 중 예외(N-Canvas): N-Canvas 제거 때 지운다 — 룰북 swiftdata.md
-    public func legacyCanvasDrawings(chapter: BibleChapter) throws -> UncheckedSendable<[BibleDrawing]> {
-        let titleName = chapter.title.rawValue
-        let chapterNumber = chapter.chapter
-        let predicate = #Predicate<BibleDrawing> {
-            $0.titleName == titleName &&
-            $0.titleChapter == chapterNumber
-        }
-        let descriptor = FetchDescriptor(predicate: predicate,
-                                         sortBy: [SortDescriptor(\.verse)])
-        let storedDrawing: [BibleDrawing] = try fetch(descriptor)
-        // 이행 중 예외(N-Canvas): N-Canvas 제거 때 지운다 — 룰북 swiftdata.md
-        return UncheckedSendable(storedDrawing)
     }
 
     // MARK: 필사 활동
