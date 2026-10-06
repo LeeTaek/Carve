@@ -45,7 +45,7 @@
 - 규칙: 필수 사유 API(required reason API)를 새로 쓰면 같은 변경에서 앱 매니페스트 `App/CarveApp/Support/PrivacyInfo.xcprivacy` 의 `NSPrivacyAccessedAPITypes` 에
   그 범주와 사유가 있는지 확인하고, 없으면 더한다.
   - 대상: 파일 속성(`FileManager.attributesOfItem` · `resourceValues` 의 날짜 키 — 범주 `NSPrivacyAccessedAPICategoryFileTimestamp`), 시스템 부팅 시간, 디스크 공간, 활성 키보드, UserDefaults 계열
-  - 지금 선언: UserDefaults `CA92.1` · 파일 타임스탬프 `C617.1`(앱 컨테이너 안 파일)
+  - 지금 선언: UserDefaults `CA92.1` · 파일 타임스탬프 `C617.1`(앱 컨테이너 안 파일) · 디스크 공간 `E174.1`(필사 백업 — `BackupArchive` 쓰기 · 풀기 전 남은 공간 확인, `BackupDiskSpace`)
 - 이유: 선언이 없으면 App Store 업로드 때 ITMS-91053 경고 · 거절이 난다. 코드 리뷰나 회귀 시험으로는 잡히지 않는다.
 - 확인: `plutil -p App/CarveApp/Support/PrivacyInfo.xcprivacy` 로 선언을 보고, 바꾼 코드에서 위 API 를 찾는다. 매니페스트는 `makeAppTarget`(`Plugins/ProjectDescriptionHelpers/Target+Templates.swift`)이 앱 번들에 넣는다.
   위젯 익스텐션(`CarveWidget`)에는 매니페스트가 없다 — 위젯에서 이런 API 를 쓰게 되면 위젯에도 매니페스트를 더한다.
