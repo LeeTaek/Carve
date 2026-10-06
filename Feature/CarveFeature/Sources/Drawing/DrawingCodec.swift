@@ -86,8 +86,8 @@ struct DrawingCodec: Sendable {
     /// - `drawingVersion == 3` 인데 metadata 없음: **첫 밑줄(`storageOrigin`) 원점으로 통째 배치** + `layoutMismatch` (§9-3-1).
     ///   좌표 형식의 진실은 `drawingVersion` 한 곳이므로(§10-1) 형식은 확정돼 있고 band 매핑 근거만 없는 상태다.
     ///   CloudKit 이 `layoutMetadataData` 를 아직 싣지 않았거나(§10-1-a) blob 디코드가 실패하면 실제로 도달한다.
-    /// - 그 밖(legacy · v2): **무변환으로 현재 `writingRect` 원점에 배치** (§14 13). 지금 N-Canvas 가 보여 주는 것과
-    ///   정확히 같다 — 각 절 캔버스가 `writingRect` 에 놓이고 `lineData` 를 로컬 좌표로 그리기 때문이다.
+    /// - 그 밖(legacy · v2): **무변환으로 현재 `writingRect` 원점에 배치** (§14 13). 2.0.x 이하 기기의 N-Canvas(2.1 에서 지웠다)가
+    ///   보여 주는 것과 정확히 같다 — 각 절 캔버스가 `writingRect` 에 놓이고 `lineData` 를 로컬 좌표로 그리기 때문이다.
     ///   1절의 상단 여백 25pt 가 `writingRect` 안(`topPadding`)에 있는 이유가 이것이다.
     /// - 소유권은 기하 판정이 아니라 **행이 속한 절**이다 (§7-3 "세션이 끊기면 DB 의 절별 그룹이 진실").
     /// - Parameters:
