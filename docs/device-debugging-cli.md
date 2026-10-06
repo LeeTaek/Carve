@@ -67,11 +67,11 @@ xcrun devicectl device install app --device "$CARVE_DEVICE_ID" \
 xcrun devicectl device orientation set --device "$CARVE_DEVICE_ID" landscapeLeft
 xcrun devicectl device process launch --device "$CARVE_DEVICE_ID" \
   --terminate-existing --console kr.co.carve.leetaek -- \
-  -SingleCanvas -ChapterLayoutOverlay -CanvasDisplayProbe \
+  -ChapterLayoutOverlay -CanvasDisplayProbe \
   > "$CARVE_DEVICE_LOGS/baseline.log" 2>&1
 ```
 
-`--` 뒤가 앱 실행 인자다. `--console` 명령은 앱이 끝날 때까지 유지된다. 일반 터미널에서는 이 창을 그대로 두고 다른 터미널에서 회전 명령을 실행한다. Codex에서는 짧은 yield로 `exec_command`의 session ID를 받은 뒤 별도 호출로 회전했다. `functions.wait`의 cell ID와 셸 실행의 session ID를 혼동하지 않는다.
+`--` 뒤가 앱 실행 인자다. 2.1 은 캔버스가 단일 Canvas 하나라 경로를 고르던 `-SingleCanvas` 인자가 없다(2026-09-08 실행에는 붙였다 — 이 문서의 명령에서는 뺐다). `--console` 명령은 앱이 끝날 때까지 유지된다. 일반 터미널에서는 이 창을 그대로 두고 다른 터미널에서 회전 명령을 실행한다. Codex에서는 짧은 yield로 `exec_command`의 session ID를 받은 뒤 별도 호출로 회전했다. `functions.wait`의 cell ID와 셸 실행의 session ID를 혼동하지 않는다.
 
 로그는 다음처럼 필요한 줄만 읽는다.
 
@@ -91,7 +91,7 @@ Debug 빌드에서 `-ChapterLayoutOverlay`를 켜면 화면 HUD와 함께 `Chapt
 rg 'ChapterHUD ' "$CARVE_DEVICE_LOGS/baseline.log"
 ```
 
-각 줄에는 장·Canvas 모드, gate·실측 개수·build·최초 빌드 시간, 폭·전체 높이·컬럼 원점·서명, 미측정 절, 최대 Δ·최악 절·높이 범위·누적 기울기·대표 절 Δ, guard·slack·저장 당시 줄 수가 더 많은 절별 초과 band(`slackBands`), compose·revision·합성 전후 원점·편집/재조회/보류 상태, mismatch/legacy/디코드 실패 절, legacy 잉크 bounds와 마지막 dirty bounds를 남긴다. 서명과 절 목록은 HUD처럼 줄이지 않고 기록한다. 아직 측정되지 않은 Δ는 `unmeasured`로 구분한다.
+각 줄에는 장, gate·실측 개수·build·최초 빌드 시간, 폭·전체 높이·컬럼 원점·서명, 미측정 절, 최대 Δ·최악 절·높이 범위·누적 기울기·대표 절 Δ, guard·slack·저장 당시 줄 수가 더 많은 절별 초과 band(`slackBands`), compose·revision·합성 전후 원점·편집/재조회/보류 상태, mismatch/legacy/디코드 실패 절, legacy 잉크 bounds와 마지막 dirty bounds를 남긴다. 서명과 절 목록은 HUD처럼 줄이지 않고 기록한다. 아직 측정되지 않은 Δ는 `unmeasured`로 구분한다.
 
 HUD와 같은 입력에서 만들어진 상태 로그다. `compose=SYNC`와 `deltaMax=0.00`은 실제 픽셀 표시의 정상화를 보증하지 않는다. `slack=true`여도 `deltaMax=0.00`이 기대값이다 — 저장 당시 줄 수가 더 많은 절도 레이아웃은 텍스트 줄 수만큼이고, 초과 줄에 걸친 필기만 그 절 안에 줄여 표시한다(설계 §6-3 · §9-3). 렌더링 결함 조사에서는 `CanvasDisplay` 로그와 회전 전후 캡처를 함께 사용한다. 로그 수집을 위해 `--terminate-existing`으로 재실행할 때에는 진행 중인 필기를 먼저 마친다.
 
@@ -132,9 +132,9 @@ xcrun devicectl device orientation set --device "$CARVE_DEVICE_ID" landscapeLeft
 2. **Window → Devices and Simulators → 연결된 iPad 선택 → Take Screenshot**을 클릭한다. iPhone이 함께 연결돼 있으므로 기기 이름과 모델을 확인한다.
 3. 이번 환경에서는 저장 대화상자 없이 `~/Desktop/Screenshot <날짜> at <시간>.png`가 생성됐다. 버튼 클릭 후 AX 상태가 그대로여도 실패로 판단하지 않는다. Desktop에서 클릭 이후 생성된 PNG를 찾는다. 파일명 공백에 유니코드 문자가 포함될 수 있으므로 경로를 직접 조립하지 않고 실제 파일명을 사용한다.
 4. 생성된 파일을 이미지 읽기 도구(`view_image`)로 열어 **iPad 화면 자체**를 확인한다. CUA의 Xcode 창 스크린샷은 Devices 창을 보여줄 뿐 iPad 화면을 대신하지 않는다.
-5. CLI로 회전한 뒤 레이아웃이 안정되면 다시 캡처한다. 장·방향·Canvas 모드·HUD·필기 위치를 함께 기록한다. `gate PASS`와 `Δ max 0.00`만으로 필기 표시 정상 여부를 판정하지 않는다.
+5. CLI로 회전한 뒤 레이아웃이 안정되면 다시 캡처한다. 장·방향·HUD·필기 위치를 함께 기록한다(2.0.x 빌드라면 Canvas 모드도 — 2.1 은 단일 Canvas 하나다). `gate PASS`와 `Δ max 0.00`만으로 필기 표시 정상 여부를 판정하지 않는다.
 
-실제 판독 표본은 시편 122장 세로 화면, `9/9`, `gate PASS`, `W 372.00`, `H 3016.00`, `columnX 366.70`, `Δ max 0.00`이었다. `guard —`, `compose — (단일 Canvas 아님)`이므로 **N-Canvas 화면**이며 D9 H 수정 검증 결과로 세지 않는다. 캡처는 Desktop에 보관되며 저장소에 포함하지 않았다.
+실제 판독 표본은 시편 122장 세로 화면, `9/9`, `gate PASS`, `W 372.00`, `H 3016.00`, `columnX 366.70`, `Δ max 0.00`이었다. `guard —`, `compose — (단일 Canvas 아님)`이므로 **N-Canvas 화면**이며 D9 H 수정 검증 결과로 세지 않는다. 캡처는 Desktop에 보관되며 저장소에 포함하지 않았다. 2.1 에는 N-Canvas 가 없다 — 2.1 빌드의 `guard —` 는 아직 실측 대기라는 뜻이다.
 
 직접 수행 가능한 범위는 확인된 CLI 회전·앱 실행·진단 통지와 Xcode 캡처를 조합한 화면 판정이다. 자동 스크롤·장 전환은 기존 Debug 실행 인자 시나리오 범위에서 구성할 수 있다. 임의의 실기기 탭·드래그를 원격 주입하는 경로는 이번에 검증하지 않았으며, 캡처 성공이 터치 제어까지 의미하지는 않는다. 실제 Apple Pencil 필기·지우개 입력도 자동 주입하지 않았다.
 
@@ -147,7 +147,7 @@ xcrun devicectl device orientation set --device "$CARVE_DEVICE_ID" landscapeLeft
 ```bash
 xcrun devicectl device process launch --device "$CARVE_DEVICE_ID" \
   --terminate-existing --console kr.co.carve.leetaek -- \
-  -SingleCanvas -ChapterLayoutOverlay -CanvasDisplayProbe -CanvasDisplayExperiments \
+  -ChapterLayoutOverlay -CanvasDisplayProbe -CanvasDisplayExperiments \
   > "$CARVE_DEVICE_LOGS/experiments.log" 2>&1
 ```
 
@@ -178,7 +178,7 @@ xcrun devicectl device notification post --device "$CARVE_DEVICE_ID" \
 ```bash
 xcrun devicectl device process launch --device "$CARVE_DEVICE_ID" \
   --terminate-existing --console kr.co.carve.leetaek -- \
-  -SingleCanvas -ChapterLayoutOverlay -CanvasDisplayProbe -CanvasReuseStrokesOnApply \
+  -ChapterLayoutOverlay -CanvasDisplayProbe -CanvasReuseStrokesOnApply \
   > "$CARVE_DEVICE_LOGS/reuse-apply.log" 2>&1
 ```
 
@@ -189,7 +189,7 @@ xcrun devicectl device process launch --device "$CARVE_DEVICE_ID" \
 ```bash
 xcrun devicectl device process launch --device "$CARVE_DEVICE_ID" \
   --terminate-existing kr.co.carve.leetaek -- \
-  -SingleCanvas -ChapterLayoutOverlay -CanvasReuseStrokesOnApply
+  -ChapterLayoutOverlay -CanvasReuseStrokesOnApply
 ```
 
 기본 경로로 돌아가려면 위 실행에서 `-CanvasReuseStrokesOnApply`를 뺀다. 재실행은 미저장 필기가 없는 진단 상황에서 한다. 종료 기록에는 마지막 실행 인자를 남겨 다음 사람이 비교 모드를 정식 수정으로 오해하지 않게 한다.

@@ -51,8 +51,8 @@
 |---|---|
 | 성경 탐색 (권 · 장 고르기) | `CarveNavigationFeature` |
 | 필사 · 필기 | `BibleDrawing`(SwiftData 모델) · `DrawingDatabase` · 필사 화면 `CarveDetailFeature` |
-| 장 · 절 | `BibleChapter` · Verse(`VerseRowFeature` 등) |
-| 필사 캔버스 · 단일 Canvas | `ChapterCanvasFeature`(리듀서 하나를 `ChapterCanvas*.swift` 여러 파일로 나눔) · `ChapterCanvasController`(PencilKit) · `SingleCanvasFlag` |
+| 장 · 절 | `BibleChapter` · Verse(`BibleVerse` · 절 행 `SentencesWithDrawingFeature` 등) |
+| 필사 캔버스 · 단일 Canvas | `ChapterCanvasFeature`(리듀서 하나를 `ChapterCanvas*.swift` 여러 파일로 나눔) · `ChapterCanvasController`(PencilKit). 캔버스는 이것 하나뿐이다 — N-Canvas · `SingleCanvasFlag` 는 2.1 에서 지웠다 |
 | 절 메뉴 | `ChapterCanvasVerseMenu` · `VerseMenuOverlay` |
 | 이전 필사 내용 보기 | `VerseDrawingHistoryFeature` |
 | 초안 · 확인이 필요한 필기 | `VerseDraft`(`LocalPreservationWriter.swift`) · 설정 `DraftRecoveryFeature` |

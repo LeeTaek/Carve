@@ -33,7 +33,6 @@
 |---|---|
 | 펜 종류 `PKInkingTool.InkType` | `CarveDetailFeature.State.lastUsedPencil`(펜슬 더블탭 전환) · `PencilPalatteFeature`(State · Action) · Domain `PencilPalatte.pencilType` |
 | 색 `UIColor` | `ColorPalatteFeature`(Action `setColor` · `defaultColors`) · `PencilPalatteFeature`(Action) · Domain `CodableColor` |
-| N-Canvas 경로 — flag off 롤백용, 설계 §13 Phase 4 에서 삭제 | `CanvasFeature`(Action 에 `PKDrawing` · `PKCanvasView`) · `CanvasView` · `SharedUndoManager` |
 | 설정 URL `UIApplication.openSettingsURLString` | `CarveDetailFeature+VerseImage`(사진 권한 알림의 「설정 열기」 effect) |
 | 광고 뷰 `UIView` | UIComponents `SponsorAdSlotFeature.State.adView`(파일 `AdSlotFeature.swift` — `nativeAdClient.view(for:)` 가 돌려준 AdMob 뷰) |
 | Domain 의 UI 프레임워크 타입 | `CodableColor`(UIKit `UIColor`) · `PencilPalatte`(PencilKit `InkType`) · `SentenceSetting`(SwiftUI 로 받은 `UIFont`) |
@@ -52,7 +51,7 @@
 ### Forbidden
 - 리듀서에서 `PKCanvasView` · `PKDrawing` 접근, UIKit API 호출 (이행 중 예외 제외)
 - View · 브리지에서 SwiftData 저장 호출
-- `DrawingCodec` 밖에서 드로잉 좌표 변환 — 예외: N-Canvas 가 v3 행을 표시할 때의 첫 밑줄 평행이동(설계 §10-3)
+- `DrawingCodec` 밖에서 드로잉 좌표 변환
 
 권장 구조(지금 이름)
 - 리듀서: `ChapterCanvasFeature` (상태 · 액션 · 저장 조율). 리듀서 하나를 `ChapterCanvas*.swift` 여러 파일로 나눈다(`ChapterCanvasSaveFeature.swift` · `ChapterCanvasEraseFeature.swift` · `ChapterCanvasDraftFeature.swift` 등).
@@ -82,7 +81,8 @@
 - **소유권은 편집 시점에 정하고 승계한다**(P2) — 기하로 매번 다시 판정하지 않는다(`StrokeOwnershipResolver`, §7-3).
 - 저장 단위는 절별 Drawing(행)이다. 저장 변환은 평행이동뿐이다 — 절 로컬 원점(`storageOrigin` = `writingRect.minX`, 첫 밑줄 y)으로 옮겨 저장하고,
   저장 시점의 레이아웃 메타데이터(`DrawingLayoutMetadata`)를 함께 남긴다(P6).
-- 좌표 형식은 `drawingVersion` 으로 명시 기록한다(P3) — nil · 1 = legacy, 2 = 절 로컬 + 좌상단(N-Canvas 형식), 3 = 절 로컬 + 첫 밑줄 원점 + metadata.
+- 좌표 형식은 `drawingVersion` 으로 명시 기록한다(P3) — nil · 1 = legacy, 2 = 절 로컬 + 좌상단(2.0.x 이하의 N-Canvas 가 만든 형식 — 2.1 은 읽기만), 3 = 절 로컬 + 첫 밑줄 원점 + metadata.
+  2.1 의 편집 저장은 3 뿐이지만, 같은 계정의 2.0.x · 1.3.0 기기가 v1 · v2 행을 계속 만들므로 `DrawingCodec` 의 nil · 1 · 2 해석은 지우지 않는다(설계 §10-3).
 
 ### Layout 변경 원칙 (필수)
 - 레이아웃 변경은 **표시 변환일 뿐, 저장을 덮어쓰지 않는다**(P10). 사용자가 그 절을 실제로 편집할 때만 새 레이아웃 기준으로 저장한다.
@@ -99,10 +99,6 @@
 - **underlineAnchors**: 밑줄 y(`writingRect` 기준 상대값). 텍스트 줄 수만큼만 만든다
 - **절 로컬(저장)**: `storageOrigin` 원점
 - `columnOrigin` 은 호스팅이 실측해 올리고, 리듀서는 보관 · 전달만 한다. 적용은 `DrawingCodec` 한 곳이다(U5).
-
-### N-Canvas (flag off 롤백 경로)
-- 절마다 `PKCanvasView` 를 두고 바깥 SwiftUI `ScrollView` 로 스크롤한다. `SingleCanvasFlag` 를 끄면 이 경로로 돌아간다(설계 §10-3).
-- 옛 clip 도우미(`PKDrawing+Extension.swift` 의 `clippedPrecisely` · `normalizedForVerseRect`)는 제품 코드에서 부르지 않는다 — Phase 4 삭제 대상이고 새 코드에서 쓰지 않는다.
 
 ---
 
@@ -122,7 +118,7 @@
 ---
 
 ## Debugging hooks
-- 레이아웃 오버레이 · HUD: Debug 실행 인자 `-ChapterLayoutOverlay`(단일 Canvas 는 `-SingleCanvas -ChapterLayoutOverlay`). 판독법과 표시 진단 인자는 `docs/device-simulator-verification.md`.
+- 레이아웃 오버레이 · HUD: Debug 실행 인자 `-ChapterLayoutOverlay`. 판독법과 표시 진단 인자는 `docs/device-simulator-verification.md`.
 - 오버레이 · HUD · 진단 인자는 실행 인자로 켜고 끄며 `#if DEBUG` 안에서만 읽는다 — 출시 구성에 들어가지 않는다.
 
 ---

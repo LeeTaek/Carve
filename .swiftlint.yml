@@ -101,7 +101,6 @@ custom_rules:
       - '/Derived/'
       # 이행 중 예외 — 룰북 references/pencilkit.md 참조
       - '/Feature/CarveFeature/Sources/Presentation/Carve/CarveDetail/CarveDetailFeature\.swift$'
-      - '/Feature/CarveFeature/Sources/Presentation/Drawing/Canvas/CanvasFeature\.swift$'
       - '/Feature/CarveFeature/Sources/Presentation/Header/PencilPalatte/PencilPalatteFeature\.swift$'
     regex: '^[ \t]*(?:@\w+(?:\([^)\n]*\))?[ \t]+)*(?:(?:public|package|internal|fileprivate|private)[ \t]+)?import[ \t]+(?:(?:typealias|struct|class|enum|protocol|let|var|func)[ \t]+)?PencilKit\b'
     excluded_match_kinds: [comment, doccomment, string]
@@ -115,7 +114,6 @@ custom_rules:
       # 이행 중 예외 — 룰북 references/pencilkit.md 참조
       - '/Feature/CarveFeature/Sources/Presentation/Carve/CarveDetail/CarveDetailFeature\.swift$'
       - '/Feature/CarveFeature/Sources/Presentation/Carve/CarveDetail/CarveDetailFeature\+VerseImage\.swift$'
-      - '/Feature/CarveFeature/Sources/Presentation/Drawing/Canvas/CanvasFeature\.swift$'
       - '/Feature/CarveFeature/Sources/Presentation/Header/ColorPalatte/ColorPalatteFeature\.swift$'
       - '/Feature/CarveFeature/Sources/Presentation/Header/PencilPalatte/PencilPalatteFeature\.swift$'
       - '/Supports/UIComponents/Sources/Ads/AdSlotFeature\.swift$'
@@ -145,7 +143,6 @@ custom_rules:
       - '/Feature/ChartFeature/Sources/Chart/DailyRecordChartFeature\.swift$'
       - '/Feature/ChartFeature/Sources/Chart/DrawingChartFeature\.swift$'
       - '/Feature/ChartFeature/Sources/Chart/DrawingWeeklySummaryFeature\.swift$'
-      - '/Feature/CarveFeature/Sources/Presentation/Drawing/Canvas/CanvasFeature\.swift$'
     regex: '\bDate\(\)|\bDate\.now\b|\bTask\.sleep\b'
     excluded_match_kinds: [comment, doccomment, string]
     message: '리듀서는 Date() · Date.now · Task.sleep 대신 @Dependency(\.date) 의 date.now 와 @Dependency(\.continuousClock) 의 clock.sleep(for:) 를 쓴다(달력은 Calendar.current 그대로). 룰북 .codex/skills/carve-rulebook/references/testing.md'

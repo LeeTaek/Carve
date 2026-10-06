@@ -18,8 +18,8 @@
 ## 관례 — State · 전역 상태
 1) TCA State 는 `Sendable` 을 붙이고 `static let initialState` 를 그대로 둔다.
    - Path · Destination 은 `extension X.Path.State: Sendable {}` 로 붙인다(TCA 1.26 방식 — `@Reducer(state:)` 인자형은 deprecated).
-   - N-Canvas(@Model) · PencilKit · UIKit 타입을 담아 Sendable 이 될 수 없는 State 만 계산 프로퍼티 `static var initialState: Self { Self() }` 로 둔다
-     (`CanvasFeature` · `SentencesWithDrawingFeature` · `CarveDetailFeature` · `DrawingChartFeature` 등).
+   - PencilKit · UIKit 타입을 담아 Sendable 이 될 수 없는 State 만 계산 프로퍼티 `static var initialState: Self { Self() }` 로 둔다
+     (`CarveDetailFeature` · `PencilPalatteFeature` · `DrawingChartFeature` 등).
    - State 에 `AlertState` · `ConfirmationDialogState` 가 있으면 그 Action 도 `Sendable` 이다.
 2) 그 밖의 전역 · static 가변 상태는 `static let` 이다(타입이 Sendable 이 아니면 계산 프로퍼티). `static var` 저장 프로퍼티를 새로 두지 않는다.
 3) DependencyKey 의 `liveValue` · `testValue` · `previewValue` 는 `static let` 이고 값 타입은 Sendable 이다(swift-dependencies 요구).
@@ -32,12 +32,12 @@
    effect 에 캡처 목록을 쓰는 것은 리듀서가 Sendable 이 될 수 없을 때만이다.
 6) Action 은 기본적으로 Sendable 이 필요 없다. effect 에서 `send` 로 넘기는 값의 타입만 Sendable 로 만든다.
 7) UI 계층 타입(뷰 지원 클래스 · UIKit 브리지 · `Coordinator` · UI 시험 클래스)은 메서드마다가 아니라 **타입 단위로** `@MainActor` 다.
-   의존성 기본값이 비격리 문맥에서 만들므로, 상태를 건드리지 않는 `init` 은 `nonisolated` 로 둔다(`SharedUndoManager` · `PersistentCloudKitContainer`).
+   의존성 기본값이 비격리 문맥에서 만들므로, 상태를 건드리지 않는 `init` 은 `nonisolated` 로 둔다(`PersistentCloudKitContainer`).
 8) MainActor 전용 SDK API 는 의존성의 클로저 · 메서드를 `@MainActor` 로 두고, 리듀서 **본문**에서 `MainActor.assumeIsolated` 로 부른다 — 리듀서 본문은 스토어(MainActor)에서 돈다.
    본보기: `SendFeedbackFeature`(`MailComposeAvailabilityClient.canSendMail: @MainActor @Sendable () -> Bool`) · `SettingsFeature`(`AdConsentClient.isPrivacyOptionsRequired`).
    effect(`.run`) 클로저는 MainActor 밖에서 돌 수 있으므로 거기서는 `assumeIsolated` 를 쓰지 않는다.
 9) TestStore 를 쓰는 시험 스위트는 `@MainActor` 다.
-10) SwiftData @Model 은 actor 밖으로 내보내지 않는다 — 저장소가 actor 안에서 DTO 로 바꿔 넘긴다(swiftdata.md 규칙 3 · 4). 예외는 N-Canvas 경계의 `UncheckedSendable` 하나다.
+10) SwiftData @Model 은 actor 밖으로 내보내지 않는다 — 저장소가 actor 안에서 DTO 로 바꿔 넘긴다(swiftdata.md 규칙 3 · 4). 예외는 없다(2.1 에서 N-Canvas 경계의 `UncheckedSendable<[BibleDrawing]>` 를 지웠다).
 
 ## 탈출구 — 쓰는 조건
 | 탈출구 | 규칙 | 기계 검사 |
@@ -45,7 +45,7 @@
 | `nonisolated(unsafe)` | 쓰지 않는다. static 상태는 관례 2, 공유 가변 상태는 관례 4 | `no_nonisolated_unsafe`(예외 없음) |
 | `@unchecked Sendable` | 새로 늘리지 않는다. 남은 것은 아래 감사 표가 목록이고, 고치면 표와 lint `excluded` 에서 함께 뺀다 | `no_unchecked_sendable`(지금 쓰는 파일은 `excluded` 로 동결) |
 | `@preconcurrency import` | SDK · 3자 모듈의 Sendable 미표기에만 쓴다. 자사 모듈에는 쓰지 않는다 | 없음(리뷰) |
-| `UncheckedSendable`(ConcurrencyExtras) | N-Canvas 경계에만 쓴다(swiftdata.md). 감싼 곳마다 주석 `이행 중 예외(N-Canvas): N-Canvas 제거 때 지운다 — 룰북 swiftdata.md` | 없음(리뷰) |
+| `UncheckedSendable`(ConcurrencyExtras) | 새로 쓰지 않는다. 남은 것은 아래 감사 표의 `CodableAppStorageKey` 하나다. @Model 을 감싸 actor 밖으로 넘기지 않는다(관례 10 · swiftdata.md 규칙 7) | 없음(리뷰) |
 | `MainActor.assumeIsolated` | 관례 8 의 리듀서 본문, 또는 메인 스레드임을 방금 확인한 곳(`Thread.isMainThread`)에만 쓴다. 가정이 틀리면 실행 중에 멈춘다 | 없음(리뷰) |
 
 - 두 lint 규칙은 리듀서 파일만이 아니라 저장소 전체(제품 · 시험 · 위젯 · UI 시험)를 본다. 주석 · 문자열 속 이름은 판정하지 않는다.
@@ -59,6 +59,7 @@
 
 ## 안전하지 않은 우회 감사 (2026-10-02, 언어 모드 6 전환 끝)
 코드는 고치지 않고 남은 것을 적었다. 줄 번호 대신 타입 · 함수 이름으로 적는다. 고치면 이 표에서 빼고, `@unchecked Sendable` 이면 `.swiftlint.yml` `no_unchecked_sendable` 의 `excluded` 에서도 뺀다.
+2.1 N-Canvas 제거(2026-10-06 반영)로 `UncheckedSendable<[BibleDrawing]>` 둘 · N-Canvas 리듀서의 `assumeIsolated` 5 · `SharedUndoManager` 가 코드와 함께 없어졌다 — 아래 수는 그 뒤의 것이다.
 
 ### `@unchecked Sendable` — 제품 5
 전환 전 6 에서 하나(App `GoogleNativeAdClient` — 타입 단위 `@MainActor` + 격리 채택으로 바꿨다) 줄었다.
@@ -83,14 +84,12 @@
 ### `UncheckedSendable`
 | 어디 | 왜 | 지울 조건 |
 |---|---|---|
-| Domain `SwiftData/SwiftDatabaseActor+DrawingDatabase.swift`(`legacyCanvasDrawings(chapter:)`) · `SwiftData/DrawingDatabase.swift`(`fetchForLegacyCanvas(chapter:)`) → CarveFeature `CarveDetailFeature`(`.wrappedValue`) | **N-Canvas 경계.** N-Canvas 는 절마다 @Model 을 들고 편집한다(설계 §10-3 롤백 경로). 지울 경로를 DTO 로 고치지 않기로 했다(plan 결정 4). 쓰는 곳은 swiftdata.md 이행 중 예외 표 | N-Canvas 제거(별도 plan) |
-| CarveFeature `Extension/CodableAppStorageKey.swift`(`storage: UncheckedSendable<UserDefaults>`) · 시험 `CodableAppStorageKeyTesting` | `SharedKey` 는 Sendable 이어야 하는데 `UserDefaults` 가 SDK 에서 Sendable 이 아니다. Sharing 의 `AppStorageKey` 와 같은 모양이고 전환 전부터 있었다. **N-Canvas 밖의 유일한 것** — 늘리지 않는다 | SDK 가 `UserDefaults` 를 Sendable 로 표기하면 |
+| CarveFeature `Extension/CodableAppStorageKey.swift`(`storage: UncheckedSendable<UserDefaults>`) · 시험 `CodableAppStorageKeyTesting` | `SharedKey` 는 Sendable 이어야 하는데 `UserDefaults` 가 SDK 에서 Sendable 이 아니다. Sharing 의 `AppStorageKey` 와 같은 모양이고 전환 전부터 있었다. **유일한 것** — 늘리지 않는다 | SDK 가 `UserDefaults` 를 Sendable 로 표기하면 |
 
-### `MainActor.assumeIsolated` — 14곳
+### `MainActor.assumeIsolated` — 9곳
 | 어디 | 무엇 | 안전하다고 보는 근거 | 지울 조건 |
 |---|---|---|---|
 | Domain `SwiftData/SwiftDataContextProvider+Dependency.swift`(`recordStoreOutcome`) | `Thread.isMainThread` 면 `PersistentCloudKitContainer.syncState` 를 곧바로 쓴다(아니면 `Task { @MainActor }`) | 동기 기본 경로(`ModelContainer.liveValue`)를 처음 읽는 스레드가 정해져 있지 않다. 메인 스레드임을 방금 확인했다. 앱 시작 경로(`ReleaseStoreBootstrapper`)는 여기를 지나지 않는다 | 동기 기본값이 저장소를 열지 않게 바꾸면 |
-| CarveFeature N-Canvas 리듀서 5 — `CarveDetailFeature`(`setSentence` 의 `undoManager.clear()`) · `CanvasFeature`(`registUndoCanvas`) · `PencilPalatteFeature`(`view(.undo)` · `view(.redo)` · `setCanUndo`) | `SharedUndoManager` 호출 | 관례 8 — 리듀서 본문 | N-Canvas 제거 |
 | SettingsFeature `SendFeedbackFeature` 2(`view(.onAppear)` · `sendFeedback`) · `SettingsFeature` 1(`view(.onAppear)`) | MessageUI · UMP 의 MainActor 의존성 | 관례 8 의 본보기 | 관례로 남긴다 |
 | UIComponents `Ads/AdSlotFeature.swift` 2(`adLoaded` 의 `nativeAdClient.view(for:)` · `invalidate(_:)`) | AdMob 뷰 · 캐시(App `GoogleNativeAdClient` 는 타입 단위 `@MainActor`) | 리듀서 본문과 본문이 부르는 동기 함수 | 관례로 남긴다 |
 | CarveFeature Debug 스파이크 `Debug/CanvasScrollSpikeHosting.swift` 3(`SpikeGestureBinder` 의 제스처 selector 2 · `SpikeOverlayCanvas` 의 `onAttach` 클로저) | `CanvasScrollSpikeMetrics`(MainActor) 기록 | UIKit 제스처 · `didMoveToWindow` 는 메인 스레드에서 불린다. 전환 전부터 있었다 | `SpikeGestureBinder` 를 타입 단위 `@MainActor`, `onAttach` 를 `@MainActor` 클로저로(관례 7) · 스파이크를 지우면 |
@@ -106,7 +105,6 @@
 | 어디 | 무엇 | 근거 |
 |---|---|---|
 | Domain `SwiftData/SwiftDataContextProvider.swift` `PersistentCloudKitContainer` | 타입 단위 `@MainActor`(plan 결정 15). `init` 과 상태를 쓰지 않는 static 함수는 `nonisolated`, DependencyKey 값은 `nonisolated static let`. `syncState` · `activity` 와 그 publisher 는 MainActor 에서만 | `@Published` 라 `LockIsolated` 로 풀리지 않고, `@unchecked Sendable` 은 탈출구 규칙 위반이다. 기존 코드도 MainActor 에서만 바꿨다. 동기 기본 경로의 `assumeIsolated` 는 위 표 |
-| CarveFeature N-Canvas `Presentation/Drawing/Canvas/SharedUndoManager.swift` | 타입 단위 `@MainActor`, `init` 만 `nonisolated`(`UndoManager` 는 처음 쓸 때 만든다) | `UndoManager` · `PKCanvasView` 가 MainActor 타입이다. 리듀서 호출 5곳은 위 표. N-Canvas 제거 때 함께 지운다 |
 | App `Infrastructure/Ads/GoogleNativeAdClient.swift` | 격리 채택 `extension GoogleNativeAdClient: @MainActor NativeAdLoaderDelegate`(클래스는 타입 단위 `@MainActor`) | AdMob 은 로더 delegate 를 메인 스레드에서 부른다(`dispatchPrecondition` 으로 확인). 이 전환에서 `@unchecked Sendable` 하나를 이것으로 바꿨다 |
 | CarveFeature `Presentation/Drawing/SentenceWithDrawing/SentencesWithDrawingView.swift` | 격리 채택 `View, @MainActor Equatable` | `==` 가 MainActor 의 store 를 비교한다. 컴파일러가 확인하는 격리라 지울 것은 없다 |
 
@@ -126,13 +124,12 @@
 5. `CodableAppStorageKey` — 알림 토큰을 `LockIsolated` 로 감싸 `@preconcurrency import Foundation` 을 되돌릴 수 있는지 본다.
 6. Debug 스파이크 `SpikeGestureBinder` 를 타입 단위 `@MainActor` 로(관례 7).
 7. SDK 표기를 기다리는 것 — `SentenceSettingCloudBackup` · `CodableAppStorageKey` 의 `UncheckedSendable<UserDefaults>` · `PencilPalatte` 의 `@preconcurrency import PencilKit`. Xcode 가 바뀔 때 다시 본다.
-8. N-Canvas 제거 때 함께 — `UncheckedSendable<[BibleDrawing]>` 둘, 리듀서 `assumeIsolated` 5, `SharedUndoManager`.
 
 ---
 
 ## Definition of done (동시성)
 - [ ] 자사 타깃의 Xcode 27 빌드에 동시성 오류 · 경고가 없다(남는 것은 의존성 쪽만)
 - [ ] `no_nonisolated_unsafe` · `no_unchecked_sendable` error 0 — 새 `@unchecked Sendable` 이 없다
-- [ ] 새 `@preconcurrency import` 는 SDK · 3자 모듈에만, `UncheckedSendable` 은 N-Canvas 경계 밖에 늘지 않았다
+- [ ] 새 `@preconcurrency import` 는 SDK · 3자 모듈에만, `UncheckedSendable` 은 늘지 않았다
 - [ ] 우회를 지웠으면 이 감사 표와 lint `excluded` 에서 함께 뺐다
 - [ ] 격리를 바꾼 SDK 콜백 경로를 실행으로 확인했다

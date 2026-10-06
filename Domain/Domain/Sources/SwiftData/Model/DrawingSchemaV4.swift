@@ -34,9 +34,9 @@ import SwiftData
 /// 따라서 V3 → V4 는 lightweight migration 으로 처리됩니다.
 ///
 /// - Important: **forward-only 입니다 (§10-3).** V4 로 마이그레이션된 store 는 V3 빌드로
-///              되돌릴 수 없습니다. 되돌릴 수단은 feature flag off 뿐이며, 그때도 저장소는
-///              V4 인 채로 남습니다. 그래서 "기존 N Canvas 경로가 V4 저장소에서 동작하는지" 를
-///              Phase 1 에서 먼저 확보합니다.
+///              되돌릴 수 없습니다. 2.0.x 까지는 feature flag off(기존 N-Canvas 경로)로 단일 Canvas 를
+///              되돌릴 수 있었지만, 2.1 에서 flag 와 N-Canvas 경로를 지웠습니다 — forward-only 원칙은
+///              그대로입니다.
 public enum DrawingSchemaV4: VersionedSchema {
     public static let versionIdentifier = Schema.Version(4, 0, 0)
 
