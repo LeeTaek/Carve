@@ -69,4 +69,24 @@ struct SettingsSidebarSelectionTesting {
     func everyRowOpensItsOwnScreen(item: SettingsFeature.SidebarItem) {
         #expect(item.initialPath.sidebarItem == item)
     }
+
+    @Test("「필사 백업」 행은 백업 화면을 처음 상태로 열고, 백업 만들기 흐름 중에 다시 골라도 그대로 둔다")
+    func backupRowOpensBackupScreen() async {
+        let store = TestStore(initialState: SettingsFeature.State.initialState(path: .iCloud(.initialState))) {
+            SettingsFeature()
+        }
+
+        await store.send(.selectSidebarItem(.backup)) {
+            $0.path = .backup(.initialState)
+        }
+        #expect(store.state.selectedSidebarItem == .backup)
+
+        var exporting = BackupFeature.State()
+        exporting.export.step = .password
+        let busy = TestStore(initialState: SettingsFeature.State.initialState(path: .backup(exporting))) {
+            SettingsFeature()
+        }
+        // 상태가 바뀌면 TestStore 가 실패한다 — 쓰던 흐름을 처음으로 되돌리지 않는다.
+        await busy.send(.selectSidebarItem(.backup))
+    }
 }
