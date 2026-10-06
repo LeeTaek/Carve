@@ -345,7 +345,7 @@ struct ChapterLayoutDebugHUD: View {
                         .foregroundStyle(legacyInkColor(compose))
                 }
             } else {
-                Text("compose — (단일 Canvas 아님)").foregroundStyle(.gray)
+                Text("compose — (합성 정보 없음)").foregroundStyle(.gray)
             }
         }
     }

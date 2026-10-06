@@ -16,8 +16,8 @@ import PencilKit
 ///
 /// 모든 blob 은 **절 로컬 좌표계**입니다 — 추출 시점의 배포 버전이 롤백 이후이기 때문입니다.
 /// 1.2.0 `CombinedCanvas` 가 저장했던 **절대좌표** 형식은 저장하지 않고
-/// `absoluteVariant(of:verseRect:)` 로 만들어 씁니다. 두 형식의 관계가
-/// `normalizedForVerseRect` 의 역변환이라는 점을 코드에 드러내기 위함입니다.
+/// `absoluteVariant(of:verseRect:)` 로 만들어 씁니다. 두 형식의 관계가 2.0.x 이하의 판정식
+/// `normalizedForVerseRect`(2.1 에서 N-Canvas 와 함께 지워 지금은 없음)의 역변환이라는 점을 코드에 드러내기 위함입니다.
 ///
 /// blob 을 base64 상수로 내장한 이유는 테스트 타깃에 resource 설정이 없어
 /// 프로젝트 설정 변경을 피하기 위함입니다 (AGENTS.md: 빌드 설정 변경 금지).
@@ -192,17 +192,17 @@ enum LegacyDrawingFixture {
 
     static let all: [Sample] = [single, aboveOrigin, wideLine, multiLine, detectable]
 
-    /// `normalizedForVerseRect` 의 판정이 **발동하지 않는** 샘플들.
+    /// 2.0.x 이하의 판정식 `normalizedForVerseRect`(지금은 없음)가 **발동하지 않던** 샘플들.
     ///
-    /// 판정은 `strokes.first.renderBounds` 가 `rect.origin` 에서 두 축 모두 20pt 이내일 때만
-    /// 성립하는데, 실제 필기는 대개 그 조건을 벗어납니다.
-    /// 추출한 225 건 중 **29% 만** 발동하고 나머지 71% 는 절대좌표여도 복원되지 않습니다.
+    /// 그 판정은 `strokes.first.renderBounds` 가 `rect.origin` 에서 두 축 모두 20pt 이내일 때만
+    /// 성립했는데, 실제 필기는 대개 그 조건을 벗어납니다.
+    /// 추출한 225 건 중 **29% 만** 발동했고 나머지 71% 는 절대좌표여도 복원되지 않았습니다.
     static let undetectable: [Sample] = [single, aboveOrigin, wideLine, multiLine]
 
     /// 1.2.0 `CombinedCanvas` 가 저장했던 **절대좌표** 형식을 재현합니다.
     ///
-    /// `normalizedForVerseRect` 는 절대좌표를 로컬로 되돌릴 때
-    /// `translationX: -rect.minX, y: -rect.minY` 를 적용합니다.
+    /// 2.0.x 이하의 판정식 `normalizedForVerseRect`(지금은 없음)는 절대좌표를 로컬로 되돌릴 때
+    /// `translationX: -rect.minX, y: -rect.minY` 를 적용했습니다.
     /// 그 역변환이 곧 "1.2.0 이 저장했을 형식" 입니다.
     static func absoluteVariant(of drawing: PKDrawing, verseRect: CGRect) -> PKDrawing {
         drawing.transformed(
@@ -212,8 +212,8 @@ enum LegacyDrawingFixture {
 
     // MARK: - 절 rect 시나리오
 
-    /// 장 **맨 위** 절. `normalizedForVerseRect(tolerance: 20)` 가
-    /// 로컬과 절대를 구분하지 못하는 구간입니다.
+    /// 장 **맨 위** 절. 2.0.x 이하의 판정식 `normalizedForVerseRect(tolerance: 20)`(지금은 없음)가
+    /// 로컬과 절대를 구분하지 못하던 구간입니다.
     static let rectAtChapterTop = CGRect(x: 0, y: 8, width: 360, height: 120)
     /// 장 중간 절.
     static let rectAtChapterMiddle = CGRect(x: 384, y: 480, width: 360, height: 120)
