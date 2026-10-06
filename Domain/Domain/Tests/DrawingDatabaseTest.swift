@@ -14,7 +14,6 @@ import Dependencies
 
 final class DrawingDatabaseTest: XCTestCase {
     @Dependency(\.createSwiftDataActor) var actor
-    @Dependency(\.drawingData) var drawingContext
 
     override func tearDown() async throws {
         try await self.actor.deleteAll(BibleDrawing.self)
@@ -35,22 +34,6 @@ final class DrawingDatabaseTest: XCTestCase {
         // then
         XCTAssertNotNil(storedDrawing)
         XCTAssertEqual(storedDrawing?.rowUUID, expectedRowUUID)
-    }
-    
-    func test_fetch_drawing() async throws {
-        // given
-        let title = BibleChapter.init(title: .genesis, chapter: 1)
-        let lastVerse = 1
-        let drawing = BibleDrawing(bibleTitle: title, verse: lastVerse)
-        let expectedRowUUID = drawing.rowUUID
-        
-        // when
-        try await actor.insert(drawing)
-        let storedDrawings = try await drawingContext.fetchForLegacyCanvas(chapter: title).value.first
-        
-        // then
-        XCTAssertNotNil(storedDrawings)
-        XCTAssertEqual(storedDrawings?.rowUUID, expectedRowUUID)
     }
 
 }

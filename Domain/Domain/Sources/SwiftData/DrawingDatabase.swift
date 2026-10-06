@@ -33,48 +33,7 @@ public struct DrawingDatabase: Sendable {
         Log.debug("Drew Log Count:", storedDrawing?.count ?? 0 )
         return storedDrawing
     }
-    
-    /// 여러 절의 필사 데이터를 한 번에 업데이트(update)
-    /// - Parameter requests: 각 절에 대한 업데이트 정보를 담은 요청 배열
-    /// - Important: 동일한 (title, verse)에 대해서는 actor 의 `mainDrawingID(chapter:verse:)` 로
-    ///   대표 Drawing 을 찾아 `lineData`와 `updateDate`만 갱신.
-    ///   기존 데이터가 없을 경우 새 `BibleDrawing`을 생성해 저장.
-    public func updateDrawings(requests: [DrawingUpdateRequest]) async {
-        for req in requests {
-            do {
-                // 해당 verse 의 대표 drawing 을 actor 안에서 고른다 — 모델은 actor 밖으로 나오지 않는다.
-                let existingID = try await actor.mainDrawingID(chapter: req.chapter, verse: req.verse)
 
-                if let id = existingID {
-                    // 기존 데이터 업데이트
-                    try await actor.update(id) { (old: BibleDrawing) in
-                        old.lineData = req.updateLineData
-                        old.updateDate = req.updateDate
-                    }
-                    Log.debug("updated drawing verse:", req.verse)
-                } else {
-                    // 존재하지 않으면 새로 생성
-                    let new = BibleDrawing(
-                        bibleTitle: req.chapter,
-                        verse: req.verse,
-                        lineData: req.updateLineData,
-                        updateDate: req.updateDate
-                    )
-                    try await actor.insert(new)
-                    Log.debug("inserted new drawing verse:", req.verse)
-                }
-            } catch {
-                analyticsClient.trackErrorShown(
-                    .drawingUpdateDrawingsFailed,
-                    feature: .domain,
-                    context: "DrawingDatabase.updateDrawings",
-                    message: error.localizedDescription
-                )
-                Log.error("❌ updateDrawings failed:", error)
-            }
-        }
-    }
-    
     // MARK: - 값으로 읽기 (모델은 actor 안에 둔다)
 
     /// 해당 절의 필사 행을 스냅샷으로 모두 가져온다 — 이력 화면용.
@@ -110,13 +69,6 @@ public struct DrawingDatabase: Sendable {
             )
             Log.error("❌ updatePresentDrawing failed:", error)
         }
-    }
-
-    /// 한 장의 필사 행을 모두 불러온다 — N-Canvas 전용.
-    /// - Parameter chapter: 가져올 성경의 이름과 장
-    /// - Returns: 그 장의 행(`verse` 오름차순). 이행 중 예외(N-Canvas): N-Canvas 제거 때 지운다 — 룰북 swiftdata.md
-    public func fetchForLegacyCanvas(chapter: BibleChapter) async throws -> UncheckedSendable<[BibleDrawing]> {
-        try await actor.legacyCanvasDrawings(chapter: chapter)
     }
 
     // MARK: - Page 단위 BibleDrawing
@@ -183,20 +135,7 @@ public struct DrawingDatabase: Sendable {
             Log.error("❌ upsertPageDrawing failed:", error)
         }
     }
-    
-    /// N-Canvas의 행 단위 변경을 저장한다.
-    ///
-    /// SwiftData 모델은 actor 경계를 넘기지 않고, 호출부가 미리 만든 Sendable 요청만 전달한다.
-    /// 기존 행의 `isPresent`와 `rowUUID`는 유지하며 신규 행은 선발급된 `rowID`를 그대로 사용한다(§8-7).
-    public func updateDrawing(request: LegacyDrawingSaveRequest) async throws {
-        do {
-            try await actor.upsertLegacyDrawing(request)
-            Log.debug("update drawing", request.rowID.raw)
-        } catch {
-            Log.error("failed to update drawing", error)
-        }
-    }
-    
+
     /// 최근 range 사이에 업데이트 된 drawing의 활동 값을 최신순으로 반환
     public func fetchDrawings(in range: DateInterval) async throws -> [DrawingActivity] {
         try await actor.drawingActivities(in: range)
@@ -243,40 +182,6 @@ extension SwiftDatabaseActor {
             }
         }
         return record
-    }
-
-    /// N-Canvas 저장 요청을 행 주소로 upsert하고 한 번 저장한다.
-    /// - Parameter request: SwiftData 모델을 포함하지 않는 행 단위 저장 값.
-    public func upsertLegacyDrawing(_ request: LegacyDrawingSaveRequest) throws {
-        let rawRowID = request.rowID.raw
-        let titleName = request.chapter.title.rawValue
-        let chapterNumber = request.chapter.chapter
-        let predicate = #Predicate<BibleDrawing> {
-            $0.titleName == titleName && $0.titleChapter == chapterNumber
-                && ($0.rowUUID == rawRowID || $0.id == rawRowID)
-        }
-        var descriptor = FetchDescriptor(predicate: predicate)
-        descriptor.fetchLimit = 1
-
-        if let stored = try modelContext.fetch(descriptor).first {
-            stored.lineData = request.lineData
-            stored.updateDate = request.updateDate
-            // 좌표 형식 표식과 metadata도 함께 옮긴다(설계 §10-3 flag off 경로).
-            stored.drawingVersion = request.drawingVersion
-            stored.layoutMetadataData = request.layoutMetadataData
-        } else {
-            let stored = BibleDrawing(
-                bibleTitle: request.chapter,
-                verse: request.verse,
-                lineData: request.lineData,
-                updateDate: request.updateDate,
-                layoutMetadataData: request.layoutMetadataData,
-                rowUUID: rawRowID
-            )
-            stored.drawingVersion = request.drawingVersion
-            modelContext.insert(stored)
-        }
-        try modelContext.save()
     }
 }
 
