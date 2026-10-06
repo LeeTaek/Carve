@@ -1,7 +1,7 @@
 # CarveFeature 단일 Canvas 전환 설계
 
-> **상태 (rev.38 · 2026-09-30):** Phase 0A~3 구현 및 `develop` 병합 완료. 단일 Canvas 기본값은 **on** (`SingleCanvasFlag.defaultValue = true`)입니다. 2026-09-15 부터 앱을 켤 때 기존 저장값을 설치당 한 번 지워 기존 사용자도 기본값을 따르게 하고(`SingleCanvasFlag.resetStoredValueOnce(in:)`), 그 뒤에 끈 값은 유지합니다.
-> **2.0.0 작업 순서와 출시 범위는 [로드맵](./release-2.0.0-roadmap.md)을 기준으로 합니다.** Phase 4(구 구조 제거)는 출시 후 안정화 과제입니다.
+> **상태 (rev.39 · 2026-10-06):** Phase 0A~3 구현 및 `develop` 병합 완료. **2.1 에서 N-Canvas 를 지웠습니다 — 필사 캔버스는 단일 Canvas 하나뿐이고 `SingleCanvasFlag` 는 없습니다**(설정 「필사 캔버스」 토글 · `-SingleCanvas` 도 함께, §10-3). 2.0.x 에서 토글을 끈 사용자에게는 필사 화면에 처음 들어갈 때 한 번 안내합니다(`AppCoordinatorFeature.CanvasRemovalNotice`). 2.0.x 의 기본값 on 과 설치당 한 번 저장값 지우기(`SingleCanvasFlag.resetStoredValueOnce(in:)`, 2026-09-15)는 rev.30 · §10-3 의 기록으로 남깁니다.
+> **2.0.0 작업 순서와 출시 범위는 [로드맵](./release-2.0.0-roadmap.md)을, 2.1 범위는 [필사 백업 · 불러오기 설계](./backup-import-design.md) §1 을 기준으로 합니다.** Phase 4(구 구조 제거)는 2.1 에서 부분 완료했습니다 — 행별 호스팅 · `BiblePageDrawing` 이 남았습니다(§13).
 > D9 의 실제 통과·미수행 범위는 [런북 §6-9 · §8-7](./phase-0a-d-device-test.md)에 남깁니다. 미보유 구기기·120Hz 검증을 출시 선행 조건으로 두지 않습니다.
 >
 > ✅ **종결:** R13 · R16 · R19 · **D9 H**(회전 표시) · **E-4**(결함 아님, D9 H 와 동일) · **R23**(flag off 로 열기만 해도 v3→v2 강등) · **R24**(같은 장 재로드가 기하 실측을 버려 잉크 미표시·R13 재발·Δ 실명) — 전부 수정·실기기 재확인 완료. §20-13 · §20-14 · §20-16 · 런북 §8-7.
@@ -9,7 +9,7 @@
 > ⚠️ **후속 작업·미확정 항목:** **R25**(롱프레스 메뉴 교체 — 오탭이 전 획 선택으로) · **R22**(세로에서 redo 접근 불가) · **R28**(구버전 기기가 v3 행을 잘못 다룸 — 해석·강등 규칙이 미출시라 **위험 확정**) · **R27**(기존 행의 `rowUUID` 가 서버에 없어 중복 가능) · **R20**(저메모리 미검증).
 > ✅ **정지 상태 메모리는 단일 Canvas 가 N-Canvas 보다 ~440 MiB 가볍습니다** (R21, 시편 119편 실측).
 > ✅ **MetricKit 을 붙였습니다** — 보유하지 않은 저메모리·ProMotion 기기의 실태는 배포 후 `mk_daily` · `mk_memory_kill` 이벤트로 받습니다. ⚠️ **매핑 경로는 아직 한 번도 실행되지 않았습니다** (payload 는 하루 한 번, 기기에 과거 payload 도 0건). 수집 연결의 실제 동작은 아직 미확인으로 남깁니다. 출시 후 수신 여부부터 확인하며, 현재 수집 항목은 메모리·종료 지표입니다. 120Hz 필기감·표시 결함·동기화 중복을 자동 판정하지는 않습니다.
-> ⚠️ **그 밖에 살아 있는 항목:** **R20**(회전 시 전이 메모리 peak 1.8 GiB — 저메모리 기기 미검증) · **R17**(Δ 가 R16 계열 미검출) · **R18**(N-Canvas 신규 행이 v1) · **R22**(팔레트 폭). 전부 §16 "남은 것".
+> ⚠️ **그 밖에 살아 있는 항목:** **R20**(회전 시 전이 메모리 peak 1.8 GiB — 저메모리 기기 미검증) · **R17**(Δ 가 R16 계열 미검출) · **R22**(팔레트 폭). 전부 §16 "남은 것". **R18**(N-Canvas 신규 행이 v1)은 2.1 의 N-Canvas 제거로 종결했습니다.
 > D9-1 · D9-2 · D9-3-1·2·4 · D9-4-1·4 · **D9-5** · **D9-6**(R23·R24 수정 후 재검증) · D9-7-1·3·4 · D9-8 · **D9-CK②·③** 통과. **D9-7-2 만 ❓ 미수행**(Pencil 입력이 필요해 자동화 불가) (런북 §8-7).
 > ⚠️ Δ 0.00 은 실제 필기 표시의 정상 판정이 **아닙니다** — 계측은 "값이 도달했는가" 만 말합니다 (§20-16).
 > D9 H 분석(삭제된 문서 — 커밋 `bc0a2e35` 의 `docs/single-canvas-rotation-display-investigation.md`) · [실기기 조작](./device-debugging-cli.md).
@@ -49,7 +49,8 @@
 | 35 | **회귀 기준선 갱신** — rev.31 이후 병합된 작업의 시험이 §19-4-2 에 반영되지 않았던 것을 2026-09-28 develop 머지 뒤 실측으로 바로잡음. 요약 줄 · 런북 · 로드맵의 312 표기도 현재 기준선으로 맞춤. 설계 변경 없음. 기준선 312 → **1069** | §19-4-2 |
 | 36 | **회귀 기준선 갱신** — 「확인이 필요한 필기」 가져오기([정책 §12-6 ④](./icloud-sync-and-backup-policy.md)) 시험 34 추가. 단일 Canvas 설계 변경 없음(캔버스는 절 메뉴 수 · 설정에서 넣은 필기의 반영만 바뀜). 기준선 1069 → **1103** | §19-4-2 |
 | 37 | **회귀 기준선 갱신** — 설정 「의견 보내기」(필수 항목 전 보내기 막기 · 메일 계정 안내) · 「앱 버전」 시험 9 추가. 단일 Canvas 설계 변경 없음. 기준선 1103 → **1112**. 개정 36 에서 올리지 않은 상태 줄의 rev 도 맞춤 | §19-4-2 |
-| **38** | **회귀 기준선 원본 이전** — 현재값과 이후 이력을 [regression-baseline.md](./regression-baseline.md) 한 곳으로 옮김. AGENTS.md · 이 문서 요약 줄 · §19-4-2 를 함께 고치던 것을 없앰. 요약 줄은 포인터로, §19-4-2 는 rev.37 까지의 이력으로 남김. 단일 Canvas 설계 변경 없음 | §19-4-2 |
+| 38 | **회귀 기준선 원본 이전** — 현재값과 이후 이력을 [regression-baseline.md](./regression-baseline.md) 한 곳으로 옮김. AGENTS.md · 이 문서 요약 줄 · §19-4-2 를 함께 고치던 것을 없앰. 요약 줄은 포인터로, §19-4-2 는 rev.37 까지의 이력으로 남김. 단일 Canvas 설계 변경 없음 | §19-4-2 |
+| **39** | **2.1 — N-Canvas 제거 (Phase 4 부분 완료)** — `CanvasFeature` · `CanvasView` · `SharedUndoManager` · `SingleCanvasFlag` · 설정 「필사 캔버스」 토글 · `-SingleCanvas` · `VerseRowFeature` · `clippedPrecisely` / `normalizedForVerseRect` · 옛 저장 API(`fetchForLegacyCanvas` · `updateDrawing(s)`)와 N-Canvas 경계를 지움. §10-3 의 flag 롤백 · v3 → v2 강등은 2.0.x 기록으로 남기고 2.1 은 v1 · v2 행을 읽기만 함. 행별 호스팅 · `BiblePageDrawing` 은 남음. R18 종결. 기준선은 [regression-baseline.md](./regression-baseline.md) | 상태 · §4 · §6-1 · §8-5 · §8-7 · §10-3 · §10-4 · §11 · §13 · §14 · §15 · §16 · §17 · 부록 |
 
 ---
 
@@ -151,7 +152,7 @@ DrawingRepository (SwiftDataDrawingRepository) ← SwiftData 단일 접근 경�
 | `ChapterLayoutBuilder` | 좌표 **영역**을 계산 (rect, 밑줄 anchor, 높이) |
 | `DrawingCodec` | Drawing에 **transform을 적용하는 유일한 곳** — `columnOrigin` 평행이동 · reflow · `storageOrigin` localize |
 
-Feature·View·Repository는 좌표 변환을 수행하지 않습니다. (예외: N-Canvas 가 v3 행을 표시할 때의 첫 밑줄 평행이동 — §10-3.)
+Feature·View·Repository는 좌표 변환을 수행하지 않습니다. (2.0.x 까지의 예외였던 N-Canvas 의 v3 행 첫 밑줄 평행이동은 2.1 에서 N-Canvas 와 함께 지웠습니다 — §10-3.)
 
 ### 모듈 배치 — 순환 의존 회피
 
@@ -160,8 +161,8 @@ Feature·View·Repository는 좌표 변환을 수행하지 않습니다. (예외
 ```
 Domain
  ├─ ChapterLayout, VerseCanvasRegion, VerseDrawingSnapshot, VerseDrawingMutation, DrawingLayoutMetadata
- ├─ DrawingRepository 계약 + SwiftDataDrawingRepository
- └─ SingleCanvasFlag (feature flag 키 — CarveFeature 와 SettingsFeature 가 공유)
+ └─ DrawingRepository 계약 + SwiftDataDrawingRepository
+    (2.0.x 의 SingleCanvasFlag — CarveFeature 와 SettingsFeature 가 공유하던 flag 키 — 는 2.1 에서 지웠다)
 
 CarveFeature
  ├─ ChapterCanvasFeature · ChapterCanvasView · ChapterCanvasController
@@ -312,7 +313,7 @@ signature 는 "레이아웃 **형식** 호환성" 판정입니다. 필사가 어
 | **`VStack` + 캔버스 지연(sticky) + 중첩 호스팅 유지 — 채택** | **5.4 s** | **198 MB** | **0.71 s** | **30** |
 | (참고) Phase 2 이전 `LazyVStack`, 같은 날 같은 절차 | 3.1 s | 83 MB | — | 20 |
 
-전 절 geometry 가 필요한 이유는 **텍스트 실측**이지 캔버스가 아닙니다. 행(본문·밑줄·frame 실측)은 전부 즉시 만들고, `PKCanvasView` 는 뷰포트 위아래 1.5 화면 안의 행에만 만들되 한 번 만든 것은 유지합니다 (`CarveDetailView.activeCanvasIDs`). 결과는 진입 +100 MB · +2.3 s (= 텍스트 행 176개의 값), 스크롤 비용은 옛 코드와 같습니다 (§20-8).
+전 절 geometry 가 필요한 이유는 **텍스트 실측**이지 캔버스가 아닙니다. 행(본문·밑줄·frame 실측)은 전부 즉시 만들고, `PKCanvasView` 는 뷰포트 위아래 1.5 화면 안의 행에만 만들되 한 번 만든 것은 유지합니다 (`CarveDetailView.activeCanvasIDs` — 행마다 캔버스를 두던 N-Canvas 의 방식이고, 2.1 에서 N-Canvas 와 함께 지웠습니다. 단일 Canvas 는 장당 캔버스 하나입니다). 결과는 진입 +100 MB · +2.3 s (= 텍스트 행 176개의 값), 스크롤 비용은 옛 코드와 같습니다 (§20-8).
 
 **구조적 함정 2건 — B 구조에도 그대로 적용됩니다.**
 
@@ -515,8 +516,8 @@ pencil-up 마다 직렬 저장하는 기본 경로가 안전성의 본체이고,
 | 지점 | 구현 |
 |---|---|
 | 장 진입 (`load`) | 이전 장의 실패 batch 를 곧바로 재시도. 큐·코덱·trailing 에 남은 이전 장 편집은 물러난 세션(§8-1)이 자기 장으로 저장 |
-| 앱 비활성 (`appWillResignActive`) | 항상 트리에 있는 `CarveNavigationView` 의 scenePhase 훅에서 보낸다 — `CarveDetailView` 는 사이드바가 열리면 트리에서 빠진다. flag 와 무관하게 보낸다 (best-effort) |
-| flag off 로 돌아온 장 (`setSentence`) | 단일 Canvas 에 남은 미저장분을 마저 저장 |
+| 앱 비활성 (`appWillResignActive`) | 항상 트리에 있는 `CarveNavigationView` 의 scenePhase 훅에서 보낸다 — `CarveDetailView` 는 사이드바가 열리면 트리에서 빠진다 (best-effort) |
+| ~~flag off 로 돌아온 장 (`setSentence`)~~ | 2.0.x 까지 — 단일 Canvas 에 남은 미저장분을 마저 저장했다. 2.1 에서 flag 와 함께 지웠다 |
 
 **미구현 — 요청/승인 흐름.** 설계 초안은 장 전환을 "flush 성공 후 전환, 실패 시 사용자 확인" 흐름으로 규정했습니다. 현재는 전환을 막지 않고 위의 물러난 세션과 장 진입 재시도로 대체합니다. 설정 화면으로의 이동은 `NavigationStack` push 라 Carve 상태(미저장분 포함)가 유지됩니다. 재시도 UI(`AnalyticsClient.trackErrorShown` + 사용자 알림)는 없습니다.
 
@@ -556,7 +557,7 @@ protocol DrawingRepository: Sendable {
 #### 히스토리 복원 흐름
 
 ```
-사용자가 회차 선택 (N-Canvas: 행별 시트 · B: 캔버스 롱프레스 → UIEditMenuInteraction → CarveDetailFeature.chapterHistory 시트)
+사용자가 회차 선택 (B: 캔버스 롱프레스 → UIEditMenuInteraction → CarveDetailFeature.chapterHistory 시트. 2.0.x 의 N-Canvas 행별 시트는 2.1 에서 지움)
   ↓ ② updatePresentDrawing — isPresent 이전 (VerseDrawingHistoryFeature)
   ↓ ③ verseRowRestored(verse:rowID:) → 미저장분 선저장(①) → DB 에서 다시 합성 → activeRowIDs 갱신 → undo stack clear (§9-5)
   ↓ ④ mutation 생성 없음 — DB 에 이미 존재하는 내용
@@ -698,20 +699,26 @@ metadata 없는 행은 마이그레이션 이후에도 다른 기기에서 계�
 
 ### 10-3. 롤백의 의미 — forward-only ★
 
-V4 로 마이그레이션된 store 는 V3 빌드로 되돌릴 수 없습니다. Phase 3 을 되돌리는 수단은 **feature flag off** 뿐이며 그때도 저장소는 V4 입니다. → **V4 저장소를 유지한 채 flag 를 껐을 때 N-Canvas 경로가 정상 동작해야 합니다** (§14 16).
+V4 로 마이그레이션된 store 는 V3 빌드로 되돌릴 수 없습니다 — 이 forward-only 원칙은 그대로입니다.
 
-flag off 경로가 단일 Canvas 의 행을 읽는 규칙 (rev.17):
+**2.1 에서 flag 롤백 수단을 지웠습니다 (rev.39).** 2.0.x 까지 Phase 3 을 되돌리는 수단은 **feature flag off** 뿐이었고 그때도 저장소는 V4 였습니다 — 그래서 V4 저장소를 유지한 채 flag 를 껐을 때 N-Canvas 경로가 정상 동작해야 했습니다(§14 16). 2.1 에는 N-Canvas · `SingleCanvasFlag` · 설정 「필사 캔버스」 토글 · `-SingleCanvas` 가 없어 단일 Canvas 를 되돌리는 수단이 없습니다. forward-only 원칙은 그대로 두고, 아래 flag off 읽기 규칙과 v3 → v2 강등 규칙은 2.0.x 기록으로 남깁니다. **2.1 은 v1 · v2 행을 읽기만 합니다.**
+
+- 같은 계정의 2.0.x · 1.3.0 기기가 v1 · v2 행을 계속 만들고, 2.0.x 에서 flag 를 끈 기기는 v3 행을 편집해 v2 로 내립니다. 그래서 코덱의 nil · 1 · 2 해석(무변환 — `writingRect` 원점)은 지우지 않습니다.
+- 2.1 은 그 형식으로 새로 쓰지 않습니다. 사용자가 그 절을 편집할 때만 같은 행을 §10-2 정책 5 대로 v3 + metadata 로 올립니다(`NCanvasRowsAfterRemovalTesting`).
+- 2.0.x 에서 토글을 끈 사용자(`singleCanvasEnabled` 가 false)에게는 필사 화면에 처음 들어갈 때 막지 않는 안내를 한 번 띄우고, 2.0.x 설정 키 둘을 지웁니다(`AppCoordinatorFeature.CanvasRemovalNotice`). 업데이트 확인은 [백업 설계 §8-3](./backup-import-design.md) 의 NCANVAS-U1 입니다.
+
+2.0.x 기록 — flag off 경로가 단일 Canvas 의 행을 읽는 규칙 (rev.17):
 
 | 행 | N-Canvas 표시 | N-Canvas 편집 |
 |---|---|---|
 | legacy (nil/1) · v2 | 무변환 | 형식 표식 불변 |
 | **v3** (첫 밑줄 원점) | `CanvasFeature.State.firstUnderlineY`(실측 첫 밑줄)만큼 내려 표시 (`displayTransform`) | 자기 형식인 **v2** 로 내리고 metadata 를 지운다. `DrawingDatabase.updateDrawing` 이 `drawingVersion` · `layoutMetadataData` 를 함께 옮긴다. 단일 Canvas 가 다음 편집 때 다시 v3 로 올린다 |
 
-설정 > 필사 캔버스 토글(`CanvasSettingsFeature`)이 `SingleCanvasFlag.appStorageKey` 에 쓰고, `CarveDetailView` 는 `usesSingleCanvas` 변화에 현재 장을 다시 불러옵니다. Debug 실행 인자 `-SingleCanvas` 는 같은 효과입니다. 앱은 시작할 때 이 키의 기존 저장값을 설치당 한 번 지워 기존 사용자도 기본값(on)을 따르게 합니다(`SingleCanvasFlag.resetStoredValueOnce(in:)`, 2026-09-15). 그 뒤 토글로 끈 값은 유지되므로 flag off 롤백 수단은 그대로입니다.
+2.0.x 기록 — 설정 > 필사 캔버스 토글(`CanvasSettingsFeature`)이 `SingleCanvasFlag.appStorageKey` 에 쓰고, `CarveDetailView` 는 `usesSingleCanvas` 변화에 현재 장을 다시 불러왔습니다. Debug 실행 인자 `-SingleCanvas` 는 같은 효과였습니다. 앱은 시작할 때 이 키의 기존 저장값을 설치당 한 번 지워 기존 사용자도 기본값(on)을 따르게 했고(`SingleCanvasFlag.resetStoredValueOnce(in:)`, 2026-09-15), 그 뒤 토글로 끈 값은 유지돼 flag off 롤백 수단이 남아 있었습니다. 2.1 은 이것을 모두 지웠습니다.
 
 ### 10-4. BiblePageDrawing
 
-기준 데이터가 아니라 캐시/복구 전용으로 격하합니다. 장 전체가 레코드 1개라 CloudKit 에서 last-writer-wins 로 통째 덮어씁니다. D8 실측상 실데이터 0행이므로 제거해도 마이그레이션 부담이 없습니다 — Phase 4 후보.
+기준 데이터가 아니라 캐시/복구 전용으로 격하합니다. 장 전체가 레코드 1개라 CloudKit 에서 last-writer-wins 로 통째 덮어씁니다. D8 실측상 실데이터 0행이므로 제거해도 마이그레이션 부담이 없습니다 — Phase 4 후보. 2.1 의 N-Canvas 제거에서도 남겼습니다 — 엔티티 제거는 별도 스키마 PR 입니다(R29).
 
 ---
 
@@ -774,12 +781,12 @@ residual = (point 의 window 좌표) − viewportOriginInWindow + contentOffset 
 | 항목 | 구현 |
 |---|---|
 | 스크롤 뷰 | `ChapterPKCanvasView: PKCanvasView` 하나 — 이 화면의 유일한 `UIScrollView`. 텍스트 컬럼(`UIHostingController`)은 scroll content 안, **잉크 아래** (`layoutSubviews` 에서 `sendSubviewToBack`). 스크롤 동기화 코드 없음 |
-| 텍스트 컬럼 | N-Canvas 와 **같은 행 뷰** (`SentencesWithDrawingView`, `isCanvasActive: false`). 호스트는 `isUserInteractionEnabled = false`. frame 높이 = 컬럼 자신의 높이 (content 높이로 늘리면 짧은 장에서 세로 중앙 배치됨), 루트에 `.frame(maxHeight: .infinity, alignment: .top)` |
+| 텍스트 컬럼 | 행 뷰 `SentencesWithDrawingView` — 2.0.x 까지는 N-Canvas 와 같은 행 뷰를 `isCanvasActive: false` 로 썼고, 2.1 에서 캔버스 부분을 덜어 본문 · 밑줄 · 실측만 남겼다. 호스트는 `isUserInteractionEnabled = false`. frame 높이 = 컬럼 자신의 높이 (content 높이로 늘리면 짧은 장에서 세로 중앙 배치됨), 루트에 `.frame(maxHeight: .infinity, alignment: .top)` |
 | 인셋 | `.never` + `contentInset(top: 헤더, bottom: safeArea + 24)`. 헤더 높이는 첫 apply 뒤에 실측돼 오므로, 인셋이 바뀔 때 맨 위에 있던 스크롤만 새 인셋으로 다시 고정 |
 | 편집 계약 | §8-1 — trailing debounce · 다음 획 시작이 직전 보고 취소 · 세대 번호 · 교체 직전 flush |
 | 표시 | `renderedRevision` 이 바뀔 때만 디코드해 `drawing` 에 넣고 undo 스택을 비움 |
 | 게이트 | `drawingGestureRecognizer.isEnabled = isComposed && !isReloading` |
-| undo/redo | 캔버스 자신의 `undoManager`. 팔레트와 `@Shared(.inMemory("canUndo"/"canRedo"))` 공유 — 단일 Canvas 에서는 팔레트가 `delegatesUndoToCanvas` 로 `SharedUndoManager` 를 건드리지 않는다 |
+| undo/redo | 캔버스 자신의 `undoManager`. 팔레트와 `@Shared(.inMemory("canUndo"/"canRedo"))` 공유 — 팔레트의 undo · redo 는 `CarveDetailFeature` 가 캔버스의 `undoTapped` · `redoTapped` 로 옮긴다(2.0.x 의 `delegatesUndoToCanvas` · `SharedUndoManager` 는 2.1 에서 지움) |
 | 스크롤 요청 | `ScrollRequest(token)` — 절 하단이 보이는 하단(`offset + bounds − inset.bottom`) 근처에 오도록. top inset 은 관여하지 않는다 |
 | 히스토리 메뉴 | 손가락 롱프레스(`allowedTouchTypes = [.direct]`) → `UIEditMenuInteraction` "이전 필사 내용 보기" → `historyRequested(at: content 좌표)` (§8-7) |
 | 헤더 애니메이션 | `scrollViewDidScroll` 이 SwiftUI `offsetY` 와 같은 의미의 (이전, 현재)를 올려 기존 `headerAnimation` 재사용 |
@@ -856,7 +863,7 @@ columnHeight 가 장 전환에 초기화되지 않음 (컨트롤러는 장을 �
 | Phase 1 (V4 additive schema) | ✅ `b68b6101`. 실기기 마이그레이션 성공. CloudKit 미러링 일부 미검증 (§20-5 · §20-7) |
 | Phase 2 (`VStack` + 게이트 + 오버레이) | ✅ rev.15 (§20-8). 실기기 미측정 |
 | Phase 3 (flag 뒤 단일 Canvas) | ✅ (3/3) rev.18 + 결함 수정 rev.17 + 승계 수정 rev.19. **rev.30에서 기본 on 전환 완료.** 이후 출시 작업은 2.0.0 로드맵 참조 |
-| Phase 4 (구 구조 제거) | 실기기 검증 및 안정화 후 |
+| Phase 4 (구 구조 제거) | **부분 완료 (2.1, rev.39)** — N-Canvas 경로를 지웠다(아래 목록). **남은 것:** 행별 호스팅(`touchIgnoringContextMenu` 의 중첩 `UIHostingController` — 2.1 뒤 별도 작업) · `BiblePageDrawing`(§10-4 · R29 — 별도 스키마 PR) |
 
 ### Phase 2 산출물
 
@@ -884,11 +891,13 @@ columnHeight 가 장 전환에 초기화되지 않음 (컨트롤러는 장을 �
 
 ### Phase 4 — 안정화 후 구 구조 제거
 
-- `CanvasFeature` / `CanvasView` · `CombinedCanvasFeature` / `CombinedCanvasView` (`StableCanvasView` 포함 — 접근 자체가 폐기, §2)
-- `SharedUndoManager` — 단일 Canvas 는 `canvas.undoManager` 를 쓰므로 불필요. (D4 실측상 관측 가능한 오동작은 없었으므로 "깨져 있어서" 가 아니라 "불필요해서" 지웁니다)
-- `clippedPrecisely` / `normalizedForVerseRect` · `VerseRowFeature`(죽은 리듀서)
-- `touchIgnoringContextMenu` 의 행별 중첩 `UIHostingController` · `CarveDetailView.activeCanvasIDs`
-- `DrawingDatabase.updateDrawings(requests:)` · `updateDrawing(drawing:)` — Repository 로 흡수
+- ✅ `CanvasFeature` / `CanvasView` · `CombinedCanvasFeature` / `CombinedCanvasView` (`StableCanvasView` 포함 — 접근 자체가 폐기, §2) — `CombinedCanvas*` 는 rev.33, `CanvasFeature` / `CanvasView` 는 2.1
+- ✅ (2.1) `SharedUndoManager` — 단일 Canvas 는 `canvas.undoManager` 를 쓰므로 불필요. (D4 실측상 관측 가능한 오동작은 없었으므로 "깨져 있어서" 가 아니라 "불필요해서" 지웁니다)
+- ✅ (2.1) `clippedPrecisely` / `normalizedForVerseRect`(`PKDrawing+Extension.swift`) · `VerseRowFeature`(죽은 리듀서 — `VerseRowView` 와 함께)
+- `touchIgnoringContextMenu` 의 행별 중첩 `UIHostingController` — **남음**(2.1 뒤 별도 작업) · `CarveDetailView.activeCanvasIDs` — ✅ (2.1)
+- ✅ (2.1) `DrawingDatabase.updateDrawings(requests:)` · `updateDrawing(drawing:)` — Repository 로 흡수. `fetchForLegacyCanvas` · `SwiftDatabaseActor.legacyCanvasDrawings` 와 N-Canvas 경계(`UncheckedSendable<[BibleDrawing]>`)도 함께
+- ✅ (2.1) `SingleCanvasFlag` · 설정 「필사 캔버스」(`CanvasSettingsFeature` / `CanvasSettingsView`) · `-SingleCanvas` — 롤백 수단이 사라졌다(§10-3)
+- `BiblePageDrawing` — **남음**(§10-4 · R29, 엔티티 제거는 별도 스키마 PR)
 
 ---
 
@@ -911,25 +920,26 @@ columnHeight 가 장 전환에 초기화되지 않음 (컨트롤러는 장을 �
 
 **레이아웃·복원** — 9 라운드트립 구조 보존 · 10 layout 미완성 시 입력·저장 금지 · 11 layout 변경 중 필기는 pencil-up 뒤 reflow · 12 줄 수 감소 시 절 안 균등 축소 (높이 불변) · 13 legacy 무변환 · 14 reflow 후 undo 초기화 · 15 signature 영속
 
-**롤백** — 16 V4 저장소 + flag off 에서 N-Canvas 정상 · 17 undo/redo 후 재실행 유지
+**롤백** — ~~16 V4 저장소 + flag off 에서 N-Canvas 정상~~(2.0.x — 2.1 에서 flag 와 함께 지움, §10-3) · 17 undo/redo 후 재실행 유지
 
 ### 테스트 파일 ↔ 항목
 
 | 파일 | 건수 | 고정하는 것 |
 |---|---:|---|
 | `ChapterLayoutBuilderTesting` · `ChapterLayoutBuilderInsetTesting` · `ChapterLayoutPointQueryTesting` (Domain) | 20+ | signature canonical (15) · `leadingInset` / `topPadding` · `verse(containing:)` |
-| `DrawingLayoutMetadataTesting` · `DrawingSchemaV4MigrationTesting` · `DrawingDatabaseTesting` (Domain) | 30+ | metadata 라운드트립 · V3→V4 마이그레이션 11건 · §10-3 등가 9건 |
+| `DrawingLayoutMetadataTesting` · `DrawingSchemaV4MigrationTesting` · `DrawingDatabaseTesting` (Domain) | 30+ | metadata 라운드트립 · V3→V4 마이그레이션 11건 · §10-3 등가 9건(2.1 에서 N-Canvas 경로 시험을 지우고, 마이그레이션된 V4 저장소에서 남은 `DrawingDatabase` 경로 · 저장 경로만 본다) |
 | `DrawingRepositoryTesting` (Domain, 13) | 13 | `create` upsert · legacy 주소지정과 승격 · `clear` 행 유지 (5) · 롤백 (3) · `rowNotFound` · 대표 행 규칙 (5-4) |
 | `StrokeOwnershipResolverTesting` (§7-1 · §7-3) | 20 | 첫 control point · U1 · 지우개 조각 승계 · 규칙 3 결정성 · **새 획은 겹쳐도 시작 절 (rev.19)** · 4 부분 |
 | `LineBandReflowTesting` · `LegacyCoordinateTesting` · `PencilKitDataModelTesting` · `TextLayoutKeyProbeTesting` | 30+ | §9-2 · 줄 수 감소 절 안 축소 (12) · §9-3-1 · legacy fixture · S1 · S2 |
-| `ChapterLayoutMeasurementTesting` · `CarveDetailLayoutMeasurementTesting` | 21 | 게이트 · 도착 순서 무관 (6-2) · 이전 장 폐기 (6-3) · 수집기 |
+| `ChapterLayoutMeasurementTesting` · `CarveDetailLayoutMeasurementTesting` | 21 | 게이트 · 도착 순서 무관 (6-2) · 이전 장 폐기 (6-3) · 수집기. `CarveDetailLayoutMeasurementTesting` 은 2.1 에서 N-Canvas 와 함께 지움 |
 | `DrawingCodecTesting` | 11 | legacy 무변환 (13) · v3 reflow · 라운드트립 무 mutation (9) · 경계 획 `create` (1) · `clear` (2) · mask dirty (5-6) · 클램프 (U8) |
 | `ChapterCanvasFeatureTesting` (18) · `ChapterCanvasHistoryTesting` (2) | 20 | 6-2 · 10 · 6-3 · 5-7 · 6-1 · 8 · 11 · 5-2 · 5-3 · 7 · 세대 · 물러난 세션 · 재합성 출구 · `coalesce` · 히스토리 절 판정 |
 | `ChapterCanvasControllerTesting` | 7 | trailing 취소·합침 · `editCancelled` · 교체 직전 flush · 호스트 frame · 늦은 헤더 높이 · `scrollOffset` |
-| `SingleCanvasRollbackTesting` (7) · `CarveDetailHistoryWiringTesting` (2) · `CanvasSettingsFeatureTesting` (1) | 10 | v3 행 표시·v2 강등·DB 반영 (16 의 일부) · 디코드 불가 행 비파괴 · 팔레트 undo 위임 · 히스토리 시트 배선 · 토글 |
+| `SingleCanvasRollbackTesting` (7) · `CarveDetailHistoryWiringTesting` (2) · `CanvasSettingsFeatureTesting` (1) | 10 | v3 행 표시·v2 강등·DB 반영 (16 의 일부) · 디코드 불가 행 비파괴 · 팔레트 undo 위임 · 히스토리 시트 배선 · 토글. 2.1 에서 `SingleCanvasRollbackTesting` · `CanvasSettingsFeatureTesting` 은 N-Canvas · 토글과 함께 지웠고, 디코드 불가 행 비파괴는 `DrawingCodecUndecodableRowTesting` 으로 옮겼다 |
+| `NCanvasRowsAfterRemovalTesting` (2.1) | 3 | 2.0.x · 1.3.0 이 남긴 v1 · v2 · v3→v2 행을 무변환으로 놓고, 그 절을 편집하면 같은 행이 v3 + metadata 로 오른다 · v2 보관 행 복원 (§10-3) |
 | `DrawingErasePersistenceTesting` | 6 | `7ba5bc46` 회귀 (§7-5) |
 
-> **테스트로 고정되지 않은 필수 항목:** 14 (reflow 후 undo 초기화 — UI) · 16 (flag off 경로는 실행으로 확인) · 17 (펜 입력 필요 — D9).
+> **테스트로 고정되지 않은 필수 항목:** 14 (reflow 후 undo 초기화 — UI) · 16 (2.0.x 의 flag off 경로 — 2.1 에서 지움) · 17 (펜 입력 필요 — D9).
 >
 > **TestStore 주의:** TCA 1.20.2 + Xcode 26.3 에서 `receive` 가 기대 액션을 못 받으면 issue 기록 경로에서 xctest 가 `EXC_BAD_ACCESS` 로 죽고 나머지가 재시작된 프로세스에서 돕니다. 크래시는 증상이고 원인은 그 위의 ✘ 단언입니다. 비exhaustive 스토어는 다음 `send` 전에 미수신 액션을 자동 소비하므로 "나중에 도착하는 결과" 는 `RepositorySpy.holdNextLoadCall / holdNextApply` 게이트로 순서를 강제합니다. `DrawingDatabase.testValue` 는 프로세스에서 한 번 만들어진 actor 를 쓰므로, 저장 결과를 다른 context 로 검증하려면 **그 actor 의 `modelContainer`** 로 검증 actor 를 만듭니다.
 
@@ -976,7 +986,7 @@ columnHeight 가 장 전환에 초기화되지 않음 (컨트롤러는 장을 �
 | Δ > `lineSpace` (한 줄 — 귀속이 확실히 틀어지는 크기) | 그 위에 더해 **새 획 입력만** 차단 |
 
 - 게이트는 `ChapterCanvasFeature.State.isDrawingInputEnabled` **하나**이고 `ChapterCanvasView.Display` 를 거쳐 `drawingGestureRecognizer.isEnabled` 로 간다. 합성·표시·저장·flush·복원은 `isComposed` / `isReloading` / `isFullyPersisted` 만 보므로 무엇이 어긋나든 계속 돈다. **`isReady` 는 건드리지 않는다.**
-- **단일 Canvas 전용.** N-Canvas 는 잉크가 절-로컬이라 레이아웃 Δ 가 귀속을 틀지 않는다 — 거기서 막으면 무해한 조건으로 필기를 못 하게 만드는 회귀다. `CarveDetailFeature.forwardLayoutToSingleCanvas` 의 `usesSingleCanvas` 가드가 그 경계다.
+- **단일 Canvas 전용.** 2.0.x 까지는 N-Canvas 가 함께 있었다 — N-Canvas 는 잉크가 절-로컬이라 레이아웃 Δ 가 귀속을 틀지 않아, 거기서 막으면 무해한 조건으로 필기를 못 하게 만드는 회귀였고 `CarveDetailFeature.forwardLayoutToSingleCanvas` 의 `usesSingleCanvas` 가드가 그 경계였다. 2.1 은 캔버스가 하나라 가드 없이 `forwardLayoutToSingleCanvas` 가 판정을 넘긴다.
 - 저장 당시 줄 수가 더 많은 절(slack)이 있어도 **판정을 보류하지 않는다** (2026-09-15). 레이아웃이 저장 필사에 의존하지 않으므로(§6-3) Δ 는 언제나 행과 레이아웃의 어긋남이다. 그 전에는 Pass 2 가 `writingRect` 만 부풀려 Δ 가 의도적으로 컸고 `hasReflowSlack` 이면 보류했는데, 그동안 여유 절 이후의 필기 귀속이 틀어져 있었다 (실기기 시편 119편 Δ 195.63).
 - **장 전환 시 리셋한다** — 이전 장의 Δ 로 새 장의 입력을 막지 않는다 (위 이월 상태 감사와 같은 계열).
 - HUD 에 `guard OPEN / BLOCKED` 로 보인다.
@@ -1017,7 +1027,7 @@ D9 에서 이 시차를 결함으로 오독했습니다 (E-4). 경위는 런북 
 | `allowFingerDrawing == true` 에서 "두 손가락 스크롤" 을 사용자가 발견하지 못함 | 제품 과제 — 안내·온보딩·설정 문구 |
 | fingerprint 가 영구 ID 가 아님 | 세션 내 승계 도구로만 사용, DB 의 절별 그룹이 진실 |
 | 로컬 atomic batch ≠ CloudKit 원자성 | 알려진 한계 (§8-6) |
-| V4 이후 버전 다운그레이드 불가 | flag off 경로 확보 + v3 행의 N-Canvas 호환 (§10-3) |
+| V4 이후 버전 다운그레이드 불가 | 2.0.x 까지는 flag off 경로 확보 + v3 행의 N-Canvas 호환. 2.1 은 flag 롤백 수단을 지웠다 — forward-only 그대로, v1 · v2 행은 읽기만 (§10-3) |
 | 절별 실측을 절마다 액션으로 올리면 O(N²) | `VerseGeometryCollector` (§6-1) |
 | 텍스트 행 176개 즉시 생성의 진입 비용 (+100 MB · +2.3 s, 시뮬레이터) — 실기기·저사양 값 없음 | D9-8에서 실기기 측정 완료(R20·R21·R26). 저메모리 기기는 출시 후 관측 |
 | 게이트가 열리지 않으면 장 전체가 필기 불가 | HUD `missing` 으로 관찰. D9 스모크에서 정상 경로 확인; 미검증 환경까지 보장하지 않음 |
@@ -1027,7 +1037,7 @@ D9 에서 이 시차를 결함으로 오독했습니다 (E-4). 경위는 런북 
 | **빌더가 행 높이를 예측한다** (`lineCount × lineSpace`) — 실기기(iOS 27)에서 절당 0.5pt 어긋나 176절에서 87.5pt 누적 (R13) | ✅ **실측 높이를 레이아웃 입력으로 승격 (rev.21, §20-14).** 예측은 실측이 없는 절의 fallback 으로만 남으므로 OS 판올림에 재발하지 않는다. 안전망이 한 줄 초과 시 새 입력을 막는다 |
 | **Δ 계측이 R16 계열(호스트 제안이 행을 늘리는 결함)을 더 이상 검출하지 못한다** — 레이아웃이 실측 높이를 따라가 예측 == 실측이 되기 때문 (rev.21 부작용, §20-14) | 자동 검출은 `hostedColumnKeepsIdealHeightAndStaysAtTop` 하나뿐. 실기기에서는 HUD 의 `H`(totalHeight)를 새 진입값과 비교한다 (런북 §6-9). **`fixedSize` 불변식과 한 쌍이다** |
 | **B 구조에서 텍스트 컬럼이 세로로 늘어날 수 있다** — 장 전환 시 1335pt 어긋남 (R16, §11) | ✅ **`fixedSize` 로 고정 · 실기기 4건 통과 (rev.20).** 컬럼 높이가 좌표 스케일이므로 이 불변식은 앞으로도 지켜야 한다 |
-| N-Canvas 가 v3 행을 편집하면 v2 가 되어 다음 폰트 변경 때 reflow 되지 않음 | flag on 에서 한 번 편집하면 v3 로 복귀 |
+| N-Canvas 가 v3 행을 편집하면 v2 가 되어 다음 폰트 변경 때 reflow 되지 않음 | flag on 에서 한 번 편집하면 v3 로 복귀. 2.1 에는 N-Canvas 가 없다 — 같은 계정의 2.0.x(flag off) 기기만 v2 로 내리고, 2.1 에서 그 절을 편집하면 v3 로 복귀 |
 | CloudKit 스키마 승격 순서 (§10-1-a) | 기본 활성화 전 dev 저장 → promote |
 
 ---
@@ -1079,9 +1089,9 @@ D9 에서 이 시차를 결함으로 오독했습니다 (E-4). 경위는 런북 
 | ⚠️ **R27** | **기존 행의 `rowUUID` 가 서버에 없습니다.** V4 가 새 행마다 쓰는 값인데 Production 스키마에 필드가 없어 2026-09-09 승격 전까지 올라가지 못했습니다. 앞으로는 올라가지만 **이미 만들어진 행은 여전히 없고**, 저장 경로가 rowUUID 로 행을 찾으므로 다른 기기에서 **절당 행 중복**이 생겼을 수 있습니다. 기기 2대 확인 필요 (런북 §8-7). ⚠️ **범위 확대 (COMPAT-0, 2026-09-09):** 출시본 1.3.0 은 **스키마 V3 라 `rowUUID` 필드 자체가 없습니다** — 앞으로도 발급하지 못합니다. 따라서 rowUUID 없는 행은 과거에 고정된 집합이 아니라 **구버전이 쓰이는 동안 계속 늘어납니다.** [데이터 호환성 결정](./data-compatibility-decision.md) §4-1. **실측 (2026-09-17, 시뮬레이터 · [테스트 계획](./icloud-sync-compatibility-test-plan.md) CK-A5):** 빈 절에 두 기기가 서로 모르고 쓰면 행이 둘이 되고, 두 기기 모두 2.0.0 행만 보여 줘 1.3.0 필기가 가려졌습니다(데이터는 남음). 같은 날 CK-A4b · CK-A4c 에서는 같은 절을 서로 모르고 고치면 나중에 올린 쪽이 절 필기 전체를 덮어써 먼저 쓴 필기가 사라졌습니다(2.0.0 끼리도 같음) — [데이터 호환성 결정](./data-compatibility-decision.md) §5-2 |
 | ⛔ **R28** ★ **출시 전 결정** | **혼재 버전에서 구버전이 v3 행을 잘못 다룹니다.** `displayTransform` 과 v3→v2 강등이 둘 다 `24e9818e`(Phase 3, **미출시**)에 들어왔고, ~~출시본은 V4 스키마(`b68b6101`)까지만 있습니다~~ → ⚠️ **정정 (COMPAT-0, 2026-09-09):** 실제 출시본은 **1.3.0 (177) · 2026-03-23 · `49f2dc27` · 스키마 V3** 로, V4 보다 5개월 앞섭니다 (`1.3.1` 은 출시된 적 없는 준비 버전). **판정은 유지합니다** — V3 에도 `drawingVersion` 이 있고, 출시본은 그 값을 편집 시 쓰지 않아(쓰는 곳은 마이그레이션 한 줄과 모델 기본값뿐) 라벨이 3 으로 남는 메커니즘이 코드로 재확인됐습니다. 근거: [데이터 호환성 결정](./data-compatibility-decision.md) §3. 보기만 하면 한 줄쯤 밀려 보이고(데이터 무사), **편집하면 좌표는 캔버스 로컬로 덮어쓰면서 라벨은 3 으로 남아** 새 기기에서도 어긋납니다. 재편집으로 복구되며 조건은 좁습니다(기기 2대 + 한쪽 미업데이트 + 양쪽 필기). 완화책: 단계적 출시 / 최소 버전 게이트 / 감수. **실측 (2026-09-17, 시뮬레이터 · [테스트 계획](./icloud-sync-compatibility-test-plan.md) CK-A2 · A3):** 보기 증상이 재현됐습니다 — 1.3.0 은 v3 행을 레이아웃 보정 없이 그려 1절은 약 38pt 위로 올라가 위쪽이 잘렸습니다. 편집 증상은 **새 획에 한정**됩니다 — 1.3.0 은 남은 획을 덮어쓰지 않고(점 · 획 변환 동일) 새 획만 절 로컬 좌표로 더하며 라벨은 3 으로 남아, 2.0.0 에서 그 획만 약 38pt 아래에 놓입니다(수치로 추정). 데이터 유실은 없었습니다. [데이터 호환성 결정](./data-compatibility-decision.md) §5-2 |
 | ⚠️ **R20** | **회전 전이 peak 과 jetsam 한도 (2026-09-09 실측).** 보유 기기(8 GB)의 한도는 **≈ 3376 MB**. 시편 119편 진입 **934.8 MB**, **회전 peak 1839.2 MB**(여유 45.5%). ⚠️ **다만 비교 대상이 안전한 기준선이 아니다** — 같은 장에서 **N-Canvas 는 정지 상태가 1322 MB** 다(R21). 한도가 RAM 에 비례한다면 3 GB 기기(~1260 MB 추정)에서는 **현재 출시본이 이미 상시로 그 선을 넘는다.** 단일 Canvas 는 정지 448 MB 낮고 회전에만 높으므로 **전환은 대체로 완화 쪽**이다. 외삽은 한 점에서 나왔으니 단정하지 않는다 — 실제 확인은 배포 후 **MetricKit** 의 memory 종료 카운트로. **실질 개선은 회전 전이를 정지 상태 근처로 낮추는 것** |
-| ⚠️ **R29** | **`BiblePageDrawing` 이 코드에는 남아 있는데 CloudKit 레코드 타입은 없습니다 (2026-09-09).** 배포 전 정리 때 `CD_BiblePageDrawing` 을 지웠으므로 **이 경로를 되살리면 Production 에 없는 타입을 쓰게 되어 동기화가 조용히 실패합니다** — `DrawingDatabase.upsertPageDrawing` 과 스키마에 경고 주석을 남겼습니다. ✅ **롤백됐던 옛 단일 Canvas 구현(`CombinedCanvasFeature`·`CombinedCanvasView` 967줄)은 삭제했습니다** — 새 단일 Canvas 옆에 남아 있어 혼란만 줬고, 삭제 후에도 312 통과로 정말 죽은 코드였음이 확인됐습니다. 그 결과 `fetchPageDrawing`·`upsertPageDrawing` 의 **제품 코드 호출부가 0건**이 되고 테스트(`DrawingSchemaV4MigrationTesting`)만 남았습니다. **엔티티 제거는 V5 마이그레이션이 필요해 여전히 Phase 4** 입니다 |
+| ⚠️ **R29** | **`BiblePageDrawing` 이 코드에는 남아 있는데 CloudKit 레코드 타입은 없습니다 (2026-09-09).** 배포 전 정리 때 `CD_BiblePageDrawing` 을 지웠으므로 **이 경로를 되살리면 Production 에 없는 타입을 쓰게 되어 동기화가 조용히 실패합니다** — `DrawingDatabase.upsertPageDrawing` 과 스키마에 경고 주석을 남겼습니다. ✅ **롤백됐던 옛 단일 Canvas 구현(`CombinedCanvasFeature`·`CombinedCanvasView` 967줄)은 삭제했습니다** — 새 단일 Canvas 옆에 남아 있어 혼란만 줬고, 삭제 후에도 312 통과로 정말 죽은 코드였음이 확인됐습니다. 그 결과 `fetchPageDrawing`·`upsertPageDrawing` 의 **제품 코드 호출부가 0건**이 되고 테스트(`DrawingSchemaV4MigrationTesting`)만 남았습니다. **엔티티 제거는 V5 마이그레이션이 필요해 여전히 Phase 4** 입니다. 2.1 의 N-Canvas 제거에서도 남겼습니다(별도 스키마 PR) |
 | ⚠️ **R17** | **`Δ max` 가 R16 계열을 검출하지 못합니다** — 레이아웃이 실측 높이를 따라가 예측 == 실측이 되기 때문 (§20-14 부작용 2). 자동 검출은 `hostedColumnKeepsIdealHeightAndStaysAtTop` 하나뿐이고, 실기기 대체 절차는 HUD 의 `H` 비교 (런북 §6-9 D9-0-d) |
-| ⚠️ **R18** | **N-Canvas 가 새로 만드는 행이 v2 가 아니라 v1(모델 기본값)로 저장됩니다.** 배치에는 영향이 없으나(코덱이 v1·v2 를 같게 처리) 진짜 legacy 와 오늘 그린 행이 `legacyVerses` 한 통에 섞여 **진단에서 구별되지 않습니다.** 저장 경로 별건 (런북 §8-7) |
+| ✅ **R18** | **종결 (2.1, rev.39) — N-Canvas 를 지워 이 앱이 새 v1 행을 더 만들지 않습니다.** 2.0.x 까지는 N-Canvas 가 새로 만드는 행이 v2 가 아니라 v1(모델 기본값)로 저장돼, 진짜 legacy 와 오늘 그린 행이 `legacyVerses` 한 통에 섞여 **진단에서 구별되지 않았습니다**(배치에는 영향 없음 — 코덱이 v1·v2 를 같게 처리). 2.1 의 편집 저장은 v3 뿐이고(§8-6), 보관 · 백업 불러오기처럼 기존 행을 옮기는 경로는 원본 라벨을 그대로 둡니다. **기존 행은 라벨만 v1 이고 고치지 않습니다** — 진단에서 구별되지 않는 한계는 그 행들(과 같은 계정의 2.0.x(flag off) · 1.3.0 기기가 계속 만드는 행)에만 남습니다 (`NCanvasRowsAfterRemovalTesting` · 런북 §8-7) |
 | ⚠️ **R25** | 롱프레스 메뉴가 PencilKit 메뉴로 교체돼 의도하지 않은 전체 선택·이동으로 이어질 수 있음. 런북 §8-7의 관측을 근거로 2.0.0 필사 UI 후속 브랜치에서 수정 |
 | ⚠️ **R22** | 세로 화면인데 도구 팔레트가 가로 폭으로 배치돼 **redo 버튼이 잘립니다** (2026-09-08 관측). UI 별건이나 undo/redo 접근성이 막힙니다 (런북 §8-7) |
 | **D9 현재 판정** | 스모크 · D9-1 · D9-2 · D9-3-1·2·4 · D9-4-1·4 · D9-5 · **D9-6(R23·R24 수정 후)** · D9-7-1·3·4 · D9-8(측정) · D9-CK②·③ 완료. **D9-7-2는 미수행**. D9-5-4·5는 설계상 판정 불가, D9-3-4의 undo 스택 초기화는 미확인. 세부 판정은 런북 §8-7을 따르며 D9 전체 통과로 확대하지 않음 |
@@ -1104,11 +1114,11 @@ D9 에서 이 시차를 결함으로 오독했습니다 (E-4). 경위는 런북 
 - [x] 실제 존재하는 입력 게이트 (`drawingGestureRecognizer.isEnabled`) · 디버그 오버레이 · Δ 검증은 출시 구성에서
 - [x] U1~U8 확정 (§12) · 저장 명령 의미 확정 (§8-6)
 - [x] 승계 규칙 3 은 규칙 2 의 전제 위에서만 — 새 획은 시작 절 (rev.19)
-- [x] 단일 Canvas 는 flag 뒤, 기본 on(명시적 off 유지) — 설정 토글 · v3 행의 N-Canvas 호환 · 히스토리 메뉴
+- [x] 단일 Canvas 는 flag 뒤, 기본 on(명시적 off 유지) — 설정 토글 · v3 행의 N-Canvas 호환 · 히스토리 메뉴 (2.0.x. 2.1 에서 flag · 토글 · N-Canvas 를 지워 단일 Canvas 하나뿐 — §10-3)
 - [ ] §8-5 장 전환 요청/승인 흐름 — 미구현 (현재는 flush + 물러난 세션)
 - [x] **R13 · R16 수정** (§16) — 실기기 재검증 통과 (§20-13 · §20-14)
 - [x] D9 기록에 근거한 기본 활성화 및 Production 스키마 승격 완료(전체 세부 항목 통과를 뜻하지 않음)
-- [ ] Phase 4 — 2.0.0 출시 후 안정화 시 구 구조 제거
+- [ ] Phase 4 — 구 구조 제거. **2.1 에서 부분 완료**(N-Canvas 제거) — 행별 호스팅 · `BiblePageDrawing` 이 남음 (§13)
 
 ---
 
@@ -1116,15 +1126,15 @@ D9 에서 이 시차를 결함으로 오독했습니다 (E-4). 경위는 런북 
 
 | 대상 | 처리 | Phase |
 |---|---|---|
-| `CanvasFeature` / `CanvasView` · `CombinedCanvasFeature` / `CombinedCanvasView` (`StableCanvasView` 포함) | 삭제. 단일 Canvas 는 신규 파일로 작성됐고 구 파일은 flag off 경로가 사라질 때 함께 | 4 |
-| `SharedUndoManager` | 삭제 — 불필요 (§13 Phase 4) | 4 |
-| `clippedPrecisely` / `normalizedForVerseRect` · `VerseRowFeature` | 삭제 | 4 |
+| `CanvasFeature` / `CanvasView` · `CombinedCanvasFeature` / `CombinedCanvasView` (`StableCanvasView` 포함) | ✅ 삭제 — `CombinedCanvas*` 는 rev.33, `CanvasFeature` / `CanvasView` 는 2.1 에서 flag off 경로와 함께 | ✅ 4 (2.1) |
+| `SharedUndoManager` | ✅ 삭제 (2.1) — 불필요 (§13 Phase 4) | ✅ 4 (2.1) |
+| `clippedPrecisely` / `normalizedForVerseRect` · `VerseRowFeature` | ✅ 삭제 (2.1) — `PKDrawing+Extension.swift` · `VerseRowFeature` / `VerseRowView` | ✅ 4 (2.1) |
 | `Data.containsPKStroke` | 의미 유지 — 호출부만 수정 완료 (`7ba5bc46`) | ✅ |
-| `BiblePageDrawing` | 격하 → 제거 후보 (실데이터 0행) | 4 |
-| `DrawingDatabase.updateDrawings(requests:)` · `updateDrawing(drawing:)` | 대체 구현 존재 (`SwiftDataDrawingRepository`). N-Canvas 가 쓰는 동안 유지 | 4 |
+| `BiblePageDrawing` | 격하 → 제거 후보 (실데이터 0행). **남음** — 2.1 의 N-Canvas 제거에서도 남겼다. 엔티티 제거는 별도 스키마 PR (R29) | 4 |
+| `DrawingDatabase.updateDrawings(requests:)` · `updateDrawing(drawing:)` | ✅ 삭제 (2.1) — `SwiftDataDrawingRepository` 로 흡수. `fetchForLegacyCanvas` 와 N-Canvas 경계(`UncheckedSendable<[BibleDrawing]>`)도 함께 | ✅ 4 (2.1) |
 | `BibleDrawing.mainDrawing()` · `VerseDrawingHistoryFeature` | ✅ 결정적 규칙 적용 · B 에서도 연결됨 | ✅ |
-| `touchIgnoringContextMenu` 의 행별 중첩 `UIHostingController` · `CarveDetailView.activeCanvasIDs` | 삭제 — N-Canvas 행과 함께 | 4 |
-| `ChapterLayoutMeasurement` · `VerseGeometryCollector` · `ChapterLayoutHosting` · `ChapterLayoutSignpost` | 유지 — 두 경로가 그대로 공유 | ✅ |
+| `touchIgnoringContextMenu` 의 행별 중첩 `UIHostingController` · `CarveDetailView.activeCanvasIDs` | `activeCanvasIDs` 는 ✅ 삭제 (2.1). 행별 중첩 호스팅은 **남음** — 단일 Canvas 본문 열(`SentencesWithDrawingView`)이 아직 쓴다. 2.1 뒤 별도 작업 | 4 |
+| `ChapterLayoutMeasurement` · `VerseGeometryCollector` · `ChapterLayoutHosting` · `ChapterLayoutSignpost` | 유지 — 2.0.x 까지 두 경로가 공유했고, 2.1 은 단일 Canvas 가 쓴다 | ✅ |
 
 ---
 

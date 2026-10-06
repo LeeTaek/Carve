@@ -46,7 +46,7 @@ UI 테스트 · 시뮬레이터 확인은 화면을 탭으로 찾아가지 않�
 | `navigation` | 성경 탐색 — 헤더 제목을 누른 것처럼 탐색 열을 모두 연다. 세로에서는 시스템이 성경 목록 열을 접어 둘 수 있다(「사이드바 보기」) |
 | `chart` · `favorites` | 기록 차트 · 즐겨찾기 목록을 필사 화면 위에 쌓는다 |
 | `settings` | 설정의 첫 화면(iCloud) |
-| `settings/<하위>` | 설정의 그 화면 — `icloud` · `draftRecovery` · `canvas` · `widget` · `appearance` · `help` · `patchnote` · `sendFeedback` · `appVersion` · `removeAds` |
+| `settings/<하위>` | 설정의 그 화면 — `icloud` · `draftRecovery` · `widget` · `appearance` · `help` · `patchnote` · `sendFeedback` · `appVersion` · `removeAds` |
 | `verse/<절 번호>` | 시작 장의 그 절. 장은 `-UITestChapter`(없으면 마지막으로 연 장)로 정한다 |
 
 - 이름은 대소문자를 가리지 않는다. 모르는 경로 · 빠진 값 · 1 보다 작은 절은 로그 `UITEST 화면 경로를 읽지 못해 무시함` 만 남기고 무시한다 — 앱은 경로 없이 시작한다.
@@ -90,8 +90,8 @@ UI 테스트는 `CarveUITestSupport` 의 도우미를 쓴다 — `app.launchArgu
   **업데이트 · CloudKit 표본이 든 시뮬레이터는 조작하지 않는다.** `simctl clone` 은 격리가 아니다 — 같은 계정 · Development private DB 를
   공유할 수 있고, `get_app_container` 가 원본 경로를 돌려준 적이 있다. 독립 peer 는 새 기기로 만든다.
   화면 확인은 안전한 synthetic 표본과 Debug 전용 실행 인자 시나리오로 한다:
-  `-ChapterLayoutAutoScroll`(11단계 스크롤) · `-ChapterLayoutAutoNext`(다음 장) · `-ChapterLayoutOverlay`(레이아웃 오버레이·HUD) ·
-  `-SingleCanvas`(단일 Canvas 경로 강제 — Phase 3 flag `singleCanvasEnabled` 와 같은 효과, 기본은 단일 Canvas. 앱 안에서는 **설정 > 필사 캔버스** 토글, 키는 Domain `SingleCanvasFlag`).
+  `-ChapterLayoutAutoScroll`(11단계 스크롤) · `-ChapterLayoutAutoNext`(다음 장) · `-ChapterLayoutOverlay`(레이아웃 오버레이·HUD).
+  2.1 은 캔버스가 단일 Canvas 하나라 경로를 고르는 인자가 없다 — 옛 `-SingleCanvas` · 설정 「필사 캔버스」 토글 · Domain `SingleCanvasFlag` 는 N-Canvas 와 함께 지웠다.
 - **표시 진단 인자(Debug 전용, 주로 실기기).** `-CanvasDisplayProbe`(읽기 전용 상태·drawing 샘플링) · `-CanvasDisplayExperiments`(원격 실험 명령 수신) ·
   ⚠️ **`-CanvasReuseStrokesOnApply` 는 D9 H 수정을 끄고 결함을 재현하는 opt-out** 이다 — 기본 검증은 이 인자 **없이** 돈다. 절차는 `docs/device-debugging-cli.md`.
 - **광고 제거 구매 · 복원은 `CarveApp-StoreKit` 스킴의 테스트로 본다** — `xcodebuild test -scheme CarveApp-StoreKit -destination <iPad 시뮬레이터> -only-testing:CarveAppUITests/RemoveAdsStoreKitUITests`.
@@ -104,7 +104,7 @@ UI 테스트는 `CarveUITestSupport` 의 도우미를 쓴다 — `app.launchArgu
   시드가 먹었는지는 앱 로그의 `ChapterLayout 완성: <권>.<장>` 으로 반드시 확인한다. (dev sqlite 도 함께 지워진다 — 시뮬레이터에는 테스트 행뿐이다.)
   hex 예 — 시편 119편 `7b227469746c65223a2022312d31395073616c6d732e747874222c202263686170746572223a203131397d`,
   창세기 1장(소제목 있음) `7b227469746c65223a2022312d303147656e657369732e747874222c202263686170746572223a20317d`.
-- **레이아웃 검증은 두 경로 모두 HUD 로 본다** — `-ChapterLayoutOverlay` 와 `-SingleCanvas -ChapterLayoutOverlay` 에서 `Δ max 0.00` 이고 `columnX` 가 `W`(= 컬럼 폭의 절반, 오른손 · iPad mini 세로 372.00) 와 같아야 하고, 단일 Canvas 에서는 `guard OPEN` 이어야 한다.
+- **레이아웃 검증은 HUD 로 본다** — `-ChapterLayoutOverlay` 에서 `Δ max 0.00` 이고 `columnX` 가 `W`(= 컬럼 폭의 절반, 오른손 · iPad mini 세로 372.00) 와 같아야 하고, `guard OPEN` 이어야 한다(`guard —` 는 아직 실측 대기).
   ⚠️ **`Δ max` 는 컬럼 신장(R16) 계열을 잡지 못한다** — 행 높이가 실측 입력이라 레이아웃이 늘어난 렌더를 따라가기 때문이다(설계 §20-14).
   그 계열은 `H`(totalHeight)를 새 진입값과 비교해 본다 (런북 §6-9 D9-0-d).
   행 안의 `onGeometryChange` 는 중첩 `UIHostingController`(`touchIgnoringContextMenu`) 때문에 바깥 `.named` 공간을 보지 못하고 **조용히 global 을 쓴다** —

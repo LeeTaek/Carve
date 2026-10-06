@@ -58,8 +58,8 @@
 - 시험: `$0.date = .constant(<고정 시각>)` · `$0.continuousClock = TestClock()` 을 넣고 `await clock.advance(by:)` 로 시간을 진행한다. 기다림 길이가 시험과 무관하면 `ImmediateClock()`.
 - 본보기: 제품 `CarveDetailFeature.swift`(`date` · `clock`), 시험 `Feature/ChartFeature/Tests/ChartTestSupport.swift` 의 `ChartTestTime.now` · `fixedTimeDependencies`.
 - 기계 검사: `reducer_no_direct_time`(리듀서 파일의 `Date()` · `Date.now` · `Task.sleep`)
-- 이행 중 예외(늘리지 않는다): ChartFeature 의 State 기본값 · 계산 프로퍼티의 `Date()`(`DrawingChartFeature` · `DailyRecordChartFeature` · `DrawingWeeklySummaryFeature`),
-  N-Canvas `CanvasFeature` 의 `Date.now`. 이 경로를 검증하는 시험만 `liveTimeDependencies`(ChartTestSupport)를 쓴다.
+- 이행 중 예외(늘리지 않는다): ChartFeature 의 State 기본값 · 계산 프로퍼티의 `Date()`(`DrawingChartFeature` · `DailyRecordChartFeature` · `DrawingWeeklySummaryFeature`).
+  이 경로를 검증하는 시험만 `liveTimeDependencies`(ChartTestSupport)를 쓴다.
 
 ## 새 의존성의 testValue — 공유 SwiftData actor 금지
 - 규칙: 새 저장소 · 클라이언트 의존성의 `testValue` 는 저장소를 건드리지 않는 스텁(빈 구현)으로 둔다. `createSwiftDataActor.testValue`(공유 테스트 actor)나 그것을 쓰는 SwiftData 구현을 기본값으로 두지 않는다.

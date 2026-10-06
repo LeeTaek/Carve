@@ -24,14 +24,14 @@
 2) Feature 는 SwiftData 를 import 하지 않는다. 쓰지 않는 import 는 예외로 두지 않고 지운다.
    - 기계 검사: `feature_no_swiftdata_import`
 3) Feature 는 Domain 이 노출한 저장소 의존성만 부르고 결과로 Domain DTO 를 받는다 — `drawingRepository` · `favoriteVerseRepository` · `drawingActivityRepository` · `drawingDataEraser` · `drawingVerseImporter` 등.
-   공유 actor(`createSwiftDataActor`)와 @Model 을 돌려주는 옛 클라이언트(`drawingData` = `DrawingDatabase`)는 새로 부르지 않는다 — 필요한 조회는 저장소에 DTO 를 돌려주는 메서드로 더한다.
+   공유 actor(`createSwiftDataActor`)와 옛 클라이언트(`drawingData` = `DrawingDatabase`)는 새로 부르지 않는다 — 필요한 조회는 저장소에 DTO 를 돌려주는 메서드로 더한다.
    - 기계 검사: lint 가 보장하지 않는다 — 리뷰로 본다.
 4) Feature 는 @Model 타입(`BibleDrawing` · `FavoriteVerse` 등)을 State · Action 에 두거나 직접 만들지 않는다. 저장소가 DTO 로 바꿔 넘긴다.
-   - 기계 검사: 없음(리뷰). 지금 참조하는 4파일은 아래 이행 중 예외다.
+   - 기계 검사: 없음(리뷰). 지금 참조하는 1파일(`iCloudSettingReducer`)은 아래 이행 중 예외다.
 5) 저장/조회는 "무엇을 저장하나(도메인 · DTO)"와 "어떻게 저장하나(SwiftData)"를 분리한다.
 6) async 작업은 Effect 로 분리하고, UI 이벤트와 저장 작업의 타이밍을 명시적으로 설계한다.
 7) @Model 은 actor(`SwiftDatabaseActor`) 밖으로 내보내지 않는다 — @Model 은 Sendable 이 아니라 언어 모드 6 에서는 넘기는 순간 컴파일 오류다. 저장소가 actor 안에서 DTO 로 바꿔 돌려준다.
-   유일한 예외는 N-Canvas 경계의 `UncheckedSendable<[BibleDrawing]>` 다(아래 표, 동시성 관례는 concurrency.md).
+   예외는 없다 — 2.1 에서 N-Canvas 경계(`UncheckedSendable<[BibleDrawing]>`)를 지웠다. @Model 을 `UncheckedSendable` 로 감싸 넘기지 않는다(동시성 관례는 concurrency.md).
    - 기계 검사: 없음(리뷰 · 컴파일러 — 감싸지 않고 넘기면 언어 모드 6 이 오류를 낸다).
 
 ### 이행 중 예외 (레거시 — 늘리지 않는다)
@@ -40,10 +40,8 @@ lint 가 있는 규칙(`feature_no_swiftdata_import` · `feature_no_swiftdata_ap
 | 무엇 | 어디 |
 |---|---|
 | 공유 actor `createSwiftDataActor` 로 저장소가 비었는지 확인(`databaseIsEmpty(BibleDrawing.self)` · `FavoriteVerse.self`) | `iCloudSettingReducer`(전체 삭제 확인) |
-| @Model 타입(`BibleDrawing` · `FavoriteVerse`) 참조 — Feature 4파일 | `CarveDetailFeature` · `CanvasFeature`(N-Canvas) · `SentencesWithDrawingFeature` · `iCloudSettingReducer` |
-| 옛 클라이언트 `drawingData`(`DrawingDatabase`)에서 @Model 받기 | `CarveDetailFeature`(`fetchForLegacyCanvas` — 아래 N-Canvas 경계) |
+| @Model 타입(`BibleDrawing` · `FavoriteVerse`) 참조 — Feature 1파일 | `iCloudSettingReducer`(위 `databaseIsEmpty` 의 인자) |
 | 옛 클라이언트 `drawingData` 의 DTO 메서드 호출 — @Model 은 받지 않지만 저장소 의존성(`drawingRepository` 등)이 아니다 | `CarveNavigationFeature`(`fetchDrawingRecord`) · `VerseDrawingHistoryFeature`(`fetchVerseSnapshots` · `updatePresentDrawing(chapter:verse:presentRowID:)`) |
-| **N-Canvas 경계** — `UncheckedSendable<[BibleDrawing]>` 로 @Model 을 actor 밖으로 넘긴다. 감싼 곳마다 주석 `이행 중 예외(N-Canvas): N-Canvas 제거 때 지운다 — 룰북 swiftdata.md`. N-Canvas 제거(별도 plan) 때 지운다 | Domain `DrawingDatabase.fetchForLegacyCanvas(chapter:)` · `SwiftDatabaseActor.legacyCanvasDrawings(chapter:)` → `CarveDetailFeature`(`.wrappedValue` → `setSentence` · `savedBandCount` · `makeLegacyDrawingSaveRequest` · `persistDrawing`) · `CanvasFeature`(`State.drawing` · `saveDrawing` 의 생성 · 이력 복원용 `legacyDrawing(from:chapter:)` — 저장소에 넣지 않는 값 운반용 모델) · `SentencesWithDrawingFeature`(`init(drawing:)` · `initialState`) |
 | App 리듀서의 공유 actor — 로컬 필사가 있는지(`hasAny(BibleDrawing.self)`) | `LaunchProgressFeature`(App) |
 
 ---
@@ -150,7 +148,7 @@ SwiftData schema(@Model)에 강하게 엮인 모델이 존재할 수 있으므�
 - 이유: 활성 컨테이너 없이 @Model 을 만들면 iPadOS 17 에서만 `failed to find a currently active container for <모델>` 로 trap 해 시험 프로세스가 죽는다
   (xcresult 에는 "Test crashed with signal trap"). 18 이상은 통과하고, 다른 시험이 컨테이너를 살려 둔 순서에서는 17 에서도 우연히 통과해 원인이 가려진다.
 - 확인: 17.5 회귀에서만 signal trap 이 나면 로그에서 위 문구를 먼저 찾고, `-only-testing:<타깃>/<스위트>/<함수>()` 로 단독 재현한다(Swift Testing 함수는 괄호 필수).
-- 본보기: `Feature/CarveFeature/Tests/CanvasLightAppearanceTesting.swift`
+- 본보기: `Feature/CarveFeature/Tests/NCanvasRowsAfterRemovalTesting.swift` 의 `makeStore(seeding:ink:)`(컨테이너를 연 뒤 행을 만들고, 시험은 `defer { withExtendedLifetime(container) {} }` 로 쥔다)
 - 기계 검사: 없음.
 
 ---
@@ -172,6 +170,6 @@ SwiftData schema(@Model)에 강하게 엮인 모델이 존재할 수 있으므�
 - Feature 에 SwiftData API 가 새로 없다 — `feature_no_swiftdata_api` error 0
 - 새 조회 · 저장은 Domain 저장소 계약 + `Sources/SwiftData/` 구현으로 들어갔고, 결과는 DTO 다.
 - @Model 참조 · `createSwiftDataActor` · `drawingData` 호출이 늘지 않았다(이행 중 예외 표).
-- @Model 이 actor 밖으로 나가지 않는다 — `UncheckedSendable` 은 N-Canvas 경계 밖에 늘지 않았다(규칙 7).
+- @Model 이 actor 밖으로 나가지 않는다 — @Model 을 `UncheckedSendable` 로 감싸 넘기지 않았다(규칙 7).
 - 동시성/타이밍 정책(debounce/end-of-drawing 등)이 문서화돼 있다.
 - 테스트가 최소 기준을 충족한다.
