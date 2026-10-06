@@ -8,6 +8,7 @@
 
 import CarveToolkit
 import ClientInterfaces
+import Domain
 import Foundation
 
 import ComposableArchitecture
@@ -34,6 +35,8 @@ public struct SettingsFeature: Sendable {
         }
     }
     public enum Action: ViewAction {
+        /// 코디네이터가 돌려준 필사 화면의 flush 결과(설계 backup-import-design §5-2) — 그 id 를 기다리는 「백업 만들기」 에 넘긴다.
+        case canvasFlushFinished(id: UUID, outcome: CanvasFlushOutcome)
         case delegate(Delegate)
         case path(PresentationAction<Path.Action>)
         /// 사이드바에서 행을 고름. 보고 있는 화면의 행이면 상세 상태를 그대로 둔다.
@@ -57,8 +60,8 @@ public struct SettingsFeature: Sendable {
         case iCloud(CloudSettingsFeature)
         /// 확인이 필요한 필기 — 개수 · 용량 · 목록 · 견주기 · 현재 필사에 넣기(정책 §12-6 구현 순서 ④, 가져오기 2026-09-29).
         case draftRecovery(DraftRecoveryFeature)
-        /// 필사 캔버스 — 단일 Canvas flag 토글 (설계 §13 Phase 3 (3/3)).
-        case canvas(CanvasSettingsFeature)
+        /// 필사 백업 — 백업 만들기 · 백업 불러오기(2.1, 설계 docs/backup-import-design.md).
+        case backup(BackupFeature)
         /// 위젯에 표시할 말씀(시안 N7 · N8).
         case widget(WidgetSettingsFeature)
         /// 화면 모드 — 시스템 설정 · 라이트 · 다크.
@@ -75,12 +78,12 @@ public struct SettingsFeature: Sendable {
 
     /// 사이드바 행 — 경로 상태에서 상세 화면의 상태를 빼고 어느 화면인지만 남긴 값.
     ///
-    /// ⚠️ 사이드바 `List(selection:)` 에 경로 상태를 그대로 쓰지 않는다. 행의 값이 처음 상태(`.canvas(.initialState)`)라
-    ///    상세 화면의 상태가 바뀌는 순간(필사 캔버스 토글 · 광고 제거 상품 불러오기) 선택 값과 달라져 선택 표시가 풀렸다.
+    /// ⚠️ 사이드바 `List(selection:)` 에 경로 상태를 그대로 쓰지 않는다. 행의 값이 처음 상태(`.widget(.initialState)`)라
+    ///    상세 화면의 상태가 바뀌는 순간(위젯 말씀 고르기 · 광고 제거 상품 불러오기) 선택 값과 달라져 선택 표시가 풀렸다.
     public enum SidebarItem: Hashable, CaseIterable, Sendable {
         case iCloud
         case draftRecovery
-        case canvas
+        case backup
         case widget
         case appearance
         case help
@@ -116,6 +119,11 @@ public struct SettingsFeature: Sendable {
                 state.path = .help(.initialState)
             case .path(.presented(.patchnote(.delegate(.close)))):
                 state.path = nil
+            case .path(.presented(.backup(.export(.delegate(.removeAdsRequested))))):
+                // 사지 않아 백업을 만들 수 없다 — 같은 설정 안의 광고 제거 화면으로 간다.
+                state.path = .removeAds(.initialState)
+            case .canvasFlushFinished(let id, let outcome):
+                return canvasFlushFinished(state: state, id: id, outcome: outcome)
             default: break
             }
             return .none
@@ -123,6 +131,13 @@ public struct SettingsFeature: Sendable {
         .ifLet(\.$path, action: \.path)
     }
 
+    /// 필사 화면의 flush 결과를 「필사 백업」 화면의 「백업 만들기」 에 넘긴다 — 그 화면이 아니면(다른 행으로 옮겼다) 기다리는 내보내기가 없어 버린다.
+    /// 같은 id 를 기다리는지는 내보내기가 본다(다른 id 의 늦은 결과는 거기서 버린다).
+    /// - Returns: 내보내기로 보내는 effect. 부작용 없음.
+    private func canvasFlushFinished(state: State, id: UUID, outcome: CanvasFlushOutcome) -> Effect<Action> {
+        guard case .backup? = state.path else { return .none }
+        return .send(.path(.presented(.backup(.export(.canvasFlushFinished(id: id, outcome: outcome))))))
+    }
 }
 
 extension SettingsFeature.Path.State: Hashable {}
@@ -134,7 +149,7 @@ extension SettingsFeature.Path.State {
         switch self {
         case .iCloud: .iCloud
         case .draftRecovery: .draftRecovery
-        case .canvas: .canvas
+        case .backup: .backup
         case .widget: .widget
         case .appearance: .appearance
         case .help: .help
@@ -152,7 +167,7 @@ extension SettingsFeature.SidebarItem {
         switch self {
         case .iCloud: .iCloud(.initialState)
         case .draftRecovery: .draftRecovery(.initialState)
-        case .canvas: .canvas(.initialState)
+        case .backup: .backup(.initialState)
         case .widget: .widget(.initialState)
         case .appearance: .appearance(.initialState)
         case .help: .help(.initialState)

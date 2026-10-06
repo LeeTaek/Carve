@@ -326,16 +326,47 @@ OLD의 실제 전체 삭제가 특정 모델 삭제인지 컨테이너·존 삭�
 >
 > 단, **시험 전 데이터 보호를 위한 백업 절차는 제품 기능과 별개로 지금도 필요하다** — 실사용 저장소를
 > 건드릴 수 있는 시험 앞에서는 매번 사본을 떠 둔다(§5-1 MIG-L1 이 그 예다).
+>
+> **2026-10-02 — 2.1 설계 확정에 맞춰 표를 고쳤다.** 규칙 원문은 [필사 백업 · 불러오기 설계](./backup-import-design.md)다(V6 미개방 · 초안 포함 ·
+> 적용은 iCloud 연결 뒤 · 번역본 저장값 키). 새 iPad 시뮬레이터에서 하고 끝나면 지운다 — CloudKit 표본이 든 기기는 쓰지 않는다.
+> NCANVAS-U1 은 백업이 아니라 2.1 의 N-Canvas 제거 업데이트 시험인데, 같은 2.1 검증이라 이 표에 둔다.
+>
+> **2026-10-06 — 구현을 마쳐 「자동 시험 대응」 열을 더했다.** 그 열의 Swift Testing 스위트가 규칙 · 흐름 · 저장소 쓰기를 보고(타깃과 구현 위치는
+> [설계 §9-1](./backup-import-design.md)), 이 표의 절차는 그것으로 끝나지 않는 실제 창 · 계정 · 동기화 · 화면 표시를 기기에서 본다(설계 §9-2). 첫 수동 확인(2026-10-06)은 표 아래에 적었다.
 
-| ID | 절차 | 통과 기준 |
+| ID | 절차 | 통과 기준 | 자동 시험 대응 |
+|---|---|---|---|
+| BACKUP-D1 | B1 암호화 내보내기 → 빈 시험 저장소에 불러오기 | 지원 대상의 원본(`lineData` · 메타데이터 바이트) · 좌표 형식(`drawingVersion` nil · 1 · 2 · 3) · `creationDate` · `updateDate` · 번역 저장값 · 건수 일치, 대표 규칙대로 실제 표시 확인. formatVersion 1 은 계보(`parents`)가 비어 있다(V6 미개방 — 설계 §7) | `BackupRestoreRoundTripTesting`(형식으로 만든 파일 · 내보내기가 만든 파일 → 빈 저장소) · `BackupExportRowTesting` · `BackupArchiveRoundTripTesting` · `BackupFormatEncodingTesting` |
+| BACKUP-D2 | 기존 최신 필사 위에 B1 불러오기 · 같은 파일 반복 불러오기 | 현재 필사 유지, 다른 내용은 이전 필사 기록(보관)에 추가, 두 번째 불러오기는 추가 0건(전부 「같은 필사」) | `BackupImportPlanInkTesting` · `BackupImportPlanPinTesting` · `BackupImporterFlowTesting`(반복 0건 · 쓰기 직전 재판정) · `BackupRestoreTransactionTesting` |
+| BACKUP-D3 | 두 NEW에서 같은 파일 오프라인 불러오기 → 연결 | 같은 내용 행이 둘 생길 수 있다(행 UUID 를 늘 새로 발급 — 설계 §7 알려진 한계). 「이전 필사 내용 보기」 에서 하나로 보이고 두 기기의 대표 표시가 같다. 다른 내용은 보존 | `VerseDrawingHistoryDedupTesting`(두 기기가 같은 백업을 넣은 모양 — 하나로 보이고 대표가 같다). 동기화 자체는 기기에서만 |
+| BACKUP-D4 | 잘못된 암호 · 변조 · 잘림 · 미지원 형식(formatVersion ≠ 1) · 허용 밖 항목 이름 · 경로 이탈 · 상한 초과 | 저장소를 바꾸기 전에 거부, 평문 · 암호 로그 없음, 평문 작업 폴더가 남지 않음 | `BackupArchiveDamageTesting` · `BackupArchiveRejectionTesting` · `BackupFormatValidatorTesting` · `BackupFormatEncodingTesting`(formatVersion 2) · `BackupImporterCleanupTesting`(저장소 무변경 · 남는 것 없음) · `BackupImportOutcomeTesting`(안내) |
+| BACKUP-D5 | 미로그인 · 연결 보류 실행에서 파일과 암호로 불러오기 → 로그인 · 앱 다시 열기(연결) → 다시 불러오기. 다른 테스트 계정이 만든 파일로도 | **미로그인 · 보류 실행은 검사 · 미리보기까지, 적용은 거부되고 사유가 보인다(저장소 무변경) → 로그인 · 재실행 뒤 적용.** 구매 여부 무관. 동기화 안내와 실제 범위 일치 | `BackupImporterCleanupTesting`(대상 계정 범위) · `BackupImporterFlowTesting`(쓰기 게이트 — 그 장부터 0건) · `BackupImportFeatureTesting`(미리보기까지 · 사유 문구) |
+| BACKUP-D6 | 불러오기 도중 종료 · 취소 · 공간 부족 → 「이어서 불러오기」 | 끝난 장 · 멈춘 장이 명확, 재시도는 암호를 다시 묻고 멱등(중복 0 · 기존 데이터 유실 없음) | `BackupImporterFlowTesting`(중간 장 실패 뒤 남은 장만 · 진행) · `BackupImporterCleanupTesting`(멈춘 작업 기록) · `BackupImportResumeTesting` · `BackupImportFeatureTesting`(적용 중 닫기) |
+| BACKUP-D7 | 광고 제거 기존 구매자 · 미구매 · 구매 복원 실패 | 기존 구매자만 만들기 가능, 모두 검사 · 불러오기 가능 | `BackupExportFeatureTesting`(구매 게이트) · `BackupFeatureTesting`(불러오기는 구매와 무관). StoreKit 상태 자체는 기기에서만 |
+| BACKUP-D8 | 미로그인 기기에서 몇 절 쓰기(초안 `acct-local`) → 구매 상태로 백업 만들기 → 연결된 다른 기기에서 불러오기 | 미로그인 기기의 초안(acct-local)이 백업에 담기고(미리보기 수) 다른 기기에서 불러진다 — 화면에 보이던 초안은 그 절의 현재 필사로, 보이지 않던 초안은 이전 필사 기록으로(그 절에 행이 있을 때 — 행이 하나도 없는 절은 대표 규칙대로 가장 늦은 보관 항목이 보인다, 설계 §5-1 「행 없는 절」). 다른 계정 묶음 초안은 담기지 않음 | `BackupExportDraftTesting`(acct-local · shown · settled · 다른 계정 제외) · `BackupRestoreRoundTripTesting`(초안 항목을 불러옴) |
+| BACKUP-D9 | 모르는 번역본 · 모르는 권 코드 · 모르는 좌표 형식(`drawingVersion`) · 풀리지 않는 메타데이터 항목이 든 파일(시험 도구로 만든 것) 불러오기 | 그 항목만 건너뛰고 사유별 수로 보인다. 나머지는 적용, 파일 전체를 거부하지 않음 | `BackupFormatSupportTesting` · `BackupImportPlanPreviewTesting`(사유별 수 · 장에 놓을 수 없는 항목) · `BackupRestoreTransactionTesting`(지원 안 됨은 쓰지 않음) · `BackupImportFeatureTesting`(사유별 표시) |
+| BACKUP-D10 | 백업을 만든 뒤 이 기기에서 그 절을 지움(비운 대표가 백업보다 늦음) → 불러오기 | 지운 절에는 보관으로만 들어간다 — 그 절은 비운 상태 그대로, 백업의 필기는 「이전 필사 내용 보기」 에만 | `BackupImportPlanInkTesting`(지운 절 보호의 앞뒤 시각) · `BackupRestoreTransactionTesting` · `BackupImportPlanPinTesting`(지운 legacy 절) |
+| BACKUP-D11 | 지운 절(비운 현재 행 + 잉크 있는 보관 행)이 든 백업을 빈 저장소에 불러오기 | 비운 상태가 대표로 남는다 — 그 절은 비어 보이고, 지운 필기는 이전 필사 기록에만 있다(지운 필기가 되살아나지 않음) | `BackupImportPlanClearedTesting` · `BackupRestoreTransactionTesting`(세 경우) · `BackupRestoreRoundTripTesting` · `BackupExportRowTesting`(비운 대표가 현재) |
+| BACKUP-D12 | 적용 중 로그아웃 · 계정 변경 / A 계정에서 일부 적용 뒤 종료 → B 계정으로 바꿔 재실행 | 그 장부터 멈추고 이미 쓴 장은 그대로, 멈춘 사유가 보인다. A 계정에서 일부 적용한 작업을 B 계정에서 이어 하지 못한다 — 「이어서 불러오기」 없이 「버리기」 · 「이 계정으로 처음부터」 만 | `BackupImporterFlowTesting`(계정 바뀜 → 0건 · A 작업을 B 에서 잇지 않음 · 처음부터) · `BackupImportResumeTesting` · `BackupExportFlowTesting`(내보내기 장 사이 계정 변경) |
+| BACKUP-D13 | 마지막 획 직후 설정 → 백업 만들기 / 저장 실패 상태(공간 부족 주입 등)에서 백업 만들기 | flush 완료 뒤에만 시작하고 그 획이 백업에 있다. 저장 실패 · 시간 초과면 시작하지 않고 「필사 화면에 아직 저장하지 못한 필기가 있어요…」 + 다시 시도 | `ChapterCanvasBackupFlushTesting` · `ChapterCanvasBackupFlushOutcomeTesting` · `BackupExportFlushTesting` · `AppCoordinatorBackupFlushTesting` |
+| NCANVAS-U1 | 새 iPad 시뮬레이터에 시험 계정 로그인 → 2.0.x 빌드 첫 실행(연결) → 단일 캔버스에서 한 절을 쓰고 「지우기」 로 보관 행 하나 → 기기를 끄고 `singleCanvasEnabled = false` 를 컨테이너 plist 에 넣음(토글 OFF) → N-Canvas 로 새 절(v1) · 그 v3 절 편집(v2 강등) → 마지막 획 · 지우기 직후 (a) 1초 뒤 종료 (b) 0.3초 안에 강제 종료 → 2.1 빌드를 덮어 설치 → 재실행 | **표시** — 잉크 위치가 업데이트 전 스크린샷과 같다. (a) 마지막 획까지 보임 (b) 사라진 것은 2.0.x 에서 저장되기 전의 마지막 변경뿐이고 다른 절 · 좌표 손상 없음(결과를 그대로 기록). **저장** — 그 절에 쓰면 `drawingVersion = 3` + 메타데이터로 승격. **이력 복원** — 「이전 필사 내용 보기」 로 보관 행 복원(두 번째 복원 포함). **안내 한 번** — 「절마다 쓰는 캔버스는 이번 버전에서 없어졌어요. 그동안 쓴 필사는 그대로예요.」 카드가 한 번만. **키 정리** — 카드를 닫으면 `singleCanvasEnabled` · `singleCanvasStoredValueReset` 이 지워짐 | `NCanvasRowsAfterRemovalTesting`(v1 · v2 · v3→v2 행 표시 · v3 승격 · 이력 복원) · `AppCoordinatorCanvasRemovalNoticeTesting`(안내 한 번 · 키 정리). 실제 2.0.x → 2.1 업데이트는 기기에서만 |
+
+**2026-10-06 수동 확인** — Xcode 27.0(27A266a) Debug(dev 저장소), 새 iPad mini (A17 Pro) iPadOS 26.2 시뮬레이터 셋(시험 계정 b 로그인 하나 · 무계정 둘), 시험 장은 룻기.
+2.0.x 빌드는 release/2.0.1 `4a3a6a2a`, 2.1 빌드는 통합 브랜치(`321dcee5` 코드 → 아래 수정 뒤 `79ac101f`).
+
+| ID | 결과 | 기록 |
 |---|---|---|
-| BACKUP-D1 | B1 암호화 내보내기 → 빈 시험 저장소에 불러오기 | 지원 대상의 원본·좌표 형식·메타데이터·계보·건수 일치, 실제 표시 확인 |
-| BACKUP-D2 | 기존 최신 필사 위에 B1 불러오기·반복 불러오기 | 현재 필사 유지, 후보 보존, 논리 중복 없음 |
-| BACKUP-D3 | 두 NEW에서 같은 파일 오프라인 불러오기 → 연결 | 동일 버전은 논리적으로 하나, 다른 내용은 보존 |
-| BACKUP-D4 | 잘못된 암호·변조·잘림·미지원 형식 | 실제 데이터 적용 전에 거부, 평문·암호 로그 없음 |
-| BACKUP-D5 | 다른 테스트 계정 또는 미로그인 상태에서 파일과 암호로 복구 | 계정·구매 제한 없이 복구. 연결 시 동기화 안내와 실제 범위 일치 |
-| BACKUP-D6 | 불러오기 도중 종료·취소·공간 부족 → 재시도 | 적용 범위 명확, 중복·기존 데이터 유실 없음 |
-| BACKUP-D7 | 광고 제거 기존 구매자와 미구매 상태 | 기존 구매자는 생성 가능, 모두 검사·불러오기 가능 |
+| NCANVAS-U1 | 통과 | 토글은 앱 설정에서 껐다(plist 대신 — 로그인한 시뮬레이터는 재시동하면 시험 계정 자격 증명이 풀린다). 업데이트 전 2.0.x 화면과 필기 영역 픽셀 차이 0. (a) 마지막 획까지 보임. (b) 마지막 획 약 28ms 뒤 `kill -9` 에도 그 획까지 저장됐다(저장 간격의 첫 변경은 바로 저장) — 0.3초 안 두 번째 변경의 유실은 주입 도구로 재현하지 못했다. v1 · v2 행에 쓰면 같은 행이 v3 + 메타데이터로 승격, 재실행 뒤 위치 그대로. 2.0.x 시절 보관 행 복원과 두 번째 · 세 번째 전환 모두 화면 · 저장소 갱신. 안내 카드 한 번, 「확인」 뒤 두 키 삭제 |
+| BACKUP-D2 | 통과 | 연결된 기기에 같은 파일 두 번 — 첫 번째는 미리보기대로 새 1 · 이전 기록 2, 두 번째는 「같은 필사 3」 · 추가 0건. 현재 필사 화면은 그대로(픽셀 차이 0). 2.0.x N-Canvas 가 만든 `isPresent` 0 행이 있는 절에서 대표 고정이 적용됐다 |
+| BACKUP-D4 | 일부 | 잘못된 암호 → 「암호가 맞지 않거나 파일이 손상됐어요」, 저장소 무변경. 변조 · 잘림 · 상한 초과 파일은 기기에서 보지 않았다 |
+| BACKUP-D5 | 일부 | 무계정 기기는 미리보기까지 — 「불러오기」 없이 로그인 · 다시 열기 안내, 저장소 무변경, 닫으면 평문 폴더 · 작업 기록 삭제. 로그인 뒤 적용은 다른 로그인 기기에서 같은 파일로 봤다(D8). 같은 기기의 로그인 → 재실행 → 적용은 하지 않았다 |
+| BACKUP-D6 | 통과 | 4장짜리 백업을 적용하다 4장 직전에 강제 종료(LLDB 중단점 `restoreBackupChapter` → kill) → 다음 실행에 평문 폴더 삭제 → 「멈춘 불러오기가 있어요 — 4장 중 3장까지」 → 암호를 다시 받아 남은 장만, 중복 0, 작업 기록 · 평문 폴더 삭제 |
+| BACKUP-D7 | 일부 | 미구매면 만들기 대신 「광고 제거 보기」, 불러오기는 열림. 구매 상태는 실행 중 LLDB 로 공유 값 `isAdFree` 를 켜 흉내 냈다(앱 시작 때 StoreKit 판정이 저장값을 덮는다) — StoreKit 자체는 `RemoveAdsStoreKitUITests` 몫 |
+| BACKUP-D8 | 통과 | 무계정 기기의 `acct-local` 초안 3 → 백업(「남겨 둔 필기 3개」, macOS `aea` 로 풀어 항목 · 계정 정보 없음 확인) → 로그인 기기에서 미리보기 수대로 적용. 행이 없는 절은 현재 필사로, 있는 절은 이전 기록으로 |
+| BACKUP-D13 | 일부 | 마지막 획 약 1.8초 뒤 설정 → 백업 만들기 — 그 획이 백업에 있다. 저장 대기 구간 안에서 시작하는 경쟁은 조작 지연으로 만들지 못했고, 저장 실패 상태는 보지 않았다 |
+| 저장 창 | 결함 → 수정 | 저장 창을 띄우면 앱이 죽었다 — SwiftUI 가 `NSFileWrapper.preferredFilename` 에 nil 을 넣는다(`fileExporter` 의 `defaultFilename` 은 이 단계에서 안 쓰인다). `BackupFileItem` 에 `suggestedFileName` 을 줘 고쳤다(`79ac101f`). 저장 · 취소(「저장하지 않았어요…」, 작업 파일 삭제) · 같은 이름이면 시스템 「둘 다 유지」 확인 |
+
+하지 않은 것: BACKUP-D1 · D3 · D9 · D10 · D11 · D12, 실제 디스크 부족, 상한 실측, 다른 기기 수신.
 
 계정 변경 실험은 전용 기기 또는 시험 데이터만 있는 상태에서 수행하고, 기존 로컬 필사가 새 계정으로 묵시적으로 전송되는지도 별도 기록한다. 이 결과는 파일 불러오기 허용과 별개의 출시 조건이다.
 

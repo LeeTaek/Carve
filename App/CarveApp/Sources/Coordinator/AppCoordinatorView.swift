@@ -113,6 +113,28 @@ public struct AppCoordinatorView: View {
                 .accessibilityIdentifier("beforeConnectionNotice")
             }
         }
+        .overlay {
+            // 2.0.x 에서 절마다 쓰는 캔버스로 쓰던 사용자 — 그 캔버스가 없어졌다고 막지 않고 한 번 알린다(2.1 결정 6).
+            // 연결 전 필기 안내와 같은 규칙으로 미루고, 두 카드가 겹치지 않게 연결 전 필기 안내가 떠 있는 동안에도 미룬다.
+            if store.showsCanvasRemovalNotice, store.patchnote == nil, store.settings == nil, !store.showsRelaunchGuidance,
+               store.beforeConnectionNotice == nil {
+                VStack(spacing: 16) {
+                    Text("절마다 쓰는 캔버스는 이번 버전에서 없어졌어요")
+                    Text("그동안 쓴 필사는 그대로예요. 불편한 점이 있으면 알려 주세요.")
+                        .font(.caption)
+                        .multilineTextAlignment(.center)
+                    HStack(spacing: 12) {
+                        Button("의견 보내기") { store.send(.canvasRemovalNoticeFeedbackTapped) }
+                        Button("확인") { store.send(.canvasRemovalNoticeDismissed) }
+                            .buttonStyle(.borderedProminent)
+                    }
+                }
+                .padding(24)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("canvasRemovalNotice")
+            }
+        }
         // 이 창의 오버레이 · 팝오버까지 같은 모드를 따른다. 필사 영역은 모드와 무관하게 라이트로 그린다(결정 8-1 안 1).
         .preferredColorScheme(appearanceMode.colorScheme)
     }

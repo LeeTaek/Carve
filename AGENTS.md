@@ -25,7 +25,7 @@
 | CarveFeature | `Feature/CarveFeature` | 성경 탐색 · 필사 화면과 캔버스 · 절 메뉴 · 즐겨찾기 · 팔레트 | ClientInterfaces, Domain, UIComponents, Resources |
 | ChartFeature | `Feature/ChartFeature` | 필사 기록 차트 · 주간 요약 | 위와 같음 |
 | SettingsFeature | `Feature/SettingsFeature` | 설정 화면 · 광고 제거 · 필기 가져오기 · iCloud | 위와 같음 |
-| Domain | `Domain/Domain` | 모델 · 본문 · SwiftData 스키마와 저장소 · 동기화 · 기기 안 초안 | CarveToolkit, ClientInterfaces, Resources |
+| Domain | `Domain/Domain` | 모델 · 본문 · SwiftData 스키마와 저장소 · 동기화 · 기기 안 초안 · 필사 백업 형식 | CarveToolkit, ClientInterfaces, Resources |
 | UIComponents | `Supports/UIComponents` | 공용 뷰 · 디자인 시스템 · 광고 슬롯 | ClientInterfaces, CarveToolkit, Resources |
 | ClientInterfaces | `Supports/ClientInterfaces` | 외부 클라이언트 프로토콜 · 공유 키 | (TCA 만) |
 | CarveToolkit | `Supports/CarveToolkit` | Logger · 리듀서 액션 · UIKit 브리지 | Resources |
@@ -51,11 +51,12 @@
 |---|---|
 | 성경 탐색 (권 · 장 고르기) | `CarveNavigationFeature` |
 | 필사 · 필기 | `BibleDrawing`(SwiftData 모델) · `DrawingDatabase` · 필사 화면 `CarveDetailFeature` |
-| 장 · 절 | `BibleChapter` · Verse(`VerseRowFeature` 등) |
-| 필사 캔버스 · 단일 Canvas | `ChapterCanvasFeature`(리듀서 하나를 `ChapterCanvas*.swift` 여러 파일로 나눔) · `ChapterCanvasController`(PencilKit) · `SingleCanvasFlag` |
+| 장 · 절 | `BibleChapter` · Verse(`BibleVerse` · 절 행 `SentencesWithDrawingFeature` 등) |
+| 필사 캔버스 · 단일 Canvas | `ChapterCanvasFeature`(리듀서 하나를 `ChapterCanvas*.swift` 여러 파일로 나눔) · `ChapterCanvasController`(PencilKit). 캔버스는 이것 하나뿐이다 — N-Canvas · `SingleCanvasFlag` 는 2.1 에서 지웠다 |
 | 절 메뉴 | `ChapterCanvasVerseMenu` · `VerseMenuOverlay` |
 | 이전 필사 내용 보기 | `VerseDrawingHistoryFeature` |
 | 초안 · 확인이 필요한 필기 | `VerseDraft`(`LocalPreservationWriter.swift`) · 설정 `DraftRecoveryFeature` |
+| 필사 백업 · 불러오기 | `BackupFeature`(설정) · `BackupExporting` · `BackupImporting` · Domain `Sources/Backup/` |
 | 즐겨찾기 | `FavoriteVerse` · `FavoriteListFeature` |
 | 기록 차트 · 주간 요약 | `DrawingChartFeature` · `DailyRecordChartFeature` · `DrawingWeeklySummaryFeature` |
 | 팔레트 · 라이선스 | **철자가 `Palatte` · `Lisence` 다** — `PencilPalatteFeature` · `ColorPalatteFeature` · `LineWidthPalatteFeature` · `LisenceFeature`. `Palette` · `License` 로 찾으면 안 나온다 |

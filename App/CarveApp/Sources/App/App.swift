@@ -33,9 +33,10 @@ struct CarveApp: App {
     init() {
         // 2.0.0(Xcode 27 빌드)이 JSON 으로 쓴 기본 타입 설정을 되돌린다 — 설정을 읽는 Store · Debug 실행 인자 처리보다 먼저.
         AppStorageFormatMigration.restorePrimitiveValues(in: .standard)
+        // 지난 실행이 남긴 백업 · 불러오기의 평문 작업 폴더(`BackupWork`)를 지운다 — 이 실행의 백업 작업이 시작되기 전이다.
+        BackupWorkDirectory.removeStale()
         let purchaseClient = StoreKitPurchaseClient()
         self.purchaseClient = purchaseClient
-        SingleCanvasFlag.resetStoredValueOnce(in: .standard)
 
         let sentenceSettingBackup = SentenceSettingCloudBackup()
         sentenceSettingBackup.start()
@@ -277,6 +278,9 @@ private struct AppStartupView: View {
         // actor 와 그것을 쥔 저장소의 기본값(`static` liveValue)은 처음 읽힌 문맥의 컨테이너로 한 번 만들어져 전역에 남는다.
         // 기본값에 기대지 않고 이 실행이 연 컨테이너로 직접 만들어 넘긴다(2026-09-28 iPadOS 18.6 실측).
         let database = SwiftDatabaseActor(modelContainer: modelContainer)
+        // 설정에서 넣은 필기(「확인이 필요한 필기」 · 「백업 불러오기」)를 그 아래 열린 필사 화면에 알린다 — 모두 같은 인스턴스를 봐야 한다.
+        let localDrawingChanges = LiveLocalDrawingChangeClient()
+        let backupRestorer = SwiftDataDrawingBackupRestorer(actor: database)
         return withDependencies {
             $0.containerId = containerID
             $0.modelContainer = modelContainer
@@ -284,6 +288,17 @@ private struct AppStartupView: View {
             $0.drawingRepository = SwiftDataDrawingRepository(actor: database)
             // 「확인이 필요한 필기」 의 가져오기 — 같은 actor 로 쓴다(저장소 세대 · 트랜잭션이 편집 화면과 같은 경계다).
             $0.drawingVerseImporter = SwiftDataDrawingRepository(actor: database)
+            // 「필사 백업」 의 내보내기 · 불러오기 · 장 단위 복원도 같은 actor 로 쓴다 — 「모든 필사 삭제」 가 이 actor 의 세대를 올리므로
+            // 장 사이 세대 확인(내보내기 `generationChanged` · 복원 `staleStoreGeneration`)이 그 삭제를 잡는다.
+            $0.drawingBackupRestorer = backupRestorer
+            $0.backupExporter = LiveBackupExporter(environment: drawingEditEnvironment, drafts: localPreservation, database: database)
+            $0.backupImporter = LiveBackupImporter(
+                environment: drawingEditEnvironment,
+                restorer: backupRestorer,
+                database: database,
+                changes: localDrawingChanges,
+                jobs: BackupImportJobStore()
+            )
             $0.favoriteVerseRepository = SwiftDataFavoriteVerseRepository(actor: database)
             // `@Dependency` 를 저장한 기본값도 처음 읽힌 runtime 문맥을 전역 캐시에 남긴다. 여기서(runtime 밖 문맥) 만들어 넘긴다.
             $0.drawingData = DrawingDatabase()
@@ -302,8 +317,7 @@ private struct AppStartupView: View {
             $0.verseDraftRecoveryReader = localPreservation
             $0.verseDraftUnreadableCleaner = localPreservation
             $0.verseDraftImportMarker = localPreservation
-            // 설정에서 넣은 필기를 그 아래 열린 필사 화면에 알린다 — 둘이 같은 인스턴스를 봐야 한다.
-            $0.localDrawingChanges = LiveLocalDrawingChangeClient()
+            $0.localDrawingChanges = localDrawingChanges
             $0.photoLibraryClient = PhotoKitLibraryClient()
             $0.widgetVerseClient = AppGroupWidgetVerseClient()
             $0.analyticsClient = FirebaseAnalyticsClient()

@@ -19,16 +19,6 @@ public struct CarveDetailView: View {
     /// 행들의 실측 콜백을 모아 런루프 한 번에 한 액션으로 보내는 수집기 (Phase 2).
     /// 참조 객체이므로 `@State` 는 수명만 잡아 줄 뿐, 값이 바뀌어도 뷰를 다시 그리지 않는다.
     @State private var geometryCollector = VerseGeometryCollector()
-    /// 뷰포트(스크롤 영역) 높이. 캔버스 지연 생성 범위 계산용.
-    @State private var viewportHeight: CGFloat = 0
-    /// 스크롤 콘텐츠 상단의 "Scroll" 좌표 (스크롤하면 음수). `offsetY` 콜백으로 갱신.
-    @State private var contentMinY: CGFloat = 0
-    /// `PKCanvasView` 를 실제로 만든 행. **한 번 활성화되면 유지**한다 (`LazyVStack` 이 만든 행을 버리지 않던 것과 같은 의미).
-    ///
-    /// Phase 2 실측: 비지연 `VStack` 에서 캔버스 176개를 진입 시점에 전부 만들면 시편 119편 진입에
-    /// CPU ≈14 s · footprint ≈550 MB (시뮬레이터 Debug) 가 들어 설계 §18-5 의 (B)표 기준을 한 자릿수 이상 넘는다.
-    /// 텍스트 행(측정에 필요한 것)은 즉시 만들고, 비싼 캔버스만 뷰포트 근처에서 만든다.
-    @State private var activeCanvasIDs: Set<SentencesWithDrawingFeature.State.ID> = []
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     public init(store: StoreOf<CarveDetailFeature>) {
@@ -73,15 +63,7 @@ public struct CarveDetailView: View {
             Task { @MainActor in
                 await ChapterLayoutDebugScenario.runScroll(
                     verses: { store.sentenceWithDrawingState.map(\.sentence.verse) },
-                    scrollTo: { verse in
-                        if store.usesSingleCanvas {
-                            send(.scrollToVerse(verse))
-                        } else if let row = store.sentenceWithDrawingState.first(where: { $0.sentence.verse == verse }) {
-                            withAnimation(.easeInOut(duration: 0.4)) {
-                                store.proxy?.scrollTo(row.id, anchor: .bottom)
-                            }
-                        }
-                    }
+                    scrollTo: { verse in send(.scrollToVerse(verse)) }
                 )
             }
         }
@@ -103,9 +85,9 @@ public struct CarveDetailView: View {
             ChapterLayoutDebugHUD(
                 measurement: store.chapterLayout,
                 lastEdit: lastEditForOverlay,
-                // 안전망은 단일 Canvas 경로에만 붙는다 — N-Canvas 는 판정 자체가 없으므로 nil 이다 (§14).
-                safetyNet: store.usesSingleCanvas ? store.chapterCanvas.layoutDelta : nil,
-                compose: store.usesSingleCanvas ? composeProbe : nil,
+                // 실측 전에는 판정이 없어 nil 이다 (§14).
+                safetyNet: store.chapterCanvas.layoutDelta,
+                compose: composeProbe,
                 reportSnapshot: { send(.debugHUDSnapshotChanged($0)) }
             )
         }
@@ -113,19 +95,12 @@ public struct CarveDetailView: View {
     }
 
     #if DEBUG
-    /// 마지막 편집 절의 drawing bounds 를 콘텐츠 좌표로 옮긴 값. 절 캔버스 로컬 좌표에 실측 frame 원점을 더한다.
+    /// 마지막 편집 절과 그 drawing bounds (콘텐츠 좌표).
     ///
-    /// 단일 Canvas 는 `CanvasEditSnapshot.dirtyBounds`(캔버스 content 좌표 = 컬럼 좌표)를 그대로 쓴다 — 장 전체 잉크의 bounds 다.
+    /// `CanvasEditSnapshot.dirtyBounds`(캔버스 content 좌표 = 컬럼 좌표)를 그대로 쓴다 — 장 전체 잉크의 bounds 다.
     private var lastEditForOverlay: (verse: Int, bounds: CGRect)? {
-        if store.usesSingleCanvas {
-            guard let bounds = store.chapterCanvas.lastDirtyBounds else { return nil }
-            return (store.chapterCanvas.lastEditedVerse ?? 0, bounds)
-        }
-        guard let id = store.lastEditedVerseID,
-              let row = store.sentenceWithDrawingState[id: id],
-              let local = row.canvasState.lastDrawingBounds,
-              let frame = store.chapterLayout.measuredFrames[row.sentence.verse] else { return nil }
-        return (row.sentence.verse, local.offsetBy(dx: frame.minX, dy: frame.minY))
+        guard let bounds = store.chapterCanvas.lastDirtyBounds else { return nil }
+        return (store.chapterCanvas.lastEditedVerse ?? 0, bounds)
     }
     #endif
     
@@ -149,13 +124,7 @@ public struct CarveDetailView: View {
         // "행 폭 → ScrollView 폭 → halfWidth → 행 폭" 이 발산한다 (Phase 2 실측: 372 → 376.7 → 381.3 → …, 고정점 1120).
         // LazyVStack 은 제안 폭을 그대로 보고해 이 순환이 드러나지 않았을 뿐이다.
         GeometryReader { container in
-            Group {
-                if store.usesSingleCanvas {
-                    singleCanvasBody
-                } else {
-                    scrollBody
-                }
-            }
+            singleCanvasBody
                 .onAppear {
                     geometryCollector.onFlush = { batch in
                         send(.verseGeometryMeasured(batch))
@@ -168,10 +137,6 @@ public struct CarveDetailView: View {
                 // 설정의 「모든 필사 데이터 삭제」도 같은 이유로 **값으로** 확인한다 — 지워지는 순간 이 뷰가
                 // 트리에 없을 수 있으므로, 돌아온 뒤 `initial: true` 로 한 번 더 비교해 놓치지 않는다.
                 .onDrawingDataChange(store.drawingDataRevision) { send(.drawingDataRevisionChanged) }
-                .onChange(of: store.usesSingleCanvas) { _, _ in
-                    // 설정 토글(또는 defaults write)로 경로가 바뀌면 현재 장을 새 경로로 다시 불러온다.
-                    send(.fetchSentence)
-                }
                 .onChange(of: container.size.width, initial: true) { _, width in
                     let half = width / 2
                     guard half > 0, half != halfWidth else { return }
@@ -179,111 +144,14 @@ public struct CarveDetailView: View {
                     // 필사 컬럼 폭 = 절 캔버스 폭 = ChapterLayout.writingWidth (Phase 2)
                     send(.layoutHostingChanged(writingWidth: half))
                 }
-                .onChange(of: container.size.height, initial: true) { _, height in
-                    viewportHeight = height
-                    updateActiveCanvases()
-                }
         }
         .background { paperBackground }
         .overlay { DeskCover() }
     }
 
-    /// 뷰포트 근처(위아래 `canvasActivationMargin` 배)의 행을 캔버스 활성 집합에 더한다. 빼지는 않는다.
-    ///
-    /// 행 위치는 실측 frame(`chapterLayout.measuredFrames`, 콘텐츠 좌표)을 쓴다. "Scroll" 좌표로 옮기려면
-    /// 콘텐츠 상단(`contentMinY`)과 헤더 padding(`headerHeight`)을 더한다.
-    private func updateActiveCanvases() {
-        guard viewportHeight > 0 else { return }
-        let frames = store.chapterLayout.measuredFrames
-        guard !frames.isEmpty else { return }
-        let margin = viewportHeight * Self.canvasActivationMargin
-        let visible = (-margin)...(viewportHeight + margin)
-        let contentOrigin = contentMinY + store.headerState.headerHeight
-        var added: Set<SentencesWithDrawingFeature.State.ID> = []
-        for row in store.sentenceWithDrawingState where !activeCanvasIDs.contains(row.id) {
-            guard let frame = frames[row.sentence.verse] else { continue }
-            let top = contentOrigin + frame.minY
-            let bottom = contentOrigin + frame.maxY
-            if bottom >= visible.lowerBound && top <= visible.upperBound {
-                added.insert(row.id)
-            }
-        }
-        guard !added.isEmpty else { return }
-        activeCanvasIDs.formUnion(added)
-    }
-
-    private var scrollBody: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                contentView
-                    .padding(.top, store.headerState.headerHeight)
-                    .padding(.bottom, paletteBottomInset)
-                    .offsetY { previous, current in
-                        contentMinY = current
-                        updateActiveCanvases()
-                        delay {
-                            send(.headerAnimation(previous, current))
-                        }
-                    }
-                    .onChange(of: store.sentenceWithDrawingState) {
-                        // 장이 바뀌면 활성 집합도 새로 시작한다 (id 가 장마다 다르므로 남겨 둬도 무해하지만 계속 자란다).
-                        activeCanvasIDs = []
-                        send(.setProxy(proxy))
-                    }
-                    .onChange(of: store.chapterLayout.measuredFrames) {
-                        // 실측 frame 이 도착한 뒤에야 어떤 행이 뷰포트 근처인지 알 수 있다.
-                        updateActiveCanvases()
-                    }
-//                    // ✅ Canvas를 contentView에 overlay로 올려서 높이/레이아웃을 완전히 동일하게 맞춘다.
-//                    // 이렇게 하면 Pencil hover/다운 시점에 Canvas만 별도로 "커지는" 레이아웃 흔들림을 줄일 수 있다.
-//                    .overlay {
-//                        CombinedCanvasView(
-//                            store: self.store.scope(
-//                                state: \.canvasState,
-//                                action: \.scope.canvasAction
-//                            ),
-//                            onInkingChanged: { isInking in
-//                                self.isInking = isInking
-//                            }
-//                        )
-//                        .border(.red)
-//                        .id(store.canvasState.chapter)
-//                        .frame(width: halfWidth)
-//                        .frame(
-//                            maxWidth: .infinity,
-//                            maxHeight: .infinity,
-//                            alignment: store.isLeftHanded ? .leading : .trailing
-//                        )
-//                        .background(
-//                            GeometryReader { proxy in
-//                                Color.clear
-//                                    .allowsHitTesting(false)
-//                                    .onAppear {
-//                                        let frame = proxy.frame(in: .named("CanvasSpace"))
-//                                        send(.canvasFrameChanged(frame))
-//                                    }
-//                                    .onChange(of: proxy.frame(in: .named("CanvasSpace"))) { _, frame in
-//                                        // 최종 레이아웃 기준 프레임을 항상 반영 (split/fullscreen 전환 시 좌표계 어긋남 방지)
-//                                        send(.canvasFrameChanged(frame))
-//                                    }
-//                            }
-//                        )
-//                    }
-                    .coordinateSpace(name: "CanvasSpace")
-            }
-            .onTapGesture {
-                send(.tapForHeaderHidden)
-            }
-            .onTwoFingerDoubleTap {
-                send(.twoFingerDoubleTapForUndo)
-            }
-            .coordinateSpace(name: "Scroll")
-        }
-    }
-    
     /// Phase 3 — 단일 Canvas (B 구조). `PKCanvasView` 가 유일한 스크롤 뷰이고 텍스트 컬럼은 그 안에 있다.
     ///
-    /// 컬럼은 N-Canvas 경로와 **같은 행 뷰**를 캔버스 없이(`isCanvasActive: false`) 쓴다. 실측·게이트·오버레이도 같다.
+    /// 컬럼은 절 행 뷰(본문 · 밑줄 · 실측)만 그리고, 잉크는 그 위의 캔버스 하나가 그린다.
     /// 헤더는 콘텐츠를 밀지 않고 `contentInset.top` 으로 비우므로 컬럼에 상단 padding 을 주지 않는다.
     private var singleCanvasBody: some View {
         ChapterCanvasView(
@@ -291,7 +159,7 @@ public struct CarveDetailView: View {
             display: ChapterCanvasView.Display(store.chapterCanvas),
             topInset: store.headerState.headerHeight,
             bottomInset: paletteBottomInset,
-            column: AnyView(verseColumn(isCanvasActive: { _ in false })),
+            column: AnyView(verseColumn()),
             onScroll: { previous, current in
                 delay {
                     send(.headerAnimation(previous, current))
@@ -305,7 +173,7 @@ public struct CarveDetailView: View {
             send(.twoFingerDoubleTapForUndo)
         }
         .onChange(of: store.sentenceWithDrawingState) {
-            // N-Canvas 의 setProxy → scrollToTop 과 같은 자리. 장 전환·딥링크(setScrollTarget)의 스크롤 요청을 여기서 낸다.
+            // 장 전환·딥링크(setScrollTarget)의 스크롤 요청을 여기서 낸다.
             // 레이아웃이 아직 없으면 컨트롤러가 요청을 들고 있다가 layout 이 오면 수행한다.
             send(.scrollToTop)
         }
@@ -316,20 +184,11 @@ public struct CarveDetailView: View {
         ))
     }
 
-    /// Phase 2 — `LazyVStack` 을 비지연 `VStack` 으로 전환 (설계 §6-1 · rev.15).
+    /// 절 행 컬럼 — 비지연 `VStack` (설계 §6-1 · rev.15).
     ///
     /// 전 절의 geometry 가 있어야 장 전체 레이아웃이 성립하므로 보이는 절만 만드는 지연 스택을 쓸 수 없다.
-    /// 즉시 만드는 것은 **텍스트 행**(본문·밑줄·frame 실측)까지이고, 비싼 `PKCanvasView` 는 `activeCanvasIDs` 로
-    /// 뷰포트 근처에서만 만든다 — 실측 결과 캔버스까지 즉시 만들면 진입 비용이 (B)표 기준을 한 자릿수 넘었다 (설계 §20-8).
     /// 간격은 `ChapterLayoutHosting` 상수로 명시해 `ChapterLayoutBuilder` 가 같은 값으로 좌표를 예측하게 한다.
-    private var contentView: some View {
-        verseColumn(isCanvasActive: { activeCanvasIDs.contains($0) })
-    }
-
-    /// 절 행 컬럼 — N-Canvas 경로와 단일 Canvas 경로가 공유한다. 차이는 행에 `PKCanvasView` 를 두는지뿐이다.
-    private func verseColumn(
-        isCanvasActive: @escaping (SentencesWithDrawingFeature.State.ID) -> Bool
-    ) -> some View {
+    private func verseColumn() -> some View {
         VStack(spacing: ChapterLayoutHosting.rowSpacing) {
             // 폭을 모르는 첫 패스에서는 행을 만들지 않는다 — 176개 행을 폭 0 으로 한 번 더 배치·실측하는 낭비를 막는다.
             if halfWidth > 0 {
@@ -341,9 +200,6 @@ public struct CarveDetailView: View {
                     SentencesWithDrawingView(
                         store: childStore,
                         halfWidth: $halfWidth,
-                        // N-Canvas 는 초안 없이 동기화 저장소에 바로 쓴다 — 소유가 확인되기 전에는 입력을 닫는다(정책 §12-6 결정 1).
-                        isLayoutReady: store.isLayoutReady && (store.usesSingleCanvas || store.nCanvasWriteBlock == nil),
-                        isCanvasActive: isCanvasActive(childStore.id),
                         isFavorite: store.favoriteVerses.contains(childStore.sentence.verse),
                         onUnderlineLayoutChange: { id, layout in
                             // 실측 콜백은 행마다 따로 오지만 액션은 수집기가 한 틱에 하나로 모은다.
@@ -407,10 +263,6 @@ public struct CarveDetailView: View {
 }
 
 private extension CarveDetailView {
-    /// 캔버스를 미리 만들어 둘 범위 — 뷰포트 위아래로 이 배수만큼.
-    /// 타입 본문이 아니라 확장에 둔다 — `CarveDetailView` 본문을 길이 제한(300줄) 안에 둔다.
-    static var canvasActivationMargin: CGFloat { 1.5 }
-
     /// 캔버스가 실제로 합성에 쓴 상태 (E-4 진단 — HUD `compose` 줄).
     #if DEBUG
     var composeProbe: CanvasComposeProbe {
@@ -558,15 +410,11 @@ private extension CarveDetailView {
                     send(.loadRetryTapped)
                 }
                 .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
-            } else if store.usesSingleCanvas, let notice = store.chapterCanvas.arrival.notice {
+            } else if let notice = store.chapterCanvas.arrival.notice {
                 // 늦게 도착한 필사 — 편집한 장은 자동으로 바꾸지 않고 여기서 알린다(P0-3). 실패 안내 다음이다 — 그쪽은 이미 쓴 필사가 위험하다.
                 // 캔버스의 일이라 그 스토어로 바로 보낸다(절 메뉴 · 지우기 확인창처럼).
                 let canvas = store.scope(state: \.chapterCanvas, action: \.scope.chapterCanvasAction)
                 ArrivalNoticeView(notice: notice, onAction: { canvas.send(.arrivalNoticeTapped) }, onDismiss: { canvas.send(.arrivalNoticeDismissed) })
-                    .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
-            } else if !store.usesSingleCanvas, let block = store.nCanvasWriteBlock {
-                // 입력을 닫은 사유를 보인다 — 다시 시도해도 같은 사유라 버튼을 두지 않는다(정책 §12-6 결정 1).
-                CarveStatusMessage(.failure, message: "절마다 쓰는 화면에서는 지금 필기를 받지 않아요. " + block.reasonText)
                     .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
             } else if let notice = store.favoriteNotice {
                 FavoriteNoticeView(notice: notice) {
@@ -627,8 +475,8 @@ private extension CarveDetailView {
         return PencilPalatteDockView.height - CarveSize.floatingToolButton / 2 - FavoriteNoticeView.height / 2
     }
 
-    /// 절 필사 기록 팝오버(시안 E2). N-Canvas 는 행마다 시트를 갖지만 단일 Canvas 는 롱탭 메뉴에서 절을 골라
-    /// 여기서 연다 (§8-7). 지금 필기를 덮지 않도록 시트가 아니라 그 절 아래에 붙는다.
+    /// 절 필사 기록 팝오버(시안 E2). 롱탭 메뉴에서 절을 골라 여기서 연다 (§8-7).
+    /// 지금 필기를 덮지 않도록 시트가 아니라 그 절 아래에 붙는다.
     @ViewBuilder
     var historyOverlay: some View {
         if let historyStore = store.scope(state: \.chapterHistory, action: \.chapterHistory.presented) {

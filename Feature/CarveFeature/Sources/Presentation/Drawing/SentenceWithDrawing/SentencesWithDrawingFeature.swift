@@ -12,87 +12,58 @@ import SwiftUI
 
 import ComposableArchitecture
 
+/// 단일 Canvas 본문 열의 절 행 하나 — 본문 · 밑줄과 그 실측만 맡는다. 잉크는 캔버스(`ChapterCanvasFeature`)가 장 단위로 그린다.
 @Reducer
-public struct SentencesWithDrawingFeature {
+public struct SentencesWithDrawingFeature: Sendable {
     @ObservableState
-    public struct State: Identifiable, Equatable {
+    public struct State: Identifiable, Equatable, Sendable {
         public static func == (lhs: SentencesWithDrawingFeature.State, rhs: SentencesWithDrawingFeature.State) -> Bool {
             lhs.id == rhs.id
         }
+        /// 행 ID(`권.장.절`) — 장 레이아웃 실측(`VerseGeometryCollector`)이 행을 가리키는 키다.
         public let id: String
+        /// 이 행의 절 본문
         public let sentence: BibleVerse
+        /// 본문 텍스트와 밑줄 상태
         public var sentenceState: VerseTextFeature.State
-        public var canvasState: CanvasFeature.State
-        public var drewHistoryState: VerseDrawingHistoryFeature.State
-        public var isPresentDrewHistory: Bool = false
+        /// 왼손잡이 배치 여부
         @Shared(.appStorage("isLeftHanded")) public var isLeftHanded: Bool = false
 
-        public init(sentence: BibleVerse, drawing: BibleDrawing?) {
+        public init(sentence: BibleVerse) {
             self.id = "\(sentence.title.title.koreanTitle()).\(sentence.title.chapter).\(sentence.verse)"
             self.sentence = sentence
             self.sentenceState = .init(chapterTitle: sentence.chapterTitle,
                                        verse: sentence.verse,
                                        verseEnd: sentence.verseEnd,
                                        sentence: sentence.sentenceScript)
-            self.canvasState = .init(sentence: sentence, drawing: drawing)
-            self.drewHistoryState = .init(title: sentence.title, verse: sentence.verse)
         }
-        
-        /// @Model(`BibleDrawing`)을 담아 Sendable 이 아니므로 저장 프로퍼티 대신 계산 프로퍼티다(N-Canvas).
-        public static var initialState: Self {
-            Self(sentence: BibleVerse.initialState,
-                 drawing: BibleDrawing.init(
-                    bibleTitle: BibleChapter(title: .leviticus, chapter: 4), verse: 1))
-        }
+
+        public static let initialState = Self(sentence: BibleVerse.initialState)
     }
-    
+
     public enum Action: ViewAction, CarveToolkit.ScopeAction {
         case view(View)
         case scope(ScopeAction)
-        
+
         @CasePathable
         public enum View {
             case setBible
             case setHeight(height: CGFloat)
-            case presentDrewHistory(Bool)
         }
     }
-    
+
     @CasePathable
     public enum ScopeAction {
+        /// 본문 텍스트 행의 액션
         case sentenceAction(VerseTextFeature.Action)
-        case canvasAction(CanvasFeature.Action)
-        case drewHistoryAction(VerseDrawingHistoryFeature.Action)
     }
-    
-    
+
+
     public var body: some Reducer<State, Action> {
         Scope(state: \.sentenceState,
               action: \.scope.sentenceAction) {
             VerseTextFeature()
         }
-        Scope(state: \.canvasState,
-              action: \.scope.canvasAction) {
-            CanvasFeature()
-        }
-        Scope(state: \.drewHistoryState,
-              action: \.scope.drewHistoryAction) {
-            VerseDrawingHistoryFeature()
-        }
-        
-        Reduce { state, action in
-            switch action {
-            case .view(.presentDrewHistory(let isPresent)):
-                state.isPresentDrewHistory = isPresent
-            case .scope(.drewHistoryAction(.setPresentDrawing(let snapshot))):
-                state.isPresentDrewHistory = false
-                // 액션만 전달하는 자리라 .run 을 쓸 이유가 없다. 고른 회차(DTO)를 캔버스가 행 모양으로 옮긴다.
-                return .send(.scope(.canvasAction(.setDrawing(snapshot))))
-            default: break
-                
-            }
-            return .none
-        }
     }
-    
+
 }

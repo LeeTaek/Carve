@@ -6,10 +6,10 @@
 //
 //  이 파일이 확보하는 것은 두 가지다.
 //  1. **V3 → V4 lightweight 마이그레이션이 데이터를 건드리지 않는가** (§10-1 · §10-2)
-//  2. **V4 저장소에서 기존 경로(flag off = 현재 N Canvas)가 그대로 동작하는가** (§10-3)
+//  2. **마이그레이션된 V4 저장소에서 지금 경로(`DrawingDatabase` 의 남은 조회 · 쓰기, 저장 경로)가 그대로 동작하는가** (§10-3)
 //
-//  2번이 Phase 1 의 존재 이유다. V4 는 forward-only 라 되돌릴 수단이 feature flag 뿐이고,
-//  그때도 저장소는 V4 인 채로 남기 때문이다.
+//  2번은 처음에 Phase 1 의 존재 이유였다 — V4 는 forward-only 라 되돌릴 수단이 feature flag(N Canvas) 뿐이었다.
+//  2.1 에서 N-Canvas 와 flag 를 지웠고, 남은 시험은 V3 에서 올라온 저장소를 지금 경로가 그대로 읽고 쓰는지 본다.
 //
 //  Copyright © 2026 leetaek. All rights reserved.
 //
@@ -493,9 +493,9 @@ struct DrawingSchemaV4MigrationTesting {
 /// > "V4 저장소를 유지한 채 flag 를 껐을 때 기존 N Canvas 경로가 정상 동작해야 합니다.
 /// > Phase 3 의 유일한 안전망이므로 Phase 1 배포 전에 이 경로를 확보합니다."
 ///
-/// feature flag 는 아직 없으므로, 지금 시점의 등가 검증은 **"기존 코드 경로가 V4 저장소에서
-/// 그대로 동작하는가"** 다. 저장소는 새로 만든 V4 가 아니라 **V3 에서 실제로 마이그레이션된 V4** 를 쓴다 —
-/// flag off 상황이 정확히 그 상태이기 때문이다.
+/// 2.1 에서 N-Canvas · flag 와 그 경로(`fetchForLegacyCanvas` · `updateDrawings(requests:)` · `updateDrawing(request:)`)를 지웠다.
+/// 남은 시험은 `DrawingDatabase` 의 조회 · 대표 바꾸기 · 장 단위 행 경로와 저장 경로(`SwiftDataDrawingRepository`)가 그대로 동작하는지 본다.
+/// 저장소는 새로 만든 V4 가 아니라 **V3 에서 실제로 마이그레이션된 V4** 를 쓴다 — V3 빌드를 쓰던 기기가 올라온 저장소가 정확히 그 상태이기 때문이다.
 @Suite("§10-3 — 마이그레이션된 V4 저장소에서 기존 DrawingDatabase 경로")
 struct LegacyPathOnV4StoreTesting {
 
@@ -510,18 +510,6 @@ struct LegacyPathOnV4StoreTesting {
         } operation: {
             DrawingDatabase()
         }
-    }
-
-    /// 절의 행을 저장소에서 직접 읽는다 — `fetchVerseSnapshots(chapter:verse:)` 와 같은 조건 · 정렬(`updateDate` 최신순).
-    /// 같은 컨테이너의 새 문맥이라 모델을 actor 밖으로 받지 않는다.
-    private static func storedRows(of database: DrawingDatabase, verse: Int) throws -> [BibleDrawing] {
-        let titleName = chapter.title.rawValue
-        let chapterNumber = chapter.chapter
-        let predicate = #Predicate<BibleDrawing> {
-            $0.titleName == titleName && $0.titleChapter == chapterNumber && $0.verse == verse
-        }
-        let descriptor = FetchDescriptor(predicate: predicate, sortBy: [SortDescriptor(\.updateDate, order: .reverse)])
-        return try ModelContext(database.actor.modelContainer).fetch(descriptor)
     }
 
     private static func seedV3(at directory: URL) throws {
@@ -568,20 +556,6 @@ struct LegacyPathOnV4StoreTesting {
 
     // MARK: fetch 경로
 
-    @Test("fetchForLegacyCanvas(chapter:) 가 마이그레이션된 legacy 행을 그대로 읽는다")
-    func fetchChapter() async throws {
-        let directory = try V4StoreHarness.makeStoreDirectory()
-        defer { V4StoreHarness.removeStoreDirectory(directory) }
-        let database = try Self.makeMigratedDatabase(at: directory)
-
-        let rows = try await database.fetchForLegacyCanvas(chapter: Self.chapter).value
-        #expect(rows.count == 3)
-        #expect(rows.map { $0.verse } == [1, 1, 2])
-        #expect(rows.allSatisfy { $0.drawingVersion == 1 })
-        #expect(rows.allSatisfy { $0.rowUUID == nil })
-        #expect(rows.allSatisfy { $0.layoutMetadataData == nil })
-    }
-
     @Test("fetchVerseSnapshots(chapter:verse:) + representative() 이 대표 행을 고른다")
     func fetchVerseAndMainDrawing() async throws {
         let directory = try V4StoreHarness.makeStoreDirectory()
@@ -615,101 +589,6 @@ struct LegacyPathOnV4StoreTesting {
     }
 
     // MARK: 쓰기 경로
-
-    @Test("updateDrawings(requests:) 가 기존 legacy 행을 갱신하고 drawingVersion 을 건드리지 않는다 ★")
-    func updateExistingRowKeepsDrawingVersion() async throws {
-        let directory = try V4StoreHarness.makeStoreDirectory()
-        defer { V4StoreHarness.removeStoreDirectory(directory) }
-        let database = try Self.makeMigratedDatabase(at: directory)
-
-        let newData = PKDrawing().dataRepresentation()
-        let stamp = Date(timeIntervalSince1970: 1_742_000_000)
-        await database.updateDrawings(requests: [
-            DrawingUpdateRequest(chapter: Self.chapter, verse: 1, updateLineData: newData, updateDate: stamp)
-        ])
-
-        let rows = try Self.storedRows(of: database, verse: 1)
-        let main = try #require(rows.mainDrawing())
-        #expect(rows.count == 2, "회차 행이 늘어나면 안 된다 (§8-7)")
-        #expect(main.lineData == newData)
-        #expect(main.updateDate == stamp)
-        // ★ 기존 경로의 쓰기는 좌표 형식을 바꾸지 않는다. legacy 는 legacy 로 남는다 (§10-2).
-        #expect(main.drawingVersion == 1)
-        #expect(main.layoutMetadataData == nil)
-        // legacy 행에 rowUUID 를 소급 발급하지 않는다 (§8-7 비파괴).
-        #expect(main.rowUUID == nil)
-    }
-
-    @Test("updateDrawings(requests:) 가 행이 없는 절에 새 행을 만든다")
-    func createsRowForEmptyVerse() async throws {
-        let directory = try V4StoreHarness.makeStoreDirectory()
-        defer { V4StoreHarness.removeStoreDirectory(directory) }
-        let database = try Self.makeMigratedDatabase(at: directory)
-
-        let newData = RealLegacyLineData.data
-        await database.updateDrawings(requests: [
-            DrawingUpdateRequest(chapter: Self.chapter, verse: 9, updateLineData: newData)
-        ])
-
-        let rows = try Self.storedRows(of: database, verse: 9)
-        let created = try #require(rows.first)
-        #expect(rows.count == 1)
-        #expect(created.lineData == newData)
-        // 신규 행은 rowUUID 를 갖는다. 좌표 형식은 아직 legacy 기본값이다 — 기록은 Phase 3 이다.
-        #expect(created.rowUUID != nil)
-        #expect(created.drawingVersion == 1)
-    }
-
-    @Test("N-Canvas 저장 요청이 legacy 행을 rowID로 갱신한다")
-    func updateDrawingByRowRequest() async throws {
-        let directory = try V4StoreHarness.makeStoreDirectory()
-        defer { V4StoreHarness.removeStoreDirectory(directory) }
-        let database = try Self.makeMigratedDatabase(at: directory)
-
-        // N-Canvas 처럼 읽은 행의 키 · 좌표 형식에 새 내용을 실어 요청을 만든다. 읽은 모델은 고치지 않는다.
-        let target = try #require(try Self.storedRows(of: database, verse: 2).first)
-        let replacement = PKDrawing().dataRepresentation()
-        try await database.updateDrawing(request: LegacyDrawingSaveRequest(
-            chapter: Self.chapter,
-            verse: 2,
-            rowID: BibleDrawingRowID(raw: target.rowKey),
-            lineData: replacement,
-            updateDate: Date(timeIntervalSince1970: 1_743_000_000),
-            drawingVersion: target.drawingVersion,
-            layoutMetadataData: target.layoutMetadataData
-        ))
-
-        let reloaded = try Self.storedRows(of: database, verse: 2)
-        let stored = try #require(reloaded.first)
-        #expect(stored.lineData == replacement)
-        #expect(stored.drawingVersion == 1)
-        #expect(stored.rowUUID == nil, "legacy 행에 UUID를 소급 발급하면 안 된다")
-    }
-
-    @Test("N-Canvas 신규 행은 선발급 rowUUID로 재시도해도 하나만 남는다")
-    func insertDrawingPreservesPreissuedRowID() async throws {
-        let directory = try V4StoreHarness.makeStoreDirectory()
-        defer { V4StoreHarness.removeStoreDirectory(directory) }
-        let database = try Self.makeMigratedDatabase(at: directory)
-        let rowID = BibleDrawingRowID.issue()
-        let request = LegacyDrawingSaveRequest(
-            chapter: Self.chapter,
-            verse: 10,
-            rowID: rowID,
-            lineData: PKDrawing().dataRepresentation(),
-            updateDate: Date(timeIntervalSince1970: 1_744_000_000),
-            drawingVersion: 1,
-            layoutMetadataData: nil
-        )
-
-        try await database.updateDrawing(request: request)
-        try await database.updateDrawing(request: request)
-
-        let rows = try Self.storedRows(of: database, verse: 10)
-        #expect(rows.count == 1)
-        #expect(rows.first?.rowUUID == rowID.raw)
-        #expect(rows.first?.isPresent != true, "기존 N-Canvas 삽입 의미를 유지한다")
-    }
 
     @Test("updatePresentDrawing 이 대표 행을 옮긴다 — 히스토리 복원 경로 (§8-7)")
     func updatePresentDrawing() async throws {
@@ -750,14 +629,30 @@ struct LegacyPathOnV4StoreTesting {
     func reopeningMigratedStoreIsStable() async throws {
         let directory = try V4StoreHarness.makeStoreDirectory()
         defer { V4StoreHarness.removeStoreDirectory(directory) }
+        let replacement = PKDrawing().dataRepresentation()
+        let metadata = DrawingLayoutMetadata(
+            baseWritingWidth: 360,
+            baseWritingHeight: 132,
+            baseUnderlineAnchors: [0, 44, 88],
+            layoutSignature: "sig-v4-reopen"
+        )
+        let written: VerseDrawingSnapshot
 
         do {
-            let database = try Self.makeMigratedDatabase(at: directory)
-            await database.updateDrawings(requests: [
-                DrawingUpdateRequest(chapter: Self.chapter, verse: 1,
-                                     updateLineData: PKDrawing().dataRepresentation(),
-                                     updateDate: Date(timeIntervalSince1970: 1_744_000_000))
-            ])
+            // 앱의 저장 경로(`SwiftDataDrawingRepository`)로 1절 대표 행(legacy)을 고친다 — replace 는 v3 로 올린다(§10-2 정책 5).
+            try Self.seedV3(at: directory)
+            let repository = SwiftDataDrawingRepository(
+                actor: SwiftDatabaseActor(modelContainer: try V4StoreHarness.openV4(at: directory))
+            )
+            let load = try await repository.load(chapter: Self.chapter)
+            let main = try #require(load.snapshots.filter { $0.verse == 1 }.representative())
+            try await repository.apply(
+                [.replace(verse: 1, rowID: main.rowID, data: replacement, metadata: metadata)],
+                chapter: Self.chapter,
+                generation: load.generation
+            )
+            let reloaded = try await repository.load(chapter: Self.chapter).snapshots
+            written = try #require(reloaded.first { $0.rowID == main.rowID })
         }
 
         // 앱 재기동에 해당한다. 이미 V4 인 store 를 다시 열어도 데이터가 그대로여야 한다.
@@ -765,8 +660,15 @@ struct LegacyPathOnV4StoreTesting {
         let context = ModelContext(container)
         let rows = try context.fetch(FetchDescriptor<BibleDrawing>(sortBy: [SortDescriptor(\.verse)]))
         #expect(rows.count == 3)
-        #expect(rows.allSatisfy { $0.drawingVersion == 1 })
-        let main = try #require(rows.first { $0.verse == 1 && $0.isPresent == true })
-        #expect(main.updateDate == Date(timeIntervalSince1970: 1_744_000_000))
+        let main = try #require(rows.first { $0.rowKey == written.rowID.raw })
+        #expect(main.isPresent == true)
+        #expect(main.lineData == replacement)
+        #expect(main.drawingVersion == 3)
+        #expect(DrawingLayoutMetadata.decode(blob: main.layoutMetadataData) == metadata)
+        #expect(main.updateDate == written.updateDate)
+        // legacy 행에 rowUUID 를 소급 발급하지 않는다 (§8-7 비파괴).
+        #expect(main.rowUUID == nil)
+        // 고치지 않은 legacy 행은 마이그레이션 때의 좌표 형식 그대로다.
+        #expect(rows.filter { $0.rowKey != written.rowID.raw }.allSatisfy { $0.drawingVersion == 1 })
     }
 }

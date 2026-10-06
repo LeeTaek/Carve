@@ -33,6 +33,17 @@ public extension InfoPlist {
                         "CFBundleURLSchemes": ["carve"]
                     ]
                 ],
+                // 필사 백업 파일 형식(.carvebackup)을 이 앱이 정의한다(2.1 필사 백업 — 설계 docs/backup-import-design.md).
+                "UTExportedTypeDeclarations": [
+                    [
+                        "UTTypeIdentifier": "kr.co.carve.leetaek.backup",
+                        "UTTypeDescription": "새기다 필사 백업",
+                        "UTTypeConformsTo": ["public.data", "public.content"],
+                        "UTTypeTagSpecification": [
+                            "public.filename-extension": ["carvebackup"]
+                        ]
+                    ]
+                ],
                 "CLOUDKIT_CONTAINER_ID": "$(CLOUDKIT_CONTAINER_ID)",
                 "GADApplicationIdentifier": "ca-app-pub-7073697298801242~1655419837",
                 "SKAdNetworkItems": .array(

@@ -493,13 +493,9 @@ struct CarveDetailLayoutMeasurementTesting {
         return "\(target.title.koreanTitle()).\(target.chapter).\(verse)"
     }
 
-    /// `reduce(into:)` 를 직접 호출한다. `setSentence` 가 `undoManager.clear()` 를 부르므로 테스트값을 주입한다.
+    /// `reduce(into:)` 를 직접 호출한다 — 상태 전이만 보고 효과는 버린다.
     private func reduce(_ state: inout CarveDetailFeature.State, _ action: CarveDetailFeature.Action) {
-        withDependencies {
-            $0.undoManager = SharedUndoManager()
-        } operation: {
-            _ = CarveDetailFeature().reduce(into: &state, action: action)
-        }
+        _ = CarveDetailFeature().reduce(into: &state, action: action)
     }
 
     private func measured(_ state: inout CarveDetailFeature.State, _ batch: [SentencesWithDrawingFeature.State.ID: VerseRowGeometry]) {
@@ -510,7 +506,7 @@ struct CarveDetailLayoutMeasurementTesting {
     func gateOpensAfterEveryVerseReportsUnderlines() {
         var state = CarveDetailFeature.State.initialState
         reduce(&state, .view(.layoutHostingChanged(writingWidth: 372)))
-        reduce(&state, .setSentence(sentences(count: 3), []))
+        reduce(&state, .setSentence(sentences(count: 3)))
 
         #expect(state.chapterLayout.chapter == chapter)
         #expect(state.chapterLayout.expectedVerseCount == 3)
@@ -541,7 +537,7 @@ struct CarveDetailLayoutMeasurementTesting {
     func singleBatchBuildsLayoutOnce() {
         var state = CarveDetailFeature.State.initialState
         reduce(&state, .view(.layoutHostingChanged(writingWidth: 372)))
-        reduce(&state, .setSentence(sentences(count: 3), []))
+        reduce(&state, .setSentence(sentences(count: 3)))
 
         measured(&state, [
             rowID(1): VerseRowGeometry(
@@ -564,7 +560,7 @@ struct CarveDetailLayoutMeasurementTesting {
     func staleChapterEventsAreDiscarded() {
         var state = CarveDetailFeature.State.initialState
         reduce(&state, .view(.layoutHostingChanged(writingWidth: 372)))
-        reduce(&state, .setSentence(sentences(count: 2), []))
+        reduce(&state, .setSentence(sentences(count: 2)))
         measured(&state, [
             rowID(1): VerseRowGeometry(underlineOffsets: [30]),
             rowID(2): VerseRowGeometry(underlineOffsets: [30])
@@ -573,7 +569,7 @@ struct CarveDetailLayoutMeasurementTesting {
 
         // 장 전환 — 새 장은 3절이고 아직 아무것도 측정되지 않았다.
         let next = BibleChapter(title: .genesis, chapter: 2)
-        reduce(&state, .setSentence(sentences(count: 3, chapter: next), []))
+        reduce(&state, .setSentence(sentences(count: 3, chapter: next)))
         #expect(!state.isLayoutReady)
         #expect(state.chapterLayout.chapter == next)
 
@@ -605,7 +601,7 @@ struct CarveDetailLayoutMeasurementTesting {
     func titleHeightAndMeasuredHeightRebuildButRowFrameDoesNot() {
         var state = CarveDetailFeature.State.initialState
         reduce(&state, .view(.layoutHostingChanged(writingWidth: 372)))
-        reduce(&state, .setSentence(sentences(count: 2), []))
+        reduce(&state, .setSentence(sentences(count: 2)))
         measured(&state, [
             rowID(1): VerseRowGeometry(underlineOffsets: [30]),
             rowID(2): VerseRowGeometry(underlineOffsets: [30])
@@ -641,7 +637,7 @@ struct CarveDetailLayoutMeasurementTesting {
     func gateOpensBeforeMeasuredHeightsAndStaysOpenAfterRebuild() {
         var state = CarveDetailFeature.State.initialState
         reduce(&state, .view(.layoutHostingChanged(writingWidth: 372)))
-        reduce(&state, .setSentence(sentences(count: 2), []))
+        reduce(&state, .setSentence(sentences(count: 2)))
 
         // 밑줄 실측만으로 게이트가 열린다 — 실측 높이는 레이아웃 완성의 조건이 아니다.
         measured(&state, [
@@ -669,7 +665,7 @@ struct CarveDetailLayoutMeasurementTesting {
     func staleChapterMeasuredHeightIsNotApplied() {
         var state = CarveDetailFeature.State.initialState
         reduce(&state, .view(.layoutHostingChanged(writingWidth: 372)))
-        reduce(&state, .setSentence(sentences(count: 2), []))
+        reduce(&state, .setSentence(sentences(count: 2)))
         measured(&state, [
             rowID(1): VerseRowGeometry(underlineOffsets: [30], canvasFrameInRow: CGRect(x: 372, y: 0, width: 372, height: 99)),
             rowID(2): VerseRowGeometry(underlineOffsets: [30], canvasFrameInRow: CGRect(x: 372, y: 0, width: 372, height: 99))
@@ -677,7 +673,7 @@ struct CarveDetailLayoutMeasurementTesting {
         #expect(state.chapterLayout.layout?.regions[0].writingRect.height == 99)
 
         let next = BibleChapter(title: .genesis, chapter: 2)
-        reduce(&state, .setSentence(sentences(count: 2, chapter: next), []))
+        reduce(&state, .setSentence(sentences(count: 2, chapter: next)))
         measured(&state, [
             rowID(1, chapter: next): VerseRowGeometry(underlineOffsets: [30]),
             rowID(2, chapter: next): VerseRowGeometry(underlineOffsets: [30])
@@ -697,7 +693,7 @@ struct CarveDetailLayoutMeasurementTesting {
     @Test("폭이 나중에 도착해도 이미 모인 실측으로 곧바로 레이아웃이 완성된다 (§6-4 도착 순서 무관)")
     func widthArrivingLastCompletesLayout() {
         var state = CarveDetailFeature.State.initialState
-        reduce(&state, .setSentence(sentences(count: 2), []))
+        reduce(&state, .setSentence(sentences(count: 2)))
         measured(&state, [
             rowID(1): VerseRowGeometry(underlineOffsets: [30]),
             rowID(2): VerseRowGeometry(underlineOffsets: [30])
@@ -708,25 +704,5 @@ struct CarveDetailLayoutMeasurementTesting {
 
         #expect(state.isLayoutReady)
         #expect(state.chapterLayout.layout?.writingWidth == 372)
-    }
-
-    @Test("metadata 가 없는 legacy 행은 band 수를 주지 않고, metadata 가 있으면 band 수를 준다")
-    func savedBandCountComesOnlyFromMetadata() throws {
-        let legacy = BibleDrawing(bibleTitle: chapter, verse: 1)
-        #expect(CarveDetailFeature.savedBandCount(of: legacy) == nil)
-        #expect(CarveDetailFeature.savedBandCount(of: nil) == nil)
-
-        let metadata = DrawingLayoutMetadata(
-            baseWritingWidth: 372,
-            baseWritingHeight: 120,
-            baseUnderlineAnchors: [0, 30, 60, 90],
-            layoutSignature: "cl1-test"
-        )
-        let versioned = BibleDrawing(
-            bibleTitle: chapter,
-            verse: 2,
-            layoutMetadataData: try JSONEncoder().encode(metadata)
-        )
-        #expect(CarveDetailFeature.savedBandCount(of: versioned) == 4)
     }
 }

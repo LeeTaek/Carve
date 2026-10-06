@@ -10,7 +10,7 @@ import Foundation
 
 /// 앱이 읽는 실행 인자(`ProcessInfo.processInfo.arguments`) 이름을 모두 여기에 모은다.
 ///
-/// - 이름마다 lowerCamelCase 상수 하나를 둔다(예: `public static let singleCanvas = "-SingleCanvas"`).
+/// - 이름마다 lowerCamelCase 상수 하나를 둔다(예: `public static let uiTestRoute = "-UITestRoute"`).
 ///   새 인자는 여기에 먼저 추가하고, 앱 · 모듈 코드와 UI 테스트는 문자열 대신 이 상수를 쓴다.
 /// - 이 파일은 Foundation 만 import 한다. `CarveAppUITests` 가 CarveToolkit 을 링크하지 않고 이 파일을 소스로 함께 컴파일한다
 ///   (`App/CarveApp/Project.swift`) — 다른 모듈의 타입을 쓰면 UI 테스트 빌드가 깨진다.
@@ -18,10 +18,8 @@ import Foundation
 /// - 쓰는 절차(장 시드 · 화면 바로 열기 · HUD · 표시 진단)는 `docs/device-simulator-verification.md` · `docs/device-debugging-cli.md` 에 있다.
 public enum LaunchArgument {
 
-    // MARK: - 필사 화면 경로 · 시작 장
+    // MARK: - 시작 장
 
-    /// 저장된 flag(`singleCanvasEnabled`)와 관계없이 단일 Canvas 경로를 쓴다. Debug 전용. 읽는 곳: `CarveDetailFeature.State.usesSingleCanvas`.
-    public static let singleCanvas = "-SingleCanvas"
     /// 뒤의 값(`BibleChapter` JSON, 예: `{"title":"1-19Psalms.txt","chapter":119}`)을 시작 장으로 저장한다. Debug 전용. 읽는 곳: `UITestLaunchChapter.apply`.
     public static let uiTestChapter = "-UITestChapter"
 

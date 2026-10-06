@@ -16,7 +16,7 @@ import UIComponents
 ///
 /// 회차를 누르면 곧바로 그 회차가 대표가 된다(탭 즉시 전환, 2026-09-10 결정). 되돌릴 수 있는 동작이라 확인 단계가 없다.
 /// 지금 보이는 회차는 체크 · 「지금 보이는 회차」 · 행 바탕으로 색 말고도 구분한다.
-/// 표면(팝오버 · 시트)은 감싸는 쪽이 정한다 — 단일 Canvas 는 `VerseHistoryPopover`, N-Canvas 는 시트다.
+/// 표면은 감싸는 쪽이 정한다 — 필사 화면은 `VerseHistoryPopover` 다.
 @ViewAction(for: VerseDrawingHistoryFeature.self)
 public struct VerseDrawingHistoryView: View {
     @Bindable public var store: StoreOf<VerseDrawingHistoryFeature>

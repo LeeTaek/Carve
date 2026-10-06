@@ -23,7 +23,7 @@ struct UITestLaunchChapterTesting {
         withDependencies {
             $0.defaultAppStorage = defaults
         } operation: {
-            UITestLaunchChapter.apply(arguments: ["CarveApp", "-SingleCanvas", "-UITestChapter", #"{"title":"1-19Psalms.txt","chapter":122}"#])
+            UITestLaunchChapter.apply(arguments: ["CarveApp", "-UITestChapter", #"{"title":"1-19Psalms.txt","chapter":122}"#])
         }
 
         let stored = try #require(defaults.data(forKey: "title"))

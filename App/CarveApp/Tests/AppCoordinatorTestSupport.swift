@@ -31,6 +31,7 @@ extension AppCoordinatorFeature.State: Equatable {
             && lhs.didShowRelaunchGuidance == rhs.didShowRelaunchGuidance
             && lhs.beforeConnectionNotice == rhs.beforeConnectionNotice
             && lhs.didShowBeforeConnectionNotice == rhs.didShowBeforeConnectionNotice
+            && lhs.showsCanvasRemovalNotice == rhs.showsCanvasRemovalNotice
             && lhs.pendingWidgetVerse == rhs.pendingWidgetVerse
             && lhs.pendingLaunchRoute == rhs.pendingLaunchRoute
     }
@@ -100,8 +101,8 @@ final class AnalyticsRecorder: AnalyticsClient {
 
 /// 본문을 읽지 못하는 클라이언트.
 ///
-/// 코디네이터가 장 · 절 이동을 보내면 필사 화면이 본문을 읽으러 간다. 여기서 멈춰야 그 뒤의 공유 SwiftData 저장소(`drawingData`)와
-/// 테스트값이 없는 `undoManager` 에 닿지 않는다. 필사 화면이 장을 여는 과정은 CarveFeature 시험이 본다.
+/// 코디네이터가 장 · 절 이동을 보내면 필사 화면이 본문을 읽으러 간다. 여기서 멈춰야 그 뒤 단일 캔버스의 장 읽기(필사 저장소 · 초안)가
+/// 돌지 않는다. 필사 화면이 장을 여는 과정은 CarveFeature 시험이 본다.
 struct UnreadableBibleTextClient: BibleTextClient {
     struct Unreadable: Error {}
 
@@ -203,19 +204,21 @@ enum CoordinatorFixture {
 ///
 /// - 자식 화면이 받은 액션의 효과까지 실제로 돈다. 저장소 · 본문에 닿는 의존성은 스텁으로 막는다.
 /// - 편집 환경 스텁(`StubDrawingEditEnvironment`)은 변화 알림이 곧바로 끝나므로 보류 · 연결 전 필기 구독이 남지 않는다.
+/// - `appStorage` 는 기본값이면 시험마다 새 것이다. 2.0.x 「필사 캔버스」 키(N-Canvas 제거 안내)를 미리 넣거나 뒤에 확인하는 시험이 자기 것을 넘긴다.
 @MainActor
 func makeCoordinatorStore(
     _ initialState: @autoclosure () -> AppCoordinatorFeature.State,
     appVersion: String = CoordinatorFixture.appVersion,
     hold: LegacySeparationHold? = nil,
     environment: DrawingEditEnvironment = .ownedForTesting,
-    analytics: AnalyticsRecorder = AnalyticsRecorder()
+    analytics: AnalyticsRecorder = AnalyticsRecorder(),
+    appStorage: UserDefaults = .inMemory
 ) -> TestStoreOf<AppCoordinatorFeature> {
     let store = TestStore(initialState: initialState()) {
         AppCoordinatorFeature()
     } withDependencies: {
-        // 시험마다 새 UserDefaults — `lastSeenAppVersion` · 현재 장 같은 @Shared(.appStorage) 가 다른 시험과 섞이지 않는다.
-        $0.defaultAppStorage = .inMemory
+        // 시험마다 새 UserDefaults — `lastSeenAppVersion` · 현재 장 같은 @Shared(.appStorage) 와 N-Canvas 제거 안내가 읽는 키가 다른 시험과 섞이지 않는다.
+        $0.defaultAppStorage = appStorage
         $0.appVersion = appVersion
         $0.analyticsClient = analytics
         $0.legacySeparationHoldState = LegacySeparationHoldState(hold: hold)

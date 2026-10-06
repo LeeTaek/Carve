@@ -20,20 +20,11 @@ public struct SentencesWithDrawingView: View, @MainActor Equatable {
     public static func == (lhs: SentencesWithDrawingView, rhs: SentencesWithDrawingView) -> Bool {
         lhs.store === rhs.store
             && lhs.halfWidth == rhs.halfWidth
-            && lhs.isLayoutReady == rhs.isLayoutReady
-            && lhs.isCanvasActive == rhs.isCanvasActive
             && lhs.isFavorite == rhs.isFavorite
     }
 
     @Bindable public var store: StoreOf<SentencesWithDrawingFeature>
     @Binding private var halfWidth: CGFloat
-    /// 설계 §6-2 입력 게이트. 장 레이아웃이 완성되기 전에는 캔버스 입력을 막는다 (Phase 2).
-    private let isLayoutReady: Bool
-    /// `PKCanvasView` 를 실제로 만들지 여부 (Phase 2 — 캔버스 지연 생성).
-    ///
-    /// 텍스트·밑줄·frame 실측은 이 값과 무관하게 항상 일어나므로 장 레이아웃은 전 절에 대해 완성된다.
-    /// false 인 동안은 같은 크기의 빈 자리만 차지한다 — 행 높이는 텍스트가 정하므로 배치가 바뀌지 않는다.
-    private let isCanvasActive: Bool
     /// 즐겨찾기한 절인가 — 절 번호 아래 별 표시(시안 N2). 상위(`CarveDetailFeature.favoriteVerses`)가 준다.
     private let isFavorite: Bool
 
@@ -45,28 +36,25 @@ public struct SentencesWithDrawingView: View, @MainActor Equatable {
     private var margins: ChapterLayoutHosting.PageMargins {
         ChapterLayoutHosting.pageMargins(contentWidth: halfWidth * 2)
     }
-    let onUnderlineLayoutChange: (VerseRowFeature.State.ID, Text.LayoutKey.Value) -> Void
+    /// 본문 줄 배치(`Text.LayoutKey`) → 상위(`CarveDetailFeature`)로 전달. 밑줄 offset 과 레이아웃 anchor 가 된다.
+    let onUnderlineLayoutChange: (SentencesWithDrawingFeature.State.ID, Text.LayoutKey.Value) -> Void
     /// 소제목 높이 실측 → 상위(`CarveDetailFeature`)로 전달. 레이아웃의 `leadingInset` 이 된다.
-    let onTitleHeightChange: (VerseRowFeature.State.ID, CGFloat) -> Void
-    /// 캔버스 영역의 실측 frame(**행 안** `ChapterLayoutHosting.rowCoordinateSpaceName` 좌표) → 상위로 전달. 레이아웃 검증용.
-    /// 행 자체의 frame 은 상위가 바깥 트리에서 재어 더한다 (중첩 호스팅 때문 — `rowCoordinateSpaceName` 참조).
-    let onCanvasFrameInRowChange: (VerseRowFeature.State.ID, CGRect) -> Void
+    let onTitleHeightChange: (SentencesWithDrawingFeature.State.ID, CGFloat) -> Void
+    /// 필기 반쪽 영역의 실측 frame(**행 안** `ChapterLayoutHosting.rowCoordinateSpaceName` 좌표) → 상위로 전달.
+    /// 높이는 레이아웃 입력(R13 — 실측 높이)이다. 행 자체의 frame 은 상위가 바깥 트리에서 재어 더한다 (중첩 호스팅 때문 — `rowCoordinateSpaceName` 참조).
+    let onCanvasFrameInRowChange: (SentencesWithDrawingFeature.State.ID, CGRect) -> Void
 
     
     public init(
         store: StoreOf<SentencesWithDrawingFeature>,
         halfWidth: Binding<CGFloat>,
-        isLayoutReady: Bool = true,
-        isCanvasActive: Bool = true,
         isFavorite: Bool = false,
-        onUnderlineLayoutChange: @escaping (VerseRowFeature.State.ID, Text.LayoutKey.Value) -> Void,
-        onTitleHeightChange: @escaping (VerseRowFeature.State.ID, CGFloat) -> Void = { _, _ in },
-        onCanvasFrameInRowChange: @escaping (VerseRowFeature.State.ID, CGRect) -> Void = { _, _ in }
+        onUnderlineLayoutChange: @escaping (SentencesWithDrawingFeature.State.ID, Text.LayoutKey.Value) -> Void,
+        onTitleHeightChange: @escaping (SentencesWithDrawingFeature.State.ID, CGFloat) -> Void = { _, _ in },
+        onCanvasFrameInRowChange: @escaping (SentencesWithDrawingFeature.State.ID, CGRect) -> Void = { _, _ in }
     ) {
         self.store = store
         self._halfWidth = halfWidth
-        self.isLayoutReady = isLayoutReady
-        self.isCanvasActive = isCanvasActive
         self.isFavorite = isFavorite
         self.onUnderlineLayoutChange = onUnderlineLayoutChange
         self.onTitleHeightChange = onTitleHeightChange
@@ -101,16 +89,10 @@ public struct SentencesWithDrawingView: View, @MainActor Equatable {
         }
         // 행 안 실측의 기준 공간. 아래 touchIgnoringContextMenu 의 중첩 호스팅 안쪽이라 바깥 공간은 보이지 않는다.
         .coordinateSpace(name: ChapterLayoutHosting.rowCoordinateSpaceName)
+        // 행별 중첩 호스팅은 레이아웃 실측의 전제라 그대로 둔다(2.1 뒤 별도 작업). 메뉴 항목은 없다 — 단일 Canvas 는 본문 열의
+        // 터치를 받지 않고(`ChapterCanvasController` 의 컬럼 호스트), 절 메뉴 · 이전 필사 보기는 캔버스의 롱프레스가 연다.
         .touchIgnoringContextMenu(ignoringType: .pencil) {
-            UIMenu(children: [
-                UIAction(title: "이전 필사 내용 보기") {_ in send(.presentDrewHistory(true)) }
-            ])
-        }
-        .sheet(isPresented: $store.isPresentDrewHistory.sending(\.view.presentDrewHistory)) {
-            VerseDrawingHistoryView(
-                store: self.store.scope(state: \.drewHistoryState,
-                                        action: \.scope.drewHistoryAction)
-            )
+            UIMenu(children: [])
         }
     }
     
@@ -130,18 +112,13 @@ public struct SentencesWithDrawingView: View, @MainActor Equatable {
         .padding(.top, topDrawingInset)
     }
     
+    /// 필기 반쪽 — 밑줄만 그린다. 잉크는 그 위의 단일 캔버스가 그리고, 이 영역의 실측이 레이아웃이 된다.
+    ///
+    /// 빈 자리(`Color.clear`)는 예전 행 캔버스 자리와 같은 배치를 지킨다 — 행 높이 · 실측(R13)이 바뀌지 않게 구조를 그대로 둔다.
     private var canvasView: some View {
         ZStack {
             underLineView
-            if isCanvasActive {
-                CanvasView(
-                    store: self.store.scope(state: \.canvasState,
-                                            action: \.scope.canvasAction),
-                    isInputEnabled: isLayoutReady
-                )
-            } else {
-                Color.clear
-            }
+            Color.clear
         }
         .frame(width: halfWidth, alignment: .topTrailing)
         .onGeometryChange(for: CGRect.self) { proxy in

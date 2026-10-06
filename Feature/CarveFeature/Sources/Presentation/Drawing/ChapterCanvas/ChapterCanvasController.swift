@@ -159,7 +159,7 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
     private(set) var freshDisplayRebuildCount = 0
     #endif
 
-    /// pencil-up 판정용 trailing debounce (CanvasView 와 같은 값).
+    /// pencil-up 판정용 trailing debounce (2.0.x N-Canvas 와 같은 값).
     private let editSettleInterval: TimeInterval = 0.3
     /// 변경 없이 도구 사용이 끝났다고 보는 대기 시간. trailing 보고보다 길어야 한다.
     private let cancelCheckInterval: TimeInterval = 0.35

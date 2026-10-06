@@ -136,7 +136,7 @@ struct ChapterCanvasLassoEditContractTesting {
     }
 }
 
-// MARK: - 팔레트 (§4-1 · §4-8)
+// MARK: - 팔레트 (§4-1)
 
 @MainActor
 struct PencilPalatteLassoTesting {
@@ -159,7 +159,6 @@ struct PencilPalatteLassoTesting {
     @Test("올가미를 고르면 잉크 설정은 그대로 두고 도구만 바뀐다")
     func selectingLassoKeepsInkSettings() throws {
         try withPalette { state, reducer in
-            state.isLassoAvailable = true
             _ = reducer.reduce(into: &state, action: .view(.setPencilType(.marker)))
 
             _ = reducer.reduce(into: &state, action: .view(.selectLasso))
@@ -174,8 +173,6 @@ struct PencilPalatteLassoTesting {
     @Test("펜 · 지우개를 누르면 올가미에서 빠져나온다")
     func choosingPenOrEraserLeavesLasso() throws {
         try withPalette { state, reducer in
-            state.isLassoAvailable = true
-
             _ = reducer.reduce(into: &state, action: .view(.selectLasso))
             _ = reducer.reduce(into: &state, action: .view(.setPencilType(.pen)))
             #expect(!state.isLassoSelected)
@@ -184,17 +181,6 @@ struct PencilPalatteLassoTesting {
             _ = reducer.reduce(into: &state, action: .view(.setPencilType(.monoline)))
             #expect(!state.isLassoSelected)
             #expect(state.pencilConfig.pencilType == .monoline)
-        }
-    }
-
-    @Test("롤백 경로(N-Canvas)에서는 올가미를 고를 수 없다 (§4-8)")
-    func lassoIsUnavailableOnRollbackPath() throws {
-        try withPalette { state, reducer in
-            state.isLassoAvailable = false
-
-            _ = reducer.reduce(into: &state, action: .view(.selectLasso))
-
-            #expect(!state.isLassoSelected)
         }
     }
 }

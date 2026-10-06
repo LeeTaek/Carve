@@ -30,6 +30,9 @@ public struct AppCoordinatorFeature: Sendable {
         public var beforeConnectionNotice: Int?
         /// 이번 실행에서 연결 전 필기 안내를 이미 띄웠다. 「나중에」 로 닫으면 다음 실행까지 다시 띄우지 않는다.
         var didShowBeforeConnectionNotice = false
+        /// 2.0.x 에서 「필사 캔버스」 를 끄고(절마다 쓰는 캔버스) 쓰던 사용자에게 그 캔버스가 없어졌다고 알리는 막지 않는 안내(2.1 결정 6).
+        /// 필사 화면에 처음 들어갈 때 정하고, 어느 버튼으로 닫든 저장된 키를 지워 다시 띄우지 않는다.
+        public var showsCanvasRemovalNotice = false
         /// 현재 루트 화면 (트리기반)
         @Presents public var root: Root.State? = .launchProgress(.initialState)
         /// 업데이트 패치노트 표시 상태
@@ -78,6 +81,8 @@ public struct AppCoordinatorFeature: Sendable {
     @Dependency(\.drawingEditEnvironment) private var editEnvironment
     @Dependency(\.verseDraftRecoveryReader) private var draftReader
     @Dependency(\.drawingRepository) private var drawingRepository
+    /// 2.0.x 의 「필사 캔버스」 설정이 남은 `UserDefaults`(앱은 `.standard`) — N-Canvas 제거 안내를 띄울지 읽고, 닫으면 그 키를 지운다.
+    @Dependency(\.defaultAppStorage) private var appStorage
 
     private enum CancelID { case relaunchGuidance, beforeConnection }
     
@@ -100,6 +105,10 @@ public struct AppCoordinatorFeature: Sendable {
         case beforeConnectionNoticeReviewTapped
         /// 연결 전 필기 안내의 「나중에」 — 필기는 그대로 남는다.
         case beforeConnectionNoticeDismissed
+        /// N-Canvas 제거 안내의 「의견 보내기」 — 안내를 닫고(키를 지움) 설정의 「의견 보내기」 를 연다.
+        case canvasRemovalNoticeFeedbackTapped
+        /// N-Canvas 제거 안내의 「확인」 — 안내를 닫고 키를 지운다.
+        case canvasRemovalNoticeDismissed
     }
     
     @Reducer
@@ -186,6 +195,8 @@ public struct AppCoordinatorFeature: Sendable {
                 if let previousVersion, previousVersion != currentVersion {
                     state.patchnote = .initialState
                 }
+                // 2.0.x 에서 「필사 캔버스」 를 끈 사용자면 그 캔버스가 없어졌다고 한 번 알린다(2.1 결정 6).
+                state.showsCanvasRemovalNotice = resolveCanvasRemovalNotice()
                 // 보류 중이면 로그인 · 소유가 확인되는지 지켜보다가 재실행을 안내한다. 연결을 기다리는 로딩은 띄우지 않는다.
                 // 연결된 실행이면 가져오기를 기다리는 연결 전 필기가 있는지 보고 안내한다(2026-09-29).
                 let guidance: Effect<Action> = holdState.isHeld ? observeRelaunchGuidance() : observeBeforeConnectionDrafts()
@@ -221,6 +232,13 @@ public struct AppCoordinatorFeature: Sendable {
             case .beforeConnectionNoticeDismissed:
                 state.beforeConnectionNotice = nil
 
+            case .canvasRemovalNoticeFeedbackTapped:
+                dismissCanvasRemovalNotice(state: &state)
+                state.settings = SettingsFeature.State.initialState(path: .sendFeedback(.initialState))
+
+            case .canvasRemovalNoticeDismissed:
+                dismissCanvasRemovalNotice(state: &state)
+
             case .openedURL(let url):
                 guard let verse = Self.verse(from: url) else { break }
                 // 위젯에서 들어왔다 — 설정 · 다른 화면을 닫고 그 절을 연다.
@@ -242,6 +260,18 @@ public struct AppCoordinatorFeature: Sendable {
             ))))):
                 state.settings = SettingsFeature.State.initialState(path: .draftRecovery(.initialState))
                 return .send(.root(.presented(.carve(.view(.closeNavigationBar)))))
+
+            // 설정의 「백업 만들기」 가 백업 전에 마지막 필기가 이 기기에 남았는지 묻는다(설계 backup-import-design §5-2 ②).
+            case .settings(.presented(.path(.presented(.backup(.export(.delegate(.canvasFlushRequested(let id)))))))):
+                return relayBackupFlushRequest(state: state, id: id)
+
+            // 필사 화면이 답했다 — 설정으로 돌려주고, 설정이 그 id 를 기다리는 「백업 만들기」 에 넘긴다(§5-2 ④).
+            case .root(.presented(.carve(.scope(.carveDetailAction(
+                .scope(.chapterCanvasAction(.delegate(.backupFlushFinished(let id, let outcome))))
+            ))))):
+                // 설정이 닫혔으면 기다리는 내보내기가 없다 — 답을 버린다.
+                guard state.settings != nil else { break }
+                return .send(.settings(.presented(.canvasFlushFinished(id: id, outcome: outcome))))
                 
             case .root(.presented(.carve(.view(.moveToChart)))):
                 state.path.append(.chart(.initialState))
@@ -315,6 +345,60 @@ public struct AppCoordinatorFeature: Sendable {
     }
 }
 
+// MARK: - 백업 전 flush 중계 (설계 backup-import-design §5-2)
+
+extension AppCoordinatorFeature {
+    /// 「백업 만들기」 의 flush 요청을 필사 화면으로 넘긴다. Feature 끼리는 서로를 모르므로 코디네이터가 잇는다.
+    ///
+    /// - 입력: 코디네이터 상태와 요청 id.
+    /// - 출력: 필사 화면이 있으면 그 캔버스로 `backupFlushRequested(id:)` — 캔버스가 같은 id 로 답한다(`delegate(.backupFlushFinished)`).
+    ///   없으면(아직 시작 화면) 지킬 편집이 없으므로 곧바로 설정에 `.durable`.
+    /// - 부작용: 없음(액션만 보낸다). 설정이 열려 있는 동안 캔버스 입력은 막혀 있어(`AppCoordinatorView.allowsHitTesting`) flush 뒤에 새 획이 끼지 않는다.
+    private func relayBackupFlushRequest(state: State, id: UUID) -> Effect<Action> {
+        guard case .carve? = state.root else {
+            return .send(.settings(.presented(.canvasFlushFinished(id: id, outcome: .durable))))
+        }
+        return .send(.root(.presented(.carve(.scope(.carveDetailAction(.scope(.chapterCanvasAction(.backupFlushRequested(id: id)))))))))
+    }
+}
+
+// MARK: - N-Canvas 제거 안내 (2.1 결정 6)
+
+extension AppCoordinatorFeature {
+    /// 2.0.x 의 「필사 캔버스」 설정이 쓰던 `UserDefaults` 키. 2.1 은 이 값을 읽는 곳이 없고, 안내를 정할 때만 본다.
+    enum CanvasRemovalNotice {
+        /// 「단일 캔버스 사용」 토글 값. Bool false 로 남아 있으면 그 사용자는 절마다 쓰는 캔버스(N-Canvas)로 쓰고 있었다.
+        static let singleCanvasEnabledKey = "singleCanvasEnabled"
+        /// 2.0.x 가 토글 값을 설치당 한 번 지웠는지 적던 키 — 함께 지운다.
+        static let storedValueResetKey = "singleCanvasStoredValueReset"
+    }
+
+    /// 필사 화면에 들어갈 때 N-Canvas 제거 안내를 띄울지 정한다.
+    ///
+    /// - 입력: `appStorage` 의 `singleCanvasEnabled`. 2.0.0(Xcode 27 빌드)이 JSON 으로 쓴 값은 앱 시작 때 `AppStorageFormatMigration` 이 Bool 로 되돌려 둔다.
+    /// - 출력: 그 값이 Bool false 로 저장돼 있으면 true(안내를 띄운다 — 키는 버튼을 누를 때 지운다).
+    /// - 부작용: 키가 없거나 false 가 아니면 안내 없이 두 키를 곧바로 지운다 — 읽는 곳이 없는 값이다.
+    private func resolveCanvasRemovalNotice() -> Bool {
+        if appStorage.object(forKey: CanvasRemovalNotice.singleCanvasEnabledKey) as? Bool == false {
+            return true
+        }
+        removeCanvasRemovalKeys()
+        return false
+    }
+
+    /// N-Canvas 제거 안내를 닫는다. 입력: 코디네이터 상태. 부작용: 두 키를 지워 다음 실행에서도 다시 띄우지 않는다.
+    private func dismissCanvasRemovalNotice(state: inout State) {
+        state.showsCanvasRemovalNotice = false
+        removeCanvasRemovalKeys()
+    }
+
+    /// 2.0.x 「필사 캔버스」 설정의 두 키를 지운다. 부작용: `appStorage` 에서 키를 지운다(없으면 아무것도 바뀌지 않는다).
+    private func removeCanvasRemovalKeys() {
+        appStorage.removeObject(forKey: CanvasRemovalNotice.singleCanvasEnabledKey)
+        appStorage.removeObject(forKey: CanvasRemovalNotice.storedValueResetKey)
+    }
+}
+
 // MARK: - 화면 바로 열기 (`-UITestRoute`)
 
 extension AppCoordinatorFeature {
@@ -328,7 +412,7 @@ extension AppCoordinatorFeature {
     /// | `navigation` | 성경 탐색 — 헤더 제목을 누른 것처럼 탐색 열을 모두 연다 |
     /// | `chart` · `favorites` | 기록 차트 · 즐겨찾기 목록을 필사 화면 위에 쌓는다 |
     /// | `settings` | 설정의 첫 화면(iCloud) |
-    /// | `settings/<하위>` | 설정의 그 화면 — `icloud` · `draftRecovery` · `canvas` · `widget` · `appearance` · `help` · `patchnote` · `sendFeedback` · `appVersion` · `removeAds` |
+    /// | `settings/<하위>` | 설정의 그 화면 — `icloud` · `draftRecovery` · `backup` · `widget` · `appearance` · `help` · `patchnote` · `sendFeedback` · `appVersion` · `removeAds` |
     /// | `verse/<절 번호>` | 시작 장(`-UITestChapter` 또는 마지막으로 연 장)의 그 절 |
     ///
     /// 이름은 대소문자를 가리지 않는다. 모르는 경로는 로그만 남기고 무시한다 — 앱은 경로 없이 시작한다.
@@ -392,7 +476,7 @@ private extension SettingsFeature.SidebarItem {
         switch self {
         case .iCloud: "icloud"
         case .draftRecovery: "draftRecovery"
-        case .canvas: "canvas"
+        case .backup: "backup"
         case .widget: "widget"
         case .appearance: "appearance"
         case .help: "help"
@@ -408,7 +492,7 @@ private extension SettingsFeature.SidebarItem {
         switch self {
         case .iCloud: .iCloud(.initialState)
         case .draftRecovery: .draftRecovery(.initialState)
-        case .canvas: .canvas(.initialState)
+        case .backup: .backup(.initialState)
         case .widget: .widget(.initialState)
         case .appearance: .appearance(.initialState)
         case .help: .help(.initialState)

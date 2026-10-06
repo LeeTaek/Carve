@@ -21,7 +21,7 @@ public struct VerseDrawingHistoryFeature: Sendable {
         public var title: BibleChapter
         /// 성경 절
         public var verse: Int
-        /// 해당 절에 대한 필사 기록 목록(행마다 스냅샷 하나)
+        /// 목록에 보이는 필사 기록(행마다 스냅샷 하나) — 획 있는 행만, 같은 내용은 하나로 묶었다(`setDrawings`).
         public var drawings: [VerseDrawingSnapshot] = []
         /// 목록을 한 번이라도 받았는지. 조회 전 빈 목록을 "기록 없음" 으로 깜빡이지 않게 한다.
         public var hasLoaded = false
@@ -75,13 +75,17 @@ public struct VerseDrawingHistoryFeature: Sendable {
                 // 그 아래로 밀린다.
                 //
                 // ⚠️ 거르는 곳은 **목록뿐이다.** 저장소의 `fetchVerseSnapshots(chapter:verse:)` 는 그대로 둔다 —
-                // `updateDrawings(requests:)` 와 `updatePresentDrawing(chapter:verse:presentRowID:)` 이 같은 행을 보고,
+                // 캔버스의 대표 선택(`DrawingRepresentativeRule`)과 `updatePresentDrawing(chapter:verse:presentRowID:)` 이 같은 행을 보고,
                 // 거기서 빈 활성 행이 빠지면 대표가 과거 회차로 승격돼 지운 획이 되살아난다. 회차를 고를 때도
                 // `updatePresentDrawing` 이 DB 의 **모든 행**을 다시 읽어 `isPresent` 를 옮기므로, 목록에서 뺀 빈 행의
                 // 표시도 정상적으로 내려간다.
                 //
                 // 기준은 `Array<BibleDrawing>.historyRows()` 와 같은 `DrawingContentRule.hasStrokes(_:)` 다. 순서는 조회 그대로다.
-                state.drawings = drawings.filter { DrawingContentRule.hasStrokes($0.lineData) }
+                let carved = drawings.filter { DrawingContentRule.hasStrokes($0.lineData) }
+                // **같은 내용의 행도 목록에서만 하나로 보인다** (정책 §7-3 — 두 기기가 오프라인으로 같은 백업을 불러오면 같은 내용 행이 둘 생긴다).
+                // 남기는 행은 대표 규칙 순서라 지금 보이는 회차는 늘 남고, 회차 고르기도 남긴 행으로 한다. 저장소의 행은 그대로다
+                // (`VerseDrawingHistoryDedup`). 남긴 행을 고르면 `updatePresentDrawing` 이 숨긴 같은 내용 행의 `isPresent` 도 함께 내린다.
+                state.drawings = VerseDrawingHistoryDedup.visibleRows(carved)
                 state.hasLoaded = true
                 return .none
                 
@@ -100,6 +104,7 @@ public struct VerseDrawingHistoryFeature: Sendable {
                     return .none
                 }
                 state.restoreBlock = nil
+                // 목록에는 남긴 행만 있다 — 같은 내용으로 숨긴 행은 고를 수 없다(`setDrawings`).
                 guard let drawing = state.drawings.first(where: { $0.rowID == presentRowID }) else { return .none }
                 return handleSelectDrawing(state: &state, drawing: drawing)
                 
@@ -112,7 +117,7 @@ public struct VerseDrawingHistoryFeature: Sendable {
 extension VerseDrawingHistoryFeature {
     /// 현재 절에 대한 필사 기록들을 비동기로 조회하고, 결과를 setDrawings 액션으로 반영.
     ///
-    /// 조회는 저장소가 주는 **모든 행** 그대로다. 빈 행을 거르는 것은 `setDrawings` 한 곳이다 (§8-7).
+    /// 조회는 저장소가 주는 **모든 행** 그대로다. 빈 행을 거르고 같은 내용을 하나로 묶는 것은 `setDrawings` 한 곳이다 (§8-7 · 정책 §7-3).
     private func fetchDrawings(state: inout State) -> Effect<Action> {
         let title = state.title
         let verse = state.verse

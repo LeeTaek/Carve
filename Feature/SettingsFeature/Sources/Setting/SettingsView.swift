@@ -54,9 +54,6 @@ public struct SettingsView: View {
         // 선택은 경로 상태가 아니라 행으로 비교한다 — 상세 화면의 상태가 바뀌어도 선택 표시가 남는다.
         List(selection: $store.selectedSidebarItem.sending(\.selectSidebarItem)) {
             Section("필사") {
-                NavigationLink(value: SettingsFeature.SidebarItem.canvas) {
-                    sidebarRow("필사 캔버스", value: "단일")
-                }
                 NavigationLink("위젯", value: SettingsFeature.SidebarItem.widget)
             }
             Section("화면") {
@@ -71,6 +68,8 @@ public struct SettingsView: View {
                 }
                 // 확인이 필요한 필기의 지속적인 진입점(정책 §12-6 ④) — 개수는 화면을 열 때 센다.
                 NavigationLink(DraftRecoveryCopy.title, value: SettingsFeature.SidebarItem.draftRecovery)
+                // 필사 백업 — 백업 만들기 · 불러오기(2.1).
+                NavigationLink(BackupCopy.title, value: SettingsFeature.SidebarItem.backup)
             }
             Section("지원") {
                 NavigationLink("도움말", value: SettingsFeature.SidebarItem.help)
@@ -146,9 +145,9 @@ public struct SettingsView: View {
             if let store = store.scope(state: \.path?.draftRecovery, action: \.path.draftRecovery) {
                 DraftRecoveryView(store: store)
             }
-        case .canvas:
-            if let store = store.scope(state: \.path?.canvas, action: \.path.canvas) {
-                CanvasSettingsView(store: store)
+        case .backup:
+            if let store = store.scope(state: \.path?.backup, action: \.path.backup) {
+                BackupView(store: store)
             }
         case .widget:
             if let store = store.scope(state: \.path?.widget, action: \.path.widget) {

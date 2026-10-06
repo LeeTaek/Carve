@@ -20,35 +20,23 @@ public struct CarveDetailFeature: Sendable {
     public struct State {
         /// 헤더 상태
         public var headerState: HeaderFeature.State
+        /// 장의 본문 행 — 단일 Canvas 의 본문 열 · 장 레이아웃 실측 · 즐겨찾기 · 위젯 · 이미지 저장이 절 본문을 여기서 읽는다.
         public var sentenceWithDrawingState: IdentifiedArrayOf<SentencesWithDrawingFeature.State> = []
-        /// ScrollView 위치 제어용 프록시
-        public var proxy: ScrollViewProxy?
-        /// 차트 등 외부 화면에서 특정 절로 이동할 때 사용할 스크롤 타깃 ID.
-        public var scrollTargetID: SentencesWithDrawingFeature.State.ID?
         /// 마지막으로 사용한 펜 종류(펜슬 더블탭시 전환용)
         var lastUsedPencil: PKInkingTool.InkType = .pencil
-//        /// global 좌표계 기준 CombinedCanvasView의 frame (Canvas 기준 verse 별 rect 계산용)
-//        var canvasGlobalFrame: CGRect = .zero
 
         /// Phase 2 — 장 전체 레이아웃 측정 상태 (설계 §6). 절별 실측이 모이면 `ChapterLayout` 이 완성된다.
         var chapterLayout = ChapterLayoutMeasurement()
-        /// 설계 §6-2 입력 게이트. false 인 동안 모든 절 캔버스의 펜 입력이 막힌다.
+        /// 설계 §6-2 입력 게이트. false 인 동안 캔버스의 펜 입력이 막힌다.
         public var isLayoutReady: Bool { chapterLayout.isReady }
         /// 진행 중인 측정 구간의 `os_signpost` ID (`ChapterLayoutSignpost`).
         var layoutSignpostID: UInt64?
-        /// 마지막으로 편집(획 추가/지우개)이 올라온 절. 디버그 오버레이의 dirtyBounds 표시용.
-        var lastEditedVerseID: SentencesWithDrawingFeature.State.ID?
 
-        // MARK: Phase 3 — feature flag 뒤 단일 Canvas (설계 §13 Phase 3)
+        // MARK: 단일 Canvas (설계 §13 Phase 3 — 2.1 부터 필사 화면의 유일한 경로)
 
-        /// 단일 Canvas 경로 사용 여부. 기본 on(`SingleCanvasFlag.defaultValue`) — flag off 가 §10-3 의 유일한 롤백 수단이다.
-        /// 앱 시작 때 `SingleCanvasFlag.resetStoredValueOnce(in:)` 가 기존 저장값을 설치당 한 번 지워 기존 사용자도 기본값을 따른다.
-        /// 설정 > 필사 캔버스 의 토글(`CanvasSettingsFeature`)이 같은 키에 쓴다. Debug 실행 인자 `-SingleCanvas` 도 같은 효과다.
-        @Shared(.appStorage(SingleCanvasFlag.appStorageKey))
-        public var isSingleCanvasEnabled: Bool = SingleCanvasFlag.defaultValue
-        /// 단일 Canvas 상태. flag off 일 때는 아무 액션도 받지 않는다.
+        /// 단일 Canvas 상태 — 장 하나를 캔버스 하나로 읽고 쓴다.
         var chapterCanvas = ChapterCanvasFeature.State(chapter: .initialState)
-        /// 외부 진입(차트 등)으로 이동할 절 번호. 단일 Canvas 는 `ScrollViewProxy` 가 없어 절 번호로 스크롤한다.
+        /// 외부 진입(차트 등)으로 이동할 절 번호. 캔버스가 절 번호로 스크롤한다(`scrollToVerse`).
         var scrollTargetVerse: Int?
         /// 단일 Canvas 의 절 필사 기록 시트 (§8-7 히스토리 UI, B 구조). 롱프레스 → `ChapterCanvasFeature.Delegate.showHistory` 로 연다.
         @Presents var chapterHistory: VerseDrawingHistoryFeature.State?
@@ -79,17 +67,7 @@ public struct CarveDetailFeature: Sendable {
         var widgetNotice: WidgetNotice?
         /// 보관하고 위젯에 담는 중. 같은 요청이 겹치지 않게 한다.
         var isAddingToWidget = false
-        /// N-Canvas 가 동기화 저장소에 쓰지 못하는 사유(정책 §12-6 결정 1). 있으면 N-Canvas 입력을 닫고 사유를 보인다. 확인 전에는 막아 둔다.
-        var nCanvasWriteBlock: SyncedWriteBlock? = .accountUnconfirmed
 
-        /// flag 또는 Debug 실행 인자로 단일 Canvas 를 쓸지.
-        public var usesSingleCanvas: Bool {
-            #if DEBUG
-            if ProcessInfo.processInfo.arguments.contains(LaunchArgument.singleCanvas) { return true }
-            #endif
-            return isSingleCanvasEnabled
-        }
-        
         /// 성경 문장 출력시 자간 폰트 등 설정
         @Shared(.codableAppStorage(SentenceSetting.appStorageKey)) public var sentenceSetting: SentenceSetting = .initialState
         /// 왼손잡이용 레이아웃 여부
@@ -99,16 +77,14 @@ public struct CarveDetailFeature: Sendable {
         /// 이 화면이 마지막으로 반영한 세대. 뷰가 트리에서 빠졌다 돌아와도 놓치지 않도록 **값으로** 비교한다.
         public var seenDrawingDataRevision: Int = 0
         
-        /// N-Canvas 행(@Model) · PencilKit 값을 담아 Sendable 이 아니므로 저장 프로퍼티 대신 계산 프로퍼티다.
+        /// PencilKit 값(`PKInkingTool.InkType` — 헤더 팔레트 · `lastUsedPencil`)을 담아 Sendable 이 아니므로 저장 프로퍼티 대신 계산 프로퍼티다.
         public static var initialState: Self {
             State(
                 headerState: .initialState
             )
         }
     }
-    @Dependency(\.drawingData) var drawingContext
     @Dependency(\.bibleTextClient) var bibleTextClient
-    @Dependency(\.undoManager) var undoManager
     @Dependency(\.favoriteVerseRepository) var favoriteRepository
     @Dependency(\.date) var date
     @Dependency(\.continuousClock) var clock
@@ -121,7 +97,9 @@ public struct CarveDetailFeature: Sendable {
     public enum Action: ViewAction, CarveToolkit.ScopeAction {
         /// 화면 최상단으로 스크롤
         case scrollToTop
-        case setSentence([BibleVerse], [BibleDrawing])
+        /// 장 본문을 읽었다 — 본문 행 · 레이아웃 측정 · 즐겨찾기를 새로 시작하고 단일 Canvas 에 장을 연다.
+        case setSentence([BibleVerse])
+        /// 외부 진입(차트 등)이 이동할 절을 정했다.
         case setScrollTarget(BibleVerse)
         /// 단일 Canvas 의 절 필사 기록 시트.
         case chapterHistory(PresentationAction<VerseDrawingHistoryFeature.Action>)
@@ -131,8 +109,6 @@ public struct CarveDetailFeature: Sendable {
         case favoriteChangeFinished(FavoriteChange, failed: Bool)
         /// 즐겨찾기 추가 · 해제를 동기화 저장소에 쓰지 않고 막았다 — 소유가 확인되지 않았다(정책 §12-6 결정 1).
         case favoriteChangeBlocked(FavoriteChange, SyncedWriteBlock)
-        /// N-Canvas 가 동기화 저장소에 쓸 수 있는지가 바뀌었다(정책 §12-6 결정 1).
-        case syncedWriteGateChanged(SyncedWriteBlock?)
         /// 다른 화면(즐겨찾기 목록)에서 즐겨찾기가 바뀌었다 — 지금 장의 표시를 다시 읽는다.
         case reloadFavorites
         /// 즐겨찾기 결과 안내를 내린다.
@@ -169,8 +145,6 @@ public struct CarveDetailFeature: Sendable {
             #endif
             /// 스크롤에 따른 헤더 애니메이션
             case headerAnimation(CGFloat, CGFloat)
-            /// scrollView proxy 설정
-            case setProxy(ScrollViewProxy)
             /// 펜을 지우개로 전환
             case switchToEraser
             /// 펜 타입을 이전으로 전환
@@ -184,7 +158,7 @@ public struct CarveDetailFeature: Sendable {
             /// 행마다 액션을 보내면 안 된다 — 액션 하나가 부모 상태를 바꿔 스코프 스토어 전체와 `VStack` 전체 패스를
             /// 다시 돌리므로 행 수의 제곱으로 비용이 늘어난다 (`VerseGeometryCollector` 참조).
             /// 밑줄 offset 을 여기서(행이 아닌 상위에서) 반영하는 것은 ForEachReducer missing element warning 회피이기도 하다.
-            case verseGeometryMeasured([VerseRowFeature.State.ID: VerseRowGeometry])
+            case verseGeometryMeasured([SentencesWithDrawingFeature.State.ID: VerseRowGeometry])
             /// 필사 컬럼 폭이 바뀜 (Phase 2 — `ChapterLayout.writingWidth`)
             case layoutHostingChanged(writingWidth: CGFloat)
             /// 앱이 비활성/백그라운드로 감 — 단일 Canvas 의 미저장분을 저장한다 (§8-5, best-effort)
@@ -250,16 +224,11 @@ public struct CarveDetailFeature: Sendable {
             case .view(.drawingDataRevisionChanged):
                 guard state.seenDrawingDataRevision != state.drawingDataRevision else { return .none }
                 state.seenDrawingDataRevision = state.drawingDataRevision
-                // 즐겨찾기 표시도 함께 지워졌다.
-                var effects: [Effect<Action>] = [.send(.reloadFavorites)]
-                if state.usesSingleCanvas {
-                    // 미저장분까지 버리고 DB 에서 다시 합성한다 — 레이아웃은 그대로라 다시 재지 않는다.
-                    effects.append(.send(.scope(.chapterCanvasAction(.drawingDataCleared))))
-                } else {
-                    // N-Canvas 롤백 경로는 절마다 drawing 을 들고 있어 장을 다시 읽는다.
-                    effects.append(.send(.view(.fetchSentence)))
-                }
-                return .merge(effects)
+                // 즐겨찾기 표시도 함께 지워졌다. 캔버스는 미저장분까지 버리고 DB 에서 다시 합성한다 — 레이아웃은 그대로라 다시 재지 않는다.
+                return .merge(
+                    .send(.reloadFavorites),
+                    .send(.scope(.chapterCanvasAction(.drawingDataCleared)))
+                )
 
             case .view(.fetchSentence):
                 let oldChapter = state.headerState.currentTitle
@@ -269,51 +238,33 @@ public struct CarveDetailFeature: Sendable {
                     handleFetchSentence(state: &state)
                 )
                 
-            case .setSentence(let sentences, let drawings):
+            case .setSentence(let sentences):
+                // 본문 행만 만든다 — 필사는 단일 Canvas 가 장 단위로 읽는다(아래 `.load`).
                 var sentenceState: IdentifiedArrayOf<SentencesWithDrawingFeature.State> = []
                 for sentence in sentences {
-                    // 획 유무로 후보를 거르지 않는다.
-                    // 지우개로 전부 지운 절은 "stroke 0개인 유효한 drawing"으로 저장되는데,
-                    // 여기서 걸러버리면 더 오래된(획이 남아 있는) 기록이 대표로 선택되어
-                    // 지운 결과가 다시 살아난 것처럼 보인다.
-                    // 대표 선택 규칙은 도메인의 `mainDrawing()`(isPresent 우선 → updateDate 최신)과 동일하게 맞춘다.
-                    let candidates = drawings.filter { $0.verse == sentence.verse }
-                    let drawing = candidates.first(where: { $0.isPresent == true })
-                    ?? candidates.sorted(by: { ($0.updateDate ?? Date.distantPast) > ($1.updateDate ?? Date.distantPast) }).first
-                    sentenceState.append(SentencesWithDrawingFeature.State(sentence: sentence, drawing: drawing))
+                    sentenceState.append(SentencesWithDrawingFeature.State(sentence: sentence))
                 }
                 state.sentenceWithDrawingState = sentenceState
-                // N-Canvas 의 `SharedUndoManager` 는 MainActor 타입이다. 리듀서는 스토어(MainActor)에서 돈다.
-                MainActor.assumeIsolated { undoManager.clear() }
                 beginLayoutMeasurement(state: &state, sentences: sentences)
-                // 단일 Canvas 면 팔레트의 undo/redo 는 캔버스가 처리한다 — 팔레트가 SharedUndoManager 값으로 공유 canUndo 를 덮지 않게.
-                state.headerState.palatteSetting.delegatesUndoToCanvas = state.usesSingleCanvas
-                // 올가미도 단일 Canvas 전용이다 (올가미 설계 §4-8). flag 를 끄고 돌아온 장에서는 선택까지 내린다 —
-                // 버튼만 잠그면 이전에 고른 올가미가 남아 N-Canvas 에서 필기가 되지 않는 것처럼 보인다.
-                state.headerState.palatteSetting.isLassoAvailable = state.usesSingleCanvas
-                if !state.usesSingleCanvas {
-                    state.headerState.palatteSetting.$isLassoSelected.withLock { $0 = false }
-                }
                 state.chapterHistory = nil
                 let chapter = sentences.first?.title ?? state.headerState.currentTitle
-                // 절 번호 아래 즐겨찾기 표시는 두 경로(단일 Canvas · N-Canvas)가 같은 본문 컬럼에 그리므로 경로와 무관하게 읽는다.
+                // 절 번호 아래 즐겨찾기 표시는 본문 컬럼에 그린다.
                 let favorites = loadFavorites(state: &state, chapter: chapter)
-                guard state.usesSingleCanvas else {
-                    // flag 를 끄고 돌아온 장 — 단일 Canvas 에 남은 미저장분은 여기서 마저 저장한다 (§8-5).
-                    return .merge(
-                        favorites,
-                        state.chapterCanvas.isFullyPersisted ? .none : .send(.scope(.chapterCanvasAction(.flushPending))),
-                        observeSyncedWriteGate()
-                    )
-                }
-                // 단일 Canvas: 본문이 확정된 시점에 조회를 시작한다 (§6-4). 레이아웃은 실측이 끝나면 따로 들어간다.
+                // 본문이 확정된 시점에 조회를 시작한다 (§6-4). 레이아웃은 실측이 끝나면 따로 들어간다.
                 return .merge(
                     favorites,
                     .send(.scope(.chapterCanvasAction(.load(chapter: chapter, expectedVerseCount: sentences.count))))
                 )
-                
+
+            case .scope(.chapterCanvasAction(.drawingsLoaded)):
+                // HUD slack 진단(설계 §6-3 `N_saved`) — 캔버스가 방금 읽은 장의 행에서 절별 저장 band 수를 채운다.
+                // 캔버스 리듀서(`Scope`)가 먼저 돌았으므로 `loadedDrawings` 는 이번 조회 결과다. 레이아웃 입력이 아니라 다시 짓지 않는다.
+                if let loaded = state.chapterCanvas.loadedDrawings {
+                    state.chapterLayout.updateSavedBandCounts(Self.savedBandCounts(from: loaded), chapter: state.chapterCanvas.chapter)
+                }
+                return .none
+
             case .setScrollTarget(let verse):
-                state.scrollTargetID = makeSentenceID(for: verse)
                 state.scrollTargetVerse = verse.verse
                 return .none
                 
@@ -328,7 +279,7 @@ public struct CarveDetailFeature: Sendable {
                 return forwardLayoutToSingleCanvas(state: &state)
 
             case .view(.appWillResignActive):
-                // flag 와 무관하게 보낸다 — 방금 flag 를 끈 뒤에도 단일 Canvas 에 미저장분이 남아 있을 수 있다. 없으면 no-op.
+                // 단일 Canvas 의 미저장분을 저장한다. 없으면 no-op.
                 return .send(.scope(.chapterCanvasAction(.flushPending)))
 
             case .view(.saveRetryTapped):
@@ -339,7 +290,6 @@ public struct CarveDetailFeature: Sendable {
                 return .send(.scope(.chapterCanvasAction(.retryLoad)))
 
             case .view(.scrollToVerse(let verse)):
-                guard state.usesSingleCanvas else { return .none }
                 return .send(.scope(.chapterCanvasAction(.scrollToVerse(verse))))
 
             case .view(.moveToNext):
@@ -356,10 +306,6 @@ public struct CarveDetailFeature: Sendable {
 
             case .favoritesLoaded, .favoriteChangeFinished, .favoriteChangeBlocked, .reloadFavorites, .favoriteNoticeExpired, .view(.favoriteRetryTapped):
                 return reduceFavorite(state: &state, action: action)
-
-            case .syncedWriteGateChanged(let block):
-                state.nCanvasWriteBlock = block
-                return .none
 
             case .view(.verseMenuHistoryTapped):
                 return .send(.scope(.chapterCanvasAction(.verseMenuHistoryTapped)))
@@ -413,17 +359,12 @@ public struct CarveDetailFeature: Sendable {
                 )))
 
             case .scope(.headerAction(.palatteAction(.view(.undo)))):
-                guard state.usesSingleCanvas else { return .none }
+                // 팔레트의 undo/redo 는 늘 캔버스(`canvas.undoManager`)가 처리한다.
                 return .send(.scope(.chapterCanvasAction(.undoTapped)))
 
             case .scope(.headerAction(.palatteAction(.view(.redo)))):
-                guard state.usesSingleCanvas else { return .none }
                 return .send(.scope(.chapterCanvasAction(.redoTapped)))
-                
-            case .view(.setProxy(let proxy)):
-                state.proxy = proxy
-                return .send(.scrollToTop)
-                
+
             case .scrollToTop:
                 return scrollToTop(state: &state)
 
@@ -446,56 +387,13 @@ public struct CarveDetailFeature: Sendable {
                 state.lastUsedPencil = penType
                 return .none
 
-//            case .scope(.verseRowAction(
-//                .element(id: let id, action: .view(.updateVerseFrame(let globalRect))))
-//            ):
-//                return updateVerseFrame(
-//                    state: &state,
-//                    id: id,
-//                    globalRect: globalRect
-//                )
-//                
-//            case .view(.canvasFrameChanged(let rect)):
-//                state.canvasGlobalFrame = rect
-//                return .none
-//
-//            case .scope(.canvasAction(.undoStateChanged(let canUndo, let canRedo))):
-//                state.headerState.palatteSetting.canUndo = canUndo
-//                state.headerState.palatteSetting.canRedo = canRedo
-//                return .none
-//            case .scope(.headerAction(.palatteAction(.view(.undo)))):
-//                return .send(.scope(.canvasAction(.undo)))
-//                return .none
-//                
-//            case .scope(.headerAction(.palatteAction(.view(.redo)))):
-//                return .send(.scope(.canvasAction(.redo)))
-            
             case .view(.tapForHeaderHidden):
                 return .send(.scope(.headerAction(.toggleCompact)))
-                
+
             case .view(.twoFingerDoubleTapForUndo):
-//                return .send(.scope(.canvasAction(.undo)))
                 Log.debug("두손가락 탭")
                 return .send(.scope(.headerAction(.palatteAction(.view(.undo)))))
 
-            case .scope(.sentenceWithDrawingAction(
-                .element(id: let id,
-                         action: .scope(.canvasAction(let action))))
-            ):
-                guard case .saveDrawing = action,
-                      let index = state.sentenceWithDrawingState.firstIndex(where: { $0.id == id }) else {
-                    return .none
-                }
-                state.lastEditedVerseID = id
-                let canvasState = state.sentenceWithDrawingState[index].canvasState
-                guard let request = makeLegacyDrawingSaveRequest(from: canvasState) else {
-                    return .none
-                }
-                return .run { _ in
-                    try await persistDrawing(request)
-                }
-                
-                     
             default: return .none
             }
         }
@@ -518,7 +416,6 @@ extension CarveDetailFeature {
         case headerAction(HeaderFeature.Action)
         /// Phase 3 — 단일 Canvas
         case chapterCanvasAction(ChapterCanvasFeature.Action)
-//        case canvasAction(CombinedCanvasFeature.Action)
     }
 
     /// 비동기 작업 취소용 작업
@@ -533,82 +430,25 @@ extension CarveDetailFeature {
         case imageSaveNotice
         /// 위젯 표시 안내의 자동 닫힘
         case widgetNotice
-        /// N-Canvas 의 동기화 쓰기 가능 여부 구독
-        case syncedWriteGate
     }
 }
 
 extension CarveDetailFeature {
-    /// N-Canvas 상태의 SwiftData 모델에서 actor 경계를 넘길 저장 값만 추출한다.
-    /// - Parameter canvasState: 변경된 절의 Canvas 상태.
-    /// - Returns: 저장할 모델이 없으면 nil, 있으면 Sendable 행 단위 요청.
-    /// - Note: 저장 부작용은 없으며 신규 모델이 가진 선발급 `rowUUID`를 보존한다.
-    private func makeLegacyDrawingSaveRequest(from canvasState: CanvasFeature.State) -> LegacyDrawingSaveRequest? {
-        guard let drawing = canvasState.drawing else { return nil }
-        return LegacyDrawingSaveRequest(
-            chapter: canvasState.title,
-            verse: canvasState.verse,
-            rowID: BibleDrawingRowID(raw: drawing.rowKey),
-            lineData: drawing.lineData,
-            updateDate: drawing.updateDate,
-            drawingVersion: drawing.drawingVersion,
-            layoutMetadataData: drawing.layoutMetadataData
-        )
-    }
-
-    /// Canvas에서 올라온 변경(획 추가 / 지우개)을 SwiftData에 반영.
-    ///
-    /// - Important: 획 유무를 조건으로 걸지 않는다.
-    ///   `PKEraserTool(.bitmap)`으로 마지막 획까지 지우면 그 stroke는 `PKDrawing.strokes`에서 제거되어
-    ///   `lineData?.containsPKStroke == false`가 된다. 예전에는 이 조건을 저장의 전제로 삼아
-    ///   "전부 지운 순간"의 저장이 통째로 건너뛰어졌고, 앱을 재기동하면 지웠던 획이 되살아났다.
-    ///   따라서 stroke가 0개인 drawing도 그대로 저장한다.
-    func persistDrawing(_ request: LegacyDrawingSaveRequest?) async throws {
-        guard let request else { return }
-        // N-Canvas 는 초안 없이 동기화 저장소에 바로 쓴다 — 소유가 확인되지 않았으면 쓰지 않는다(정책 §12-6 결정 1, ACC-1 F30). 입력도 막혀 있다.
-        if let block = SyncedWriteBlock.check(await drawingEditEnvironment.current()) {
-            Log.error("N-Canvas — 동기화 저장소에 쓰지 않고 막았다", "\(block)")
-            return
-        }
-        try await drawingContext.updateDrawing(request: request)
-    }
-
-    /// N-Canvas 가 동기화 저장소에 쓸 수 있는지를 따라간다 — 막히면 입력을 닫고 사유를 보인다(정책 §12-6 결정 1).
-    func observeSyncedWriteGate() -> Effect<Action> {
-        .run { [drawingEditEnvironment] send in
-            await send(.syncedWriteGateChanged(SyncedWriteBlock.check(await drawingEditEnvironment.current())))
-            for await _ in drawingEditEnvironment.changes() {
-                await send(.syncedWriteGateChanged(SyncedWriteBlock.check(await drawingEditEnvironment.current())))
-            }
-        }
-        .cancellable(id: CancelID.syncedWriteGate, cancelInFlight: true)
-    }
-
-    /// `SentencesWithDrawingFeature.State.id` 규칙과 동일한 스크롤용 ID를 생성.
-    private func makeSentenceID(for verse: BibleVerse) -> SentencesWithDrawingFeature.State.ID {
-        "\(verse.title.title.koreanTitle()).\(verse.title.chapter).\(verse.verse)"
-    }
-
     // MARK: - Phase 2 — 장 레이아웃 측정 (설계 §6)
 
     /// 새 장의 본문이 확정된 시점에 측정을 시작한다. 이전 장의 실측값은 전부 버린다.
     ///
     /// `expectedVerseCount` 는 여기서 확정된 절 개수이며(§6-4), 게이트는 이 값과 완성된 레이아웃의 절 수를 비교한다.
+    /// 절별 저장 band 수(HUD slack 진단)는 아직 모른다 — 캔버스가 장을 읽은 뒤(`drawingsLoaded`) 채운다.
     /// - Parameters:
     ///   - state: Feature 상태.
     ///   - sentences: fetch 된 본문.
     private func beginLayoutMeasurement(state: inout State, sentences: [BibleVerse]) {
         let chapter = sentences.first?.title ?? state.headerState.currentTitle
-        var savedBandCounts: [Int: Int] = [:]
-        for row in state.sentenceWithDrawingState {
-            if let count = Self.savedBandCount(of: row.canvasState.drawing) {
-                savedBandCounts[row.sentence.verse] = count
-            }
-        }
         state.chapterLayout.begin(
             chapter: chapter,
             verses: sentences.map(\.verse),
-            savedBandCounts: savedBandCounts,
+            savedBandCounts: [:],
             now: ContinuousClock().now
         )
         state.layoutSignpostID = ChapterLayoutSignpost.beginMeasure(chapter: chapter, verseCount: sentences.count)
@@ -623,7 +463,7 @@ extension CarveDetailFeature {
     /// - Parameters:
     ///   - state: Feature 상태.
     ///   - batch: 행 id → 실측값.
-    private func applyVerseGeometry(state: inout State, batch: [VerseRowFeature.State.ID: VerseRowGeometry]) {
+    private func applyVerseGeometry(state: inout State, batch: [SentencesWithDrawingFeature.State.ID: VerseRowGeometry]) {
         var layoutInputChanged = false
         for (id, geometry) in batch {
             guard var row = state.sentenceWithDrawingState[id: id] else { continue }
@@ -632,11 +472,8 @@ extension CarveDetailFeature {
             if let offsets = geometry.underlineOffsets {
                 // 밑줄은 캔버스 영역 안에서 1절의 상단 여백만큼 내려 그려지므로, 레이아웃 anchor 도 같은 값을 더한다.
                 let anchors = offsets.map { $0 + ChapterLayoutHosting.topPadding(forVerse: verse) }
-                // 절 캔버스의 첫 밑줄 y — 단일 Canvas 가 첫 밑줄 원점(v3)으로 저장한 행을 N-Canvas 가 제자리에 보이게 하는 기준 (§10-3 flag off).
-                let firstUnderlineY = anchors.first ?? 0
-                if row.sentenceState.underlineOffsets != offsets || row.canvasState.firstUnderlineY != firstUnderlineY {
+                if row.sentenceState.underlineOffsets != offsets {
                     row.sentenceState.underlineOffsets = offsets
-                    row.canvasState.firstUnderlineY = firstUnderlineY
                     state.sentenceWithDrawingState[id: id] = row
                 }
                 if state.chapterLayout.recordText(verse: verse, underlineAnchors: anchors) {
@@ -687,68 +524,48 @@ extension CarveDetailFeature {
         }
     }
 
-    /// 저장된 필사의 band 수 (설계 §6-3 의 `N_saved`). metadata 가 없는 legacy 행이면 nil.
-    /// - Parameter drawing: 절의 대표 행.
-    /// - Returns: band 수.
-    static func savedBandCount(of drawing: BibleDrawing?) -> Int? {
-        guard let data = drawing?.layoutMetadataData,
-              let metadata = try? JSONDecoder().decode(DrawingLayoutMetadata.self, from: data) else {
-            return nil
-        }
-        return metadata.savedBandCount
+    /// 단일 Canvas 가 읽은 장의 행에서 절별 저장 band 수(설계 §6-3 의 `N_saved`)를 뽑는다 — HUD slack 진단 전용.
+    ///
+    /// 절마다 대표 행(`DrawingRepresentativeRule` — 캔버스가 합성하는 그 행)만 본다. metadata 가 없는 행(v1 · v2 · metadata 를 잃은 v3)은 빠진다.
+    /// - Parameter snapshots: `ChapterCanvasFeature.State.loadedDrawings` — 히스토리 행 포함.
+    /// - Returns: 절 → band 수. 부작용 없음.
+    static func savedBandCounts(from snapshots: [VerseDrawingSnapshot]) -> [Int: Int] {
+        snapshots.representativesByVerse().compactMapValues { $0.metadata?.savedBandCount }
     }
-    
-    /// 1. 성경 본문 fetch
-    /// 2. sentenceWithDrawingState 및 canvasState 초기화,
-    /// 3. Drawing데이터 불러옴
+
+    /// 성경 본문을 읽어 `setSentence` 로 넘긴다. 필사는 단일 Canvas 가 `setSentence` 뒤 장 단위로 읽는다.
+    /// - Parameter state: Feature 상태(지금 장).
+    /// - Returns: 본문을 읽는 효과. 장이 바뀌면 이전 장의 읽기는 취소된다. 실패하면 로그만 남긴다.
     private func handleFetchSentence(state: inout State) -> Effect<Action> {
         let title = state.headerState.currentTitle
-          
+
         return .run { send in
             do {
                 let sentences = try bibleTextClient.fetch(chapter: title)
-                // 이행 중 예외(N-Canvas): N-Canvas 제거 때 지운다 — 룰북 swiftdata.md
-                // N-Canvas 는 절마다 @Model 을 들고 편집하므로 장의 행을 모델 그대로 받는다(`fetchForLegacyCanvas`).
-                let drawings = try await drawingContext.fetchForLegacyCanvas(chapter: title)
-                
                 try Task.checkCancellation()
-                await send(.setSentence(sentences, drawings.wrappedValue))
+                await send(.setSentence(sentences))
             } catch {
                 Log.error("Fetch Sentence Error")
             }
         }
         .cancellable(id: CancelID.fetchBible(title: title), cancelInFlight: true)
     }
-    
-    
-    /// ScrollView 맨 위로 스크롤
+
+
+    /// 외부 진입으로 정한 절(없으면 첫 절)로 캔버스를 스크롤한다.
     private func scrollToTop(state: inout State) -> Effect<Action> {
-        if state.usesSingleCanvas {
-            let verse = state.scrollTargetVerse ?? state.sentenceWithDrawingState.first?.sentence.verse
-            state.scrollTargetID = nil
-            state.scrollTargetVerse = nil
-            guard let verse else { return .none }
-            return .send(.scope(.chapterCanvasAction(.scrollToVerse(verse))))
-        }
-        let id = state.scrollTargetID ?? state.sentenceWithDrawingState.first?.id
-        guard let id else { return .none }
-        state.scrollTargetID = nil
+        let verse = state.scrollTargetVerse ?? state.sentenceWithDrawingState.first?.sentence.verse
         state.scrollTargetVerse = nil
-        withAnimation(.easeInOut(duration: 0.5)) {
-            state.proxy?.scrollTo(id, anchor: .bottom)
-        }
-        return .none
+        guard let verse else { return .none }
+        return .send(.scope(.chapterCanvasAction(.scrollToVerse(verse))))
     }
 
     /// Phase 3 — 완성된 `ChapterLayout` · `columnOrigin` · Δ 안전망 판정을 단일 Canvas 에 넘긴다. 값이 바뀐 것만 보낸다.
     ///
     /// `columnOrigin` 의 y 는 0 이다 — 헤더는 `contentInset.top` 으로 비우므로 콘텐츠 좌표는 헤더와 무관하다.
-    ///
-    /// **안전망은 단일 Canvas 경로에만 붙는다** (설계 §14 — D9 R13). 이 함수 자체가 `usesSingleCanvas` 로 막혀 있으므로
-    /// N-Canvas 에서는 판정이 아예 나가지 않는다 — N-Canvas 는 절마다 자기 캔버스가 있고 잉크가 절-로컬이라
-    /// 레이아웃 Δ 가 귀속을 틀지 않는다. 거기서 입력을 막으면 무해한 조건으로 필기를 못 하게 만드는 회귀다.
+    /// Δ 안전망(설계 §14 — D9 R13)은 여기서 판정을 넘겨 캔버스의 새 획 입력만 닫는다.
     private func forwardLayoutToSingleCanvas(state: inout State) -> Effect<Action> {
-        guard state.usesSingleCanvas, let layout = state.chapterLayout.layout else { return .none }
+        guard let layout = state.chapterLayout.layout else { return .none }
         var effects: [Effect<Action>] = []
         if let origin = state.chapterLayout.columnOrigin,
            origin != state.chapterCanvas.columnOrigin, origin != state.chapterCanvas.pendingColumnOrigin {
@@ -763,37 +580,4 @@ extension CarveDetailFeature {
         }
         return effects.isEmpty ? .none : .merge(effects)
     }
-    
-//    
-//    /// Sentence 셀에서 전달된 global 좌표를 Canvas 기준 로컬 좌표로 변환하고,
-//    /// 각 절의 rect를 CombinedCanvasFeature에 전달.
-//    /// - Parameters:
-//    ///   - id: 각 절의 상태 ID
-//    ///   - globalRect: 각 절의 Rect
-//    private func updateVerseFrame(
-//        state: inout State,
-//        id: VerseRowFeature.State.ID,
-//        globalRect: CGRect
-//    ) -> Effect<Action> {
-//        guard let index = state.verseRowState.firstIndex(where: { $0.id == id }) else {
-//            return .none
-//        }
-//        let sentenceState = state.verseRowState[index]
-//        let verse = sentenceState.sentence.verse
-//
-//        let canvasFrame = state.canvasGlobalFrame
-//        guard canvasFrame.width > 0, canvasFrame.height > 0 else { return .none }
-//
-//        // canvas 기준 로컬 rect로 변환
-//        let localRect = CGRect(
-//            x: globalRect.minX - canvasFrame.minX,
-//            y: globalRect.minY - canvasFrame.minY,
-//            width: globalRect.width,
-//            height: globalRect.height
-//        )
-//
-//        return .send(.scope(.canvasAction(
-//            .verseFrameUpdated(verse: verse, rect: localRect)
-//        )))
-//    }
 }

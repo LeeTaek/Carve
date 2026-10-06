@@ -98,7 +98,6 @@ struct CarveDetailDataClearTesting {
             $0.drawingRepository = RepositorySpy()
             $0.drawingCodec = CanvasTestSupport.codec(results: LockIsolated([]))
             $0.uuid = .incrementing
-            $0.undoManager = SharedUndoManager()
         }
     }
 

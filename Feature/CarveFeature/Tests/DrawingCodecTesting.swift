@@ -353,3 +353,50 @@ struct DrawingCodecTesting {
         #expect(unchanged.mutations.isEmpty)
     }
 }
+
+// MARK: - 디코드 불가 · 비운 행 (rev.17 — `SingleCanvasRollbackTesting` 에서 옮김)
+
+/// 읽지 못하는 행은 덮어쓰지 않고, 비운 행은 읽지 못한 행과 구분한다 — 코덱의 활성 행 판정.
+@Suite("Phase 3 — DrawingCodec · 디코드 불가 행 비파괴")
+struct DrawingCodecUndecodableRowTesting {
+
+    @Test("디코드할 수 없는 행은 활성 행에서 빠지고, 그 절의 다음 편집은 replace 가 아니라 create 다 — 원본을 덮어쓰지 않는다")
+    func undecodableRowIsNotOverwritten() throws {
+        let codec = DrawingCodec()
+        let layout = OwnershipTestSupport.uniformLayout(verseCount: 4, lineSpace: 30)
+        let broken = VerseDrawingSnapshot(
+            verse: 2, rowID: BibleDrawingRowID(raw: "broken"), isPresent: true, updateDate: nil,
+            lineData: Data([0xDE, 0xAD, 0xBE, 0xEF]), drawingVersion: 3, metadata: CanvasTestSupport.metadata()
+        )
+        let composed = codec.compose(snapshots: [broken], layout: layout, columnOrigin: .zero)
+        #expect(composed.undecodableVerses == [2])
+        #expect(composed.activeRowIDs[2] == nil)
+        #expect(try PKDrawing(data: composed.data).strokes.isEmpty)
+
+        // layout (10, 35) → verse 2 에 새 획.
+        let added = OwnershipTestSupport.stroke(from: CGPoint(x: 10, y: 35), to: CGPoint(x: 20, y: 35), seed: 3, creationTime: 3_000)
+        let result = codec.mutations(
+            beforeData: composed.data, beforeOwnership: composed.ownership,
+            afterData: PKDrawing(strokes: [added]).dataRepresentation(),
+            context: DrawingEditContext(layout: layout, columnOrigin: .zero, activeRowIDs: composed.activeRowIDs)
+        )
+        guard case .create(let verse, let rowID, _, _) = try #require(result.mutations.first) else {
+            Issue.record("create 가 아니다"); return
+        }
+        #expect(verse == 2)
+        #expect(rowID.raw != "broken")
+    }
+
+    @Test("비워진 행(lineData nil)은 디코드 불가가 아니다 — 활성 행으로 남는다")
+    func clearedRowStaysActive() {
+        let codec = DrawingCodec()
+        let layout = OwnershipTestSupport.uniformLayout(verseCount: 4, lineSpace: 30)
+        let cleared = VerseDrawingSnapshot(
+            verse: 1, rowID: BibleDrawingRowID(raw: "cleared"), isPresent: true, updateDate: nil,
+            lineData: nil, drawingVersion: 3, metadata: CanvasTestSupport.metadata()
+        )
+        let composed = codec.compose(snapshots: [cleared], layout: layout, columnOrigin: .zero)
+        #expect(composed.undecodableVerses.isEmpty)
+        #expect(composed.activeRowIDs[1]?.raw == "cleared")
+    }
+}

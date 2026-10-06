@@ -151,11 +151,11 @@ struct ChapterCanvasDeltaGuardTesting {
 /// | 끊길 수 있는 곳 | 여기서 고정하는 것 |
 /// |---|---|
 /// | `ChapterCanvasView.Display` 가 합성 게이트를 읽는다 | 표시 상태는 `isDrawingInputEnabled` 를 실어야 한다 |
-/// | `forwardLayoutToSingleCanvas` 의 `usesSingleCanvas` 가드 | N-Canvas 에는 판정이 **effect 로도** 가지 않아야 한다 |
+/// | `forwardLayoutToSingleCanvas` 가 판정을 넘긴다 | 판정이 **effect 로** 캔버스까지 가야 한다 |
 ///
-/// 경로 두 건은 리듀서를 직접 부르지 않고 **실제 `Store` 로 effect 를 태운다** — `reduce(into:)` 직접 호출은
-/// effect 를 버리므로 가드를 지워도 상태가 그대로라 배선 회귀를 잡지 못한다.
-@Suite("Phase 3 — Δ 안전망 배선 (뷰 경계 · N-Canvas/단일 Canvas 경로)")
+/// 경로 시험은 리듀서를 직접 부르지 않고 **실제 `Store` 로 effect 를 태운다** — `reduce(into:)` 직접 호출은
+/// effect 를 버리므로 배선을 끊어도 상태가 그대로라 회귀를 잡지 못한다.
+@Suite("Phase 3 — Δ 안전망 배선 (뷰 경계 · 단일 Canvas 경로)")
 @MainActor
 struct ChapterCanvasDeltaGuardWiringTesting {
     private let chapter = BibleChapter(title: .genesis, chapter: 1)
@@ -182,7 +182,7 @@ struct ChapterCanvasDeltaGuardWiringTesting {
         #expect(!ChapterCanvasView.Display(store.state).isInputEnabled)
     }
 
-    // MARK: 경로 — 안전망은 단일 Canvas 에만 붙는다
+    // MARK: 경로 — 판정이 캔버스까지 간다
 
     private func rowID(_ verse: Int) -> SentencesWithDrawingFeature.State.ID {
         "\(chapter.title.koreanTitle()).\(chapter.chapter).\(verse)"
@@ -198,7 +198,6 @@ struct ChapterCanvasDeltaGuardWiringTesting {
         } withDependencies: {
             $0.drawingRepository = RepositorySpy()
             $0.drawingCodec = CanvasTestSupport.codec(results: LockIsolated([]))
-            $0.undoManager = SharedUndoManager()
             $0.uuid = .incrementing
             $0.date = .constant(Date(timeIntervalSince1970: 0))
         }
@@ -208,7 +207,7 @@ struct ChapterCanvasDeltaGuardWiringTesting {
     /// 마지막 절의 Δ 가 한 줄(줄 거리 `linePitch`, 기본 설정에서 약 53pt)을 확실히 넘도록 절 수를 넉넉히 준다.
     private func measureWithAccumulatingDelta(_ store: StoreOf<CarveDetailFeature>, verseCount: Int = 150) {
         store.send(.view(.layoutHostingChanged(writingWidth: 372)))
-        store.send(.setSentence(sentences(count: verseCount), []))
+        store.send(.setSentence(sentences(count: verseCount)))
         var batch: [SentencesWithDrawingFeature.State.ID: VerseRowGeometry] = [:]
         for verse in 1...verseCount {
             batch[rowID(verse)] = VerseRowGeometry(underlineOffsets: [30])
@@ -236,51 +235,9 @@ struct ChapterCanvasDeltaGuardWiringTesting {
         store.send(.view(.verseGeometryMeasured(inner)))
     }
 
-    @Test("N-Canvas 경로에서는 Δ 가 한 줄을 넘어도 판정이 캔버스로 가지 않고 입력이 닫히지 않는다 (§14)")
-    func nCanvasPathIsNeverBlockedByDelta() async throws {
-        // ⚠️ 기본값에 기대지 않고 **명시적으로 flag 를 끈다.** 기본이 단일 Canvas 로 바뀌었으므로
-        // (설계 §10-3 · `SingleCanvasFlag.defaultValue`) 예전처럼 initialState 를 쓰면 이 테스트가
-        // 검증하려던 N-Canvas 경로를 타지 않는다.
-        let suite = "CarveDetailDeltaGuard.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite) }
-        defaults.set(false, forKey: SingleCanvasFlag.appStorageKey)
-
-        var state = CarveDetailFeature.State(headerState: .initialState)
-        state.$isSingleCanvasEnabled = Shared(
-            wrappedValue: false,
-            .appStorage(SingleCanvasFlag.appStorageKey, store: defaults)
-        )
-        try #require(!state.usesSingleCanvas)
-        let store = makeDetailStore(state)
-        measureWithAccumulatingDelta(store)
-        try await Task.sleep(for: .milliseconds(200))
-
-        // 측정 자체는 "차단해야 할 크기" 라고 판정한다 — 즉 이 테스트는 Δ 가 작아서 통과하는 것이 아니다.
-        let verdict = try #require(store.chapterLayout.layoutDeltaVerdict)
-        #expect(verdict.blocksInput)
-        #expect(verdict.magnitude > SentenceSetting.initialState.linePitch)
-
-        // effect 를 실제로 태웠는데도 N-Canvas 경로에는 아무것도 전달되지 않았다.
-        #expect(store.chapterCanvas.layoutDelta == nil)
-        #expect(store.chapterCanvas.isDrawingInputEnabled == store.chapterCanvas.isInputEnabled)
-        #expect(store.isLayoutReady)
-    }
-
     @Test("단일 Canvas 경로에서는 Δ 판정이 effect 로 캔버스까지 전달돼 새 입력이 닫힌다 (§14 안전망 배선)")
     func singleCanvasPathReceivesDeltaVerdict() async throws {
-        let suite = "CarveDetailDeltaGuard.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite) }
-        defaults.set(true, forKey: SingleCanvasFlag.appStorageKey)
-
-        var state = CarveDetailFeature.State(headerState: .initialState)
-        state.$isSingleCanvasEnabled = Shared(
-            wrappedValue: true,
-            .appStorage(SingleCanvasFlag.appStorageKey, store: defaults)
-        )
-        try #require(state.usesSingleCanvas)
-        let store = makeDetailStore(state)
+        let store = makeDetailStore(CarveDetailFeature.State(headerState: .initialState))
         measureWithAccumulatingDelta(store)
         try await Task.sleep(for: .milliseconds(300))
 

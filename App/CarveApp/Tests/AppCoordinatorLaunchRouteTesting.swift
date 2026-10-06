@@ -5,6 +5,7 @@
 //  화면 바로 열기(`-UITestRoute`)와 억제 스위치(`-UITestSkipFirstRunGuide` · `-UITestSkipPatchnote`) — Debug 실행 인자.
 //  앱 진입점이 읽어 둔 경로는 시작 화면이 끝나 필사 화면에 들어간 직후(위젯 보류 절과 같은 때) 열리고, 모르는 경로는 무시된다.
 //  억제는 Store 를 만들기 전에 저장해 두는 값이라, 시험은 초기 상태 자리(그 시험의 UserDefaults)에서 부른다.
+//  「필사 백업」(settings/backup) 화면의 백업 전 flush 중계도 여기서 본다 — 설정의 「백업 만들기」 ↔ 코디네이터 ↔ 필사 화면(설계 backup-import-design §5-2).
 //
 
 import CarveFeature
@@ -45,12 +46,13 @@ struct AppCoordinatorLaunchRouteTesting {
         #expect(Route("settings") == .settings(nil))
         #expect(Route("verse/16") == .verse(16))
         #expect(Route("Settings/RemoveAds") == .settings(.removeAds))
+        #expect(Route("settings/backup") == .settings(.backup))
     }
 
     @Test("설정 하위 경로는 설정 사이드바의 행마다 하나씩 있다")
     func parsesEverySettingsSubroute() {
         let names: [String: SettingsFeature.SidebarItem] = [
-            "icloud": .iCloud, "draftRecovery": .draftRecovery, "canvas": .canvas, "widget": .widget, "appearance": .appearance,
+            "icloud": .iCloud, "draftRecovery": .draftRecovery, "backup": .backup, "widget": .widget, "appearance": .appearance,
             "help": .help, "patchnote": .patchnote, "sendFeedback": .sendFeedback, "appVersion": .appVersion, "removeAds": .removeAds
         ]
         #expect(Set(names.values) == Set(SettingsFeature.SidebarItem.allCases))
@@ -72,7 +74,7 @@ struct AppCoordinatorLaunchRouteTesting {
         let app = "/Applications/Carve.app/Carve"
         #expect(Route.parse(arguments: [app]) == nil)
         #expect(Route.parse(arguments: [app, LaunchArgument.uiTestRoute, "settings/removeAds"]) == .settings(.removeAds))
-        #expect(Route.parse(arguments: [app, LaunchArgument.singleCanvas, LaunchArgument.uiTestRoute, "chart", LaunchArgument.uiTestNoAds]) == .chart)
+        #expect(Route.parse(arguments: [app, LaunchArgument.uiTestSkipFirstRunGuide, LaunchArgument.uiTestRoute, "chart", LaunchArgument.uiTestNoAds]) == .chart)
         #expect(Route.parse(arguments: [app, LaunchArgument.uiTestRoute]) == nil)
         // 값을 빠뜨리면 바로 뒤의 다른 인자를 경로로 읽지 않는다.
         #expect(Route.parse(arguments: [app, LaunchArgument.uiTestRoute, LaunchArgument.uiTestNoAds]) == nil)
@@ -105,6 +107,18 @@ struct AppCoordinatorLaunchRouteTesting {
             $0.settings = SettingsFeature.State.initialState(path: .removeAds(.initialState))
         }
         #expect(store.state.rootScreen == .carve)
+        await store.finish()
+    }
+
+    @Test("settings/backup — 필사 화면에 들어가며 설정을 「필사 백업」 으로 연다")
+    func settingsBackupRouteOpensBackup() async {
+        let store = makeCoordinatorStore(CoordinatorFixture.launching(launchRoute: .settings(.backup)))
+
+        await store.send(Self.syncCompleted) {
+            $0.pendingLaunchRoute = nil
+            $0.settings = SettingsFeature.State.initialState(path: .backup(.initialState))
+        }
+        #expect(store.state.settings?.selectedSidebarItem == .backup)
         await store.finish()
     }
 
@@ -262,5 +276,121 @@ struct AppCoordinatorLaunchRouteTesting {
         #expect(suppressed.state.carve?.firstRunGuide == nil)
         #expect(suppressed.state.carve?.hasPresentedFirstRunGuide == true)
         await suppressed.finish()
+    }
+}
+
+// MARK: - 필사 백업 — 백업 전 flush 중계 (설계 backup-import-design §5-2)
+
+/// 설정의 「백업 만들기」 가 보낸 flush 요청을 필사 화면으로 넘기고, 그 답을 설정으로 돌려준다.
+/// Feature 끼리는 서로를 모르므로 코디네이터만이 이 둘을 잇는다 — 이 중계가 빠지면 「백업 만들기」 는 답을 받지 못해 10초 시한으로만 끝난다.
+@Suite("코디네이터 — 필사 백업 flush 중계")
+@MainActor
+struct AppCoordinatorBackupFlushTesting {
+    private nonisolated static let requestID = UUID(uuidString: "00000000-0000-0000-0000-0000000000B1")!
+
+    /// 그 id 의 flush 답을 기다리는 「백업 만들기」 를 연 설정.
+    private static func settingsAwaitingFlush() -> SettingsFeature.State {
+        var backup = BackupFeature.State()
+        backup.export.step = .flushing(id: requestID)
+        backup.export.password = "abcd1234"
+        backup.export.passwordConfirmation = "abcd1234"
+        return SettingsFeature.State.initialState(path: .backup(backup))
+    }
+
+    /// 설정의 「백업 만들기」 가 보낸 flush 요청.
+    private static var flushRequested: AppCoordinatorFeature.Action {
+        .settings(.presented(.path(.presented(.backup(.export(.delegate(.canvasFlushRequested(id: requestID))))))))
+    }
+
+    /// 필사 화면의 캔버스가 보낸 flush 답.
+    private static func canvasAnswered(_ outcome: CanvasFlushOutcome) -> AppCoordinatorFeature.Action {
+        .root(.presented(.carve(.scope(.carveDetailAction(.scope(.chapterCanvasAction(
+            .delegate(.backupFlushFinished(id: requestID, outcome: outcome))
+        )))))))
+    }
+
+    /// 코디네이터가 캔버스로 넘긴 요청인가.
+    private static func isCanvasRequest(_ action: AppCoordinatorFeature.Action) -> Bool {
+        guard case .root(.presented(.carve(.scope(.carveDetailAction(.scope(.chapterCanvasAction(.backupFlushRequested(let id)))))))) = action else {
+            return false
+        }
+        return id == requestID
+    }
+
+    /// 코디네이터가 설정으로 돌려준 답인가.
+    private static func isAnswerToSettings(_ outcome: CanvasFlushOutcome) -> (AppCoordinatorFeature.Action) -> Bool {
+        { action in
+            guard case .settings(.presented(.canvasFlushFinished(let id, let received))) = action else { return false }
+            return id == requestID && received == outcome
+        }
+    }
+
+    /// 설정의 「백업 만들기」 단계.
+    private func exportStep(_ store: TestStoreOf<AppCoordinatorFeature>) -> BackupExportFeature.Step? {
+        store.state.settings?.path?.backup?.export.step
+    }
+
+    /// 효과가 다 끝나기를 기다린 뒤 받은 액션을 모두 소비한다 — 비망라 TestStore 의 `store.state` 는 소비해야 반영된다(룰북 testing.md).
+    private func settle(_ store: TestStoreOf<AppCoordinatorFeature>) async {
+        await store.finish()
+        await store.skipReceivedActions(strict: false)
+    }
+
+    /// durable 이면 「백업 만들기」 가 파일 만들기를 시작한다 — 기본 파일 이름의 날짜를 고정한다.
+    private func fixDate(_ store: TestStoreOf<AppCoordinatorFeature>) {
+        store.dependencies.date = .constant(Date(timeIntervalSince1970: 1_791_288_000))
+        store.dependencies.timeZone = .gmt
+    }
+
+    @Test("필사 화면이 있으면 요청을 캔버스로 넘기고, 캔버스의 답을 설정의 백업 만들기로 돌려준다")
+    func relaysRequestToCanvasAndAnswerBack() async {
+        let store = makeCoordinatorStore(CoordinatorFixture.writing(settings: Self.settingsAwaitingFlush()))
+        fixDate(store)
+
+        await store.send(Self.flushRequested)
+        await store.receive(Self.isCanvasRequest)
+        // 지킬 편집이 없는 캔버스는 곧바로 durable 로 답한다.
+        await store.receive(Self.isAnswerToSettings(.durable))
+        await settle(store)
+        // durable 이라 파일 만들기를 시작했다 — 이 시험 번들에는 내보내기가 주입되지 않아 그 사유로 끝난다.
+        #expect(exportStep(store) == .exportFailed(.unavailable))
+    }
+
+    @Test("필사 화면이 없으면(시작 화면) 곧바로 durable 로 답한다")
+    func answersDurableWithoutWritingScreen() async {
+        let store = makeCoordinatorStore({ () -> AppCoordinatorFeature.State in
+            var state = CoordinatorFixture.launching()
+            state.settings = Self.settingsAwaitingFlush()
+            return state
+        }())
+        fixDate(store)
+
+        await store.send(Self.flushRequested)
+        await store.receive(Self.isAnswerToSettings(.durable))
+        await settle(store)
+        #expect(store.state.rootScreen == .launchProgress)
+        #expect(exportStep(store) == .exportFailed(.unavailable))
+    }
+
+    @Test("캔버스의 답이 durable 이 아니면 그대로 돌려준다 — 백업 만들기는 파일을 만들지 않고 막는다",
+          arguments: [CanvasFlushOutcome.failed(retryCount: 2), .timedOut])
+    func relaysNonDurableAnswerBack(outcome: CanvasFlushOutcome) async {
+        let store = makeCoordinatorStore(CoordinatorFixture.writing(settings: Self.settingsAwaitingFlush()))
+
+        await store.send(Self.canvasAnswered(outcome))
+        await store.receive(Self.isAnswerToSettings(outcome))
+        await settle(store)
+        #expect(exportStep(store) == .flushBlocked(outcome))
+    }
+
+    @Test("설정이 닫혀 있으면 캔버스의 늦은 답을 버린다")
+    func dropsAnswerWhenSettingsClosed() async {
+        let store = makeCoordinatorStore(CoordinatorFixture.writing())
+        // 받은 액션이 하나라도 있으면 실패하게 전부 확인한다.
+        store.exhaustivity = .on
+
+        await store.send(Self.canvasAnswered(.durable))
+        await store.finish()
+        #expect(store.state.settings == nil)
     }
 }
