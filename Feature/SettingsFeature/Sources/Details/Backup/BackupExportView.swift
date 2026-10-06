@@ -277,6 +277,9 @@ struct BackupFileItem: Transferable {
         FileRepresentation(exportedContentType: .carveBackup) { item in
             SentTransferredFile(item.url)
         }
+        // 저장 창이 쓰는 파일 이름. 없으면 SwiftUI 가 NSFileWrapper 의 preferredFilename 에 nil 을 넣어 앱이 죽는다
+        // (`fileExporter` 의 `defaultFilename` 은 이 단계에서 쓰이지 않는다 — 2026-10-06 iPadOS 26.2 시뮬레이터 확인).
+        .suggestedFileName { $0.url.lastPathComponent }
     }
 }
 
