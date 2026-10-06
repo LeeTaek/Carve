@@ -48,7 +48,7 @@ struct BackupFormatSupportTesting {
 
     @Test("모르는 번역본")
     func unknownTranslation() {
-        #expect(reason(item(translation: "KJV"), metadata: BackupFormatSample.metadata) == .unknownTranslation)
+        #expect(reason(item(translation: "ESV"), metadata: BackupFormatSample.metadata) == .unknownTranslation)
         #expect(reason(item(translation: "nkrv"), metadata: BackupFormatSample.metadata) == .unknownTranslation)
     }
 
@@ -107,7 +107,7 @@ struct BackupFormatSupportTesting {
 
     @Test("이유는 번역본 → 권 → 범위 → 좌표 형식 → 메타데이터 순으로 하나다")
     func firstReasonWins() {
-        #expect(reason(item(translation: "KJV", book: "TOB", chapter: 0, drawingVersion: 9), metadata: nil) == .unknownTranslation)
+        #expect(reason(item(translation: "ESV", book: "TOB", chapter: 0, drawingVersion: 9), metadata: nil) == .unknownTranslation)
         #expect(reason(item(book: "TOB", chapter: 0, drawingVersion: 9), metadata: nil) == .unknownBook)
         #expect(reason(item(chapter: 0, drawingVersion: 9), metadata: nil) == .outOfRange)
         #expect(reason(item(drawingVersion: 9, metadata: BackupFormatSample.brokenMetadata), metadata: BackupFormatSample.brokenMetadata) == .unknownDrawingVersion)
