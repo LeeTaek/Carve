@@ -28,7 +28,14 @@ let settings: Settings = .settings(
 
 
 let target: [Target] = [
-    .makeFrameworkTarget(projName: projectName, target: .debug, script: script, dependencies: dependencies, settings: settings),
+    .makeFrameworkTarget(
+        projName: projectName,
+        target: .debug,
+        resources: ["Resources/**"],
+        script: script,
+        dependencies: dependencies,
+        settings: settings
+    ),
     .makeTestTarget(projName: projectName, target: .debug, script: script, dependencies: [.target(name: projectName)])
 ]
 
