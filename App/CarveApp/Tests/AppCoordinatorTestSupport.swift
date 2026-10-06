@@ -101,8 +101,8 @@ final class AnalyticsRecorder: AnalyticsClient {
 
 /// 본문을 읽지 못하는 클라이언트.
 ///
-/// 코디네이터가 장 · 절 이동을 보내면 필사 화면이 본문을 읽으러 간다. 여기서 멈춰야 그 뒤의 공유 SwiftData 저장소(`drawingData`)와
-/// 테스트값이 없는 `undoManager` 에 닿지 않는다. 필사 화면이 장을 여는 과정은 CarveFeature 시험이 본다.
+/// 코디네이터가 장 · 절 이동을 보내면 필사 화면이 본문을 읽으러 간다. 여기서 멈춰야 그 뒤 단일 캔버스의 장 읽기(필사 저장소 · 초안)가
+/// 돌지 않는다. 필사 화면이 장을 여는 과정은 CarveFeature 시험이 본다.
 struct UnreadableBibleTextClient: BibleTextClient {
     struct Unreadable: Error {}
 

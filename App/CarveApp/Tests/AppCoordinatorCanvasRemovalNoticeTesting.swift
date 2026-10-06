@@ -5,10 +5,6 @@
 //  N-Canvas 제거 안내(2.1 결정 6) — 2.0.x 에서 「필사 캔버스」 를 끈 사용자(`singleCanvasEnabled` 가 Bool false)에게만
 //  필사 화면에 처음 들어갈 때 막지 않는 안내를 한 번 띄운다. 어느 버튼이든 두 키를 지워 다시 띄우지 않고, 값이 없거나 true 면 안내 없이 키만 지운다.
 //
-//  ⚠️ 필사 화면 상태에 `singleCanvasEnabled` 를 기본값(true)과 함께 읽는 `@Shared(.appStorage)` 가 남아 있으면, 그 값은 지운 직후 기본값으로
-//     다시 쓰인다(Sharing 이 없는 키에 기본값을 쓴다). 그래서 필사 화면에 들어간 뒤의 시험은 「false 가 남지 않았다」 만 보고,
-//     두 키를 정확히 지우는지는 필사 화면이 없는 상태에서 버튼 액션을 보내는 시험(`buttonsRemoveBothKeys`)이 본다.
-//
 
 import Foundation
 import SettingsFeature
@@ -59,16 +55,18 @@ struct AppCoordinatorCanvasRemovalNoticeTesting {
             $0.showsCanvasRemovalNotice = false
         }
         #expect(store.state.settings == nil)
-        #expect(defaults.object(forKey: Keys.singleCanvasEnabledKey) as? Bool != false)
+        #expect(defaults.object(forKey: Keys.singleCanvasEnabledKey) == nil)
         #expect(defaults.object(forKey: Keys.storedValueResetKey) == nil)
         await store.finish()
 
-        // 다음 실행 — 같은 저장소로 다시 들어가도 안내는 없다.
+        // 다음 실행 — 같은 저장소로 다시 들어가도 안내는 없고, 필사 화면이 두 키를 다시 쓰지 않는다.
         let relaunched = makeCoordinatorStore(CoordinatorFixture.launching(), appStorage: defaults)
         await relaunched.send(Self.syncCompleted)
         #expect(relaunched.state.rootScreen == .carve)
         #expect(!relaunched.state.showsCanvasRemovalNotice)
         await relaunched.finish()
+        #expect(defaults.object(forKey: Keys.singleCanvasEnabledKey) == nil)
+        #expect(defaults.object(forKey: Keys.storedValueResetKey) == nil)
     }
 
     @Test("안내의 「의견 보내기」 는 안내를 내리고 키를 지운 뒤 설정의 「의견 보내기」 를 연다")
@@ -87,7 +85,7 @@ struct AppCoordinatorCanvasRemovalNoticeTesting {
             $0.settings = SettingsFeature.State.initialState(path: .sendFeedback(.initialState))
         }
         #expect(store.state.settings?.selectedSidebarItem == .sendFeedback)
-        #expect(defaults.object(forKey: Keys.singleCanvasEnabledKey) as? Bool != false)
+        #expect(defaults.object(forKey: Keys.singleCanvasEnabledKey) == nil)
         #expect(defaults.object(forKey: Keys.storedValueResetKey) == nil)
         await store.finish()
     }
@@ -99,7 +97,7 @@ struct AppCoordinatorCanvasRemovalNoticeTesting {
         let actions: [AppCoordinatorFeature.Action] = [.canvasRemovalNoticeDismissed, .canvasRemovalNoticeFeedbackTapped]
 
         for action in actions {
-            // given: 키가 남은 설치. 시작 화면 상태라 이 키를 읽는 다른 화면이 없다.
+            // given: 키가 남은 설치에 안내가 떠 있다.
             Self.storeTurnedOffSetting(in: defaults)
             let store = makeCoordinatorStore({ () -> AppCoordinatorFeature.State in
                 var state = CoordinatorFixture.launching()
@@ -131,6 +129,7 @@ struct AppCoordinatorCanvasRemovalNoticeTesting {
 
         #expect(store.state.rootScreen == .carve)
         #expect(!store.state.showsCanvasRemovalNotice)
+        #expect(defaults.object(forKey: Keys.singleCanvasEnabledKey) == nil)
         #expect(defaults.object(forKey: Keys.storedValueResetKey) == nil)
         await store.finish()
     }
@@ -147,7 +146,7 @@ struct AppCoordinatorCanvasRemovalNoticeTesting {
 
         #expect(store.state.rootScreen == .carve)
         #expect(!store.state.showsCanvasRemovalNotice)
-        #expect(defaults.object(forKey: Keys.singleCanvasEnabledKey) as? Bool != false)
+        #expect(defaults.object(forKey: Keys.singleCanvasEnabledKey) == nil)
         #expect(defaults.object(forKey: Keys.storedValueResetKey) == nil)
         await store.finish()
     }
