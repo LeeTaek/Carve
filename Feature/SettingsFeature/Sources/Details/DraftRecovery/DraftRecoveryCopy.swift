@@ -239,13 +239,25 @@ public enum DraftRecoveryCopy {
 
     // MARK: - 형식
 
-    /// 「창세기 1장 3절 · KJV」 — 번역본이 섞이는 목록이라 약칭을 붙인다(영어 현지화 결정 11, `BibleReference`).
+    /// 「창세기 1장 3절 · KJV」 · 「창세기 1장 3절」 — 번역본이 섞이는 목록이라 KJV · BSB 는 약칭을 붙이고,
+    /// 개역개정은 생략한다(영어 현지화 결정 11 · 사용자 결정 17, `chapterName`).
     /// 권 · 번역본을 이 판이 모르면(모르는 원본 이름) 그 값을 그대로 보인다 — 어디인지 숨기지 않는다.
     public static func place(_ key: VerseDraftKey) -> String {
         guard let chapter = key.bibleChapter else {
             return "\(key.title) \(key.chapter):\(key.verse) · \(key.translation)"
         }
-        return BibleReference(chapter: chapter, verse: key.verse, showsTranslation: true).text(locale: SettingsCatalog.locale)
+        return reference(chapter, verses: .verse(key.verse))
+    }
+
+    /// 읽지 못한 장 이름(「창세기 1장 · KJV」 · 「창세기 1장」) — 자리 표기와 같은 약칭 규칙이다(사용자 결정 17).
+    public static func chapterName(_ chapter: BibleChapter) -> String {
+        reference(chapter, verses: .wholeChapter)
+    }
+
+    /// 확인이 필요한 필기의 참조 — KJV · BSB 만 약칭을 붙인다(사용자 결정 17 — 2.0 까지 개역개정만 있던 목록의 표기를 그대로 둔다).
+    private static func reference(_ chapter: BibleChapter, verses: BibleReference.Verses) -> String {
+        BibleReference(chapter: chapter, verses: verses, showsTranslation: chapter.translation != .NKRV)
+            .text(locale: SettingsCatalog.locale)
     }
 
     /// 쓴 때 · 바뀐 때 — 기기 로케일의 날짜 · 시각(ko 「2026년 10월 6일 오후 9:05」, en 「Oct 6, 2026 at 9:05 PM」).

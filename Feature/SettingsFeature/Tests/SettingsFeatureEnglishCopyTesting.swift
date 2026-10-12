@@ -133,14 +133,16 @@ struct SettingsFeatureEnglishCopyTesting {
         }
     }
 
-    @Test("자리 — 영어 기기는 개역개정 필기도 「Genesis 1:3 · NKRV」 처럼 적는다")
+    @Test("자리 — 영어 기기도 KJV 필기는 「Genesis 1:3 · KJV」, 개역개정 필기는 약칭 없이 「Genesis 1:3」 이다(사용자 결정 17)")
     func draftPlaceUsesEnglishReference() {
         let kjv = VerseDraftKey(sessionID: "s", chapter: BibleChapter(title: .genesis, chapter: 1, translation: .KJV), verse: 3)
         let nkrv = VerseDraftKey(sessionID: "s", chapter: BibleChapter(title: .genesis, chapter: 1), verse: 3)
 
         inEnglish {
             #expect(DraftRecoveryCopy.place(kjv) == "Genesis 1:3 · KJV")
-            #expect(DraftRecoveryCopy.place(nkrv) == "Genesis 1:3 · NKRV")
+            #expect(DraftRecoveryCopy.place(nkrv) == "Genesis 1:3")
+            #expect(DraftRecoveryCopy.chapterName(BibleChapter(title: .genesis, chapter: 1, translation: .KJV)) == "Genesis 1 · KJV")
+            #expect(DraftRecoveryCopy.chapterName(BibleChapter(title: .genesis, chapter: 1)) == "Genesis 1")
             #expect(DraftRecoveryCopy.imported("Genesis 1:3 · KJV", previousKept: false) == "Added this draft to Genesis 1:3 · KJV.")
         }
     }

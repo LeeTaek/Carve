@@ -132,7 +132,7 @@ public struct DrawingWeeklySummaryView: View {
                     Button {
                         send(.recentChapterTapped(item))
                     } label: {
-                        Text(verbatim: "• \(BibleReference(chapter: item, showsTranslation: true).text)")
+                        Text(verbatim: "• \(BibleReference(chartChapter: item).text)")
                     }
                     .font(CarveTypography.label)
                     .foregroundStyle(CarveColor.ink)
@@ -152,8 +152,8 @@ public struct DrawingWeeklySummaryView: View {
                     send(.topChapterTapped)
                 } label: {
                     VStack(alignment: .leading, spacing: 4) {
-                        // 번역본이 섞이는 자리라 약칭을 붙인다(영어 현지화 결정 11).
-                        Text(BibleReference(chapter: topChapter.chapter, showsTranslation: true).text)
+                        // 번역본이 섞이는 자리라 영어 번역본만 약칭을 붙인다(영어 현지화 결정 11 · 사용자 결정 17).
+                        Text(BibleReference(chartChapter: topChapter.chapter).text)
                             .font(.title3)
                             .foregroundStyle(CarveColor.ink)
                             .lineLimit(2)

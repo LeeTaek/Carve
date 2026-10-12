@@ -109,7 +109,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "You have handwriting on this iPad from before connecting to iCloud"
+            "value" : "You have writing on this iPad from before connecting to iCloud"
           }
         },
         "ko" : {
@@ -194,7 +194,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Later"
+            "value" : "Not Now"
           }
         },
         "ko" : {
@@ -313,7 +313,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Start"
+            "value" : "Get Started"
           }
         },
         "ko" : {
@@ -568,7 +568,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Review Handwriting"
+            "value" : "Review Drafts"
           }
         },
         "ko" : {

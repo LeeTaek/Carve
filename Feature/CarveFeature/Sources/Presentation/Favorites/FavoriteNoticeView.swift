@@ -57,15 +57,19 @@ struct FavoriteNoticeView: View {
         switch notice {
         case .added:
             String(localized: "즐겨찾기에 추가했어요", bundle: .module)
+        // 3항 연산을 `String(localized:)` 안에 두면 컴파일러가 한쪽 문구만 카탈로그 추출에 넣는다 — 문구마다 따로 부른다.
         case .failed(let change):
-            String(localized: change.isAdding ? "즐겨찾기에 추가하지 못했어요" : "즐겨찾기를 해제하지 못했어요", bundle: .module)
+            if change.isAdding {
+                String(localized: "즐겨찾기에 추가하지 못했어요", bundle: .module)
+            } else {
+                String(localized: "즐겨찾기를 해제하지 못했어요", bundle: .module)
+            }
         case let .blocked(change, block):
-            String(
-                localized: change.isAdding
-                    ? "즐겨찾기에 추가하지 않았어요. \(block.reasonText)"
-                    : "즐겨찾기를 해제하지 않았어요. \(block.reasonText)",
-                bundle: .module
-            )
+            if change.isAdding {
+                String(localized: "즐겨찾기에 추가하지 않았어요. \(block.reasonText)", bundle: .module)
+            } else {
+                String(localized: "즐겨찾기를 해제하지 않았어요. \(block.reasonText)", bundle: .module)
+            }
         }
     }
 }

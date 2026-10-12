@@ -27,8 +27,19 @@ public struct RecentVerseItem: Equatable, Identifiable, Sendable {
         self.drawingID = drawingID
     }
 
-    /// 화면에 적는 참조(「요한복음 3장 16절 · 개역개정」). 번역본이 섞이는 목록이라 약칭을 붙인다(영어 현지화 결정 11).
+    /// 화면에 적는 참조(「요한복음 3장 16절」 · 「요한복음 3장 16절 · KJV」). 번역본이 섞이는 목록이라 영어 번역본만 약칭을 붙인다(사용자 결정 17).
     public var message: String {
-        BibleReference(chapter: verse.title, verse: verse.verse, showsTranslation: true).text
+        BibleReference(chartChapter: verse.title, verses: .verse(verse.verse)).text
+    }
+}
+
+extension BibleReference {
+    /// 차트 목록(최근 절 · 최근 장 · 가장 많이 쓴 장)의 참조 — 번역본이 섞이므로 KJV · BSB 는 약칭을 「 · KJV」 처럼 붙이고,
+    /// 개역개정은 약칭을 생략한다(사용자 결정 17 — 2.0 까지 개역개정만 있던 목록의 표기를 그대로 둔다).
+    /// - Parameters:
+    ///   - chapter: 권 · 장 · 번역본.
+    ///   - verses: 가리키는 절. 기본은 장 전체.
+    init(chartChapter chapter: BibleChapter, verses: Verses = .wholeChapter) {
+        self.init(chapter: chapter, verses: verses, showsTranslation: chapter.translation != .NKRV)
     }
 }

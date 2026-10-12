@@ -71,6 +71,14 @@ extension PatchnoteFeature {
         [
             Release(version: "2.1", notes: [
                 Note(
+                    title: SettingsCatalog.string("영어 성경 KJV · BSB"),
+                    body: SettingsCatalog.string("사이드바에서 번역본을 바꿔 필사해요. 필사는 번역본마다 따로 저장돼요.")
+                ),
+                Note(
+                    title: SettingsCatalog.string("영어 화면"),
+                    body: SettingsCatalog.string("기기 언어가 영어면 앱도 영어로 보여요.")
+                ),
+                Note(
                     title: SettingsCatalog.string("필사 백업 · 불러오기"),
                     body: SettingsCatalog.string("""
                         설정의 필사 백업에서 암호를 건 파일로 필사를 백업하고 다시 불러와요. \

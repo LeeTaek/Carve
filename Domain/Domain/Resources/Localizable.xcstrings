@@ -222,23 +222,6 @@
         }
       }
     },
-    "나눔꽃향기" : {
-      "comment" : "본문 글꼴 이름(FontCase.flower, 파일 NanumFlowerScent) — 본문 설정의 글꼴 고르기",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nanum Flower Scent"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "나눔꽃향기"
-          }
-        }
-      }
-    },
     "나눔명조" : {
       "comment" : "본문 글꼴 이름(FontCase.myeongjo) — 본문 설정의 글꼴 고르기",
       "localizations" : {
@@ -252,6 +235,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "나눔명조"
+          }
+        }
+      }
+    },
+    "나눔손글씨 꽃내음" : {
+      "comment" : "본문 글꼴 이름(FontCase.flower, 파일 NanumFlowerScent · 패밀리 「나눔손글씨 꽃내음」) — 본문 설정의 글꼴 고르기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nanum Flower Scent"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "나눔손글씨 꽃내음"
           }
         }
       }

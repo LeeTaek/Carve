@@ -83,7 +83,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Turn on “Allow Finger Writing” in %@ to write with your finger, too. Then scroll with two fingers."
+            "value" : "Turn on “Allow finger writing” in %@ to write with your finger, too. Then scroll with two fingers."
           }
         },
         "ko" : {
@@ -117,7 +117,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Replaced the handwriting in %@. The previous one is in “Previous Writing.”"
+            "value" : "Replaced the writing in %@ with this draft. The previous writing is in “Previous Writing.”"
           }
         },
         "ko" : {
@@ -161,6 +161,10 @@
           }
         }
       }
+    },
+    "%lld/%lld" : {
+      "comment" : "번역하지 않음 — 의견 보내기 글자 수(쓴 수/최대)",
+      "shouldTranslate" : false
     },
     "%lld개" : {
       "comment" : "설정 › 필사 백업 — 백업 불러오기 — 형식 문자열(%lld 는 수, %@ 는 문구)",
@@ -361,6 +365,14 @@
           }
         }
       }
+    },
+    "Lisence" : {
+      "comment" : "번역하지 않음 — 들어가는 길이 없는 자리표시 화면(LisenceView, AppVersionFeature.pushToLisence 를 보내는 곳이 없다)",
+      "shouldTranslate" : false
+    },
+    "iCloud" : {
+      "comment" : "번역하지 않음 — 서비스 이름",
+      "shouldTranslate" : false
     },
     "iCloud Drive 같은 곳에 저장했다면, 그곳으로 올리는 일은 그 앱이 이어서 마쳐요." : {
       "comment" : "설정 › 필사 백업 — 백업 만들기",
@@ -805,7 +817,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Choose “System” to follow your iPad's light or dark setting. The paper area with the text and your handwriting stays bright even in dark mode."
+            "value" : "Choose “System” to follow your iPad's light or dark setting. The paper area with the text and your writing stays bright even in dark mode."
           }
         },
         "ko" : {
@@ -1470,6 +1482,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "기기 설정에서 허용해야 동기화할 수 있어요."
+          }
+        }
+      }
+    },
+    "기기 언어가 영어면 앱도 영어로 보여요." : {
+      "comment" : "패치노트 2.1 — 영어 화면 본문",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If your device is in English, so is the app."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "기기 언어가 영어면 앱도 영어로 보여요."
           }
         }
       }
@@ -2201,7 +2230,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Saving your latest handwriting…"
+            "value" : "Saving your latest writing…"
           }
         },
         "ko" : {
@@ -2439,7 +2468,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Handwriting in every chapter and your writing history will be deleted."
+            "value" : "Writing in every chapter and its history will be deleted."
           }
         },
         "ko" : {
@@ -2558,7 +2587,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Unknown handwriting format"
+            "value" : "Unknown writing format"
           }
         },
         "ko" : {
@@ -2643,7 +2672,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Replacing won't delete your current handwriting. It stays in “Previous Writing,” so you can choose it again."
+            "value" : "Replacing won't delete your current writing. It stays in “Previous Writing,” so you can choose it again."
           }
         },
         "ko" : {
@@ -3275,7 +3304,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Combines the text and your handwriting into one image and saves it to Photos."
+            "value" : "Combines the text and your writing into one image and saves it to Photos."
           }
         },
         "ko" : {
@@ -3467,7 +3496,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Your current handwriting changed while comparing. Please check the new comparison."
+            "value" : "Your current writing changed while comparing. Please check the new comparison."
           }
         },
         "ko" : {
@@ -3508,6 +3537,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "사이드바 · 필사 화면 · 차트의 광고가 모두 사라져요."
+          }
+        }
+      }
+    },
+    "사이드바에서 번역본을 바꿔 필사해요. 필사는 번역본마다 따로 저장돼요." : {
+      "comment" : "패치노트 2.1 — 영어 성경 본문",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Switch translations in the sidebar. Writing is saved per translation."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "사이드바에서 번역본을 바꿔 필사해요. 필사는 번역본마다 따로 저장돼요."
           }
         }
       }
@@ -3887,7 +3933,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "All your handwriting is in your current writing."
+            "value" : "All your drafts are already in your current writing."
           }
         },
         "ko" : {
@@ -3972,7 +4018,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No favorites yet"
+            "value" : "No favorite verses yet"
           }
         },
         "ko" : {
@@ -4275,6 +4321,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "영국 밖에서는 공개 도메인"
+          }
+        }
+      }
+    },
+    "영어 성경 KJV · BSB" : {
+      "comment" : "패치노트 2.1 — 영어 성경 제목",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "English Bibles: KJV · BSB"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "영어 성경 KJV · BSB"
+          }
+        }
+      }
+    },
+    "영어 화면" : {
+      "comment" : "패치노트 2.1 — 영어 화면 제목",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "English Interface"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "영어 화면"
           }
         }
       }
@@ -5045,7 +5125,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "This verse was cleared after the draft was written. Adding it puts handwriting back into the cleared verse."
+            "value" : "This verse was cleared after the draft was written. Adding it puts writing back into the cleared verse."
           }
         },
         "ko" : {
@@ -5249,7 +5329,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Shows Previous Writing, Save Image, Show in Widget, and Delete."
+            "value" : "Shows Previous Writing, Save Image, Add to Widget, and Erase."
           }
         },
         "ko" : {
@@ -5266,7 +5346,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Previous Writing, Save Image, Widget, and Delete in one place."
+            "value" : "Previous Writing, Save Image, Widget, and Erase in one place."
           }
         },
         "ko" : {
@@ -5283,7 +5363,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "General Question"
+            "value" : "General Inquiry"
           }
         },
         "ko" : {
@@ -5936,7 +6016,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Couldn't read the current handwriting for that verse. This doesn't mean there is none."
+            "value" : "Couldn't read the current writing for that verse. This doesn't mean there is none."
           }
         },
         "ko" : {
@@ -6434,7 +6514,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No handwriting"
+            "value" : "No writing"
           }
         },
         "ko" : {
@@ -6468,7 +6548,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Handwriting was deleted, but favorites may remain."
+            "value" : "Writing was deleted, but favorites may remain."
           }
         },
         "ko" : {
@@ -6485,7 +6565,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Handwriting was deleted, but favorites and widget verses may remain."
+            "value" : "Writing was deleted, but favorites and widget verses may remain."
           }
         },
         "ko" : {
@@ -6502,7 +6582,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Handwriting and favorites were deleted, but widget verses may remain."
+            "value" : "Writing and favorites were deleted, but widget verses may remain."
           }
         },
         "ko" : {
@@ -6621,7 +6701,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Turn on “Allow Finger Writing” in Text Settings at the top of the writing screen to write with your finger, too. Then scroll with two fingers."
+            "value" : "Turn on “Allow finger writing” in Text Settings at the top of the writing screen to write with your finger, too. Then scroll with two fingers."
           }
         },
         "ko" : {
@@ -6638,7 +6718,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Some handwriting on the writing screen isn't saved yet. Try saving again there, then back up."
+            "value" : "Some writing on the writing screen isn't saved yet. Try saving again there, then back up."
           }
         },
         "ko" : {
@@ -6954,7 +7034,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Verse now: has other handwriting"
+            "value" : "Verse now: has other writing"
           }
         },
         "ko" : {
@@ -6971,7 +7051,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Verse now: has other handwriting · %@"
+            "value" : "Verse now: has other writing · %@"
           }
         },
         "ko" : {
@@ -6988,7 +7068,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Verse now: no handwriting"
+            "value" : "Verse now: no writing"
           }
         },
         "ko" : {
