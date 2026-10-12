@@ -22,6 +22,8 @@ public struct AppVersionFeature {
     }
     public enum Action {
         case path(StackActionOf<Path>)
+        /// 「앱 정보」 의 「성경 본문 출처」 행을 눌렀을 때(영어 현지화 결정 11).
+        case pushToBibleSource
         case pushToLisence
         case setiCloud(Bool)
     }
@@ -29,11 +31,15 @@ public struct AppVersionFeature {
     @Reducer
     public enum Path {
         case lisence(LisenceFeature)
+        /// 성경 본문 출처 — 번역본마다 이름 · 판 · 권리 · 출처(결정 11).
+        case bibleSource(BibleSourceFeature)
     }
     
     public var body: some Reducer<State, Action> {
         Reduce { state, action in
             switch action {
+            case .pushToBibleSource:
+                state.path.append(.bibleSource(.initialState))
             case.pushToLisence:
                 state.path.append(.lisence(.initialState))
             case .setiCloud(let isOn):

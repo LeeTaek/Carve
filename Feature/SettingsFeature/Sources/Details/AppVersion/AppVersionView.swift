@@ -31,6 +31,8 @@ public struct AppVersionView: View {
             switch store.case {
             case .lisence(let store):
                 LisenceView(store: store)
+            case .bibleSource(let store):
+                BibleSourceView(store: store)
             }
         }
     }
@@ -54,6 +56,7 @@ public struct AppVersionView: View {
                         CarveSettingsRow("빌드", value: build)
                     }
                     #endif
+                    bibleSourceRow
                 }
             }
             .padding(CarveSpacing.large)
@@ -61,6 +64,22 @@ public struct AppVersionView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(CarveColor.surface)
+    }
+
+    /// 「성경 본문 출처」 로 들어가는 행 — 번역본마다 이름 · 판 · 권리 · 출처(영어 현지화 결정 11).
+    private var bibleSourceRow: some View {
+        Button {
+            store.send(.pushToBibleSource)
+        } label: {
+            CarveSettingsRow(BibleSourceCopy.title) {
+                Image(systemName: "chevron.right")
+                    .font(CarveTypography.label)
+                    .foregroundStyle(CarveColor.secondary)
+                    .accessibilityHidden(true)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     /// 앱 아이콘과 이름 · 버전.
