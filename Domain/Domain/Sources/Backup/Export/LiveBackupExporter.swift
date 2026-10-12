@@ -15,9 +15,12 @@ import Foundation
 ///
 /// 1. 시작할 때 환경(`DrawingEditEnvironmentClient.current()`)의 **계정 상태 · 저장소 소유 · 여는 초안 묶음**(`readableDraftScopes ∪
 ///    beforeConnectionDraftScopes`)을 적어 둔다.
-/// 2. 장 목록 = 행이 있는 장(`backupChapterList` — 그때의 저장소 세대와 함께) ∪ 여는 묶음에 초안이 있는 장(`draftSummary(in:).chapters`).
-/// 3. 장마다: 환경을 다시 읽어 1 과 다르면 `accountChanged` → `backupRows(chapter:)` 의 세대가 장 목록 때와 다르면 `generationChanged` →
-///    그 장의 초안을 「확인이 필요한 필기」 와 같은 규칙으로 고른다(`BackupExportDraftSelection`) → 항목 · blob 을 준비 폴더에 쓴다 → 진행.
+/// 2. 장 목록 = 행이 있는 장(`backupChapterList` — 그때의 저장소 세대와 함께) ∪ 여는 묶음에 초안이 있는 장(`draftSummary(in:).chapters`)을
+///    **권 · 장 자리**로 줄인 것(`BibleChapter.backupPlaces`) — 같은 권 · 장이 번역본별로 여러 번 와도 한 번이다.
+/// 3. 자리마다: 환경을 다시 읽어 1 과 다르면 `accountChanged` → 번역본마다(`Translation.allCases` — 그 번역본의 장):
+///    `backupRows(chapter:)` 의 세대가 장 목록 때와 다르면 `generationChanged` → 그 장의 초안을 「확인이 필요한 필기」 와 같은 규칙으로 고른다
+///    (`BackupExportDraftSelection` — 그 번역본 초안만 읽는다) → 항목 · blob 을 준비 폴더에 쓴다. 자리를 마치면 진행.
+///    번역본마다 따로 읽으므로 초안 요약이 장을 번역본별로 나누든(KJV 초안이 KJV 장으로 오든) 아니든 같은 초안을 한 번씩만 담는다.
 /// 4. manifest · items 를 쓰고 `BackupArchive.write` 로 암호화 파일을 만든 뒤 평문 준비 폴더를 지운다.
 /// 5. 그 파일을 같은 암호 · 같은 상한으로 다시 풀어 대조한다(`BackupExportVerification`). 맞을 때만 성공이다.
 ///
@@ -150,47 +153,67 @@ public struct LiveBackupExporter: BackupExporting {
 
     // MARK: - 장 단위 읽기
 
-    /// 장 목록을 정하고 장마다 행 · 초안을 읽어 준비 폴더에 담는다(타입 주석 1 ~ 3).
-    /// - 부작용: 준비 폴더에 blob 쓰기, 진행 알림.
+    /// 장 목록을 정하고 권 · 장 자리마다 번역본별로 행 · 초안을 읽어 준비 폴더에 담는다(타입 주석 1 ~ 3).
+    /// - 부작용: 준비 폴더에 blob 쓰기, 진행 알림(자리 단위).
     private func collect(into staging: inout BackupExportStaging, progress: @Sendable (BackupProgress) async -> Void) async throws {
         let basis = BackupExportEnvironmentBasis(await environment.current())
         let listed = try await chapters(opening: basis.draftScopes)
         await progress(BackupProgress(done: 0, total: listed.chapters.count))
-        for (index, chapter) in listed.chapters.enumerated() {
+        for (index, place) in listed.chapters.enumerated() {
             try Task.checkCancellation()
             let current = await environment.current()
             guard BackupExportEnvironmentBasis(current) == basis else {
-                Log.error("백업 — 장 사이에 계정 상태 · 저장소 소유 · 여는 초안 묶음이 바뀌어 멈춘다", "\(chapter.title.rawValue).\(chapter.chapter)")
+                Log.error("백업 — 장 사이에 계정 상태 · 저장소 소유 · 여는 초안 묶음이 바뀌어 멈춘다", "\(place.title.rawValue).\(place.chapter)")
                 throw BackupExportError.accountChanged
             }
-            let load: BackupRowLoad
-            do {
-                load = try await database.backupRows(chapter: chapter)
-            } catch {
-                Log.error("백업 — 이 장의 필사 행을 읽지 못했다", "\(chapter.title.rawValue).\(chapter.chapter)", "\(error)")
-                throw BackupExportError.storeUnreadable
-            }
-            guard load.generation == listed.generation else {
-                Log.error("백업 — 장 사이에 저장소 세대가 바뀌어(모든 필사 삭제) 멈춘다", "목록 세대=\(listed.generation.raw)", "지금 세대=\(load.generation.raw)")
-                throw BackupExportError.generationChanged
-            }
-            let selected: [BackupExportDraft]
-            do {
-                selected = try await BackupExportDraftSelection.select(chapter: chapter, environment: current, rows: load.rows, reader: drafts)
-            } catch let error as CancellationError {
-                throw error
-            } catch {
-                Log.error("백업 — 이 장의 초안을 읽지 못해 멈춘다(조용히 빼지 않는다)", "\(chapter.title.rawValue).\(chapter.chapter)", "\(error)")
-                throw BackupExportError.draftsUnreadable
-            }
-            for candidate in BackupExportItems.candidates(chapter: chapter, rows: load.rows, drafts: selected) {
-                try staging.add(candidate)
+            for chapter in place.backupTranslationChapters {
+                try await stage(chapter, environment: current, generation: listed.generation, into: &staging)
             }
             await progress(BackupProgress(done: index + 1, total: listed.chapters.count))
         }
     }
 
-    /// 장 목록 — 행이 있는 장 ∪ 여는 묶음에 초안이 있는 장, 권 → 장 순서. 세대는 행이 있는 장을 읽은 때의 것이다.
+    /// 번역본 장 하나의 행 · 초안을 읽어 준비 폴더에 담는다 — 행과 세대는 같은 actor 구간에서 읽는다(장 단위 일관성).
+    /// - Parameters:
+    ///   - chapter: 번역본 장.
+    ///   - environment: 그 자리를 읽기 전에 다시 읽은 편집 환경.
+    ///   - generation: 장 목록을 읽은 때의 저장소 세대.
+    ///   - staging: 준비 폴더.
+    /// - Throws: `storeUnreadable` · `generationChanged` · `draftsUnreadable` · 취소. 부작용: 준비 폴더에 blob 쓰기.
+    private func stage(
+        _ chapter: BibleChapter,
+        environment current: DrawingEditEnvironment,
+        generation: DrawingStoreGeneration,
+        into staging: inout BackupExportStaging
+    ) async throws {
+        let label = "\(StoredBookKey.titleName(for: chapter)).\(chapter.chapter)"
+        let load: BackupRowLoad
+        do {
+            load = try await database.backupRows(chapter: chapter)
+        } catch {
+            Log.error("백업 — 이 장의 필사 행을 읽지 못했다", label, "\(error)")
+            throw BackupExportError.storeUnreadable
+        }
+        guard load.generation == generation else {
+            Log.error("백업 — 장 사이에 저장소 세대가 바뀌어(모든 필사 삭제) 멈춘다", "목록 세대=\(generation.raw)", "지금 세대=\(load.generation.raw)")
+            throw BackupExportError.generationChanged
+        }
+        let selected: [BackupExportDraft]
+        do {
+            selected = try await BackupExportDraftSelection.select(chapter: chapter, environment: current, rows: load.rows, reader: drafts)
+        } catch let error as CancellationError {
+            throw error
+        } catch {
+            Log.error("백업 — 이 장의 초안을 읽지 못해 멈춘다(조용히 빼지 않는다)", label, "\(error)")
+            throw BackupExportError.draftsUnreadable
+        }
+        for candidate in BackupExportItems.candidates(chapter: chapter, rows: load.rows, drafts: selected) {
+            try staging.add(candidate)
+        }
+    }
+
+    /// 장 목록 — 행이 있는 장 ∪ 여는 묶음에 초안이 있는 장을 권 · 장 자리로 줄인 것(번역본은 개역개정으로 맞춘다), 권 → 장 순서.
+    /// 세대는 행이 있는 장을 읽은 때의 것이다.
     /// - Parameter scopes: 여는 초안 묶음.
     /// - Throws: 저장소를 읽지 못하면 `storeUnreadable`, 묶음 요약을 읽지 못하면 `draftsUnreadable`.
     private func chapters(opening scopes: [AccountScope]) async throws -> (chapters: [BibleChapter], generation: DrawingStoreGeneration) {
@@ -201,16 +224,16 @@ public struct LiveBackupExporter: BackupExporting {
             Log.error("백업 — 필사 행이 있는 장을 읽지 못했다", "\(error)")
             throw BackupExportError.storeUnreadable
         }
-        var chapters = Set(stored.chapters)
+        var chapters = stored.chapters
         for scope in scopes {
             do {
-                chapters.formUnion(try await drafts.draftSummary(in: scope).chapters)
+                chapters += try await drafts.draftSummary(in: scope).chapters
             } catch {
                 Log.error("백업 — 초안 묶음을 읽지 못했다", "\(error)")
                 throw BackupExportError.draftsUnreadable
             }
         }
-        return (chapters.sorted(by: BibleChapter.backupOrder), stored.generation)
+        return (BibleChapter.backupPlaces(chapters), stored.generation)
     }
 
     /// 사용자에게 알릴 오류 — 이미 정한 오류 · 취소는 그대로, 컨테이너 공간 부족은 `insufficientSpace`, 그 밖의 쓰기 실패는 `writeFailed`.

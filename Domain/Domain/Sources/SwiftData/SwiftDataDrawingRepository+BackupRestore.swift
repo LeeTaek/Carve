@@ -53,7 +53,9 @@ extension SwiftDatabaseActor {
     /// | 넣는 행 | 값 |
     /// |---|---|
     /// | `lineData` · `layoutMetadataData` | blob 원본 바이트(비운 행이면 `lineData` nil) |
-    /// | `drawingVersion` · `translation` | 항목 값 그대로(nil 이면 nil — 모델 기본값 1 · NKRV 로 두지 않는다) |
+    /// | `drawingVersion` | 항목 값 그대로(nil 이면 nil — 모델 기본값 1 로 두지 않는다) |
+    /// | `translation` | 개역개정 항목은 값 그대로(nil 이면 nil — 모델 기본값 NKRV 로 두지 않는다). KJV · BSB 항목은 nil(`StoredBookKey.translationColumn`) |
+    /// | `titleName` | `StoredBookKey.titleName(title:translation:)` — 개역개정 · nil 은 `BibleTitle.rawValue`, 영어는 `KJV-<rawValue>` 등 |
     /// | `creationDate` · `updateDate` | 항목의 `createdAt` · `updatedAt` 그대로 — `BibleDrawing.init` 이 채운 now 를 넣은 뒤 덮는다 |
     /// | `isPresent` | `insertCurrent` 만 true |
     /// | `rowUUID` · business `id` | 새 UUID · `BibleDrawing.init` 규칙(불러온 시각 기준) |
@@ -108,9 +110,9 @@ extension SwiftDatabaseActor {
         }
     }
 
-    /// 그 장의 모든 행(대표 · 보관 · 비운 행) — `backupRows(chapter:)` 와 같은 조건.
+    /// 그 장의 모든 행(대표 · 보관 · 비운 행) — `backupRows(chapter:)` 와 같은 조건(그 장의 번역본 `titleName`).
     private func backupRestoreRows(chapter: BibleChapter) throws -> [BibleDrawing] {
-        let titleName = chapter.title.rawValue
+        let titleName = StoredBookKey.titleName(for: chapter)
         let chapterNumber = chapter.chapter
         let predicate = #Predicate<BibleDrawing> {
             $0.titleName == titleName && $0.titleChapter == chapterNumber
@@ -129,19 +131,29 @@ private struct BackupRestoreRow {
     let insertion: BackupRowInsertion
     let lineData: Data?
     let layoutMetadataData: Data?
-    let translation: Translation?
+    /// `translation` 열에 쓸 값 — `.NKRV` 나 nil 만(영어 값은 쓰지 않는다 — 이미 나간 2.0.0 기기가 모르는 열거값을 디코딩하다 죽을 수 있다).
+    let translationColumn: Translation?
+    /// `titleName` 에 쓸 값 — 장의 권 · 번역본으로 지은 `StoredBookKey.titleName(title:translation:)`(항목의 번역본과 같은 것을 확인했다).
+    let titleName: String
 
-    /// - Throws: blob 바이트가 없거나 이름과 다르면 `blobUnavailable`, 번역본을 모르면 `unknownTranslation`.
+    /// - Throws: blob 바이트가 없거나 이름과 다르면 `blobUnavailable`, 번역본을 모르거나 장의 번역본과 다르면 `unknownTranslation`.
     init(_ insertion: BackupRowInsertion, blobs: [String: Data]) throws {
         self.insertion = insertion
         self.lineData = try insertion.inkBlob.map { try Self.bytes(named: $0, in: blobs) }
         self.layoutMetadataData = try insertion.metadataBlob.map { try Self.bytes(named: $0, in: blobs) }
+        // 번역 nil 은 개역개정 묶음이고 열에는 nil 그대로 쓴다(NKRV 로 채우지 않는다).
+        let translation: Translation
         if let raw = insertion.translation {
             guard let known = Translation(rawValue: raw) else { throw BackupChapterRestoreError.unknownTranslation }
-            self.translation = known
+            translation = known
+            self.translationColumn = StoredBookKey.translationColumn(for: known)
         } else {
-            self.translation = nil
+            translation = .NKRV
+            self.translationColumn = nil
         }
+        // 판정기는 장과 같은 번역본 항목만 넣는다 — 어긋나면 다른 번역본 장에 행이 섞이므로 쓰지 않는다.
+        guard translation == insertion.chapter.translation else { throw BackupChapterRestoreError.unknownTranslation }
+        self.titleName = insertion.titleName
     }
 
     /// blob 바이트 — 이름(SHA-256)과 같은 바이트만 받는다.
@@ -163,9 +175,11 @@ private struct BackupRestoreRow {
             rowUUID: UUID().uuidString
         )
         // init 이 now 로 채운 만든 시각과 모델 기본값(좌표 형식 1 · NKRV · isPresent false)을 항목 원본으로 덮는다.
+        // 권 이름 · 번역 열도 init 규칙에 기대지 않고 확인해 둔 값으로 적는다(영어 행은 `KJV-…` · 열 nil).
+        row.titleName = titleName
         row.creationDate = insertion.creationDate
         row.drawingVersion = insertion.drawingVersion
-        row.translation = translation
+        row.translation = translationColumn
         row.isPresent = insertion.isPresent
         return row
     }

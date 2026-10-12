@@ -81,7 +81,8 @@ public enum BackupItemKind: String, Codable, Sendable, CaseIterable {
 
 /// 절 식별 — 번역본 저장값 + USFM 권 코드 + 장 · 절 (설계 §2-4, 결정 9).
 public struct BackupVerseKey: Codable, Equatable, Hashable, Sendable {
-    /// 행 · 초안에 저장된 번역본 값 그대로(`Translation.rawValue`). 없으면 nil — NKRV 로 채우지 않는다.
+    /// 행 · 초안의 번역본(`Translation.rawValue` — `NKRV` · `KJV` · `BSB`). 개역개정 행은 열에 저장된 값 그대로이고 없으면 nil — NKRV 로 채우지 않는다.
+    /// 영어 행은 열이 늘 nil 이라 `titleName` 접두에서 온 값이다(`BackupRowRecord.backupTranslation`). 초안은 초안 키의 값 그대로다.
     public var translation: String?
     /// USFM 권 코드(`GEN` … `REV`). 모르는 코드도 그대로 읽고, 지원 판정(`BackupItemSupport`)이 건너뛴다.
     public var book: String
@@ -121,7 +122,8 @@ public struct BackupItemSource: Codable, Equatable, Sendable {
         case account
     }
 
-    /// `BibleTitle.rawValue` 원문(예: `1-01Genesis.txt`) — 권 코드와 함께 원본을 보존한다.
+    /// 행의 `titleName` 원문(개역개정 `1-01Genesis.txt`, 영어 `KJV-1-01Genesis.txt`) · 초안 키의 권 이름 — 권 코드와 함께 원본을 보존한다.
+    /// 불러오기는 이 값이 아니라 `book` · `translation` 으로 권 이름을 다시 짓는다(`StoredBookKey.titleName(title:translation:)`).
     public var titleName: String
     /// 행: `rowUUID ?? business id`. 초안: 식별 · 판정에 쓰지 않는다(nil 이어도 된다).
     public var rowKey: String?

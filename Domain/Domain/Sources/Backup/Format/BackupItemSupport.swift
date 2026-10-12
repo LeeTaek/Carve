@@ -10,7 +10,7 @@ import Foundation
 
 /// 항목 하나를 이 앱이 해석할 수 없는 이유 (설계 §5-1 `unsupported`). 파일은 거부하지 않고 그 항목만 건너뛰고 사유별 수로 알린다.
 public enum BackupUnsupportedReason: String, Codable, Hashable, Sendable, CaseIterable {
-    /// 번역본이 nil 도 아니고 `Translation` 의 값도 아니다.
+    /// 번역본이 nil 도 아니고 `Translation` 의 값(`NKRV` · `KJV` · `BSB`)도 아니다(예: `"ESV"`).
     case unknownTranslation
     /// 권 코드가 `BibleBookCode` 에 없다.
     case unknownBook

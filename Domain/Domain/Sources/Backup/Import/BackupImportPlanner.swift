@@ -13,8 +13,10 @@ import Foundation
 /// **순수 함수다.** 파일 · 저장소 · 시각을 모른다. 항목의 지원 판정(`BackupItemSupport`)은 호출부가 blob 을 읽어 미리 계산해 넘기고,
 /// 지금 저장소는 백업 전용 조회(`BackupRowRecord` — 원본 바이트로 만든 지문)로 받는다. 미리보기와 쓰기 직전 재판정이 같은 함수를 쓴다.
 ///
-/// - **판정 단위는 한 절이다** — 권 · 장 · 절과 번역 묶음이 같은 것. 번역 nil 은 지금 앱에서 NKRV 화면에 보이므로 NKRV 와 한 묶음이고,
-///   넣는 행의 번역 저장값은 nil 그대로다.
+/// - **판정 단위는 한 절이다** — 권 · 장 · 절과 번역 묶음이 같은 것. 묶음은 셋이다(영어 현지화 2026-10-06): 번역 nil 은 지금 앱에서
+///   NKRV 화면에 보이므로 NKRV 와 한 묶음이고(넣는 행의 번역 저장값은 nil 그대로), KJV · BSB 는 각자 묶음이다. 장(`BibleChapter`)이 번역본을
+///   지니므로 한 장의 항목 · 행은 한 묶음뿐이다 — 항목은 `chapter(of:)` 가 번역본까지 맞는 장에만 놓고, 행은 그 장의 번역본 `titleName`
+///   (`StoredBookKey.titleName(for:)`)으로 고르고 묶음은 `titleName` 접두를 먼저 본다(`BackupRowRecord.backupTranslation` — 영어 행은 열이 nil).
 /// - `R` = 그 절의 지금 저장소 행 전부(현재 · 보관 · 비운 행), 대표 = `DrawingRepresentativeRule.pick(R)`. 같은 파일의 다른 항목이 넣을 행은
 ///   `R` 에 더하지 않는다 — 단 **같은 지문은 한 절에 한 번만** 넣는다.
 /// - 처리 순서는 지원 판정 → 현재 후보 → 나머지(id 순)다. 현재 후보는 지원 판정을 통과한 `isCurrent` 항목 중 `updatedAt` 이 가장 늦은 하나다
@@ -28,17 +30,18 @@ import Foundation
 /// - **대표 고정** — `R` 이 있는데 `isPresent` 행이 없는 절(1.3.0 legacy)에 `insertCurrent` 없이 보관 행만 넣으면, 지금 대표를 `pins` 로 내
 ///   적용이 같은 트랜잭션에서 present 로 고정하게 한다(오케스트레이터 결정 2026-10-06). 결정과 미리보기 수는 바뀌지 않는다.
 public enum BackupImportPlanner {
-    /// 번역 nil 과 한 묶음으로 판정하는 번역본 — 지금 앱에서 nil 은 NKRV 화면에 보인다.
+    /// 번역 nil 과 한 묶음으로 판정하는 번역본 — 지금 앱에서 nil 은 NKRV 화면에 보인다. KJV · BSB 는 각자 묶음이다.
     static let nilTranslationGroup = Translation.NKRV.rawValue
 
     // MARK: - 장 하나
 
     /// 장 하나를 판정한다.
     /// - Parameters:
-    ///   - items: 백업 항목. 이 장(권 코드 · 장)에 놓이는 항목만 보고, 다른 장 항목은 결정에 넣지 않는다.
+    ///   - items: 백업 항목. 이 장(권 코드 · 장 · 번역본 — `chapter(of:)`)에 놓이는 항목만 보고, 다른 장 항목은 결정에 넣지 않는다.
     ///   - unsupported: 항목 id → 해석할 수 없는 이유(호출부가 `BackupItemSupport.reason` 으로 계산). 여기 있는 항목은 `.unsupported` 다.
-    ///   - current: 그 장의 지금 저장소 행 전부(`BackupRowLoad.rows`). 다른 장 행(`titleName` · `chapter` 가 다른 것)은 보지 않는다.
-    ///   - chapter: 판정할 장.
+    ///   - current: 그 장의 지금 저장소 행 전부(`BackupRowLoad.rows`). 다른 장 행(`titleName` 이 그 장의 번역본 이름과 다르거나 `chapter` 가
+    ///     다른 것 — 다른 번역본의 같은 권 · 장 행 포함)은 보지 않는다.
+    ///   - chapter: 판정할 장(번역본 포함).
     /// - Returns: 항목마다의 결정과 넣을 행. 부작용 없음.
     public static func plan(
         items: [BackupItem],
@@ -51,8 +54,9 @@ public enum BackupImportPlanner {
             itemsByGroup[VerseGroup(verse: item.verse.verse, translation: item.verse.translation), default: []].append(item)
         }
         var rowsByGroup: [VerseGroup: [BackupRowRecord]] = [:]
-        for row in current where row.titleName == chapter.title.rawValue && row.chapter == chapter.chapter {
-            rowsByGroup[VerseGroup(verse: row.verse, translation: row.translation), default: []].append(row)
+        let titleName = StoredBookKey.titleName(for: chapter)
+        for row in current where row.titleName == titleName && row.chapter == chapter.chapter {
+            rowsByGroup[VerseGroup(verse: row.verse, translation: row.backupTranslation), default: []].append(row)
         }
 
         var decisions: [BackupItemDecision] = []
@@ -140,11 +144,21 @@ public enum BackupImportPlanner {
 
     // MARK: - 장 나누기 · 미리보기
 
-    /// 항목이 놓일 장 — 권 코드가 `BibleBookCode` 에 있고 장이 `1...권.lastChapter` 일 때만.
-    /// - Returns: 장. 어느 장에도 놓을 수 없으면 nil(미리보기가 지원 안 됨으로 센다).
+    /// 항목이 놓일 장 — 권 코드가 `BibleBookCode` 에 있고 장이 `1...권.lastChapter` 일 때만. 번역본은 `placementTranslation` 이다.
+    /// - Returns: 장(번역본 포함). 어느 장에도 놓을 수 없으면 nil(미리보기가 지원 안 됨으로 센다).
     public static func chapter(of item: BackupItem) -> BibleChapter? {
         guard let title = item.verse.title, (1...title.lastChapter).contains(item.verse.chapter) else { return nil }
-        return BibleChapter(title: title, chapter: item.verse.chapter)
+        return BibleChapter(title: title, chapter: item.verse.chapter, translation: placementTranslation(item.verse.translation))
+    }
+
+    /// 항목이 놓일 장의 번역본 — nil · `NKRV` 는 개역개정(한 묶음), `KJV` · `BSB` 는 그 번역본.
+    ///
+    /// 모르는 번역본(예: `"ESV"`)은 개역개정 장에 놓는다 — 그 장의 판정에서 지원 안 됨(`unknownTranslation`)으로 세기만 하고 쓰지 않는다
+    /// (지원 판정이 먼저라 행을 넣는 결정이 나지 않는다). 2.1 이전과 같은 자리에서 센다.
+    /// - Parameter translation: 항목의 번역본 값.
+    /// - Returns: 번역본. 부작용 없음.
+    static func placementTranslation(_ translation: String?) -> Translation {
+        translation.flatMap(Translation.init(rawValue:)) ?? .NKRV
     }
 
     /// 항목을 장으로 나눈다 — 어느 장에도 놓을 수 없는 항목은 빠진다. 부작용 없음.
@@ -157,7 +171,7 @@ public enum BackupImportPlanner {
         return grouped
     }
 
-    /// 항목이 놓이는 장 — 권 순서 → 장 순서, 겹치지 않게. 검사가 장마다 저장소 행을 읽는 순서다.
+    /// 항목이 놓이는 장 — 권 순서 → 장 순서 → 번역본 순서, 겹치지 않게. 검사가 장마다 저장소 행을 읽는 순서다.
     public static func chapters(of items: [BackupItem]) -> [BibleChapter] {
         ordered(Array(itemsByChapter(items).keys))
     }
@@ -199,21 +213,23 @@ public enum BackupImportPlanner {
         return BackupImportPreview(plans: plans, unplaced: unplaced(items: items, unsupported: unsupported))
     }
 
-    /// 장을 권 순서(`BibleTitle.allCases`) → 장 순서로 늘어놓는다. 겹치는 장은 하나로.
+    /// 장을 권 순서(`BibleTitle.allCases`) → 장 순서 → 번역본 순서(`Translation.allCases`)로 늘어놓는다. 겹치는 장(같은 번역본)은 하나로.
     static func ordered(_ chapters: [BibleChapter]) -> [BibleChapter] {
         let bookOrder = Dictionary(uniqueKeysWithValues: BibleTitle.allCases.enumerated().map { ($0.element, $0.offset) })
+        let translationOrder = Dictionary(uniqueKeysWithValues: Translation.allCases.enumerated().map { ($0.element, $0.offset) })
         return Array(Set(chapters)).sorted { lhs, rhs in
             let lhsBook = bookOrder[lhs.title] ?? 0
             let rhsBook = bookOrder[rhs.title] ?? 0
             if lhsBook != rhsBook { return lhsBook < rhsBook }
-            return lhs.chapter < rhs.chapter
+            if lhs.chapter != rhs.chapter { return lhs.chapter < rhs.chapter }
+            return (translationOrder[lhs.translation] ?? 0) < (translationOrder[rhs.translation] ?? 0)
         }
     }
 }
 
 // MARK: - 절 판정
 
-/// 판정 단위 — 절과 번역 묶음(nil 은 NKRV 와 한 묶음).
+/// 판정 단위 — 절과 번역 묶음(nil 은 NKRV 와 한 묶음, KJV · BSB 는 각자). 행의 번역은 `backupTranslation`(`titleName` 접두 먼저)이다.
 private struct VerseGroup: Hashable, Comparable {
     let verse: Int
     let translation: String
