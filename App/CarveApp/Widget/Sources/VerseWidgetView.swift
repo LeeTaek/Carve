@@ -9,7 +9,7 @@
 import SwiftUI
 import WidgetKit
 
-/// 위젯 카드(시안 G4) — 짧은 출처 · 지정 당시 필기 · 「새기다 · 번역본」.
+/// 위젯 카드(시안 G4) — 짧은 출처 · 지정 당시 필기 · 「새기다 · 번역본」(영어 「Carve · 번역본」).
 ///
 /// 필기가 없는 말씀은 본문을 대신 보여 준다. 지정된 말씀이 없으면 고르는 방법을 안내한다.
 /// 누르면 그 절의 필사 화면으로 들어간다.
@@ -58,20 +58,21 @@ struct VerseWidgetView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
 
-            Text("새기다 · \(payload.translationDisplayName)")
+            Text("새기다 · \(payload.translationDisplayName)", bundle: .main, comment: "위젯 카드 아래 — 앱 이름 · 번역본 약칭. 영어 앱 이름은 Carve")
                 .font(.caption2)
                 .foregroundStyle(VerseWidgetPalette.secondary)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(payload.reference). \(payload.sentence)")
+        // 참조 · 본문은 담을 때 앱이 만든 문자열이라 카탈로그를 거치지 않는다.
+        .accessibilityLabel(Text(verbatim: "\(payload.reference). \(payload.sentence)"))
     }
 
     private var empty: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("표시할 말씀을 골라 주세요")
+            Text("표시할 말씀을 골라 주세요", bundle: .main, comment: "위젯 빈 상태 제목 — 담은 말씀이 없다")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(VerseWidgetPalette.ink)
-            Text("새기다 앱의 즐겨찾기에서 고를 수 있어요.")
+            Text("새기다 앱의 즐겨찾기에서 고를 수 있어요.", bundle: .main, comment: "위젯 빈 상태 설명 — 앱 이름(영어 Carve)의 즐겨찾기에서 고른다")
                 .font(.caption2)
                 .foregroundStyle(VerseWidgetPalette.secondary)
                 .lineLimit(2)

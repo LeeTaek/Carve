@@ -29,8 +29,12 @@ struct VerseWidget: Widget {
                 .environment(\.colorScheme, .light)
                 .containerBackground(VerseWidgetPalette.paper, for: .widget)
         }
-        .configurationDisplayName("말씀")
-        .description("즐겨찾기에서 고른 말씀을 홈 화면에 띄워요. 여러 개를 고르면 한 시간에 하나씩 돌아가며 보여 줘요.")
+        .configurationDisplayName(Text("말씀", bundle: .main, comment: "위젯 갤러리의 위젯 이름"))
+        .description(Text(
+            "즐겨찾기에서 고른 말씀을 홈 화면에 띄워요. 여러 개를 고르면 한 시간에 하나씩 돌아가며 보여 줘요.",
+            bundle: .main,
+            comment: "위젯 갤러리의 위젯 설명"
+        ))
         // 작게(systemSmall)는 말씀 한 줄도 좁아 뺀다(2026-09-16 사용자 확인).
         // 중간은 필기가 작아 읽기 어려워 크게 · 아주 크게를 더한다(2026-09-29 사용자 요청).
         .supportedFamilies([.systemMedium, .systemLarge, .systemExtraLarge])

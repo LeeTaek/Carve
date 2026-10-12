@@ -1,7 +1,720 @@
 {
   "sourceLanguage" : "ko",
   "strings" : {
-
+    "%@ %lld:%lld" : {
+      "comment" : "위젯 머리의 짧은 참조 — 권 이름, 장:절. 예: 창세기 1:1 · Genesis 1:1",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ %2$lld:%3$lld"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ %2$lld:%3$lld"
+          }
+        }
+      }
+    },
+    "iCloud 계정 상태를 확인하지 못했어요.\n필사는 이 기기에 저장돼요." : {
+      "comment" : "시작 화면 오류 — 계정 상태 확인 실패",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't check your iCloud account status.\nYour writing is saved on this device."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 계정 상태를 확인하지 못했어요.\n필사는 이 기기에 저장돼요."
+          }
+        }
+      }
+    },
+    "iCloud 계정을 확인해 주세요.\n지금은 이 기기에만 저장돼요." : {
+      "comment" : "시작 화면 오류 — iCloud 계정 없음",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Please check your iCloud account.\nFor now, your writing is saved on this device only."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 계정을 확인해 주세요.\n지금은 이 기기에만 저장돼요."
+          }
+        }
+      }
+    },
+    "iCloud 동기화를 준비하지 못했어요.\n필사는 이 기기에 저장돼요." : {
+      "comment" : "시작 화면 오류 — 동기화 준비 실패",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't set up iCloud sync.\nYour writing is saved on this device."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 동기화를 준비하지 못했어요.\n필사는 이 기기에 저장돼요."
+          }
+        }
+      }
+    },
+    "iCloud 로그인을 확인했어요" : {
+      "comment" : "재실행 안내 카드 제목 — iCloud 로그인은 됐다",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud sign-in confirmed"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 로그인을 확인했어요"
+          }
+        }
+      }
+    },
+    "iCloud 연결을 확인하지 못했어요.\n지금은 이 기기에만 저장돼요." : {
+      "comment" : "시작 화면 오류 — 원인 모름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't check the iCloud connection.\nFor now, your writing is saved on this device only."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 연결을 확인하지 못했어요.\n지금은 이 기기에만 저장돼요."
+          }
+        }
+      }
+    },
+    "iCloud에 연결하기 전에 이 iPad에서 쓴 필기가 있어요" : {
+      "comment" : "연결 전 필기 안내 카드 제목",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You have handwriting on this iPad from before connecting to iCloud"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud에 연결하기 전에 이 iPad에서 쓴 필기가 있어요"
+          }
+        }
+      }
+    },
+    "iCloud에 저장된 필사를 확인하고 있어요.\n%@" : {
+      "comment" : "시작 화면 안내 — 초기 복원 확인 중. 끝의 %@ 는 「먼저 시작해도 …」 약속 문장",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Checking iCloud for your saved writing.\n%@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud에 저장된 필사를 확인하고 있어요.\n%@"
+          }
+        }
+      }
+    },
+    "iCloud에서 필사를 가져오다 문제가 생겼어요.\n지금은 이 기기에만 저장돼요." : {
+      "comment" : "시작 화면 오류 — 가져오기 실패",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Something went wrong while getting your writing from iCloud.\nFor now, it's saved on this device only."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud에서 필사를 가져오다 문제가 생겼어요.\n지금은 이 기기에만 저장돼요."
+          }
+        }
+      }
+    },
+    "그동안 쓴 필사는 그대로예요. 불편한 점이 있으면 알려 주세요." : {
+      "comment" : "절마다 캔버스 제거 안내 본문",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Everything you've written is still here. Let us know if anything feels off."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "그동안 쓴 필사는 그대로예요. 불편한 점이 있으면 알려 주세요."
+          }
+        }
+      }
+    },
+    "기존 필사를 불러오는 데 시간이 걸리고 있어요.\n계속 기다리거나 먼저 시작할 수 있어요.\n%@" : {
+      "comment" : "시작 화면 안내 — 초기 복원 20초. 끝의 %@ 는 「먼저 시작해도 …」 약속 문장",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading your existing writing is taking a while.\nYou can keep waiting or start now.\n%@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "기존 필사를 불러오는 데 시간이 걸리고 있어요.\n계속 기다리거나 먼저 시작할 수 있어요.\n%@"
+          }
+        }
+      }
+    },
+    "나중에" : {
+      "comment" : "연결 전 필기 안내 — 미룬다",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Later"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "나중에"
+          }
+        }
+      }
+    },
+    "데이터 동기화 완료" : {
+      "comment" : "시작 화면 안내 — iCloud 동기화를 마쳤다",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Data sync complete"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "데이터 동기화 완료"
+          }
+        }
+      }
+    },
+    "데이터 마이그레이션 중...\n조금만 기다려주세요." : {
+      "comment" : "시작 화면 안내 — 옛 필사를 새 형식으로 옮기는 중",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Migrating data...\nPlease wait a moment."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "데이터 마이그레이션 중...\n조금만 기다려주세요."
+          }
+        }
+      }
+    },
+    "데이터 마이그레이션이 완료" : {
+      "comment" : "재실행 안내 알림 제목 — 옛 필사를 새 형식으로 옮겼다",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Data Migration Complete"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "데이터 마이그레이션이 완료"
+          }
+        }
+      }
+    },
+    "먼저 시작하기" : {
+      "comment" : "시작 화면 버튼 — iCloud 필사를 기다리지 않고 들어간다",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start Now"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "먼저 시작하기"
+          }
+        }
+      }
+    },
+    "먼저 시작해도 기존 필사는 도착하는 대로 화면에 반영하거나 알려 드려요." : {
+      "comment" : "시작 화면 안내 끝 문장 — 먼저 들어가도 늦게 온 필사를 반영하거나 알린다",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If you start now, your existing writing will appear or you'll be notified as it arrives."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "먼저 시작해도 기존 필사는 도착하는 대로 화면에 반영하거나 알려 드려요."
+          }
+        }
+      }
+    },
+    "새 형식으로 옮기기 전에 기존 필사를 따로 보관하지 못했어요.\n기기 저장 공간을 확보한 뒤 앱을 다시 열어 주세요." : {
+      "comment" : "저장소를 열 수 없음 — 옮기기 전 보관 실패(공간 부족이 흔하다)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't keep a copy of your existing writing before moving it to the new format.\nFree up storage on your device, then open the app again."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "새 형식으로 옮기기 전에 기존 필사를 따로 보관하지 못했어요.\n기기 저장 공간을 확보한 뒤 앱을 다시 열어 주세요."
+          }
+        }
+      }
+    },
+    "시작하기" : {
+      "comment" : "시작 화면 버튼 — 기다릴 것이 없을 때",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "시작하기"
+          }
+        }
+      }
+    },
+    "시편 %lld:%lld" : {
+      "comment" : "위젯 머리의 짧은 시편 참조 — 장:절. en 은 단수 Psalm",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Psalm %1$lld:%2$lld"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "시편 %1$lld:%2$lld"
+          }
+        }
+      }
+    },
+    "아직 기존 필사를 받고 있어요.\n필사가 많거나 네트워크가 느리면 오래 걸릴 수 있어요.\n%@" : {
+      "comment" : "시작 화면 안내 — 초기 복원 60초. 끝의 %@ 는 「먼저 시작해도 …」 약속 문장",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Still downloading your existing writing.\nThis can take a while if you have a lot of writing or a slow network.\n%@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "아직 기존 필사를 받고 있어요.\n필사가 많거나 네트워크가 느리면 오래 걸릴 수 있어요.\n%@"
+          }
+        }
+      }
+    },
+    "아직 이 기기의 필사는 iCloud와 연결되지 않았어요.\n%@" : {
+      "comment" : "재실행 안내 카드 본문 — %@ 는 설정의 「앱을 다시 열어 연결」 안내 문장",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your writing on this device isn't connected to iCloud yet.\n%@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "아직 이 기기의 필사는 iCloud와 연결되지 않았어요.\n%@"
+          }
+        }
+      }
+    },
+    "앱을 다시 실행해 주세요" : {
+      "comment" : "재실행 안내 알림 제목",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Please Restart the App"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "앱을 다시 실행해 주세요"
+          }
+        }
+      }
+    },
+    "앱을 재실행해주세요." : {
+      "comment" : "재실행 안내 알림 본문 — 그 밖의 경우",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Please restart the app."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "앱을 재실행해주세요."
+          }
+        }
+      }
+    },
+    "앱을 지우지 마세요. 같은 안내가 계속되면 %@ 로 알려 주세요." : {
+      "comment" : "막힌 경우의 당부 — %@ 는 문의 메일 주소",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Please don't delete the app. If this keeps happening, let us know at %@."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "앱을 지우지 마세요. 같은 안내가 계속되면 %@ 로 알려 주세요."
+          }
+        }
+      }
+    },
+    "앱을 지우지 마세요. 같은 안내가 계속되면 알려 주세요." : {
+      "comment" : "막힌 경우의 당부 — 문의 주소가 없을 때",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Please don't delete the app. If this keeps happening, let us know."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "앱을 지우지 마세요. 같은 안내가 계속되면 알려 주세요."
+          }
+        }
+      }
+    },
+    "의견 보내기" : {
+      "comment" : "절마다 캔버스 제거 안내 — 의견 보내기 화면으로 간다",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send Feedback"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "의견 보내기"
+          }
+        }
+      }
+    },
+    "이 기기의 필사를 새 형식으로 옮기려면 앱을 다시 실행해야 해요." : {
+      "comment" : "재실행 안내 알림 본문 — iCloud 를 쓰지 않는 기기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restart the app to move your writing on this device to the new format."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 기기의 필사를 새 형식으로 옮기려면 앱을 다시 실행해야 해요."
+          }
+        }
+      }
+    },
+    "이 기기의 필사를 새 형식으로 옮기려면 앱을 다시 실행해야 해요.\niCloud에서 필사를 받았는지는 확인하지 못했어요." : {
+      "comment" : "재실행 안내 알림 본문 — iCloud 에서 받았는지 모른다",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restart the app to move your writing on this device to the new format.\nWe couldn't confirm whether your writing was downloaded from iCloud."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 기기의 필사를 새 형식으로 옮기려면 앱을 다시 실행해야 해요.\niCloud에서 필사를 받았는지는 확인하지 못했어요."
+          }
+        }
+      }
+    },
+    "이 버전의 앱이 알아보지 못하는 필사 저장소예요.\n앱을 최신 버전으로 업데이트하면 열릴 수 있어요." : {
+      "comment" : "저장소를 열 수 없음 — 모르는 버전",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This version of the app can't read your writing storage.\nUpdating to the latest version may open it."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 버전의 앱이 알아보지 못하는 필사 저장소예요.\n앱을 최신 버전으로 업데이트하면 열릴 수 있어요."
+          }
+        }
+      }
+    },
+    "절마다 쓰는 캔버스는 이번 버전에서 없어졌어요" : {
+      "comment" : "2.0.x 절마다 캔버스 사용자에게 한 번 보이는 안내 제목",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The per-verse canvas has been removed in this version"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "절마다 쓰는 캔버스는 이번 버전에서 없어졌어요"
+          }
+        }
+      }
+    },
+    "지금은 이 기기에만 저장하는 상태로 시작해요" : {
+      "comment" : "시작 화면 안내 — iCloud 연결 보류",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Starting with your writing saved on this device only for now"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지금은 이 기기에만 저장하는 상태로 시작해요"
+          }
+        }
+      }
+    },
+    "초기화 중..." : {
+      "comment" : "시작 화면 안내 — 대기 방식을 정하기 전",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Getting ready..."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "초기화 중..."
+          }
+        }
+      }
+    },
+    "필기 확인하기" : {
+      "comment" : "연결 전 필기 안내 — 설정의 확인이 필요한 필기로 간다",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Review Handwriting"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필기 확인하기"
+          }
+        }
+      }
+    },
+    "필사 저장소를 읽지 못했어요.\n앱을 완전히 종료한 뒤 다시 열어 주세요." : {
+      "comment" : "저장소를 열 수 없음 — 읽기 실패",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't read your writing storage.\nQuit the app completely, then open it again."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필사 저장소를 읽지 못했어요.\n앱을 완전히 종료한 뒤 다시 열어 주세요."
+          }
+        }
+      }
+    },
+    "필사 저장소를 준비하지 못했어요.\n앱을 완전히 종료한 뒤 다시 열어 주세요." : {
+      "comment" : "저장소를 열 수 없음 — 준비 실패",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't prepare your writing storage.\nQuit the app completely, then open it again."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필사 저장소를 준비하지 못했어요.\n앱을 완전히 종료한 뒤 다시 열어 주세요."
+          }
+        }
+      }
+    },
+    "필사 저장소와 계정 소유를 확인하고 있어요" : {
+      "comment" : "앱 시작 직후 — 저장소와 iCloud 계정 소유를 확인하는 동안",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Checking your writing storage and account"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필사 저장소와 계정 소유를 확인하고 있어요"
+          }
+        }
+      }
+    },
+    "필사를 iCloud에 올리지 못했어요.\n이 기기에는 저장돼 있어요." : {
+      "comment" : "시작 화면 오류 — 올리기 실패",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't upload your writing to iCloud.\nIt's saved on this device."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필사를 iCloud에 올리지 못했어요.\n이 기기에는 저장돼 있어요."
+          }
+        }
+      }
+    },
+    "필사를 여는 중이에요" : {
+      "comment" : "시작 화면 안내 — 이 기기에 필사가 있어 바로 연다",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opening your writing"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필사를 여는 중이에요"
+          }
+        }
+      }
+    },
+    "필사를 지키려고 시작을 멈췄어요.\n%@\n%@" : {
+      "comment" : "저장소를 열 수 없음 — 사유(%1$@)와 앱을 지우지 말라는 당부(%2$@)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Startup stopped to protect your writing.\n%1$@\n%2$@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필사를 지키려고 시작을 멈췄어요.\n%@\n%@"
+          }
+        }
+      }
+    },
+    "현재 필사에 넣을 내용을 확인해 주세요." : {
+      "comment" : "연결 전 필기 안내 카드 본문",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Review what to add to your current writing."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "현재 필사에 넣을 내용을 확인해 주세요."
+          }
+        }
+      }
+    },
+    "확인" : {
+      "comment" : "알림 · 안내 카드의 확인(닫기) 버튼",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OK"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "확인"
+          }
+        }
+      }
+    }
   },
   "version" : "1.0"
 }

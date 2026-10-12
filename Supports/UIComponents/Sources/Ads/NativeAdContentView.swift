@@ -324,9 +324,14 @@ public final class NativeAdContentView: UIView {
         addSubview(view)
     }
 
+    /// 광고 배지 문구(앱 언어) — ko 「광고」 · en 「Ad」.
+    nonisolated static var adBadgeText: String {
+        String(localized: "광고", bundle: .module, comment: "네이티브 광고 배지(AdMob 필수 표시) — 짧게")
+    }
+
     /// AdMob 네이티브 필수 표시. 앱 언어로 옮겨 쓸 수 있고 15px 이상이어야 한다.
     private func configureBadge(font: UIFont, textColor: UIColor, backgroundColor: UIColor?, cornerRadius: CGFloat) {
-        adBadgeLabel.text = "광고"
+        adBadgeLabel.text = Self.adBadgeText
         adBadgeLabel.font = font
         adBadgeLabel.textColor = textColor
         adBadgeLabel.backgroundColor = backgroundColor

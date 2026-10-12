@@ -26,10 +26,11 @@ public struct UserFeedback: Equatable, Hashable, Sendable {
     /// 사용자의 기기/OS 정보 등 추가 환경 정보를 문자열로 담는 필드.
     public var deviceInfo: String?
     
+    /// 처음 값. 본문은 「- 문의 내용:」 머리(앱 언어)로 시작한다 — 의견 보내기 화면이 이 머리 뒤에 적은 것만 내용으로 센다.
     public static let initialState = Self(
         email: "",
         title: "",
-        body: "- 문의 내용:"
+        body: DomainCatalog.string("- 문의 내용:", locale: nil)
     )
     
     public init(
@@ -44,6 +45,8 @@ public struct UserFeedback: Equatable, Hashable, Sendable {
         self.attachment = attachment
     }
     
+    /// 의견 종류. `rawValue` 는 메일 제목(「[일반 문의] …」)에 쓰는 한국어 그대로다 — 받는 쪽이 이 말로 분류한다.
+    /// 화면에는 `localizedName`(앱 언어)을 적는다.
     public enum FeedbackType: String, CaseIterable, Sendable {
         /// 일반적인 문의/질문.
         case inquiry = "일반 문의"
@@ -51,5 +54,18 @@ public struct UserFeedback: Equatable, Hashable, Sendable {
         case proposal =  "개선 및 제안"
         /// 기타 피드백.
         case etc = "기타"
+
+        /// 화면에 적는 종류 이름(앱 언어) — ko 「일반 문의」 · en 「General Inquiry」.
+        public var localizedName: String { localizedName(locale: nil) }
+
+        /// 종류 이름을 한 언어로 꺼낸다.
+        /// - Parameter locale: 언어를 정할 로케일. nil 이면 앱(기기) 언어다.
+        public func localizedName(locale: Locale?) -> String {
+            switch self {
+            case .inquiry: DomainCatalog.string("일반 문의", locale: locale)
+            case .proposal: DomainCatalog.string("개선 및 제안", locale: locale)
+            case .etc: DomainCatalog.string("기타", locale: locale)
+            }
+        }
     }
 }

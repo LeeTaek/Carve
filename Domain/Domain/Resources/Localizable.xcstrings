@@ -52,6 +52,23 @@
         }
       }
     },
+    "- 문의 내용:" : {
+      "comment" : "의견 보내기 본문의 처음 머리(UserFeedback.initialState.body) — 이 뒤에 적은 것만 내용으로 센다",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "- Message:"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "- 문의 내용:"
+          }
+        }
+      }
+    },
     "갈라디아서" : {
       "comment" : "성경 권 이름(목록 · 참조). 영어는 표준 권 이름",
       "localizations" : {
@@ -65,6 +82,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "갈라디아서"
+          }
+        }
+      }
+    },
+    "개선 및 제안" : {
+      "comment" : "의견 보내기 종류(UserFeedback.FeedbackType.proposal) — 화면 표시용",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suggestion"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "개선 및 제안"
           }
         }
       }
@@ -150,6 +184,74 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "골로새서"
+          }
+        }
+      }
+    },
+    "기타" : {
+      "comment" : "의견 보내기 종류(UserFeedback.FeedbackType.etc) — 화면 표시용",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Other"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "기타"
+          }
+        }
+      }
+    },
+    "나눔고딕" : {
+      "comment" : "본문 글꼴 이름(FontCase.gothic, 파일 NanumGothic) — 본문 설정의 글꼴 고르기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nanum Gothic"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "나눔고딕"
+          }
+        }
+      }
+    },
+    "나눔꽃향기" : {
+      "comment" : "본문 글꼴 이름(FontCase.flower, 파일 NanumFlowerScent) — 본문 설정의 글꼴 고르기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nanum Flower Scent"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "나눔꽃향기"
+          }
+        }
+      }
+    },
+    "나눔명조" : {
+      "comment" : "본문 글꼴 이름(FontCase.myeongjo) — 본문 설정의 글꼴 고르기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nanum Myeongjo"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "나눔명조"
           }
         }
       }
@@ -575,6 +677,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "사사기"
+          }
+        }
+      }
+    },
+    "새기다 필사 백업" : {
+      "comment" : "필사 백업 파일 기본 이름의 앞부분 — 뒤에 날짜(YYYY-MM-DD)와 .carvebackup 이 붙는다. 영어 앱 이름은 Carve",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carve Backup"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "새기다 필사 백업"
           }
         }
       }
@@ -1119,6 +1238,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "이사야"
+          }
+        }
+      }
+    },
+    "일반 문의" : {
+      "comment" : "의견 보내기 종류(UserFeedback.FeedbackType.inquiry) — 화면 표시용. 메일 제목에는 한국어 rawValue 를 쓴다",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "General Inquiry"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "일반 문의"
           }
         }
       }

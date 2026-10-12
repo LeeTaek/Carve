@@ -51,6 +51,11 @@ public struct VerseWidgetPayload: Codable, Equatable, Sendable {
     public var sentence: String
     /// 위젯에 담은 시각.
     public var designatedAt: Date
+    /// 앱이 담을 때 `BibleReference` 로 만든 참조(앱 언어 — 「시편 23장 1절」 · 「Psalm 23:1」).
+    /// 2.1 전 앱이 쓴 payload 에는 없다(nil) — 그때는 `reference` 가 옛 한국어 형식으로 만든다.
+    public var referenceText: String?
+    /// 앱이 담을 때 만든 짧은 참조(앱 언어 — 「시편 23:1」 · 「Psalm 23:1」). 2.1 전 payload 에는 없다(nil).
+    public var compactReferenceText: String?
 
     public init(
         titleRawValue: String,
@@ -60,7 +65,9 @@ public struct VerseWidgetPayload: Codable, Equatable, Sendable {
         translation: String,
         translationDisplayName: String,
         sentence: String,
-        designatedAt: Date
+        designatedAt: Date,
+        referenceText: String? = nil,
+        compactReferenceText: String? = nil
     ) {
         self.titleRawValue = titleRawValue
         self.bookDisplayName = bookDisplayName
@@ -70,16 +77,21 @@ public struct VerseWidgetPayload: Codable, Equatable, Sendable {
         self.translationDisplayName = translationDisplayName
         self.sentence = sentence
         self.designatedAt = designatedAt
+        self.referenceText = referenceText
+        self.compactReferenceText = compactReferenceText
     }
 
-    /// 앱과 같은 출처 표기(「시편 23장 1절」).
+    /// 앱과 같은 출처 표기(「시편 23장 1절」 · 「Psalm 23:1」). 위젯의 손쉬운 사용 레이블에 쓴다.
+    ///
+    /// 위젯은 Domain 을 링크하지 않으므로 앱이 담을 때 만든 `referenceText` 를 그대로 쓴다 — 권 이름(`bookDisplayName`)과
+    /// 장절 형식이 같은 언어라 「Psalms 23장 1절」 처럼 섞이지 않는다. 옛 payload(2.0.x 앱이 담은 것, 권 이름이 늘 한국어)는 옛 형식으로 만든다.
     public var reference: String {
-        "\(bookDisplayName) \(chapter)장 \(verse)절"
+        referenceText ?? "\(bookDisplayName) \(chapter)장 \(verse)절"
     }
 
-    /// 위젯처럼 좁은 자리의 짧은 표기(「시편 23:1」, 시안 G4).
+    /// 위젯처럼 좁은 자리의 짧은 표기(「시편 23:1」 · 「Psalm 23:1」, 시안 G4). 옛 payload 는 옛 형식으로 만든다.
     public var compactReference: String {
-        "\(bookDisplayName) \(chapter):\(verse)"
+        compactReferenceText ?? "\(bookDisplayName) \(chapter):\(verse)"
     }
 
     /// 이 말씀의 필기 그림 파일 이름.
