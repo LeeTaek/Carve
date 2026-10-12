@@ -23,8 +23,8 @@ public struct LineWidthPalatteView: View {
 
     public var body: some View {
         VStack(spacing: 0) {
-            CarvePanelHeader("펜 굵기") {
-                Button("완료") { send(.done) }
+            CarvePanelHeader(String(localized: "펜 굵기", bundle: .module)) {
+                Button { send(.done) } label: { Text("완료", bundle: .module) }
                     .font(CarveTypography.body)
                     .foregroundStyle(CarveColor.accent)
                     .buttonStyle(.plain)
@@ -32,14 +32,14 @@ public struct LineWidthPalatteView: View {
             }
 
             VStack(alignment: .leading, spacing: CarveSpacing.medium) {
-                Text("굵기를 눌러 고르고, 아래에서 세밀하게 맞춰요.")
+                Text("굵기를 눌러 고르고, 아래에서 세밀하게 맞춰요.", bundle: .module)
                     .font(CarveTypography.label)
                     .foregroundStyle(CarveColor.secondary)
 
                 quickPicks
 
                 CarveLabeledSlider(
-                    "굵기 조절",
+                    String(localized: "굵기 조절", bundle: .module),
                     value: $store.lineWidth.sending(\.setWidth),
                     in: LineWidthPalatteFeature.widthRange,
                     step: LineWidthPalatteFeature.widthStep,
@@ -86,7 +86,7 @@ public struct LineWidthPalatteView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("굵기 \(Self.millimeters(width))")
+                .accessibilityLabel(Text("굵기 \(Self.millimeters(width))", bundle: .module))
                 .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
             }
         }

@@ -97,6 +97,8 @@ let targets: [Target] = [
             // 도는 순서 규칙은 Domain 이 갖고 Domain 테스트가 지킨다. 위젯은 링크하지 않고 소스로 함께 컴파일한다.
             "../../Domain/Domain/Sources/Widget/WidgetVerseRotation.swift"
         ],
+        // 위젯의 현지화 카탈로그(Localizable · InfoPlist). 위젯은 Feature 모듈을 링크하지 않아 자기 번들에 둔다.
+        resources: ["Widget/Resources/**"],
         entitlements: .file(path: .relativeToCurrentFile("Support/CarveWidget.entitlements"))
     ),
     .makeAppTarget(
@@ -119,12 +121,15 @@ let targets: [Target] = [
 /// 시뮬레이터에서 광고 제거 구매를 시험하는 스킴. 실행(Run)은 로컬 StoreKit 설정(`Support/Carve.storekit`)을 쓴다.
 /// 테스트는 `RemoveAdsStoreKitUITests` 를 켠다(`CARVE_STOREKIT_UITEST=1`) — 표준 `Carve-Workspace` 실행에서는 건너뛴다.
 /// Xcode Cloud · 아카이브는 자동 생성되는 `CarveApp` 스킴을 그대로 쓰므로 StoreKit 설정이 섞이지 않는다.
+/// 시험은 자동 스킴(`Project.makeModule` · `Workspace.swift`)과 같이 한국어 · 한국 지역으로 돈다(영어 현지화 결정 6) —
+/// `RemoveAdsStoreKitUITests` 의 한국어 단언이 시뮬레이터 언어와 상관없이 맞는다.
 let storeKitScheme: Scheme = .scheme(
     name: "\(projectName)-StoreKit",
     buildAction: .buildAction(targets: [.target(projectName)]),
     testAction: .targets(
         [.testableTarget(target: .target("\(projectName)UITests"))],
-        arguments: .arguments(environmentVariables: ["CARVE_STOREKIT_UITEST": "1"])
+        arguments: .arguments(environmentVariables: ["CARVE_STOREKIT_UITEST": "1"]),
+        options: .options(language: "ko", region: "KR")
     ),
     runAction: .runAction(
         configuration: .debug,

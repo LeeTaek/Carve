@@ -19,7 +19,7 @@ extension DraftRecoveryFeature {
     func compare(_ item: Item, stamp: Stamp) -> Effect<Action> {
         .run { [reader, repository, editEnvironment] send in
             guard let reader else {
-                await send(.currentFailed(itemID: item.id, stamp: stamp, "이 iPad의 보존 영역을 열지 못했어요."))
+                await send(.currentFailed(itemID: item.id, stamp: stamp, SettingsCatalog.string("이 iPad의 보존 영역을 열지 못했어요.")))
                 return
             }
             let environment = await editEnvironment.current()
@@ -30,8 +30,8 @@ extension DraftRecoveryFeature {
             do {
                 let current = try await VerseDraftRecoveryQuery(reader: reader, repository: repository)
                     .currentVerse(chapter: item.chapter, verse: item.verse)
-                let translation = Translation(rawValue: item.key.translation) ?? .NKRV
-                let draft = try await reader.drafts(in: item.scope, chapter: item.chapter, translation: translation)
+                // 줄의 장이 곧 초안의 번역본 장이다(`Item.chapter` = `VerseDraftKey.bibleChapter`) — 개역개정으로 바꾸지 않는다.
+                let draft = try await reader.drafts(in: item.scope, chapter: item.chapter, translation: item.chapter.translation)
                     .first { $0.key == item.key }
                 let after = Stamp(await editEnvironment.current())
                 guard after == stamp else {
@@ -48,7 +48,7 @@ extension DraftRecoveryFeature {
                 await send(.currentLoaded(itemID: item.id, stamp: stamp, ink: current?.lineData, updatedAt: current?.updateDate, check: check))
             } catch {
                 Log.error("확인이 필요한 필기 — 지금 필기를 읽지 못했다", item.place, "\(error)")
-                await send(.currentFailed(itemID: item.id, stamp: stamp, "지금 그 절의 필기를 읽지 못했어요. 없다는 뜻은 아니에요."))
+                await send(.currentFailed(itemID: item.id, stamp: stamp, SettingsCatalog.string("지금 그 절의 필기를 읽지 못했어요. 없다는 뜻은 아니에요.")))
             }
         }
         .cancellable(id: CancelID.compare, cancelInFlight: true)

@@ -40,15 +40,20 @@ struct WidgetNoticeView: View {
     private var message: String {
         switch notice {
         case .added(let addedToFavorites):
-            addedToFavorites ? "즐겨찾기에 추가하고 위젯에 담았어요" : "위젯에 담았어요"
+            // 3항 연산을 `String(localized:)` 안에 두면 컴파일러가 한쪽 문구만 카탈로그 추출에 넣는다 — 문구마다 따로 부른다.
+            if addedToFavorites {
+                String(localized: "즐겨찾기에 추가하고 위젯에 담았어요", bundle: .module)
+            } else {
+                String(localized: "위젯에 담았어요", bundle: .module)
+            }
         case .alreadyAdded:
-            "이미 위젯에 담긴 말씀이에요"
+            String(localized: "이미 위젯에 담긴 말씀이에요", bundle: .module)
         case .limitReached:
-            "위젯에는 \(WidgetVerseLimit.maximum)개까지 담을 수 있어요"
+            String(localized: "위젯에는 \(WidgetVerseLimit.maximum)개까지 담을 수 있어요", bundle: .module)
         case .failed:
-            "위젯에 담지 못했어요"
+            String(localized: "위젯에 담지 못했어요", bundle: .module)
         case .blocked(let block):
-            "위젯에 담지 않았어요. " + block.reasonText
+            String(localized: "위젯에 담지 않았어요. \(block.reasonText)", bundle: .module)
         }
     }
 }

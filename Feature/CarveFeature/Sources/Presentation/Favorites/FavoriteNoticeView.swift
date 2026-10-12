@@ -56,11 +56,20 @@ struct FavoriteNoticeView: View {
     private var message: String {
         switch notice {
         case .added:
-            "즐겨찾기에 추가했어요"
+            String(localized: "즐겨찾기에 추가했어요", bundle: .module)
+        // 3항 연산을 `String(localized:)` 안에 두면 컴파일러가 한쪽 문구만 카탈로그 추출에 넣는다 — 문구마다 따로 부른다.
         case .failed(let change):
-            change.isAdding ? "즐겨찾기에 추가하지 못했어요" : "즐겨찾기를 해제하지 못했어요"
+            if change.isAdding {
+                String(localized: "즐겨찾기에 추가하지 못했어요", bundle: .module)
+            } else {
+                String(localized: "즐겨찾기를 해제하지 못했어요", bundle: .module)
+            }
         case let .blocked(change, block):
-            (change.isAdding ? "즐겨찾기에 추가하지 않았어요. " : "즐겨찾기를 해제하지 않았어요. ") + block.reasonText
+            if change.isAdding {
+                String(localized: "즐겨찾기에 추가하지 않았어요. \(block.reasonText)", bundle: .module)
+            } else {
+                String(localized: "즐겨찾기를 해제하지 않았어요. \(block.reasonText)", bundle: .module)
+            }
         }
     }
 }
@@ -69,12 +78,12 @@ extension SyncedWriteBlock {
     /// 동기화 저장소에 쓰지 않고 막은 사유 — 안내 문구의 뒷문장(정책 §12-6 결정 1).
     var reasonText: String {
         switch self {
-        case .signedOut: "iCloud 에 로그인하지 않았어요"
-        case .accountUnconfirmed: "iCloud 계정을 확인하는 중이에요"
-        case .ownershipUnverified: "이 기기의 필사가 지금 계정의 것인지 아직 확인하지 못했어요"
-        case .knowledgeUnreadable: "삭제 기록을 읽지 못했어요"
-        case .verseFromOtherSession: "이 절의 필기는 다른 계정 · 확인 전에 쓴 것이에요"
-        case .connectionHeld: "지금은 iCloud 연결이 보류되어 이 기기에만 저장돼요"
+        case .signedOut: String(localized: "iCloud 에 로그인하지 않았어요", bundle: .module)
+        case .accountUnconfirmed: String(localized: "iCloud 계정을 확인하는 중이에요", bundle: .module)
+        case .ownershipUnverified: String(localized: "이 기기의 필사가 지금 계정의 것인지 아직 확인하지 못했어요", bundle: .module)
+        case .knowledgeUnreadable: String(localized: "삭제 기록을 읽지 못했어요", bundle: .module)
+        case .verseFromOtherSession: String(localized: "이 절의 필기는 다른 계정 · 확인 전에 쓴 것이에요", bundle: .module)
+        case .connectionHeld: String(localized: "지금은 iCloud 연결이 보류되어 이 기기에만 저장돼요", bundle: .module)
         }
     }
 }

@@ -93,9 +93,19 @@ struct BackupRestoreEntry {
         ink.map { VerseContentFingerprint.make(lineData: $0, drawingVersion: drawingVersion, layoutMetadataBlob: metadata) }
     }
 
+    /// 불러온 행의 `titleName` — 항목의 권 · 번역본으로 지은 이름(nil · 모르는 번역본은 개역개정 이름).
+    var storedTitleName: String {
+        StoredBookKey.titleName(title: chapter.title, translation: BackupImportPlanner.placementTranslation(translation))
+    }
+
+    /// 불러온 행의 `translation` 열 — 개역개정은 값 그대로(nil 은 nil), KJV · BSB 는 nil.
+    var storedTranslation: String? {
+        translation.flatMap(Translation.init(rawValue:)).flatMap(StoredBookKey.translationColumn(for:))?.rawValue
+    }
+
     /// 백업 항목.
     var item: BackupItem {
-        let titleName = chapter.title.rawValue
+        let titleName = storedTitleName
         let source = kind == .row
             ? BackupItemSource(titleName: titleName, rowKey: sourceKey)
             : BackupItemSource(titleName: titleName, draftScope: BackupItemSource.DraftScope.local.rawValue, draftRevision: 1)
@@ -302,15 +312,16 @@ extension BackupChapterRestoreCommand {
 }
 
 extension BackupRowRecord {
-    /// 불러온 행이 원본 항목과 같은 값인가 — 바이트 · 좌표 형식 · 시각 · 번역 저장값 · 장 · 절(행 식별자는 새로 발급하므로 보지 않는다).
+    /// 불러온 행이 원본 항목과 같은 값인가 — 바이트 · 좌표 형식 · 시각 · 번역 저장값 · 권 이름 · 장 · 절(행 식별자는 새로 발급하므로 보지 않는다).
+    /// 영어 항목은 열이 nil 이고 권 이름이 `KJV-…` 다(`storedTranslation` · `storedTitleName`).
     func matchesOriginal(_ entry: BackupRestoreEntry) -> Bool {
         lineData == entry.ink
             && layoutMetadataData == entry.metadata
             && drawingVersion == entry.drawingVersion
             && creationDate == (entry.kind == .draft ? nil : entry.createdAt)
             && updateDate == entry.updatedAt
-            && translation == entry.translation
-            && titleName == entry.chapter.title.rawValue
+            && translation == entry.storedTranslation
+            && titleName == entry.storedTitleName
             && chapter == entry.chapter.chapter
             && verse == entry.verse
     }

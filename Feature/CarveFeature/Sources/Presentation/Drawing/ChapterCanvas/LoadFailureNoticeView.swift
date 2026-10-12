@@ -24,9 +24,9 @@ struct LoadFailureNoticeView: View {
             }
     }
 
-    static let message = "이 장의 필사를 불러오지 못했어요"
+    static var message: String { String(localized: "이 장의 필사를 불러오지 못했어요", bundle: .module) }
     /// 이 기기에 남은 초안을 읽지 못했다 — 그 초안 위에 새 필기가 덮이지 않게 쓸 수 없게 둔다(정책 §12-6 구현 순서 ②).
-    static let draftsMessage = "이 기기에 남은 필기를 불러오지 못했어요"
+    static var draftsMessage: String { String(localized: "이 기기에 남은 필기를 불러오지 못했어요", bundle: .module) }
 
     static func message(for failure: DrawingLoadFailure) -> String {
         failure.source == .drafts ? draftsMessage : message

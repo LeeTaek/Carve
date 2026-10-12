@@ -185,7 +185,7 @@ struct ChapterCanvasDeltaGuardWiringTesting {
     // MARK: 경로 — 판정이 캔버스까지 간다
 
     private func rowID(_ verse: Int) -> SentencesWithDrawingFeature.State.ID {
-        "\(chapter.title.koreanTitle()).\(chapter.chapter).\(verse)"
+        SentencesWithDrawingFeature.State.rowID(chapter: chapter, verse: verse)
     }
 
     private func sentences(count: Int) -> [BibleVerse] {

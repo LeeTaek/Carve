@@ -23,38 +23,66 @@ public struct SentenceSettingsView: View {
     public var body: some View {
         ScrollView {
             VStack(spacing: 0) {
-                CarvePanelHeader("본문 설정") {
-                    Button("완료") { dismiss() }
+                CarvePanelHeader(String(localized: "본문 설정", bundle: .module)) {
+                    Button { dismiss() } label: { Text("완료", bundle: .module) }
                         .buttonStyle(.carve(.primary))
                 }
 
                 VStack(alignment: .leading, spacing: CarveSpacing.large) {
-                    CarveSettingsSection("글꼴") {
+                    CarveSettingsSection(String(localized: "글꼴", bundle: .module)) {
                         CarveSegmentedPicker(selection: $store.setting.fontFamily.sending(\.setFontFamily), items: FontCase.allCases) { font in
-                            Text(font.title)
+                            Text(verbatim: Self.fontName(font))
                                 .font(CarveTypography.scripture(font.font(size: 14)))
                         }
                     }
 
-                    CarveLabeledSlider("글자 크기", value: $store.setting.fontSize.sending(\.setFontSize), in: 15...40, step: 1, valueText: "\(Int(store.setting.fontSize)) pt")
-                    CarveLabeledSlider("줄 간격", value: $store.setting.lineSpace.sending(\.setLineSpace), in: 5...70, step: 1, valueText: "\(Int(store.setting.lineSpace))")
-                    CarveLabeledSlider("자간", value: $store.setting.traking.sending(\.setTraking), in: 1...10, step: 1, valueText: "\(Int(store.setting.traking))")
+                    CarveLabeledSlider(
+                        String(localized: "글자 크기", bundle: .module),
+                        value: $store.setting.fontSize.sending(\.setFontSize),
+                        in: 15...40,
+                        step: 1,
+                        valueText: "\(Int(store.setting.fontSize)) pt"
+                    )
+                    CarveLabeledSlider(
+                        String(localized: "줄 간격", bundle: .module),
+                        value: $store.setting.lineSpace.sending(\.setLineSpace),
+                        in: 5...70,
+                        step: 1,
+                        valueText: "\(Int(store.setting.lineSpace))"
+                    )
+                    CarveLabeledSlider(
+                        String(localized: "자간", bundle: .module),
+                        value: $store.setting.traking.sending(\.setTraking),
+                        in: 1...10,
+                        step: 1,
+                        valueText: "\(Int(store.setting.traking))"
+                    )
                 }
                 .padding(CarveSpacing.large)
 
                 CarveDivider()
 
-                CarveSettingsSection("화면과 필기") {
-                    CarveSettingsRow("왼손 사용자용 화면", description: "필기 열이 왼쪽으로 가요", isOn: $store.isLeftHanded.sending(\.setLeftHanded))
-                    CarveSettingsRow("손가락 필사 허용", description: "끄면 Apple Pencil로만 필사할 수 있어요", isOn: $store.allowFingerDrawing.sending(\.setAllowFingerDrawing))
+                CarveSettingsSection(String(localized: "화면과 필기", bundle: .module)) {
+                    CarveSettingsRow(
+                        String(localized: "왼손 사용자용 화면", bundle: .module),
+                        description: String(localized: "필기 열이 왼쪽으로 가요", bundle: .module),
+                        isOn: $store.isLeftHanded.sending(\.setLeftHanded)
+                    )
+                    CarveSettingsRow(
+                        String(localized: "손가락 필사 허용", bundle: .module),
+                        description: String(localized: "끄면 Apple Pencil로만 필사할 수 있어요", bundle: .module),
+                        isOn: $store.allowFingerDrawing.sending(\.setAllowFingerDrawing)
+                    )
                 }
                 .padding(.horizontal, CarveSpacing.large)
                 .padding(.vertical, CarveSpacing.medium)
 
                 CarveDivider()
 
-                Button("본문 모양 초기화") {
+                Button {
                     store.send(.resetSetting)
+                } label: {
+                    Text("본문 모양 초기화", bundle: .module)
                 }
                 .buttonStyle(.carve(.primary, fillsWidth: true))
                 .disabled(store.setting == .initialState)
@@ -63,6 +91,15 @@ public struct SentenceSettingsView: View {
         }
         .frame(idealWidth: 350)
         .carvePresentationSurface()
+    }
+}
+
+extension SentenceSettingsView {
+    /// 역할: 글꼴 고르기 칸의 이름(앱 언어). 글꼴 이름은 Domain `FontCase.title(locale:)` 한 곳에서 현지화한다.
+    /// 입력 · 출력: 글꼴 · 로케일(nil 이면 앱 언어) → 이름(ko 「나눔명조」 · en 「Nanum Myeongjo」).
+    /// 부작용: 없음.
+    static func fontName(_ font: FontCase, locale: Locale? = nil) -> String {
+        font.title(locale: locale)
     }
 }
 

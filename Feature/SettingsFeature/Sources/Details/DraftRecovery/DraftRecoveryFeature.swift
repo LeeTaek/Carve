@@ -308,7 +308,7 @@ public struct DraftRecoveryFeature {
     private func load(sequence: Int) -> Effect<Action> {
         .run { [reader, repository, editEnvironment] send in
             guard let reader else {
-                await send(.failed(sequence: sequence, "이 iPad의 보존 영역을 열지 못했어요. 앱을 다시 켜 보세요."))
+                await send(.failed(sequence: sequence, SettingsCatalog.string("이 iPad의 보존 영역을 열지 못했어요. 앱을 다시 켜 보세요.")))
                 return
             }
             let environment = await editEnvironment.current()
@@ -319,13 +319,14 @@ public struct DraftRecoveryFeature {
                 scopes = try await reader.draftBuckets()
             } catch {
                 Log.error("확인이 필요한 필기 — 묶음 목록을 읽지 못했다", "\(error)")
-                await send(.failed(sequence: sequence, "이 iPad에 남겨 둔 필기를 읽지 못했어요. 파일은 그대로 있어요."))
+                await send(.failed(sequence: sequence, SettingsCatalog.string("이 iPad에 남겨 둔 필기를 읽지 못했어요. 파일은 그대로 있어요.")))
                 return
             }
             var buckets: [Bucket] = []
             for scope in scopes {
                 do {
-                    let inventory = try await query.inventory(in: scope, environment: environment)
+                    // 모든 번역본의 초안을 한 목록으로 보인다 — 장마다 그 장의 번역본으로 저장소와 견준다(영어 현지화 결정 1 · 11).
+                    let inventory = try await query.inventoryAcrossTranslations(in: scope, environment: environment)
                     // 내보낼 파일 자리는 목록과 함께 읽는다 — **대조한 묶음만.** 지금 계정에서 열어 보지 않는 묶음은 파일 자리도 들지 않는다(P0-1).
                     // 읽지 못하면 내보내기만 못 하고 나머지는 그대로 보인다.
                     let files = inventory.comparedWithStore ? (try? await reader.unreadableDraftFiles(in: scope)) ?? [] : []
@@ -351,15 +352,15 @@ public struct DraftRecoveryFeature {
     private func removeUnreadable(in scope: AccountScope) -> Effect<Action> {
         .run { [cleaner] send in
             guard let cleaner else {
-                await send(.removedUnreadable("이 iPad의 보존 영역을 열지 못해 지우지 못했어요."))
+                await send(.removedUnreadable(SettingsCatalog.string("이 iPad의 보존 영역을 열지 못해 지우지 못했어요.")))
                 return
             }
             do {
                 let removed = try await cleaner.removeUnreadableDraftFiles(in: scope)
-                await send(.removedUnreadable("읽지 못한 파일 \(removed)개를 지웠어요."))
+                await send(.removedUnreadable(SettingsCatalog.string("읽지 못한 파일 \(removed)개를 지웠어요.")))
             } catch {
                 Log.error("확인이 필요한 필기 — 읽지 못한 파일을 지우지 못했다", scope.key, "\(error)")
-                await send(.removedUnreadable("읽지 못한 파일을 지우지 못했어요. 파일은 그대로 있어요."))
+                await send(.removedUnreadable(SettingsCatalog.string("읽지 못한 파일을 지우지 못했어요. 파일은 그대로 있어요.")))
             }
         }
     }
@@ -406,10 +407,11 @@ extension DraftRecoveryFeature {
 
     /// 목록의 한 줄.
     public struct Item: Hashable, Identifiable, Sendable {
+        /// 묶음 · 세션 · 번역본 · 권 · 장 · 절 — 같은 절이라도 번역본이 다르면 다른 줄이다.
         public var id: String
-        /// "창세기 1:3".
+        /// 「창세기 1장 3절 · KJV」 · 「창세기 1장 3절」 — 번역본이 섞이는 목록이라 KJV · BSB 만 약칭을 붙인다(`DraftRecoveryCopy.place`).
         public var place: String
-        /// 비교할 때 이 장만 읽는다.
+        /// 비교할 때 이 장만 읽는다. 초안의 번역본 장이다 — 넣기도 이 번역본의 행으로 간다.
         public var chapter: BibleChapter
         public var verse: Int
         /// 가져올 때 그 초안을 다시 찾는다 — 묶음 · 키 · 사용자가 본 revision.
@@ -474,8 +476,9 @@ extension DraftRecoveryFeature.Bucket {
             comparedWithStore: inventory.comparedWithStore,
             inaccessibleCount: inventory.inaccessibleCount,
             readFailed: false,
-            items: inventory.entries.map { DraftRecoveryFeature.Item($0, scope: inventory.scope, environment: environment) },
-            unreadChapters: inventory.unreadChapters.map { "\($0.title.koreanTitle()) \($0.chapter)장" }
+            // 이 판이 모르는 권 · 번역본의 초안은 줄로 만들지 않는다(조회도 그런 장을 대조하지 않는다) — 수 · 용량에만 든다.
+            items: inventory.entries.compactMap { DraftRecoveryFeature.Item($0, scope: inventory.scope, environment: environment) },
+            unreadChapters: inventory.unreadChapters.map(DraftRecoveryCopy.chapterName)
         )
     }
 
@@ -490,12 +493,16 @@ extension DraftRecoveryFeature.Bucket {
 }
 
 extension DraftRecoveryFeature.Item {
-    init(_ entry: VerseDraftRecoveryEntry, scope: AccountScope, environment: DrawingEditEnvironment) {
+    /// 조회 결과의 한 줄을 화면의 값으로 옮긴다.
+    /// - 입력 · 출력: 초안 한 줄 · 묶음 · 편집 환경 → 그 초안의 번역본 장을 든 줄. 키의 권 · 번역본을 이 판이 모르면 nil — 개역개정 · 창세기에 붙이지 않는다.
+    /// - 부작용: 없음.
+    init?(_ entry: VerseDraftRecoveryEntry, scope: AccountScope, environment: DrawingEditEnvironment) {
         let key = entry.draft.key
+        guard let chapter = key.bibleChapter else { return nil }
         self.init(
-            id: "\(scope.key)/\(key.sessionID)/\(key.title)/\(key.chapter)/\(key.verse)",
+            id: "\(scope.key)/\(key.sessionID)/\(key.translation)/\(key.title)/\(key.chapter)/\(key.verse)",
             place: DraftRecoveryCopy.place(key),
-            chapter: BibleChapter(title: BibleTitle(rawValue: key.title) ?? .genesis, chapter: key.chapter),
+            chapter: chapter,
             verse: key.verse,
             scope: scope,
             key: key,

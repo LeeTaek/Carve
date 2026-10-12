@@ -155,8 +155,10 @@ private struct AppStartupView: View {
                 rootView(runtime)
                     .modelContainer(runtime.modelContainer)
             } else {
-                ProgressView("필사 저장소와 계정 소유를 확인하고 있어요")
-                    .task { await startIfNeeded() }
+                ProgressView {
+                    Text("필사 저장소와 계정 소유를 확인하고 있어요", bundle: .main, comment: "앱 시작 직후 — 저장소와 iCloud 계정 소유를 확인하는 동안")
+                }
+                .task { await startIfNeeded() }
             }
         }
         // 2.0.0 은 보류한 실행이 로그인 뒤 활성화돼도 저장소를 다시 연결하지 않는다. 실행 중 교체는 옛 컨테이너가 해제되지 않아

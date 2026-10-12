@@ -88,14 +88,15 @@ struct BackupFeatureTesting {
         await store.send(.canvasFlushFinished(id: UUID(9), outcome: .durable))
     }
 
-    @Test("패치노트의 이번 출시는 2.1 — 필사 백업 · 불러오기와 캔버스가 하나가 된 것을 알린다")
+    @Test("패치노트의 이번 출시는 2.1 — 영어 성경 · 영어 화면, 필사 백업 · 불러오기와 캔버스가 하나가 된 것을 알린다")
     func patchnoteAnnouncesBackup() throws {
         let latest = try #require(PatchnoteFeature.releases.first)
         #expect(latest == PatchnoteFeature.latest)
         #expect(latest.version == "2.1")
-        #expect(latest.notes.map(\.title) == ["필사 백업 · 불러오기", "필사 캔버스는 하나로", "본문 표시를 바로잡았어요"])
-        #expect(latest.notes[0].body.contains("광고 제거 구매에 포함"))
-        #expect(latest.notes[0].body.contains("불러오기는 무료"))
+        #expect(latest.notes.map(\.title) == ["영어 성경 KJV · BSB", "영어 화면", "필사 백업 · 불러오기", "필사 캔버스는 하나로", "본문 표시를 바로잡았어요"])
+        #expect(latest.notes[0].body.contains("번역본마다 따로"))
+        #expect(latest.notes[2].body.contains("광고 제거 구매에 포함"))
+        #expect(latest.notes[2].body.contains("불러오기는 무료"))
         // 지난 출시의 바뀐 점도 설정의 패치노트에 남는다.
         #expect(PatchnoteFeature.releases.map(\.version) == ["2.1", "2.0"])
     }

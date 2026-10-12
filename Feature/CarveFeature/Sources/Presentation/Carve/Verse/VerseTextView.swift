@@ -67,8 +67,8 @@ public struct VerseTextView: View {
                 }
             }
             // 실기기 UI 테스트가 「1절」 이라는 이름으로 번호를 찾는다 — 즐겨찾기는 이름이 아니라 값으로 알린다.
-            .accessibilityLabel(verseEnd.map { "\(verse)-\($0)절" } ?? "\(verse)절")
-            .accessibilityValue(isFavorite ? "즐겨찾기" : "")
+            .accessibilityLabel(verseEnd.map { Text("\(verse)-\($0)절", bundle: .module) } ?? Text("\(verse)절", bundle: .module))
+            .accessibilityValue(isFavorite ? Text("즐겨찾기", bundle: .module) : Text(verbatim: ""))
     }
 
     /// 절 번호 표기. 두 자리로 맞추고, 합쳐진 절은 범위로 쓴다(`06`, `18-19`).

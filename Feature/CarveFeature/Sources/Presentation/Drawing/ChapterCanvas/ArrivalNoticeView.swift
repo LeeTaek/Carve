@@ -39,7 +39,9 @@ struct ArrivalNoticeView: View {
                 .buttonStyle(.plain)
             }
             if case .draftsHidden = notice {
-                Button("닫기", action: onDismiss)
+                Button(action: onDismiss) {
+                    Text("닫기", bundle: .module)
+                }
                     .font(CarveTypography.label)
                     .foregroundStyle(CarveColor.secondary)
                     .frame(minHeight: CarveSize.minimumHitTarget)

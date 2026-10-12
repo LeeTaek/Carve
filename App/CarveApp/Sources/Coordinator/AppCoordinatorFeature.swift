@@ -43,7 +43,7 @@ public struct AppCoordinatorFeature: Sendable {
         @Shared(.appStorage("lastSeenAppVersion")) public var lastSeenAppVersion: String?
         /// 루트 화면 위에 Push될 화면 Path. (스택 기반)
         public var path: StackState<Path.State> = .init()
-        /// 위젯을 눌러 앱이 시작됐을 때 필사 화면이 준비되면 이동할 절.
+        /// 위젯을 눌러 앱이 시작됐을 때 필사 화면이 준비되면 이동할 절. 링크의 번역본은 절의 장(`BibleVerse.title`)에 함께 담겨 그대로 간다.
         var pendingWidgetVerse: BibleVerse?
         /// `-UITestRoute` 로 받은 화면 — 필사 화면이 준비되면(위젯 보류 절과 같은 때) 연다. 실행 인자는 Debug 빌드에서만 읽으므로 Release 에서는 늘 nil 이다.
         var pendingLaunchRoute: UITestRoute?
@@ -128,11 +128,17 @@ public struct AppCoordinatorFeature: Sendable {
         case favorites(FavoriteListFeature)
     }
     
-    /// 위젯이 넘긴 URL 의 절. 앱이 아는 권이 아니면 nil.
+    /// 위젯이 넘긴 URL 의 절 — 링크의 번역본 장으로 연다(영어 현지화 설계 §7).
+    ///
+    /// - 입력: 위젯이 만든 URL(`VerseWidgetPayload.deepLinkURL`).
+    /// - 출력: 권 · 장 · 절 · 번역본을 담은 절. 앱이 아는 권이 아니거나 **번역본을 모르면 nil** — 개역개정으로 바꾸지 않고 링크를 무시한다.
+    /// - 부작용: 없음.
     static func verse(from url: URL) -> BibleVerse? {
         guard let link = VerseWidgetDeepLink.parse(url),
-              let title = BibleTitle(rawValue: link.titleRawValue) else { return nil }
-        return BibleVerse(title: BibleChapter(title: title, chapter: link.chapter), verse: link.verse, sentence: "")
+              let title = BibleTitle(rawValue: link.titleRawValue),
+              let translation = Translation(rawValue: link.translation) else { return nil }
+        let chapter = BibleChapter(title: title, chapter: link.chapter, translation: translation)
+        return BibleVerse(title: chapter, verse: link.verse, sentence: "")
     }
 
     /// 보류 중 편집 환경이 바뀔 때마다(로그인 · 앱 활성화) 다시 읽는다. 재실행하면 연결되면 안내하고 구독을 멈춘다.
@@ -168,8 +174,9 @@ public struct AppCoordinatorFeature: Sendable {
                 }
                 guard ready else { return }
             }
+            // 모든 번역본의 연결 전 필기를 센다 — 설정의 「확인이 필요한 필기」 도 모든 번역본을 한 목록으로 보인다.
             let found = await VerseDraftRecoveryQuery(reader: draftReader, repository: drawingRepository)
-                .beforeConnectionCount(environment: environment)
+                .beforeConnectionCountAcrossTranslations(environment: environment)
             if found > 0 { await send(.beforeConnectionDraftsFound(found)) }
         }
         .cancellable(id: CancelID.beforeConnection, cancelInFlight: true)

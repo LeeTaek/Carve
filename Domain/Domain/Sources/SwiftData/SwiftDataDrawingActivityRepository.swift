@@ -38,6 +38,9 @@ public struct SwiftDataDrawingActivityRepository: DrawingActivityRepository {
 
 extension DrawingActivity {
     /// 필사 행에서 차트가 읽는 값만 옮긴다. actor 안에서만 부른다.
+    ///
+    /// `titleName` 은 저장값 그대로 옮긴다 — 권 · 번역본은 `chapter` · `translation` 이 `StoredBookKey.decode` 로 푼다.
+    /// 모르는 권 이름의 행도 지금처럼 활동으로 남기고(날짜별 수에 든다), 장별로 셀 때 호출부가 건너뛴다(`chapter` 가 nil).
     init(drawing: BibleDrawing) {
         self.init(
             updateDate: drawing.updateDate,

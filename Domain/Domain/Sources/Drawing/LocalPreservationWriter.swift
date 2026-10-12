@@ -11,6 +11,9 @@ import Dependencies
 import Foundation
 
 /// 초안 하나를 가리키는 키 — 세션 · 번역 · 권 · 장 · 절 (정책 §12-6 구현 순서 ②).
+///
+/// 초안은 동기화하지 않는 이 기기의 파일이라 `translation` 에 **실제 번역본**(`"NKRV"` · `"KJV"` · `"BSB"`)을 쓴다 — SwiftData 의
+/// `translation` 열과 달리 구버전 기기가 읽지 않는다(영어 현지화 결정 1). 파일 이름도 번역본으로 시작한다(`KJV~1-01Genesis.txt~1~1.json`).
 public struct VerseDraftKey: Hashable, Codable, Sendable {
     public var sessionID: String
     public var translation: String
@@ -18,12 +21,24 @@ public struct VerseDraftKey: Hashable, Codable, Sendable {
     public var chapter: Int
     public var verse: Int
 
-    public init(sessionID: String, translation: Translation = .NKRV, chapter: BibleChapter, verse: Int) {
+    /// 장의 번역본 그대로의 키.
+    public init(sessionID: String, chapter: BibleChapter, verse: Int) {
+        self.init(sessionID: sessionID, translation: chapter.translation, chapter: chapter, verse: verse)
+    }
+
+    /// 번역본을 따로 주는 키 — 장의 번역본 대신 이 값을 적는다.
+    public init(sessionID: String, translation: Translation, chapter: BibleChapter, verse: Int) {
         self.sessionID = sessionID
         self.translation = translation.rawValue
         self.title = chapter.title.rawValue
         self.chapter = chapter.chapter
         self.verse = verse
+    }
+
+    /// 키가 가리키는 장(번역본 포함). 이 판이 모르는 번역본 · 권이면 nil — 개역개정에 임의로 붙이지 않는다(정책 §8 「미상 판본을 임의 귀속하지 않음」).
+    public var bibleChapter: BibleChapter? {
+        guard let translation = Translation(rawValue: translation), let title = BibleTitle(rawValue: title) else { return nil }
+        return BibleChapter(title: title, chapter: chapter, translation: translation)
     }
 
     /// 파일 이름. 구성요소에 경로 구분자가 들어오지 않게 바꾼다.
@@ -40,11 +55,32 @@ public struct VerseDraftKey: Hashable, Codable, Sendable {
         components.map { $0.replacingOccurrences(of: "/", with: "_") }.joined(separator: "~")
     }
 
-    /// 파일 이름이 가리키는 장 — 파일을 열지 않고 읽는다(깨진 초안도 어느 장인지는 안다). 모양이 다르면 nil.
+    /// 파일 이름이 가리키는 장(번역본 포함) — 파일을 열지 않고 읽는다(깨진 초안도 어느 장인지는 안다).
+    /// 모양이 다르거나 이 판이 모르는 번역본이면 nil — 모르는 번역본을 개역개정 장으로 치지 않는다.
     static func chapter(fromFileName name: String) -> BibleChapter? {
-        let parts = name.replacingOccurrences(of: ".json", with: "").split(separator: "~", omittingEmptySubsequences: false)
-        guard parts.count == 4, let title = BibleTitle(rawValue: String(parts[1])), let chapter = Int(parts[2]) else { return nil }
-        return BibleChapter(title: title, chapter: chapter)
+        guard let parts = FileNameParts(name), let translation = Translation(rawValue: parts.translation) else { return nil }
+        return BibleChapter(title: parts.title, chapter: parts.chapter, translation: translation)
+    }
+
+    /// 파일 이름이 초안 파일의 모양(`번역~권~장~절`)인가 — 번역본은 이 판이 모르는 값이어도 된다(옆으로 옮긴 파일을 세고 지울 때 쓴다).
+    static func hasDraftFileShape(_ name: String) -> Bool {
+        FileNameParts(name) != nil
+    }
+
+    /// 파일 이름의 번역 · 권 · 장. 번역은 문자열 그대로 둔다.
+    private struct FileNameParts {
+        let translation: String
+        let title: BibleTitle
+        let chapter: Int
+
+        /// 모양(`번역~권~장~절[.json]`)이 다르면 nil.
+        init?(_ name: String) {
+            let parts = name.replacingOccurrences(of: ".json", with: "").split(separator: "~", omittingEmptySubsequences: false)
+            guard parts.count == 4, let title = BibleTitle(rawValue: String(parts[1])), let chapter = Int(parts[2]) else { return nil }
+            self.translation = String(parts[0])
+            self.title = title
+            self.chapter = chapter
+        }
     }
 }
 
@@ -230,11 +266,15 @@ public struct DraftBucketSummary: Equatable, Sendable {
     /// 읽지 못해 옆으로 옮긴 파일(`*.unreadable-*`) — 되살릴 수 없고 내보내기만 한다.
     public let unreadableCount: Int
     public let unreadableBytes: Int64
-    /// 초안이 남아 있는 장. 분류(저장소 대조)는 이 장만 읽으면 된다.
+    /// 초안이 남아 있는 장(번역본 포함 — 같은 권 · 장의 KJV 와 개역개정은 따로다). 분류(저장소 대조)는 이 장만 읽으면 된다.
+    /// 이 판이 모르는 번역본의 파일은 장으로 올리지 않는다.
     public let chapters: [BibleChapter]
+    /// 읽을 수 있는 초안 파일 수를 번역본별로 — 파일 이름으로 센다. 모르는 번역본의 파일은 `draftCount` 에만 든다.
+    public let draftCountByTranslation: [Translation: Int]
 
     public init(
-        scope: AccountScope, draftCount: Int, draftBytes: Int64, unreadableCount: Int, unreadableBytes: Int64, chapters: [BibleChapter]
+        scope: AccountScope, draftCount: Int, draftBytes: Int64, unreadableCount: Int, unreadableBytes: Int64, chapters: [BibleChapter],
+        draftCountByTranslation: [Translation: Int] = [:]
     ) {
         self.scope = scope
         self.draftCount = draftCount
@@ -242,6 +282,7 @@ public struct DraftBucketSummary: Equatable, Sendable {
         self.unreadableCount = unreadableCount
         self.unreadableBytes = unreadableBytes
         self.chapters = chapters
+        self.draftCountByTranslation = draftCountByTranslation
     }
 }
 
@@ -422,10 +463,12 @@ public actor LocalPreservationWriter {
         return try draftFiles(in: scope) { _ in true }
             .map { try readDraft(at: $0) }
             .filter { $0.eraseGeneration == current }
-            .sorted { ($0.key.sessionID, $0.key.chapter, $0.key.verse) < ($1.key.sessionID, $1.key.chapter, $1.key.verse) }
+            .sorted(by: Self.bucketOrder)
     }
 
-    /// 한 묶음에서 한 장의 초안들. 파일 이름으로 먼저 거르므로 다른 장의 초안은 열지 않는다. 지금 세대의 것만 준다.
+    /// 한 묶음에서 한 장의 초안들. 파일 이름으로 먼저 거르므로 다른 장 · 다른 번역본의 초안은 열지 않는다. 지금 세대의 것만 준다.
+    ///
+    /// 번역본은 `translation` 인자로 고른다(장의 번역본이 아니다) — 부르는 쪽은 보통 `chapter.translation` 을 넘긴다.
     ///
     /// **그 장의 초안 파일을 하나라도 읽지 · 풀지 못하면 던진다.** 없는 것으로 치면 편집 화면이 그 초안을 보이지 않은 채 열리고, 같은 키 ·
     /// 더 새 revision 의 초안이 그 위에 덮인다(초안 전용 세션에서는 그것이 유일한 사본이다). 묶음 폴더가 아예 없으면(초안을 쓴 적 없음) 빈 목록이다.
@@ -468,24 +511,25 @@ public actor LocalPreservationWriter {
         let bucket = bucketRoot(scope)
         var draftCount = 0, unreadableCount = 0
         var draftBytes: Int64 = 0, unreadableBytes: Int64 = 0
-        var chapters: Set<BibleChapter> = []
+        var chapters: Set<BibleChapter> = [], countByTranslation: [Translation: Int] = [:]
         for url in files {
             let size = Int64((try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
+            let chapter = VerseDraftKey.chapter(fromFileName: url.lastPathComponent)
             if Self.isUnreadableFile(url, bucketRoot: bucket) {
                 unreadableCount += 1
                 unreadableBytes += size
             } else if url.pathExtension == "json" {
                 draftCount += 1
                 draftBytes += size
+                if let chapter { countByTranslation[chapter.translation, default: 0] += 1 }
             } else {
                 continue
             }
-            if let chapter = VerseDraftKey.chapter(fromFileName: url.lastPathComponent) { chapters.insert(chapter) }
+            if let chapter { chapters.insert(chapter) }
         }
         return DraftBucketSummary(
             scope: scope, draftCount: draftCount, draftBytes: draftBytes, unreadableCount: unreadableCount,
-            unreadableBytes: unreadableBytes,
-            chapters: chapters.sorted { ($0.title.rawValue, $0.chapter) < ($1.title.rawValue, $1.chapter) }
+            unreadableBytes: unreadableBytes, chapters: chapters.sorted(by: Self.summaryOrder), draftCountByTranslation: countByTranslation
         )
     }
 
@@ -647,6 +691,24 @@ public actor LocalPreservationWriter {
     }
 }
 
+// MARK: - 순서
+
+extension LocalPreservationWriter {
+    /// 한 묶음의 초안 순서 — 세션 → 장 → 절, 같으면 번역본 → 권 이름(같은 목록을 두 번 읽어도 순서가 같다).
+    static func bucketOrder(_ lhs: VerseDraft, _ rhs: VerseDraft) -> Bool {
+        let left = lhs.key, right = rhs.key
+        return (left.sessionID, left.chapter, left.verse, left.translation, left.title)
+            < (right.sessionID, right.chapter, right.verse, right.translation, right.title)
+    }
+
+    /// 요약의 장 순서 — 번역본(`Translation.allCases` 순) → 권 이름 → 장. 개역개정만 있으면 예전 순서(권 이름 → 장) 그대로다.
+    static func summaryOrder(_ lhs: BibleChapter, _ rhs: BibleChapter) -> Bool {
+        let left = Translation.allCases.firstIndex(of: lhs.translation) ?? 0
+        let right = Translation.allCases.firstIndex(of: rhs.translation) ?? 0
+        return (left, lhs.title.rawValue, lhs.chapter) < (right, rhs.title.rawValue, rhs.chapter)
+    }
+}
+
 // MARK: - 읽지 못해 옆으로 옮긴 파일
 
 extension LocalPreservationWriter {
@@ -674,7 +736,8 @@ extension LocalPreservationWriter {
         let url = URL(fileURLWithPath: name)
         let marker = url.pathExtension
         guard marker.hasPrefix(unreadableMarker), UUID(uuidString: String(marker.dropFirst(unreadableMarker.count))) != nil else { return false }
-        return VerseDraftKey.chapter(fromFileName: url.deletingPathExtension().lastPathComponent) != nil
+        // 번역본은 보지 않는다 — 이 판이 모르는 번역본의 파일도 세고 · 내보내고 · 지울 수 있어야 자리를 되찾는다.
+        return VerseDraftKey.hasDraftFileShape(url.deletingPathExtension().lastPathComponent)
     }
 
     /// 링크를 따라가지 않은 파일 종류(`S_IFREG` · `S_IFDIR` · `S_IFLNK` …). 보지 못하면 nil.

@@ -27,9 +27,9 @@ public struct VerseDrawingHistoryView: View {
 
     public var body: some View {
         VStack(spacing: 0) {
-            CarvePanelHeader("\(store.verse)절 · 이전 필사") {
+            CarvePanelHeader(String(localized: "\(store.verse)절 · 이전 필사", bundle: .module)) {
                 if store.hasLoaded {
-                    Text("\(store.drawings.count)회")
+                    Text("\(store.drawings.count)회", bundle: .module)
                         .font(CarveTypography.label)
                         .foregroundStyle(CarveColor.secondary)
                 }
@@ -59,8 +59,8 @@ public struct VerseDrawingHistoryView: View {
                 .padding(.vertical, CarveSpacing.small)
         } else {
             VStack(alignment: .leading, spacing: 2) {
-                Text("회차를 선택하면 바로 그 필사로 바뀌어요.")
-                Text("다른 회차는 지워지지 않고 그대로 남아요.")
+                Text("회차를 선택하면 바로 그 필사로 바뀌어요.", bundle: .module)
+                Text("다른 회차는 지워지지 않고 그대로 남아요.", bundle: .module)
             }
             .font(CarveTypography.caption)
             .foregroundStyle(CarveColor.secondary)
@@ -71,7 +71,7 @@ public struct VerseDrawingHistoryView: View {
     }
 
     static func blockedMessage(_ block: SyncedWriteBlock) -> String {
-        "이 회차로 바꾸지 않았어요. " + block.reasonText
+        String(localized: "이 회차로 바꾸지 않았어요. \(block.reasonText)", bundle: .module)
     }
 
     @ViewBuilder
@@ -81,8 +81,8 @@ public struct VerseDrawingHistoryView: View {
             Color.clear.frame(height: 120)
         } else if store.drawings.isEmpty {
             CarveEmptyState(
-                "아직 이 절의 이전 필사가 없어요.",
-                message: "이전 필사 기록이 생기면 여기에 보여요."
+                String(localized: "아직 이 절의 이전 필사가 없어요.", bundle: .module),
+                message: String(localized: "이전 필사 기록이 생기면 여기에 보여요.", bundle: .module)
             )
         } else {
             // 목록이 짧으면 내용 높이만큼, 길면 주어진 높이 안에서 스크롤한다.
@@ -118,13 +118,13 @@ public struct VerseDrawingHistoryView: View {
                 }
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(Self.dateText(drawing.updateDate) + (isCurrent ? ", 지금 보이는 회차" : ""))
-            .accessibilityHint(isCurrent ? "" : "누르면 이 필사로 바뀌어요")
+            .accessibilityLabel(Self.rowAccessibilityLabel(drawing.updateDate, isCurrent: isCurrent))
+            .accessibilityHint(isCurrent ? Text(verbatim: "") : Text("누르면 이 필사로 바뀌어요", bundle: .module))
             .accessibilityAddTraits(isCurrent ? .isSelected : [])
         } else {
             // 손상된 회차(시안 E3) — 이 회차만 건너뛰고 목록 전체를 막지 않는다.
             rowBody(drawing: drawing, isCurrent: isCurrent) {
-                Text("불러올 수 없는 필사 데이터")
+                Text("불러올 수 없는 필사 데이터", bundle: .module)
                     .font(CarveTypography.label)
                     .foregroundStyle(CarveColor.danger)
                     .frame(maxWidth: .infinity)
@@ -149,7 +149,7 @@ public struct VerseDrawingHistoryView: View {
                     CarveIcon.checkmark.image
                         .resizable()
                         .frame(width: 17, height: 17)
-                    Text("지금 보이는 회차")
+                    Text("지금 보이는 회차", bundle: .module)
                 }
             }
             .font(CarveTypography.caption)
@@ -168,12 +168,27 @@ public struct VerseDrawingHistoryView: View {
         .contentShape(Rectangle())
     }
 
-    static func dateText(_ date: Date?) -> String {
-        guard let date else { return "날짜를 확인할 수 없어요" }
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ko_KR")
-        formatter.dateFormat = "yyyy년 M월 d일 HH:mm"
-        return formatter.string(from: date)
+    /// 역할: 회차 행의 VoiceOver 이름 — 날짜, 지금 보이는 회차면 그 사실을 함께 읽는다.
+    /// 입력 · 출력: 회차 시각 · 지금 보이는 회차인가 → 이름. 부작용: 없음.
+    static func rowAccessibilityLabel(_ date: Date?, isCurrent: Bool) -> String {
+        let dateText = dateText(date)
+        guard isCurrent else { return dateText }
+        return "\(dateText), \(String(localized: "지금 보이는 회차", bundle: .module))"
+    }
+
+    /// 역할: 회차의 날짜 줄(「2026년 9월 15일 오후 3:20」 · 「September 15, 2026 at 3:20 PM」).
+    ///   고정 형식이 아니라 기기 로케일의 날짜 · 시각 서식(`Date.FormatStyle`)을 따른다(영어 현지화 결정 5).
+    /// 입력 · 출력: 회차 시각(nil 이면 날짜를 모른다는 문구) · 로케일(nil 이면 앱 · 기기 로케일) → 문구.
+    /// 부작용: 없음.
+    static func dateText(_ date: Date?, locale: Locale? = nil) -> String {
+        guard let date else { return CarveFeatureCatalog.string("날짜를 확인할 수 없어요", locale: locale) }
+        let style = Date.FormatStyle(locale: locale ?? .autoupdatingCurrent)
+            .year()
+            .month(.wide)
+            .day()
+            .hour()
+            .minute()
+        return date.formatted(style)
     }
 }
 

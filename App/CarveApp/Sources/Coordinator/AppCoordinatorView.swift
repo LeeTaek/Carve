@@ -81,11 +81,19 @@ public struct AppCoordinatorView: View {
             if store.showsRelaunchGuidance {
                 // 로그인 완료와 연결 완료를 구분한다 — 이 실행은 계속 이 기기에만 저장한다. 기다릴 것이 없으므로 로딩을 띄우지 않는다.
                 VStack(spacing: 16) {
-                    Text("iCloud 로그인을 확인했어요")
-                    Text("아직 이 기기의 필사는 iCloud와 연결되지 않았어요.\n\(CloudSettingsFeature.relaunchToConnect)")
-                        .font(.caption)
-                        .multilineTextAlignment(.center)
-                    Button("확인") { store.send(.relaunchGuidanceDismissed) }
+                    Text("iCloud 로그인을 확인했어요", bundle: .main, comment: "재실행 안내 카드 제목 — iCloud 로그인은 됐다")
+                    Text(
+                        "아직 이 기기의 필사는 iCloud와 연결되지 않았어요.\n\(CloudSettingsFeature.relaunchToConnect)",
+                        bundle: .main,
+                        comment: "재실행 안내 카드 본문 — %@ 는 설정의 「앱을 다시 열어 연결」 안내 문장"
+                    )
+                    .font(.caption)
+                    .multilineTextAlignment(.center)
+                    Button {
+                        store.send(.relaunchGuidanceDismissed)
+                    } label: {
+                        Text("확인", bundle: .main, comment: "안내 카드 닫기")
+                    }
                 }
                 .padding(24)
                 .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
@@ -97,14 +105,22 @@ public struct AppCoordinatorView: View {
             // 연결 전에 쓴 필기가 있다 — 막지 않고 한 번 알린다. 넣기는 설정에서 절마다 견주고 고른 것만 한다(2026-09-29).
             if store.beforeConnectionNotice != nil, store.patchnote == nil, store.settings == nil, !store.showsRelaunchGuidance {
                 VStack(spacing: 16) {
-                    Text("iCloud에 연결하기 전에 이 iPad에서 쓴 필기가 있어요")
-                    Text("현재 필사에 넣을 내용을 확인해 주세요.")
+                    Text("iCloud에 연결하기 전에 이 iPad에서 쓴 필기가 있어요", bundle: .main, comment: "연결 전 필기 안내 카드 제목")
+                    Text("현재 필사에 넣을 내용을 확인해 주세요.", bundle: .main, comment: "연결 전 필기 안내 카드 본문")
                         .font(.caption)
                         .multilineTextAlignment(.center)
                     HStack(spacing: 12) {
-                        Button("나중에") { store.send(.beforeConnectionNoticeDismissed) }
-                        Button("필기 확인하기") { store.send(.beforeConnectionNoticeReviewTapped) }
-                            .buttonStyle(.borderedProminent)
+                        Button {
+                            store.send(.beforeConnectionNoticeDismissed)
+                        } label: {
+                            Text("나중에", bundle: .main, comment: "연결 전 필기 안내 — 미룬다")
+                        }
+                        Button {
+                            store.send(.beforeConnectionNoticeReviewTapped)
+                        } label: {
+                            Text("필기 확인하기", bundle: .main, comment: "연결 전 필기 안내 — 설정의 확인이 필요한 필기로 간다")
+                        }
+                        .buttonStyle(.borderedProminent)
                     }
                 }
                 .padding(24)
@@ -119,14 +135,22 @@ public struct AppCoordinatorView: View {
             if store.showsCanvasRemovalNotice, store.patchnote == nil, store.settings == nil, !store.showsRelaunchGuidance,
                store.beforeConnectionNotice == nil {
                 VStack(spacing: 16) {
-                    Text("절마다 쓰는 캔버스는 이번 버전에서 없어졌어요")
-                    Text("그동안 쓴 필사는 그대로예요. 불편한 점이 있으면 알려 주세요.")
+                    Text("절마다 쓰는 캔버스는 이번 버전에서 없어졌어요", bundle: .main, comment: "2.0.x 절마다 캔버스 사용자에게 한 번 보이는 안내 제목")
+                    Text("그동안 쓴 필사는 그대로예요. 불편한 점이 있으면 알려 주세요.", bundle: .main, comment: "절마다 캔버스 제거 안내 본문")
                         .font(.caption)
                         .multilineTextAlignment(.center)
                     HStack(spacing: 12) {
-                        Button("의견 보내기") { store.send(.canvasRemovalNoticeFeedbackTapped) }
-                        Button("확인") { store.send(.canvasRemovalNoticeDismissed) }
-                            .buttonStyle(.borderedProminent)
+                        Button {
+                            store.send(.canvasRemovalNoticeFeedbackTapped)
+                        } label: {
+                            Text("의견 보내기", bundle: .main, comment: "절마다 캔버스 제거 안내 — 의견 보내기 화면으로 간다")
+                        }
+                        Button {
+                            store.send(.canvasRemovalNoticeDismissed)
+                        } label: {
+                            Text("확인", bundle: .main, comment: "안내 카드 닫기")
+                        }
+                        .buttonStyle(.borderedProminent)
                     }
                 }
                 .padding(24)

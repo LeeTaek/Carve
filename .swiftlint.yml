@@ -188,5 +188,23 @@ custom_rules:
     excluded_match_kinds: [comment, doccomment, string]
     message: '@unchecked Sendable 을 새로 늘리지 않는다 — 가변 상태는 LockIsolated 로 감싸 Sendable 을 컴파일러가 확인하게 하거나, UI 타입은 타입 단위 @MainActor 로 둔다. 룰북 .codex/skills/carve-rulebook/references/concurrency.md'
     severity: error
+  # 현지화(영어 현지화 결정 5 · 7) — 한글 문구 리터럴은 모듈 카탈로그를 찾도록 bundle 을 지정한다.
+  # bundle 이 없으면 메인 번들의 표를 찾으므로, 모듈 카탈로그의 문구가 영어 기기에서도 한국어로 남는다.
+  # - 리터럴 바로 뒤(다음 `)` 앞)에 `bundle:` 이 있는지만 본다. 3항 연산 · 변수로 넘기는 문구는 보지 않는다(리뷰로 본다).
+  # - 매치에 문자열 토큰이 들어가므로 excluded_match_kinds 에 string 을 넣지 않는다.
+  # - 현지화하지 않는 곳(Debug 하네스 · 컴포넌트 갤러리)은 excluded 다. 로그 · #if DEBUG 안의 문구는 이 호출들을 쓰지 않는다.
+  localized_text_needs_bundle:
+    name: '한글 문구 리터럴의 bundle'
+    included: '/(?:Feature/[^/]+|Supports/[^/]+|App/CarveApp)/(?:Sources|Widget)/'
+    excluded:
+      - '/Derived/'
+      # 현지화하지 않는 곳 — 영어 현지화 결정 5(Debug 폴더 · 프리뷰 · 컴포넌트 갤러리)
+      - '/Debug/'
+      - '/Preview/'
+      - 'Gallery\.swift$'
+    regex: '(?:\b(?:Text|TextState|Button|Label|Section|Toggle|Link|NavigationLink|Picker|Menu|LabeledContent|ContentUnavailableView|Stepper|TextField|SecureField|LocalizedStringKey|LocalizedStringResource)\(|\.(?:navigationTitle|accessibilityLabel|accessibilityHint|accessibilityValue|help)\(|\bString\(localized:)\s*"(?:[^"\\\n]|\\.)*[가-힣](?:[^"\\\n]|\\.)*"(?![^)]*\bbundle:)'
+    excluded_match_kinds: [comment, doccomment]
+    message: '한글 문구 리터럴은 bundle 을 지정한다 — Text("…", bundle: .module) · String(localized: "…", bundle: .module) · TextState("…", bundle: .module). bundle 을 받지 않는 Button · Label · Section · navigationTitle · accessibilityLabel 은 Text("…", bundle:) 를 받는 형태로 쓴다. 영어 현지화 결정 5 · 7'
+    severity: error
 
 reporter: "xcode" # 보고 유형 (xcode, json, csv, checkstyle, junit, html, emoji, markdown)

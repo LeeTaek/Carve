@@ -74,8 +74,15 @@ public struct DailyRecordChartFeature: Sendable {
                 <= today.addDays(-(DailyRecordChartFeature.pageDays - 1))
         }
 
-        /// VoiceOver가 막대를 하나씩 탐색하지 않아도 주간 흐름을 알 수 있는 요약이다.
-        var accessibilitySummary: String {
+        /// VoiceOver가 막대를 하나씩 탐색하지 않아도 주간 흐름을 알 수 있는 요약이다(앱 언어).
+        var accessibilitySummary: String { accessibilitySummary(locale: nil) }
+
+        /// 역할: 보이는 7일의 합계 · 평균 · 가장 많은 날 · 기록 없는 날을 한 문장으로 만든다.
+        /// 입력 · 출력: 로케일(nil 이면 앱 · 기기 언어) → 「차트. 9월 4일부터 9월 10일까지. … 없는 날은 이틀.」 ·
+        ///   「Chart. September 4 to September 10. … 2 days with no record.」.
+        ///   한국어 수사(하루 · 이틀)는 영어에서 숫자로 적는다 — 카탈로그 키가 ko 수사마다 따로 있다.
+        /// 부작용: 없음.
+        func accessibilitySummary(locale: Locale?) -> String {
             let calendar = Calendar.current
             let start = visibleStartDate
             let end = visibleEndDate
@@ -92,18 +99,31 @@ public struct DailyRecordChartFeature: Sendable {
                 .map(\.date)
                 .min()
 
-            let range = "\(start.chartMonthDayText)부터 \(end.chartMonthDayText)까지"
-            let maximumText = maximumDate.map { "가장 많은 날은 \($0.chartMonthDayText) \(maximum)절" }
-                ?? "가장 많은 날은 없어요"
-            let zeroDayText: String
-            switch zeroDayCount {
-            case 0: zeroDayText = "기록 없는 날은 없어요"
-            case 1: zeroDayText = "없는 날은 하루"
-            case 2: zeroDayText = "없는 날은 이틀"
-            default: zeroDayText = "없는 날은 \(zeroDayCount)일"
+            let startText = start.chartMonthDayText(locale: locale)
+            let endText = end.chartMonthDayText(locale: locale)
+            let range = ChartCatalog.string("\(startText)부터 \(endText)까지", locale: locale)
+            let totalText = ChartCatalog.string("\(total)절", locale: locale)
+            let averageNumber = average.formatted(.number.precision(.fractionLength(1)).locale(locale ?? .autoupdatingCurrent))
+            let averageText = ChartCatalog.string("\(averageNumber)절", locale: locale)
+            let maximumText: String
+            if let maximumDate {
+                let dayText = maximumDate.chartMonthDayText(locale: locale)
+                let countText = ChartCatalog.string("\(maximum)절", locale: locale)
+                maximumText = ChartCatalog.string("가장 많은 날은 \(dayText) \(countText)", locale: locale)
+            } else {
+                maximumText = ChartCatalog.string("가장 많은 날은 없어요", locale: locale)
+            }
+            let zeroDayText = switch zeroDayCount {
+            case 0: ChartCatalog.string("기록 없는 날은 없어요", locale: locale)
+            case 1: ChartCatalog.string("없는 날은 하루", locale: locale)
+            case 2: ChartCatalog.string("없는 날은 이틀", locale: locale)
+            default: ChartCatalog.string("없는 날은 \(zeroDayCount)일", locale: locale)
             }
 
-            return "차트. \(range). 하루에 필사한 절 수. 모두 \(total)절, 하루 평균 \(average.formatted(.number.precision(.fractionLength(1))))절. \(maximumText), \(zeroDayText)."
+            return ChartCatalog.string(
+                "차트. \(range). 하루에 필사한 절 수. 모두 \(totalText), 하루 평균 \(averageText). \(maximumText), \(zeroDayText).",
+                locale: locale
+            )
         }
         
         init(

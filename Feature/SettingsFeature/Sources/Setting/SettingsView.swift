@@ -26,9 +26,11 @@ public struct SettingsView: View {
 
     public var body: some View {
         VStack(spacing: 0) {
-            CarvePanelHeader("설정") {
-                Button("완료") {
+            CarvePanelHeader(SettingsCatalog.string("설정")) {
+                Button {
                     send(.backToCarve)
+                } label: {
+                    Text("완료", bundle: .module)
                 }
                 .buttonStyle(.carve(.secondary))
             }
@@ -53,44 +55,64 @@ public struct SettingsView: View {
     private var sideBar: some View {
         // 선택은 경로 상태가 아니라 행으로 비교한다 — 상세 화면의 상태가 바뀌어도 선택 표시가 남는다.
         List(selection: $store.selectedSidebarItem.sending(\.selectSidebarItem)) {
-            Section("필사") {
-                NavigationLink("위젯", value: SettingsFeature.SidebarItem.widget)
-            }
-            Section("화면") {
-                NavigationLink(value: SettingsFeature.SidebarItem.appearance) {
-                    sidebarRow("화면 모드", value: appearanceMode.title)
+            Section {
+                NavigationLink(value: SettingsFeature.SidebarItem.widget) {
+                    Text("위젯", bundle: .module)
                 }
+            } header: {
+                Text("필사", bundle: .module)
             }
-            Section("저장") {
+            Section {
+                NavigationLink(value: SettingsFeature.SidebarItem.appearance) {
+                    sidebarRow(SettingsCatalog.string("화면 모드"), value: appearanceMode.title)
+                }
+            } header: {
+                Text("화면", bundle: .module)
+            }
+            Section {
                 NavigationLink(value: SettingsFeature.SidebarItem.iCloud) {
                     // 연결 보류 중에는 「보류」 — 이 실행은 이 기기에만 저장한다(정책 §12-6 C14 ③). 까닭은 iCloud 화면이 말한다.
-                    sidebarRow("iCloud", value: store.isConnectionHeld ? "보류" : "켬")
+                    sidebarRow("iCloud", value: store.isConnectionHeld ? SettingsCatalog.string("보류") : SettingsCatalog.string("켬"))
                 }
                 // 확인이 필요한 필기의 지속적인 진입점(정책 §12-6 ④) — 개수는 화면을 열 때 센다.
                 NavigationLink(DraftRecoveryCopy.title, value: SettingsFeature.SidebarItem.draftRecovery)
                 // 필사 백업 — 백업 만들기 · 불러오기(2.1).
                 NavigationLink(BackupCopy.title, value: SettingsFeature.SidebarItem.backup)
+            } header: {
+                Text("저장", bundle: .module)
             }
-            Section("지원") {
-                NavigationLink("도움말", value: SettingsFeature.SidebarItem.help)
-                NavigationLink("패치노트", value: SettingsFeature.SidebarItem.patchnote)
-                NavigationLink("의견 보내기", value: SettingsFeature.SidebarItem.sendFeedback)
-                NavigationLink(value: SettingsFeature.SidebarItem.appVersion) {
-                    sidebarRow("앱 버전", value: UIDevice.appVersion())
+            Section {
+                NavigationLink(value: SettingsFeature.SidebarItem.help) {
+                    Text("도움말", bundle: .module)
                 }
+                NavigationLink(value: SettingsFeature.SidebarItem.patchnote) {
+                    Text("패치노트", bundle: .module)
+                }
+                NavigationLink(value: SettingsFeature.SidebarItem.sendFeedback) {
+                    Text("의견 보내기", bundle: .module)
+                }
+                NavigationLink(value: SettingsFeature.SidebarItem.appVersion) {
+                    sidebarRow(SettingsCatalog.string("앱 버전"), value: UIDevice.appVersion())
+                }
+            } header: {
+                Text("지원", bundle: .module)
             }
-            Section("광고") {
+            Section {
                 // 구매를 권하지 않고 설정에 한 줄로만 둔다(시안 K4).
                 NavigationLink(value: SettingsFeature.SidebarItem.removeAds) {
-                    sidebarRow("광고 제거", value: isAdFree ? "구매함" : "")
+                    sidebarRow(SettingsCatalog.string("광고 제거"), value: isAdFree ? SettingsCatalog.string("구매함") : "")
                 }
                 if store.isPrivacyOptionsRequired {
                     // 동의가 필요한 지역에서는 광고 동의를 다시 고를 수 있는 진입점을 둬야 한다(UMP 개인정보 옵션).
-                    Button("광고 개인정보 옵션") {
+                    Button {
                         send(.privacyOptionsTapped)
+                    } label: {
+                        Text("광고 개인정보 옵션", bundle: .module)
                     }
                     .foregroundStyle(CarveColor.ink)
                 }
+            } header: {
+                Text("광고", bundle: .module)
             }
         }
         .onAppear {
@@ -101,18 +123,18 @@ public struct SettingsView: View {
                 CarveDivider()
                 // 글자로 「가가」 라고 쓰면 무엇을 가리키는지 알기 어려워 헤더의 본문 설정 버튼 모양을 그대로 보여 준다.
                 VStack(alignment: .leading, spacing: CarveSpacing.xxSmall) {
-                    Text("본문 글꼴·크기·줄 간격은")
+                    Text("본문 글꼴·크기·줄 간격은", bundle: .module)
                     HStack(spacing: CarveSpacing.xxSmall) {
-                        Text("필사 화면 위")
+                        Text("필사 화면 위", bundle: .module)
                         CarveIconBadge(.textFormat)
-                        Text("\(Text("(본문 설정)").font(.caption2))에서 바꿔요.")
+                        Text("\(Text("(본문 설정)", bundle: .module).font(.caption2))에서 바꿔요.", bundle: .module)
                     }
                 }
                 .font(CarveTypography.caption)
                 .foregroundStyle(CarveColor.secondary)
                 .padding(.horizontal, CarveSpacing.small)
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel("본문 글꼴·크기·줄 간격은 필사 화면 위 본문 설정에서 바꿔요.")
+                .accessibilityLabel(Text("본문 글꼴·크기·줄 간격은 필사 화면 위 본문 설정에서 바꿔요.", bundle: .module))
             }
             .padding(.bottom, CarveSpacing.small)
             .background(CarveColor.surface)

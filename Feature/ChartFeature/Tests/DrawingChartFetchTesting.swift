@@ -91,12 +91,14 @@ struct DrawingChartFetchTesting {
         #expect(store.state.chapterCountsByDay[fixedChartDay(-1)] == [john: 1])
     }
 
-    @Test("최근 절에서 빠진 권 · 장 · 절은 창세기 1장 1절로, 빠진 시각은 먼 미래로 채우고 시각이 없는 항목은 맨 뒤에 둔다")
+    @Test("최근 절은 권 · 번역본을 모르거나 장이 없는 활동을 건너뛰고, 빠진 절은 1절로 빠진 시각은 먼 미래로 채워 맨 뒤에 둔다")
     @MainActor
-    func fetchDataFillsMissingRecentFieldsAndSortsNilLast() async {
-        // Given: 저장소가 순서 없이 돌려준다
+    func fetchDataSkipsUnknownRecentChaptersAndSortsNilLast() async {
+        // Given: 저장소가 순서 없이 돌려준다 — 모르는 권 · 모르는 번역본 접두 · 장 없는 행이 섞여 있다
         let john = BibleChapter(title: .john, chapter: 3)
         let romans = BibleChapter(title: .romans, chapter: 8)
+        let psalms = BibleChapter(title: .psalms, chapter: 23)
+        let oldest = Date(timeIntervalSince1970: 500)
         let older = Date(timeIntervalSince1970: 1_000)
         let middle = Date(timeIntervalSince1970: 2_000)
         let newer = Date(timeIntervalSince1970: 3_000)
@@ -104,6 +106,9 @@ struct DrawingChartFetchTesting {
             DrawingActivity(updateDate: nil, titleName: nil, titleChapter: nil, verse: nil),
             DrawingActivity(updateDate: middle, titleName: john.title.rawValue, titleChapter: john.chapter, verse: 16),
             DrawingActivity(updateDate: older, titleName: "Unknown.txt", titleChapter: 5, verse: 7),
+            DrawingActivity(updateDate: oldest, titleName: "ESV-\(BibleTitle.genesis.rawValue)", titleChapter: 1, verse: 1),
+            DrawingActivity(updateDate: older, titleName: john.title.rawValue, titleChapter: nil, verse: 3),
+            DrawingActivity(updateDate: nil, titleName: psalms.title.rawValue, titleChapter: psalms.chapter, verse: nil),
             DrawingActivity(updateDate: newer, titleName: romans.title.rawValue, titleChapter: romans.chapter, verse: 28)
         ]
         let store = TestStore(initialState: DrawingChartFeature.State()) {
@@ -118,17 +123,55 @@ struct DrawingChartFetchTesting {
         await store.send(.view(.fetchData))
         await store.receive(\.setFetchedDailyData)
 
-        // Then: 최신순, 모르는 권은 창세기로, 전부 빠진 항목은 창세기 1장 1절 · 먼 미래로 맨 뒤
+        // Then: 최신순, 창세기 등 다른 자리로 바꿔 담지 않는다. 시각이 없는 시편은 1절 · 먼 미래로 맨 뒤
         await store.receive(\.setRecentItems) {
             $0.drawingWeeklySummary.recentVerses = [
                 recentVerse(romans, verse: 28, at: newer),
                 recentVerse(john, verse: 16, at: middle),
-                recentVerse(BibleChapter(title: .genesis, chapter: 5), verse: 7, at: older),
-                recentVerse(BibleChapter(title: .genesis, chapter: 1), verse: 1, at: .distantFuture)
+                recentVerse(psalms, verse: 1, at: .distantFuture)
             ]
-            // 장 목록은 권 · 장을 알 수 있는 항목만 담는다
-            $0.drawingWeeklySummary.recentChapters = [romans, john]
+            // 장 목록도 권 · 장 · 번역본을 알 수 있는 항목만 담는다
+            $0.drawingWeeklySummary.recentChapters = [romans, john, psalms]
         }
+    }
+
+    @Test("같은 권 · 장도 KJV 와 개역개정은 장별 횟수 · 최근 장에서 따로 세고, 최근 절은 그 번역본 장을 든다")
+    @MainActor
+    func fetchDataSeparatesTranslationsOfSameChapter() async {
+        // Given: 오늘 요한복음 3장을 개역개정으로 두 절, KJV 로 한 절(KJV 행의 권 이름은 번역본 접두가 붙는다)
+        let john = BibleChapter(title: .john, chapter: 3)
+        let johnKJV = BibleChapter(title: .john, chapter: 3, translation: .KJV)
+        let today = fixedChartDay(0)
+        let activities = [
+            DrawingActivity(updateDate: today.addingTimeInterval(3_600), chapter: johnKJV, verse: 16),
+            DrawingActivity(updateDate: today.addingTimeInterval(2_400), chapter: john, verse: 17),
+            DrawingActivity(updateDate: today.addingTimeInterval(1_200), chapter: john, verse: 16)
+        ]
+        let store = TestStore(initialState: DrawingChartFeature.State()) {
+            DrawingChartFeature()
+        } withDependencies: {
+            fixedTimeDependencies(&$0)
+            $0.drawingActivityRepository = RecordingDrawingActivityRepository(activities: activities, recent: activities)
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        // When
+        await store.send(.view(.fetchData))
+        await store.receive(\.setFetchedDailyData)
+
+        // Then: 날짜별 수는 셋 다, 장별 횟수는 번역본마다 따로
+        #expect(store.state.dailyRecordChart.records.last == DailyRecord(date: today, count: 3))
+        #expect(store.state.chapterCountsByDay[today] == [john: 2, johnKJV: 1])
+        await store.receive(\.setRecentItems) {
+            $0.drawingWeeklySummary.recentVerses = [
+                recentVerse(johnKJV, verse: 16, at: today.addingTimeInterval(3_600)),
+                recentVerse(john, verse: 17, at: today.addingTimeInterval(2_400)),
+                recentVerse(john, verse: 16, at: today.addingTimeInterval(1_200))
+            ]
+            $0.drawingWeeklySummary.recentChapters = [johnKJV, john]
+        }
+        // 주간 요약의 가장 많이 쓴 장도 번역본마다 따로 센 값이다
+        #expect(store.state.drawingWeeklySummary.chapterCountsByDay[today] == [john: 2, johnKJV: 1])
     }
 }
 

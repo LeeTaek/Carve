@@ -31,8 +31,8 @@ public struct ColorPalatteView: View {
 
     public var body: some View {
         VStack(spacing: 0) {
-            CarvePanelHeader("필기 색상") {
-                Button("완료") { send(.done) }
+            CarvePanelHeader(String(localized: "필기 색상", bundle: .module)) {
+                Button { send(.done) } label: { Text("완료", bundle: .module) }
                     .font(CarveTypography.body)
                     .foregroundStyle(CarveColor.accent)
                     .buttonStyle(.plain)
@@ -40,10 +40,10 @@ public struct ColorPalatteView: View {
             }
 
             VStack(alignment: .leading, spacing: CarveSpacing.small) {
-                sectionTitle("기본 색상")
+                sectionTitle(String(localized: "기본 색상", bundle: .module))
                 colorGrid
 
-                sectionTitle("선택한 색상")
+                sectionTitle(String(localized: "선택한 색상", bundle: .module))
                 InkPreview(
                     color: Color(uiColor: store.selectedColor.color),
                     lineWidth: store.pencilConfig.lineWidth
@@ -100,7 +100,7 @@ public struct ColorPalatteView: View {
     /// 필사 화면에서 밑줄과 섞여 사용자가 왜 흐린지 알기 어렵다.
     private var customColorRow: some View {
         ColorPicker(selection: customColorBinding, supportsOpacity: false) {
-            Text("다른 색상 고르기")
+            Text("다른 색상 고르기", bundle: .module)
                 .font(CarveTypography.body)
                 .foregroundStyle(CarveColor.ink)
         }
@@ -117,14 +117,19 @@ public struct ColorPalatteView: View {
     }
 
     /// VoiceOver 가 읽을 색 이름. 시안 P1 의 12색 순서와 같다.
-    static func colorName(_ color: UIColor) -> String {
+    /// - Parameter locale: 이름 언어. nil 이면 앱(기기) 언어다 — 영어 시험만 넘긴다.
+    static func colorName(_ color: UIColor, locale: Locale? = nil) -> String {
         let names = [
-            "먹색", "초록", "갈색", "붉은색", "파랑", "보라",
-            "노랑", "흰색", "회색", "짙은 초록", "분홍", "베이지"
+            CarveFeatureCatalog.string("먹색", locale: locale), CarveFeatureCatalog.string("초록", locale: locale),
+            CarveFeatureCatalog.string("갈색", locale: locale), CarveFeatureCatalog.string("붉은색", locale: locale),
+            CarveFeatureCatalog.string("파랑", locale: locale), CarveFeatureCatalog.string("보라", locale: locale),
+            CarveFeatureCatalog.string("노랑", locale: locale), CarveFeatureCatalog.string("흰색", locale: locale),
+            CarveFeatureCatalog.string("회색", locale: locale), CarveFeatureCatalog.string("짙은 초록", locale: locale),
+            CarveFeatureCatalog.string("분홍", locale: locale), CarveFeatureCatalog.string("베이지", locale: locale)
         ]
         guard let index = ColorPalatteFeature.defaultColors.firstIndex(where: { $0.isSameColor(as: color) }),
               index < names.count else {
-            return "색상"
+            return CarveFeatureCatalog.string("색상", locale: locale)
         }
         return names[index]
     }

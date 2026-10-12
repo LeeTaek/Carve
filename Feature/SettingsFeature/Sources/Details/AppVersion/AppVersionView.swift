@@ -31,6 +31,8 @@ public struct AppVersionView: View {
             switch store.case {
             case .lisence(let store):
                 LisenceView(store: store)
+            case .bibleSource(let store):
+                BibleSourceView(store: store)
             }
         }
     }
@@ -38,7 +40,7 @@ public struct AppVersionView: View {
     private var content: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: CarveSpacing.large) {
-                Text("앱 버전")
+                Text("앱 버전", bundle: .module)
                     .font(CarveTypography.sectionTitle)
                     .foregroundStyle(CarveColor.secondary)
 
@@ -46,14 +48,15 @@ public struct AppVersionView: View {
 
                 CarveDivider()
 
-                CarveSettingsSection("앱 정보") {
-                    CarveSettingsRow("버전", value: UIDevice.appVersion())
+                CarveSettingsSection(SettingsCatalog.string("앱 정보")) {
+                    CarveSettingsRow(SettingsCatalog.string("버전"), value: UIDevice.appVersion())
                     #if DEBUG
                     // 개발 빌드에서만 — 어느 빌드를 시험하는지 가린다. 출시 빌드에는 보이지 않는다.
                     if let build = Self.buildNumber {
                         CarveSettingsRow("빌드", value: build)
                     }
                     #endif
+                    bibleSourceRow
                 }
             }
             .padding(CarveSpacing.large)
@@ -61,6 +64,22 @@ public struct AppVersionView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(CarveColor.surface)
+    }
+
+    /// 「성경 본문 출처」 로 들어가는 행 — 번역본마다 이름 · 판 · 권리 · 출처(영어 현지화 결정 11).
+    private var bibleSourceRow: some View {
+        Button {
+            store.send(.pushToBibleSource)
+        } label: {
+            CarveSettingsRow(BibleSourceCopy.title) {
+                Image(systemName: "chevron.right")
+                    .font(CarveTypography.label)
+                    .foregroundStyle(CarveColor.secondary)
+                    .accessibilityHidden(true)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     /// 앱 아이콘과 이름 · 버전.
@@ -77,10 +96,10 @@ public struct AppVersionView: View {
                 }
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: CarveSpacing.xxSmall) {
-                Text("새기다")
+                Text("새기다", bundle: .module)
                     .font(CarveTypography.title)
                     .foregroundStyle(CarveColor.ink)
-                Text("버전 \(UIDevice.appVersion())")
+                Text("버전 \(UIDevice.appVersion())", bundle: .module)
                     .font(CarveTypography.body)
                     .foregroundStyle(CarveColor.secondary)
             }

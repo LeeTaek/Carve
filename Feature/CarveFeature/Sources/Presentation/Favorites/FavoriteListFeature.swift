@@ -17,6 +17,8 @@ import ComposableArchitecture
 /// 최근 추가순으로 권 · 장 · 절과 번역본, **추가할 때의** 본문 · 필기, 추가 날짜를 보여 준다.
 /// 카드의 채운 별은 해제 버튼이고 해제 직후 「실행 취소」 를 준다. 해제는 즐겨찾기만 지운다 — 원래 필사와 이전 필사 기록은 그대로다.
 /// 「말씀으로 이동」 은 그 장 · 절의 필사 화면으로 돌아가며, 보존한 필기를 캔버스에 덮어쓰지 않는다.
+///
+/// 항목은 번역본마다 따로다 — 같은 절의 KJV · 개역개정 즐겨찾기는 키가 달라 카드도 둘이고, 「말씀으로 이동」 은 그 번역본 장으로 간다.
 @Reducer
 public struct FavoriteListFeature {
     public init() { }
@@ -277,6 +279,7 @@ public struct FavoriteListFeature {
 
             case .view(.openVerseTapped(let key)):
                 guard let favorite = state.favorites[id: key] else { return .none }
+                // 장은 키의 장 그대로다 — 번역본까지 담겨 KJV 즐겨찾기는 KJV 장으로 간다(영어 현지화 결정 1).
                 let verse = BibleVerse(title: key.chapter, verse: key.verse, sentence: favorite.sentence)
                 return .send(.delegate(.openVerse(verse)))
 
@@ -376,15 +379,15 @@ extension FavoriteListFeature {
     /// 위젯에 담긴 말씀을 해제하기 전 확인(시안 N9).
     static func removeDisplayedFavoriteAlert(_ key: FavoriteVerseKey) -> AlertState<Action.RemoveConfirm> {
         AlertState {
-            TextState("즐겨찾기를 해제할까요?")
+            TextState("즐겨찾기를 해제할까요?", bundle: .module)
         } actions: {
-            ButtonState(role: .cancel) { TextState("취소") }
-            ButtonState(role: .destructive, action: .confirm(key)) { TextState("해제하기") }
+            ButtonState(role: .cancel) { TextState("취소", bundle: .module) }
+            ButtonState(role: .destructive, action: .confirm(key)) { TextState("해제하기", bundle: .module) }
         } message: {
             TextState("""
             이 말씀은 위젯에 담겨 있어요. 해제하면 위젯에서도 빠져요.
             원래 필사와 이전 필사 기록은 남아요.
-            """)
+            """, bundle: .module)
         }
     }
 

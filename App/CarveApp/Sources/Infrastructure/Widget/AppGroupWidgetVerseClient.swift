@@ -83,28 +83,49 @@ struct AppGroupWidgetVerseClient: WidgetVerseClient {
         await Self.reloadWidgets()
     }
 
-    /// 보관본을 위젯이 읽는 모양으로 옮겨 적는다.
+    /// 보관본을 위젯이 읽는 모양으로 옮겨 적는다. 번역본은 즐겨찾기 장의 번역본이다 — 딥링크(`deepLinkURL`)도 이 값으로 그 번역본 절을 연다.
+    ///
+    /// 권 이름(`bookDisplayName`) · 참조(`referenceText` · `compactReferenceText`)는 **담을 때의 앱 언어**로 남는다 — 위젯은 Domain 을
+    /// 링크하지 않아 그 문자열을 그대로 쓰고, 기기 언어를 바꿔도 다시 담기 전까지 그대로다(영어 현지화 설계 §10 알려진 한계).
     private static func payload(for favorite: FavoriteVerseSnapshot) -> VerseWidgetPayload {
-        let key = favorite.key
+        let chapter = favorite.key.chapter
+        let verse = favorite.key.verse
         return VerseWidgetPayload(
-            titleRawValue: key.chapter.title.rawValue,
-            bookDisplayName: key.chapter.title.koreanTitle(),
-            chapter: key.chapter.chapter,
-            verse: key.verse,
-            translation: key.translation.rawValue,
-            translationDisplayName: key.translation.displayName,
+            titleRawValue: chapter.title.rawValue,
+            bookDisplayName: chapter.title.localizedName,
+            chapter: chapter.chapter,
+            verse: verse,
+            translation: chapter.translation.rawValue,
+            translationDisplayName: chapter.translation.displayName,
             sentence: favorite.sentence,
-            designatedAt: Date()
+            designatedAt: Date(),
+            referenceText: BibleReference(chapter: chapter, verse: verse).text,
+            compactReferenceText: compactReference(chapter: chapter, verse: verse)
         )
     }
 
-    /// 위젯이 읽은 페이로드를 다시 즐겨찾기 키로 되돌린다. 모르는 권이면 nil.
+    /// 위젯 머리의 짧은 참조(앱 언어) — ko 「시편 23:1」 · en 「Psalm 23:1」(시안 G4).
+    ///
+    /// 형식은 앱 카탈로그에 있다. 시편은 en 에서 단수 「Psalm」 이라 `BibleReference` 처럼 형식을 따로 둔다(영어 현지화 결정 3 · 11).
+    private static func compactReference(chapter: BibleChapter, verse: Int) -> String {
+        if chapter.title == .psalms {
+            return String(localized: "시편 \(chapter.chapter):\(verse)", bundle: .main, comment: "위젯 머리의 짧은 시편 참조 — 장:절. en 은 단수 Psalm")
+        }
+        return String(
+            localized: "\(chapter.title.localizedName) \(chapter.chapter):\(verse)",
+            bundle: .main,
+            comment: "위젯 머리의 짧은 참조 — 권 이름, 장:절. 예: 창세기 1:1 · Genesis 1:1"
+        )
+    }
+
+    /// 위젯이 읽은 페이로드를 다시 즐겨찾기 키(번역본 포함)로 되돌린다.
+    /// 모르는 권이거나 **이 판이 모르는 번역본이면 nil** — 개역개정 즐겨찾기로 바꾸지 않는다.
     private static func key(from payload: VerseWidgetPayload) -> FavoriteVerseKey? {
-        guard let title = BibleTitle(rawValue: payload.titleRawValue) else { return nil }
+        guard let title = BibleTitle(rawValue: payload.titleRawValue),
+              let translation = Translation(rawValue: payload.translation) else { return nil }
         return FavoriteVerseKey(
-            chapter: BibleChapter(title: title, chapter: payload.chapter),
-            verse: payload.verse,
-            translation: Translation(rawValue: payload.translation) ?? .NKRV
+            chapter: BibleChapter(title: title, chapter: payload.chapter, translation: translation),
+            verse: payload.verse
         )
     }
 

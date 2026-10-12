@@ -1,6 +1,6 @@
 # 필사 백업 · 불러오기 설계 (2.1)
 
-작성: 2026-10-02 · 갱신: 2026-10-06(구현 반영) · 목표: **2.1** · 상태: **구현됨 / 기기 · 시뮬레이터 확인(시험 계획 단계 D · NCANVAS-U1) 남음** — 무엇이 어디 있고 어느 자동 시험이 보는지는 §9
+작성: 2026-10-02 · 갱신: 2026-10-06(구현 반영 · 영어 현지화 번역본 규칙 — §1-1 4 · §2-4 · §4-3 · §5-1 · §5-3) · 2026-10-12(번역본 항목 순서 · 진행 단위를 구현에 맞춤 — §2-4 · §3-1 · §3-2 · §3-4 · §4-1 · §4-3 · §5-3) · 목표: **2.1** · 상태: **구현됨 / 기기 · 시뮬레이터 확인(시험 계획 단계 D · NCANVAS-U1) 남음** — 무엇이 어디 있고 어느 자동 시험이 보는지는 §9
 
 > 이 문서는 [iCloud 동기화·오프라인 사용·외부 백업 정책](./icloud-sync-and-backup-policy.md) §6 · §7 의 결정을 2.1 에서 구현하는 **계약**이다.
 > 정책 문서는 결정만, 이 문서는 파일 형식 · 흐름 · 판정 규칙 · 시험을 담는다. 「결정 n」 은 2026-10-02 사용자 결정(인터뷰 기록)의 번호이고
@@ -38,8 +38,11 @@ iCloud 는 기기 간 동기화라 잘못된 수정 · 삭제도 퍼진다(정�
    때만이다. 2.0.0 은 소유 근거 없이 저장소에 쓰지 않고(F30), 미로그인 저장소에 행을 넣으면 첫 연결의 소유 증명(`StoreOwnershipClaimRule.emptyUnaccountedStore`
    의 행 0 · V3 원시 사본 일치)이 깨져 연결이 계속 보류될 수 있다. 불러온 필기는 **지금 연결된 계정의 것**이 되고, 파일을 만든 계정은 보지 않는다(§6).
 4. **절 식별은 번역본 저장값 + USFM 권 코드(결정 9).** 번역본은 행 · 초안에 저장된 값 그대로(없으면 null — 미상을 NKRV 로 채우지 않는다, 정책 §8),
-   권은 USFM 코드, 원본 파일 이름(`titleName`)도 함께 둔다. 불러오기는 아는 번역본(지금 NKRV)과 null 만 넣고 모르는 번역본은 건너뛴다 — 나중에 다른
+   권은 USFM 코드, 원본 파일 이름(`titleName`)도 함께 둔다. 불러오기는 아는 번역본과 null 만 넣고 모르는 번역본은 건너뛴다 — 나중에 다른
    번역본 필사가 든 파일을 한국어 절에 섞지 않는다. 권 코드 · 번역본 규칙은 영어 성경 작업(별도 브랜치)에 인터페이스로 넘긴다.
+   **2026-10-06 영어 현지화([영어 현지화 설계](./english-localization-design.md) §3):** 아는 번역본은 NKRV · **KJV · BSB** 다. 영어 행은 SwiftData `translation` 열이
+   늘 nil 이고 번역본을 `titleName` 접두(`KJV-1-01Genesis.txt`)로 지니므로, **영어 행의 백업 키 번역본은 열이 아니라 `titleName` 접두에서 온다**(`StoredBookKey.decode`).
+   개역개정 행은 지금처럼 열 값 그대로(nil 은 null)이고 **nil · NKRV 한 묶음 규칙은 그대로다**(§5-1). 파일 형식(`formatVersion` 1)은 바꾸지 않는다.
 
 ### 1-2. 구현 위치
 
@@ -131,21 +134,22 @@ iCloud 는 기기 간 동기화라 잘못된 수정 · 삭제도 퍼진다(정�
 
 | 키 | 뜻 |
 |---|---|
-| `translation` | String? — 행 · 초안에 저장된 값 그대로(`Translation.rawValue`, 지금 `NKRV`). 행에 값이 없으면 null — NKRV 로 채우지 않는다 |
-| `book` | USFM 권 코드 `GEN` … `REV` — Domain `BibleBookCode` 가 `BibleTitle` 66권과 1:1 양방향(§2-6) |
+| `translation` | String? — 행 · 초안에 저장된 값 그대로(`Translation.rawValue` — `NKRV` · `KJV` · `BSB`). 행에 값이 없으면 null — NKRV 로 채우지 않는다. **영어 행은 열이 nil 이므로 `titleName` 접두에서 온 값(`"KJV"` · `"BSB"`)을 쓴다**(2026-10-06 — `StoredBookKey.decode`). 접두가 없는 행만 열 값을 본다. 초안은 `VerseDraftKey.translation`(기기 안 파일이라 영어도 실제 값) |
+| `book` | USFM 권 코드 `GEN` … `REV` — Domain `BibleBookCode` 가 `BibleTitle` 66권과 1:1 양방향(§2-6). 영어 행은 `titleName` 을 `StoredBookKey.decode` 로 푼 권이다 — 번역본마다 같은 코드다 |
 | `chapter` · `verse` | Int |
 
 `BackupItemSource`
 
 | 키 | 뜻 |
 |---|---|
-| `titleName` | `BibleTitle.rawValue` 원문(예: `1-01Genesis.txt`) — 권 코드와 함께 원본을 보존한다 |
+| `titleName` | 행의 `titleName` 원문 — 개역개정 `1-01Genesis.txt`, 영어 `KJV-1-01Genesis.txt`(2026-10-06). 권 코드와 함께 원본을 보존한다. 불러오기는 이 값이 아니라 `book` · `translation` 으로 권 이름을 다시 짓는다(§4-3) |
 | `rowKey` | 행: `rowUUID ?? business id`. 초안: 식별 · 판정에 쓰지 않는다(null 이어도 된다) |
 | `draftScope` | 초안만. `"local"`(로그인하지 않은 동안 · `acct-local`) · `"unverified"`(계정을 확인하지 못한 동안 · `acct-unverified`) · `"account"`(확인된 계정 묶음) 중 하나. **계정 해시는 넣지 않는다** |
 | `draftRevision` | 초안만. 그 세션 · 절의 revision |
 
-- `isCurrent` 의 「그 절」 은 번역 저장값(null 은 NKRV 와 한 묶음) + 절이다 — 불러오기 판정 단위(§5-1)와 같다(`BackupExportVerseSlot`).
-- 항목 순서 — 장(권 → 장)마다 행(절 → 행 키) 다음 초안(절 → 묶음 → 세션 → revision)이다. 행 키와 내용이 같은 행이 둘이면(같은 id) 하나만 담는다(§3-3).
+- `isCurrent` 의 「그 절」 은 번역 저장값(null 은 NKRV 와 한 묶음, KJV · BSB 는 각자 — 영어 행은 `titleName` 접두의 번역본) + 절이다 — 불러오기 판정 단위(§5-1)와 같다(`BackupExportVerseSlot`).
+- 항목 순서 — **권 → 장 → 번역본**(NKRV → KJV → BSB, `Translation.allCases` 순서 — `BibleChapter.backupOrder`)이고, 번역본 장마다 행(절 → 행 키) 다음 초안(절 → 묶음 → 세션 → revision)이다.
+  같은 권 · 장의 번역본들은 연달아 온다(2026-10-12 구현에 맞춤 — 그 전 문서는 「장(권 → 장)마다」 만 적었다). 행 키와 내용이 같은 행이 둘이면(같은 id) 하나만 담는다(§3-3).
 
 ### 2-5. 항목 식별자 — `BackupItemID`
 
@@ -322,7 +326,7 @@ id          = ("row-" | "draft-") + SHA-256(정규 문자열) 소문자 hex 64�
 | 2 | **안내** — 「이 기기에 저장된 필사를 백업해요. 아직 동기화되지 않은 다른 기기의 필사는 포함되지 않을 수 있어요. 즐겨찾기 · 설정 · 위젯은 담지 않아요.」 · 「암호를 잊으면 Carve 도 이 파일을 열 수 없어요.」(`BackupCopy.exportScope` · `passwordWarning`) | — |
 | 3 | **암호** — 「암호(8자 이상)」 · 「암호 확인」 두 칸, 8자 이상(글자 수 — 한글 8자도 된다), 둘이 같아야 한다. 시스템 암호 자동 완성은 막지 않는다(`textContentType(.newPassword)`). Carve 는 암호를 저장 · 기록하지 않고, 파일을 다 만들거나 흐름을 닫으면 상태에서도 지운다 | 그 자리에서 「암호는 8자 이상이어야 해요.」 · 「두 암호가 같지 않아요.」 |
 | 4 | **flush** — 필사 화면의 마지막 편집이 이 기기에 내구성 있게 남았는지 확인한다(§5-2). 기다리는 동안 「마지막 필기를 저장하는 중이에요」 | `.durable` 이 아니면(`.failed` · `.timedOut` — 설정 쪽 시한 10초 포함) 시작하지 않는다 — 「필사 화면에 아직 저장하지 못한 필기가 있어요. 필사 화면에서 저장을 다시 시도한 뒤 백업해 주세요.」 + [다시 시도](새 id) |
-| 5 | **장 단위 읽기 · 쓰기** — §3-2(`backupExporter.export(password:fileName:progress:)`). 진행은 「필사를 모으는 중이에요 · n/N장」 → 「암호를 걸어 파일을 쓰고, 다시 열어 확인하는 중이에요」. 평문은 작업 폴더(`BackupWorkDirectory` — `FileManager.temporaryDirectory/BackupWork/<UUID>/`)의 준비 폴더 `staged/` 에만 두고, 다 모으면 `BackupArchive.write(stagedDirectory:to:password:)` 로 같은 작업 폴더에 암호화 파일 하나를 만든 뒤 `staged/` 를 곧바로 지운다 | `BackupExportError` — `generationChanged` · `accountChanged` · `storeUnreadable` · `draftsUnreadable` · `insufficientSpace` · `writeFailed`(이 실행에 내보내기가 주입되지 않았으면 Feature 의 `unavailable`). 사유마다 문구(`BackupCopy.exportFailed`)와 [다시 시도] — flush 부터 새 id 로 한다 |
+| 5 | **장 단위 읽기 · 쓰기** — §3-2(`backupExporter.export(password:fileName:progress:)`). 진행은 「필사를 모으는 중이에요 · n/N장」(N 은 권 · 장 자리 수 — 한 장에 번역본이 여럿이어도 한 장으로 센다, §3-2) → 「암호를 걸어 파일을 쓰고, 다시 열어 확인하는 중이에요」. 평문은 작업 폴더(`BackupWorkDirectory` — `FileManager.temporaryDirectory/BackupWork/<UUID>/`)의 준비 폴더 `staged/` 에만 두고, 다 모으면 `BackupArchive.write(stagedDirectory:to:password:)` 로 같은 작업 폴더에 암호화 파일 하나를 만든 뒤 `staged/` 를 곧바로 지운다 | `BackupExportError` — `generationChanged` · `accountChanged` · `storeUnreadable` · `draftsUnreadable` · `insufficientSpace` · `writeFailed`(이 실행에 내보내기가 주입되지 않았으면 Feature 의 `unavailable`). 사유마다 문구(`BackupCopy.exportFailed`)와 [다시 시도] — flush 부터 새 id 로 한다 |
 | 6 | **검증** — 다 쓴 파일을 같은 암호 · 같은 상한으로 작업 폴더의 `verify/` 에 다시 풀어 `BackupPayload.load`(counts · blob 크기 · SHA-256 · 항목이 가리키는 blob · blob 으로 다시 계산한 내용 지문)를 거친 뒤, 풀린 manifest · 항목이 쓴 것과 **같은지** 견준다(`BackupExportVerification`). 맞을 때만 성공이고 풀린 평문은 곧바로 지운다(정책 §6-1 3) | `verificationFailed` — 파일을 내놓지 않는다(「만든 파일을 다시 열어 확인했더니 내용이 맞지 않아 내놓지 않았어요. …」) |
 | 7 | **저장 위치** — SwiftUI `fileExporter(isPresented:item:contentTypes: [.carveBackup] …)` 로 사용자가 고른다. 넘기는 것은 `BackupFileItem`(`Transferable` — `FileRepresentation(exportedContentType: .carveBackup)` 로 작업 폴더의 파일을 그대로 보낸다). 기본 이름 「새기다 필사 백업 YYYY-MM-DD.carvebackup」(`BackupExportFileName.defaultName(for:timeZone:)` — 날짜는 `@Dependency(\.date)` · `@Dependency(\.timeZone)`) | 사용자 취소 |
 | 8 | **결과** — 저장 · 취소 · 실패를 따로 보인다. 저장: 「백업 파일을 저장했어요. 필사 기록 N개 · 남겨 둔 필기 M개를 담았어요.」 + 저장된 파일 이름 + 「iCloud Drive 같은 곳에 저장했다면, 그곳으로 올리는 일은 그 앱이 이어서 마쳐요.」(앱의 저장 성공과 그 제공자의 업로드 완료는 별개다 — 정책 §6-1). 수는 `BackupExportResult`(`fileURL` · `counts` · `backupID`)의 것이다 | 취소 「저장하지 않았어요. 만든 파일은 이 iPad에서 지웠어요.」 · 실패 「고른 곳에 저장하지 못했어요. …」 — 둘 다 [다시 만들기](암호부터) |
@@ -339,15 +343,19 @@ id          = ("row-" | "draft-") + SHA-256(정규 문자열) 소문자 hex 64�
 1. 시작할 때 `DrawingEditEnvironmentClient.current()` 로 환경을 읽어 **계정 상태 · 저장소 소유 · 여는 묶음**(`readableDraftScopes ∪ beforeConnectionDraftScopes`, 겹치는 것은
    한 번)을 적어 둔다(`BackupExportEnvironmentBasis`).
 2. 장 목록 = 행이 있는 장(`SwiftDatabaseActor.backupChapterList()` — `backupChapters()` 와 같은 목록을 **그때의 저장소 세대와 같은 actor 구간에서** 준다) ∪ 여는 묶음마다
-   초안이 있는 장(`draftSummary(in:).chapters`), 권 → 장 순서. 진행은 `BackupProgress(done: 0, total: 장 수)` 로 먼저 한 번 알린다.
-3. 장마다:
+   초안이 있는 장(`draftSummary(in:).chapters`)을 **권 · 장 자리**로 줄인 것(`BibleChapter.backupPlaces` — 같은 권 · 장이 번역본별로 여러 번 와도 한 번), 권 → 장 순서.
+   진행은 `BackupProgress(done: 0, total: 자리 수)` 로 먼저 한 번 알린다.
+3. 자리(권, 장)마다:
    1. `current()` 를 다시 읽는다. 계정 상태 · 저장소 소유 · 여는 묶음이 시작 때와 다르면 **`accountChanged` 로 실패**한다 — 다른 계정 초안이 한 파일에 섞이지 않게.
-   2. `SwiftDatabaseActor.backupRows(chapter:)` 가 그 장의 `BackupRowRecord` 목록과 저장소 세대를 **같은 actor 구간에서** 돌려준다(`BackupRowLoad`).
-      세대가 장 목록을 읽은 때와 다르면(그 사이 「모든 필사 삭제」 — 첫 장 전의 삭제도 잡는다) **`generationChanged` 로 실패**한다. 행을 읽지 못하면 `storeUnreadable`.
-   3. 그 장의 초안을 분류한다(§3-4 — `BackupExportDraftSelection.select(chapter:environment:rows:reader:)`, 환경은 1 에서 다시 읽은 것) — 위 행을 저장소 쪽 입력으로 쓴다.
-      그 장의 초안 파일을 하나라도 읽지 못하면 `draftsUnreadable` 로 실패한다.
-   4. 항목과 blob 을 준비 폴더에 쓴다(`BackupExportItems.candidates` → `BackupExportStaging.add`). 같은 바이트의 blob 은 한 번만 쓰고, 같은 id 의 항목은 한 번만 담는다.
-   5. 진행을 알린다(`BackupProgress(done:total:)`).
+   2. 그 자리의 번역본 장마다(`backupTranslationChapters` — NKRV → KJV → BSB, `Translation.allCases` 순서) 아래 3 ~ 5 를 한다. 행 · 초안이 없는 번역본 장은 항목 없이 지나간다.
+   3. `SwiftDatabaseActor.backupRows(chapter:)` 가 그 번역본 장의 `BackupRowRecord` 목록과 저장소 세대를 **같은 actor 구간에서** 돌려준다(`BackupRowLoad` — 행은 그 번역본의
+      `StoredBookKey.titleName(for:)` 로 고르므로 다른 번역본 행이 섞이지 않는다). 세대가 장 목록을 읽은 때와 다르면(그 사이 「모든 필사 삭제」 — 첫 장 전의 삭제도 잡는다)
+      **`generationChanged` 로 실패**한다. 행을 읽지 못하면 `storeUnreadable`.
+   4. 그 번역본 장의 초안을 분류한다(§3-4 — `BackupExportDraftSelection.select(chapter:environment:rows:reader:)`, 환경은 1 에서 다시 읽은 것, 초안은 그 번역본 것만 읽는다) —
+      위 행을 저장소 쪽 입력으로 쓴다. 그 장의 초안 파일을 하나라도 읽지 못하면 `draftsUnreadable` 로 실패한다.
+   5. 항목과 blob 을 준비 폴더에 쓴다(`BackupExportItems.candidates` → `BackupExportStaging.add`). 같은 바이트의 blob 은 한 번만 쓰고, 같은 id 의 항목은 한 번만 담는다.
+   6. 자리의 번역본을 다 돌면 진행을 알린다(`BackupProgress(done:total:)` — **진행 단위는 (권, 장) 자리**다).
+   - 자리로 줄인 뒤 번역본마다 다시 읽으므로, 초안 요약이 장을 번역본별로 나누든 아니든 같은 초안을 한 번씩만 담는다(2026-10-12 구현에 맞춤 — `LiveBackupExporter.collect`).
 4. manifest(`backupID` 새 UUID · 시작 시각 · 앱 버전 · 수)와 `items.json` 을 쓰고(`BackupExportStaging.finish`), §3-1 5 · 6단계로 암호화 · 재검증한다.
    실패 · 취소면 작업 폴더째 지우고 던진다 — 컨테이너의 공간 부족은 `insufficientSpace`, 그 밖의 쓰기 실패는 `writeFailed` 다.
 5. 일관성은 **장 단위**다. 절이 충돌 단위이고(정책 §12-3) 한 장은 한 actor 구간에서 읽으므로 한 행의 잉크와 메타데이터가 다른 시점에서 섞이지 않는다.
@@ -367,7 +375,8 @@ id          = ("row-" | "draft-") + SHA-256(정규 문자열) 소문자 hex 64�
 
 입력은 「확인이 필요한 필기」 목록(`VerseDraftRecoveryQuery.inventory`)과 같다. 편집 화면이 읽는 묶음은 `VerseDraftRecoveryRule.screenDrafts` →
 `plan(sessionID: nil, …)` 로(지금 편집 세션 없이 — 모든 초안을 다른 세션의 것으로), 확인된 계정의 연결 전 묶음은 `beforeConnectionDrafts` → `importPlan` 으로 가른다
-(`BackupExportDraftSelection.select` — 초안은 `drafts(in:chapter:translation: .NKRV)` 로 읽는다).
+(`BackupExportDraftSelection.select` — 초안은 장의 번역본 하나로 `drafts(in:chapter:translation: chapter.translation)` 로 읽는다. 모든 번역본의 초안은 §3-2 가 자리마다
+`Translation.allCases` 를 돌며 담는다 — 2.1 영어 현지화 전에는 `.NKRV` 고정이었다).
 저장소 쪽 입력(절마다 대표 내용 · 행 · 이력 지문)은 §3-2 의 `BackupRowLoad` 에서 만든다 — 행을 장 조회(`loadDrawingSnapshots`)와 **같은 변환**
 (`BackupRowRecord.recoveryRuleSnapshot` — 메타데이터를 해석한 `VerseDrawingSnapshot`)으로 바꿔 `VerseDraftStoreView` 에 넣는다. 편집 화면 · 「확인이 필요한 필기」 가
 이 모양으로 견주므로 같은 판정이 되려면 같은 입력이어야 한다. 이 변환은 판정에만 쓰고, 항목은 원본(`BackupRowRecord`) 그대로 담는다.
@@ -411,7 +420,7 @@ id          = ("row-" | "draft-") + SHA-256(정규 문자열) 소문자 hex 64�
 | 5 | **대상 계정** — 검사를 시작할 때 읽은 환경으로 `targetScope` 를 정한다(`LiveBackupImporter.targetScope(for:)` — §6-2). 작업 기록에 묶는다 | 그대로 |
 | 6 | **미리보기** — 항목마다 지원 판정(`BackupItemSupport.reason(_:blobDirectory:)`)을 하고, 항목이 놓이는 장마다 `backupRows(chapter:)` 와 `BackupImportPlanner.plan` 으로 수를 센다(`BackupImportPreview` — `new` · `same` · `archived` · `protectedCleared` · `skippedEmpty` · `unsupported`(사유별) · `chapters`). 장 하나씩 읽고 놓는다. 화면은 만든 때 · 담은 수(manifest), 「새 필사」 · 「같은 필사」 · 「이전 필사 기록에 더할 것」 · 「지운 절이라 기록에만」 · 「넣을 수 없는 것」(사유별)과 안내 원문 「불러온 필사는 이 기기에 저장되고, 지금 연결된 iCloud 계정으로 동기화돼요. 지금 필사는 그대로 두고, 다른 내용은 이전 필사 기록에 더해요.」 · 「미리보기 수는 지금 기준이에요. …」 를 보인다(비운 항목 수 `skippedEmpty` 는 미리보기에 따로 보이지 않고 결과의 「건너뛴 것」 에 「비운 기록」 으로 보인다) | 그대로 |
 | 7 | **쓰기 게이트** — `targetScope` 가 nil 이면(`BackupInspection.canApply == false`) 미리보기까지다. 적용 대신 「지금은 미리보기만 할 수 있어요. 」 + 사유와 할 일을 보인다 — 「확인이 필요한 필기」 가져오기(`DraftRecoveryCopy.importBlocked`)와 같은 `SyncedWriteBlock` 사유를 불러오기 말로 한다(`BackupCopy.importBlocked` — 미로그인 · 연결 보류는 하나로 「iCloud 에 로그인한 뒤 앱을 다시 열면 불러올 수 있어요.」) | 그대로 |
-| 8 | **적용** — 「불러오기」 를 누르면 작업 기록을 「적용 중」 으로 바꾸고(다른 작업 기록은 지운다 — 작업 기록은 늘 하나다) 장 단위로 쓴다(§4-3). 진행 「필사를 넣는 중이에요 · n/N장」 | 장마다 한 트랜잭션 |
+| 8 | **적용** — 「불러오기」 를 누르면 작업 기록을 「적용 중」 으로 바꾸고(다른 작업 기록은 지운다 — 작업 기록은 늘 하나다) 장 단위로 쓴다(§4-3). 진행 「필사를 넣는 중이에요 · n/N장」(N 은 번역본 장 수 — 내보내기와 달리 같은 권 · 장도 번역본마다 한 장으로 센다) | 장마다 한 트랜잭션 |
 | 9 | **결과** — 실제로 넣은 수 · 건너뛴 수 · 넣지 못한 수 · 멈춘 사유(`BackupImportReport` — `.completed(tally)` · `.blocked(SyncedWriteBlock, doneChapters:, tally:)` · `.accountChanged(doneChapters:, tally:)` · `.generationChanged(doneChapters:, tally:)`, 저장 실패 등은 `BackupImportError`). 수는 `BackupImportTally`(`new` · `same` · `archived` · `protectedCleared` · 「비운 기록」 `skippedEmpty` · `unsupported` · 대표 고정 `pinned`)다. 쓰기 직전에 다시 판정하므로 미리보기 수와 다를 수 있다(정책 §7-1). 넣은 것이 있으면 「이 기기에 저장됐어요. iCloud 전송은 따로 진행돼요.」 — 로컬 반영과 iCloud 전송은 다르다(정책 §7-2 5) | — |
 | 10 | **정리** — 평문 작업 폴더는 끝나면(성공 · 멈춤 · 실패 · 취소 · 닫기) 지운다(`apply` 가 끝날 때 · `discard(_ inspection:)`). 적용을 시작하지 않은 작업은 기록 · 암호화 사본도 지운다. 앱 시작 때 남은 `BackupWork` 를 지운다(`BackupWorkDirectory.removeStale()`) | — |
 
@@ -456,7 +465,8 @@ id          = ("row-" | "draft-") + SHA-256(정규 문자열) 소문자 hex 64�
 없으면 `jobNotFound` 다. 이 작업 밖의 작업 기록을 지우고(`removeAll(except:)`) 상태를 「적용 중」 으로 남긴 뒤, 저장소 세대를 **한 번** 읽는다
 (`SwiftDatabaseActor.backupStoreGeneration()`). 진행은 이미 끝난 장 수로 먼저 한 번 알린다.
 
-장마다(미리보기의 `chapters` — 지원 항목이 있는 장, 권 순서 → 장 순서):
+장마다(미리보기의 `chapters` — 지원 항목이 있는 장, 권 순서 → 장 순서 → 번역본 순서. 장은 번역본을 지니므로(`BackupImportPlanner.chapter(of:)` — nil · 모르는 번역본은
+개역개정 장) 같은 권 · 장도 번역본마다 따로 쓰고 따로 진행을 센다. 2026-10-12 구현에 맞춤):
 
 1. 작업 기록에 끝난 장이면 건너뛴다(이어 하기). 다시 써도 같은 지문은 `skipSame` 이라 결과는 같다.
 2. `DrawingEditEnvironmentClient.current()` 로 **최신 환경**을 읽는다. `SyncedWriteBlock.check(env) != nil` 이면 그 장부터 멈추고 `.blocked(사유, doneChapters:, tally:)`,
@@ -486,8 +496,8 @@ id          = ("row-" | "draft-") + SHA-256(정규 문자열) 소문자 hex 64�
 | `isPresent` | `insertCurrent` 만 true. `insertArchived` · `protectCleared` 는 false |
 | `rowUUID` | **늘 새로 발급**한다. 두 기기가 같은 파일을 넣어 같은 `rowUUID` 행이 둘 생기면 행 찾기(`rowUUID == raw \|\| id == raw`)가 깨진다 — 대신 같은 내용 행이 둘일 수 있다(§7) |
 | business `id` | `BibleDrawing.init` 이 만드는 값 그대로(`<titleName>.<장>.<절>.<불러온 시각 초>`). 행 키는 `rowUUID` 라 이 값으로 찾지 않고, 쪼개 파싱하지 않는다 |
-| `translation` | 항목 값 그대로 — null 이면 null(모델 기본값 NKRV 로 두지 않는다) |
-| `titleName` · `titleChapter` · `verse` | 권 코드로 찾은 `BibleTitle.rawValue` · 장 · 절 |
+| `translation` | 개역개정 항목은 값 그대로 — null 이면 null(모델 기본값 NKRV 로 두지 않는다). **KJV · BSB 항목은 nil**(2026-10-06 — SwiftData 열에는 `.NKRV` · nil 만 쓴다, `StoredBookKey.translationColumn`) |
+| `titleName` · `titleChapter` · `verse` | 권 코드 + 번역본으로 지은 `StoredBookKey.titleName(title:translation:)`(개역개정 · null 은 `BibleTitle.rawValue`, 영어는 `KJV-<rawValue>` 등) · 장 · 절. 복원 판정이 읽는 그 장의 행도 같은 이름으로 고른다 |
 
 **있는 행은 고치지 않는다 — 넣기만 한다(정책 §1-6).** 재시도는 같은 규칙으로 **멱등**이다.
 
@@ -513,6 +523,10 @@ id          = ("row-" | "draft-") + SHA-256(정규 문자열) 소문자 hex 64�
 **판정 단위 — 한 절.** 권 · 장 · 절이 같고 번역본이 같은 것. 번역 null 은 지금 앱에서 NKRV 화면에 보이므로(장 조회는 번역으로 거르지 않고, 즐겨찾기도
 `translation ?? .NKRV` 로 본다) **NKRV 와 한 묶음**으로 판정한다 — 저장값은 null 그대로 넣는다. 번역본이 둘 이상이 되면 이 묶음을 다시 정한다(영어 성경 작업).
 
+**2026-10-06 영어 현지화 — 묶음은 셋이다.** nil · NKRV 한 묶음은 **그대로**고, KJV · BSB 는 각자 묶음이다. 영어 행은 저장소에서 `translation` 열이 nil 이어도
+`titleName` 접두로 KJV · BSB 로 읽힌다 — **행의 묶음은 `titleName` 접두를 먼저 보고(`StoredBookKey.decode`), 접두가 없는 행만 열 값으로 정한다.** 그래서 영어 행이
+null 묶음(개역개정)에 섞이지 않는다. 장 단위 조회도 번역본별 `titleName` 으로 고르므로 한 장의 행은 한 번역본뿐이다.
+
 - `R` = 그 절의 지금 저장소 행 전부(`BackupRowRecord` — 현재 · 보관 · 비운 행). `대표` = `DrawingRepresentativeRule.pick(R)`.
 - `R` 은 쓰기 직전에 다시 읽은 저장소다. 같은 파일의 다른 항목이 넣을 행은 `R` 에 더하지 않는다 — 단 **같은 지문은 한 절에 한 번만** 넣는다.
 - **현재 후보** = 그 절의 지원되는 `isCurrent` 항목 중 `updatedAt` 이 가장 늦은 하나(null 은 가장 이른 시각, 같으면 id 사전순 앞). 나머지 `isCurrent` 항목은
@@ -523,7 +537,7 @@ id          = ("row-" | "draft-") + SHA-256(정규 문자열) 소문자 hex 64�
 
 | 결정 | 언제 | 쓰기 | 미리보기 | 근거 |
 |---|---|---|---|---|
-| `unsupported(사유)` | 판정 순서대로 첫 사유 하나(`BackupUnsupportedReason`): 번역본이 null 도 아니고 `Translation` 의 값도 아님(`unknownTranslation`) · 권 코드가 `BibleBookCode` 에 없음(`unknownBook`) · 장이 `1...그 권의 lastChapter` 밖이거나 절이 1 미만(`outOfRange` — 2026-10-02 더함) · `drawingVersion` 이 nil · 1 · 2 · 3 밖(`unknownDrawingVersion`) · `drawingVersion` 3 이고 잉크가 있고 **메타데이터 blob 이 있는데** `DrawingLayoutMetadata.decode` 로 풀리지 않음(`undecodableMetadata` — 뒤 버전의 `metadataSchemaVersion` 일 수 있다). **메타데이터 blob 이 없는 v3 잉크 항목은 지원한다**(2026-10-02 — 원본 그대로 넣는다. `DrawingCodec` 이 이미 첫 밑줄 `storageOrigin` 기준으로 보여 주는 상태라 건너뛰면 필기를 잃는다). 비운 항목은 메타데이터가 없거나 깨져도 지원 밖이 아니다 | 없음 | unsupported(사유별 수 — 「모르는 번역본」 · 「모르는 성경 권」 · 「성경에 없는 장이나 절」 · 「모르는 필기 형식」 · 「읽지 못하는 위치 정보」) | 모르는 형식을 조용히 바꾸거나 버리지 않는다 — 건너뛰고 알린다(정책 §6-2 · §8) |
+| `unsupported(사유)` | 판정 순서대로 첫 사유 하나(`BackupUnsupportedReason`): 번역본이 null 도 아니고 `Translation` 의 값도 아님(`unknownTranslation` — 2026-10-06 부터 `KJV` · `BSB` 는 아는 값, 예: `"ESV"`) · 권 코드가 `BibleBookCode` 에 없음(`unknownBook`) · 장이 `1...그 권의 lastChapter` 밖이거나 절이 1 미만(`outOfRange` — 2026-10-02 더함) · `drawingVersion` 이 nil · 1 · 2 · 3 밖(`unknownDrawingVersion`) · `drawingVersion` 3 이고 잉크가 있고 **메타데이터 blob 이 있는데** `DrawingLayoutMetadata.decode` 로 풀리지 않음(`undecodableMetadata` — 뒤 버전의 `metadataSchemaVersion` 일 수 있다). **메타데이터 blob 이 없는 v3 잉크 항목은 지원한다**(2026-10-02 — 원본 그대로 넣는다. `DrawingCodec` 이 이미 첫 밑줄 `storageOrigin` 기준으로 보여 주는 상태라 건너뛰면 필기를 잃는다). 비운 항목은 메타데이터가 없거나 깨져도 지원 밖이 아니다 | 없음 | unsupported(사유별 수 — 「모르는 번역본」 · 「모르는 성경 권」 · 「성경에 없는 장이나 절」 · 「모르는 필기 형식」 · 「읽지 못하는 위치 정보」) | 모르는 형식을 조용히 바꾸거나 버리지 않는다 — 건너뛰고 알린다(정책 §6-2 · §8) |
 | **잉크 있는 항목** | | | | |
 | `skipSame` | `R` 의 어느 행(대표 · 보관)과 `fingerprint` 가 같다, 또는 이 절에 같은 지문을 이미 넣기로 했다 | 없음 | same | 같은 내용은 한 번만 — 같은 파일을 다시 불러오면 0건(정책 §7-1) |
 | `protectCleared` | 현재 후보 · 대표가 비운 행 · 대표의 `updateDate` 가 항목 `updatedAt` 보다 늦다 | 새 행, `isPresent = false` | protectedCleared | 이 기기에서 백업보다 뒤에 지운 절 — 지운 것을 되살리지 않고 기록에만 둔다(`VerseDraftImportCheck.Caution.verseClearedAfterDraft` 선례) |
@@ -614,9 +628,10 @@ id          = ("row-" | "draft-") + SHA-256(정규 문자열) 소문자 hex 64�
   디코딩할 때도 원본 필드로 다시 계산한다(저장된 계산값을 믿지 않는다). `DrawingRepresentativeCandidate` 를 따른다(`isPresent` null 은 false — 대표 규칙을 그대로 쓴다).
 - `SwiftDatabaseActor.backupRows(chapter:)` 가 장마다 `BackupRowLoad(rows:generation:)` 를 **같은 actor 구간에서** 돌려준다 — 따로 읽으면 그 사이의 전체 삭제를 놓친다.
   행은 절 → 행 키 순이다. 세대(`DrawingStoreGeneration`)는 앱 실행 동안만 뜻이 있어 `BackupRowLoad` 는 Codable 이 아니다(파일에 쓰지 않는다).
-- `backupChapters()` 는 행이 있는 장 목록(권 순서 → 장 순서)이고, 내보내기는 같은 목록을 그때의 세대와 **같은 actor 구간에서** 주는 internal
+- `backupChapters()` 는 행이 있는 장 목록(번역본 포함 — 권 순서 → 장 순서 → 번역본 순서, 번역본은 `titleName` 접두)이고, 내보내기는 같은 목록을 그때의 세대와 **같은 actor 구간에서** 주는 internal
   `backupChapterList()` 를 쓴다(첫 장을 읽기 전의 「모든 필사 삭제」 도 잡는다). 권 · 장 두 속성만 읽는다(`propertiesToFetch` — 잉크 바이트를 메모리에 올리지 않는다).
-- 권 이름이 `BibleTitle` 에 없거나 장이 없는 행은 어느 장에도 들지 않고, 절 번호가 없는 행은 `backupRows` 에서 빠진다 — 절 키를 만들 수 없어 담지 못하고
+- `BackupRowRecord.translation` 은 열 원본이다 — 영어 행은 nil 이다. 백업 키 · 판정 묶음의 번역본은 `titleName` 접두에서 정한다(§2-4 · §5-1, 2026-10-06).
+- 권 이름을 풀 수 없거나(`StoredBookKey.decode` 가 nil — 2026-10-06 전에는 `BibleTitle` 에 없는 이름) 장이 없는 행은 어느 장에도 들지 않고, 절 번호가 없는 행은 `backupRows` 에서 빠진다 — 절 키를 만들 수 없어 담지 못하고
   **수만 로그에 남긴다**(편집 화면 · 이력 화면에도 보이지 않는 행이다 — §7).
 - `BibleDrawing` → `BackupRowRecord` 변환은 `SwiftDatabaseActor+Backup.swift` 한 곳(`DrawingSchemaV4.BibleDrawing.backupRecord` — internal 확장)이다.
   **내보내기 · 판정 · 복원 쓰기가 같은 변환으로 견준다** — 지문이 한쪽만 다시 인코딩되면 같은 필기를 다른 것으로 본다. 복원 쓰기는 같은 조건으로 그 장의 행을
@@ -671,7 +686,7 @@ id          = ("row-" | "draft-") + SHA-256(정규 문자열) 소문자 hex 64�
 | 한계 | 내용 |
 |---|---|
 | 두 기기가 오프라인으로 같은 파일을 넣음 | 각 기기가 자기 저장소로 판정해 둘 다 넣는다. `rowUUID` 를 늘 새로 발급하므로 연결 뒤 **같은 내용 행이 둘**이 된다. 「이전 필사 내용 보기」 는 같은 내용 행을 하나로 보이고(`VerseDrawingHistoryDedup` — 목록에서만, 남기는 행은 대표 규칙으로 고른다. 저장소 행은 그대로이고, 남긴 행을 고르면 `updatePresentDrawing` 이 숨긴 같은 내용 행도 대표에서 내린다), 둘 다 현재 행이어도 대표 규칙이 결정적이라 화면은 같다. 파괴적인 중복 정리는 하지 않는다(정책 §7-3) |
-| 권 · 장 · 절을 알 수 없는 행은 담지 않는다 | 권 이름이 `BibleTitle` 에 없거나 장 · 절 번호가 없는 `BibleDrawing` 행은 절 키(권 코드 · 장 · 절)를 만들 수 없어 내보내기에서 빠지고, **수만 로그에 남긴다**(`backupChapterList` · `backupRows` — 2026-10-06 내보내기 구현 때 정함). 편집 화면 · 이력 화면에도 보이지 않는 행이라 사용자가 보던 필사가 빠지지는 않지만, 「원본 그대로 전부」 의 예외다. **후속:** 실사용 저장소에 그런 행이 있는지 로그 수로 보고, 있으면 다음 `formatVersion` 에서 원본 키를 그대로 담을지 정한다 |
+| 권 · 장 · 절을 알 수 없는 행은 담지 않는다 | 권 이름을 풀 수 없거나(2026-10-06 부터 `StoredBookKey.decode` — 영어 행 `KJV-…` · `BSB-…` 는 풀린다) 장 · 절 번호가 없는 `BibleDrawing` 행은 절 키(권 코드 · 장 · 절)를 만들 수 없어 내보내기에서 빠지고, **수만 로그에 남긴다**(`backupChapterList` · `backupRows` — 2026-10-06 내보내기 구현 때 정함). 편집 화면 · 이력 화면에도 보이지 않는 행이라 사용자가 보던 필사가 빠지지는 않지만, 「원본 그대로 전부」 의 예외다. **후속:** 실사용 저장소에 그런 행이 있는지 로그 수로 보고, 있으면 다음 `formatVersion` 에서 원본 키를 그대로 담을지 정한다 |
 | 절 번호의 상한은 보지 않는다 | 지원 판정의 `outOfRange` 는 장이 `1...lastChapter` 인지와 절이 1 이상인지만 본다. 그 장의 마지막 절은 본문(`BibleText`)을 읽어야 알 수 있어 순수 판정에서 보지 않는다 — 손으로 고친 파일에 마지막 절보다 큰 절 항목이 있으면 화면에 보이지 않는 행으로 들어갈 수 있다 |
 | 행 없는 절에 보이지 않던 필기가 보임 | 그 절에 행이 하나도 없고 현재 후보가 없으면, 원래 기기에서 보이지 않던 초안 · 보관 항목도 보관 행으로 들어가 대표 규칙대로 가장 늦은 것이 보인다. 빈 자리 행은 나중에 도착하는 legacy 행을 가려 만들지 않는다(§5-1 「행 없는 절」) |
 | `ChapterCanvasFeature` 의 `type_body_length` 경고 | flush 완료 신호를 넣으며 리듀서 본체가 **308줄**(경고 300 · 에러 400)이 됐다 — State 필드 하나 · Action 둘 · 판정 호출 넷만 더하고 처리는 `ChapterCanvasBackupFlushFeature.swift` 로 뺐지만 경고는 피하지 못했다(2026-10-06 flush 신호 구현). lint error 는 아니다(`file_length` 경고는 그 전부터 있었다). **후속:** 2.1 백업 범위 밖의 별도 리팩토링에서 본체의 다른 갈래를 `ChapterCanvas*Feature.swift` 로 나눈다 |

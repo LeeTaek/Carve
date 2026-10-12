@@ -48,7 +48,7 @@ public extension SettingsDictionary {
     /// - `SWIFT_EMIT_LOC_STRINGS`: 컴파일러가 `Text("...")`, `String(localized:)` 같은 문자열을 카탈로그로 추출한다.
     /// - `STRING_CATALOG_GENERATE_SYMBOLS`: .xcstrings 에서 타입 세이프한 심볼을 생성한다.
     ///
-    /// .xcstrings 가 아직 없어서 지금은 동작상 no-op 이고, 카탈로그를 추가하는 순간부터 효과가 있다.
+    /// 카탈로그는 모듈마다 `Resources/Localizable.xcstrings`(원문 언어 ko), 앱 · 위젯은 `InfoPlist.xcstrings` 도 둔다(영어 현지화).
     static let localization: Self = [
         "LOCALIZATION_PREFERS_STRING_CATALOGS": "YES",
         "SWIFT_EMIT_LOC_STRINGS": "YES",
@@ -93,6 +93,14 @@ public extension Project {
         name: name,
         organizationName: organizationName,
         options: .options(
+            // 프로젝트 자동 스킴도 워크스페이스 스킴(`Workspace.swift`)과 같이 시험을 한국어 · 한국 지역으로 돌린다(영어 현지화 결정 6).
+            // 나머지는 Tuist 4.208 의 `.enabled()` 기본값 그대로다(이름 끝으로 스킴 묶기 · 코드 커버리지 끔 · 시험 옵션 없음).
+            automaticSchemesOptions: .enabled(
+                codeCoverageEnabled: false,
+                testingOptions: [],
+                testLanguage: "ko",
+                testRegion: "KR"
+            ),
             defaultKnownRegions: ["en", "ko"],
             developmentRegion: "ko"
         ),

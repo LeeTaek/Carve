@@ -36,8 +36,10 @@ public struct CarveDetailFeature: Sendable {
 
         /// 단일 Canvas 상태 — 장 하나를 캔버스 하나로 읽고 쓴다.
         var chapterCanvas = ChapterCanvasFeature.State(chapter: .initialState)
-        /// 외부 진입(차트 등)으로 이동할 절 번호. 캔버스가 절 번호로 스크롤한다(`scrollToVerse`).
+        /// 외부 진입(차트 등) · 번역본 전환으로 이동할 절 번호. 새 장의 본문 행이 들어오면 캔버스가 이 절(없으면 바로 앞 절)로 스크롤한다(`scrollToVerse`).
         var scrollTargetVerse: Int?
+        /// 캔버스가 마지막으로 알린 스크롤 위치 — 헤더 바로 아래(보이는 맨 위)의 콘텐츠 y. 번역본을 바꿀 때 보던 절(`viewingVerse`)을 정한다.
+        var visibleContentTop: CGFloat = 0
         /// 단일 Canvas 의 절 필사 기록 시트 (§8-7 히스토리 UI, B 구조). 롱프레스 → `ChapterCanvasFeature.Delegate.showHistory` 로 연다.
         @Presents var chapterHistory: VerseDrawingHistoryFeature.State?
 
@@ -77,6 +79,19 @@ public struct CarveDetailFeature: Sendable {
         /// 이 화면이 마지막으로 반영한 세대. 뷰가 트리에서 빠졌다 돌아와도 놓치지 않도록 **값으로** 비교한다.
         public var seenDrawingDataRevision: Int = 0
         
+        /// 지금 보던 절 — 번역본을 바꿀 때 같은 절로 돌아가는 기준이다(결정 9).
+        ///
+        /// 아직 옮기지 않은 이동 목표(`scrollTargetVerse`)가 있으면 그 절이다 — 새 장을 읽는 사이 다시 바꿔도 처음 보던 절을 잃지 않는다.
+        /// 그 밖에는 보이는 맨 위(헤더 바로 아래)에 걸친 절이다. 레이아웃이 아직 없으면 nil(장 이동처럼 첫 절로 간다).
+        var viewingVerse: Int? {
+            if let scrollTargetVerse { return scrollTargetVerse }
+            guard let layout = chapterLayout.layout, let firstVerse = layout.regions.first?.verse else { return nil }
+            // 레이아웃 좌표는 컬럼 원점 기준이다 — 컬럼 원점 y 는 0 이지만(헤더는 contentInset 으로 비운다) 원점이 있으면 뺀다.
+            let originY = chapterLayout.columnOrigin?.y ?? 0
+            let contentY = min(max(visibleContentTop - originY, 0), layout.totalHeight)
+            return layout.verse(containing: CGPoint(x: 0, y: contentY)) ?? firstVerse
+        }
+
         /// PencilKit 값(`PKInkingTool.InkType` — 헤더 팔레트 · `lastUsedPencil`)을 담아 Sendable 이 아니므로 저장 프로퍼티 대신 계산 프로퍼티다.
         public static var initialState: Self {
             State(
@@ -219,6 +234,8 @@ public struct CarveDetailFeature: Sendable {
                 }
             #endif
             case .view(.headerAnimation(let previous, let current)):
+                // `current` 는 콘텐츠 맨 위가 보이는 맨 위에 있으면 0, 내려가면 음수다(`ChapterCanvasController.scrollViewDidScroll`).
+                state.visibleContentTop = max(0, -current)
                 return .send(.scope(.headerAction(.headerAnimation(previous, current))))
                 
             case .view(.drawingDataRevisionChanged):
@@ -534,6 +551,9 @@ extension CarveDetailFeature {
     }
 
     /// 성경 본문을 읽어 `setSentence` 로 넘긴다. 필사는 단일 Canvas 가 `setSentence` 뒤 장 단위로 읽는다.
+    ///
+    /// 본문은 지금 장의 번역본(`BibleChapter.translation`)으로 읽는다 — 로더가 번역본의 리소스 파일 · 인코딩을 고른다.
+    /// 번역본만 바뀐 장도 다른 장이라 본문 행 · 레이아웃 측정 · 캔버스 조회 · 즐겨찾기 표시를 새로 시작한다.
     /// - Parameter state: Feature 상태(지금 장).
     /// - Returns: 본문을 읽는 효과. 장이 바뀌면 이전 장의 읽기는 취소된다. 실패하면 로그만 남긴다.
     private func handleFetchSentence(state: inout State) -> Effect<Action> {
@@ -552,12 +572,24 @@ extension CarveDetailFeature {
     }
 
 
-    /// 외부 진입으로 정한 절(없으면 첫 절)로 캔버스를 스크롤한다.
+    /// 외부 진입 · 번역본 전환으로 정한 절(없으면 첫 절)로 캔버스를 스크롤한다.
     private func scrollToTop(state: inout State) -> Effect<Action> {
-        let verse = state.scrollTargetVerse ?? state.sentenceWithDrawingState.first?.sentence.verse
+        let rows = state.sentenceWithDrawingState
+        let verse = state.scrollTargetVerse.flatMap { Self.scrollableVerse(for: $0, in: rows) } ?? rows.first?.sentence.verse
         state.scrollTargetVerse = nil
         guard let verse else { return .none }
         return .send(.scope(.chapterCanvasAction(.scrollToVerse(verse))))
+    }
+
+    /// 이동할 절을 지금 본문 행에서 찾는다(결정 9).
+    ///
+    /// 행이 있으면 그 절이다. 이 번역본에 없는 절(BSB 마 17:21 등)이면 바로 앞 절, 합쳐진 절(`18-19`)의 뒤 번호면 그 행의 앞 번호다.
+    /// - Parameters:
+    ///   - target: 이동하려던 절 번호.
+    ///   - rows: 지금 장의 본문 행(절 순서).
+    /// - Returns: 스크롤할 절 번호. 앞 절이 없으면 첫 절, 행이 없으면 nil. 부작용 없음.
+    static func scrollableVerse(for target: Int, in rows: IdentifiedArrayOf<SentencesWithDrawingFeature.State>) -> Int? {
+        rows.last { $0.sentence.verse <= target }?.sentence.verse ?? rows.first?.sentence.verse
     }
 
     /// Phase 3 — 완성된 `ChapterLayout` · `columnOrigin` · Δ 안전망 판정을 단일 Canvas 에 넘긴다. 값이 바뀐 것만 보낸다.
