@@ -1,6 +1,316 @@
 {
   "sourceLanguage" : "ko",
   "strings" : {
+    "%@에 만든 백업 · 필사 기록 %lld개 · 남겨 둔 필기 %lld개" : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Backup from %1$@ · %#@rows@ · %#@drafts@"
+          },
+          "substitutions" : {
+            "drafts" : {
+              "argNum" : 3,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg kept draft"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg kept drafts"
+                    }
+                  }
+                }
+              }
+            },
+            "rows" : {
+              "argNum" : 2,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg writing entry"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg writing entries"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@에 만든 백업 · 필사 기록 %lld개 · 남겨 둔 필기 %lld개"
+          }
+        }
+      }
+    },
+    "%@에 이 필기를 넣었어요." : {
+      "comment" : "설정 › 확인이 필요한 필기 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Added this draft to %@."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@에 이 필기를 넣었어요."
+          }
+        }
+      }
+    },
+    "%@에서 「손가락 필사 허용」을 켜면 손가락으로도 필사할 수 있어요. 이때는 두 손가락으로 스크롤해요." : {
+      "comment" : "설정 › 도움말 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn on “Allow Finger Writing” in %@ to write with your finger, too. Then scroll with two fingers."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@에서 「손가락 필사 허용」을 켜면 손가락으로도 필사할 수 있어요. 이때는 두 손가락으로 스크롤해요."
+          }
+        }
+      }
+    },
+    "%@에서 바꿔요." : {
+      "comment" : "설정 사이드바 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ button."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@에서 바꿔요."
+          }
+        }
+      }
+    },
+    "%@의 필기를 이 필기로 바꿨어요. 이전 필기는 「이전 필사 내용 보기」에 남아 있어요." : {
+      "comment" : "설정 › 확인이 필요한 필기 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Replaced the handwriting in %@. The previous one is in “Previous Writing.”"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@의 필기를 이 필기로 바꿨어요. 이전 필기는 「이전 필사 내용 보기」에 남아 있어요."
+          }
+        }
+      }
+    },
+    "%@의 현재 필사가 이미 이 필기와 같아요." : {
+      "comment" : "설정 › 확인이 필요한 필기 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The current writing in %@ already matches this draft."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@의 현재 필사가 이미 이 필기와 같아요."
+          }
+        }
+      }
+    },
+    "%lld / %lld개 선택 · 적용을 누르면 위젯이 바뀌어요." : {
+      "comment" : "설정 › 위젯 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld of %lld selected · Tap Apply to update the widget."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld / %lld개 선택 · 적용을 누르면 위젯이 바뀌어요."
+          }
+        }
+      }
+    },
+    "%lld개" : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld개"
+          }
+        }
+      }
+    },
+    "%lld개 담김 · 최대 %lld개" : {
+      "comment" : "설정 › 위젯 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%#@added@ · up to %2$lld"
+          },
+          "substitutions" : {
+            "added" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg verse added"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg verses added"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld개 담김 · 최대 %lld개"
+          }
+        }
+      }
+    },
+    "%lld번째 사진 빼기" : {
+      "comment" : "설정 › 의견 보내기 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove photo %lld"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld번째 사진 빼기"
+          }
+        }
+      }
+    },
+    "%lld장 중 %lld장까지 넣었어요 · 넣은 필사 %lld개" : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Added %2$lld of %#@chapters@ · %#@entries@"
+          },
+          "substitutions" : {
+            "chapters" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg chapter"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg chapters"
+                    }
+                  }
+                }
+              }
+            },
+            "entries" : {
+              "argNum" : 3,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg writing entry added"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg writing entries added"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld장 중 %lld장까지 넣었어요 · 넣은 필사 %lld개"
+          }
+        }
+      }
+    },
+    "(본문 설정)" : {
+      "comment" : "설정 › 도움말",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "(Text Settings)"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "(본문 설정)"
+          }
+        }
+      }
+    },
     "1769년 표준판 본문" : {
       "comment" : "성경 본문 출처 — KJV 의 판",
       "localizations" : {
@@ -14,6 +324,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "1769년 표준판 본문"
+          }
+        }
+      }
+    },
+    "Apple Pencil은 필사에 쓰고, 화면은 손가락으로 밀어 올려요." : {
+      "comment" : "설정 › 도움말",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Write with Apple Pencil and scroll the screen with your finger."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Pencil은 필사에 쓰고, 화면은 손가락으로 밀어 올려요."
           }
         }
       }
@@ -35,6 +362,732 @@
         }
       }
     },
+    "iCloud Drive 같은 곳에 저장했다면, 그곳으로 올리는 일은 그 앱이 이어서 마쳐요." : {
+      "comment" : "설정 › 필사 백업 — 백업 만들기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If you saved to a place like iCloud Drive, that service finishes the upload."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud Drive 같은 곳에 저장했다면, 그곳으로 올리는 일은 그 앱이 이어서 마쳐요."
+          }
+        }
+      }
+    },
+    "iCloud 계정 상태를 확인하지 못했어요" : {
+      "comment" : "설정 › iCloud — 계정 · 동기화 상태",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't check iCloud account status"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 계정 상태를 확인하지 못했어요"
+          }
+        }
+      }
+    },
+    "iCloud 계정을 확인하는 중이에요. 확인이 끝나면 넣을 수 있어요." : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Checking your iCloud account. You can add it once that's done."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 계정을 확인하는 중이에요. 확인이 끝나면 넣을 수 있어요."
+          }
+        }
+      }
+    },
+    "iCloud 계정을 확인하는 중이에요. 확인이 끝난 뒤 다시 불러와 주세요." : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Checking your iCloud account. Import again once that's done."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 계정을 확인하는 중이에요. 확인이 끝난 뒤 다시 불러와 주세요."
+          }
+        }
+      }
+    },
+    "iCloud 계정을 확인해 주세요" : {
+      "comment" : "설정 › iCloud — 계정 · 동기화 상태",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Check your iCloud account"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 계정을 확인해 주세요"
+          }
+        }
+      }
+    },
+    "iCloud 계정이 바뀌어 불러오기를 멈췄어요. 넣은 장 %lld개는 그대로 있어요." : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Import stopped because your iCloud account changed. The %lld chapter already added stays as it is."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Import stopped because your iCloud account changed. The %lld chapters already added stay as they are."
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 계정이 바뀌어 불러오기를 멈췄어요. 넣은 장 %lld개는 그대로 있어요."
+          }
+        }
+      }
+    },
+    "iCloud 동기화를 준비하지 못했어요" : {
+      "comment" : "설정 › iCloud — 계정 · 동기화 상태",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't set up iCloud sync"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 동기화를 준비하지 못했어요"
+          }
+        }
+      }
+    },
+    "iCloud 로그인과 이 기기 필사의 계정이 확인됐어요." : {
+      "comment" : "설정 › iCloud — 전체 삭제 · 연결 보류 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your iCloud sign-in and the account of this device's writing are confirmed."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 로그인과 이 기기 필사의 계정이 확인됐어요."
+          }
+        }
+      }
+    },
+    "iCloud 사용 여부는 기기의 설정 앱에서 바꿀 수 있어요." : {
+      "comment" : "설정 › iCloud — 계정 · 동기화 상태",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can turn iCloud on or off in the Settings app."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 사용 여부는 기기의 설정 앱에서 바꿀 수 있어요."
+          }
+        }
+      }
+    },
+    "iCloud 사용이 제한돼 있어요" : {
+      "comment" : "설정 › iCloud — 계정 · 동기화 상태",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud is restricted"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 사용이 제한돼 있어요"
+          }
+        }
+      }
+    },
+    "iCloud 상태를 확인하는 중이에요" : {
+      "comment" : "설정 › iCloud — 계정 · 동기화 상태",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Checking iCloud status…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 상태를 확인하는 중이에요"
+          }
+        }
+      }
+    },
+    "iCloud 상태를 확인하지 못했어요" : {
+      "comment" : "설정 › iCloud — 계정 · 동기화 상태",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't check iCloud status"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 상태를 확인하지 못했어요"
+          }
+        }
+      }
+    },
+    "iCloud 에 로그인한 뒤 앱을 다시 열면 불러올 수 있어요." : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sign in to iCloud and reopen the app to import."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 에 로그인한 뒤 앱을 다시 열면 불러올 수 있어요."
+          }
+        }
+      }
+    },
+    "iCloud 연결 전에 쓴 필기" : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Written before iCloud connected"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 연결 전에 쓴 필기"
+          }
+        }
+      }
+    },
+    "iCloud 연결을 마치려면 앱을 다시 열어 주세요." : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reopen the app to finish connecting to iCloud."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 연결을 마치려면 앱을 다시 열어 주세요."
+          }
+        }
+      }
+    },
+    "iCloud에 로그인돼 있어요" : {
+      "comment" : "설정 › iCloud — 계정 · 동기화 상태",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signed in to iCloud"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud에 로그인돼 있어요"
+          }
+        }
+      }
+    },
+    "iCloud에 로그인돼 있지 않아요" : {
+      "comment" : "설정 › iCloud — 계정 · 동기화 상태",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not signed in to iCloud"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud에 로그인돼 있지 않아요"
+          }
+        }
+      }
+    },
+    "iCloud에 로그인하지 않고 씀" : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Written while signed out of iCloud"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud에 로그인하지 않고 씀"
+          }
+        }
+      }
+    },
+    "iCloud에 로그인하지 않았어요. 로그인한 뒤 앱을 다시 열면 넣을 수 있어요." : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You're not signed in to iCloud. Sign in and reopen the app to add it."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud에 로그인하지 않았어요. 로그인한 뒤 앱을 다시 열면 넣을 수 있어요."
+          }
+        }
+      }
+    },
+    "iCloud에 로그인한 뒤 앱을 완전히 종료하고 다시 열면 계정과 저장소를 다시 확인해요." : {
+      "comment" : "설정 › iCloud — 전체 삭제 · 연결 보류 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sign in to iCloud, then fully quit and reopen the app to check the account and storage again."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud에 로그인한 뒤 앱을 완전히 종료하고 다시 열면 계정과 저장소를 다시 확인해요."
+          }
+        }
+      }
+    },
+    "iCloud에 반영되지 않은 수정" : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edit not in iCloud"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud에 반영되지 않은 수정"
+          }
+        }
+      }
+    },
+    "iCloud에 연결돼 있어요" : {
+      "comment" : "설정 › iCloud — 계정 · 동기화 상태",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connected to iCloud"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud에 연결돼 있어요"
+          }
+        }
+      }
+    },
+    "iCloud에서 필사를 받아오지 못했어요" : {
+      "comment" : "설정 › iCloud — 계정 · 동기화 상태",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't get writing from iCloud"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud에서 필사를 받아오지 못했어요"
+          }
+        }
+      }
+    },
+    "iPad의 저장 공간이 부족해 백업 파일을 만들지 못했어요. 공간을 비운 뒤 다시 시도해 주세요." : {
+      "comment" : "설정 › 필사 백업 — 백업 만들기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not enough storage on this iPad to create the backup file. Free up space and try again."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPad의 저장 공간이 부족해 백업 파일을 만들지 못했어요. 공간을 비운 뒤 다시 시도해 주세요."
+          }
+        }
+      }
+    },
+    "iPad의 저장 공간이 부족해 백업 파일을 확인하지 못했어요. 공간을 비운 뒤 다시 시도해 주세요." : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not enough storage on this iPad to check the backup file. Free up space and try again."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPad의 저장 공간이 부족해 백업 파일을 확인하지 못했어요. 공간을 비운 뒤 다시 시도해 주세요."
+          }
+        }
+      }
+    },
+    "「시스템 설정」을 고르면 iPad의 라이트·다크 설정을 따라가요. 원문과 필기가 있는 종이 영역은 다크 모드에서도 밝게 보여요." : {
+      "comment" : "설정 › 화면 모드",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose “System” to follow your iPad's light or dark setting. The paper area with the text and your handwriting stays bright even in dark mode."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「시스템 설정」을 고르면 iPad의 라이트·다크 설정을 따라가요. 원문과 필기가 있는 종이 영역은 다크 모드에서도 밝게 보여요."
+          }
+        }
+      }
+    },
+    "가격을 불러오는 중" : {
+      "comment" : "설정 › 광고 제거",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading price"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "가격을 불러오는 중"
+          }
+        }
+      }
+    },
+    "같은 내용이 현재 필사나 「이전 필사 내용 보기」에 이미 있어요. 확인할 필요는 없지만 지우지 않고 남겨 두었어요." : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The same writing is already in your current writing or in “Previous Writing.” No need to review it, but it's kept."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "같은 내용이 현재 필사나 「이전 필사 내용 보기」에 이미 있어요. 확인할 필요는 없지만 지우지 않고 남겨 두었어요."
+          }
+        }
+      }
+    },
+    "같은 절에 더 늦게 쓴 필기가 있어요" : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A newer draft exists for this verse"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "같은 절에 더 늦게 쓴 필기가 있어요"
+          }
+        }
+      }
+    },
+    "같은 절에 이 iPad에서 더 늦게 쓴 필기가 있어 그쪽을 보여 주고 있어요. 이 필기도 지우지 않고 남겨 두었어요." : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A newer draft for this verse on this iPad is shown instead. This one is kept too."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "같은 절에 이 iPad에서 더 늦게 쓴 필기가 있어 그쪽을 보여 주고 있어요. 이 필기도 지우지 않고 남겨 두었어요."
+          }
+        }
+      }
+    },
+    "같은 절이 이 필기보다 앞서 저장한 내용으로 돌아왔어요. 그 뒤에 고친 이 필기는 이 iPad에만 있어요. 현재 필사와 비교해 사용할 필기를 선택해 주세요." : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The verse went back to a version saved before this draft. This later edit exists only on this iPad. Compare it with your current writing and choose which to use."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "같은 절이 이 필기보다 앞서 저장한 내용으로 돌아왔어요. 그 뒤에 고친 이 필기는 이 iPad에만 있어요. 현재 필사와 비교해 사용할 필기를 선택해 주세요."
+          }
+        }
+      }
+    },
+    "같은 필사" : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Same"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "같은 필사"
+          }
+        }
+      }
+    },
+    "개선 및 제안" : {
+      "comment" : "설정 › 의견 보내기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suggestion"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "개선 및 제안"
+          }
+        }
+      }
+    },
+    "건너뛴 것 %lld개 — 같은 필사 %lld · 비운 기록 %lld" : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld skipped — same %lld · empty records %lld"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "건너뛴 것 %lld개 — 같은 필사 %lld · 비운 기록 %lld"
+          }
+        }
+      }
+    },
+    "계정을 확인하기 전에 씀" : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Written before account check"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "계정을 확인하기 전에 씀"
+          }
+        }
+      }
+    },
+    "계정을 확인하기 전에 씀 · 다른 계정을 참고" : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Written before account check · likely another account"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "계정을 확인하기 전에 씀 · 다른 계정을 참고"
+          }
+        }
+      }
+    },
+    "계정을 확인하기 전에 씀 · 이 계정을 참고" : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Written before account check · likely this account"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "계정을 확인하기 전에 씀 · 이 계정을 참고"
+          }
+        }
+      }
+    },
+    "계정을 확인하지 못한 동안" : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "While account unconfirmed"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "계정을 확인하지 못한 동안"
+          }
+        }
+      }
+    },
+    "계정이 없다는 뜻은 아니에요. 잠시 뒤 다시 열어 보세요." : {
+      "comment" : "설정 › iCloud — 계정 · 동기화 상태",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This doesn't mean there's no account. Try opening this again in a moment."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "계정이 없다는 뜻은 아니에요. 잠시 뒤 다시 열어 보세요."
+          }
+        }
+      }
+    },
+    "고른 곳에 저장하지 못했어요. 만든 파일은 이 iPad에서 지웠어요. 다시 만들어 주세요." : {
+      "comment" : "설정 › 필사 백업 — 백업 만들기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't save to the chosen location. The file was removed from this iPad. Please create it again."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "고른 곳에 저장하지 못했어요. 만든 파일은 이 iPad에서 지웠어요. 다시 만들어 주세요."
+          }
+        }
+      }
+    },
+    "고른 파일: %@" : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selected file: %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "고른 파일: %@"
+          }
+        }
+      }
+    },
+    "고른 파일을 읽지 못했어요. 파일이 이 iPad에 내려받아져 있는지 확인해 주세요." : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't read the selected file. Make sure it's downloaded to this iPad."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "고른 파일을 읽지 못했어요. 파일이 이 iPad에 내려받아져 있는지 확인해 주세요."
+          }
+        }
+      }
+    },
     "공식 사이트" : {
       "comment" : "성경 본문 출처 — 항목 이름: 번역본을 낸 곳의 사이트",
       "localizations" : {
@@ -48,6 +1101,278 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "공식 사이트"
+          }
+        }
+      }
+    },
+    "광고" : {
+      "comment" : "설정 사이드바",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ads"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "광고"
+          }
+        }
+      }
+    },
+    "광고 개인정보 옵션" : {
+      "comment" : "설정 사이드바",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ad Privacy Options"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "광고 개인정보 옵션"
+          }
+        }
+      }
+    },
+    "광고 없이 쓰기" : {
+      "comment" : "설정 › 광고 제거",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use without ads"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "광고 없이 쓰기"
+          }
+        }
+      }
+    },
+    "광고 없이 쓰는 중" : {
+      "comment" : "설정 › 광고 제거",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Using without ads"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "광고 없이 쓰는 중"
+          }
+        }
+      }
+    },
+    "광고 제거" : {
+      "comment" : "설정 › 광고 제거",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove Ads"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "광고 제거"
+          }
+        }
+      }
+    },
+    "광고 제거 보기" : {
+      "comment" : "설정 › 필사 백업 — 백업 만들기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "View Remove Ads"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "광고 제거 보기"
+          }
+        }
+      }
+    },
+    "광고 제거를 구매하면 백업을 만들 수 있어요." : {
+      "comment" : "설정 › 필사 백업 — 백업 만들기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Purchase Remove Ads to create backups."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "광고 제거를 구매하면 백업을 만들 수 있어요."
+          }
+        }
+      }
+    },
+    "광고 제거를 구매했어요." : {
+      "comment" : "설정 › 광고 제거",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You purchased Remove Ads."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "광고 제거를 구매했어요."
+          }
+        }
+      }
+    },
+    "구매" : {
+      "comment" : "설정 › 광고 제거",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Purchase"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "구매"
+          }
+        }
+      }
+    },
+    "구매 내역 확인 중" : {
+      "comment" : "설정 › 광고 제거",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Checking purchases"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "구매 내역 확인 중"
+          }
+        }
+      }
+    },
+    "구매 내역을 확인하지 못했어요. 다시 시도해 주세요." : {
+      "comment" : "설정 › 광고 제거",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't check your purchases. Please try again."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "구매 내역을 확인하지 못했어요. 다시 시도해 주세요."
+          }
+        }
+      }
+    },
+    "구매 복원" : {
+      "comment" : "설정 › 광고 제거",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restore Purchase"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "구매 복원"
+          }
+        }
+      }
+    },
+    "구매 승인을 기다리고 있어요. 승인되면 광고가 사라져요." : {
+      "comment" : "설정 › 광고 제거",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Waiting for purchase approval. Ads will disappear once it's approved."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "구매 승인을 기다리고 있어요. 승인되면 광고가 사라져요."
+          }
+        }
+      }
+    },
+    "구매 진행 중" : {
+      "comment" : "설정 › 광고 제거",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Purchasing"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "구매 진행 중"
+          }
+        }
+      }
+    },
+    "구매를 마치지 못했어요. 다시 시도해 주세요." : {
+      "comment" : "설정 › 광고 제거",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The purchase couldn't be completed. Please try again."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "구매를 마치지 못했어요. 다시 시도해 주세요."
+          }
+        }
+      }
+    },
+    "구매함" : {
+      "comment" : "설정 › 광고 제거",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Purchased"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "구매함"
           }
         }
       }
@@ -69,6 +1394,1682 @@
         }
       }
     },
+    "그래도 넣기" : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add Anyway"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "그래도 넣기"
+          }
+        }
+      }
+    },
+    "그래도 바꾸기" : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Replace Anyway"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "그래도 바꾸기"
+          }
+        }
+      }
+    },
+    "그중 확인이 필요한 필기 %lld개" : {
+      "comment" : "설정 › 확인이 필요한 필기 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld of them needs review"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld of them need review"
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "그중 확인이 필요한 필기 %lld개"
+          }
+        }
+      }
+    },
+    "기기 설정에서 허용해야 동기화할 수 있어요." : {
+      "comment" : "설정 › iCloud — 계정 · 동기화 상태",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow it in device settings to sync."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "기기 설정에서 허용해야 동기화할 수 있어요."
+          }
+        }
+      }
+    },
+    "기종과 OS 정보를 함께 보내요" : {
+      "comment" : "설정 › 의견 보내기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Include device model and OS version"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "기종과 OS 정보를 함께 보내요"
+          }
+        }
+      }
+    },
+    "기타" : {
+      "comment" : "설정 › 의견 보내기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Other"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "기타"
+          }
+        }
+      }
+    },
+    "나중에 확인하기" : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Review Later"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "나중에 확인하기"
+          }
+        }
+      }
+    },
+    "남겨 둔 필기" : {
+      "comment" : "설정 › 확인이 필요한 필기 — 화면",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kept draft"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "남겨 둔 필기"
+          }
+        }
+      }
+    },
+    "남겨 둔 필기가 그 사이 바뀌었어요. 목록을 다시 읽었으니 다시 확인해 주세요." : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The kept draft changed in the meantime. The list was reloaded, so please check again."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "남겨 둔 필기가 그 사이 바뀌었어요. 목록을 다시 읽었으니 다시 확인해 주세요."
+          }
+        }
+      }
+    },
+    "남겨 둔 필기가 없어요." : {
+      "comment" : "설정 › 확인이 필요한 필기 — 화면",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No kept drafts."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "남겨 둔 필기가 없어요."
+          }
+        }
+      }
+    },
+    "남겨 둔 필기를 확인하는 중이에요" : {
+      "comment" : "설정 › 확인이 필요한 필기 — 화면",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Checking kept drafts…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "남겨 둔 필기를 확인하는 중이에요"
+          }
+        }
+      }
+    },
+    "내보내기" : {
+      "comment" : "설정 › 확인이 필요한 필기 — 화면",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Export"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "내보내기"
+          }
+        }
+      }
+    },
+    "내용" : {
+      "comment" : "설정 › 의견 보내기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Message"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "내용"
+          }
+        }
+      }
+    },
+    "넣는 중이에요" : {
+      "comment" : "설정 › 확인이 필요한 필기 — 화면",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adding…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "넣는 중이에요"
+          }
+        }
+      }
+    },
+    "넣은 필사 %lld개 — 새 필사 %lld · 이전 필사 기록 %lld · 지운 절이라 기록에만 %lld" : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%#@added@ — new %2$lld · history %3$lld · history only (cleared verse) %4$lld"
+          },
+          "substitutions" : {
+            "added" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg writing entry added"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg writing entries added"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "넣은 필사 %lld개 — 새 필사 %lld · 이전 필사 기록 %lld · 지운 절이라 기록에만 %lld"
+          }
+        }
+      }
+    },
+    "넣을 수 없는 것" : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Can't be added"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "넣을 수 없는 것"
+          }
+        }
+      }
+    },
+    "넣지 못한 것 %lld개 — 이 앱이 읽을 수 없는 내용이에요" : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld not added — this app can't read it"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld not added — this app can't read them"
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "넣지 못한 것 %lld개 — 이 앱이 읽을 수 없는 내용이에요"
+          }
+        }
+      }
+    },
+    "넣지 못했어요. 현재 필사와 남겨 둔 필기는 그대로예요. 다시 시도해 주세요." : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't add it. Your current writing and the kept draft are unchanged. Please try again."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "넣지 못했어요. 현재 필사와 남겨 둔 필기는 그대로예요. 다시 시도해 주세요."
+          }
+        }
+      }
+    },
+    "다른 iCloud 계정에서 시작한 불러오기예요" : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This import was started with another iCloud account"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다른 iCloud 계정에서 시작한 불러오기예요"
+          }
+        }
+      }
+    },
+    "다른 iCloud 계정에서 시작한 불러오기예요. 지금 계정의 필사에는 이어서 넣지 않아요." : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This import was started with another iCloud account. It won't continue into the current account's writing."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다른 iCloud 계정에서 시작한 불러오기예요. 지금 계정의 필사에는 이어서 넣지 않아요."
+          }
+        }
+      }
+    },
+    "다른 계정 · %@" : {
+      "comment" : "설정 › 확인이 필요한 필기 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Other account · %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다른 계정 · %@"
+          }
+        }
+      }
+    },
+    "다른 계정에서 씀" : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Written with another account"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다른 계정에서 씀"
+          }
+        }
+      }
+    },
+    "다른 계정을 쓰던 때의 필기 %lld개" : {
+      "comment" : "설정 › 확인이 필요한 필기 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld draft from another account"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld drafts from another account"
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다른 계정을 쓰던 때의 필기 %lld개"
+          }
+        }
+      }
+    },
+    "다른 계정을 쓰던 때의 필기 %lld개는 여기서 열어 보지 않아요. 그 계정으로 돌아오면 볼 수 있어요. 파일은 그대로 있어요." : {
+      "comment" : "설정 › 확인이 필요한 필기 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld draft from another account isn't opened here. Switch back to that account to see it. The file is kept."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld drafts from another account aren't opened here. Switch back to that account to see them. The files are kept."
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다른 계정을 쓰던 때의 필기 %lld개는 여기서 열어 보지 않아요. 그 계정으로 돌아오면 볼 수 있어요. 파일은 그대로 있어요."
+          }
+        }
+      }
+    },
+    "다른 계정을 쓰던 때의 필기라 지금 계정에 넣지 않아요." : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This is from another account, so it won't be added to the current one."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다른 계정을 쓰던 때의 필기라 지금 계정에 넣지 않아요."
+          }
+        }
+      }
+    },
+    "다른 파일 고르기" : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose Another File"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다른 파일 고르기"
+          }
+        }
+      }
+    },
+    "다시 만들기" : {
+      "comment" : "설정 › 필사 백업 — 백업 만들기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Create Again"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다시 만들기"
+          }
+        }
+      }
+    },
+    "다시 시도" : {
+      "comment" : "여러 화면의 버튼 · 제목",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Try Again"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다시 시도"
+          }
+        }
+      }
+    },
+    "다시 읽기" : {
+      "comment" : "설정 › 확인이 필요한 필기 — 화면",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reload"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다시 읽기"
+          }
+        }
+      }
+    },
+    "다크" : {
+      "comment" : "설정 › 화면 모드",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dark"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다크"
+          }
+        }
+      }
+    },
+    "닫기" : {
+      "comment" : "여러 화면의 버튼 · 제목",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "닫기"
+          }
+        }
+      }
+    },
+    "담은 말씀 고르기" : {
+      "comment" : "설정 › 위젯",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose Verses"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "담은 말씀 고르기"
+          }
+        }
+      }
+    },
+    "담은 말씀은 홈 화면의 새기다 위젯에 함께 적용되고, 한 시간마다 차례가 넘어가요." : {
+      "comment" : "설정 › 위젯",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your verses appear in the Carve widget on your Home Screen and change every hour."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "담은 말씀은 홈 화면의 새기다 위젯에 함께 적용되고, 한 시간마다 차례가 넘어가요."
+          }
+        }
+      }
+    },
+    "담을 말씀 고르기" : {
+      "comment" : "설정 › 위젯",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose Verses"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "담을 말씀 고르기"
+          }
+        }
+      }
+    },
+    "도구 팔레트가 아래로 내려가고, 쓰지 않을 땐 접혀요." : {
+      "comment" : "패치노트 — 출시별 바뀐 점(제목 · 본문)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The tool palette moved to the bottom and folds away when not in use."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "도구 팔레트가 아래로 내려가고, 쓰지 않을 땐 접혀요."
+          }
+        }
+      }
+    },
+    "도움말" : {
+      "comment" : "설정 › 도움말",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Help"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "도움말"
+          }
+        }
+      }
+    },
+    "도움말 보기" : {
+      "comment" : "패치노트 화면",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "View Help"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "도움말 보기"
+          }
+        }
+      }
+    },
+    "돌아가기" : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Back"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "돌아가기"
+          }
+        }
+      }
+    },
+    "동기화 중 문제가 생겼어요" : {
+      "comment" : "설정 › iCloud — 계정 · 동기화 상태",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A problem occurred while syncing"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "동기화 중 문제가 생겼어요"
+          }
+        }
+      }
+    },
+    "동기화하는 중이에요" : {
+      "comment" : "설정 › iCloud — 계정 · 동기화 상태",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Syncing…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "동기화하는 중이에요"
+          }
+        }
+      }
+    },
+    "두 암호가 같지 않아요." : {
+      "comment" : "설정 › 필사 백업 — 백업 만들기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The passwords don't match."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "두 암호가 같지 않아요."
+          }
+        }
+      }
+    },
+    "라이트" : {
+      "comment" : "설정 › 화면 모드",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Light"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "라이트"
+          }
+        }
+      }
+    },
+    "로그인하지 않은 동안" : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "While signed out"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "로그인하지 않은 동안"
+          }
+        }
+      }
+    },
+    "마지막 필기를 저장하는 중이에요" : {
+      "comment" : "설정 › 필사 백업 — 백업 만들기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saving your latest handwriting…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "마지막 필기를 저장하는 중이에요"
+          }
+        }
+      }
+    },
+    "마지막으로 받음 · %@" : {
+      "comment" : "설정 › iCloud — 계정 · 동기화 상태 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last received · %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "마지막으로 받음 · %@"
+          }
+        }
+      }
+    },
+    "마지막으로 올림 · %@" : {
+      "comment" : "설정 › iCloud — 계정 · 동기화 상태 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last sent · %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "마지막으로 올림 · %@"
+          }
+        }
+      }
+    },
+    "만든 파일을 다시 열어 확인했더니 내용이 맞지 않아 내놓지 않았어요. 다시 시도해 주세요." : {
+      "comment" : "설정 › 필사 백업 — 백업 만들기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The file didn't match when it was reopened to verify, so it wasn't saved. Please try again."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "만든 파일을 다시 열어 확인했더니 내용이 맞지 않아 내놓지 않았어요. 다시 시도해 주세요."
+          }
+        }
+      }
+    },
+    "만들기" : {
+      "comment" : "설정 › 필사 백업 — 백업 만들기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Create"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "만들기"
+          }
+        }
+      }
+    },
+    "멈춘 불러오기가 있어요" : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "An import was interrupted"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "멈춘 불러오기가 있어요"
+          }
+        }
+      }
+    },
+    "멈춘 불러오기를 이어 가려면 백업 암호를 다시 입력해 주세요." : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enter the backup password again to resume the interrupted import."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "멈춘 불러오기를 이어 가려면 백업 암호를 다시 입력해 주세요."
+          }
+        }
+      }
+    },
+    "멈춘 불러오기를 지금은 이어서 할 수 없어요" : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The interrupted import can't be resumed right now"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "멈춘 불러오기를 지금은 이어서 할 수 없어요"
+          }
+        }
+      }
+    },
+    "멈춘 불러오기를 찾지 못해 멈췄어요. 넣은 장은 그대로 있어요. 파일을 다시 골라 불러와 주세요." : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stopped because the interrupted import couldn't be found. Chapters already added stay as they are. Choose the file again to import."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "멈춘 불러오기를 찾지 못해 멈췄어요. 넣은 장은 그대로 있어요. 파일을 다시 골라 불러와 주세요."
+          }
+        }
+      }
+    },
+    "멈춘 불러오기를 찾지 못했어요. 이미 끝났거나 버린 불러오기예요." : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't find the interrupted import. It has already finished or was discarded."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "멈춘 불러오기를 찾지 못했어요. 이미 끝났거나 버린 불러오기예요."
+          }
+        }
+      }
+    },
+    "멈춘 불러오기의 백업 사본을 지금 계정으로 처음부터 확인해요. 백업 암호를 입력해 주세요." : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The interrupted import's backup copy will be checked again from the start for the current account. Enter the backup password."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "멈춘 불러오기의 백업 사본을 지금 계정으로 처음부터 확인해요. 백업 암호를 입력해 주세요."
+          }
+        }
+      }
+    },
+    "메일 앱으로 개발자에게 버그 제보나 기능 개선 의견을 보낼 수 있어요. 회신이 필요하면 보내신 메일 주소로 답장해요." : {
+      "comment" : "설정 › 의견 보내기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send bug reports or ideas to the developer with the Mail app. If a reply is needed, it goes to the address you sent from."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "메일 앱으로 개발자에게 버그 제보나 기능 개선 의견을 보낼 수 있어요. 회신이 필요하면 보내신 메일 주소로 답장해요."
+          }
+        }
+      }
+    },
+    "메일을 보낼 수 없어요" : {
+      "comment" : "설정 › 의견 보내기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Can't Send Mail"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "메일을 보낼 수 없어요"
+          }
+        }
+      }
+    },
+    "모두 지우기" : {
+      "comment" : "설정 › iCloud — 전체 삭제 · 연결 보류 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete All"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모두 지우기"
+          }
+        }
+      }
+    },
+    "모든 장의 필기와 이전 필사 기록이 지워져요." : {
+      "comment" : "설정 › iCloud — 전체 삭제 · 연결 보류 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Handwriting in every chapter and your writing history will be deleted."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모든 장의 필기와 이전 필사 기록이 지워져요."
+          }
+        }
+      }
+    },
+    "모든 장의 필사 기록이 사라져요. 되돌릴 수 없어요." : {
+      "comment" : "설정 › iCloud — 계정 · 동기화 상태",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All writing in every chapter will be deleted. This can't be undone."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모든 장의 필사 기록이 사라져요. 되돌릴 수 없어요."
+          }
+        }
+      }
+    },
+    "모든 필사 데이터 삭제" : {
+      "comment" : "설정 › iCloud — 계정 · 동기화 상태",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete All Writing Data"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모든 필사 데이터 삭제"
+          }
+        }
+      }
+    },
+    "모든 필사 데이터를 지울까요?" : {
+      "comment" : "설정 › iCloud — 전체 삭제 · 연결 보류 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete all writing data?"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모든 필사 데이터를 지울까요?"
+          }
+        }
+      }
+    },
+    "모든 필사 데이터를 지웠어요." : {
+      "comment" : "설정 › iCloud — 전체 삭제 · 연결 보류 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All writing data was deleted."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모든 필사 데이터를 지웠어요."
+          }
+        }
+      }
+    },
+    "모르는 번역본" : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unknown translation"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모르는 번역본"
+          }
+        }
+      }
+    },
+    "모르는 성경 권" : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unknown book"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모르는 성경 권"
+          }
+        }
+      }
+    },
+    "모르는 필기 형식" : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unknown handwriting format"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모르는 필기 형식"
+          }
+        }
+      }
+    },
+    "문의 내용" : {
+      "comment" : "설정 › 의견 보내기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Message"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "문의 내용"
+          }
+        }
+      }
+    },
+    "문의 분류" : {
+      "comment" : "설정 › 의견 보내기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Category"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "문의 분류"
+          }
+        }
+      }
+    },
+    "미리보기 수는 지금 기준이에요. 넣기 직전에 절마다 다시 확인해서 실제로 넣는 수는 조금 다를 수 있어요." : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preview counts reflect the current state. Each verse is checked again right before adding, so the final counts may differ slightly."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "미리보기 수는 지금 기준이에요. 넣기 직전에 절마다 다시 확인해서 실제로 넣는 수는 조금 다를 수 있어요."
+          }
+        }
+      }
+    },
+    "미리보기 없음" : {
+      "comment" : "설정 › 확인이 필요한 필기 — 화면",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No preview"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "미리보기 없음"
+          }
+        }
+      }
+    },
+    "바꿔도 현재 필기는 지우지 않아요. 「이전 필사 내용 보기」에 남아 다시 고를 수 있어요." : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Replacing won't delete your current handwriting. It stays in “Previous Writing,” so you can choose it again."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "바꿔도 현재 필기는 지우지 않아요. 「이전 필사 내용 보기」에 남아 다시 고를 수 있어요."
+          }
+        }
+      }
+    },
+    "바뀐 때 %@" : {
+      "comment" : "설정 › 확인이 필요한 필기 — 화면 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changed %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "바뀐 때 %@"
+          }
+        }
+      }
+    },
+    "바뀐 때를 모름" : {
+      "comment" : "설정 › 확인이 필요한 필기 — 화면",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Change time unknown"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "바뀐 때를 모름"
+          }
+        }
+      }
+    },
+    "바뀐 점" : {
+      "comment" : "패치노트 화면",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What's changed"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "바뀐 점"
+          }
+        }
+      }
+    },
+    "백업 만들기" : {
+      "comment" : "여러 화면의 버튼 · 제목",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Create Backup"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "백업 만들기"
+          }
+        }
+      }
+    },
+    "백업 불러오기" : {
+      "comment" : "설정 › 필사 백업 — 백업 만들기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import Backup"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "백업 불러오기"
+          }
+        }
+      }
+    },
+    "백업 암호" : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Backup Password"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "백업 암호"
+          }
+        }
+      }
+    },
+    "백업 파일을 만드는 중이에요" : {
+      "comment" : "설정 › 필사 백업 — 백업 만들기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Creating the backup file…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "백업 파일을 만드는 중이에요"
+          }
+        }
+      }
+    },
+    "백업 파일을 만들었어요. 저장할 곳을 골라 주세요." : {
+      "comment" : "설정 › 필사 백업 — 백업 만들기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The backup file is ready. Choose where to save it."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "백업 파일을 만들었어요. 저장할 곳을 골라 주세요."
+          }
+        }
+      }
+    },
+    "백업 파일을 만들지 못했어요. 다시 시도해 주세요." : {
+      "comment" : "설정 › 필사 백업 — 백업 만들기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't create the backup file. Please try again."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "백업 파일을 만들지 못했어요. 다시 시도해 주세요."
+          }
+        }
+      }
+    },
+    "백업 파일을 저장했어요. 필사 기록 %lld개 · 남겨 둔 필기 %lld개를 담았어요." : {
+      "comment" : "설정 › 필사 백업 — 백업 만들기 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Backup saved with %#@rows@ and %#@drafts@."
+          },
+          "substitutions" : {
+            "drafts" : {
+              "argNum" : 2,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg kept draft"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg kept drafts"
+                    }
+                  }
+                }
+              }
+            },
+            "rows" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg writing entry"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg writing entries"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "백업 파일을 저장했어요. 필사 기록 %lld개 · 남겨 둔 필기 %lld개를 담았어요."
+          }
+        }
+      }
+    },
+    "백업 파일을 확인하는 중이에요" : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Checking the backup file…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "백업 파일을 확인하는 중이에요"
+          }
+        }
+      }
+    },
+    "백업 파일을 확인하지 못했어요. 다시 시도해 주세요." : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't check the backup file. Please try again."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "백업 파일을 확인하지 못했어요. 다시 시도해 주세요."
+          }
+        }
+      }
+    },
+    "백업 파일의 필사를 이 기기에 더해요. 불러오기는 구매하지 않아도 쓸 수 있어요." : {
+      "comment" : "설정 › 필사 백업 — 백업 만들기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adds the writing in a backup file to this device. Importing is free."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "백업 파일의 필사를 이 기기에 더해요. 불러오기는 구매하지 않아도 쓸 수 있어요."
+          }
+        }
+      }
+    },
+    "백업 파일이 너무 커서 불러올 수 없어요." : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The backup file is too large to import."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "백업 파일이 너무 커서 불러올 수 없어요."
+          }
+        }
+      }
+    },
+    "백업과는 달라요. 한 기기에서 지우면 다른 기기에서도 사라져요." : {
+      "comment" : "설정 › iCloud — 계정 · 동기화 상태",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This isn't a backup. Deleting on one device deletes it on the others too."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "백업과는 달라요. 한 기기에서 지우면 다른 기기에서도 사라져요."
+          }
+        }
+      }
+    },
+    "백업을 만드는 사이 iCloud 계정 상태가 바뀌었어요. 다른 계정의 필기가 한 파일에 섞이지 않도록 멈췄어요. 다시 시도해 주세요." : {
+      "comment" : "설정 › 필사 백업 — 백업 만들기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your iCloud account status changed while creating the backup. It stopped so writing from different accounts isn't mixed in one file. Please try again."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "백업을 만드는 사이 iCloud 계정 상태가 바뀌었어요. 다른 계정의 필기가 한 파일에 섞이지 않도록 멈췄어요. 다시 시도해 주세요."
+          }
+        }
+      }
+    },
+    "백업을 만드는 사이 ‘모든 필사 삭제’가 실행됐어요. 다시 시도하면 지금 남은 필사로 처음부터 만들어요." : {
+      "comment" : "설정 › 필사 백업 — 백업 만들기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "‘Delete All Writing Data’ ran while the backup was being created. Try again to start over with the writing that remains."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "백업을 만드는 사이 ‘모든 필사 삭제’가 실행됐어요. 다시 시도하면 지금 남은 필사로 처음부터 만들어요."
+          }
+        }
+      }
+    },
+    "백업을 만들 때 정한 암호를 입력해 주세요." : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enter the password you set when creating the backup."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "백업을 만들 때 정한 암호를 입력해 주세요."
+          }
+        }
+      }
+    },
+    "버리기" : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discard"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "버리기"
+          }
+        }
+      }
+    },
+    "버리면 멈춘 불러오기의 기록과 이 iPad에 남겨 둔 백업 사본만 지워요. 이미 넣은 필사는 그대로 있어요." : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discarding deletes only the interrupted import's record and the backup copy kept on this iPad. Writing already added stays as it is."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "버리면 멈춘 불러오기의 기록과 이 iPad에 남겨 둔 백업 사본만 지워요. 이미 넣은 필사는 그대로 있어요."
+          }
+        }
+      }
+    },
+    "버전" : {
+      "comment" : "설정 › 앱 버전",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Version"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "버전"
+          }
+        }
+      }
+    },
+    "버전 %@" : {
+      "comment" : "설정 › 앱 버전 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Version %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "버전 %@"
+          }
+        }
+      }
+    },
     "번역본마다 본문의 판 · 권리 · 출처를 적었어요." : {
       "comment" : "성경 본문 출처 화면 첫 줄 안내",
       "localizations" : {
@@ -82,6 +3083,154 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "번역본마다 본문의 판 · 권리 · 출처를 적었어요."
+          }
+        }
+      }
+    },
+    "보관만 하는 예전 필기 %lld개" : {
+      "comment" : "설정 › 확인이 필요한 필기 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld older draft kept for reference"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld older drafts kept for reference"
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "보관만 하는 예전 필기 %lld개"
+          }
+        }
+      }
+    },
+    "보내기 전에 확인해 주세요" : {
+      "comment" : "설정 › 의견 보내기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Before you send"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "보내기 전에 확인해 주세요"
+          }
+        }
+      }
+    },
+    "보내려면 내용을 적어 주세요." : {
+      "comment" : "설정 › 의견 보내기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enter a message to send."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "보내려면 내용을 적어 주세요."
+          }
+        }
+      }
+    },
+    "보내려면 제목을 적어 주세요." : {
+      "comment" : "설정 › 의견 보내기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enter a subject to send."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "보내려면 제목을 적어 주세요."
+          }
+        }
+      }
+    },
+    "보내려면 필수 항목에 모두 동의해 주세요." : {
+      "comment" : "설정 › 의견 보내기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agree to all required items to send."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "보내려면 필수 항목에 모두 동의해 주세요."
+          }
+        }
+      }
+    },
+    "보류" : {
+      "comment" : "설정 사이드바",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On Hold"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "보류"
+          }
+        }
+      }
+    },
+    "본문 글꼴·크기·줄 간격은" : {
+      "comment" : "설정 사이드바",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Change text font, size, and spacing"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "본문 글꼴·크기·줄 간격은"
+          }
+        }
+      }
+    },
+    "본문 글꼴·크기·줄 간격은 필사 화면 위 본문 설정에서 바꿔요." : {
+      "comment" : "설정 사이드바",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Change text font, size, and line spacing with Text Settings at the top of the writing screen."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "본문 글꼴·크기·줄 간격은 필사 화면 위 본문 설정에서 바꿔요."
           }
         }
       }
@@ -103,6 +3252,550 @@
         }
       }
     },
+    "본문 표시를 바로잡았어요" : {
+      "comment" : "패치노트 — 출시별 바뀐 점(제목 · 본문)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Text display fixes"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "본문 표시를 바로잡았어요"
+          }
+        }
+      }
+    },
+    "본문과 필기를 한 장으로 합쳐 사진에 저장해요." : {
+      "comment" : "설정 › 도움말",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Combines the text and your handwriting into one image and saves it to Photos."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "본문과 필기를 한 장으로 합쳐 사진에 저장해요."
+          }
+        }
+      }
+    },
+    "불러오기" : {
+      "comment" : "여러 화면의 버튼 · 제목",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "불러오기"
+          }
+        }
+      }
+    },
+    "불러오기를 마쳤어요." : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import finished."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "불러오기를 마쳤어요."
+          }
+        }
+      }
+    },
+    "불러오기를 마쳤어요. 새로 넣은 필사는 없어요." : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import finished. No new writing was added."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "불러오기를 마쳤어요. 새로 넣은 필사는 없어요."
+          }
+        }
+      }
+    },
+    "불러오기를 멈췄어요. %@ 넣은 장 %lld개는 그대로 있어요." : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import stopped. %1$@ The %#@chapters@."
+          },
+          "substitutions" : {
+            "chapters" : {
+              "argNum" : 2,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg chapter already added stays as it is"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg chapters already added stay as they are"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "불러오기를 멈췄어요. %@ 넣은 장 %lld개는 그대로 있어요."
+          }
+        }
+      }
+    },
+    "불러오기를 이어 가지 못했어요. ‘백업 불러오기’를 다시 열고 암호를 다시 입력하면 이어서 불러올 수 있어요." : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't continue the import. Open ‘Import Backup’ again and re-enter the password to resume."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "불러오기를 이어 가지 못했어요. ‘백업 불러오기’를 다시 열고 암호를 다시 입력하면 이어서 불러올 수 있어요."
+          }
+        }
+      }
+    },
+    "불러오기를 준비하는 중이에요" : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preparing to import…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "불러오기를 준비하는 중이에요"
+          }
+        }
+      }
+    },
+    "불러온 필사는 이 기기에 저장되고, 지금 연결된 iCloud 계정으로 동기화돼요. 지금 필사는 그대로 두고, 다른 내용은 이전 필사 기록에 더해요." : {
+      "comment" : "설정 › 필사 백업 — 백업 만들기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Imported writing is saved on this device and syncs with the connected iCloud account. Your current writing stays as it is; anything different is added to your writing history."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "불러온 필사는 이 기기에 저장되고, 지금 연결된 iCloud 계정으로 동기화돼요. 지금 필사는 그대로 두고, 다른 내용은 이전 필사 기록에 더해요."
+          }
+        }
+      }
+    },
+    "불러올 백업 파일(.carvebackup)을 골라 주세요. 파일을 먼저 확인해 무엇이 들어오는지 보여 드리고, ‘불러오기’를 눌러야 이 기기에 넣어요." : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose a backup file (.carvebackup) to import. The file is checked first to show what it contains; nothing is added to this device until you tap ‘Import’."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "불러올 백업 파일(.carvebackup)을 골라 주세요. 파일을 먼저 확인해 무엇이 들어오는지 보여 드리고, ‘불러오기’를 눌러야 이 기기에 넣어요."
+          }
+        }
+      }
+    },
+    "비교 접기" : {
+      "comment" : "설정 › 확인이 필요한 필기 — 화면",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hide Comparison"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "비교 접기"
+          }
+        }
+      }
+    },
+    "비교하는 사이 현재 필기가 바뀌었어요. 다시 비교한 내용을 확인해 주세요." : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your current handwriting changed while comparing. Please check the new comparison."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "비교하는 사이 현재 필기가 바뀌었어요. 다시 비교한 내용을 확인해 주세요."
+          }
+        }
+      }
+    },
+    "비운 절" : {
+      "comment" : "설정 › 확인이 필요한 필기 — 화면",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cleared verse"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "비운 절"
+          }
+        }
+      }
+    },
+    "사이드바 · 필사 화면 · 차트의 광고가 모두 사라져요." : {
+      "comment" : "설정 › 광고 제거",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Removes all ads from the sidebar, writing screen, and charts."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "사이드바 · 필사 화면 · 차트의 광고가 모두 사라져요."
+          }
+        }
+      }
+    },
+    "사진 보관함" : {
+      "comment" : "설정 › 의견 보내기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo Library"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "사진 보관함"
+          }
+        }
+      }
+    },
+    "사진 첨부" : {
+      "comment" : "설정 › 의견 보내기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attach Photos"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "사진 첨부"
+          }
+        }
+      }
+    },
+    "사진은 %lld장까지 붙일 수 있어요." : {
+      "comment" : "설정 › 의견 보내기 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "You can attach up to %lld photo."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "You can attach up to %lld photos."
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "사진은 %lld장까지 붙일 수 있어요."
+          }
+        }
+      }
+    },
+    "삭제 기록 기준을 모름" : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deletion history unknown"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "삭제 기록 기준을 모름"
+          }
+        }
+      }
+    },
+    "삭제 기록을 읽지 못했어요. 앱을 다시 열어 보세요." : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't read the deletion history. Try reopening the app."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "삭제 기록을 읽지 못했어요. 앱을 다시 열어 보세요."
+          }
+        }
+      }
+    },
+    "삭제 기록을 확인하지 못한 필기" : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deletion history not checked"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "삭제 기록을 확인하지 못한 필기"
+          }
+        }
+      }
+    },
+    "삭제 기록을 확인하지 못했어요. 넣으면 지웠던 내용이 다시 들어갈 수 있어요." : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't check the deletion history. Adding it may bring back deleted writing."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "삭제 기록을 확인하지 못했어요. 넣으면 지웠던 내용이 다시 들어갈 수 있어요."
+          }
+        }
+      }
+    },
+    "삭제를 완료하지 못했어요. 다시 시도해 주세요." : {
+      "comment" : "설정 › iCloud — 전체 삭제 · 연결 보류 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't finish deleting. Please try again."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "삭제를 완료하지 못했어요. 다시 시도해 주세요."
+          }
+        }
+      }
+    },
+    "새 필사" : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "새 필사"
+          }
+        }
+      }
+    },
+    "새기다" : {
+      "comment" : "설정 › 앱 버전",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carve"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "새기다"
+          }
+        }
+      }
+    },
+    "새기다 %@" : {
+      "comment" : "패치노트 화면 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carve %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "새기다 %@"
+          }
+        }
+      }
+    },
+    "선택 안 됨" : {
+      "comment" : "설정 › 의견 보내기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not selected"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "선택 안 됨"
+          }
+        }
+      }
+    },
+    "선택됨" : {
+      "comment" : "설정 › 의견 보내기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selected"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "선택됨"
+          }
+        }
+      }
+    },
+    "설정" : {
+      "comment" : "설정 사이드바",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Settings"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "설정"
+          }
+        }
+      }
+    },
+    "설정 앱의 메일에서 계정을 추가한 뒤 다시 보내 주세요. App Store 리뷰로 의견을 남겨 주셔도 돼요." : {
+      "comment" : "설정 › 의견 보내기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add an account in Settings › Mail, then send again. You can also leave feedback in an App Store review."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "설정 앱의 메일에서 계정을 추가한 뒤 다시 보내 주세요. App Store 리뷰로 의견을 남겨 주셔도 돼요."
+          }
+        }
+      }
+    },
+    "설정의 필사 백업에서 암호를 건 파일로 필사를 백업하고 다시 불러와요. 백업 만들기는 광고 제거 구매에 포함되고, 불러오기는 무료예요." : {
+      "comment" : "패치노트 — 출시별 바뀐 점(제목 · 본문)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In Settings › Backup, back up your writing to a password-protected file and import it again. Creating backups comes with Remove Ads; importing is free."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "설정의 필사 백업에서 암호를 건 파일로 필사를 백업하고 다시 불러와요. 백업 만들기는 광고 제거 구매에 포함되고, 불러오기는 무료예요."
+          }
+        }
+      }
+    },
     "성경 본문 출처" : {
       "comment" : "설정 › 앱 버전의 행 이름이자 성경 본문 출처 화면 제목",
       "localizations" : {
@@ -116,6 +3809,455 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "성경 본문 출처"
+          }
+        }
+      }
+    },
+    "성경에 없는 장이나 절" : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chapter or verse not in the Bible"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "성경에 없는 장이나 절"
+          }
+        }
+      }
+    },
+    "손가락으로 스크롤" : {
+      "comment" : "설정 › 도움말",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scroll with your finger"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "손가락으로 스크롤"
+          }
+        }
+      }
+    },
+    "시스템 설정" : {
+      "comment" : "설정 › 화면 모드",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "System"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "시스템 설정"
+          }
+        }
+      }
+    },
+    "시험 주입" : {
+      "comment" : "설정 › 확인이 필요한 필기 — 화면",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test injection"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "시험 주입"
+          }
+        }
+      }
+    },
+    "쓰던 필기가 모두 현재 필사에 반영돼 있어요." : {
+      "comment" : "설정 › 확인이 필요한 필기 — 화면",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All your handwriting is in your current writing."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "쓰던 필기가 모두 현재 필사에 반영돼 있어요."
+          }
+        }
+      }
+    },
+    "쓴 때 %@" : {
+      "comment" : "설정 › 확인이 필요한 필기 — 화면 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Written %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "쓴 때 %@"
+          }
+        }
+      }
+    },
+    "쓴 절을 지정하면 그 순간 모습이 위젯에 남아요." : {
+      "comment" : "패치노트 — 출시별 바뀐 점(제목 · 본문)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose a verse you wrote, and the widget keeps it as it looked at that moment."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "쓴 절을 지정하면 그 순간 모습이 위젯에 남아요."
+          }
+        }
+      }
+    },
+    "아직 담은 말씀이 없어요" : {
+      "comment" : "설정 › 위젯",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No verses yet"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "아직 담은 말씀이 없어요"
+          }
+        }
+      }
+    },
+    "아직 이 기기의 필사는 iCloud와 연결되지 않았어요." : {
+      "comment" : "설정 › iCloud — 계정 · 동기화 상태",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Writing on this device isn't connected to iCloud yet."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "아직 이 기기의 필사는 iCloud와 연결되지 않았어요."
+          }
+        }
+      }
+    },
+    "아직 즐겨찾기한 말씀이 없어요" : {
+      "comment" : "설정 › 위젯",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No favorites yet"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "아직 즐겨찾기한 말씀이 없어요"
+          }
+        }
+      }
+    },
+    "암호 다시 입력" : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Re-enter Password"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "암호 다시 입력"
+          }
+        }
+      }
+    },
+    "암호 확인" : {
+      "comment" : "설정 › 필사 백업 — 백업 만들기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirm Password"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "암호 확인"
+          }
+        }
+      }
+    },
+    "암호(8자 이상)" : {
+      "comment" : "설정 › 필사 백업 — 백업 만들기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Password (8+ characters)"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "암호(8자 이상)"
+          }
+        }
+      }
+    },
+    "암호가 맞지 않거나 파일이 손상됐어요. 암호를 확인해 다시 입력해 주세요." : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The password is wrong or the file is damaged. Check the password and enter it again."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "암호가 맞지 않거나 파일이 손상됐어요. 암호를 확인해 다시 입력해 주세요."
+          }
+        }
+      }
+    },
+    "암호는 %lld자 이상이어야 해요." : {
+      "comment" : "설정 › 필사 백업 — 백업 만들기 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "The password must be at least %lld character."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "The password must be at least %lld characters."
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "암호는 %lld자 이상이어야 해요."
+          }
+        }
+      }
+    },
+    "암호를 건 백업 파일 하나로 저장해요. 저장할 곳은 직접 골라요." : {
+      "comment" : "설정 › 필사 백업 — 백업 만들기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saves one password-protected backup file. You choose where to save it."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "암호를 건 백업 파일 하나로 저장해요. 저장할 곳은 직접 골라요."
+          }
+        }
+      }
+    },
+    "암호를 걸어 파일을 쓰고, 다시 열어 확인하는 중이에요" : {
+      "comment" : "설정 › 필사 백업 — 백업 만들기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encrypting, writing, and verifying the file…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "암호를 걸어 파일을 쓰고, 다시 열어 확인하는 중이에요"
+          }
+        }
+      }
+    },
+    "암호를 잊으면 새기다 앱도 이 파일을 열 수 없어요." : {
+      "comment" : "설정 › 필사 백업 — 백업 만들기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If you forget the password, even Carve can't open this file."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "암호를 잊으면 새기다 앱도 이 파일을 열 수 없어요."
+          }
+        }
+      }
+    },
+    "앞서 넣은 %lld장은 건너뛰고 남은 장부터 넣어요." : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Skips the %lld chapter already added and adds the rest."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Skips the %lld chapters already added and adds the rest."
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "앞서 넣은 %lld장은 건너뛰고 남은 장부터 넣어요."
+          }
+        }
+      }
+    },
+    "앱 버전" : {
+      "comment" : "설정 › 앱 버전",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App Version"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "앱 버전"
+          }
+        }
+      }
+    },
+    "앱 정보" : {
+      "comment" : "설정 › 앱 버전",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "About"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "앱 정보"
+          }
+        }
+      }
+    },
+    "앱에서 말씀을 골라도 홈 화면 위젯이 자동으로 생기지는 않아요." : {
+      "comment" : "설정 › 위젯",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choosing verses in the app doesn't add the widget to your Home Screen."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "앱에서 말씀을 골라도 홈 화면 위젯이 자동으로 생기지는 않아요."
+          }
+        }
+      }
+    },
+    "앱을 완전히 종료한 뒤 다시 열면 계정과 저장소를 다시 확인해요." : {
+      "comment" : "설정 › iCloud — 전체 삭제 · 연결 보류 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fully quit and reopen the app to check the account and storage again."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "앱을 완전히 종료한 뒤 다시 열면 계정과 저장소를 다시 확인해요."
+          }
+        }
+      }
+    },
+    "여기에 남겨 둔 필기는 다른 기기에서도 볼 수 있는 iCloud 백업을 뜻하지 않아요. 앱을 삭제하거나 ‘모든 필사 삭제’를 실행하면 사라질 수 있어요." : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drafts kept here aren't an iCloud backup and can't be seen on other devices. They may be lost if you delete the app or use ‘Delete All Writing Data’."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "여기에 남겨 둔 필기는 다른 기기에서도 볼 수 있는 iCloud 백업을 뜻하지 않아요. 앱을 삭제하거나 ‘모든 필사 삭제’를 실행하면 사라질 수 있어요."
+          }
+        }
+      }
+    },
+    "연결을 완료하려면 앱을 완전히 종료한 뒤 다시 열어 주세요." : {
+      "comment" : "설정 › iCloud — 전체 삭제 · 연결 보류 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To finish connecting, fully quit the app and open it again."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "연결을 완료하려면 앱을 완전히 종료한 뒤 다시 열어 주세요."
           }
         }
       }
@@ -137,6 +4279,2082 @@
         }
       }
     },
+    "예전에 저장한 필기" : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saved earlier"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "예전에 저장한 필기"
+          }
+        }
+      }
+    },
+    "옛 필사의 사본을 남기지 못했어요." : {
+      "comment" : "설정 › iCloud — 전체 삭제 · 연결 보류 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't keep a copy of older writing."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "옛 필사의 사본을 남기지 못했어요."
+          }
+        }
+      }
+    },
+    "완료" : {
+      "comment" : "여러 화면의 버튼 · 제목",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Done"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "완료"
+          }
+        }
+      }
+    },
+    "위젯" : {
+      "comment" : "설정 사이드바",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Widget"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "위젯"
+          }
+        }
+      }
+    },
+    "위젯에 담은 말씀" : {
+      "comment" : "설정 › 위젯",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verses in Widget"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "위젯에 담은 말씀"
+          }
+        }
+      }
+    },
+    "위젯에 담을 말씀" : {
+      "comment" : "설정 › 위젯",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verses for Widget"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "위젯에 담을 말씀"
+          }
+        }
+      }
+    },
+    "위젯에 표시하기" : {
+      "comment" : "설정 › 도움말",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show in a widget"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "위젯에 표시하기"
+          }
+        }
+      }
+    },
+    "위젯에서 모두 빼기" : {
+      "comment" : "설정 › 위젯",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove All from Widget"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "위젯에서 모두 빼기"
+          }
+        }
+      }
+    },
+    "위치 정보를 읽지 못한 필기" : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Position data unreadable"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "위치 정보를 읽지 못한 필기"
+          }
+        }
+      }
+    },
+    "위치 정보를 읽지 못해 현재 필사에 넣을 수 없어요. 필기는 이 iPad에 그대로 남아 있어요." : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Position data couldn't be read, so it can't be added to your current writing. The draft stays on this iPad."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "위치 정보를 읽지 못해 현재 필사에 넣을 수 없어요. 필기는 이 iPad에 그대로 남아 있어요."
+          }
+        }
+      }
+    },
+    "위치 정보를 읽지 못해 현재 필사에 넣지 못했어요. 필기는 그대로 남아 있어요." : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't add it because position data couldn't be read. The draft is kept."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "위치 정보를 읽지 못해 현재 필사에 넣지 못했어요. 필기는 그대로 남아 있어요."
+          }
+        }
+      }
+    },
+    "위험한 동작" : {
+      "comment" : "설정 › iCloud — 계정 · 동기화 상태",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Danger Zone"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "위험한 동작"
+          }
+        }
+      }
+    },
+    "의견 보내기" : {
+      "comment" : "설정 › 의견 보내기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send Feedback"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "의견 보내기"
+          }
+        }
+      }
+    },
+    "이 Apple 계정에서 복원할 구매 내역이 없어요." : {
+      "comment" : "설정 › 광고 제거",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "There are no purchases to restore for this Apple Account."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 Apple 계정에서 복원할 구매 내역이 없어요."
+          }
+        }
+      }
+    },
+    "이 iPad에 남겨 둔 필기 %lld개 · %@" : {
+      "comment" : "설정 › 확인이 필요한 필기 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%#@drafts@ kept on this iPad · %2$@"
+          },
+          "substitutions" : {
+            "drafts" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg draft"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg drafts"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 iPad에 남겨 둔 필기 %lld개 · %@"
+          }
+        }
+      }
+    },
+    "이 iPad에 남겨 둔 필기 %lld개도 모두 지워져요(확인이 필요한 필기 · 다른 계정에서 쓴 것 · 읽지 못한 파일 포함)." : {
+      "comment" : "설정 › iCloud — 전체 삭제 · 연결 보류 안내 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "The %lld draft kept on this iPad will also be deleted (including drafts to review, writing from other accounts, and unreadable files)."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "All %lld drafts kept on this iPad will also be deleted (including drafts to review, writing from other accounts, and unreadable files)."
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 iPad에 남겨 둔 필기 %lld개도 모두 지워져요(확인이 필요한 필기 · 다른 계정에서 쓴 것 · 읽지 못한 파일 포함)."
+          }
+        }
+      }
+    },
+    "이 iPad에 남겨 둔 필기 일부를 읽지 못해 멈췄어요. 설정의 ‘확인이 필요한 필기’에서 확인할 수 있어요." : {
+      "comment" : "설정 › 필사 백업 — 백업 만들기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stopped because some drafts kept on this iPad couldn't be read. Check them in Settings › ‘Drafts to Review’."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 iPad에 남겨 둔 필기 일부를 읽지 못해 멈췄어요. 설정의 ‘확인이 필요한 필기’에서 확인할 수 있어요."
+          }
+        }
+      }
+    },
+    "이 iPad에 남겨 둔 필기가 없어요" : {
+      "comment" : "설정 › 확인이 필요한 필기 — 화면",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No drafts kept on this iPad"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 iPad에 남겨 둔 필기가 없어요"
+          }
+        }
+      }
+    },
+    "이 iPad에 남겨 둔 필기도 모두 지워져요(확인이 필요한 필기 · 다른 계정에서 쓴 것 · 읽지 못한 파일 포함)." : {
+      "comment" : "설정 › iCloud — 전체 삭제 · 연결 보류 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All drafts kept on this iPad will also be deleted (including drafts to review, writing from other accounts, and unreadable files)."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 iPad에 남겨 둔 필기도 모두 지워져요(확인이 필요한 필기 · 다른 계정에서 쓴 것 · 읽지 못한 파일 포함)."
+          }
+        }
+      }
+    },
+    "이 iPad에 남겨 둔 필기를 읽지 못했어요. 파일은 그대로 있어요." : {
+      "comment" : "설정 › 확인이 필요한 필기 — 읽기 · 지우기 결과",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't read the drafts kept on this iPad. The files are kept."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 iPad에 남겨 둔 필기를 읽지 못했어요. 파일은 그대로 있어요."
+          }
+        }
+      }
+    },
+    "이 iPad에 메일 계정이 설정돼 있지 않아 지금은 보낼 수 없어요. 설정 앱의 메일에서 계정을 추가하거나 App Store 리뷰로 남겨 주세요." : {
+      "comment" : "설정 › 의견 보내기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No mail account is set up on this iPad, so you can't send right now. Add an account in Settings › Mail, or leave an App Store review."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 iPad에 메일 계정이 설정돼 있지 않아 지금은 보낼 수 없어요. 설정 앱의 메일에서 계정을 추가하거나 App Store 리뷰로 남겨 주세요."
+          }
+        }
+      }
+    },
+    "이 iPad에 메일 계정이 설정돼 있지 않아요." : {
+      "comment" : "설정 › 의견 보내기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No mail account is set up on this iPad."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 iPad에 메일 계정이 설정돼 있지 않아요."
+          }
+        }
+      }
+    },
+    "이 iPad에서 썼지만 현재 필사에 반영됐는지 확인이 필요한 내용이에요. iCloud 계정을 확인하지 못했거나, 같은 절의 저장된 내용이 달라져 자동으로 반영하지 않았어요." : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "These were written on this iPad, but it's unclear whether they made it into your current writing. They weren't applied automatically because the iCloud account couldn't be confirmed or the saved verse changed."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 iPad에서 썼지만 현재 필사에 반영됐는지 확인이 필요한 내용이에요. iCloud 계정을 확인하지 못했거나, 같은 절의 저장된 내용이 달라져 자동으로 반영하지 않았어요."
+          }
+        }
+      }
+    },
+    "이 iPad의 보존 영역을 열지 못해 지우지 못했어요." : {
+      "comment" : "설정 › 확인이 필요한 필기 — 읽기 · 지우기 결과",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't open this iPad's local storage, so nothing was deleted."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 iPad의 보존 영역을 열지 못해 지우지 못했어요."
+          }
+        }
+      }
+    },
+    "이 iPad의 보존 영역을 열지 못했어요." : {
+      "comment" : "설정 › 확인이 필요한 필기 — 견주기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't open this iPad's local storage."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 iPad의 보존 영역을 열지 못했어요."
+          }
+        }
+      }
+    },
+    "이 iPad의 보존 영역을 열지 못했어요. 앱을 다시 켜 보세요." : {
+      "comment" : "설정 › 확인이 필요한 필기 — 읽기 · 지우기 결과",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't open this iPad's local storage. Try reopening the app."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 iPad의 보존 영역을 열지 못했어요. 앱을 다시 켜 보세요."
+          }
+        }
+      }
+    },
+    "이 iPad의 필사가 지금 iCloud 계정의 것인지 아직 확인하지 못했어요." : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It's not yet confirmed that the writing on this iPad belongs to the current iCloud account."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 iPad의 필사가 지금 iCloud 계정의 것인지 아직 확인하지 못했어요."
+          }
+        }
+      }
+    },
+    "이 계정에서 씀" : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Written with this account"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 계정에서 씀"
+          }
+        }
+      }
+    },
+    "이 계정으로 처음부터" : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start Over with This Account"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 계정으로 처음부터"
+          }
+        }
+      }
+    },
+    "이 기기에 계정과 연결되지 않은 옛 필사 %lld개가 있어요. 사본은 이 기기에 보관했어요." : {
+      "comment" : "설정 › iCloud — 전체 삭제 · 연결 보류 안내 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "This device has %lld older writing entry not linked to an account. A copy is kept on this device."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "This device has %lld older writing entries not linked to an account. Copies are kept on this device."
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 기기에 계정과 연결되지 않은 옛 필사 %lld개가 있어요. 사본은 이 기기에 보관했어요."
+          }
+        }
+      }
+    },
+    "이 기기에 저장됐어요. iCloud 전송은 따로 진행돼요." : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saved on this device. Sending to iCloud happens separately."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 기기에 저장됐어요. iCloud 전송은 따로 진행돼요."
+          }
+        }
+      }
+    },
+    "이 기기에 저장된 필사를 백업해요. 아직 동기화되지 않은 다른 기기의 필사는 포함되지 않을 수 있어요. 즐겨찾기 · 설정 · 위젯은 담지 않아요." : {
+      "comment" : "설정 › 필사 백업 — 백업 만들기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Backs up the writing saved on this device. Writing from other devices that hasn't synced yet may not be included. Favorites, settings, and widgets aren't included."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 기기에 저장된 필사를 백업해요. 아직 동기화되지 않은 다른 기기의 필사는 포함되지 않을 수 있어요. 즐겨찾기 · 설정 · 위젯은 담지 않아요."
+          }
+        }
+      }
+    },
+    "이 기기의 옛 필사가 어느 계정의 것인지 확인하지 못했어요." : {
+      "comment" : "설정 › iCloud — 전체 삭제 · 연결 보류 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't confirm which account older writing on this device belongs to."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 기기의 옛 필사가 어느 계정의 것인지 확인하지 못했어요."
+          }
+        }
+      }
+    },
+    "이 기기의 옛 필사가 현재 계정에 속하는지 확인하지 못했어요." : {
+      "comment" : "설정 › iCloud — 전체 삭제 · 연결 보류 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't confirm that older writing on this device belongs to the current account."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 기기의 옛 필사가 현재 계정에 속하는지 확인하지 못했어요."
+          }
+        }
+      }
+    },
+    "이 묶음은 지금 계정에서 열어 보지 않아요. 개수와 용량만 보이고, 그 계정으로 돌아오면 자세히 볼 수 있어요. 파일은 그대로 있어요." : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This group isn't opened with the current account. Only the count and size are shown; switch back to that account to see details. The files are kept."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 묶음은 지금 계정에서 열어 보지 않아요. 개수와 용량만 보이고, 그 계정으로 돌아오면 자세히 볼 수 있어요. 파일은 그대로 있어요."
+          }
+        }
+      }
+    },
+    "이 묶음을 읽지 못했어요. 파일은 그대로 두고 다시 읽어 볼 수 있어요." : {
+      "comment" : "설정 › 확인이 필요한 필기 — 화면",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't read this group. The files are kept; you can try reloading."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 묶음을 읽지 못했어요. 파일은 그대로 두고 다시 읽어 볼 수 있어요."
+          }
+        }
+      }
+    },
+    "이 버전의 앱이 읽을 수 없는 형식의 백업이에요. 앱을 업데이트한 뒤 다시 불러와 주세요." : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This version of the app can't read this backup format. Update the app and import again."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 버전의 앱이 읽을 수 없는 형식의 백업이에요. 앱을 업데이트한 뒤 다시 불러와 주세요."
+          }
+        }
+      }
+    },
+    "이 장들은 대조하지 못했어요 — %@. 파일은 그대로 있어요." : {
+      "comment" : "설정 › 확인이 필요한 필기 — 화면 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't compare these chapters — %@. The files are kept."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 장들은 대조하지 못했어요 — %@. 파일은 그대로 있어요."
+          }
+        }
+      }
+    },
+    "이 필기로 바꾸기" : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Replace with This Draft"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 필기로 바꾸기"
+          }
+        }
+      }
+    },
+    "이 필기를 놓을 위치 정보를 읽지 못해 현재 필사에 넣을 수 없어요. 미리보기로 내용만 확인할 수 있고, 필기는 이 iPad에 그대로 남아 있어요." : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Its position data couldn't be read, so it can't be added to your current writing. You can view the preview only. The draft stays on this iPad."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 필기를 놓을 위치 정보를 읽지 못해 현재 필사에 넣을 수 없어요. 미리보기로 내용만 확인할 수 있고, 필기는 이 iPad에 그대로 남아 있어요."
+          }
+        }
+      }
+    },
+    "이 필기를 쓴 뒤 ‘모든 필사 삭제’가 있었어요. 넣으면 지웠던 내용이 다시 들어갈 수 있어요." : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "‘Delete All Writing Data’ was used after this draft was written. Adding it may bring back deleted writing."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 필기를 쓴 뒤 ‘모든 필사 삭제’가 있었어요. 넣으면 지웠던 내용이 다시 들어갈 수 있어요."
+          }
+        }
+      }
+    },
+    "이 필기를 쓴 뒤 같은 절에 저장된 내용이 바뀌었어요. 현재 내용을 덮어쓰지 않도록 이 필기를 따로 남겨 두었어요. 두 내용을 비교해 사용할 필기를 선택해 주세요." : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The saved verse changed after this was written. This draft was kept separately so your current writing isn't overwritten. Compare the two and choose which to use."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 필기를 쓴 뒤 같은 절에 저장된 내용이 바뀌었어요. 현재 내용을 덮어쓰지 않도록 이 필기를 따로 남겨 두었어요. 두 내용을 비교해 사용할 필기를 선택해 주세요."
+          }
+        }
+      }
+    },
+    "이 필기를 쓴 뒤 이 절이 지워졌어요. 넣으면 지웠던 절에 필기가 다시 들어가요." : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This verse was cleared after the draft was written. Adding it puts handwriting back into the cleared verse."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 필기를 쓴 뒤 이 절이 지워졌어요. 넣으면 지웠던 절에 필기가 다시 들어가요."
+          }
+        }
+      }
+    },
+    "이 필기를 쓸 때는 iCloud 계정을 확인할 수 없었어요. 어느 계정의 필사에 넣어야 할지 확인하지 못해 이 iPad에 따로 저장했어요. 현재 필사에 자동으로 반영하지 않았으니, 내용을 확인한 뒤 넣어 주세요." : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The iCloud account couldn't be checked when this was written, so it was saved separately on this iPad. It wasn't added to your current writing automatically. Review it, then add it."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 필기를 쓸 때는 iCloud 계정을 확인할 수 없었어요. 어느 계정의 필사에 넣어야 할지 확인하지 못해 이 iPad에 따로 저장했어요. 현재 필사에 자동으로 반영하지 않았으니, 내용을 확인한 뒤 넣어 주세요."
+          }
+        }
+      }
+    },
+    "이 필기를 쓸 때와 지금의 삭제 기록 기준이 달라 자동으로 반영하지 않았어요. 지웠던 내용이 다시 들어가지 않는지 확인한 뒤 넣어 주세요." : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The deletion history differs from when this was written, so it wasn't applied automatically. Make sure it won't bring back deleted writing before adding it."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 필기를 쓸 때와 지금의 삭제 기록 기준이 달라 자동으로 반영하지 않았어요. 지웠던 내용이 다시 들어가지 않는지 확인한 뒤 넣어 주세요."
+          }
+        }
+      }
+    },
+    "이 필기를 현재 필사에 넣기" : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add to Current Writing"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 필기를 현재 필사에 넣기"
+          }
+        }
+      }
+    },
+    "이미 넣은 필사는 그대로 있어요." : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Writing already added stays as it is."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이미 넣은 필사는 그대로 있어요."
+          }
+        }
+      }
+    },
+    "이미 반영된 필기예요." : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This draft is already applied."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이미 반영된 필기예요."
+          }
+        }
+      }
+    },
+    "이미 저장된 필기" : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Already saved"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이미 저장된 필기"
+          }
+        }
+      }
+    },
+    "이미지로 저장하기" : {
+      "comment" : "설정 › 도움말",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save as an image"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이미지로 저장하기"
+          }
+        }
+      }
+    },
+    "이번 실행에서는 아직 주고받은 기록이 없어요" : {
+      "comment" : "설정 › iCloud — 계정 · 동기화 상태",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing synced yet since the app opened"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이번 실행에서는 아직 주고받은 기록이 없어요"
+          }
+        }
+      }
+    },
+    "이어서 불러오기" : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Resume Import"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이어서 불러오기"
+          }
+        }
+      }
+    },
+    "이어서 불러오면 남은 장부터 넣어요. 암호는 저장하지 않아서 백업 암호를 다시 입력해야 해요." : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Resuming adds the remaining chapters. The password isn't stored, so you'll need to enter the backup password again."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이어서 불러오면 남은 장부터 넣어요. 암호는 저장하지 않아서 백업 암호를 다시 입력해야 해요."
+          }
+        }
+      }
+    },
+    "이전 필사 기록에 더할 것" : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To add to history"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이전 필사 기록에 더할 것"
+          }
+        }
+      }
+    },
+    "이전 필사 보기 · 이미지 저장 · 위젯에 표시 · 지우기가 나와요." : {
+      "comment" : "설정 › 도움말",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shows Previous Writing, Save Image, Show in Widget, and Delete."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이전 필사 보기 · 이미지 저장 · 위젯에 표시 · 지우기가 나와요."
+          }
+        }
+      }
+    },
+    "이전 필사·이미지 저장·위젯·지우기를 한 자리에서." : {
+      "comment" : "패치노트 — 출시별 바뀐 점(제목 · 본문)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Previous Writing, Save Image, Widget, and Delete in one place."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이전 필사·이미지 저장·위젯·지우기를 한 자리에서."
+          }
+        }
+      }
+    },
+    "일반 문의" : {
+      "comment" : "설정 › 의견 보내기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "General Question"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "일반 문의"
+          }
+        }
+      }
+    },
+    "일부 장에서 절이 겹치거나 줄이 따로 떨어져 보이던 문제와 합쳐진 절 · 시편 권 표시를 고쳤어요. 가로 화면에서 장 목록이 내려앉던 문제도 고쳤어요." : {
+      "comment" : "패치노트 — 출시별 바뀐 점(제목 · 본문)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fixed verses overlapping or lines splitting apart in some chapters, and how combined verses and Psalms book numbers are shown. Also fixed the chapter list sliding down in landscape."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "일부 장에서 절이 겹치거나 줄이 따로 떨어져 보이던 문제와 합쳐진 절 · 시편 권 표시를 고쳤어요. 가로 화면에서 장 목록이 내려앉던 문제도 고쳤어요."
+          }
+        }
+      }
+    },
+    "읽지 못하는 위치 정보" : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unreadable position data"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "읽지 못하는 위치 정보"
+          }
+        }
+      }
+    },
+    "읽지 못한 파일 %lld개" : {
+      "comment" : "설정 › 확인이 필요한 필기 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld unreadable file"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld unreadable files"
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "읽지 못한 파일 %lld개"
+          }
+        }
+      }
+    },
+    "읽지 못한 파일 %lld개를 지울까요?" : {
+      "comment" : "설정 › 확인이 필요한 필기 — 화면 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Delete %lld unreadable file?"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Delete %lld unreadable files?"
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "읽지 못한 파일 %lld개를 지울까요?"
+          }
+        }
+      }
+    },
+    "읽지 못한 파일 %lld개를 지웠어요." : {
+      "comment" : "설정 › 확인이 필요한 필기 — 읽기 · 지우기 결과 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Deleted %lld unreadable file."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Deleted %lld unreadable files."
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "읽지 못한 파일 %lld개를 지웠어요."
+          }
+        }
+      }
+    },
+    "읽지 못한 파일을 지우지 못했어요. 파일은 그대로 있어요." : {
+      "comment" : "설정 › 확인이 필요한 필기 — 읽기 · 지우기 결과",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't delete the unreadable files. The files are kept."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "읽지 못한 파일을 지우지 못했어요. 파일은 그대로 있어요."
+          }
+        }
+      }
+    },
+    "읽지 못해 보관만 하는 파일 %lld개 · %@" : {
+      "comment" : "설정 › 확인이 필요한 필기 — 화면 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%#@files@ kept but unreadable · %2$@"
+          },
+          "substitutions" : {
+            "files" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg file"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg files"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "읽지 못해 보관만 하는 파일 %lld개 · %@"
+          }
+        }
+      }
+    },
+    "읽지 못해 옆으로 옮겨 둔 파일이 %lld개 있어요 · %@. 넣을 수는 없고 보관만 해요." : {
+      "comment" : "설정 › 확인이 필요한 필기 — 화면 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%#@files@ set aside as unreadable · %2$@. Unreadable files can't be added, only kept."
+          },
+          "substitutions" : {
+            "files" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg file"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg files"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "읽지 못해 옆으로 옮겨 둔 파일이 %lld개 있어요 · %@. 넣을 수는 없고 보관만 해요."
+          }
+        }
+      }
+    },
+    "읽지 못했어요 · 파일은 그대로 있어요" : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't read · Files are kept"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "읽지 못했어요 · 파일은 그대로 있어요"
+          }
+        }
+      }
+    },
+    "작성한 의견을 개발자에게 보내요" : {
+      "comment" : "설정 › 의견 보내기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send this feedback to the developer"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "작성한 의견을 개발자에게 보내요"
+          }
+        }
+      }
+    },
+    "저장" : {
+      "comment" : "설정 사이드바",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Storage"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "저장"
+          }
+        }
+      }
+    },
+    "저장됐는지 확인하지 못한 필기" : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save not confirmed"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "저장됐는지 확인하지 못한 필기"
+          }
+        }
+      }
+    },
+    "저장된 필사를 읽지 못해 미리보기를 만들지 못했어요. 잠시 뒤 다시 시도해 주세요." : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't read your saved writing, so the preview wasn't created. Try again in a moment."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "저장된 필사를 읽지 못해 미리보기를 만들지 못했어요. 잠시 뒤 다시 시도해 주세요."
+          }
+        }
+      }
+    },
+    "저장된 필사를 읽지 못해 백업을 만들지 못했어요. 잠시 뒤 다시 시도해 주세요." : {
+      "comment" : "설정 › 필사 백업 — 백업 만들기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't read your saved writing, so the backup wasn't created. Try again in a moment."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "저장된 필사를 읽지 못해 백업을 만들지 못했어요. 잠시 뒤 다시 시도해 주세요."
+          }
+        }
+      }
+    },
+    "저장을 마친 뒤 같은 절을 이어서 고친 예전 필기예요. 확인할 필요는 없지만 지우지 않고 남겨 두었어요." : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "An older draft saved before later edits to this verse. No need to review it, but it's kept."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "저장을 마친 뒤 같은 절을 이어서 고친 예전 필기예요. 확인할 필요는 없지만 지우지 않고 남겨 두었어요."
+          }
+        }
+      }
+    },
+    "저장하던 중에 앱이 종료됐고, 그 뒤 같은 절의 내용이 바뀌었어요. 이 필기가 저장됐는지 확인할 수 없어 따로 남겨 두었어요. 현재 필사와 비교해 사용할 필기를 선택해 주세요." : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The app closed while saving, and the verse changed afterward. It's unclear whether this draft was saved, so it was kept separately. Compare it with your current writing and choose which to use."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "저장하던 중에 앱이 종료됐고, 그 뒤 같은 절의 내용이 바뀌었어요. 이 필기가 저장됐는지 확인할 수 없어 따로 남겨 두었어요. 현재 필사와 비교해 사용할 필기를 선택해 주세요."
+          }
+        }
+      }
+    },
+    "저장하지 않았어요. 만든 파일은 이 iPad에서 지웠어요." : {
+      "comment" : "설정 › 필사 백업 — 백업 만들기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not saved. The file was removed from this iPad."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "저장하지 않았어요. 만든 파일은 이 iPad에서 지웠어요."
+          }
+        }
+      }
+    },
+    "저장할 곳 고르기" : {
+      "comment" : "설정 › 필사 백업 — 백업 만들기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose Location"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "저장할 곳 고르기"
+          }
+        }
+      }
+    },
+    "적용" : {
+      "comment" : "여러 화면의 버튼 · 제목",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apply"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "적용"
+          }
+        }
+      }
+    },
+    "적용 중에 모든 필사가 지워져 멈췄어요. ‘백업 불러오기’를 다시 열면 처음부터 다시 불러올 수 있어요." : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stopped because all writing was deleted while adding. Open ‘Import Backup’ again to import from the start."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "적용 중에 모든 필사가 지워져 멈췄어요. ‘백업 불러오기’를 다시 열면 처음부터 다시 불러올 수 있어요."
+          }
+        }
+      }
+    },
+    "절마다 쓰는 캔버스 설정이 없어졌어요. 그동안 쓴 필사는 그대로예요." : {
+      "comment" : "패치노트 — 출시별 바뀐 점(제목 · 본문)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The per-verse canvas setting is gone. Everything you've written stays the same."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "절마다 쓰는 캔버스 설정이 없어졌어요. 그동안 쓴 필사는 그대로예요."
+          }
+        }
+      }
+    },
+    "절을 길게 눌러 메뉴 열기" : {
+      "comment" : "설정 › 도움말",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Touch and hold a verse for its menu"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "절을 길게 눌러 메뉴 열기"
+          }
+        }
+      }
+    },
+    "절을 길게 눌러보세요" : {
+      "comment" : "패치노트 — 출시별 바뀐 점(제목 · 본문)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Touch and hold a verse"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "절을 길게 눌러보세요"
+          }
+        }
+      }
+    },
+    "제목" : {
+      "comment" : "설정 › 의견 보내기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Subject"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "제목"
+          }
+        }
+      }
+    },
+    "제목을 적어 주세요" : {
+      "comment" : "설정 › 의견 보내기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enter a subject"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "제목을 적어 주세요"
+          }
+        }
+      }
+    },
+    "즐겨찾기에서 고른 말씀을 홈 화면에 띄워요. 여러 개를 담으면 한 시간에 하나씩 돌아가며 보여요." : {
+      "comment" : "설정 › 위젯",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show verses you pick from Favorites on your Home Screen. With several verses, a new one appears every hour."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "즐겨찾기에서 고른 말씀을 홈 화면에 띄워요. 여러 개를 담으면 한 시간에 하나씩 돌아가며 보여요."
+          }
+        }
+      }
+    },
+    "즐겨찾기에서 말씀을 골라 홈 화면에 띄워요." : {
+      "comment" : "설정 › 위젯",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pick verses from Favorites to show on your Home Screen."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "즐겨찾기에서 말씀을 골라 홈 화면에 띄워요."
+          }
+        }
+      }
+    },
+    "즐겨찾기와 위젯에 담은 말씀도 함께 사라져요." : {
+      "comment" : "설정 › iCloud — 전체 삭제 · 연결 보류 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Favorites and verses in the widget will be removed too."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "즐겨찾기와 위젯에 담은 말씀도 함께 사라져요."
+          }
+        }
+      }
+    },
+    "지금 계정" : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Current account"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지금 계정"
+          }
+        }
+      }
+    },
+    "지금 계정에서 열어 보지 않은 필기 %lld개는 분류하지 않았어요." : {
+      "comment" : "설정 › 확인이 필요한 필기 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld draft not opened with this account wasn't sorted."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld drafts not opened with this account weren't sorted."
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지금 계정에서 열어 보지 않은 필기 %lld개는 분류하지 않았어요."
+          }
+        }
+      }
+    },
+    "지금 계정에서는 열어 보지 않아요" : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not opened with this account"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지금 계정에서는 열어 보지 않아요"
+          }
+        }
+      }
+    },
+    "지금 계정의 필사에는 이어서 넣지 않아요. 이미 넣은 필사는 그대로 있어요." : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It won't continue into the current account's writing. Writing already added stays as it is."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지금 계정의 필사에는 이어서 넣지 않아요. 이미 넣은 필사는 그대로 있어요."
+          }
+        }
+      }
+    },
+    "지금 그 절의 필기를 읽지 못했어요. 없다는 뜻은 아니에요." : {
+      "comment" : "설정 › 확인이 필요한 필기 — 견주기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't read the current handwriting for that verse. This doesn't mean there is none."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지금 그 절의 필기를 읽지 못했어요. 없다는 뜻은 아니에요."
+          }
+        }
+      }
+    },
+    "지금은 iCloud 연결이 보류돼 이 기기에만 저장돼요" : {
+      "comment" : "설정 › iCloud — 전체 삭제 · 연결 보류 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud connection is on hold — saving only on this device"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지금은 iCloud 연결이 보류돼 이 기기에만 저장돼요"
+          }
+        }
+      }
+    },
+    "지금은 iCloud 연결이 보류되어 전체 삭제를 할 수 없어요.\n연결 문제를 해결한 뒤 다시 시도해 주세요." : {
+      "comment" : "설정 › iCloud — 전체 삭제 · 연결 보류 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud connection is on hold, so you can't delete everything right now.\nResolve the connection issue and try again."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지금은 iCloud 연결이 보류되어 전체 삭제를 할 수 없어요.\n연결 문제를 해결한 뒤 다시 시도해 주세요."
+          }
+        }
+      }
+    },
+    "지금은 구매할 수 없어요. 잠시 뒤 다시 시도해 주세요." : {
+      "comment" : "설정 › 광고 제거",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Purchases aren't available right now. Try again in a moment."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지금은 구매할 수 없어요. 잠시 뒤 다시 시도해 주세요."
+          }
+        }
+      }
+    },
+    "지금은 미리보기만 할 수 있어요." : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only a preview is available right now."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지금은 미리보기만 할 수 있어요."
+          }
+        }
+      }
+    },
+    "지금은 백업을 만들 수 없어요. 앱을 다시 연 뒤 시도해 주세요." : {
+      "comment" : "설정 › 필사 백업 — 백업 만들기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Can't create a backup right now. Reopen the app and try again."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지금은 백업을 만들 수 없어요. 앱을 다시 연 뒤 시도해 주세요."
+          }
+        }
+      }
+    },
+    "지금은 백업을 불러올 수 없어요. 앱을 다시 연 뒤 시도해 주세요." : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Can't import a backup right now. Reopen the app and try again."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지금은 백업을 불러올 수 없어요. 앱을 다시 연 뒤 시도해 주세요."
+          }
+        }
+      }
+    },
+    "지금은 불러올 수 없어요. 앱을 다시 연 뒤 시도해 주세요." : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Can't import right now. Reopen the app and try again."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지금은 불러올 수 없어요. 앱을 다시 연 뒤 시도해 주세요."
+          }
+        }
+      }
+    },
+    "지금은 이 기기에만 저장돼요." : {
+      "comment" : "설정 › iCloud — 계정 · 동기화 상태",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "For now, it's saved only on this device."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지금은 이 기기에만 저장돼요."
+          }
+        }
+      }
+    },
+    "지금은 현재 필사에 넣을 수 없어요. %@ 내용은 확인하고 비교할 수 있어요." : {
+      "comment" : "설정 › 확인이 필요한 필기 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Can't add to your current writing right now. %@ You can still review and compare."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지금은 현재 필사에 넣을 수 없어요. %@ 내용은 확인하고 비교할 수 있어요."
+          }
+        }
+      }
+    },
+    "지우기" : {
+      "comment" : "여러 화면의 버튼 · 제목",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지우기"
+          }
+        }
+      }
+    },
+    "지운 데이터는 되돌릴 수 없어요." : {
+      "comment" : "설정 › iCloud — 전체 삭제 · 연결 보류 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deleted data can't be restored."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지운 데이터는 되돌릴 수 없어요."
+          }
+        }
+      }
+    },
+    "지운 절이라 기록에만" : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "History only (cleared verse)"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지운 절이라 기록에만"
+          }
+        }
+      }
+    },
+    "지운 파일은 되돌릴 수 없어요. 먼저 내보내 두면 나중에 살펴볼 수 있어요." : {
+      "comment" : "설정 › 확인이 필요한 필기 — 화면",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deleted files can't be restored. Export them first if you want to look at them later."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지운 파일은 되돌릴 수 없어요. 먼저 내보내 두면 나중에 살펴볼 수 있어요."
+          }
+        }
+      }
+    },
+    "지울 필사 데이터가 없어요." : {
+      "comment" : "설정 › iCloud — 전체 삭제 · 연결 보류 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "There's no writing data to delete."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지울 필사 데이터가 없어요."
+          }
+        }
+      }
+    },
+    "지원" : {
+      "comment" : "설정 사이드바",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Support"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지원"
+          }
+        }
+      }
+    },
+    "지정한 순간의 모습이 위젯에 남아요. 홈 화면에 위젯을 먼저 추가해 주세요." : {
+      "comment" : "설정 › 도움말",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The widget keeps the verse as it looked when you chose it. Add the widget to your Home Screen first."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지정한 순간의 모습이 위젯에 남아요. 홈 화면에 위젯을 먼저 추가해 주세요."
+          }
+        }
+      }
+    },
+    "처음부터 다시 보기" : {
+      "comment" : "설정 › 도움말",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show Guide Again"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "처음부터 다시 보기"
+          }
+        }
+      }
+    },
+    "첨부 사진 · 선택" : {
+      "comment" : "설정 › 의견 보내기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photos · Optional"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "첨부 사진 · 선택"
+          }
+        }
+      }
+    },
+    "최초 진입 안내를 다시 보려면" : {
+      "comment" : "설정 › 도움말",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To see the welcome guide again"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "최초 진입 안내를 다시 보려면"
+          }
+        }
+      }
+    },
+    "취소" : {
+      "comment" : "여러 화면의 버튼 · 제목",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancel"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "취소"
+          }
+        }
+      }
+    },
+    "켬" : {
+      "comment" : "설정 사이드바",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "켬"
+          }
+        }
+      }
+    },
+    "파일 고르기" : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose File"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "파일 고르기"
+          }
+        }
+      }
+    },
+    "파일 선택" : {
+      "comment" : "설정 › 의견 보내기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose File"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "파일 선택"
+          }
+        }
+      }
+    },
+    "파일 이름: %@" : {
+      "comment" : "설정 › 필사 백업 — 백업 만들기 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "File name: %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "파일 이름: %@"
+          }
+        }
+      }
+    },
     "판" : {
       "comment" : "성경 본문 출처 — 항목 이름: 본문의 판(예: 1769년 표준판)",
       "localizations" : {
@@ -150,6 +6368,922 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "판"
+          }
+        }
+      }
+    },
+    "패치노트" : {
+      "comment" : "패치노트 화면",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What's New"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "패치노트"
+          }
+        }
+      }
+    },
+    "필기 %lld개 · %@" : {
+      "comment" : "설정 › 확인이 필요한 필기 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%#@drafts@ · %2$@"
+          },
+          "substitutions" : {
+            "drafts" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg draft"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg drafts"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필기 %lld개 · %@"
+          }
+        }
+      }
+    },
+    "필기 없음" : {
+      "comment" : "설정 › 확인이 필요한 필기 — 화면",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No handwriting"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필기 없음"
+          }
+        }
+      }
+    },
+    "필기가 사라지지 않도록 이 iPad에 따로 남겨 두었어요. 현재 필사와 비교한 뒤 사용할 내용을 선택해 주세요." : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "They're kept separately on this iPad so nothing is lost. Compare them with your current writing and choose what to use."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필기가 사라지지 않도록 이 iPad에 따로 남겨 두었어요. 현재 필사와 비교한 뒤 사용할 내용을 선택해 주세요."
+          }
+        }
+      }
+    },
+    "필기는 지웠지만 즐겨찾기가 남았을 수 있어요." : {
+      "comment" : "설정 › iCloud — 전체 삭제 · 연결 보류 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Handwriting was deleted, but favorites may remain."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필기는 지웠지만 즐겨찾기가 남았을 수 있어요."
+          }
+        }
+      }
+    },
+    "필기는 지웠지만 즐겨찾기와 위젯에 담은 말씀이 남았을 수 있어요." : {
+      "comment" : "설정 › iCloud — 전체 삭제 · 연결 보류 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Handwriting was deleted, but favorites and widget verses may remain."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필기는 지웠지만 즐겨찾기와 위젯에 담은 말씀이 남았을 수 있어요."
+          }
+        }
+      }
+    },
+    "필기와 즐겨찾기는 지웠지만 위젯에 담은 말씀이 남았을 수 있어요." : {
+      "comment" : "설정 › iCloud — 전체 삭제 · 연결 보류 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Handwriting and favorites were deleted, but widget verses may remain."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필기와 즐겨찾기는 지웠지만 위젯에 담은 말씀이 남았을 수 있어요."
+          }
+        }
+      }
+    },
+    "필사" : {
+      "comment" : "설정 사이드바",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Writing"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필사"
+          }
+        }
+      }
+    },
+    "필사 데이터를 모두 지우지 못했어요" : {
+      "comment" : "설정 › iCloud — 전체 삭제 · 연결 보류 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't delete all writing data"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필사 데이터를 모두 지우지 못했어요"
+          }
+        }
+      }
+    },
+    "필사 백업" : {
+      "comment" : "설정 › 필사 백업 — 백업 만들기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Backup"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필사 백업"
+          }
+        }
+      }
+    },
+    "필사 백업 · 불러오기" : {
+      "comment" : "패치노트 — 출시별 바뀐 점(제목 · 본문)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Backup and import"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필사 백업 · 불러오기"
+          }
+        }
+      }
+    },
+    "필사 캔버스는 하나로" : {
+      "comment" : "패치노트 — 출시별 바뀐 점(제목 · 본문)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "One writing canvas"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필사 캔버스는 하나로"
+          }
+        }
+      }
+    },
+    "필사 화면 위" : {
+      "comment" : "설정 사이드바",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "with the writing screen's"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필사 화면 위"
+          }
+        }
+      }
+    },
+    "필사 화면 위 본문 설정에서 「손가락 필사 허용」을 켜면 손가락으로도 필사할 수 있어요. 이때는 두 손가락으로 스크롤해요." : {
+      "comment" : "설정 › 도움말",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn on “Allow Finger Writing” in Text Settings at the top of the writing screen to write with your finger, too. Then scroll with two fingers."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필사 화면 위 본문 설정에서 「손가락 필사 허용」을 켜면 손가락으로도 필사할 수 있어요. 이때는 두 손가락으로 스크롤해요."
+          }
+        }
+      }
+    },
+    "필사 화면에 아직 저장하지 못한 필기가 있어요. 필사 화면에서 저장을 다시 시도한 뒤 백업해 주세요." : {
+      "comment" : "설정 › 필사 백업 — 백업 만들기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Some handwriting on the writing screen isn't saved yet. Try saving again there, then back up."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필사 화면에 아직 저장하지 못한 필기가 있어요. 필사 화면에서 저장을 다시 시도한 뒤 백업해 주세요."
+          }
+        }
+      }
+    },
+    "필사 화면에서 절을 길게 눌러 즐겨찾기에 추가해 보세요." : {
+      "comment" : "설정 › 위젯",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Touch and hold a verse on the writing screen to add it to Favorites."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필사 화면에서 절을 길게 눌러 즐겨찾기에 추가해 보세요."
+          }
+        }
+      }
+    },
+    "필사 화면을 정리했어요" : {
+      "comment" : "패치노트 — 출시별 바뀐 점(제목 · 본문)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A cleaner writing screen"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필사 화면을 정리했어요"
+          }
+        }
+      }
+    },
+    "필사가 같은 계정의 다른 기기로 전해져요." : {
+      "comment" : "설정 › iCloud — 계정 · 동기화 상태",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your writing syncs to other devices on the same account."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필사가 같은 계정의 다른 기기로 전해져요."
+          }
+        }
+      }
+    },
+    "필사를 iCloud에 올리지 못했어요 · 이 기기에는 저장돼 있어요" : {
+      "comment" : "설정 › iCloud — 계정 · 동기화 상태",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't send writing to iCloud · It's saved on this device"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필사를 iCloud에 올리지 못했어요 · 이 기기에는 저장돼 있어요"
+          }
+        }
+      }
+    },
+    "필사를 넣는 중이에요" : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adding writing…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필사를 넣는 중이에요"
+          }
+        }
+      }
+    },
+    "필사를 넣는 중이에요 · %lld/%lld장" : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adding writing · %1$lld of %#@chapters@"
+          },
+          "substitutions" : {
+            "chapters" : {
+              "argNum" : 2,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg chapter"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg chapters"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필사를 넣는 중이에요 · %lld/%lld장"
+          }
+        }
+      }
+    },
+    "필사를 넣지 못해 멈췄어요. 넣은 장은 그대로 있어요. ‘백업 불러오기’를 다시 열면 이어서 불러올 수 있어요." : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stopped because writing couldn't be added. Chapters already added stay as they are. Open ‘Import Backup’ again to resume."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필사를 넣지 못해 멈췄어요. 넣은 장은 그대로 있어요. ‘백업 불러오기’를 다시 열면 이어서 불러올 수 있어요."
+          }
+        }
+      }
+    },
+    "필사를 모으는 중이에요 · %lld/%lld장" : {
+      "comment" : "설정 › 필사 백업 — 백업 만들기 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Collecting writing · %1$lld of %#@chapters@"
+          },
+          "substitutions" : {
+            "chapters" : {
+              "argNum" : 2,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg chapter"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg chapters"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필사를 모으는 중이에요 · %lld/%lld장"
+          }
+        }
+      }
+    },
+    "필사를 이미지로 남겨요" : {
+      "comment" : "패치노트 — 출시별 바뀐 점(제목 · 본문)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save your writing as an image"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필사를 이미지로 남겨요"
+          }
+        }
+      }
+    },
+    "필사한 내용을 iCloud로 기기 사이에 동기화해요." : {
+      "comment" : "설정 › iCloud — 계정 · 동기화 상태",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your writing syncs between devices with iCloud."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필사한 내용을 iCloud로 기기 사이에 동기화해요."
+          }
+        }
+      }
+    },
+    "필수" : {
+      "comment" : "설정 › 의견 보내기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Required"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필수"
+          }
+        }
+      }
+    },
+    "필수 · 의견을 확인한 뒤 바로 지워요." : {
+      "comment" : "설정 › 의견 보내기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Required · Deleted right after your feedback is reviewed."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필수 · 의견을 확인한 뒤 바로 지워요."
+          }
+        }
+      }
+    },
+    "한 번 구매" : {
+      "comment" : "설정 › 광고 제거",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "One-time purchase"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "한 번 구매"
+          }
+        }
+      }
+    },
+    "한 번 구매 · %@" : {
+      "comment" : "설정 › 광고 제거 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "One-time purchase · %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "한 번 구매 · %@"
+          }
+        }
+      }
+    },
+    "한 절만 비우려면 해당 절을 길게 눌러\n지우기를 선택해 주세요." : {
+      "comment" : "설정 › iCloud — 전체 삭제 · 연결 보류 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To clear just one verse, touch and hold it\nand choose Delete."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "한 절만 비우려면 해당 절을 길게 눌러\n지우기를 선택해 주세요."
+          }
+        }
+      }
+    },
+    "현재 그 절: 다른 필기가 있음" : {
+      "comment" : "설정 › 확인이 필요한 필기 — 화면",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verse now: has other handwriting"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "현재 그 절: 다른 필기가 있음"
+          }
+        }
+      }
+    },
+    "현재 그 절: 다른 필기가 있음 · %@" : {
+      "comment" : "설정 › 확인이 필요한 필기 — 화면 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verse now: has other handwriting · %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "현재 그 절: 다른 필기가 있음 · %@"
+          }
+        }
+      }
+    },
+    "현재 그 절: 필기 없음" : {
+      "comment" : "설정 › 확인이 필요한 필기 — 화면",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verse now: no handwriting"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "현재 그 절: 필기 없음"
+          }
+        }
+      }
+    },
+    "현재 필사" : {
+      "comment" : "설정 › 확인이 필요한 필기 — 화면",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Current writing"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "현재 필사"
+          }
+        }
+      }
+    },
+    "현재 필사를 읽는 중이에요" : {
+      "comment" : "설정 › 확인이 필요한 필기 — 화면",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reading current writing…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "현재 필사를 읽는 중이에요"
+          }
+        }
+      }
+    },
+    "현재 필사와 남겨 둔 필기는 그대로예요. 지우는 것은 **읽지 못해 넣을 수 없는 파일**이에요." : {
+      "comment" : "설정 › 확인이 필요한 필기 — 화면",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your current writing and kept drafts stay as they are. Only **files that can't be read or added** are deleted."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "현재 필사와 남겨 둔 필기는 그대로예요. 지우는 것은 **읽지 못해 넣을 수 없는 파일**이에요."
+          }
+        }
+      }
+    },
+    "현재 필사와 내용이 달라요" : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Differs from current writing"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "현재 필사와 내용이 달라요"
+          }
+        }
+      }
+    },
+    "현재 필사와 비교하기" : {
+      "comment" : "설정 › 확인이 필요한 필기 — 화면",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compare with Current Writing"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "현재 필사와 비교하기"
+          }
+        }
+      }
+    },
+    "홈 화면 위젯" : {
+      "comment" : "패치노트 — 출시별 바뀐 점(제목 · 본문)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Home Screen widget"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "홈 화면 위젯"
+          }
+        }
+      }
+    },
+    "홈 화면에 위젯을 추가해 주세요" : {
+      "comment" : "설정 › 위젯",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add the widget to your Home Screen"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "홈 화면에 위젯을 추가해 주세요"
+          }
+        }
+      }
+    },
+    "홈 화면을 길게 누르고 위젯 추가에서 새기다를 찾아 주세요." : {
+      "comment" : "설정 › 위젯",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Touch and hold the Home Screen, tap Edit › Add Widget, and find Carve."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "홈 화면을 길게 누르고 위젯 추가에서 새기다를 찾아 주세요."
+          }
+        }
+      }
+    },
+    "화면" : {
+      "comment" : "설정 사이드바",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Display"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "화면"
+          }
+        }
+      }
+    },
+    "화면 모드" : {
+      "comment" : "설정 › 화면 모드",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appearance"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "화면 모드"
+          }
+        }
+      }
+    },
+    "확인" : {
+      "comment" : "여러 화면의 버튼 · 제목",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OK"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "확인"
+          }
+        }
+      }
+    },
+    "확인이 필요한 필기" : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drafts to Review"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "확인이 필요한 필기"
+          }
+        }
+      }
+    },
+    "확인이 필요한 필기 %lld개" : {
+      "comment" : "설정 › 확인이 필요한 필기 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld to review"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "확인이 필요한 필기 %lld개"
+          }
+        }
+      }
+    },
+    "확인이 필요한 필기 없음" : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing to review"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "확인이 필요한 필기 없음"
+          }
+        }
+      }
+    },
+    "확인이 필요한 필기가 없어요. 남겨 둔 필기는 그 장을 열면 자동으로 표시되거나 이미 현재 필사에 반영돼 있어요." : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No drafts need review. Kept drafts appear automatically when you open their chapter, or are already in your current writing."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "확인이 필요한 필기가 없어요. 남겨 둔 필기는 그 장을 열면 자동으로 표시되거나 이미 현재 필사에 반영돼 있어요."
+          }
+        }
+      }
+    },
+    "확인이 필요한 필기는 없어요." : {
+      "comment" : "설정 › 확인이 필요한 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No drafts need review."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "확인이 필요한 필기는 없어요."
+          }
+        }
+      }
+    },
+    "확인하는 단계에서 멈춰서 필사는 바뀌지 않았어요." : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It stopped while checking, so your writing wasn't changed."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "확인하는 단계에서 멈춰서 필사는 바뀌지 않았어요."
           }
         }
       }

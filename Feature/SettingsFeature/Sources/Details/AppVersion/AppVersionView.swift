@@ -40,7 +40,7 @@ public struct AppVersionView: View {
     private var content: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: CarveSpacing.large) {
-                Text("앱 버전")
+                Text("앱 버전", bundle: .module)
                     .font(CarveTypography.sectionTitle)
                     .foregroundStyle(CarveColor.secondary)
 
@@ -48,8 +48,8 @@ public struct AppVersionView: View {
 
                 CarveDivider()
 
-                CarveSettingsSection("앱 정보") {
-                    CarveSettingsRow("버전", value: UIDevice.appVersion())
+                CarveSettingsSection(SettingsCatalog.string("앱 정보")) {
+                    CarveSettingsRow(SettingsCatalog.string("버전"), value: UIDevice.appVersion())
                     #if DEBUG
                     // 개발 빌드에서만 — 어느 빌드를 시험하는지 가린다. 출시 빌드에는 보이지 않는다.
                     if let build = Self.buildNumber {
@@ -96,10 +96,10 @@ public struct AppVersionView: View {
                 }
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: CarveSpacing.xxSmall) {
-                Text("새기다")
+                Text("새기다", bundle: .module)
                     .font(CarveTypography.title)
                     .foregroundStyle(CarveColor.ink)
-                Text("버전 \(UIDevice.appVersion())")
+                Text("버전 \(UIDevice.appVersion())", bundle: .module)
                     .font(CarveTypography.body)
                     .foregroundStyle(CarveColor.secondary)
             }
