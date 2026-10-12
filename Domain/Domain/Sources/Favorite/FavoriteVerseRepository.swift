@@ -15,15 +15,25 @@ import Dependencies
 /// 즐겨찾기 한 항목의 식별 — **번역본 · 권 · 장 · 절마다 하나**다.
 ///
 /// CloudKit 은 unique 제약을 허용하지 않아 같은 키의 행이 여럿 저장될 수 있다. 저장소는 이 키로 합쳐 한 항목으로 돌려준다.
+///
+/// 번역본은 장(`BibleChapter.translation`)이 든다 — 같은 절의 KJV 와 개역개정은 다른 키다(영어 현지화 결정 1).
+/// 행에는 `StoredBookKey` 로 옮겨 적는다(영어는 권 이름 접두 · 열 nil).
 public struct FavoriteVerseKey: Hashable, Sendable {
     public let chapter: BibleChapter
     public let verse: Int
-    public let translation: Translation
 
-    public init(chapter: BibleChapter, verse: Int, translation: Translation = .NKRV) {
+    /// 이 즐겨찾기의 번역본 — 장의 번역본 그대로다.
+    public var translation: Translation { chapter.translation }
+
+    /// 장의 번역본 그대로의 키.
+    public init(chapter: BibleChapter, verse: Int) {
         self.chapter = chapter
         self.verse = verse
-        self.translation = translation
+    }
+
+    /// 번역본을 따로 주는 키 — 장도 그 번역본으로 맞춘다. 장과 번역본이 어긋난 키는 만들지 않는다.
+    public init(chapter: BibleChapter, verse: Int, translation: Translation) {
+        self.init(chapter: BibleChapter(title: chapter.title, chapter: chapter.chapter, translation: translation), verse: verse)
     }
 }
 
@@ -57,8 +67,8 @@ public struct FavoriteVerseSnapshot: Hashable, Sendable, Identifiable {
 public protocol FavoriteVerseRepository: Sendable {
     /// 장에서 즐겨찾기한 절 번호. 필사 화면의 절 메뉴 문구와 절 번호 아래 별 표시가 읽는다.
     /// - Parameters:
-    ///   - chapter: 대상 장.
-    ///   - translation: 대상 번역본.
+    ///   - chapter: 대상 권 · 장.
+    ///   - translation: 대상 번역본. 장의 번역본이 아니라 이 값으로 고른다 — 부르는 쪽은 보통 `chapter.translation` 을 넘긴다.
     func favoriteVerses(in chapter: BibleChapter, translation: Translation) async throws -> Set<Int>
 
     /// 모든 즐겨찾기 — 최근 추가순이고 키마다 하나다(같은 키가 여럿이면 가장 최근 것).
