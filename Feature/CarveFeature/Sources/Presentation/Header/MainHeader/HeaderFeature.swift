@@ -46,7 +46,8 @@ public struct HeaderFeature {
 
     @ObservableState
     public struct State {
-        @Shared(.codableAppStorage("title")) public var currentTitle: BibleChapter = .initialState
+        /// 지금 장(번역본 포함) — 탐색(`CarveNavigationFeature`)과 같은 공유 값이다. 저장값이 없으면 처음 설치 기본 장이다.
+        @Shared(.codableAppStorage("title")) public var currentTitle: BibleChapter = .firstLaunch
         public var headerHeight: CGFloat
         public var headerOffset: CGFloat
         public var lastHeaderOffset: CGFloat

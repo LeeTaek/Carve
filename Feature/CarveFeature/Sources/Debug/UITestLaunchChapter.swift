@@ -21,6 +21,9 @@ import ComposableArchitecture
 /// | 인자 | 동작 |
 /// |---|---|
 /// | `-UITestChapter <BibleChapter JSON>` | Store 를 만들기 전에 시작 장을 저장한다. 예: `{"title":"1-19Psalms.txt","chapter":119}` |
+///
+/// 번역본은 JSON 의 `translation` 키(`"NKRV"` · `"KJV"` · `"BSB"`)로 정한다. 키가 없으면 개역개정이다(`BibleChapter` Codable) —
+/// 예: `{"title":"2-01Matthew.txt","chapter":17,"translation":"BSB"}`. 모르는 번역본 값이면 장으로 읽지 못해 무시한다.
 public enum UITestLaunchChapter {
     public static let argument = LaunchArgument.uiTestChapter
 
@@ -41,9 +44,9 @@ public enum UITestLaunchChapter {
             Log.info("UITEST 시작 장 인자를 장으로 읽지 못해 무시함")
             return
         }
-        @Shared(.codableAppStorage("title")) var currentTitle: BibleChapter = .initialState
+        @Shared(.codableAppStorage("title")) var currentTitle: BibleChapter = .firstLaunch
         $currentTitle.withLock { $0 = chapter }
-        Log.info("UITEST 시작 장", "\(chapter.title.rawValue) \(chapter.chapter)")
+        Log.info("UITEST 시작 장", "\(chapter.translation.rawValue) \(chapter.title.rawValue) \(chapter.chapter)")
     }
 }
 #endif
