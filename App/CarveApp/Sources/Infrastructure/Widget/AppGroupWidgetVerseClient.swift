@@ -83,28 +83,32 @@ struct AppGroupWidgetVerseClient: WidgetVerseClient {
         await Self.reloadWidgets()
     }
 
-    /// 보관본을 위젯이 읽는 모양으로 옮겨 적는다.
+    /// 보관본을 위젯이 읽는 모양으로 옮겨 적는다. 번역본은 즐겨찾기 장의 번역본이다 — 딥링크(`deepLinkURL`)도 이 값으로 그 번역본 절을 연다.
+    ///
+    /// 권 이름(`bookDisplayName`)은 **담을 때의 앱 언어**로 남는다 — 위젯은 Domain 을 링크하지 않아 그 문자열을 그대로 쓰고,
+    /// 기기 언어를 바꿔도 다시 담기 전까지 그대로다(영어 현지화 설계 §10 알려진 한계).
     private static func payload(for favorite: FavoriteVerseSnapshot) -> VerseWidgetPayload {
-        let key = favorite.key
+        let chapter = favorite.key.chapter
         return VerseWidgetPayload(
-            titleRawValue: key.chapter.title.rawValue,
-            bookDisplayName: key.chapter.title.koreanTitle(),
-            chapter: key.chapter.chapter,
-            verse: key.verse,
-            translation: key.translation.rawValue,
-            translationDisplayName: key.translation.displayName,
+            titleRawValue: chapter.title.rawValue,
+            bookDisplayName: chapter.title.localizedName,
+            chapter: chapter.chapter,
+            verse: favorite.key.verse,
+            translation: chapter.translation.rawValue,
+            translationDisplayName: chapter.translation.displayName,
             sentence: favorite.sentence,
             designatedAt: Date()
         )
     }
 
-    /// 위젯이 읽은 페이로드를 다시 즐겨찾기 키로 되돌린다. 모르는 권이면 nil.
+    /// 위젯이 읽은 페이로드를 다시 즐겨찾기 키(번역본 포함)로 되돌린다.
+    /// 모르는 권이거나 **이 판이 모르는 번역본이면 nil** — 개역개정 즐겨찾기로 바꾸지 않는다.
     private static func key(from payload: VerseWidgetPayload) -> FavoriteVerseKey? {
-        guard let title = BibleTitle(rawValue: payload.titleRawValue) else { return nil }
+        guard let title = BibleTitle(rawValue: payload.titleRawValue),
+              let translation = Translation(rawValue: payload.translation) else { return nil }
         return FavoriteVerseKey(
-            chapter: BibleChapter(title: title, chapter: payload.chapter),
-            verse: payload.verse,
-            translation: Translation(rawValue: payload.translation) ?? .NKRV
+            chapter: BibleChapter(title: title, chapter: payload.chapter, translation: translation),
+            verse: payload.verse
         )
     }
 

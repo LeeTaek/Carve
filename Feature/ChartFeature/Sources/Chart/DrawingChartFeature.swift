@@ -190,13 +190,10 @@ extension DrawingChartFeature {
                 var counts: [BibleChapter: Int] = [:]
                 
                 for drawing in dayDrawings {
-                    guard let raw = drawing.titleName,
-                          let title = BibleTitle(rawValue: raw),
-                          let chapter = drawing.titleChapter
-                    else { continue }
-                    
-                    let key = BibleChapter(title: title, chapter: chapter)
-                    counts[key, default: 0] += 1
+                    // 번역본까지 든 장으로 센다 — 같은 권 · 장도 번역본이 다르면 따로 센다.
+                    // 권 · 번역본을 모르거나(`StoredBookKey.decode` 가 nil) 장이 없는 행은 날짜별 수에만 들고 여기서는 건너뛴다.
+                    guard let chapter = drawing.chapter else { continue }
+                    counts[chapter, default: 0] += 1
                 }
                 chapterCountsByDay[day] = counts
             }
@@ -206,30 +203,21 @@ extension DrawingChartFeature {
             let recentDrawings = try await drawingActivityRepository.recentActivities(limit: 5)
             let sorted = recentDrawings.sorted { ($0.updateDate ?? .distantPast) > ($1.updateDate ?? .distantPast) }
             
+            // 최근 절은 그 행의 번역본 장으로 담아 누르면 그 번역본 절로 연다.
+            // 권 · 번역본을 모르거나 장이 없는 행은 건너뛴다 — 창세기 등 다른 자리로 바꿔 보이지 않는다.
             let recentVerses: [RecentVerseItem] = sorted.compactMap { drawing in
-                RecentVerseItem(
-                    verse: .init(
-                        title: .init(
-                            title: .init(rawValue: drawing.titleName ?? "") ?? .genesis,
-                            chapter: drawing.titleChapter ?? 1
-                        ),
-                        verse: drawing.verse ?? 1,
-                        sentence: ""
-                    ),
+                guard let chapter = drawing.chapter else { return nil }
+                return RecentVerseItem(
+                    verse: BibleVerse(title: chapter, verse: drawing.verse ?? 1, sentence: ""),
                     updatedAt: drawing.updateDate ?? .distantFuture
                 )
             }
             
+            // 장은 겹치지 않게 — 같은 권 · 장이라도 번역본이 다르면 다른 장이다.
             var seen = Set<BibleChapter>()
             let recentChapters: [BibleChapter] = sorted.compactMap { drawing in
-                guard let titleRaw = drawing.titleName,
-                      let title = BibleTitle(rawValue: titleRaw),
-                      let chapter = drawing.titleChapter
-                else { return nil }
-                
-                let key = BibleChapter(title: title, chapter: chapter)
-                guard seen.insert(key).inserted else { return nil }
-                return key
+                guard let chapter = drawing.chapter, seen.insert(chapter).inserted else { return nil }
+                return chapter
             }
             
             await send(.setRecentItems(recentVerses: recentVerses, recentChapters: recentChapters))
@@ -319,11 +307,8 @@ extension DrawingChartFeature {
                 var counts: [BibleChapter: Int] = [:]
                 
                 for drawing in dayDrawings {
-                    guard let titleRaw = drawing.titleName,
-                          let title = BibleTitle(rawValue: titleRaw),
-                          let titleChapter = drawing.titleChapter
-                    else { continue }
-                    let chapter = BibleChapter(title: title, chapter: titleChapter)
+                    // 첫 조회와 같은 규칙 — 번역본까지 든 장으로 세고, 권 · 번역본을 모르는 행은 건너뛴다.
+                    guard let chapter = drawing.chapter else { continue }
                     counts[chapter, default: 0] += 1
                 }
                 

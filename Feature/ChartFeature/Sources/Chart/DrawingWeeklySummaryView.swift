@@ -6,6 +6,7 @@
 //  Copyright © 2026 leetaek. All rights reserved.
 //
 
+import Domain
 import SwiftUI
 import UIComponents
 
@@ -131,7 +132,7 @@ public struct DrawingWeeklySummaryView: View {
                     Button {
                         send(.recentChapterTapped(item))
                     } label: {
-                        Text("• \(item.title.koreanTitle()) \(item.chapter)장")
+                        Text("• \(BibleReference(chapter: item, showsTranslation: true).text)")
                     }
                     .font(CarveTypography.label)
                     .foregroundStyle(CarveColor.ink)
@@ -151,7 +152,8 @@ public struct DrawingWeeklySummaryView: View {
                     send(.topChapterTapped)
                 } label: {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("\(topChapter.chapter.title.koreanTitle()) \(topChapter.chapter.chapter)장")
+                        // 번역본이 섞이는 자리라 약칭을 붙인다(영어 현지화 결정 11).
+                        Text(BibleReference(chapter: topChapter.chapter, showsTranslation: true).text)
                             .font(.title3)
                             .foregroundStyle(CarveColor.ink)
                             .lineLimit(2)

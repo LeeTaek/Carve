@@ -11,7 +11,7 @@ import Foundation
 import Testing
 
 struct ChartModelTesting {
-    @Test("최근 필사 항목은 성경 위치를 한글 표시 문자열로 만든다")
+    @Test("최근 필사 항목은 성경 위치를 한글 표시 문자열로 만들고, 번역본이 섞이는 목록이라 약칭을 붙인다")
     func recentVerseItemMessageUsesLocalizedBiblePosition() {
         let item = RecentVerseItem(
             verse: BibleVerse(
@@ -22,7 +22,17 @@ struct ChartModelTesting {
             updatedAt: Date(timeIntervalSince1970: 1_800)
         )
 
-        #expect(item.message == "요한복음 3장 16절")
+        #expect(item.message == "요한복음 3장 16절 · 개역개정")
+    }
+
+    @Test("KJV 최근 필사 항목도 권 · 장절은 앱 언어(한국어)로 적고 뒤에 KJV 를 붙인다")
+    func recentVerseItemMessageShowsKJVAbbreviation() {
+        let item = RecentVerseItem(
+            verse: BibleVerse(title: BibleChapter(title: .john, chapter: 3, translation: .KJV), verse: 16, sentence: ""),
+            updatedAt: Date(timeIntervalSince1970: 1_800)
+        )
+
+        #expect(item.message == "요한복음 3장 16절 · KJV")
     }
 
     @Test("최근 필사 항목 식별자는 성경 위치와 수정 시각으로 결정된다")
@@ -38,6 +48,20 @@ struct ChartModelTesting {
         )
 
         #expect(item.id == "1-19Psalms.txt|23|1|2400.0")
+    }
+
+    @Test("같은 절 · 같은 시각이라도 번역본이 다르면 최근 필사 항목 식별자가 다르다")
+    func recentVerseItemIDSeparatesTranslations() {
+        let updatedAt = Date(timeIntervalSince1970: 2_400)
+        let korean = RecentVerseItem(
+            verse: BibleVerse(title: BibleChapter(title: .psalms, chapter: 23), verse: 1, sentence: ""), updatedAt: updatedAt
+        )
+        let english = RecentVerseItem(
+            verse: BibleVerse(title: BibleChapter(title: .psalms, chapter: 23, translation: .KJV), verse: 1, sentence: ""), updatedAt: updatedAt
+        )
+
+        #expect(english.id == "KJV-1-19Psalms.txt|23|1|2400.0")
+        #expect(korean.id != english.id)
     }
 
     @Test("일별 기록의 식별자는 날짜와 동일하다")

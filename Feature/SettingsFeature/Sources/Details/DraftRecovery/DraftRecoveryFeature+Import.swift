@@ -30,8 +30,8 @@ extension DraftRecoveryFeature {
             do {
                 let current = try await VerseDraftRecoveryQuery(reader: reader, repository: repository)
                     .currentVerse(chapter: item.chapter, verse: item.verse)
-                let translation = Translation(rawValue: item.key.translation) ?? .NKRV
-                let draft = try await reader.drafts(in: item.scope, chapter: item.chapter, translation: translation)
+                // 줄의 장이 곧 초안의 번역본 장이다(`Item.chapter` = `VerseDraftKey.bibleChapter`) — 개역개정으로 바꾸지 않는다.
+                let draft = try await reader.drafts(in: item.scope, chapter: item.chapter, translation: item.chapter.translation)
                     .first { $0.key == item.key }
                 let after = Stamp(await editEnvironment.current())
                 guard after == stamp else {
