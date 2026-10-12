@@ -119,9 +119,16 @@ extension ChapterCanvasFeature {
     }
 
     /// 저장 명령을 스냅샷 위에 겹친다 — 저장소의 `create`(upsert) · `replace` · `clear`(행 유지, 없으면 빈 행) 와 같은 의미다.
-    func overlay(_ snapshots: [VerseDrawingSnapshot], with mutations: [VerseDrawingMutation]) -> [VerseDrawingSnapshot] {
+    /// - Parameter translation: 겹쳐 만드는 행의 번역본 — 그 장(`State.chapter`)의 번역본이다. 이미 있는 행은 그 행의 번역본을 그대로 둔다.
+    ///   nil 이면 스냅샷의 번역본(없으면 개역개정)이다. KJV 장의 `loadedDrawings` 에 개역개정 행이 섞이지 않게 장의 번역본을 넘긴다.
+    func overlay(
+        _ snapshots: [VerseDrawingSnapshot],
+        with mutations: [VerseDrawingMutation],
+        translation: Translation? = nil
+    ) -> [VerseDrawingSnapshot] {
         guard !mutations.isEmpty else { return snapshots }
         let now = date.now
+        let rowTranslation = translation ?? snapshots.first?.translation ?? .NKRV
         var result = snapshots
         var indexByRow: [BibleDrawingRowID: Int] = [:]
         for (index, snapshot) in result.enumerated() { indexByRow[snapshot.rowID] = index }
@@ -141,12 +148,14 @@ extension ChapterCanvasFeature {
             case .create(let verse, let rowID, let data, let metadata), .replace(let verse, let rowID, let data, let metadata):
                 upsert(VerseDrawingSnapshot(
                     verse: verse, rowID: rowID, isPresent: existing?.isPresent ?? true, updateDate: now,
-                    lineData: data, drawingVersion: 3, metadata: metadata
+                    lineData: data, drawingVersion: 3, metadata: metadata,
+                    translation: existing?.translation ?? rowTranslation
                 ))
             case .clear(let verse, let rowID):
                 upsert(VerseDrawingSnapshot(
                     verse: verse, rowID: rowID, isPresent: existing?.isPresent ?? true, updateDate: now,
-                    lineData: nil, drawingVersion: existing?.drawingVersion ?? 3, metadata: existing?.metadata
+                    lineData: nil, drawingVersion: existing?.drawingVersion ?? 3, metadata: existing?.metadata,
+                    translation: existing?.translation ?? rowTranslation
                 ))
             }
         }
@@ -280,11 +289,11 @@ extension ChapterCanvasFeature {
         }
         // 저장된 내용을 DB 내용에 겹쳐 둔다 — 재조회가 실패해도 `loadedDrawings ⊕ pendingMutations` 가 현재 내용이 되게.
         if chapter == state.chapter, let loaded = state.loadedDrawings {
-            state.loadedDrawings = overlay(loaded, with: mutations)
+            state.loadedDrawings = overlay(loaded, with: mutations, translation: state.chapter.translation)
         }
         // 늦게 도착한 필사를 가릴 기준에도 겹친다 — 내 저장은 도착이 아니다. 그 행을 원격이 다시 바꾸면 기준과 달라져 도착으로 본다(P0-3).
         if chapter == state.chapter, let baseline = state.arrival.storeBaseline {
-            state.arrival.storeBaseline = overlay(baseline, with: mutations)
+            state.arrival.storeBaseline = overlay(baseline, with: mutations, translation: state.chapter.translation)
         }
         state.persistedRevision = max(state.persistedRevision, revision)
         state.consecutiveSaveFailures = 0

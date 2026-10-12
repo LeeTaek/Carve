@@ -390,7 +390,7 @@ extension ChapterCanvasFeature {
             state.pendingMutations[rowID] = nil
             if case .create = entry.mutation { state.drafts.draftOnlyRowIDs.insert(rowID) }
             if entry.chapter == state.chapter, let loaded = state.loadedDrawings {
-                state.loadedDrawings = overlay(loaded, with: [entry.mutation])
+                state.loadedDrawings = overlay(loaded, with: [entry.mutation], translation: state.chapter.translation)
             }
         }
     }
@@ -533,8 +533,9 @@ extension ChapterCanvasFeature {
         // 목록에도 없다(2026-09-21 후속 리뷰 P0-2a).
         let drafts: [VerseDraft]
         do {
+            // 장의 번역본으로 읽는다 — 초안 키(`VerseDraftKey(sessionID:chapter:verse:)`)도 장의 번역본을 따르므로 KJV 장의 초안은 KJV 로 쓰고 읽는다.
             drafts = try await VerseDraftRecoveryRule.screenDrafts(environment: environment) { scope in
-                try await store.drafts(in: scope, chapter: chapter, translation: .NKRV)
+                try await store.drafts(in: scope, chapter: chapter, translation: chapter.translation)
             }.map(\.draft)
         } catch {
             Log.error("단일 Canvas — 이 장의 초안을 읽지 못했다. 입력을 막고 다시 시도를 기다린다", "\(error)")
@@ -562,7 +563,7 @@ extension ChapterCanvasFeature {
         guard let store, !environment.beforeConnectionDraftScopes.isEmpty else { return [] }
         do {
             return try await VerseDraftRecoveryRule.beforeConnectionDrafts(environment: environment) { scope in
-                try await store.drafts(in: scope, chapter: chapter, translation: .NKRV)
+                try await store.drafts(in: scope, chapter: chapter, translation: chapter.translation)
             }.map(\.draft)
         } catch {
             Log.error("단일 Canvas — 연결 전 필기를 읽지 못했다. 절 메뉴 수에서만 빠진다", "\(error)")
@@ -648,6 +649,6 @@ extension ChapterCanvasFeature {
                      "kept=\(plan.kept.count)", "uncertain=\(plan.uncertain.count)", "undisplayable=\(plan.undisplayable.count)",
                      "settled=\(plan.settled.count)")
         }
-        return overlay(snapshots, with: mutations)
+        return overlay(snapshots, with: mutations, translation: state.chapter.translation)
     }
 }

@@ -125,6 +125,8 @@ public struct CarveNavigationView: View {
                         .accessibilitySortPriority(-1)
                 }
                 HStack(spacing: CarveSpacing.xSmall) {
+                    // 시안 K3 · J2 의 「개역개정 ⌄」 자리.
+                    translationMenu
                     Spacer(minLength: 0)
                     // 차트 바로 왼쪽(시안 N3). 목록은 차트와 같이 앱 스택에 올린다.
                     CarveIconButton(.star, accessibilityLabel: "즐겨찾기") {
@@ -148,6 +150,46 @@ public struct CarveNavigationView: View {
         }
     }
     
+    /// 번역본 고르기(시안 K3 · J2 의 「개역개정 ⌄」 자리). 지금 번역본의 약칭을 보이고, 메뉴에서 약칭과 전체 이름으로 고른다.
+    /// 고르면 같은 권 · 장 · 지금 보던 절로 간다(결정 9 — `CarveNavigationFeature.switchTranslation`).
+    private var translationMenu: some View {
+        let current = store.currentTitle.translation
+        let shape = RoundedRectangle(cornerRadius: CarveRadius.control, style: .continuous)
+        return Menu {
+            Picker(selection: translationSelection) {
+                ForEach(Translation.allCases, id: \.self) { translation in
+                    Text(verbatim: Self.translationMenuTitle(translation)).tag(translation)
+                }
+            } label: {
+                Text("번역본", bundle: .module)
+            }
+        } label: {
+            HStack(spacing: CarveSpacing.xxSmall) {
+                Text(verbatim: current.displayName)
+                    .font(CarveTypography.label)
+                    .lineLimit(1)
+                Image(systemName: "chevron.down")
+                    .font(CarveTypography.caption)
+                    .accessibilityHidden(true)
+            }
+            .foregroundStyle(CarveColor.ink)
+            .padding(.horizontal, CarveSpacing.small)
+            .frame(minHeight: CarveSize.minimumHitTarget)
+            .background(CarveColor.fill, in: shape)
+            .contentShape(shape)
+        }
+        .accessibilityLabel(Text("번역본", bundle: .module))
+        .accessibilityValue(Text(verbatim: current.fullName))
+    }
+
+    /// 번역본 고르기의 선택값. 고르면 리듀서로 보낸다 — 지금 번역본은 공유 장(`currentTitle`)이 정한다.
+    private var translationSelection: Binding<Translation> {
+        Binding(
+            get: { store.currentTitle.translation },
+            set: { send(.translationSelected($0)) }
+        )
+    }
+
     /// 선택한 성경의 장 목록. 44pt 버튼을 5열 그리드로 두어 긴 성경도 빠르게 훑는다.
     private var contentList: some View {
         ScrollViewReader { proxy in
@@ -231,7 +273,11 @@ public struct CarveNavigationView: View {
     private var filteredTitles: [BibleTitle] {
         let titles = testament == .old ? Array(BibleTitle.allCases[0..<39]) : Array(BibleTitle.allCases[39..<66])
         guard !searchText.isEmpty else { return titles }
-        return titles.filter { $0.koreanTitle().localizedCaseInsensitiveContains(searchText) }
+        // 한국어 이름과 고정 영문 이름(`englishName`) 둘 다 맞춘다 — 앱 언어와 상관없이 어느 쪽으로 찾아도 나온다.
+        return titles.filter {
+            $0.koreanTitle().localizedCaseInsensitiveContains(searchText)
+                || $0.englishName.localizedCaseInsensitiveContains(searchText)
+        }
     }
 
     /// 장 목록이 보여 줄 성경. 성경 열에서 고른 성경이 없으면 현재 성경이다.
@@ -275,7 +321,8 @@ public struct CarveNavigationView: View {
         return Button {
             // selectedChapter 는 목록의 강조만 나타낸다. 도메인 이동 액션으로 보내야
             // 장 상태·detail 전환·본문 로딩이 한 흐름으로 처리된다.
-            send(.chapterTapped(BibleChapter(title: browsingTitle, chapter: chapter)))
+            // 장 목록은 지금 번역본의 장을 연다 — 번역본은 사이드바 하단에서 따로 바꾼다.
+            send(.chapterTapped(BibleChapter(title: browsingTitle, chapter: chapter, translation: store.currentTitle.translation)))
         } label: {
             Text(chapter.description)
                 .font(CarveTypography.body)
@@ -301,6 +348,13 @@ enum ChapterListScroll: Equatable {
 }
 
 extension CarveNavigationView {
+    /// 번역본 고르기 메뉴의 항목 이름 — 약칭과 전체 이름. 둘이 같으면(한국어의 개역개정) 한 번만 적는다.
+    static func translationMenuTitle(_ translation: Translation, locale: Locale? = nil) -> String {
+        let abbreviation = translation.displayName(locale: locale)
+        let fullName = translation.fullName(locale: locale)
+        return abbreviation == fullName ? abbreviation : "\(abbreviation) · \(fullName)"
+    }
+
     static let chapterColumnCount = 5
     /// 장 그리드 전체의 스크롤 id. 목록 맨 위 · 맨 아래로 옮길 때 쓴다.
     static let chapterGridID = "chapterGrid"
