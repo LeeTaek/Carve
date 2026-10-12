@@ -24,15 +24,20 @@ public struct CarveStatusMessage: View {
     private let retryTitle: String
     private let onRetry: (() -> Void)?
 
+    /// 다시 시도 버튼의 기본 제목(앱 언어) — ko 「다시 시도」 · en 「Try Again」.
+    nonisolated public static var defaultRetryTitle: String {
+        String(localized: "다시 시도", bundle: .module, comment: "결과 알림 줄의 다시 시도 버튼 기본 제목")
+    }
+
     /// - Parameters:
     ///   - kind: 결과 종류.
-    ///   - message: 결과 문장(예: 「사진에 저장했어요」).
-    ///   - retryTitle: 다시 시도 버튼 제목.
+    ///   - message: 결과 문장(예: 「사진에 저장했어요」). 부르는 쪽이 앱 언어로 옮겨 준다.
+    ///   - retryTitle: 다시 시도 버튼 제목. 기본은 `defaultRetryTitle`.
     ///   - onRetry: 다시 시도 콜백. 있을 때만 버튼이 생긴다.
     public init(
         _ kind: Kind,
         message: String,
-        retryTitle: String = "다시 시도",
+        retryTitle: String = CarveStatusMessage.defaultRetryTitle,
         onRetry: (() -> Void)? = nil
     ) {
         self.kind = kind

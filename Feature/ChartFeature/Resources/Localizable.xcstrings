@@ -1,7 +1,540 @@
 {
   "sourceLanguage" : "ko",
   "strings" : {
-
+    "%@ %@" : {
+      "comment" : "차트 X축 날짜 라벨 — 월 · 일, 요일. 예: 9월 4일 금 · Fri Sep 4",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%2$@ %1$@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ %2$@"
+          }
+        }
+      }
+    },
+    "%@부터 %@까지" : {
+      "comment" : "차트 접근성 요약 — 보이는 기간. 예: 9월 4일부터 9월 10일까지 · September 4 to September 10",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ to %2$@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@부터 %@까지"
+          }
+        }
+      }
+    },
+    "%@절" : {
+      "comment" : "평균 절 수(소수 한 자리, 예: 1.7절 · 1.7 verses)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ verses"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@절"
+          }
+        }
+      }
+    },
+    "%lld절" : {
+      "comment" : "절 수 — 영어는 복수형(1 verse · 3 verses)",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld verse"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld verses"
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld절"
+          }
+        }
+      }
+    },
+    "%lld주 전" : {
+      "comment" : "차트 주 머리 — 보이는 7일이 N주 전이다",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld week ago"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld weeks ago"
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld주 전"
+          }
+        }
+      }
+    },
+    "가장 많은 날은 %@ %@" : {
+      "comment" : "차트 접근성 요약 — 가장 많이 필사한 날과 그날 절 수. 예: 가장 많은 날은 9월 6일 3절 · Most on September 6 with 3 verses",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Most on %1$@ with %2$@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "가장 많은 날은 %@ %@"
+          }
+        }
+      }
+    },
+    "가장 많은 날은 없어요" : {
+      "comment" : "차트 접근성 요약 — 보이는 7일에 필사가 없다",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No busiest day"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "가장 많은 날은 없어요"
+          }
+        }
+      }
+    },
+    "가장 많이 쓴 장" : {
+      "comment" : "주간 요약 타일 제목 — 7일 동안 가장 많이 필사한 장",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Top Chapter"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "가장 많이 쓴 장"
+          }
+        }
+      }
+    },
+    "기록 없는 날은 없어요" : {
+      "comment" : "차트 접근성 요약 — 7일 모두 필사했다",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "every day has a record"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "기록 없는 날은 없어요"
+          }
+        }
+      }
+    },
+    "기록 없음" : {
+      "comment" : "주간 요약 — 가장 많이 쓴 장이 없다",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No records"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "기록 없음"
+          }
+        }
+      }
+    },
+    "날짜" : {
+      "comment" : "차트 X축 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Date"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "날짜"
+          }
+        }
+      }
+    },
+    "다음 주" : {
+      "comment" : "차트 주 이동 버튼(VoiceOver) — 뒤 7일",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next week"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다음 주"
+          }
+        }
+      }
+    },
+    "아직 기록이 없어요" : {
+      "comment" : "차트 빈 상태 제목 — 필사 기록이 하나도 없다",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No records yet"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "아직 기록이 없어요"
+          }
+        }
+      }
+    },
+    "없는 날은 %lld일" : {
+      "comment" : "차트 접근성 요약 — 기록 없는 날이 3일 이상",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld days with no record"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "없는 날은 %lld일"
+          }
+        }
+      }
+    },
+    "없는 날은 이틀" : {
+      "comment" : "차트 접근성 요약 — 기록 없는 날이 2일(한국어는 수사 「이틀」, 영어는 숫자)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "2 days with no record"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "없는 날은 이틀"
+          }
+        }
+      }
+    },
+    "없는 날은 하루" : {
+      "comment" : "차트 접근성 요약 — 기록 없는 날이 1일(한국어는 수사 「하루」, 영어는 숫자)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 day with no record"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "없는 날은 하루"
+          }
+        }
+      }
+    },
+    "이번 주" : {
+      "comment" : "차트 주 머리 — 보이는 7일이 오늘을 포함한다",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This week"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이번 주"
+          }
+        }
+      }
+    },
+    "이어서 쓰기" : {
+      "comment" : "주간 요약 — 가장 많이 쓴 장을 열어 이어서 필사한다",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continue Writing"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이어서 쓰기"
+          }
+        }
+      }
+    },
+    "이전 주" : {
+      "comment" : "차트 주 이동 버튼(VoiceOver) — 앞 7일",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Previous week"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이전 주"
+          }
+        }
+      }
+    },
+    "지난 주" : {
+      "comment" : "차트 주 머리 — 보이는 7일이 바로 앞 주다",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last week"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지난 주"
+          }
+        }
+      }
+    },
+    "차트" : {
+      "comment" : "차트 화면 제목",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chart"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "차트"
+          }
+        }
+      }
+    },
+    "차트. %@. 하루에 필사한 절 수. 모두 %@, 하루 평균 %@. %@, %@." : {
+      "comment" : "차트 접근성 요약 — 기간, 합계(절 수), 평균(절 수), 가장 많은 날, 기록 없는 날",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chart. %1$@. Verses written per day. %2$@ in total, %3$@ a day on average. %4$@, %5$@."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "차트. %@. 하루에 필사한 절 수. 모두 %@, 하루 평균 %@. %@, %@."
+          }
+        }
+      }
+    },
+    "최근" : {
+      "comment" : "주간 요약 — 최근에 필사한 절 목록 머리",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recent"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "최근"
+          }
+        }
+      }
+    },
+    "최근 장" : {
+      "comment" : "주간 요약 — 최근에 필사한 장 목록 머리",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recent Chapters"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "최근 장"
+          }
+        }
+      }
+    },
+    "필사량" : {
+      "comment" : "차트 Y축 이름 — 하루에 필사한 절 수",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verses"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필사량"
+          }
+        }
+      }
+    },
+    "필사하러 가기" : {
+      "comment" : "차트 빈 상태 버튼 — 필사 화면으로 돌아간다",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start Writing"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필사하러 가기"
+          }
+        }
+      }
+    },
+    "하루 평균" : {
+      "comment" : "주간 요약 타일 제목 — 7일 평균 절 수",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Daily Average"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "하루 평균"
+          }
+        }
+      }
+    },
+    "하루에 필사한 절" : {
+      "comment" : "차트 카드 제목 — 하루마다 필사한 절 수 막대 차트",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verses per day"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "하루에 필사한 절"
+          }
+        }
+      }
+    },
+    "한 절이라도 필사하면 여기에 쌓여요." : {
+      "comment" : "차트 빈 상태 설명",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Write even one verse and it will show up here."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "한 절이라도 필사하면 여기에 쌓여요."
+          }
+        }
+      }
+    },
+    "한 주 동안" : {
+      "comment" : "주간 요약 타일 제목 — 보이는 7일 동안 필사한 절 수",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This Week"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "한 주 동안"
+          }
+        }
+      }
+    }
   },
   "version" : "1.0"
 }

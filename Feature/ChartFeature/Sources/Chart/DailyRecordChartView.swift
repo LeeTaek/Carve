@@ -23,7 +23,7 @@ struct DailyRecordChartView: View {
         VStack(spacing: CarveSpacing.medium) {
             weekNavigator
 
-            CardSection(title: "하루에 필사한 절") {
+            CardSection(title: String(localized: "하루에 필사한 절", bundle: .module, comment: "차트 카드 제목 — 하루마다 필사한 절 수 막대 차트")) {
                 GeometryReader { geometry in
                     ZStack {
                         axisChart
@@ -51,13 +51,14 @@ struct DailyRecordChartView: View {
 
     private var weekNavigator: some View {
         HStack(spacing: CarveSpacing.medium) {
-            CarveIconButton(.chevronLeft, accessibilityLabel: "이전 주") {
+            CarveIconButton(.chevronLeft, accessibilityLabel: String(localized: "이전 주", bundle: .module, comment: "차트 주 이동 버튼(VoiceOver) — 앞 7일")) {
                 send(.previousWeekTapped)
             }
             .disabled(!store.canMoveToPreviousWeek)
 
             VStack(spacing: CarveSpacing.xxSmall) {
-                Text("\(store.visibleStartDate.chartMonthDayText) – \(store.visibleEndDate.chartMonthDayText)")
+                // 날짜는 기기 로케일 서식이고 사이의 「 – 」 는 어느 언어든 같다 — 카탈로그를 거치지 않는다.
+                Text(verbatim: "\(store.visibleStartDate.chartShortMonthDayText) – \(store.visibleEndDate.chartShortMonthDayText)")
                     .font(CarveTypography.body)
                     .foregroundStyle(CarveColor.ink)
                     .monospacedDigit()
@@ -69,7 +70,7 @@ struct DailyRecordChartView: View {
             .frame(maxWidth: 280)
             .accessibilityElement(children: .combine)
 
-            CarveIconButton(.chevronRight, accessibilityLabel: "다음 주") {
+            CarveIconButton(.chevronRight, accessibilityLabel: String(localized: "다음 주", bundle: .module, comment: "차트 주 이동 버튼(VoiceOver) — 뒤 7일")) {
                 send(.nextWeekTapped)
             }
             .disabled(!store.canMoveToNextWeek)
@@ -84,9 +85,11 @@ struct DailyRecordChartView: View {
         let days = calendar.dateComponents([.day], from: end, to: today).day ?? 0
 
         switch days {
-        case ...0: return "이번 주"
-        case 1...7: return "지난 주"
-        default: return "\(max(1, Int(round(Double(days) / 7.0))))주 전"
+        case ...0: return String(localized: "이번 주", bundle: .module, comment: "차트 주 머리 — 보이는 7일이 오늘을 포함한다")
+        case 1...7: return String(localized: "지난 주", bundle: .module, comment: "차트 주 머리 — 보이는 7일이 바로 앞 주다")
+        default:
+            let weeks = max(1, Int(round(Double(days) / 7.0)))
+            return String(localized: "\(weeks)주 전", bundle: .module, comment: "차트 주 머리 — 보이는 7일이 N주 전이다")
         }
     }
     
@@ -151,13 +154,14 @@ struct DailyRecordChartView: View {
                     ForEach(dates, id: \.self) { date in
                         if let xPosition = proxy.position(forX: date) {
                             let positionX = min(max(xPosition, plotFrame.minX + 22), plotFrame.maxX - 22)
-                            let weekday = date.formatted(
-                                Date.FormatStyle()
-                                    .locale(Locale(identifier: "ko_KR"))
-                                    .weekday(.narrow)
+                            // ko 「9월 4일 금」 · en 「Fri Sep 4」 — 날짜와 요일의 순서를 카탈로그가 정한다.
+                            let label = String(
+                                localized: "\(date.chartShortMonthDayText) \(date.chartWeekdayText)",
+                                bundle: .module,
+                                comment: "차트 X축 날짜 라벨 — 월 · 일, 요일. 예: 9월 4일 금 · Fri Sep 4"
                             )
-                            
-                            Text("\(date.chartMonthDayText) \(weekday)")
+
+                            Text(label)
                                 .font(CarveTypography.caption)
                                 .monospacedDigit()
                                 .foregroundStyle(CarveColor.secondary)
@@ -206,8 +210,8 @@ struct DailyRecordChartView: View {
                 && store.selectedDate.map { Calendar.current.isDate(record.date, inSameDayAs: $0) } == true
             
             BarMark(
-                x: .value("날짜", record.date.middleOfDay(), unit: .day),
-                y: .value("필사량", record.count),
+                x: .value(String(localized: "날짜", bundle: .module, comment: "차트 X축 이름"), record.date.middleOfDay(), unit: .day),
+                y: .value(String(localized: "필사량", bundle: .module, comment: "차트 Y축 이름 — 하루에 필사한 절 수"), record.count),
                 width: .ratio(0.55)
             )
             .cornerRadius(6)

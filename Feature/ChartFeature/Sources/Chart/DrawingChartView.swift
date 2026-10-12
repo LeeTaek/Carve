@@ -33,7 +33,7 @@ public struct DrawingChartView: View {
         }
         .scrollDisabled(store.dailyRecordChart.isScrolling)
         .background(CarveColor.canvas)
-        .navigationTitle("차트")
+        .navigationTitle(Text("차트", bundle: .module, comment: "차트 화면 제목"))
         .navigationBarTitleDisplayMode(.inline)
         .task {
             send(.fetchData)
@@ -60,9 +60,9 @@ public struct DrawingChartView: View {
 
     private var emptyContent: some View {
         CarveEmptyState(
-            "아직 기록이 없어요",
-            message: "한 절이라도 필사하면 여기에 쌓여요.",
-            actionTitle: "필사하러 가기"
+            String(localized: "아직 기록이 없어요", bundle: .module, comment: "차트 빈 상태 제목 — 필사 기록이 하나도 없다"),
+            message: String(localized: "한 절이라도 필사하면 여기에 쌓여요.", bundle: .module, comment: "차트 빈 상태 설명"),
+            actionTitle: String(localized: "필사하러 가기", bundle: .module, comment: "차트 빈 상태 버튼 — 필사 화면으로 돌아간다")
         ) {
             send(.backToWriting)
         }
