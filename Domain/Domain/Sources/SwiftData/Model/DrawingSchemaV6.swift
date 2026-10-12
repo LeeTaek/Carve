@@ -58,6 +58,11 @@ public enum DrawingSchemaV6: VersionedSchema {
 
         public init() { }
 
+        /// 새 즐겨찾기 행. 권 이름과 `translation` 열은 `StoredBookKey` 로 짓는다(영어 현지화 결정 1) —
+        /// 개역개정은 지금처럼 `rawValue` · `.NKRV`, KJV · BSB 는 `"<번역본>-<rawValue>"` · nil 이다(열에는 영어 값을 쓰지 않는다).
+        /// - Parameters:
+        ///   - chapter: 권 · 장. 번역본은 `translation` 인자를 따른다.
+        ///   - translation: 이 즐겨찾기의 번역본.
         public init(
             chapter: BibleChapter,
             verse: Int,
@@ -69,10 +74,10 @@ public enum DrawingSchemaV6: VersionedSchema {
             knownEraseEpochs: Set<String> = []
         ) {
             self.favoriteID = favoriteID
-            self.titleName = chapter.title.rawValue
+            self.titleName = StoredBookKey.titleName(title: chapter.title, translation: translation)
             self.titleChapter = chapter.chapter
             self.verse = verse
-            self.translation = translation
+            self.translation = StoredBookKey.translationColumn(for: translation)
             self.sentence = sentence
             self.lineData = lineData
             self.createdDate = createdDate

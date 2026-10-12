@@ -127,15 +127,25 @@ public struct VerseDrawingImportCommand: Equatable, Sendable {
     public let metadata: DrawingLayoutMetadata?
     /// 사용자가 견준 지금 필기의 지문(비었으면 nil). 저장소가 이 내용 그대로일 때만 쓴다.
     public let expectedCurrentFingerprint: String?
+    /// 가져온 초안의 번역본 — 이 번역본의 행(`StoredBookKey`)으로 넣는다. nil 이면 `importVerse` 가 받은 장의 번역본이다.
+    public let translation: Translation?
 
     public init(
-        verse: Int, rowID: BibleDrawingRowID, lineData: Data?, metadata: DrawingLayoutMetadata?, expectedCurrentFingerprint: String?
+        verse: Int, rowID: BibleDrawingRowID, lineData: Data?, metadata: DrawingLayoutMetadata?, expectedCurrentFingerprint: String?,
+        translation: Translation? = nil
     ) {
         self.verse = verse
         self.rowID = rowID
         self.lineData = lineData
         self.metadata = metadata
         self.expectedCurrentFingerprint = expectedCurrentFingerprint
+        self.translation = translation
+    }
+
+    /// 이 명령이 쓰는 장 — 받은 권 · 장에 이 명령의 번역본(없으면 장의 번역본)을 붙인다.
+    public func target(in chapter: BibleChapter) -> BibleChapter {
+        guard let translation else { return chapter }
+        return BibleChapter(title: chapter.title, chapter: chapter.chapter, translation: translation)
     }
 }
 
@@ -223,9 +233,10 @@ public struct VerseDraftImportRequest: Equatable, Sendable {
         self.acknowledgedCaution = acknowledgedCaution
     }
 
-    /// 초안 키가 가리키는 장. 모르는 권이면 nil.
+    /// 초안 키가 가리키는 장(번역본 포함). 이 판이 모르는 권 · 번역본이면 nil — 개역개정에 임의로 붙이지 않고 가져오지 않는다
+    /// (정책 §8 「미상 판본을 임의 귀속하지 않음」).
     public var chapter: BibleChapter? {
-        BibleTitle(rawValue: key.title).map { BibleChapter(title: $0, chapter: key.chapter) }
+        key.bibleChapter
     }
 }
 
@@ -279,9 +290,12 @@ public struct VerseDraftImporter: Sendable {
 
     public func importDraft(_ request: VerseDraftImportRequest, environment: DrawingEditEnvironment) async throws -> Result {
         if let block = SyncedWriteBlock.check(environment) { return .blocked(block) }
-        guard let chapter = request.chapter else { return .draftChanged }
-        let translation = Translation(rawValue: request.key.translation) ?? .NKRV
-        guard let draft = try await reader.drafts(in: request.scope, chapter: chapter, translation: translation)
+        guard let chapter = request.chapter else {
+            // 모르는 권 · 번역본의 초안은 어느 장으로도 가져오지 않는다 — 개역개정에 붙이지 않는다. 파일은 그대로 남는다.
+            Log.error("가져오기 — 이 판이 모르는 권 · 번역본의 초안이라 건너뛴다", request.key.translation, request.key.title)
+            return .draftChanged
+        }
+        guard let draft = try await reader.drafts(in: request.scope, chapter: chapter, translation: chapter.translation)
             .first(where: { $0.key == request.key }), draft.revision == request.revision else {
             return .draftChanged
         }
@@ -309,7 +323,8 @@ public struct VerseDraftImporter: Sendable {
             metadata = decoded
         }
         let command = VerseDrawingImportCommand(
-            verse: verse, rowID: .issue(), lineData: draft.lineData, metadata: metadata, expectedCurrentFingerprint: check.currentFingerprint
+            verse: verse, rowID: .issue(), lineData: draft.lineData, metadata: metadata, expectedCurrentFingerprint: check.currentFingerprint,
+            translation: chapter.translation
         )
         switch try await writer.importVerse(command, chapter: chapter, generation: load.generation) {
         case .currentChanged:

@@ -50,12 +50,12 @@ public struct SwiftDataFavoriteVerseRepository: FavoriteVerseRepository {
 extension SwiftDatabaseActor {
     /// 장에서 즐겨찾기한 절 번호를 읽는다.
     /// - Parameters:
-    ///   - chapter: 대상 장.
-    ///   - translation: 대상 번역본.
+    ///   - chapter: 대상 권 · 장.
+    ///   - translation: 대상 번역본. 장의 번역본이 아니라 이 값으로 고른다.
     /// - Returns: 절 번호 집합.
     public func loadFavoriteVerses(in chapter: BibleChapter, translation: Translation) throws -> Set<Int> {
-        let rows = try favoriteRows(in: chapter)
-        return Set(rows.filter { ($0.translation ?? .NKRV) == translation }.compactMap(\.verse))
+        let rows = try favoriteRows(title: chapter.title, chapter: chapter.chapter, translation: translation)
+        return Set(rows.compactMap(\.verse))
     }
 
     /// 모든 즐겨찾기를 최근 추가순으로 읽는다. 같은 키의 행이 여럿이면 가장 최근 행 하나만 남긴다.
@@ -121,11 +121,13 @@ extension SwiftDatabaseActor {
         [SortDescriptor(\.createdDate, order: .reverse), SortDescriptor(\.favoriteID)]
     }
 
-    /// 장의 즐겨찾기 행(최근 추가순). 번역본은 술어에 넣지 않고 메모리에서 거른다 — `Translation` 은 Codable 열거형이라
-    /// 술어로 비교하는 경로를 확인하지 않았고, 한 장의 즐겨찾기는 몇 행뿐이다.
-    private func favoriteRows(in chapter: BibleChapter) throws -> [FavoriteVerse] {
-        let titleName = chapter.title.rawValue
-        let chapterNumber = chapter.chapter
+    /// 한 번역본 · 권 · 장의 즐겨찾기 행(최근 추가순).
+    ///
+    /// 번역본은 권 이름(`StoredBookKey`)으로 가린다 — 영어 행은 `"<번역본>-<rawValue>"`, 개역개정 행은 접두 없는 `rawValue` 다.
+    /// `translation` 열은 보지 않는다: 영어 행은 늘 nil 이고, 접두 없는 행은 열이 nil 이든 `.NKRV` 든 개역개정이다(영어 현지화 결정 1).
+    private func favoriteRows(title: BibleTitle, chapter: Int, translation: Translation) throws -> [FavoriteVerse] {
+        let titleName = StoredBookKey.titleName(title: title, translation: translation)
+        let chapterNumber = chapter
         let predicate = #Predicate<FavoriteVerse> {
             $0.titleName == titleName && $0.titleChapter == chapterNumber
         }
@@ -133,8 +135,8 @@ extension SwiftDatabaseActor {
     }
 
     private func favoriteRows(for key: FavoriteVerseKey) throws -> [FavoriteVerse] {
-        try favoriteRows(in: key.chapter).filter {
-            $0.verse == key.verse && ($0.translation ?? .NKRV) == key.translation
+        try favoriteRows(title: key.chapter.title, chapter: key.chapter.chapter, translation: key.translation).filter {
+            $0.verse == key.verse
         }
     }
 }
@@ -142,15 +144,16 @@ extension SwiftDatabaseActor {
 // MARK: - 행 → 도메인 값
 
 extension FavoriteVerse {
-    /// 권 · 장 · 절을 해석할 수 없는 행(알 수 없는 권 이름 등)은 nil — 목록에 올리지 않는다.
+    /// 권 · 장 · 절을 해석할 수 없는 행(알 수 없는 권 이름 · 모르는 번역본 접두 등)은 nil — 목록에 올리지 않는다.
+    ///
+    /// 번역본은 권 이름의 접두로 정한다(`StoredBookKey.decode`). 모르는 접두를 개역개정에 붙이지 않는다.
     var snapshot: FavoriteVerseSnapshot? {
-        guard let titleName, let title = BibleTitle(rawValue: titleName),
+        guard let titleName, let book = StoredBookKey.decode(titleName),
               let titleChapter, let verse else { return nil }
         return FavoriteVerseSnapshot(
             key: FavoriteVerseKey(
-                chapter: BibleChapter(title: title, chapter: titleChapter),
-                verse: verse,
-                translation: translation ?? .NKRV
+                chapter: BibleChapter(title: book.title, chapter: titleChapter, translation: book.translation),
+                verse: verse
             ),
             sentence: sentence ?? "",
             lineData: lineData,
