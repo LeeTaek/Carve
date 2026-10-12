@@ -54,7 +54,7 @@ struct VerseImageCard: View {
             if let handwriting {
                 divider
                     .padding(.top, 28)
-                Text("나의 필사")
+                Text("나의 필사", bundle: .module)
                     .font(.system(size: 12))
                     .foregroundStyle(CarveColor.Paper.secondary)
                     .padding(.top, 20)
@@ -69,7 +69,8 @@ struct VerseImageCard: View {
                     .font(.system(size: 14))
                     .foregroundStyle(CarveColor.Paper.text)
                 Spacer(minLength: CarveSpacing.medium)
-                Text("새기다")
+                // 앱 이름(ko 「새기다」 · en 「Carve」, 영어 현지화 결정 8).
+                Text("새기다", bundle: .module)
                     .font(.system(size: 13))
                     .foregroundStyle(CarveColor.Paper.secondary)
             }

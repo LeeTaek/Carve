@@ -43,7 +43,7 @@ struct ChapterCanvasEraseTesting {
         await store.send(.eraseRequested(at: Self.pointInVerse))
         let alert = try #require(store.state.eraseAlert)
         let title = String(state: alert.title)
-        #expect(title.contains(CanvasTestSupport.chapter.title.koreanTitle()))
+        #expect(title.contains(CanvasTestSupport.chapter.title.localizedName))
         #expect(title.contains("\(CanvasTestSupport.chapter.chapter)장"))
         #expect(title.contains("\(Self.verse)절"))
         let message = String(state: try #require(alert.message))

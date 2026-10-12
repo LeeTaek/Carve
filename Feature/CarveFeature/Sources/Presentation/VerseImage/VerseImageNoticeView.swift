@@ -37,8 +37,8 @@ struct VerseImageNoticeView: View {
 
     private var message: String {
         switch notice {
-        case .saved: "사진에 저장했어요"
-        case .failed: "저장하지 못했어요"
+        case .saved: String(localized: "사진에 저장했어요", bundle: .module)
+        case .failed: String(localized: "저장하지 못했어요", bundle: .module)
         }
     }
 }

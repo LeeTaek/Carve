@@ -22,7 +22,7 @@ public struct DrewLogView: View {
     }
     
     public var content: some View {
-        Text("Hello, World!")
+        Text(verbatim: "Hello, World!")
     }
 }
 

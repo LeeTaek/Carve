@@ -97,24 +97,29 @@ public struct PencilPalatteView: View {
                     }
                 }
             }
-            .accessibilityHint("길게 누르면 연필 · 펜 · 형광펜을 고릅니다")
+            .accessibilityHint(Text("길게 누르면 연필 · 펜 · 형광펜을 고릅니다", bundle: .module))
 
-            CarveIconButton(.eraser, accessibilityLabel: "지우개", isSelected: isErasing, background: .plain) {
+            CarveIconButton(.eraser, accessibilityLabel: String(localized: "지우개", bundle: .module), isSelected: isErasing, background: .plain) {
                 send(.setPencilType(.monoline))
             }
 
-            CarveIconButton(.lasso, accessibilityLabel: "올가미", isSelected: store.isLassoSelected, background: .plain) {
+            CarveIconButton(
+                .lasso,
+                accessibilityLabel: String(localized: "올가미", bundle: .module),
+                isSelected: store.isLassoSelected,
+                background: .plain
+            ) {
                 send(.selectLasso)
             }
-            .accessibilityHint("필기를 묶어 옮깁니다")
+            .accessibilityHint(Text("필기를 묶어 옮깁니다", bundle: .module))
         }
     }
 
     private func inkName(_ ink: PKInkingTool.InkType) -> String {
         switch ink {
-        case .pencil: "연필"
-        case .marker: "형광펜"
-        default: "펜"
+        case .pencil: String(localized: "연필", bundle: .module)
+        case .marker: String(localized: "형광펜", bundle: .module)
+        default: String(localized: "펜", bundle: .module)
         }
     }
 
@@ -142,8 +147,8 @@ public struct PencilPalatteView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("펜 굵기 \(millimeters(store.pencilConfig.lineWidth))")
-        .accessibilityHint("탭하면 굵기를 고릅니다")
+        .accessibilityLabel(Text("펜 굵기 \(millimeters(store.pencilConfig.lineWidth))", bundle: .module))
+        .accessibilityHint(Text("탭하면 굵기를 고릅니다", bundle: .module))
         .popover(
             item: $store.scope(state: \.navigation?.lineWidthPalatte,
                                action: \.navigation.lineWidthPalatte),
@@ -169,8 +174,8 @@ public struct PencilPalatteView: View {
                         longPressGesture(action: .popoverColor(index))
                     )
                     .accessibilityElement()
-                    .accessibilityLabel("색상 \(index + 1)")
-                    .accessibilityHint("길게 누르면 색을 바꿉니다")
+                    .accessibilityLabel(Text("색상 \(index + 1)", bundle: .module))
+                    .accessibilityHint(Text("길게 누르면 색을 바꿉니다", bundle: .module))
                     .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
             }
         }
@@ -192,12 +197,12 @@ public struct PencilPalatteView: View {
 
     private var undoRedoButtons: some View {
         HStack(spacing: CarveSpacing.xxSmall) {
-            CarveIconButton(.undo, accessibilityLabel: "실행 취소", background: .plain) {
+            CarveIconButton(.undo, accessibilityLabel: String(localized: "실행 취소", bundle: .module), background: .plain) {
                 send(.undo)
             }
             .disabled(!store.canUndo)
 
-            CarveIconButton(.redo, accessibilityLabel: "다시 실행", background: .plain) {
+            CarveIconButton(.redo, accessibilityLabel: String(localized: "다시 실행", bundle: .module), background: .plain) {
                 send(.redo)
             }
             .disabled(!store.canRedo)
@@ -315,7 +320,11 @@ public struct PencilPalatteDockView: View {
     ///    바깥의 `opacity` · `scaleEffect` 를 따르지 않으므로, 유리를 둔 채 숨기면 캡슐 옆에 아이콘이 그대로 보였다.
     ///    접을 때 유리가 다시 생기며 독립된 버튼으로 나타난다.
     private var undoButton: some View {
-        CarveIconButton(.undo, accessibilityLabel: "실행 취소", background: isShowingExpanded ? .plain : .floating) {
+        CarveIconButton(
+            .undo,
+            accessibilityLabel: String(localized: "실행 취소", bundle: .module),
+            background: isShowingExpanded ? .plain : .floating
+        ) {
             store.send(.view(.undo))
         }
         .disabled(!store.canUndo)
@@ -333,7 +342,7 @@ public struct PencilPalatteDockView: View {
                 Text(gestureGuide)
                     .transition(.opacity)
             } else {
-                Text("\(compactToolName) · \(store.pencilConfig.lineWidth / 4, specifier: "%.1f") mm")
+                Text(verbatim: "\(compactToolName) · \(LineWidthPalatteView.millimeters(store.pencilConfig.lineWidth))")
                     .transition(.opacity)
             }
         }
@@ -350,7 +359,9 @@ public struct PencilPalatteDockView: View {
 
     /// 펼친 팔레트 아래 조작 안내. 손가락 필사를 허용하면 한 손가락은 필기라 스크롤은 두 손가락이 된다.
     private var gestureGuide: String {
-        allowFingerDrawing ? "두 손가락으로 스크롤 · 손가락으로 필사" : "손가락으로 스크롤 · Apple Pencil로 필사"
+        allowFingerDrawing
+            ? String(localized: "두 손가락으로 스크롤 · 손가락으로 필사", bundle: .module)
+            : String(localized: "손가락으로 스크롤 · Apple Pencil로 필사", bundle: .module)
     }
 
     private var compactToolButton: some View {
@@ -367,7 +378,7 @@ public struct PencilPalatteDockView: View {
             .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(compactToolName), \(store.pencilConfig.lineWidth / 4, specifier: "%.1f") 밀리미터. 탭하면 도구 팔레트를 펼칩니다")
+        .accessibilityLabel(Text("\(compactToolName), \(String(format: "%.1f", store.pencilConfig.lineWidth / 4)) 밀리미터. 탭하면 도구 팔레트를 펼칩니다", bundle: .module))
     }
 
     private var compactToolIcon: CarveIcon {
@@ -376,12 +387,12 @@ public struct PencilPalatteDockView: View {
     }
 
     private var compactToolName: String {
-        if store.isLassoSelected { return "올가미" }
+        if store.isLassoSelected { return String(localized: "올가미", bundle: .module) }
         switch store.pencilConfig.pencilType {
-        case .monoline: return "지우개"
-        case .pencil: return "연필"
-        case .marker: return "형광펜"
-        default: return "펜"
+        case .monoline: return String(localized: "지우개", bundle: .module)
+        case .pencil: return String(localized: "연필", bundle: .module)
+        case .marker: return String(localized: "형광펜", bundle: .module)
+        default: return String(localized: "펜", bundle: .module)
         }
     }
 }

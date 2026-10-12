@@ -200,7 +200,7 @@ struct ChapterLayoutSlackSourceTesting {
         store.send(.setSentence((1...3).map { BibleVerse(title: chapter, verse: $0, sentence: "본문 \($0)") }))
         var batch: [SentencesWithDrawingFeature.State.ID: VerseRowGeometry] = [:]
         for verse in 1...3 {
-            batch["\(chapter.title.koreanTitle()).\(chapter.chapter).\(verse)"] = VerseRowGeometry(underlineOffsets: [30])
+            batch[SentencesWithDrawingFeature.State.rowID(chapter: chapter, verse: verse)] = VerseRowGeometry(underlineOffsets: [30])
         }
         store.send(.view(.verseGeometryMeasured(batch)))
 

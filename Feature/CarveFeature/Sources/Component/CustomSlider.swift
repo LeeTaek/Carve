@@ -28,7 +28,7 @@ public struct CustomSlider: View {
         GeometryReader { geometry in
             let sliderLength = geometry.size.width - 85
             HStack(alignment: .center, spacing: 5) {
-                Text("-")
+                Text(verbatim: "-")
                     .font(.title)
                     .fontWeight(.bold)
                 
@@ -56,7 +56,7 @@ public struct CustomSlider: View {
                 }
                 .padding(.horizontal)
                 
-                Text("+")
+                Text(verbatim: "+")
                     .font(.title)
                     .fontWeight(.bold)
             }

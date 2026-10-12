@@ -189,12 +189,12 @@ struct VerseMenuOverlay: View {
 
     private func title(_ item: Item) -> Text {
         switch item {
-        case .favorite: Text(isFavorite ? "즐겨찾기 해제" : "즐겨찾기에 추가")
-        case .history: Text("이전 필사 내용 보기")
-        case .image: Text("이미지 저장")
-        case .widget: Text("위젯에 추가")
-        case .drafts: Text("확인이 필요한 필기 \(menu.availability.hiddenDraftCount)")
-        case .erase: Text("지우기")
+        case .favorite: Text(isFavorite ? "즐겨찾기 해제" : "즐겨찾기에 추가", bundle: .module)
+        case .history: Text("이전 필사 내용 보기", bundle: .module)
+        case .image: Text("이미지 저장", bundle: .module)
+        case .widget: Text("위젯에 추가", bundle: .module)
+        case .drafts: Text("확인이 필요한 필기 \(menu.availability.hiddenDraftCount)", bundle: .module)
+        case .erase: Text("지우기", bundle: .module)
         }
     }
 }

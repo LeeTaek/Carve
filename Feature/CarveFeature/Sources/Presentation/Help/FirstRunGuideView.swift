@@ -23,7 +23,7 @@ public struct FirstRunGuideView: View {
             Spacer(minLength: 0)
 
             VStack(alignment: .leading, spacing: CarveSpacing.medium) {
-                Text("\(store.currentPage + 1) / \(Self.guides.count)")
+                Text(verbatim: "\(store.currentPage + 1) / \(Self.guides.count)")
                     .font(CarveTypography.caption)
                     .foregroundStyle(CarveColor.accent)
 
@@ -37,8 +37,10 @@ public struct FirstRunGuideView: View {
                 .frame(height: 104)
 
                 HStack(spacing: CarveSpacing.medium) {
-                    Button("건너뛰기") {
+                    Button {
                         send(.skipTapped)
+                    } label: {
+                        Text("건너뛰기", bundle: .module)
                     }
                     .buttonStyle(.plain)
                     .font(CarveTypography.caption)
@@ -57,8 +59,10 @@ public struct FirstRunGuideView: View {
 
                     Spacer(minLength: 0)
 
-                    Button(store.currentPage == Self.guides.count - 1 ? "시작하기" : "다음") {
+                    Button {
                         send(.nextTapped)
+                    } label: {
+                        store.currentPage == Self.guides.count - 1 ? Text("시작하기", bundle: .module) : Text("다음", bundle: .module)
                     }
                     .buttonStyle(.carve(.primary))
                 }
@@ -88,22 +92,28 @@ public struct FirstRunGuideView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
-    private static let guides: [(title: String, body: String)] = [
-        (
-            "펜으로 쓰고, 손가락으로 스크롤해요",
-            "펜으로 말씀을 따라 써 보세요. 화면을 움직일 때는 손가락으로 밀어 주세요. 한 손가락으로도 스크롤할 수 있어요."
-        ),
-        (
-            "필기 도구를 골라보세요",
-            "펜 버튼을 누르면 펜과 지우개를 바꾸고, 필기 색상을 고를 수 있어요."
-        ),
-        (
-            "다른 성경으로 이동해요",
-            "왼쪽 위 탐색 버튼을 누르면 원하는 성경과 장을 고를 수 있어요."
-        ),
-        (
-            "절을 길게 눌러보세요",
-            "이전 필사를 보거나 이미지로 저장하고, 위젯에 표시할 수 있어요. 지우기를 누르면 해당 절의 캔버스만 비워지고, 필사한 내용은 이전 필사에 남아요."
-        )
-    ]
+    /// 안내 페이지(제목 · 본문). 문구는 카탈로그에 있다 — 앱 언어로 꺼낸다.
+    private static var guides: [(title: String, body: String)] {
+        [
+            (
+                String(localized: "펜으로 쓰고, 손가락으로 스크롤해요", bundle: .module),
+                String(localized: "펜으로 말씀을 따라 써 보세요. 화면을 움직일 때는 손가락으로 밀어 주세요. 한 손가락으로도 스크롤할 수 있어요.", bundle: .module)
+            ),
+            (
+                String(localized: "필기 도구를 골라보세요", bundle: .module),
+                String(localized: "펜 버튼을 누르면 펜과 지우개를 바꾸고, 필기 색상을 고를 수 있어요.", bundle: .module)
+            ),
+            (
+                String(localized: "다른 성경으로 이동해요", bundle: .module),
+                String(localized: "왼쪽 위 탐색 버튼을 누르면 원하는 성경과 장을 고를 수 있어요.", bundle: .module)
+            ),
+            (
+                String(localized: "절을 길게 눌러보세요", bundle: .module),
+                String(
+                    localized: "이전 필사를 보거나 이미지로 저장하고, 위젯에 표시할 수 있어요. 지우기를 누르면 해당 절의 캔버스만 비워지고, 필사한 내용은 이전 필사에 남아요.",
+                    bundle: .module
+                )
+            )
+        ]
+    }
 }
