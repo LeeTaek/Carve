@@ -20,13 +20,13 @@ public struct BackupRowRecord: Codable, Equatable, Sendable {
     public let rowUUID: String?
     /// business `id`(`BibleDrawing.id`) 원본.
     public let businessID: String?
-    /// `BibleTitle.rawValue` 원문.
+    /// `titleName` 원문 — 개역개정 `BibleTitle.rawValue`, 영어 `"<번역본>-<rawValue>"`(`StoredBookKey`).
     public let titleName: String
     /// 장(`titleChapter`).
     public let chapter: Int
     /// 절.
     public let verse: Int
-    /// 번역 저장값 그대로. 없으면 nil — NKRV 로 채우지 않는다.
+    /// 번역 열 저장값 그대로. 없으면 nil — NKRV 로 채우지 않는다. 영어 행은 늘 nil 이다 — 백업 키 · 판정 묶음의 번역본은 `backupTranslation`.
     public let translation: String?
     /// `isPresent` 원본(nil 포함). 대표 판정에서 nil 은 false 다.
     public let isPresent: Bool?
@@ -122,6 +122,23 @@ public struct BackupRowRecord: Codable, Equatable, Sendable {
         try container.encodeIfPresent(drawingVersion, forKey: .drawingVersion)
         try container.encodeIfPresent(lineData, forKey: .lineData)
         try container.encodeIfPresent(layoutMetadataData, forKey: .layoutMetadataData)
+    }
+}
+
+extension BackupRowRecord {
+    /// 백업 키의 번역본(`BackupVerseKey.translation`)이자 판정 묶음의 번역본 (설계 §2-4 · §5-1, 영어 현지화 결정 1).
+    ///
+    /// `titleName` 접두를 먼저 본다 — 영어 행은 열이 늘 nil 이라 열로 정하면 개역개정 null 묶음에 섞인다.
+    /// - 접두가 KJV · BSB 면 그 값(`"KJV"` · `"BSB"`).
+    /// - 접두가 없는 개역개정 행은 열 값 그대로(nil 은 nil — NKRV 로 채우지 않는다, 2.1 백업 결정 9). 열에 영어 값이 있으면(쓰지 않는 값)
+    ///   그 행은 앱에서 개역개정으로 읽히므로 `"NKRV"` 다.
+    /// - 권 이름을 풀 수 없는 행(백업 조회가 고르지 않는다)은 열 값 그대로.
+    public var backupTranslation: String? {
+        guard let decoded = StoredBookKey.decode(titleName) else { return translation }
+        switch decoded.translation {
+        case .NKRV: return translation == nil ? nil : Translation.NKRV.rawValue
+        case .KJV, .BSB: return decoded.translation.rawValue
+        }
     }
 }
 

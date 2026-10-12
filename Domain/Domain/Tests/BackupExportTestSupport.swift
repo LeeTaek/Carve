@@ -100,6 +100,8 @@ enum BackupExportSample {
 }
 
 /// 심을 행 하나 — `BibleDrawing` 의 원본 필드 그대로.
+///
+/// 권 이름은 장의 번역본으로 짓는다(`StoredBookKey.titleName(for:)` — 영어 장은 `KJV-…`). 영어 행의 번역 열은 부르는 쪽이 nil 로 준다.
 struct BackupExportRowSeed {
     var chapter: BibleChapter = BackupExportSample.genesis1
     var verse: Int?
@@ -147,12 +149,15 @@ struct BackupExportRowSeed {
     /// 행 키 — `rowUUID ?? business id`.
     var rowKey: String { rowUUID ?? businessID }
 
+    /// 심는 `titleName` — 바꿔 심지 않았으면 장의 번역본으로 지은 이름.
+    var titleName: String { titleNameOverride ?? StoredBookKey.titleName(for: chapter) }
+
     /// 이 행이 백업 전용 조회에서 보일 원본.
     var record: BackupRowRecord {
         BackupRowRecord(
             rowUUID: rowUUID,
             businessID: businessID,
-            titleName: chapter.title.rawValue,
+            titleName: titleName,
             chapter: chapter.chapter,
             verse: verse ?? 0,
             translation: translation?.rawValue,
@@ -181,7 +186,8 @@ struct BackupExportRowSeed {
         row.translation = translation
         row.isPresent = isPresent
         row.drawingVersion = drawingVersion
-        if let titleNameOverride { row.titleName = titleNameOverride }
+        // init 규칙에 기대지 않고 권 이름을 적는다(영어 장은 `KJV-…`).
+        row.titleName = titleName
         if dropsChapter { row.titleChapter = nil }
         return row
     }

@@ -15,7 +15,8 @@ import Foundation
 ///
 /// 구현(`SwiftDataDrawingBackupRestorer`)은 같은 actor 구간에서 ① 세대를 확인하고 ② 그 장의 행을 백업 전용 조회(`BackupRowRecord` —
 /// 내보내기와 같은 변환)로 다시 읽어 ③ `BackupImportPlanner` 로 **다시 판정한 결과만** 쓴다(미리보기 뒤 동기화로 바뀐 것 반영).
-/// 넣는 행은 바이트 · `drawingVersion` · 시각 · 번역 저장값을 원본 그대로 두고 `rowUUID` 만 새로 발급한다. 있는 행은 고치지 않는다 —
+/// 넣는 행은 바이트 · `drawingVersion` · 시각 · 번역 저장값을 원본 그대로 두고 `rowUUID` 만 새로 발급한다(KJV · BSB 항목은 `titleName` 접두로
+/// 번역본을 지니고 열은 nil — `StoredBookKey`). 있는 행은 고치지 않는다 —
 /// 대표 고정(`BackupRepresentativePin`)의 `isPresent` 하나만 예외다(오케스트레이터 결정 2026-10-06).
 /// 재시도는 같은 규칙으로 멱등이다 — 이미 넣은 내용은 같은 지문이라 `skipSame` 이다.
 public protocol DrawingBackupRestoring: Sendable {
@@ -110,7 +111,7 @@ public struct BackupChapterRestoreOutcome: Equatable, Sendable {
 public enum BackupChapterRestoreError: Error, Equatable, Sendable {
     /// 넣을 행의 blob 바이트가 명령에 없거나, 바이트가 이름(SHA-256)과 다르다.
     case blobUnavailable(name: String)
-    /// 넣을 행의 번역본을 이 앱이 모른다 — 명령이 지원 판정을 계산하므로 생기지 않아야 한다.
+    /// 넣을 행의 번역본을 이 앱이 모르거나 장의 번역본과 다르다 — 명령이 지원 판정을 계산하고 판정기가 장의 번역본 항목만 넣으므로 생기지 않아야 한다.
     case unknownTranslation
 }
 
