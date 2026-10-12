@@ -118,6 +118,8 @@ extension CarveDetailFeature {
         guard !state.chapterCanvas.inheritsOtherSessionInk(verse: request.verse) else {
             return showWidgetNotice(state: &state, .blocked(.verseFromOtherSession), duration: Self.widgetNoticeDuration)
         }
+        // 키의 번역본은 지금 장(`favoriteChapter`)의 번역본이다 — KJV 장에서 담은 절은 KJV 보관본이고,
+        // 같은 절의 개역개정 보관본 · 위젯 항목과 따로다(영어 현지화 결정 1). 아래 보관본 찾기 · 이미 담김 판정도 이 키로 한다.
         let key = FavoriteVerseKey(chapter: chapter, verse: request.verse)
         let sentence = state.sentenceWithDrawingState.first { $0.sentence.verse == request.verse }?.sentence.sentenceScript ?? ""
         let createdDate = date.now
