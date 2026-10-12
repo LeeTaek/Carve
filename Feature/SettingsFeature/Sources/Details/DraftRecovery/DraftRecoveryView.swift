@@ -76,8 +76,8 @@ public struct DraftRecoveryView: View {
                 note(DraftRecoveryCopy.unopenedLine(store.unopenedCount), emphasized: false)
             }
             if store.totalUnreadableCount > 0 {
-                note("읽지 못해 보관만 하는 파일 \(store.totalUnreadableCount)개 · \(DraftRecoveryCopy.bytesText(store.totalUnreadableBytes))",
-                     emphasized: false)
+                let bytes = DraftRecoveryCopy.bytesText(store.totalUnreadableBytes)
+                note(SettingsCatalog.string("읽지 못해 보관만 하는 파일 \(store.totalUnreadableCount)개 · \(bytes)"), emphasized: false)
             }
             if let message = store.importMessage {
                 note(message.text, emphasized: message.needsAttention)
@@ -99,18 +99,21 @@ public struct DraftRecoveryView: View {
         } else if store.isLoading, store.buckets.isEmpty {
             HStack {
                 ProgressView()
-                Text("남겨 둔 필기를 확인하는 중이에요")
+                Text("남겨 둔 필기를 확인하는 중이에요", bundle: .module)
                     .font(CarveTypography.body)
                     .foregroundStyle(CarveColor.secondary)
             }
         } else if store.buckets.isEmpty {
-            CarveEmptyState("이 iPad에 남겨 둔 필기가 없어요", message: "쓰던 필기가 모두 현재 필사에 반영돼 있어요.")
+            CarveEmptyState(
+                SettingsCatalog.string("이 iPad에 남겨 둔 필기가 없어요"),
+                message: SettingsCatalog.string("쓰던 필기가 모두 현재 필사에 반영돼 있어요.")
+            )
         } else {
             VStack(alignment: .leading, spacing: CarveSpacing.small) {
                 ForEach(store.buckets) { bucket in
                     bucketCard(bucket)
                 }
-                Button("다시 읽기") { send(.reload) }
+                Button { send(.reload) } label: { Text("다시 읽기", bundle: .module) }
                     .buttonStyle(.carve(.secondary))
                     .disabled(store.isLoading || store.importingItemID != nil)
             }
@@ -156,7 +159,7 @@ public struct DraftRecoveryView: View {
             CarveDivider()
 
             if bucket.readFailed {
-                note("이 묶음을 읽지 못했어요. 파일은 그대로 두고 다시 읽어 볼 수 있어요.", emphasized: true)
+                note(SettingsCatalog.string("이 묶음을 읽지 못했어요. 파일은 그대로 두고 다시 읽어 볼 수 있어요."), emphasized: true)
             } else if !bucket.comparedWithStore {
                 // 다른 계정 묶음은 지금 저장소와 견주지 않고 상세도 만들지 않는다 — 수 · 용량만 보인다(P0-1).
                 note(DraftRecoveryCopy.notOpenedBucket, emphasized: false)
@@ -170,12 +173,13 @@ public struct DraftRecoveryView: View {
             }
 
             if !bucket.unreadChapters.isEmpty {
-                note("이 장들은 대조하지 못했어요 — \(bucket.unreadChapters.joined(separator: ", ")). 파일은 그대로 있어요.", emphasized: true)
+                let chapters = bucket.unreadChapters.joined(separator: ", ")
+                note(SettingsCatalog.string("이 장들은 대조하지 못했어요 — \(chapters). 파일은 그대로 있어요."), emphasized: true)
             }
 
             if bucket.comparedWithStore {
                 if bucket.pendingItems.isEmpty {
-                    note(bucket.draftCount == 0 ? "남겨 둔 필기가 없어요." : DraftRecoveryCopy.nothingPending, emphasized: false)
+                    note(bucket.draftCount == 0 ? SettingsCatalog.string("남겨 둔 필기가 없어요.") : DraftRecoveryCopy.nothingPending, emphasized: false)
                 } else {
                     ForEach(bucket.pendingItems) { item in
                         itemCard(item)
@@ -226,18 +230,18 @@ private extension DraftRecoveryView {
     @ViewBuilder
     func unreadableSection(_ bucket: DraftRecoveryFeature.Bucket) -> some View {
         VStack(alignment: .leading, spacing: CarveSpacing.xSmall) {
-            note("읽지 못해 옆으로 옮겨 둔 파일이 \(bucket.unreadableCount)개 있어요 · "
-                 + "\(DraftRecoveryCopy.bytesText(bucket.unreadableBytes)). 넣을 수는 없고 보관만 해요.", emphasized: false)
+            let bytes = DraftRecoveryCopy.bytesText(bucket.unreadableBytes)
+            note(SettingsCatalog.string("읽지 못해 옆으로 옮겨 둔 파일이 \(bucket.unreadableCount)개 있어요 · \(bytes). 넣을 수는 없고 보관만 해요."), emphasized: false)
             HStack(spacing: CarveSpacing.small) {
                 if !bucket.unreadableFiles.isEmpty {
                     // 지우기 전에 먼저 꺼내 둘 수 있게 내보내기를 앞에 둔다.
                     ShareLink(items: bucket.unreadableFiles) {
-                        Text("내보내기")
+                        Text("내보내기", bundle: .module)
                             .font(CarveTypography.label)
                             .foregroundStyle(CarveColor.accent)
                     }
                 }
-                Button("지우기") { send(.askRemoveUnreadable(bucket.scope)) }
+                Button { send(.askRemoveUnreadable(bucket.scope)) } label: { Text("지우기", bundle: .module) }
                     .font(CarveTypography.label)
                     .foregroundStyle(CarveColor.danger)
                     .buttonStyle(.plain)
@@ -252,21 +256,21 @@ private extension DraftRecoveryView {
     /// 지우기 확인 — **무엇이 지워지고 무엇이 그대로인지**를 먼저 말한다(C11 문구 규칙).
     func removalConfirmation(_ bucket: DraftRecoveryFeature.Bucket) -> some View {
         VStack(alignment: .leading, spacing: CarveSpacing.xSmall) {
-            Text("읽지 못한 파일 \(bucket.unreadableCount)개를 지울까요?")
+            Text("읽지 못한 파일 \(bucket.unreadableCount)개를 지울까요?", bundle: .module)
                 .font(CarveTypography.body)
                 .foregroundStyle(CarveColor.ink)
-            Text("현재 필사와 남겨 둔 필기는 그대로예요. 지우는 것은 **읽지 못해 넣을 수 없는 파일**이에요.")
+            Text("현재 필사와 남겨 둔 필기는 그대로예요. 지우는 것은 **읽지 못해 넣을 수 없는 파일**이에요.", bundle: .module)
                 .font(CarveTypography.caption)
                 .foregroundStyle(CarveColor.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            Text("지운 파일은 되돌릴 수 없어요. 먼저 내보내 두면 나중에 살펴볼 수 있어요.")
+            Text("지운 파일은 되돌릴 수 없어요. 먼저 내보내 두면 나중에 살펴볼 수 있어요.", bundle: .module)
                 .font(CarveTypography.caption)
                 .foregroundStyle(CarveColor.ink)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: CarveSpacing.small) {
-                Button("지우기") { send(.removeUnreadableConfirmed(bucket.scope)) }
+                Button { send(.removeUnreadableConfirmed(bucket.scope)) } label: { Text("지우기", bundle: .module) }
                     .buttonStyle(.carve(.destructive))
-                Button("취소") { send(.askRemoveUnreadable(nil)) }
+                Button { send(.askRemoveUnreadable(nil)) } label: { Text("취소", bundle: .module) }
                     .buttonStyle(.carve(.secondary))
             }
         }
@@ -308,14 +312,14 @@ private extension DraftRecoveryView {
                     .font(CarveTypography.body)
                     .foregroundStyle(CarveColor.ink)
                     .fixedSize(horizontal: false, vertical: true)
-                Text("쓴 때 \(DraftRecoveryCopy.dateText(item.savedAt))")
+                Text("쓴 때 \(DraftRecoveryCopy.dateText(item.savedAt))", bundle: .module)
                     .font(CarveTypography.caption)
                     .foregroundStyle(CarveColor.secondary)
                 HStack(spacing: CarveSpacing.xSmall) {
                     badge(DraftRecoveryCopy.reasonTitle(item.reason))
                     if item.injected {
                         // 시험용 주입은 소유 증명이 아니다 — 화면에서도 구분한다.
-                        badge("시험 주입")
+                        badge(SettingsCatalog.string("시험 주입"))
                     }
                 }
                 Text(DraftRecoveryCopy.reasonDetail(item.reason))
@@ -330,7 +334,7 @@ private extension DraftRecoveryView {
                         .font(CarveTypography.caption)
                         .foregroundStyle(CarveColor.secondary)
                 }
-                Text(store.comparison?.itemID == item.id ? "비교 접기" : "현재 필사와 비교하기")
+                (store.comparison?.itemID == item.id ? Text("비교 접기", bundle: .module) : Text("현재 필사와 비교하기", bundle: .module))
                     .font(CarveTypography.caption)
                     .foregroundStyle(CarveColor.accent)
             }
@@ -342,9 +346,10 @@ private extension DraftRecoveryView {
     /// 지금 그 절이 어떤 상태인지 — 펼치기 전에도 견줄 실마리는 준다.
     func currentText(of item: DraftRecoveryFeature.Item) -> String? {
         guard let isEmpty = item.currentIsEmpty else { return nil }
-        if isEmpty { return "현재 그 절: 필기 없음" }
-        guard let updatedAt = item.currentUpdatedAt else { return "현재 그 절: 다른 필기가 있음" }
-        return "현재 그 절: 다른 필기가 있음 · \(DraftRecoveryCopy.dateText(updatedAt))"
+        if isEmpty { return SettingsCatalog.string("현재 그 절: 필기 없음") }
+        guard let updatedAt = item.currentUpdatedAt else { return SettingsCatalog.string("현재 그 절: 다른 필기가 있음") }
+        let updated = DraftRecoveryCopy.dateText(updatedAt)
+        return SettingsCatalog.string("현재 그 절: 다른 필기가 있음 · \(updated)")
     }
 
     @ViewBuilder
@@ -355,7 +360,7 @@ private extension DraftRecoveryView {
                     .resizable()
                     .scaledToFit()
             } else {
-                Text(item.ink == nil ? "비운 절" : "미리보기 없음")
+                (item.ink == nil ? Text("비운 절", bundle: .module) : Text("미리보기 없음", bundle: .module))
                     .font(CarveTypography.caption)
                     .foregroundStyle(CarveColor.secondary)
                     .multilineTextAlignment(.center)
@@ -388,7 +393,7 @@ private extension DraftRecoveryView {
             if comparison?.isLoading == true {
                 HStack {
                     ProgressView()
-                    Text("현재 필사를 읽는 중이에요")
+                    Text("현재 필사를 읽는 중이에요", bundle: .module)
                         .font(CarveTypography.caption)
                         .foregroundStyle(CarveColor.secondary)
                 }
@@ -400,16 +405,16 @@ private extension DraftRecoveryView {
             } else {
                 HStack(alignment: .top, spacing: CarveSpacing.small) {
                     side(
-                        title: "현재 필사",
+                        title: SettingsCatalog.string("현재 필사"),
                         ink: comparison?.currentInk,
-                        emptyText: "필기 없음",
-                        detail: comparison?.currentUpdatedAt.map { "바뀐 때 \(DraftRecoveryCopy.dateText($0))" } ?? "바뀐 때를 모름"
+                        emptyText: SettingsCatalog.string("필기 없음"),
+                        detail: comparison?.currentUpdatedAt.map { Self.changedText($0) } ?? SettingsCatalog.string("바뀐 때를 모름")
                     )
                     side(
-                        title: "남겨 둔 필기",
+                        title: SettingsCatalog.string("남겨 둔 필기"),
                         ink: item.ink,
-                        emptyText: "비운 절",
-                        detail: "쓴 때 \(DraftRecoveryCopy.dateText(item.savedAt))"
+                        emptyText: SettingsCatalog.string("비운 절"),
+                        detail: Self.writtenText(item.savedAt)
                     )
                 }
                 if let check = comparison?.check {
@@ -451,7 +456,7 @@ private extension DraftRecoveryView {
             } else if store.importingItemID == item.id {
                 HStack {
                     ProgressView()
-                    Text("넣는 중이에요")
+                    Text("넣는 중이에요", bundle: .module)
                         .font(CarveTypography.caption)
                         .foregroundStyle(CarveColor.secondary)
                 }
@@ -481,7 +486,7 @@ private extension DraftRecoveryView {
             Button(DraftRecoveryCopy.cautionConfirmTitle(action)) { send(.cautionConfirmed) }
                 .buttonStyle(.carve(.primary))
                 .accessibilityIdentifier("draftRecovery.cautionConfirm")
-            Button("취소") { send(.cautionCancelled) }
+            Button { send(.cautionCancelled) } label: { Text("취소", bundle: .module) }
                 .buttonStyle(.carve(.secondary))
         }
     }
@@ -491,6 +496,18 @@ private extension DraftRecoveryView {
         Button(DraftRecoveryCopy.laterTitle) { send(.closeComparison) }
             .buttonStyle(.carve(.secondary))
             .disabled(store.importingItemID != nil)
+    }
+
+    /// 「쓴 때 …」 — 남겨 둔 필기를 쓴 때.
+    static func writtenText(_ date: Date) -> String {
+        let written = DraftRecoveryCopy.dateText(date)
+        return SettingsCatalog.string("쓴 때 \(written)")
+    }
+
+    /// 「바뀐 때 …」 — 그 절의 지금 필기가 바뀐 때.
+    static func changedText(_ date: Date) -> String {
+        let changed = DraftRecoveryCopy.dateText(date)
+        return SettingsCatalog.string("바뀐 때 \(changed)")
     }
 
     func side(title: String, ink: Data?, emptyText: String, detail: String) -> some View {
@@ -504,7 +521,7 @@ private extension DraftRecoveryView {
                         .resizable()
                         .scaledToFit()
                 } else {
-                    Text(ink == nil ? emptyText : "미리보기 없음")
+                    Text(ink == nil ? emptyText : SettingsCatalog.string("미리보기 없음"))
                         .font(CarveTypography.caption)
                         .foregroundStyle(CarveColor.secondary)
                 }

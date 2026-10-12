@@ -39,7 +39,7 @@ public struct PatchnoteView: View {
     private var detailContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
-                Text("패치노트")
+                Text("패치노트", bundle: .module)
                     .font(CarveTypography.sectionTitle)
                     .foregroundStyle(CarveColor.secondary)
 
@@ -51,7 +51,7 @@ public struct PatchnoteView: View {
                         Text(Self.title(of: release))
                             .font(CarveTypography.title)
                             .foregroundStyle(CarveColor.ink)
-                        Text("바뀐 점")
+                        Text("바뀐 점", bundle: .module)
                             .font(CarveTypography.caption)
                             .foregroundStyle(CarveColor.secondary)
                     }
@@ -68,7 +68,7 @@ public struct PatchnoteView: View {
 
     /// 업데이트 뒤 자동으로 띄우는 창 — 이번 출시만 보인다.
     private var modalContent: some View {
-        CarveModalCard(title: Self.title(of: PatchnoteFeature.latest), subtitle: "바뀐 점") {
+        CarveModalCard(title: Self.title(of: PatchnoteFeature.latest), subtitle: SettingsCatalog.string("바뀐 점")) {
             VStack(alignment: .leading, spacing: 24) {
                 notes(of: PatchnoteFeature.latest)
             }
@@ -76,7 +76,7 @@ public struct PatchnoteView: View {
             Button {
                 send(.helpTapped)
             } label: {
-                Text("도움말 보기")
+                Text("도움말 보기", bundle: .module)
                     .foregroundStyle(CarveColor.accent)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .contentShape(Rectangle())
@@ -87,7 +87,7 @@ public struct PatchnoteView: View {
             Button {
                 send(.closeTapped)
             } label: {
-                Text("닫기")
+                Text("닫기", bundle: .module)
                     .foregroundStyle(CarveColor.ink)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .contentShape(Rectangle())
@@ -96,7 +96,7 @@ public struct PatchnoteView: View {
     }
 
     private static func title(of release: PatchnoteFeature.Release) -> String {
-        "새기다 \(release.version)"
+        SettingsCatalog.string("새기다 \(release.version)")
     }
 
     /// 한 출시의 바뀐 점 — 사이에 구분선을 둔다.

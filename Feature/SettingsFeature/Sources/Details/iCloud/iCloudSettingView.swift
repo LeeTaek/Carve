@@ -31,19 +31,19 @@ public struct CloudSettingView: View {
     private var accountStatusCopy: AccountStatusCopy {
         switch store.availability {
         case .checking:
-            AccountStatusCopy(title: "iCloud 상태를 확인하는 중이에요", detail: "")
+            AccountStatusCopy(title: SettingsCatalog.string("iCloud 상태를 확인하는 중이에요"), detail: "")
         case .available where store.connectionHold != nil:
             // 로그인과 연결을 섞지 않는다 — 이번 실행은 보류라 아직 주고받지 않는다(아래 보류 안내가 까닭과 할 일을 말한다).
-            AccountStatusCopy(title: "iCloud에 로그인돼 있어요", detail: "아직 이 기기의 필사는 iCloud와 연결되지 않았어요.")
+            AccountStatusCopy(title: SettingsCatalog.string("iCloud에 로그인돼 있어요"), detail: SettingsCatalog.string("아직 이 기기의 필사는 iCloud와 연결되지 않았어요."))
         case .available:
-            AccountStatusCopy(title: "iCloud에 연결돼 있어요", detail: "필사가 같은 계정의 다른 기기로 전해져요.")
+            AccountStatusCopy(title: SettingsCatalog.string("iCloud에 연결돼 있어요"), detail: SettingsCatalog.string("필사가 같은 계정의 다른 기기로 전해져요."))
         case .noAccount:
-            AccountStatusCopy(title: "iCloud에 로그인돼 있지 않아요", detail: "지금은 이 기기에만 저장돼요.")
+            AccountStatusCopy(title: SettingsCatalog.string("iCloud에 로그인돼 있지 않아요"), detail: SettingsCatalog.string("지금은 이 기기에만 저장돼요."))
         case .restricted:
-            AccountStatusCopy(title: "iCloud 사용이 제한돼 있어요", detail: "기기 설정에서 허용해야 동기화할 수 있어요.")
+            AccountStatusCopy(title: SettingsCatalog.string("iCloud 사용이 제한돼 있어요"), detail: SettingsCatalog.string("기기 설정에서 허용해야 동기화할 수 있어요."))
         case .unknown:
             // 확인 실패와 "계정 없음" 을 같은 문구로 쓰지 않는다.
-            AccountStatusCopy(title: "iCloud 상태를 확인하지 못했어요", detail: "계정이 없다는 뜻은 아니에요. 잠시 뒤 다시 열어 보세요.")
+            AccountStatusCopy(title: SettingsCatalog.string("iCloud 상태를 확인하지 못했어요"), detail: SettingsCatalog.string("계정이 없다는 뜻은 아니에요. 잠시 뒤 다시 열어 보세요."))
         }
     }
 
@@ -70,9 +70,9 @@ public struct CloudSettingView: View {
         VStack(alignment: .leading, spacing: CarveSpacing.xSmall) {
             switch store.activity.summary {
             case .noRecord:
-                activityLine("이번 실행에서는 아직 주고받은 기록이 없어요", emphasized: false)
+                activityLine(SettingsCatalog.string("이번 실행에서는 아직 주고받은 기록이 없어요"), emphasized: false)
             case .running:
-                activityLine("동기화하는 중이에요", emphasized: false)
+                activityLine(SettingsCatalog.string("동기화하는 중이에요"), emphasized: false)
             case .failed(let failures):
                 // 해결되지 않은 실패를 모두 보인다 — 하나만 보이면 나머지가 해결된 것처럼 읽힌다.
                 ForEach(failures, id: \.self) { failure in
@@ -80,10 +80,12 @@ public struct CloudSettingView: View {
                 }
             case .succeeded(let lastImport, let lastExport):
                 if let lastImport {
-                    activityLine("마지막으로 받음 · \(lastImport.formatted(.relative(presentation: .named)))", emphasized: false)
+                    let relative = lastImport.formatted(.relative(presentation: .named))
+                    activityLine(SettingsCatalog.string("마지막으로 받음 · \(relative)"), emphasized: false)
                 }
                 if let lastExport {
-                    activityLine("마지막으로 올림 · \(lastExport.formatted(.relative(presentation: .named)))", emphasized: false)
+                    let relative = lastExport.formatted(.relative(presentation: .named))
+                    activityLine(SettingsCatalog.string("마지막으로 올림 · \(relative)"), emphasized: false)
                 }
             }
         }
@@ -118,12 +120,12 @@ public struct CloudSettingView: View {
     /// 받지 못한 것과 올리지 못한 것은 사용자에게 뜻이 다르다.
     private func failureText(_ failure: CloudSyncFailure) -> String {
         switch failure {
-        case .accountUnavailable: "iCloud 계정을 확인해 주세요"
-        case .accountCheckFailed: "iCloud 계정 상태를 확인하지 못했어요"
-        case .importFailed: "iCloud에서 필사를 받아오지 못했어요"
-        case .exportFailed: "필사를 iCloud에 올리지 못했어요 · 이 기기에는 저장돼 있어요"
-        case .setupFailed: "iCloud 동기화를 준비하지 못했어요"
-        case .unknown: "동기화 중 문제가 생겼어요"
+        case .accountUnavailable: SettingsCatalog.string("iCloud 계정을 확인해 주세요")
+        case .accountCheckFailed: SettingsCatalog.string("iCloud 계정 상태를 확인하지 못했어요")
+        case .importFailed: SettingsCatalog.string("iCloud에서 필사를 받아오지 못했어요")
+        case .exportFailed: SettingsCatalog.string("필사를 iCloud에 올리지 못했어요 · 이 기기에는 저장돼 있어요")
+        case .setupFailed: SettingsCatalog.string("iCloud 동기화를 준비하지 못했어요")
+        case .unknown: SettingsCatalog.string("동기화 중 문제가 생겼어요")
         }
     }
 
@@ -149,11 +151,11 @@ public struct CloudSettingView: View {
                     CarveDivider()
 
                     VStack(alignment: .leading, spacing: CarveSpacing.xSmall) {
-                        Text("필사한 내용을 iCloud로 기기 사이에 동기화해요.")
+                        Text("필사한 내용을 iCloud로 기기 사이에 동기화해요.", bundle: .module)
                             .foregroundStyle(CarveColor.ink)
                         // 동기화를 백업이라고 부르지 않는다 — 지운 것도 함께 전해진다.
-                        Text("백업과는 달라요. 한 기기에서 지우면 다른 기기에서도 사라져요.")
-                        Text("iCloud 사용 여부는 기기의 설정 앱에서 바꿀 수 있어요.")
+                        Text("백업과는 달라요. 한 기기에서 지우면 다른 기기에서도 사라져요.", bundle: .module)
+                        Text("iCloud 사용 여부는 기기의 설정 앱에서 바꿀 수 있어요.", bundle: .module)
                     }
                     .font(CarveTypography.body)
                     .foregroundStyle(CarveColor.secondary)
@@ -161,19 +163,19 @@ public struct CloudSettingView: View {
                     CarveDivider()
 
                     VStack(alignment: .leading, spacing: CarveSpacing.small) {
-                        Text("위험한 동작")
+                        Text("위험한 동작", bundle: .module)
                             .font(CarveTypography.sectionTitle)
                             .foregroundStyle(CarveColor.secondary)
 
                         Button {
                             send(.databaseIsEmpty)
                         } label: {
-                            Text("모든 필사 데이터 삭제")
+                            Text("모든 필사 데이터 삭제", bundle: .module)
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.carve(.destructive, fillsWidth: true))
 
-                        Text("모든 장의 필사 기록이 사라져요. 되돌릴 수 없어요.")
+                        Text("모든 장의 필사 기록이 사라져요. 되돌릴 수 없어요.", bundle: .module)
                             .font(CarveTypography.caption)
                             .foregroundStyle(CarveColor.secondary)
                     }

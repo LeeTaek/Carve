@@ -308,7 +308,7 @@ public struct DraftRecoveryFeature {
     private func load(sequence: Int) -> Effect<Action> {
         .run { [reader, repository, editEnvironment] send in
             guard let reader else {
-                await send(.failed(sequence: sequence, "이 iPad의 보존 영역을 열지 못했어요. 앱을 다시 켜 보세요."))
+                await send(.failed(sequence: sequence, SettingsCatalog.string("이 iPad의 보존 영역을 열지 못했어요. 앱을 다시 켜 보세요.")))
                 return
             }
             let environment = await editEnvironment.current()
@@ -319,7 +319,7 @@ public struct DraftRecoveryFeature {
                 scopes = try await reader.draftBuckets()
             } catch {
                 Log.error("확인이 필요한 필기 — 묶음 목록을 읽지 못했다", "\(error)")
-                await send(.failed(sequence: sequence, "이 iPad에 남겨 둔 필기를 읽지 못했어요. 파일은 그대로 있어요."))
+                await send(.failed(sequence: sequence, SettingsCatalog.string("이 iPad에 남겨 둔 필기를 읽지 못했어요. 파일은 그대로 있어요.")))
                 return
             }
             var buckets: [Bucket] = []
@@ -352,15 +352,15 @@ public struct DraftRecoveryFeature {
     private func removeUnreadable(in scope: AccountScope) -> Effect<Action> {
         .run { [cleaner] send in
             guard let cleaner else {
-                await send(.removedUnreadable("이 iPad의 보존 영역을 열지 못해 지우지 못했어요."))
+                await send(.removedUnreadable(SettingsCatalog.string("이 iPad의 보존 영역을 열지 못해 지우지 못했어요.")))
                 return
             }
             do {
                 let removed = try await cleaner.removeUnreadableDraftFiles(in: scope)
-                await send(.removedUnreadable("읽지 못한 파일 \(removed)개를 지웠어요."))
+                await send(.removedUnreadable(SettingsCatalog.string("읽지 못한 파일 \(removed)개를 지웠어요.")))
             } catch {
                 Log.error("확인이 필요한 필기 — 읽지 못한 파일을 지우지 못했다", scope.key, "\(error)")
-                await send(.removedUnreadable("읽지 못한 파일을 지우지 못했어요. 파일은 그대로 있어요."))
+                await send(.removedUnreadable(SettingsCatalog.string("읽지 못한 파일을 지우지 못했어요. 파일은 그대로 있어요.")))
             }
         }
     }
@@ -478,7 +478,7 @@ extension DraftRecoveryFeature.Bucket {
             readFailed: false,
             // 이 판이 모르는 권 · 번역본의 초안은 줄로 만들지 않는다(조회도 그런 장을 대조하지 않는다) — 수 · 용량에만 든다.
             items: inventory.entries.compactMap { DraftRecoveryFeature.Item($0, scope: inventory.scope, environment: environment) },
-            unreadChapters: inventory.unreadChapters.map { BibleReference(chapter: $0, showsTranslation: true).text }
+            unreadChapters: inventory.unreadChapters.map { BibleReference(chapter: $0, showsTranslation: true).text(locale: SettingsCatalog.locale) }
         )
     }
 

@@ -19,7 +19,7 @@ extension DraftRecoveryFeature {
     func compare(_ item: Item, stamp: Stamp) -> Effect<Action> {
         .run { [reader, repository, editEnvironment] send in
             guard let reader else {
-                await send(.currentFailed(itemID: item.id, stamp: stamp, "이 iPad의 보존 영역을 열지 못했어요."))
+                await send(.currentFailed(itemID: item.id, stamp: stamp, SettingsCatalog.string("이 iPad의 보존 영역을 열지 못했어요.")))
                 return
             }
             let environment = await editEnvironment.current()
@@ -48,7 +48,7 @@ extension DraftRecoveryFeature {
                 await send(.currentLoaded(itemID: item.id, stamp: stamp, ink: current?.lineData, updatedAt: current?.updateDate, check: check))
             } catch {
                 Log.error("확인이 필요한 필기 — 지금 필기를 읽지 못했다", item.place, "\(error)")
-                await send(.currentFailed(itemID: item.id, stamp: stamp, "지금 그 절의 필기를 읽지 못했어요. 없다는 뜻은 아니에요."))
+                await send(.currentFailed(itemID: item.id, stamp: stamp, SettingsCatalog.string("지금 그 절의 필기를 읽지 못했어요. 없다는 뜻은 아니에요.")))
             }
         }
         .cancellable(id: CancelID.compare, cancelInFlight: true)
