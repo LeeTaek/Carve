@@ -311,12 +311,13 @@ struct TranslationSwitchTesting {
         }
     }
 
-    @Test("번역본만 바뀐 장의 행 id 는 번역본마다 다르다 — 개역개정은 예전 형식 그대로다")
+    @Test("번역본만 바뀐 장의 행 id 는 번역본마다 다르다 — 앱 언어와 무관한 rawValue 형식이다")
     func rowIDDiffersByTranslation() {
         let nkrv = SentencesWithDrawingFeature.State.rowID(chapter: BibleChapter(title: .genesis, chapter: 1), verse: 1)
         let kjv = SentencesWithDrawingFeature.State.rowID(chapter: BibleChapter(title: .genesis, chapter: 1, translation: .KJV), verse: 1)
         let bsb = SentencesWithDrawingFeature.State.rowID(chapter: BibleChapter(title: .genesis, chapter: 1, translation: .BSB), verse: 1)
-        #expect(nkrv == "창세기.1.1")
+        #expect(nkrv == "NKRV/1-01Genesis.txt/1/1")
+        #expect(kjv == "KJV/1-01Genesis.txt/1/1")
         #expect(Set([nkrv, kjv, bsb]).count == 3)
 
         // 같은 권 · 장 · 절이라도 번역본이 다르면 다른 행이다 — 뷰가 행을 새로 만들고 장 전환 스크롤을 낸다.

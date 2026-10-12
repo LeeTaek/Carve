@@ -289,13 +289,14 @@ private extension CarveDetailView {
     var ownershipInjectionBadge: some View {
         #if DEBUG
         if store.chapterCanvas.editEnvironment.ownershipInjected {
-            Text("소유 주입(DEBUG) · 소유 증명 아님")
+            // DEBUG 전용 표시라 카탈로그로 옮기지 않는다(영어 현지화 결정 5).
+            Text(verbatim: "소유 주입(DEBUG) · 소유 증명 아님")
                 .font(CarveTypography.caption)
                 .foregroundStyle(CarveColor.ink)
                 .padding(.horizontal, CarveSpacing.small)
                 .background(Color.yellow.opacity(0.85), in: Capsule())
                 .allowsHitTesting(false)
-                .accessibilityLabel("시험용 소유 주입이 켜져 있어요")
+                .accessibilityLabel(Text(verbatim: "시험용 소유 주입이 켜져 있어요"))
         }
         #endif
     }
@@ -461,9 +462,9 @@ private extension CarveDetailView {
     var localSaveText: String? {
         switch store.chapterCanvas.localSaveIndicator {
         case .none, .failed: nil
-        case .pending: "저장 대기 중"
-        case .saving: "저장 중…"
-        case .saved: "이 기기에 저장됨"
+        case .pending: String(localized: "저장 대기 중", bundle: .module)
+        case .saving: String(localized: "저장 중…", bundle: .module)
+        case .saved: String(localized: "이 기기에 저장됨", bundle: .module)
         }
     }
 
@@ -522,13 +523,13 @@ private struct ChapterColumnHeader: View {
     var body: some View {
         let margins = ChapterLayoutHosting.pageMargins(contentWidth: halfWidth * 2)
         let scripture = columnLabel(
-            "말씀",
+            String(localized: "말씀", bundle: .module),
             alignment: .leading,
             leading: isLeftHanded ? margins.gutter : margins.outer,
             trailing: isLeftHanded ? margins.outer : margins.gutter
         )
         let writing = columnLabel(
-            "나의 필사 · 절을 길게 눌러 더 보기",
+            String(localized: "나의 필사 · 절을 길게 눌러 더 보기", bundle: .module),
             alignment: isLeftHanded ? .leading : .trailing,
             leading: isLeftHanded ? margins.outer : margins.gutter,
             trailing: isLeftHanded ? margins.gutter : margins.outer

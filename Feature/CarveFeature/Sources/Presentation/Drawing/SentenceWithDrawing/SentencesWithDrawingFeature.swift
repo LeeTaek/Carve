@@ -40,21 +40,18 @@ public struct SentencesWithDrawingFeature: Sendable {
 
         public static let initialState = Self(sentence: BibleVerse.initialState)
 
-        /// 절 행의 ID. 메모리에서만 쓴다 — 행 비교(`==`) · 뷰 `ForEach` · 실측 묶음(`verseGeometryMeasured`)의 키다.
+        /// 절 행의 ID. 메모리에서만 쓴다 — 행 비교(`==`) · 뷰 `ForEach` · 실측 묶음(`verseGeometryMeasured`)의 키다. 저장하지 않는다.
         ///
         /// 번역본마다 다르다 — 같은 권 · 장을 번역본만 바꿔 열면 행이 새로 생겨 다시 재고(이전 번역본 실측이 새 본문에 붙지 않는다),
         /// 뷰의 장 전환 스크롤(`onChange(of: sentenceWithDrawingState)`)이 돈다. 같은 id 면 `==` 가 같다고 보아 본문이 바뀌지 않는다.
-        /// 개역개정은 예전 형식(`권 한글 이름.장.절`) 그대로다 — 장 레이아웃 시험들이 이 형식으로 행을 찾는다.
+        /// 앱 언어와 무관하게 같은 값이 되도록 화면 이름이 아니라 `rawValue`(번역본 · 권)로 짓는다(영어 현지화 결정 3).
+        /// 저장되는 `titleName`(`StoredBookKey`)과는 다른 메모리 전용 형식이다.
         /// - Parameters:
         ///   - chapter: 행의 장(번역본 포함).
         ///   - verse: 절 번호.
-        /// - Returns: 개역개정 `창세기.1.1`, 그 밖 `KJV-창세기.1.1` 처럼 번역본을 앞에 붙인 문자열. 부작용 없음.
+        /// - Returns: `NKRV/1-01Genesis.txt/1/1` · `KJV/1-01Genesis.txt/1/1` 처럼 번역본 · 권 · 장 · 절을 이은 문자열. 부작용 없음.
         static func rowID(chapter: BibleChapter, verse: Int) -> String {
-            let place = "\(chapter.title.koreanTitle()).\(chapter.chapter).\(verse)"
-            switch chapter.translation {
-            case .NKRV: return place
-            case .KJV, .BSB: return "\(chapter.translation.rawValue)-\(place)"
-            }
+            "\(chapter.translation.rawValue)/\(chapter.title.rawValue)/\(chapter.chapter)/\(verse)"
         }
     }
 

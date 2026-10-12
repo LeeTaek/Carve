@@ -37,7 +37,7 @@ public struct FavoriteListView: View {
                 .padding(.bottom, CarveSpacing.xLarge * 3)
         }
         .background(CarveColor.canvas)
-        .navigationTitle("즐겨찾기")
+        .navigationTitle(Text("즐겨찾기", bundle: .module))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .principal) {
@@ -62,7 +62,7 @@ public struct FavoriteListView: View {
             CarveIcon.starFill.image
                 .foregroundStyle(CarveColor.accent)
                 .accessibilityHidden(true)
-            Text("즐겨찾기")
+            Text("즐겨찾기", bundle: .module)
                 .font(CarveTypography.title)
                 .foregroundStyle(CarveColor.ink)
         }
@@ -72,7 +72,7 @@ public struct FavoriteListView: View {
 
     private var content: some View {
         VStack(alignment: .leading, spacing: CarveSpacing.medium) {
-            Text("마음에 남은 말씀과 필사를 모아봐요")
+            Text("마음에 남은 말씀과 필사를 모아봐요", bundle: .module)
                 .font(.body)
                 .foregroundStyle(CarveColor.ink)
 
@@ -94,9 +94,9 @@ public struct FavoriteListView: View {
     private var favoritesList: some View {
         VStack(alignment: .leading, spacing: CarveSpacing.large) {
             HStack(spacing: CarveSpacing.small) {
-                Text("\(store.favorites.count)개의 말씀")
+                Text("\(store.favorites.count)개의 말씀", bundle: .module)
                 Spacer(minLength: 0)
-                Text("최근 추가순")
+                Text("최근 추가순", bundle: .module)
             }
             .font(CarveTypography.body)
             .foregroundStyle(CarveColor.ink)
@@ -125,9 +125,9 @@ public struct FavoriteListView: View {
                 .foregroundStyle(CarveColor.accent)
                 .accessibilityHidden(true)
             CarveEmptyState(
-                "아직 즐겨찾기한 말씀이 없어요",
-                message: "필사 화면에서 절을 길게 눌러 즐겨찾기에 추가해 보세요.",
-                actionTitle: "말씀 보러 가기"
+                String(localized: "아직 즐겨찾기한 말씀이 없어요", bundle: .module),
+                message: String(localized: "필사 화면에서 절을 길게 눌러 즐겨찾기에 추가해 보세요.", bundle: .module),
+                actionTitle: String(localized: "말씀 보러 가기", bundle: .module)
             ) {
                 send(.backToWritingTapped)
             }
@@ -137,9 +137,9 @@ public struct FavoriteListView: View {
 
     private var loadFailedState: some View {
         CarveEmptyState(
-            "즐겨찾기를 불러오지 못했어요",
-            message: "잠시 후 다시 시도해 주세요.",
-            actionTitle: "다시 시도"
+            String(localized: "즐겨찾기를 불러오지 못했어요", bundle: .module),
+            message: String(localized: "잠시 후 다시 시도해 주세요.", bundle: .module),
+            actionTitle: String(localized: "다시 시도", bundle: .module)
         ) {
             send(.retryLoadTapped)
         }
@@ -152,7 +152,7 @@ public struct FavoriteListView: View {
             Group {
                 switch notice {
                 case .removed:
-                    CarveStatusMessage(.success, message: Self.message(for: notice), retryTitle: "실행 취소") {
+                    CarveStatusMessage(.success, message: Self.message(for: notice), retryTitle: String(localized: "실행 취소", bundle: .module)) {
                         send(.noticeActionTapped)
                     }
                 case .removeFailed, .restoreFailed, .widgetFailed:
@@ -178,14 +178,14 @@ public struct FavoriteListView: View {
 
     static func message(for notice: FavoriteListFeature.Notice) -> String {
         switch notice {
-        case .removed: "즐겨찾기에서 해제했어요"
-        case .removeFailed: "즐겨찾기를 해제하지 못했어요"
-        case .restoreFailed: "즐겨찾기를 되돌리지 못했어요"
-        case .widgetAdded: "위젯에 담았어요"
-        case .widgetRemoved: "위젯에서 뺐어요"
-        case .widgetLimitReached: "위젯에는 \(WidgetVerseLimit.maximum)개까지 담을 수 있어요"
-        case .widgetFailed: "위젯을 바꾸지 못했어요"
-        case .blocked(let block): "즐겨찾기를 바꾸지 않았어요. " + block.reasonText
+        case .removed: String(localized: "즐겨찾기에서 해제했어요", bundle: .module)
+        case .removeFailed: String(localized: "즐겨찾기를 해제하지 못했어요", bundle: .module)
+        case .restoreFailed: String(localized: "즐겨찾기를 되돌리지 못했어요", bundle: .module)
+        case .widgetAdded: String(localized: "위젯에 담았어요", bundle: .module)
+        case .widgetRemoved: String(localized: "위젯에서 뺐어요", bundle: .module)
+        case .widgetLimitReached: String(localized: "위젯에는 \(WidgetVerseLimit.maximum)개까지 담을 수 있어요", bundle: .module)
+        case .widgetFailed: String(localized: "위젯을 바꾸지 못했어요", bundle: .module)
+        case .blocked(let block): String(localized: "즐겨찾기를 바꾸지 않았어요. \(block.reasonText)", bundle: .module)
         }
     }
 
@@ -204,14 +204,18 @@ public struct FavoriteListView: View {
         key.translation.displayName(locale: locale)
     }
 
-    /// 「9월 15일 추가」. 올해가 아니면 연도를 붙인다.
-    static func addedDateText(_ date: Date, now: Date = Date(), calendar: Calendar = .current) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ko_KR")
-        formatter.calendar = calendar
-        formatter.timeZone = calendar.timeZone
-        formatter.dateFormat = calendar.isDate(date, equalTo: now, toGranularity: .year) ? "M월 d일" : "yyyy년 M월 d일"
-        return "\(formatter.string(from: date)) 추가"
+    /// 역할: 카드의 추가 날짜(「9월 15일 추가」 · 「Added September 15」). 올해가 아니면 연도를 붙인다.
+    ///   날짜 표기는 고정 형식이 아니라 기기 로케일의 날짜 서식(`Date.FormatStyle`)을 따른다(영어 현지화 결정 5).
+    /// 입력 · 출력: 추가 시각 · 지금 · 달력(시간대 포함) · 로케일(nil 이면 앱 · 기기 로케일) → 문구.
+    /// 부작용: 없음.
+    static func addedDateText(_ date: Date, now: Date = Date(), calendar: Calendar = .current, locale: Locale? = nil) -> String {
+        var style = Date.FormatStyle(locale: locale ?? .autoupdatingCurrent, calendar: calendar, timeZone: calendar.timeZone)
+            .month(.wide)
+            .day()
+        if !calendar.isDate(date, equalTo: now, toGranularity: .year) {
+            style = style.year()
+        }
+        return CarveFeatureCatalog.string("\(date.formatted(style)) 추가", locale: locale)
     }
 }
 
@@ -255,7 +259,7 @@ private struct FavoriteVerseCard: View {
                 }
                 .buttonStyle(.plain)
                 .padding(.top, -CarveSpacing.xSmall)
-                .accessibilityLabel("즐겨찾기 해제")
+                .accessibilityLabel(Text("즐겨찾기 해제", bundle: .module))
 
                 moreMenu
             }
@@ -285,7 +289,7 @@ private struct FavoriteVerseCard: View {
 
                 Button(action: onOpen) {
                     HStack(spacing: CarveSpacing.xxSmall) {
-                        Text("말씀으로 이동")
+                        Text("말씀으로 이동", bundle: .module)
                         CarveIcon.chevronRight.image
                             .resizable()
                             .frame(width: 16, height: 16)
@@ -297,7 +301,7 @@ private struct FavoriteVerseCard: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("말씀으로 이동")
+                .accessibilityLabel(Text("말씀으로 이동", bundle: .module))
             }
         }
         .padding(.horizontal, CarveSpacing.large)
@@ -312,7 +316,7 @@ private struct FavoriteVerseCard: View {
                 .resizable()
                 .frame(width: 14, height: 14)
                 .accessibilityHidden(true)
-            Text("위젯에 담김")
+            Text("위젯에 담김", bundle: .module)
                 .font(CarveTypography.label)
         }
         .foregroundStyle(CarveColor.accent)
@@ -327,14 +331,14 @@ private struct FavoriteVerseCard: View {
         Menu {
             Button(action: onWidget) {
                 Label {
-                    Text(isOnWidget ? "위젯에서 빼기" : "위젯에 추가")
+                    isOnWidget ? Text("위젯에서 빼기", bundle: .module) : Text("위젯에 추가", bundle: .module)
                 } icon: {
                     CarveIcon.widget.image
                 }
             }
             Button(role: .destructive, action: onUnfavorite) {
                 Label {
-                    Text("즐겨찾기 해제")
+                    Text("즐겨찾기 해제", bundle: .module)
                 } icon: {
                     CarveIcon.starFill.image
                 }
@@ -347,8 +351,8 @@ private struct FavoriteVerseCard: View {
         }
         .padding(.top, -CarveSpacing.xSmall)
         .padding(.trailing, -CarveSpacing.small)
-        .accessibilityLabel("더보기")
-        .accessibilityHint(isOnWidget ? "위젯에서 빼기 · 즐겨찾기 해제" : "위젯에 추가 · 즐겨찾기 해제")
+        .accessibilityLabel(Text("더보기", bundle: .module))
+        .accessibilityHint(isOnWidget ? Text("위젯에서 빼기 · 즐겨찾기 해제", bundle: .module) : Text("위젯에 추가 · 즐겨찾기 해제", bundle: .module))
     }
 
     private var sentence: some View {
@@ -378,7 +382,7 @@ private struct FavoriteHandwritingPreview: View {
     var body: some View {
         Group {
             if lineData == nil {
-                Text("아직 필기하지 않은 말씀이에요")
+                Text("아직 필기하지 않은 말씀이에요", bundle: .module)
                     .font(CarveTypography.body)
                     .foregroundStyle(CarveColor.secondary)
                     .multilineTextAlignment(.center)
@@ -401,9 +405,9 @@ private struct FavoriteHandwritingPreview: View {
                     .resizable()
                     .scaledToFit()
                     .frame(maxWidth: .infinity, maxHeight: 160)
-                    .accessibilityLabel("추가할 때의 필기")
+                    .accessibilityLabel(Text("추가할 때의 필기", bundle: .module))
             case .unavailable:
-                Text("불러올 수 없는 필사 데이터")
+                Text("불러올 수 없는 필사 데이터", bundle: .module)
                     .font(CarveTypography.label)
                     .foregroundStyle(CarveColor.Paper.secondary)
                     .frame(maxWidth: .infinity)

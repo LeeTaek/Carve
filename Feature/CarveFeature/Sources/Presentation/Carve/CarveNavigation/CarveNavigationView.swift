@@ -76,25 +76,28 @@ public struct CarveNavigationView: View {
     /// 성경 선택 열. 탐색을 열어도 detail을 대체하지 않으므로 필사 화면은 계속 유지된다.
     private var sideBar: some View {
         VStack(spacing: CarveSpacing.small) {
-            Text("새기다")
+            // 앱 안 로고 — 앱 이름(ko 「새기다」 · en 「Carve」, 영어 현지화 결정 8).
+            Text("새기다", bundle: .module)
                 .font(CarveTypography.scripture(ResourcesFontFamily.NanumMyeongjo.regular.font(size: 22)))
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            TextField("성경 · 장 검색", text: $searchText)
+            TextField(String(localized: "성경 · 장 검색", bundle: .module), text: $searchText)
                 .textFieldStyle(.plain)
                 .padding(.horizontal, CarveSpacing.medium)
                 .frame(height: CarveSize.minimumHitTarget)
                 .background(CarveColor.fill, in: RoundedRectangle(cornerRadius: CarveRadius.control, style: .continuous))
 
-            Picker("성경 구분", selection: $testament) {
-                Text("구약").tag(Testament.old)
-                Text("신약").tag(Testament.new)
+            Picker(selection: $testament) {
+                Text("구약", bundle: .module).tag(Testament.old)
+                Text("신약", bundle: .module).tag(Testament.new)
+            } label: {
+                Text("성경 구분", bundle: .module)
             }
             .pickerStyle(.segmented)
 
             ScrollView {
                 LazyVStack(spacing: 0) {
-                    Text("성경")
+                    Text("성경", bundle: .module)
                         .font(CarveTypography.caption)
                         .foregroundStyle(CarveColor.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -129,13 +132,13 @@ public struct CarveNavigationView: View {
                     translationMenu
                     Spacer(minLength: 0)
                     // 차트 바로 왼쪽(시안 N3). 목록은 차트와 같이 앱 스택에 올린다.
-                    CarveIconButton(.star, accessibilityLabel: "즐겨찾기") {
+                    CarveIconButton(.star, accessibilityLabel: String(localized: "즐겨찾기", bundle: .module)) {
                         send(.moveToFavorites)
                     }
-                    CarveIconButton(.chart, accessibilityLabel: "필사 차트") {
+                    CarveIconButton(.chart, accessibilityLabel: String(localized: "필사 차트", bundle: .module)) {
                         send(.moveToChart)
                     }
-                    CarveIconButton(.settings, accessibilityLabel: "앱 설정") {
+                    CarveIconButton(.settings, accessibilityLabel: String(localized: "앱 설정", bundle: .module)) {
                         send(.moveToSetting)
                     }
                 }
@@ -226,7 +229,7 @@ public struct CarveNavigationView: View {
             }
         }
         // 성경을 고른 직후 필사 기록을 읽는 동안은 선택한 장이 없어 성경 이름만 보인다.
-        .navigationTitle(store.selectedChapter.map { "\(browsingTitle.koreanTitle()) \($0)장" } ?? browsingTitle.koreanTitle())
+        .navigationTitle(Self.chapterListTitle(browsingTitle, chapter: store.selectedChapter))
         .background(CarveColor.surface)
     }
     
@@ -273,11 +276,7 @@ public struct CarveNavigationView: View {
     private var filteredTitles: [BibleTitle] {
         let titles = testament == .old ? Array(BibleTitle.allCases[0..<39]) : Array(BibleTitle.allCases[39..<66])
         guard !searchText.isEmpty else { return titles }
-        // 한국어 이름과 고정 영문 이름(`englishName`) 둘 다 맞춘다 — 앱 언어와 상관없이 어느 쪽으로 찾아도 나온다.
-        return titles.filter {
-            $0.koreanTitle().localizedCaseInsensitiveContains(searchText)
-                || $0.englishName.localizedCaseInsensitiveContains(searchText)
-        }
+        return titles.filter { Self.titleMatches($0, searchText: searchText) }
     }
 
     /// 장 목록이 보여 줄 성경. 성경 열에서 고른 성경이 없으면 현재 성경이다.
@@ -291,12 +290,12 @@ public struct CarveNavigationView: View {
             send(.bibleTitleTapped(title))
         } label: {
             HStack(spacing: CarveSpacing.small) {
-                Text(title.koreanTitle())
+                Text(verbatim: title.localizedName)
                     .font(CarveTypography.body)
                 Spacer(minLength: 0)
                 if isSelected {
                     // 선택한 성경의 마지막 장을 보여준다. 선택한 장은 장 목록에서 강조한다.
-                    Text("\(title.lastChapter)장")
+                    Text("\(title.lastChapter)장", bundle: .module)
                         .font(CarveTypography.caption)
                         .foregroundStyle(CarveColor.accent)
                 }
@@ -307,7 +306,7 @@ public struct CarveNavigationView: View {
             .background(isSelected ? CarveColor.selected : .clear, in: RoundedRectangle(cornerRadius: CarveRadius.control, style: .continuous))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(isSelected ? "\(title.koreanTitle()), 총 \(title.lastChapter)장" : title.koreanTitle())
+        .accessibilityLabel(Self.titleAccessibilityLabel(title, isSelected: isSelected))
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
@@ -331,8 +330,9 @@ public struct CarveNavigationView: View {
                 .background(background, in: RoundedRectangle(cornerRadius: CarveRadius.control, style: .continuous))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(chapter)장")
-        .accessibilityValue(isDrawn ? "필사 기록 있음" : "")
+        // 장 번호만 적힌 버튼이라 권 이름을 함께 읽는다(「창세기 1장」 · 「Genesis 1」).
+        .accessibilityLabel(BibleReference(title: browsingTitle, chapter: chapter).text)
+        .accessibilityValue(isDrawn ? Text("필사 기록 있음", bundle: .module) : Text(verbatim: ""))
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
@@ -348,6 +348,32 @@ enum ChapterListScroll: Equatable {
 }
 
 extension CarveNavigationView {
+    /// 역할: 장 목록 열의 제목(「창세기 1장」 · 「Genesis 1」). 성경을 고른 직후 장을 정하기 전에는 권 이름만 적는다.
+    /// 입력 · 출력: 보고 있는 권 · 선택한 장(nil 이면 권 이름만) · 로케일(nil 이면 앱 언어) → 제목 문자열.
+    /// 부작용: 없음.
+    static func chapterListTitle(_ title: BibleTitle, chapter: Int?, locale: Locale? = nil) -> String {
+        guard let chapter else { return title.localizedName(locale: locale) }
+        return BibleReference(title: title, chapter: chapter).text(locale: locale)
+    }
+
+    /// 역할: 권 검색어가 이 권에 맞는가. 앱 언어 이름 · 한국어 이름 · 고정 영문 이름(`englishName`) 중 하나라도 맞으면 맞다 —
+    ///   앱 언어와 상관없이 한국어 · 영어 어느 쪽으로 찾아도 나온다.
+    /// 입력 · 출력: 권 · 검색어 → 맞으면 true.
+    /// 부작용: 없음.
+    static func titleMatches(_ title: BibleTitle, searchText: String) -> Bool {
+        [title.localizedName, title.localizedName(locale: Locale(identifier: "ko")), title.englishName]
+            .contains { $0.localizedCaseInsensitiveContains(searchText) }
+    }
+
+    /// 역할: 성경 목록 행의 VoiceOver 이름. 고른 권은 장 수를 함께 읽는다(「창세기, 총 50장」 · 「Genesis, 50 chapters」).
+    /// 입력 · 출력: 권 · 고른 권인가 · 로케일(nil 이면 앱 언어) → 이름.
+    /// 부작용: 없음.
+    static func titleAccessibilityLabel(_ title: BibleTitle, isSelected: Bool, locale: Locale? = nil) -> String {
+        let name = title.localizedName(locale: locale)
+        guard isSelected else { return name }
+        return "\(name), \(CarveFeatureCatalog.string("총 \(title.lastChapter)장", locale: locale))"
+    }
+
     /// 번역본 고르기 메뉴의 항목 이름 — 약칭과 전체 이름. 둘이 같으면(한국어의 개역개정) 한 번만 적는다.
     static func translationMenuTitle(_ translation: Translation, locale: Locale? = nil) -> String {
         let abbreviation = translation.displayName(locale: locale)

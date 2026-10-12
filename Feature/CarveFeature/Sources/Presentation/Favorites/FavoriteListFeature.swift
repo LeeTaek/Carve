@@ -379,15 +379,15 @@ extension FavoriteListFeature {
     /// 위젯에 담긴 말씀을 해제하기 전 확인(시안 N9).
     static func removeDisplayedFavoriteAlert(_ key: FavoriteVerseKey) -> AlertState<Action.RemoveConfirm> {
         AlertState {
-            TextState("즐겨찾기를 해제할까요?")
+            TextState("즐겨찾기를 해제할까요?", bundle: .module)
         } actions: {
-            ButtonState(role: .cancel) { TextState("취소") }
-            ButtonState(role: .destructive, action: .confirm(key)) { TextState("해제하기") }
+            ButtonState(role: .cancel) { TextState("취소", bundle: .module) }
+            ButtonState(role: .destructive, action: .confirm(key)) { TextState("해제하기", bundle: .module) }
         } message: {
             TextState("""
             이 말씀은 위젯에 담겨 있어요. 해제하면 위젯에서도 빠져요.
             원래 필사와 이전 필사 기록은 남아요.
-            """)
+            """, bundle: .module)
         }
     }
 

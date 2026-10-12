@@ -79,20 +79,21 @@ enum ArrivalNotice: Equatable, Sendable {
 
     var message: String {
         switch self {
-        case .arrived: "다른 필사가 도착했어요"
-        case .confirming: "지금 필기를 보존하고 새로 들어온 필사를 읽는 중이에요"
-        case .reloadFailed: "새로 들어온 필사를 불러오지 못했어요. 지금 화면과 필기는 그대로예요"
-        case .draftsHidden(let count): "이 iPad에서 쓴 필기 \(count)개는 새로 들어온 필사와 기준이 달라 자동으로 표시하지 않아요"
+        case .arrived: String(localized: "다른 필사가 도착했어요", bundle: .module)
+        case .confirming: String(localized: "지금 필기를 보존하고 새로 들어온 필사를 읽는 중이에요", bundle: .module)
+        case .reloadFailed: String(localized: "새로 들어온 필사를 불러오지 못했어요. 지금 화면과 필기는 그대로예요", bundle: .module)
+        case .draftsHidden(let count):
+            String(localized: "이 iPad에서 쓴 필기 \(count)개는 새로 들어온 필사와 기준이 달라 자동으로 표시하지 않아요", bundle: .module)
         }
     }
 
     /// 버튼 제목. 없으면 버튼을 두지 않는다.
     var actionTitle: String? {
         switch self {
-        case .arrived: "확인하기"
+        case .arrived: String(localized: "확인하기", bundle: .module)
         case .confirming: nil
-        case .reloadFailed: "다시 시도"
-        case .draftsHidden: "필기 확인하기"
+        case .reloadFailed: String(localized: "다시 시도", bundle: .module)
+        case .draftsHidden: String(localized: "필기 확인하기", bundle: .module)
         }
     }
 }

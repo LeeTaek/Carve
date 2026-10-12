@@ -1,7 +1,3002 @@
 {
   "sourceLanguage" : "ko",
   "strings" : {
-
+    "%@ 추가" : {
+      "comment" : "즐겨찾기 카드의 추가 날짜(9월 15일 추가)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Added %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 추가"
+          }
+        }
+      }
+    },
+    "%@ 필사 지우기" : {
+      "comment" : "지우기 확인창 제목 — 참조(창세기 1장 1절 · Genesis 1:1)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erase writing on %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 필사 지우기"
+          }
+        }
+      }
+    },
+    "%@, %@ 밀리미터. 탭하면 도구 팔레트를 펼칩니다" : {
+      "comment" : "접힌 도구 버튼 VoiceOver 이름 — 도구 이름, 굵기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@, %2$@ millimeters. Tap to expand the tool palette"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@, %@ 밀리미터. 탭하면 도구 팔레트를 펼칩니다"
+          }
+        }
+      }
+    },
+    "%@, 성경과 장 목록 열기" : {
+      "comment" : "헤더 제목 버튼 VoiceOver 이름 — 참조(창세기 1장)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@, open book and chapter list"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@, 성경과 장 목록 열기"
+          }
+        }
+      }
+    },
+    "%@의 필사는 그대로 있습니다. 다시 시도해 주세요." : {
+      "comment" : "지우기 실패 확인창 본문 — 참조",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your writing on %@ is unchanged. Please try again."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@의 필사는 그대로 있습니다. 다시 시도해 주세요."
+          }
+        }
+      }
+    },
+    "%lld-%lld절" : {
+      "comment" : "합쳐진 절 번호 VoiceOver 이름(18-19절)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verses %1$lld-%2$lld"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld-%lld절"
+          }
+        }
+      }
+    },
+    "%lld개의 말씀" : {
+      "comment" : "즐겨찾기 개수",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld verse"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld verses"
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld개의 말씀"
+          }
+        }
+      }
+    },
+    "%lld장" : {
+      "comment" : "고른 권의 장 수 — 사이드바 권 행 오른쪽(50장)",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld chapter"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld chapters"
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld장"
+          }
+        }
+      }
+    },
+    "%lld절" : {
+      "comment" : "절 번호 VoiceOver 이름(1절)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verse %lld"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld절"
+          }
+        }
+      }
+    },
+    "%lld절 · 이전 필사" : {
+      "comment" : "이전 필사 팝오버 제목",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verse %lld · History"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld절 · 이전 필사"
+          }
+        }
+      }
+    },
+    "%lld회" : {
+      "comment" : "이전 필사 회차 수",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld version"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld versions"
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld회"
+          }
+        }
+      }
+    },
+    "iCloud 계정을 확인하는 중이에요" : {
+      "comment" : "저장을 막은 사유 — 계정 확인 중",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Checking your iCloud account"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 계정을 확인하는 중이에요"
+          }
+        }
+      }
+    },
+    "iCloud 에 로그인하지 않았어요" : {
+      "comment" : "저장을 막은 사유 — iCloud 로그아웃",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You're not signed in to iCloud"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 에 로그인하지 않았어요"
+          }
+        }
+      }
+    },
+    "갈색" : {
+      "comment" : "색 이름(VoiceOver)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Brown"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "갈색"
+          }
+        }
+      }
+    },
+    "건너뛰기" : {
+      "comment" : "첫 실행 안내 — 건너뛰기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skip"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "건너뛰기"
+          }
+        }
+      }
+    },
+    "구약" : {
+      "comment" : "구약 — 사이드바 구분 · 헤더 부제",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Old Testament"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "구약"
+          }
+        }
+      }
+    },
+    "굵기 %@" : {
+      "comment" : "굵기 칸 VoiceOver 이름(굵기 0.5 mm)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Width %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "굵기 %@"
+          }
+        }
+      }
+    },
+    "굵기 조절" : {
+      "comment" : "굵기 팝오버 슬라이더 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adjust width"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "굵기 조절"
+          }
+        }
+      }
+    },
+    "굵기를 눌러 고르고, 아래에서 세밀하게 맞춰요." : {
+      "comment" : "굵기 팝오버 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap a width, then fine-tune it below."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "굵기를 눌러 고르고, 아래에서 세밀하게 맞춰요."
+          }
+        }
+      }
+    },
+    "글꼴" : {
+      "comment" : "본문 설정 — 글꼴 칸 머리글",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Font"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "글꼴"
+          }
+        }
+      }
+    },
+    "글자 크기" : {
+      "comment" : "본문 설정 슬라이더",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Text size"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "글자 크기"
+          }
+        }
+      }
+    },
+    "기본 색상" : {
+      "comment" : "색상 팝오버 — 기본 색상 칸 머리글",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Basic colors"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "기본 색상"
+          }
+        }
+      }
+    },
+    "길게 누르면 색을 바꿉니다" : {
+      "comment" : "팔레트 색 칸 VoiceOver 힌트",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Touch and hold to change the color"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "길게 누르면 색을 바꿉니다"
+          }
+        }
+      }
+    },
+    "길게 누르면 연필 · 펜 · 형광펜을 고릅니다" : {
+      "comment" : "펜 버튼 VoiceOver 힌트",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Touch and hold to choose pencil, pen, or highlighter"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "길게 누르면 연필 · 펜 · 형광펜을 고릅니다"
+          }
+        }
+      }
+    },
+    "끄면 Apple Pencil로만 필사할 수 있어요" : {
+      "comment" : "손가락 필사 허용 설명",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When off, you can write only with Apple Pencil"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "끄면 Apple Pencil로만 필사할 수 있어요"
+          }
+        }
+      }
+    },
+    "나눔꽃향기" : {
+      "comment" : "글꼴 이름 — 나눔 손글씨 꽃내음",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Flower Scent"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "나눔꽃향기"
+          }
+        }
+      }
+    },
+    "나눔명조" : {
+      "comment" : "글꼴 이름 — 나눔명조",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Myeongjo"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "나눔명조"
+          }
+        }
+      }
+    },
+    "나눔바른고딕" : {
+      "comment" : "글꼴 이름 — 나눔바른고딕",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Barun Gothic"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "나눔바른고딕"
+          }
+        }
+      }
+    },
+    "나의 필사" : {
+      "comment" : "절 이미지 — 필기 칸 머리글",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "My writing"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "나의 필사"
+          }
+        }
+      }
+    },
+    "나의 필사 · 절을 길게 눌러 더 보기" : {
+      "comment" : "필기 열 머리글",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "My writing · Touch and hold a verse for more"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "나의 필사 · 절을 길게 눌러 더 보기"
+          }
+        }
+      }
+    },
+    "나중에" : {
+      "comment" : "사진 추가 권한 확인창 — 닫기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not Now"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "나중에"
+          }
+        }
+      }
+    },
+    "날짜를 확인할 수 없어요" : {
+      "comment" : "이전 필사 — 날짜 없음",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unknown date"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "날짜를 확인할 수 없어요"
+          }
+        }
+      }
+    },
+    "노랑" : {
+      "comment" : "색 이름(VoiceOver)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yellow"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "노랑"
+          }
+        }
+      }
+    },
+    "누르면 이 필사로 바뀌어요" : {
+      "comment" : "이전 필사 회차 VoiceOver 힌트",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Switches to this version"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "누르면 이 필사로 바뀌어요"
+          }
+        }
+      }
+    },
+    "다른 색상 고르기" : {
+      "comment" : "색상 팝오버 — 시스템 색상 선택기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose another color"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다른 색상 고르기"
+          }
+        }
+      }
+    },
+    "다른 성경으로 이동해요" : {
+      "comment" : "첫 실행 안내 3 제목",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Go to another book"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다른 성경으로 이동해요"
+          }
+        }
+      }
+    },
+    "다른 필사가 도착했어요" : {
+      "comment" : "다른 기기의 필사 도착 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New writing arrived"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다른 필사가 도착했어요"
+          }
+        }
+      }
+    },
+    "다른 회차는 지워지지 않고 그대로 남아요." : {
+      "comment" : "이전 필사 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Other versions are kept."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다른 회차는 지워지지 않고 그대로 남아요."
+          }
+        }
+      }
+    },
+    "다시 시도" : {
+      "comment" : "다시 시도 버튼",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Try Again"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다시 시도"
+          }
+        }
+      }
+    },
+    "다시 실행" : {
+      "comment" : "팔레트 다시 실행 버튼",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Redo"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다시 실행"
+          }
+        }
+      }
+    },
+    "다음" : {
+      "comment" : "첫 실행 안내 — 다음 페이지",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다음"
+          }
+        }
+      }
+    },
+    "다음 장" : {
+      "comment" : "헤더 다음 장 버튼 VoiceOver 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next chapter"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다음 장"
+          }
+        }
+      }
+    },
+    "닫기" : {
+      "comment" : "닫기 버튼",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "닫기"
+          }
+        }
+      }
+    },
+    "더보기" : {
+      "comment" : "즐겨찾기 카드 더보기 버튼 VoiceOver 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "More"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "더보기"
+          }
+        }
+      }
+    },
+    "두 손가락으로 스크롤 · 손가락으로 필사" : {
+      "comment" : "펼친 팔레트 아래 조작 안내 — 손가락 필사 허용",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scroll with two fingers · Write with a finger"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "두 손가락으로 스크롤 · 손가락으로 필사"
+          }
+        }
+      }
+    },
+    "마음에 남은 말씀과 필사를 모아봐요" : {
+      "comment" : "즐겨찾기 화면 설명",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verses and writing you want to keep"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "마음에 남은 말씀과 필사를 모아봐요"
+          }
+        }
+      }
+    },
+    "말씀" : {
+      "comment" : "본문 열 머리글",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scripture"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "말씀"
+          }
+        }
+      }
+    },
+    "말씀 보러 가기" : {
+      "comment" : "즐겨찾기 빈 상태 — 필사 화면으로",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Go to Verses"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "말씀 보러 가기"
+          }
+        }
+      }
+    },
+    "말씀으로 이동" : {
+      "comment" : "즐겨찾기 카드 — 그 절로 이동",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Go to Verse"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "말씀으로 이동"
+          }
+        }
+      }
+    },
+    "먹색" : {
+      "comment" : "색 이름(VoiceOver)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ink black"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "먹색"
+          }
+        }
+      }
+    },
+    "번역본" : {
+      "comment" : "사이드바 번역본 고르기 이름 · VoiceOver 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Translation"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "번역본"
+          }
+        }
+      }
+    },
+    "베이지" : {
+      "comment" : "색 이름(VoiceOver)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beige"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "베이지"
+          }
+        }
+      }
+    },
+    "보라" : {
+      "comment" : "색 이름(VoiceOver)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Purple"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "보라"
+          }
+        }
+      }
+    },
+    "본문 모양 초기화" : {
+      "comment" : "본문 설정 초기화 버튼",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reset Text Style"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "본문 모양 초기화"
+          }
+        }
+      }
+    },
+    "본문 설정" : {
+      "comment" : "헤더 본문 설정 버튼 · 본문 설정 팝오버 제목",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Text Settings"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "본문 설정"
+          }
+        }
+      }
+    },
+    "분홍" : {
+      "comment" : "색 이름(VoiceOver)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pink"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "분홍"
+          }
+        }
+      }
+    },
+    "불러올 수 없는 필사 데이터" : {
+      "comment" : "손상된 필기 표시",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Writing data can't be loaded"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "불러올 수 없는 필사 데이터"
+          }
+        }
+      }
+    },
+    "붉은색" : {
+      "comment" : "색 이름(VoiceOver)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Red"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "붉은색"
+          }
+        }
+      }
+    },
+    "사진 접근이 꺼져 있어요" : {
+      "comment" : "사진 추가 권한 확인창 제목",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo access is off"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "사진 접근이 꺼져 있어요"
+          }
+        }
+      }
+    },
+    "사진에 저장했어요" : {
+      "comment" : "이미지 저장 완료 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saved to Photos"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "사진에 저장했어요"
+          }
+        }
+      }
+    },
+    "삭제 기록을 읽지 못했어요" : {
+      "comment" : "저장을 막은 사유 — 삭제 기록 읽기 실패",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't read the deletion records"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "삭제 기록을 읽지 못했어요"
+          }
+        }
+      }
+    },
+    "새기다" : {
+      "comment" : "앱 이름 — 사이드바 로고 · 이미지 카드 서명",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carve"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "새기다"
+          }
+        }
+      }
+    },
+    "새로 들어온 필사를 불러오지 못했어요. 지금 화면과 필기는 그대로예요" : {
+      "comment" : "도착한 필사 읽기 실패 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't load the new writing. Your screen and writing are unchanged"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "새로 들어온 필사를 불러오지 못했어요. 지금 화면과 필기는 그대로예요"
+          }
+        }
+      }
+    },
+    "색상" : {
+      "comment" : "기본 색이 아닌 색의 이름(VoiceOver)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Color"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "색상"
+          }
+        }
+      }
+    },
+    "색상 %lld" : {
+      "comment" : "팔레트 색 칸 VoiceOver 이름(색상 1)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Color %lld"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "색상 %lld"
+          }
+        }
+      }
+    },
+    "선택한 색상" : {
+      "comment" : "색상 팝오버 — 고른 색 미리보기 머리글",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selected color"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "선택한 색상"
+          }
+        }
+      }
+    },
+    "설정 열기" : {
+      "comment" : "사진 추가 권한 확인창 — 설정 앱 열기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Settings"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "설정 열기"
+          }
+        }
+      }
+    },
+    "설정에서 사진 추가 권한을 켜면 저장할 수 있어요." : {
+      "comment" : "사진 추가 권한 확인창 본문",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow adding photos in Settings to save images."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "설정에서 사진 추가 권한을 켜면 저장할 수 있어요."
+          }
+        }
+      }
+    },
+    "성경" : {
+      "comment" : "사이드바 권 목록 머리글",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Books"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "성경"
+          }
+        }
+      }
+    },
+    "성경 · 장 검색" : {
+      "comment" : "사이드바 권 검색 칸 자리표시자",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Search books"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "성경 · 장 검색"
+          }
+        }
+      }
+    },
+    "성경 구분" : {
+      "comment" : "구약 · 신약 고르기 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Testament"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "성경 구분"
+          }
+        }
+      }
+    },
+    "성경 탐색 닫기" : {
+      "comment" : "헤더 탐색 버튼 VoiceOver 이름 — 탐색이 열려 있을 때",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close book list"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "성경 탐색 닫기"
+          }
+        }
+      }
+    },
+    "성경 탐색 열기" : {
+      "comment" : "헤더 탐색 버튼 VoiceOver 이름 — 탐색이 닫혀 있을 때",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open book list"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "성경 탐색 열기"
+          }
+        }
+      }
+    },
+    "손가락 필사 허용" : {
+      "comment" : "본문 설정 토글",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow finger writing"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "손가락 필사 허용"
+          }
+        }
+      }
+    },
+    "손가락으로 스크롤 · Apple Pencil로 필사" : {
+      "comment" : "펼친 팔레트 아래 조작 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scroll with a finger · Write with Apple Pencil"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "손가락으로 스크롤 · Apple Pencil로 필사"
+          }
+        }
+      }
+    },
+    "시작하기" : {
+      "comment" : "첫 실행 안내 — 마지막 페이지 버튼",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Get Started"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "시작하기"
+          }
+        }
+      }
+    },
+    "신약" : {
+      "comment" : "신약 — 사이드바 구분 · 헤더 부제",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New Testament"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "신약"
+          }
+        }
+      }
+    },
+    "실행 취소" : {
+      "comment" : "실행 취소 — 팔레트 버튼 · 즐겨찾기 해제 안내 버튼",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Undo"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "실행 취소"
+          }
+        }
+      }
+    },
+    "아직 이 절의 이전 필사가 없어요." : {
+      "comment" : "이전 필사 빈 상태 제목",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No history for this verse yet."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "아직 이 절의 이전 필사가 없어요."
+          }
+        }
+      }
+    },
+    "아직 즐겨찾기한 말씀이 없어요" : {
+      "comment" : "즐겨찾기 빈 상태 제목",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No favorite verses yet"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "아직 즐겨찾기한 말씀이 없어요"
+          }
+        }
+      }
+    },
+    "아직 필기하지 않은 말씀이에요" : {
+      "comment" : "즐겨찾기 카드 — 필기 없음",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You haven't written this verse yet"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "아직 필기하지 않은 말씀이에요"
+          }
+        }
+      }
+    },
+    "앱 설정" : {
+      "comment" : "사이드바 설정 버튼 VoiceOver 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Settings"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "앱 설정"
+          }
+        }
+      }
+    },
+    "연필" : {
+      "comment" : "필기 도구 — 연필",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pencil"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "연필"
+          }
+        }
+      }
+    },
+    "올가미" : {
+      "comment" : "필기 도구 — 올가미",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lasso"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "올가미"
+          }
+        }
+      }
+    },
+    "완료" : {
+      "comment" : "팝오버 닫기 버튼",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Done"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "완료"
+          }
+        }
+      }
+    },
+    "왼손 사용자용 화면" : {
+      "comment" : "본문 설정 토글",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Left-handed layout"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "왼손 사용자용 화면"
+          }
+        }
+      }
+    },
+    "왼쪽 위 탐색 버튼을 누르면 원하는 성경과 장을 고를 수 있어요." : {
+      "comment" : "첫 실행 안내 3 본문",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap the browse button at the top left to choose a book and chapter."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "왼쪽 위 탐색 버튼을 누르면 원하는 성경과 장을 고를 수 있어요."
+          }
+        }
+      }
+    },
+    "위젯에 담김" : {
+      "comment" : "즐겨찾기 카드 배지 — 위젯에 담긴 절",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On Widget"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "위젯에 담김"
+          }
+        }
+      }
+    },
+    "위젯에 담았어요" : {
+      "comment" : "위젯에 추가 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Added to the widget"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "위젯에 담았어요"
+          }
+        }
+      }
+    },
+    "위젯에 담지 못했어요" : {
+      "comment" : "위젯에 추가 실패 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't add to the widget"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "위젯에 담지 못했어요"
+          }
+        }
+      }
+    },
+    "위젯에 담지 않았어요. %@" : {
+      "comment" : "위젯 추가를 막은 안내 — 뒤에 사유",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not added to the widget. %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "위젯에 담지 않았어요. %@"
+          }
+        }
+      }
+    },
+    "위젯에 추가" : {
+      "comment" : "절 메뉴 · 즐겨찾기 카드 — 위젯에 추가",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add to Widget"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "위젯에 추가"
+          }
+        }
+      }
+    },
+    "위젯에 추가 · 즐겨찾기 해제" : {
+      "comment" : "즐겨찾기 카드 더보기 VoiceOver 힌트",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add to widget · Remove from Favorites"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "위젯에 추가 · 즐겨찾기 해제"
+          }
+        }
+      }
+    },
+    "위젯에는 %lld개까지 담을 수 있어요" : {
+      "comment" : "위젯 개수 상한 안내",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "The widget can hold up to %lld verse"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "The widget can hold up to %lld verses"
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "위젯에는 %lld개까지 담을 수 있어요"
+          }
+        }
+      }
+    },
+    "위젯에서 빼기" : {
+      "comment" : "즐겨찾기 카드 더보기 — 위젯에서 빼기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove from Widget"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "위젯에서 빼기"
+          }
+        }
+      }
+    },
+    "위젯에서 빼기 · 즐겨찾기 해제" : {
+      "comment" : "즐겨찾기 카드 더보기 VoiceOver 힌트",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove from widget · Remove from Favorites"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "위젯에서 빼기 · 즐겨찾기 해제"
+          }
+        }
+      }
+    },
+    "위젯에서 뺐어요" : {
+      "comment" : "위젯에서 빼기 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Removed from the widget"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "위젯에서 뺐어요"
+          }
+        }
+      }
+    },
+    "위젯을 바꾸지 못했어요" : {
+      "comment" : "위젯 변경 실패 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't update the widget"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "위젯을 바꾸지 못했어요"
+          }
+        }
+      }
+    },
+    "이 iPad에서 쓴 필기 %lld개는 새로 들어온 필사와 기준이 달라 자동으로 표시하지 않아요" : {
+      "comment" : "도착 뒤 자동으로 표시하지 않는 초안 개수 안내",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld piece of writing from this iPad doesn't match the new writing, so it isn't shown automatically"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld pieces of writing from this iPad don't match the new writing, so they aren't shown automatically"
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 iPad에서 쓴 필기 %lld개는 새로 들어온 필사와 기준이 달라 자동으로 표시하지 않아요"
+          }
+        }
+      }
+    },
+    "이 기기에 남은 필기를 불러오지 못했어요" : {
+      "comment" : "기기 안 초안 불러오기 실패 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't load the writing kept on this device"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 기기에 남은 필기를 불러오지 못했어요"
+          }
+        }
+      }
+    },
+    "이 기기에 저장됨" : {
+      "comment" : "필사 저장 상태 한 줄",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saved on this device"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 기기에 저장됨"
+          }
+        }
+      }
+    },
+    "이 기기의 필사가 지금 계정의 것인지 아직 확인하지 못했어요" : {
+      "comment" : "저장을 막은 사유 — 소유 미확인",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It's not yet confirmed that the writing on this device belongs to this account"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 기기의 필사가 지금 계정의 것인지 아직 확인하지 못했어요"
+          }
+        }
+      }
+    },
+    "이 말씀은 위젯에 담겨 있어요. 해제하면 위젯에서도 빠져요.\n원래 필사와 이전 필사 기록은 남아요." : {
+      "comment" : "즐겨찾기 해제 확인창 본문",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This verse is on your widget. Removing it also takes it off the widget.\nYour writing and its history stay."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 말씀은 위젯에 담겨 있어요. 해제하면 위젯에서도 빠져요.\n원래 필사와 이전 필사 기록은 남아요."
+          }
+        }
+      }
+    },
+    "이 장의 필사를 불러오지 못했어요" : {
+      "comment" : "장 필사 불러오기 실패 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't load the writing for this chapter"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 장의 필사를 불러오지 못했어요"
+          }
+        }
+      }
+    },
+    "이 절의 필기는 다른 계정 · 확인 전에 쓴 것이에요" : {
+      "comment" : "저장을 막은 사유 — 다른 세션의 필기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This verse was written with another account or before confirmation"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 절의 필기는 다른 계정 · 확인 전에 쓴 것이에요"
+          }
+        }
+      }
+    },
+    "이 절의 필사를 지울까요? 현재 필사는 이전 필사 기록에 남습니다.\n이 장의 되돌리기 기록은 초기화됩니다." : {
+      "comment" : "지우기 확인창 본문",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erase your writing on this verse? It stays in the verse's history.\nUndo history for this chapter will be cleared."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 절의 필사를 지울까요? 현재 필사는 이전 필사 기록에 남습니다.\n이 장의 되돌리기 기록은 초기화됩니다."
+          }
+        }
+      }
+    },
+    "이 회차로 바꾸지 않았어요. %@" : {
+      "comment" : "회차 전환을 막은 안내 — 뒤에 사유",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Didn't switch to this version. %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 회차로 바꾸지 않았어요. %@"
+          }
+        }
+      }
+    },
+    "이미 위젯에 담긴 말씀이에요" : {
+      "comment" : "이미 위젯에 있는 절 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This verse is already on the widget"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이미 위젯에 담긴 말씀이에요"
+          }
+        }
+      }
+    },
+    "이미지 저장" : {
+      "comment" : "절 메뉴 — 이미지로 저장",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save Image"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이미지 저장"
+          }
+        }
+      }
+    },
+    "이전 장" : {
+      "comment" : "헤더 이전 장 버튼 VoiceOver 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Previous chapter"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이전 장"
+          }
+        }
+      }
+    },
+    "이전 필사 기록이 생기면 여기에 보여요." : {
+      "comment" : "이전 필사 빈 상태 설명",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Earlier versions of your writing will appear here."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이전 필사 기록이 생기면 여기에 보여요."
+          }
+        }
+      }
+    },
+    "이전 필사 내용 보기" : {
+      "comment" : "절 메뉴 — 이전 필사 보기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "View History"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이전 필사 내용 보기"
+          }
+        }
+      }
+    },
+    "이전 필사를 보거나 이미지로 저장하고, 위젯에 표시할 수 있어요. 지우기를 누르면 해당 절의 캔버스만 비워지고, 필사한 내용은 이전 필사에 남아요." : {
+      "comment" : "첫 실행 안내 4 본문",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "View its history, save it as an image, or add it to a widget. Erase clears only that verse; your writing stays in its history."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이전 필사를 보거나 이미지로 저장하고, 위젯에 표시할 수 있어요. 지우기를 누르면 해당 절의 캔버스만 비워지고, 필사한 내용은 이전 필사에 남아요."
+          }
+        }
+      }
+    },
+    "자간" : {
+      "comment" : "본문 설정 슬라이더",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Letter spacing"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "자간"
+          }
+        }
+      }
+    },
+    "잠시 후 다시 시도해 주세요." : {
+      "comment" : "즐겨찾기 불러오기 실패 설명",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Please try again in a moment."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "잠시 후 다시 시도해 주세요."
+          }
+        }
+      }
+    },
+    "저장 대기 중" : {
+      "comment" : "필사 저장 상태 한 줄",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Waiting to save"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "저장 대기 중"
+          }
+        }
+      }
+    },
+    "저장 중…" : {
+      "comment" : "필사 저장 상태 한 줄",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saving…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "저장 중…"
+          }
+        }
+      }
+    },
+    "저장하지 못했어요" : {
+      "comment" : "이미지 저장 실패 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't save"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "저장하지 못했어요"
+          }
+        }
+      }
+    },
+    "절을 길게 눌러보세요" : {
+      "comment" : "첫 실행 안내 4 제목",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Touch and hold a verse"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "절을 길게 눌러보세요"
+          }
+        }
+      }
+    },
+    "줄 간격" : {
+      "comment" : "본문 설정 슬라이더",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Line spacing"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "줄 간격"
+          }
+        }
+      }
+    },
+    "즐겨찾기" : {
+      "comment" : "즐겨찾기 — 사이드바 버튼 · 즐겨찾기 화면 제목 · 절 번호 VoiceOver 값",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Favorites"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "즐겨찾기"
+          }
+        }
+      }
+    },
+    "즐겨찾기 해제" : {
+      "comment" : "절 메뉴 · 즐겨찾기 카드 — 즐겨찾기 해제",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove from Favorites"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "즐겨찾기 해제"
+          }
+        }
+      }
+    },
+    "즐겨찾기를 되돌리지 못했어요" : {
+      "comment" : "즐겨찾기 되돌리기 실패 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't restore the favorite"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "즐겨찾기를 되돌리지 못했어요"
+          }
+        }
+      }
+    },
+    "즐겨찾기를 바꾸지 않았어요. %@" : {
+      "comment" : "즐겨찾기 변경을 막은 안내 — 뒤에 사유",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Favorites weren't changed. %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "즐겨찾기를 바꾸지 않았어요. %@"
+          }
+        }
+      }
+    },
+    "즐겨찾기를 불러오지 못했어요" : {
+      "comment" : "즐겨찾기 불러오기 실패 제목",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't load favorites"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "즐겨찾기를 불러오지 못했어요"
+          }
+        }
+      }
+    },
+    "즐겨찾기를 해제하지 못했어요" : {
+      "comment" : "즐겨찾기 해제 실패 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't remove from Favorites"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "즐겨찾기를 해제하지 못했어요"
+          }
+        }
+      }
+    },
+    "즐겨찾기를 해제하지 않았어요. %@" : {
+      "comment" : "즐겨찾기 해제를 막은 안내 — 뒤에 사유",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not removed from Favorites. %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "즐겨찾기를 해제하지 않았어요. %@"
+          }
+        }
+      }
+    },
+    "즐겨찾기를 해제할까요?" : {
+      "comment" : "위젯에 담긴 즐겨찾기 해제 확인창 제목",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove from Favorites?"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "즐겨찾기를 해제할까요?"
+          }
+        }
+      }
+    },
+    "즐겨찾기에 추가" : {
+      "comment" : "절 메뉴 — 즐겨찾기에 추가",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add to Favorites"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "즐겨찾기에 추가"
+          }
+        }
+      }
+    },
+    "즐겨찾기에 추가하고 위젯에 담았어요" : {
+      "comment" : "위젯에 추가 안내 — 즐겨찾기도 함께",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Added to Favorites and the widget"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "즐겨찾기에 추가하고 위젯에 담았어요"
+          }
+        }
+      }
+    },
+    "즐겨찾기에 추가하지 못했어요" : {
+      "comment" : "즐겨찾기 추가 실패 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't add to Favorites"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "즐겨찾기에 추가하지 못했어요"
+          }
+        }
+      }
+    },
+    "즐겨찾기에 추가하지 않았어요. %@" : {
+      "comment" : "즐겨찾기 추가를 막은 안내 — 뒤에 사유",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not added to Favorites. %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "즐겨찾기에 추가하지 않았어요. %@"
+          }
+        }
+      }
+    },
+    "즐겨찾기에 추가했어요" : {
+      "comment" : "즐겨찾기 추가 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Added to Favorites"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "즐겨찾기에 추가했어요"
+          }
+        }
+      }
+    },
+    "즐겨찾기에서 해제했어요" : {
+      "comment" : "즐겨찾기 해제 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Removed from Favorites"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "즐겨찾기에서 해제했어요"
+          }
+        }
+      }
+    },
+    "지금 보이는 회차" : {
+      "comment" : "이전 필사 — 지금 보이는 회차 표시",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Showing now"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지금 보이는 회차"
+          }
+        }
+      }
+    },
+    "지금 필기를 보존하고 새로 들어온 필사를 읽는 중이에요" : {
+      "comment" : "도착한 필사를 읽는 중 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keeping your writing and loading the new writing…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지금 필기를 보존하고 새로 들어온 필사를 읽는 중이에요"
+          }
+        }
+      }
+    },
+    "지금은 iCloud 연결이 보류되어 이 기기에만 저장돼요" : {
+      "comment" : "저장을 막은 사유 — iCloud 연결 보류",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud is on hold, so writing is saved only on this device"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지금은 iCloud 연결이 보류되어 이 기기에만 저장돼요"
+          }
+        }
+      }
+    },
+    "지우개" : {
+      "comment" : "필기 도구 — 지우개",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eraser"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지우개"
+          }
+        }
+      }
+    },
+    "지우기" : {
+      "comment" : "절 메뉴 · 지우기 확인창의 지우기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erase"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지우기"
+          }
+        }
+      }
+    },
+    "짙은 초록" : {
+      "comment" : "색 이름(VoiceOver)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dark green"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "짙은 초록"
+          }
+        }
+      }
+    },
+    "초록" : {
+      "comment" : "색 이름(VoiceOver)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Green"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "초록"
+          }
+        }
+      }
+    },
+    "총 %lld장" : {
+      "comment" : "고른 권의 장 수 — 권 행 VoiceOver 이름 뒤(창세기, 총 50장)",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld chapter"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld chapters"
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "총 %lld장"
+          }
+        }
+      }
+    },
+    "최근 추가순" : {
+      "comment" : "즐겨찾기 정렬 순서",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recently added"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "최근 추가순"
+          }
+        }
+      }
+    },
+    "추가할 때의 필기" : {
+      "comment" : "즐겨찾기 카드 필기 그림 VoiceOver 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Writing when added"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "추가할 때의 필기"
+          }
+        }
+      }
+    },
+    "취소" : {
+      "comment" : "확인창 취소 버튼",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancel"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "취소"
+          }
+        }
+      }
+    },
+    "탭하면 굵기를 고릅니다" : {
+      "comment" : "굵기 버튼 VoiceOver 힌트",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap to choose the width"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "탭하면 굵기를 고릅니다"
+          }
+        }
+      }
+    },
+    "파랑" : {
+      "comment" : "색 이름(VoiceOver)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blue"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "파랑"
+          }
+        }
+      }
+    },
+    "펜" : {
+      "comment" : "필기 도구 — 펜",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pen"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "펜"
+          }
+        }
+      }
+    },
+    "펜 굵기" : {
+      "comment" : "굵기 팝오버 제목",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pen Width"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "펜 굵기"
+          }
+        }
+      }
+    },
+    "펜 굵기 %@" : {
+      "comment" : "굵기 버튼 VoiceOver 이름(펜 굵기 0.5 mm)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pen width %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "펜 굵기 %@"
+          }
+        }
+      }
+    },
+    "펜 버튼을 누르면 펜과 지우개를 바꾸고, 필기 색상을 고를 수 있어요." : {
+      "comment" : "첫 실행 안내 2 본문",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap the pen button to switch between pen and eraser and to pick an ink color."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "펜 버튼을 누르면 펜과 지우개를 바꾸고, 필기 색상을 고를 수 있어요."
+          }
+        }
+      }
+    },
+    "펜으로 말씀을 따라 써 보세요. 화면을 움직일 때는 손가락으로 밀어 주세요. 한 손가락으로도 스크롤할 수 있어요." : {
+      "comment" : "첫 실행 안내 1 본문",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copy the verses with your pen. Swipe with your finger to move around — one finger works too."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "펜으로 말씀을 따라 써 보세요. 화면을 움직일 때는 손가락으로 밀어 주세요. 한 손가락으로도 스크롤할 수 있어요."
+          }
+        }
+      }
+    },
+    "펜으로 쓰고, 손가락으로 스크롤해요" : {
+      "comment" : "첫 실행 안내 1 제목",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Write with a pen, scroll with a finger"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "펜으로 쓰고, 손가락으로 스크롤해요"
+          }
+        }
+      }
+    },
+    "필기 도구를 골라보세요" : {
+      "comment" : "첫 실행 안내 2 제목",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose a writing tool"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필기 도구를 골라보세요"
+          }
+        }
+      }
+    },
+    "필기 색상" : {
+      "comment" : "색상 팝오버 제목",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ink Color"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필기 색상"
+          }
+        }
+      }
+    },
+    "필기 열이 왼쪽으로 가요" : {
+      "comment" : "왼손 사용자용 화면 설명",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Moves the writing column to the left"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필기 열이 왼쪽으로 가요"
+          }
+        }
+      }
+    },
+    "필기 확인하기" : {
+      "comment" : "도착 안내 버튼 — 확인이 필요한 필기 보기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Review Writing"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필기 확인하기"
+          }
+        }
+      }
+    },
+    "필기를 묶어 옮깁니다" : {
+      "comment" : "올가미 버튼 VoiceOver 힌트",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Select and move writing"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필기를 묶어 옮깁니다"
+          }
+        }
+      }
+    },
+    "필사 기록 있음" : {
+      "comment" : "장 버튼 VoiceOver 값 — 필사한 장",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Written"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필사 기록 있음"
+          }
+        }
+      }
+    },
+    "필사 차트" : {
+      "comment" : "사이드바 차트 버튼 VoiceOver 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Writing chart"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필사 차트"
+          }
+        }
+      }
+    },
+    "필사 화면에서 절을 길게 눌러 즐겨찾기에 추가해 보세요." : {
+      "comment" : "즐겨찾기 빈 상태 설명",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Touch and hold a verse while writing to add it to Favorites."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필사 화면에서 절을 길게 눌러 즐겨찾기에 추가해 보세요."
+          }
+        }
+      }
+    },
+    "필사를 이 기기에 저장하지 못했어요" : {
+      "comment" : "기기 저장 실패 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't save your writing on this device"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필사를 이 기기에 저장하지 못했어요"
+          }
+        }
+      }
+    },
+    "필사를 이 기기에 저장하지 못했어요. 저장 공간을 확인해 주세요" : {
+      "comment" : "기기 저장 반복 실패 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't save your writing on this device. Check your storage"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필사를 이 기기에 저장하지 못했어요. 저장 공간을 확인해 주세요"
+          }
+        }
+      }
+    },
+    "필사를 지우지 못했습니다" : {
+      "comment" : "지우기 실패 확인창 제목",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't erase the writing"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필사를 지우지 못했습니다"
+          }
+        }
+      }
+    },
+    "해제하기" : {
+      "comment" : "즐겨찾기 해제 확인창 — 해제",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "해제하기"
+          }
+        }
+      }
+    },
+    "형광펜" : {
+      "comment" : "필기 도구 — 형광펜",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Highlighter"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "형광펜"
+          }
+        }
+      }
+    },
+    "화면과 필기" : {
+      "comment" : "본문 설정 — 화면 · 필기 칸 머리글",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Layout and writing"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "화면과 필기"
+          }
+        }
+      }
+    },
+    "확인이 필요한 필기 %lld" : {
+      "comment" : "절 메뉴 — 확인이 필요한 필기 개수",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Writing to Review (%lld)"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "확인이 필요한 필기 %lld"
+          }
+        }
+      }
+    },
+    "확인하기" : {
+      "comment" : "도착 안내 버튼 — 다시 읽기",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Review"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "확인하기"
+          }
+        }
+      }
+    },
+    "회색" : {
+      "comment" : "색 이름(VoiceOver)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gray"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "회색"
+          }
+        }
+      }
+    },
+    "회차를 선택하면 바로 그 필사로 바뀌어요." : {
+      "comment" : "이전 필사 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose a version to switch to it right away."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "회차를 선택하면 바로 그 필사로 바뀌어요."
+          }
+        }
+      }
+    },
+    "흰색" : {
+      "comment" : "색 이름(VoiceOver)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "White"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "흰색"
+          }
+        }
+      }
+    }
   },
   "version" : "1.0"
 }

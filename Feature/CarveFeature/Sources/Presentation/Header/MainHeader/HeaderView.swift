@@ -6,6 +6,7 @@
 //  Copyright © 2024 leetaek. All rights reserved.
 //
 
+import Domain
 import Resources
 import SwiftUI
 
@@ -130,15 +131,17 @@ public struct HeaderView: View {
     }
 
     private var navigationAccessibilityLabel: String {
-        store.isNavigationPresented ? "성경 탐색 닫기" : "성경 탐색 열기"
+        store.isNavigationPresented
+            ? String(localized: "성경 탐색 닫기", bundle: .module)
+            : String(localized: "성경 탐색 열기", bundle: .module)
     }
 
     private var trailingControls: some View {
         HStack(spacing: CarveSpacing.xxSmall) {
-            CarveIconButton(.previous, accessibilityLabel: "이전 장", visualScale: buttonVisualScale) {
+            CarveIconButton(.previous, accessibilityLabel: String(localized: "이전 장", bundle: .module), visualScale: buttonVisualScale) {
                 send(.moveToBefore)
             }
-            CarveIconButton(.next, accessibilityLabel: "다음 장", visualScale: buttonVisualScale) {
+            CarveIconButton(.next, accessibilityLabel: String(localized: "다음 장", bundle: .module), visualScale: buttonVisualScale) {
                 send(.moveToNext)
             }
             // 실기기 UI 테스트가 찾는 식별자. 접근성 이름(「다음 장」)이 문구 변경으로 바뀌어도 유지한다.
@@ -151,7 +154,7 @@ public struct HeaderView: View {
     private var sentenceSettingsButton: some View {
         CarveIconButton(
             .textFormat,
-            accessibilityLabel: "본문 설정",
+            accessibilityLabel: String(localized: "본문 설정", bundle: .module),
             isSelected: store.sentenceSettings != nil,
             visualScale: buttonVisualScale
         ) {
@@ -172,13 +175,13 @@ public struct HeaderView: View {
             send(.titleDidTapped)
         } label: {
             VStack(spacing: 2) {
-                Text("\(store.currentTitle.title.koreanTitle()) \(store.currentTitle.chapter)장")
+                Text(verbatim: Self.titleText(store.currentTitle))
                     .font(CarveTypography.scripture(ResourcesFontFamily.NanumMyeongjo.regular.font(size: 26 - 10 * collapseProgress)))
                     // 세로 화면에서 광고와 함께 두면 폭이 좁아진다. 줄바꿈 대신 줄여 그린다.
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
-                // 번역본 약칭은 지금 장의 번역본이다(결정 11). 구약 · 신약 · 권 이름 문구 현지화는 L4 가 옮긴다.
-                Text("\(store.currentTitle.translation.displayName) · \(store.currentTitle.title.isOldtestment ? "구약" : "신약") / \(store.currentTitle.title.koreanTitle())")
+                // 번역본 약칭은 지금 장의 번역본이다(결정 11).
+                Text(verbatim: Self.subtitleText(store.currentTitle))
                     .font(CarveTypography.caption)
                     .foregroundStyle(CarveColor.secondary)
                     .lineLimit(1)
@@ -192,6 +195,34 @@ public struct HeaderView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(store.currentTitle.title.koreanTitle()) \(store.currentTitle.chapter)장, 성경과 장 목록 열기")
+        .accessibilityLabel(Self.titleAccessibilityLabel(store.currentTitle))
+    }
+}
+
+// MARK: - 제목 문구
+
+extension HeaderView {
+    /// 역할: 헤더 제목(「창세기 1장」 · 「Genesis 1」). 권 이름 · 장 표기는 번역본이 아니라 앱 언어를 따른다(영어 현지화 결정 3).
+    /// 입력 · 출력: 지금 장 · 로케일(nil 이면 앱 언어) → 참조 문자열(`BibleReference`, 약칭 없음 — 부제가 적는다).
+    /// 부작용: 없음.
+    static func titleText(_ chapter: BibleChapter, locale: Locale? = nil) -> String {
+        BibleReference(chapter: chapter).text(locale: locale)
+    }
+
+    /// 역할: 헤더 부제(「개역개정 · 구약 / 창세기」 · 「KJV · Old Testament / Genesis」).
+    /// 입력 · 출력: 지금 장 · 로케일(nil 이면 앱 언어) → 번역본 약칭 · 구약/신약 · 권 이름.
+    /// 부작용: 없음.
+    static func subtitleText(_ chapter: BibleChapter, locale: Locale? = nil) -> String {
+        let testament = chapter.title.isOldtestment
+            ? CarveFeatureCatalog.string("구약", locale: locale)
+            : CarveFeatureCatalog.string("신약", locale: locale)
+        return "\(chapter.translation.displayName(locale: locale)) · \(testament) / \(chapter.title.localizedName(locale: locale))"
+    }
+
+    /// 역할: 제목 버튼의 VoiceOver 이름(「창세기 1장, 성경과 장 목록 열기」).
+    /// 입력 · 출력: 지금 장 · 로케일(nil 이면 앱 언어) → 제목과 버튼이 하는 일.
+    /// 부작용: 없음.
+    static func titleAccessibilityLabel(_ chapter: BibleChapter, locale: Locale? = nil) -> String {
+        CarveFeatureCatalog.string("\(titleText(chapter, locale: locale)), 성경과 장 목록 열기", locale: locale)
     }
 }
