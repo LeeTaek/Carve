@@ -28,12 +28,12 @@ struct DomainEnglishCopyTesting {
         #expect(BackupExportFileName.defaultName(for: date, timeZone: seoul) == "새기다 필사 백업 2026-10-07.carvebackup")
     }
 
-    @Test("글꼴 이름은 영어에서 Nanum 로마자 이름이고, 한국어 고딕은 실제 글꼴 파일대로 「나눔고딕」 이다")
+    @Test("글꼴 이름은 영어에서 Nanum 로마자 이름이고, 한국어는 실제 글꼴 패밀리대로 「나눔고딕」 · 「나눔손글씨 꽃내음」 이다")
     func fontNamesInEnglish() {
         #expect(FontCase.myeongjo.title(locale: Self.english) == "Nanum Myeongjo")
         #expect(FontCase.gothic.title(locale: Self.english) == "Nanum Gothic")
         #expect(FontCase.flower.title(locale: Self.english) == "Nanum Flower Scent")
-        #expect(FontCase.allCases.map(\.title) == ["나눔명조", "나눔고딕", "나눔꽃향기"])
+        #expect(FontCase.allCases.map(\.title) == ["나눔명조", "나눔고딕", "나눔손글씨 꽃내음"])
         // 표시 이름만 바뀌고 저장값(rawValue)은 그대로다.
         #expect(FontCase.allCases.map(\.rawValue) == ["NanumMyeongjo", "NanumGothic", "NanumFlowerScent"])
     }

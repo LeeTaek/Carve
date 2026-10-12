@@ -184,7 +184,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Verse %lld · History"
+            "value" : "Verse %lld · Previous Writing"
           }
         },
         "ko" : {
@@ -458,57 +458,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "끄면 Apple Pencil로만 필사할 수 있어요"
-          }
-        }
-      }
-    },
-    "나눔꽃향기" : {
-      "comment" : "글꼴 이름 — 나눔 손글씨 꽃내음",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Flower Scent"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "나눔꽃향기"
-          }
-        }
-      }
-    },
-    "나눔명조" : {
-      "comment" : "글꼴 이름 — 나눔명조",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Myeongjo"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "나눔명조"
-          }
-        }
-      }
-    },
-    "나눔바른고딕" : {
-      "comment" : "글꼴 이름 — 나눔바른고딕",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Barun Gothic"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "나눔바른고딕"
           }
         }
       }
@@ -1369,7 +1318,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No history for this verse yet."
+            "value" : "No previous writing for this verse yet."
           }
         },
         "ko" : {
@@ -1607,7 +1556,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Add to widget · Remove from Favorites"
+            "value" : "Add to Widget · Remove from Favorites"
           }
         },
         "ko" : {
@@ -1670,7 +1619,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Remove from widget · Remove from Favorites"
+            "value" : "Remove from Widget · Remove from Favorites"
           }
         },
         "ko" : {
@@ -1724,13 +1673,13 @@
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld piece of writing from this iPad doesn't match the new writing, so it isn't shown automatically"
+                  "value" : "%lld draft from this iPad doesn't match the new writing, so it isn't shown automatically"
                 }
               },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld pieces of writing from this iPad don't match the new writing, so they aren't shown automatically"
+                  "value" : "%lld drafts from this iPad don't match the new writing, so they aren't shown automatically"
                 }
               }
             }
@@ -1750,7 +1699,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Couldn't load the writing kept on this device"
+            "value" : "Couldn't load the drafts kept on this device"
           }
         },
         "ko" : {
@@ -1937,7 +1886,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Earlier versions of your writing will appear here."
+            "value" : "Your writing history will appear here."
           }
         },
         "ko" : {
@@ -1954,7 +1903,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "View History"
+            "value" : "Previous Writing"
           }
         },
         "ko" : {
@@ -1971,7 +1920,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "View its history, save it as an image, or add it to a widget. Erase clears only that verse; your writing stays in its history."
+            "value" : "View its previous writing, save it as an image, or add it to a widget. Erase clears only that verse; your writing stays in Previous Writing."
           }
         },
         "ko" : {
@@ -2731,7 +2680,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Review Writing"
+            "value" : "Review Drafts"
           }
         },
         "ko" : {
@@ -2799,7 +2748,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Touch and hold a verse while writing to add it to Favorites."
+            "value" : "Touch and hold a verse on the writing screen to add it to Favorites."
           }
         },
         "ko" : {
@@ -2918,7 +2867,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Writing to Review (%lld)"
+            "value" : "Drafts to Review (%lld)"
           }
         },
         "ko" : {

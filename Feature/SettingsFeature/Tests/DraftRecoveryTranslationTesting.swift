@@ -143,7 +143,7 @@ struct DraftRecoveryTranslationTesting {
             #expect(english.chapter == Self.english)
             #expect(korean.chapter == Self.korean)
             #expect(english.place == "창세기 1장 1절 · KJV")
-            #expect(korean.place == "창세기 1장 1절 · 개역개정")
+            #expect(korean.place == "창세기 1장 1절")
             #expect(english.ink == translationInks[2])
             #expect(store.state.pendingCount == 2)
         }

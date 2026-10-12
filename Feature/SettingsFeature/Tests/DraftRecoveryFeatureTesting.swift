@@ -212,8 +212,8 @@ struct DraftRecoveryFeatureTesting {
         let readable = try #require(store.state.buckets.first { $0.scope == Self.accountA })
         #expect(readable.title == "지금 계정")
         #expect(readable.comparedWithStore)
-        // 번역본이 섞이는 목록이라 개역개정도 약칭을 붙인다(영어 현지화 결정 11).
-        #expect(readable.items.map(\.place) == ["창세기 1장 3절 · 개역개정"])
+        // 번역본이 섞이는 목록이지만 개역개정은 약칭을 생략한다(사용자 결정 17).
+        #expect(readable.items.map(\.place) == ["창세기 1장 3절"])
         #expect(readable.items.first?.reason == .storeMoved)
         let unreadable = try #require(store.state.buckets.first { $0.scope == broken })
         #expect(unreadable.readFailed)

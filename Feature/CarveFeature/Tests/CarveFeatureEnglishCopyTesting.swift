@@ -119,13 +119,17 @@ struct CarveFeatureEnglishCopyTesting {
 
     // MARK: 팔레트 · 본문 설정
 
-    @Test("색 이름 · 글꼴 이름도 카탈로그의 영어로 나온다")
+    @Test("색 이름은 카탈로그의 영어로, 글꼴 이름은 Domain 글꼴 이름(FontCase.title)의 영어로 나온다")
     func paletteAndFontNames() throws {
         let ink = try #require(ColorPalatteFeature.defaultColors.first)
         #expect(ColorPalatteView.colorName(ink, locale: Self.english) == "Ink black")
         #expect(ColorPalatteView.colorName(ink) == "먹색")
-        #expect(SentenceSettingsView.fontName(.myeongjo, locale: Self.english) == "Myeongjo")
-        #expect(SentenceSettingsView.fontName(.myeongjo) == "나눔명조")
+        // 글꼴 이름은 Domain 한 곳에서 현지화한다 — 본문 설정 칸과 Domain 표기가 어긋나지 않는다.
+        #expect(FontCase.allCases.map { SentenceSettingsView.fontName($0, locale: Self.english) }
+            == ["Nanum Myeongjo", "Nanum Gothic", "Nanum Flower Scent"])
+        #expect(FontCase.allCases.map { SentenceSettingsView.fontName($0) } == ["나눔명조", "나눔고딕", "나눔손글씨 꽃내음"])
+        #expect(FontCase.allCases.map { SentenceSettingsView.fontName($0, locale: Self.english) }
+            == FontCase.allCases.map { $0.title(locale: Self.english) })
     }
 
     // MARK: 앱 이름
@@ -134,5 +138,18 @@ struct CarveFeatureEnglishCopyTesting {
     func appName() {
         #expect(CarveFeatureCatalog.string("새기다", locale: Self.english) == "Carve")
         #expect(CarveFeatureCatalog.string("새기다") == "새기다")
+    }
+
+    // MARK: 용어
+
+    @Test("영어 용어는 모듈 사이에서 같다 — 이전 필사 = Previous Writing, 확인이 필요한 필기 = Drafts to Review, 본문 설정 = Text Settings")
+    func sharedTerms() {
+        // 설정 화면 문구(SettingsFeature)가 이 이름들을 「“Previous Writing”」 처럼 인용한다 — 메뉴 이름과 어긋나지 않게 고정한다.
+        #expect(CarveFeatureCatalog.string("이전 필사 내용 보기", locale: Self.english) == "Previous Writing")
+        #expect(CarveFeatureCatalog.string("확인이 필요한 필기 \(3)", locale: Self.english) == "Drafts to Review (3)")
+        #expect(CarveFeatureCatalog.string("필기 확인하기", locale: Self.english) == "Review Drafts")
+        #expect(CarveFeatureCatalog.string("본문 설정", locale: Self.english) == "Text Settings")
+        #expect(CarveFeatureCatalog.string("손가락 필사 허용", locale: Self.english) == "Allow finger writing")
+        #expect(CarveFeatureCatalog.string("지우기", locale: Self.english) == "Erase")
     }
 }

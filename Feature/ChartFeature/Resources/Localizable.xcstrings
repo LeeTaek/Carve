@@ -1,6 +1,14 @@
 {
   "sourceLanguage" : "ko",
   "strings" : {
+    "" : {
+      "comment" : "번역하지 않음 — 축만 그리는 빈 차트의 값 이름(RuleMark .value(\"\", 0)). 화면에 보이지 않는다",
+      "shouldTranslate" : false
+    },
+    " " : {
+      "comment" : "번역하지 않음 — X축 자리 맞춤용 빈 라벨",
+      "shouldTranslate" : false
+    },
     "%@ %@" : {
       "comment" : "차트 X축 날짜 라벨 — 월 · 일, 요일. 예: 9월 4일 금 · Fri Sep 4",
       "localizations" : {
@@ -51,6 +59,10 @@
           }
         }
       }
+    },
+    "%lld" : {
+      "comment" : "번역하지 않음 — Y축 눈금 숫자",
+      "shouldTranslate" : false
     },
     "%lld절" : {
       "comment" : "절 수 — 영어는 복수형(1 verse · 3 verses)",

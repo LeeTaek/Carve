@@ -40,7 +40,12 @@ struct WidgetNoticeView: View {
     private var message: String {
         switch notice {
         case .added(let addedToFavorites):
-            String(localized: addedToFavorites ? "즐겨찾기에 추가하고 위젯에 담았어요" : "위젯에 담았어요", bundle: .module)
+            // 3항 연산을 `String(localized:)` 안에 두면 컴파일러가 한쪽 문구만 카탈로그 추출에 넣는다 — 문구마다 따로 부른다.
+            if addedToFavorites {
+                String(localized: "즐겨찾기에 추가하고 위젯에 담았어요", bundle: .module)
+            } else {
+                String(localized: "위젯에 담았어요", bundle: .module)
+            }
         case .alreadyAdded:
             String(localized: "이미 위젯에 담긴 말씀이에요", bundle: .module)
         case .limitReached:

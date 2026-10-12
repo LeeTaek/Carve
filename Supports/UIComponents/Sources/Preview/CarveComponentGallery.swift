@@ -237,9 +237,9 @@ private struct TextSettingsPanelSample: View {
 
         var title: String {
             switch self {
-            case .gothic: "나눔바른고딕"
+            case .gothic: "나눔고딕"
             case .myeongjo: "나눔명조"
-            case .flower: "나눔꽃향기"
+            case .flower: "나눔손글씨 꽃내음"
             }
         }
 

@@ -95,15 +95,11 @@ public struct SentenceSettingsView: View {
 }
 
 extension SentenceSettingsView {
-    /// 역할: 글꼴 고르기 칸의 이름(앱 언어). 글꼴 이름(`FontCase.title`)은 Domain 의 한국어 고정 문구라 화면에서 카탈로그로 바꾼다.
-    /// 입력 · 출력: 글꼴 · 로케일(nil 이면 앱 언어) → 이름(ko 「나눔명조」 · en 「Myeongjo」).
+    /// 역할: 글꼴 고르기 칸의 이름(앱 언어). 글꼴 이름은 Domain `FontCase.title(locale:)` 한 곳에서 현지화한다.
+    /// 입력 · 출력: 글꼴 · 로케일(nil 이면 앱 언어) → 이름(ko 「나눔명조」 · en 「Nanum Myeongjo」).
     /// 부작용: 없음.
     static func fontName(_ font: FontCase, locale: Locale? = nil) -> String {
-        switch font {
-        case .myeongjo: CarveFeatureCatalog.string("나눔명조", locale: locale)
-        case .gothic: CarveFeatureCatalog.string("나눔바른고딕", locale: locale)
-        case .flower: CarveFeatureCatalog.string("나눔꽃향기", locale: locale)
-        }
+        font.title(locale: locale)
     }
 }
 

@@ -409,7 +409,7 @@ extension DraftRecoveryFeature {
     public struct Item: Hashable, Identifiable, Sendable {
         /// 묶음 · 세션 · 번역본 · 권 · 장 · 절 — 같은 절이라도 번역본이 다르면 다른 줄이다.
         public var id: String
-        /// 「창세기 1장 3절 · KJV」 — 번역본이 섞이는 목록이라 약칭을 붙인다(`DraftRecoveryCopy.place`).
+        /// 「창세기 1장 3절 · KJV」 · 「창세기 1장 3절」 — 번역본이 섞이는 목록이라 KJV · BSB 만 약칭을 붙인다(`DraftRecoveryCopy.place`).
         public var place: String
         /// 비교할 때 이 장만 읽는다. 초안의 번역본 장이다 — 넣기도 이 번역본의 행으로 간다.
         public var chapter: BibleChapter
@@ -478,7 +478,7 @@ extension DraftRecoveryFeature.Bucket {
             readFailed: false,
             // 이 판이 모르는 권 · 번역본의 초안은 줄로 만들지 않는다(조회도 그런 장을 대조하지 않는다) — 수 · 용량에만 든다.
             items: inventory.entries.compactMap { DraftRecoveryFeature.Item($0, scope: inventory.scope, environment: environment) },
-            unreadChapters: inventory.unreadChapters.map { BibleReference(chapter: $0, showsTranslation: true).text(locale: SettingsCatalog.locale) }
+            unreadChapters: inventory.unreadChapters.map(DraftRecoveryCopy.chapterName)
         )
     }
 
