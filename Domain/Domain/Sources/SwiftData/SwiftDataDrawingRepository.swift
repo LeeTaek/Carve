@@ -62,28 +62,20 @@ extension SwiftDatabaseActor {
     ///
     /// 행 키는 `rowUUID` 가 있으면 그것, 없으면(legacy) business `id` 다 (§8-7). 절 → 행 키 순으로 정렬해
     /// 호출 순서와 무관하게 같은 결과를 낸다.
-    /// - Parameter chapter: 대상 장.
+    ///
+    /// 장의 번역본 행만 읽는다 — 술어의 `titleName` 은 `StoredBookKey.titleName(for:)` 다. 개역개정은 접두가 없으므로
+    /// `translation` 열이 nil 인 옛 행도 함께 읽힌다. 스냅샷의 번역본은 행의 `titleName` 을 `StoredBookKey.decode` 로 푼 값이다.
+    /// - Parameter chapter: 대상 장(번역본 포함).
     /// - Returns: 스냅샷 배열.
     public func loadDrawingSnapshots(chapter: BibleChapter) throws -> [VerseDrawingSnapshot] {
-        let titleName = chapter.title.rawValue
+        let titleName = StoredBookKey.titleName(for: chapter)
         let chapterNumber = chapter.chapter
         let predicate = #Predicate<BibleDrawing> {
             $0.titleName == titleName && $0.titleChapter == chapterNumber
         }
         let rows: [BibleDrawing] = try modelContext.fetch(FetchDescriptor(predicate: predicate))
         return rows
-            .compactMap { row -> VerseDrawingSnapshot? in
-                guard let verse = row.verse else { return nil }
-                return VerseDrawingSnapshot(
-                    verse: verse,
-                    rowID: BibleDrawingRowID(raw: row.rowKey),
-                    isPresent: row.isPresent ?? false,
-                    updateDate: row.updateDate,
-                    lineData: row.lineData,
-                    drawingVersion: row.drawingVersion,
-                    metadata: DrawingLayoutMetadata.decode(blob: row.layoutMetadataData)
-                )
-            }
+            .compactMap(VerseDrawingSnapshot.init(drawing:))
             .sorted { lhs, rhs in
                 lhs.verse != rhs.verse ? lhs.verse < rhs.verse : lhs.rowID < rhs.rowID
             }
@@ -219,6 +211,9 @@ extension SwiftDatabaseActor {
     /// | 보관 행 (`archiveRowID`) | 활성 행의 `lineData` · `layoutMetadataData` · `drawingVersion` 복제, **`isPresent = false`**, `updateDate` 는 원래 필사 시각 유지 |
     /// | 활성 행 (`activeRowID`) | 행 유지, `lineData = nil`, **`isPresent = true`**(대표 유지), `updateDate = now` |
     ///
+    /// 보관 행의 `titleName` · `translation` 열도 활성 행 그대로 옮긴다 — 번역본이 같은 행으로 남고(영어 현지화 결정 1),
+    /// 열이 nil 인 옛 개역개정 행의 보관본도 nil 이다.
+    ///
     /// **보관 행이 다시 대표로 뽑히지 않는 이유가 여기 있다.** `VerseDrawingMutation.clear` 는 기존 행의 `isPresent` 를
     /// 바꾸지 않으므로 대표 규칙(`DrawingRepresentativeRule`: `isPresent` 우선 → `updateDate` 최신)을 이 작업이 직접
     /// 보장해야 한다. 보관 행의 `updateDate` 를 원래 값으로 두는 것도 같은 이유다 — `isPresent` 가 하나도 없는
@@ -257,6 +252,9 @@ extension SwiftDatabaseActor {
                 modelContext.insert(row)
                 archived = row
             }
+            // 권 이름 · 번역본 열은 원래 행 그대로 옮긴다 — 열이 nil 인 옛 개역개정 행의 보관본도 nil 이다(영어 행은 늘 nil).
+            archived.titleName = active.titleName
+            archived.translation = active.translation
             archived.verse = command.verse
             archived.lineData = active.lineData
             archived.layoutMetadataData = active.layoutMetadataData
@@ -281,9 +279,10 @@ extension SwiftDatabaseActor {
 
     // MARK: 내부
 
+    /// 장(번역본 포함)의 행 하나를 행 키로 찾는다 — 다른 번역본의 같은 권 · 장 행은 주소지정되지 않는다.
     private func drawingRow(rowID: BibleDrawingRowID, chapter: BibleChapter) throws -> BibleDrawing? {
         let raw = rowID.raw
-        let titleName = chapter.title.rawValue
+        let titleName = StoredBookKey.titleName(for: chapter)
         let chapterNumber = chapter.chapter
         let predicate = #Predicate<BibleDrawing> {
             $0.titleName == titleName && $0.titleChapter == chapterNumber

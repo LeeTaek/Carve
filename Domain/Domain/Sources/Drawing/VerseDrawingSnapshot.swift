@@ -59,7 +59,11 @@ public struct VerseDrawingSnapshot: Equatable, Sendable {
     public let drawingVersion: Int?
     /// `drawingVersion == 3` 일 때만 존재.
     public let metadata: DrawingLayoutMetadata?
+    /// 이 행의 번역본. 저장소는 행의 `titleName` 을 `StoredBookKey.decode` 로 풀어 채운다 —
+    /// 접두가 없는 행은 `translation` 열이 nil 이든 `.NKRV` 든 개역개정이다.
+    public let translation: Translation
 
+    /// - Parameter translation: 행의 번역본. 생략하면 개역개정이다(번역본 이전 호출부).
     public init(
         verse: Int,
         rowID: BibleDrawingRowID,
@@ -67,7 +71,8 @@ public struct VerseDrawingSnapshot: Equatable, Sendable {
         updateDate: Date?,
         lineData: Data?,
         drawingVersion: Int?,
-        metadata: DrawingLayoutMetadata?
+        metadata: DrawingLayoutMetadata?,
+        translation: Translation = .NKRV
     ) {
         self.verse = verse
         self.rowID = rowID
@@ -76,6 +81,7 @@ public struct VerseDrawingSnapshot: Equatable, Sendable {
         self.lineData = lineData
         self.drawingVersion = drawingVersion
         self.metadata = metadata
+        self.translation = translation
     }
 
     /// 좌표 형식이 확정된 행인가 (`drawingVersion == 3` + metadata).
