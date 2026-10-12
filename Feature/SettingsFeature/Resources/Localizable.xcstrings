@@ -1,7 +1,159 @@
 {
   "sourceLanguage" : "ko",
   "strings" : {
-
+    "1769년 표준판 본문" : {
+      "comment" : "성경 본문 출처 — KJV 의 판",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1769 standard edition"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1769년 표준판 본문"
+          }
+        }
+      }
+    },
+    "CC0 1.0 — %@ 공개 도메인에 헌정" : {
+      "comment" : "성경 본문 출처 — BSB 의 권리. 값: 헌정한 날(기기 로케일의 긴 날짜, 예: 2023년 4월 30일 · April 30, 2023)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CC0 1.0 — dedicated to the public domain on %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CC0 1.0 — %@ 공개 도메인에 헌정"
+          }
+        }
+      }
+    },
+    "공식 사이트" : {
+      "comment" : "성경 본문 출처 — 항목 이름: 번역본을 낸 곳의 사이트",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Official site"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "공식 사이트"
+          }
+        }
+      }
+    },
+    "권리" : {
+      "comment" : "성경 본문 출처 — 항목 이름: 본문을 쓸 수 있는 권리",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rights"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "권리"
+          }
+        }
+      }
+    },
+    "번역본마다 본문의 판 · 권리 · 출처를 적었어요." : {
+      "comment" : "성경 본문 출처 화면 첫 줄 안내",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edition, rights, and source for each translation."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "번역본마다 본문의 판 · 권리 · 출처를 적었어요."
+          }
+        }
+      }
+    },
+    "본문 사본 출처" : {
+      "comment" : "성경 본문 출처 — 항목 이름: 앱에 담은 본문 사본을 받은 곳",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Text source"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "본문 사본 출처"
+          }
+        }
+      }
+    },
+    "성경 본문 출처" : {
+      "comment" : "설정 › 앱 버전의 행 이름이자 성경 본문 출처 화면 제목",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bible Text Sources"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "성경 본문 출처"
+          }
+        }
+      }
+    },
+    "영국 밖에서는 공개 도메인" : {
+      "comment" : "성경 본문 출처 — KJV 의 권리",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Public domain outside the UK"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "영국 밖에서는 공개 도메인"
+          }
+        }
+      }
+    },
+    "판" : {
+      "comment" : "성경 본문 출처 — 항목 이름: 본문의 판(예: 1769년 표준판)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edition"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "판"
+          }
+        }
+      }
+    }
   },
   "version" : "1.0"
 }
