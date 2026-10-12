@@ -25,7 +25,7 @@
 | CarveFeature | `Feature/CarveFeature` | 성경 탐색 · 필사 화면과 캔버스 · 절 메뉴 · 즐겨찾기 · 팔레트 | ClientInterfaces, Domain, UIComponents, Resources |
 | ChartFeature | `Feature/ChartFeature` | 필사 기록 차트 · 주간 요약 | 위와 같음 |
 | SettingsFeature | `Feature/SettingsFeature` | 설정 화면 · 광고 제거 · 필기 가져오기 · iCloud | 위와 같음 |
-| Domain | `Domain/Domain` | 모델 · 본문 · SwiftData 스키마와 저장소 · 동기화 · 기기 안 초안 · 필사 백업 형식 | CarveToolkit, ClientInterfaces, Resources |
+| Domain | `Domain/Domain` | 모델 · 본문(개역개정 · KJV · BSB) · SwiftData 스키마와 저장소 · 동기화 · 기기 안 초안 · 필사 백업 형식 | CarveToolkit, ClientInterfaces, Resources |
 | UIComponents | `Supports/UIComponents` | 공용 뷰 · 디자인 시스템 · 광고 슬롯 | ClientInterfaces, CarveToolkit, Resources |
 | ClientInterfaces | `Supports/ClientInterfaces` | 외부 클라이언트 프로토콜 · 공유 키 | (TCA 만) |
 | CarveToolkit | `Supports/CarveToolkit` | Logger · 리듀서 액션 · UIKit 브리지 | Resources |
@@ -52,6 +52,8 @@
 | 성경 탐색 (권 · 장 고르기) | `CarveNavigationFeature` |
 | 필사 · 필기 | `BibleDrawing`(SwiftData 모델) · `DrawingDatabase` · 필사 화면 `CarveDetailFeature` |
 | 장 · 절 | `BibleChapter` · Verse(`BibleVerse` · 절 행 `SentencesWithDrawingFeature` 등) |
+| 번역본 (개역개정 · KJV · BSB) | `Translation`(`NKRV` · `KJV` · `BSB`) — 지금 번역본은 `BibleChapter.translation`. SwiftData 행의 권 이름 짓기 · 풀기는 `StoredBookKey` 만 쓴다(영어 행은 `KJV-` · `BSB-` 접두 · `translation` 열 nil). 참조 문자열은 `BibleReference`, 권 이름은 `BibleTitle.localizedName` |
+| 현지화 · 영어 화면 | 모듈마다 `Resources/Localizable.xcstrings`(원문 ko, 키 = 한국어 문장) · 문구에 `bundle: .module`(앱 · 위젯은 `.main`). 규칙은 룰북 `references/localization.md` |
 | 필사 캔버스 · 단일 Canvas | `ChapterCanvasFeature`(리듀서 하나를 `ChapterCanvas*.swift` 여러 파일로 나눔) · `ChapterCanvasController`(PencilKit). 캔버스는 이것 하나뿐이다 — N-Canvas · `SingleCanvasFlag` 는 2.1 에서 지웠다 |
 | 절 메뉴 | `ChapterCanvasVerseMenu` · `VerseMenuOverlay` |
 | 이전 필사 내용 보기 | `VerseDrawingHistoryFeature` |
@@ -68,6 +70,7 @@
 - 기본 검증 경로는 `xcodebuild test`를 우선 사용한다.
 - Tuist 특화 흐름이나 selective testing이 필요할 때는 `tuist test`를 사용한다.
 - CLI 검증을 수행할 때는 iPhone simulator가 아니라 iPad simulator destination을 사용한다.
+- 시험 언어는 스킴에서 ko-KR 로 고정돼 있다(`Workspace.swift` · `Project+Templates.swift` 의 `testLanguage` · `testRegion`, 손으로 만드는 스킴에도 같은 값) — 영어는 시험 안에서 언어를 골라 본다(룰북 `references/localization.md`).
 
 ## 툴체인 제약 ★ 먼저 읽을 것
 

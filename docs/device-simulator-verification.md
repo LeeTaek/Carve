@@ -22,6 +22,7 @@
   `xcrun devicectl device process launch --device <id> <bundle> -- -MyFlag`
 - **실기기 UI 테스트는 시작 장을 인자로 정한다** — `-UITestChapter <BibleChapter JSON>`(Debug 전용, `UITestLaunchChapter`,
   UITests 에서는 `startChapterArguments`). 앱은 마지막으로 연 장에서 시작하므로 인자 없이는 기기 상태에 따라 결과가 갈린다.
+  JSON 에 `translation` 이 없으면 개역개정이다 — 번역본 지정은 아래 「언어 · 번역본」.
   헤더 다음 장 버튼(`nextChapter`)과 절 메뉴 항목(`verseMenu.favorite` · `history` · `image` · `widget` · `erase`)은 접근성 이름이 아니라 식별자로 찾는다.
   절 메뉴는 2026-09-15 부터 필기가 없는 절에서도 「즐겨찾기」 로 뜬다 — 「이전 필사 내용 보기」 는 보관본이, 「지우기」 는 필기가 있어야 보인다.
   메뉴 항목은 누르지 않는다(「지우기」 는 실제 필사를 비우고 「즐겨찾기」 는 실제로 저장되며 「이미지 저장」 은 사진 추가 권한을 묻고 사진 보관함에 넣고 「위젯에 추가」 는 즐겨찾기에 보관하고 위젯 목록을 바꾼다). 즐겨찾기한 절 번호는 이름 「1절」 을 그대로 두고 값 「즐겨찾기」 만 더한다.
@@ -74,6 +75,30 @@ xcrun devicectl device process launch --device <id> kr.co.carve.leetaek -- -UITe
 
 UI 테스트는 `CarveUITestSupport` 의 도우미를 쓴다 — `app.launchArguments = routeArguments("settings/removeAds") + suppressionArguments`
 (`suppressionArguments` 는 세 억제 스위치, 시작 장은 `startChapterArguments`). 같은 `XCUIApplication` 을 `terminate()` 뒤 `launch()` 해도 같은 인자로 뜬다.
+
+### 언어 · 번역본 (영어 현지화, 2026-10-12)
+
+앱 화면은 **기기 언어**를 따르고(앱 안 언어 설정은 없다), 지금 번역본은 저장된 시작 장(`@Shared("title")` 의 `BibleChapter.translation`)을 따른다.
+둘 다 실행 인자로 정해 연다. 설계는 [영어 현지화 설계](./english-localization-design.md) §4 · §6 · §9.
+
+| 인자 | 하는 일 |
+|---|---|
+| `-AppleLanguages "(en)" -AppleLocale en_US` | 그 실행만 영어 화면 · 미국 지역 서식(날짜 · 수)으로 연다. 시스템 인자라 Release 빌드에서도 먹고, 기기 설정은 바꾸지 않는다. 한국어로 열려면 `-AppleLanguages "(ko)" -AppleLocale ko_KR` |
+| `-UITestChapter '{"title":"1-01Genesis.txt","chapter":1,"translation":"KJV"}'` | 시작 장을 번역본까지 정한다 — `translation` 은 `"NKRV"` · `"KJV"` · `"BSB"`. 키가 없으면 개역개정이고(옛 JSON 그대로), 모르는 값(예 `"ESV"`)이면 장으로 읽지 못해 무시한다. Debug 전용 |
+
+```bash
+# 시뮬레이터 — 영어 화면으로 KJV 창세기 1장
+xcrun simctl launch <UDID> kr.co.carve.leetaek -AppleLanguages "(en)" -AppleLocale en_US \
+  -UITestChapter '{"title":"1-01Genesis.txt","chapter":1,"translation":"KJV"}' -UITestSkipFirstRunGuide -UITestSkipPatchnote -UITestNoAds
+# 시뮬레이터 — 한국어 화면으로 BSB 마태복음 17장 20절(BSB 에는 17:21 이 없다)
+xcrun simctl launch <UDID> kr.co.carve.leetaek -AppleLanguages "(ko)" -AppleLocale ko_KR \
+  -UITestChapter '{"title":"2-01Matthew.txt","chapter":17,"translation":"BSB"}' -UITestRoute verse/20
+```
+
+- **`-UITestChapter` 는 시작 장을 저장한다** — 다음 실행도 인자 없이 그 번역본으로 열린다. 번역본을 되돌리려면 다시 인자로 정한다.
+- **새로 만든 시뮬레이터는 기본 언어가 영어다.** 인자 없이 띄우면 영어 화면이고, 저장된 장이 없는 새 설치는 BSB 창세기 1장에서 시작한다
+  (결정 4 — 기기 첫 언어가 `ko` 가 아니면 BSB). 한국어 화면 · 개역개정을 볼 때는 위 한국어 인자와 `-UITestChapter` 를 함께 준다.
+- 단위 시험은 이 인자와 상관없이 스킴의 시험 언어 ko-KR 로 돈다(AGENTS.md 「검증」). 화면의 영어 확인은 이 인자로 연 시뮬레이터에서 하고, 문구 자체는 영어 시험(예 `CarveFeatureEnglishCopyTesting`)이 본다.
 
 ## 시뮬레이터 측정
 
