@@ -189,9 +189,19 @@ public struct FavoriteListView: View {
         }
     }
 
-    /// 「시편 23장 1절」. 장 단위는 필사 화면 헤더 · 차트와 같은 「장」 이다.
-    static func referenceText(_ key: FavoriteVerseKey) -> String {
-        "\(key.chapter.title.koreanTitle()) \(key.chapter.chapter)장 \(key.verse)절"
+    /// 역할: 카드 제목의 참조(「시편 23장 1절」 · 「Psalm 23:1」)를 `BibleReference` 로 짓는다.
+    ///   권 이름 · 장절 표기는 앱 언어를 따르고, 번역본 약칭은 붙이지 않는다 — 카드가 그 아래 줄에 따로 적는다(`translationText`).
+    /// 입력 · 출력: 즐겨찾기 키 · 로케일(nil 이면 앱 언어) → 참조 문자열.
+    /// 부작용: 없음.
+    static func referenceText(_ key: FavoriteVerseKey, locale: Locale? = nil) -> String {
+        BibleReference(chapter: key.chapter, verse: key.verse).text(locale: locale)
+    }
+
+    /// 역할: 카드의 번역본 약칭(「개역개정」 · 「KJV」). 같은 절이라도 번역본이 다르면 다른 카드다(영어 현지화 결정 1 · 11).
+    /// 입력 · 출력: 즐겨찾기 키 · 로케일(nil 이면 앱 언어) → 키의 번역본(장의 번역본) 약칭.
+    /// 부작용: 없음.
+    static func translationText(_ key: FavoriteVerseKey, locale: Locale? = nil) -> String {
+        key.translation.displayName(locale: locale)
     }
 
     /// 「9월 15일 추가」. 올해가 아니면 연도를 붙인다.
@@ -223,7 +233,7 @@ private struct FavoriteVerseCard: View {
                     Text(FavoriteListView.referenceText(favorite.key))
                         .font(.title3)
                         .foregroundStyle(CarveColor.ink)
-                    Text(favorite.key.translation.displayName)
+                    Text(FavoriteListView.translationText(favorite.key))
                         .font(CarveTypography.label)
                         .foregroundStyle(CarveColor.secondary)
                 }

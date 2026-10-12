@@ -17,7 +17,7 @@ public struct VerseDrawingHistoryFeature: Sendable {
     @ObservableState
     public struct State: Identifiable, Sendable {
         public var id: String
-        /// 성경 제목, 장
+        /// 성경 제목, 장(번역본 포함). 조회 · 회차 바꾸기는 이 번역본의 행만 본다 — 같은 절의 다른 번역본 필사는 섞이지 않는다.
         public var title: BibleChapter
         /// 성경 절
         public var verse: Int
@@ -34,7 +34,8 @@ public struct VerseDrawingHistoryFeature: Sendable {
                                                verse: 1)
         
         public init(title: BibleChapter, verse: Int) {
-            self.id = "DrewHistory.\(title.title.rawValue).\(title.chapter).\(verse)"
+            // 권 이름은 행과 같은 `StoredBookKey` 로 짓는다 — 개역개정은 지금과 같고(`rawValue`), 영어는 번역본 접두가 붙어 따로다.
+            self.id = "DrewHistory.\(StoredBookKey.titleName(for: title)).\(title.chapter).\(verse)"
             self.title = title
             self.verse = verse
         }
@@ -118,6 +119,7 @@ extension VerseDrawingHistoryFeature {
     /// 현재 절에 대한 필사 기록들을 비동기로 조회하고, 결과를 setDrawings 액션으로 반영.
     ///
     /// 조회는 저장소가 주는 **모든 행** 그대로다. 빈 행을 거르고 같은 내용을 하나로 묶는 것은 `setDrawings` 한 곳이다 (§8-7 · 정책 §7-3).
+    /// 저장소는 장(`state.title`)의 번역본 행만 준다 — KJV 장이면 KJV 행만 보인다(영어 현지화 결정 1).
     private func fetchDrawings(state: inout State) -> Effect<Action> {
         let title = state.title
         let verse = state.verse
@@ -137,6 +139,7 @@ extension VerseDrawingHistoryFeature {
     ///   - state: 목록 상태. 고른 행만 `isPresent == true` 로 바꾼다(표시용).
     ///   - drawing: 고른 회차.
     /// - Returns: 저장소의 대표 행을 옮긴 뒤 `setPresentDrawing` 을 보내는 효과. 순서는 저장 → 알림이다.
+    ///   대표는 장(`state.title`)의 번역본 행 사이에서만 옮긴다 — 같은 절의 다른 번역본 대표는 그대로다.
     private func handleSelectDrawing(state: inout State, drawing: VerseDrawingSnapshot) -> Effect<Action> {
         // 로컬 상태에서 선택된 행만 isPresent = true 로 갱신
         state.drawings = state.drawings.map { $0.withPresent($0.rowID == drawing.rowID) }

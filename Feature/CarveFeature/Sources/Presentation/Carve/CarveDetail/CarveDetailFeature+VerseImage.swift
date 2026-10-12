@@ -83,10 +83,11 @@ extension CarveDetailFeature {
         guard let verse = state.sentenceWithDrawingState.first(where: { $0.sentence.verse == handwriting.verse })?.sentence else {
             return .none
         }
+        // 출처의 번역본은 그 절이 든 장(지금 본문)의 번역본이다 — KJV 장의 절은 「… · KJV」(영어 현지화 결정 11).
         let content = VerseImageContent(
             sentence: verse.sentenceScript,
             setting: state.sentenceSetting,
-            reference: VerseImageContent.reference(chapter: verse.title, verse: verse.verse),
+            reference: VerseImageContent.reference(chapter: verse.title, verse: verse.verse, verseEnd: verse.verseEnd),
             handwriting: handwriting
         )
         return startVerseImageSave(state: &state, content)
