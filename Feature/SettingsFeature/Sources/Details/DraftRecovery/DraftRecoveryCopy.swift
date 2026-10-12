@@ -205,10 +205,13 @@ public enum DraftRecoveryCopy {
 
     // MARK: - 형식
 
-    /// "창세기 1:3". 책 이름을 읽지 못하면(모르는 원본 이름) 그 값을 그대로 보인다 — 어디인지 숨기지 않는다.
+    /// 「창세기 1장 3절 · KJV」 — 번역본이 섞이는 목록이라 약칭을 붙인다(영어 현지화 결정 11, `BibleReference`).
+    /// 권 · 번역본을 이 판이 모르면(모르는 원본 이름) 그 값을 그대로 보인다 — 어디인지 숨기지 않는다.
     public static func place(_ key: VerseDraftKey) -> String {
-        let title = BibleTitle(rawValue: key.title)?.koreanTitle() ?? key.title
-        return "\(title) \(key.chapter):\(key.verse)"
+        guard let chapter = key.bibleChapter else {
+            return "\(key.title) \(key.chapter):\(key.verse) · \(key.translation)"
+        }
+        return BibleReference(chapter: chapter, verse: key.verse, showsTranslation: true).text
     }
 
     public static func dateText(_ date: Date) -> String {

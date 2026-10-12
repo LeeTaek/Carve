@@ -154,4 +154,26 @@ struct AppCoordinatorNavigationTesting {
         await store.receive(\.root.presented.carve.moveToVerse, Self.verse)
         await store.finish()
     }
+
+    @Test("주간 요약에서 KJV 로 쓴 절 · 장을 고르면 번역본을 바꾸지 않고 그 KJV 절 · 장으로 간다")
+    func weeklySummaryOpensKJVVerseAndChapter() async throws {
+        let johnKJV = BibleChapter(title: .john, chapter: 3, translation: .KJV)
+        let verse = BibleVerse(title: johnKJV, verse: 16, sentence: "")
+
+        // 최근 절
+        let verseStore = makeCoordinatorStore(CoordinatorFixture.writing(path: [.chart(.initialState)]))
+        let verseChartID = try #require(verseStore.state.path.ids.last)
+        await verseStore.send(.path(.element(id: verseChartID, action: .chart(.drawingWeeklySummary(.openVerse(verse))))))
+        #expect(verseStore.state.pathScreens.isEmpty)
+        await verseStore.receive(\.root.presented.carve.moveToVerse, verse)
+        await verseStore.finish()
+
+        // 최근 장 · 가장 많이 쓴 장
+        let chapterStore = makeCoordinatorStore(CoordinatorFixture.writing(path: [.chart(.initialState)]))
+        let chapterChartID = try #require(chapterStore.state.path.ids.last)
+        await chapterStore.send(.path(.element(id: chapterChartID, action: .chart(.drawingWeeklySummary(.openChapter(johnKJV))))))
+        #expect(chapterStore.state.pathScreens.isEmpty)
+        await chapterStore.receive(\.root.presented.carve.moveToChapter, johnKJV)
+        await chapterStore.finish()
+    }
 }
