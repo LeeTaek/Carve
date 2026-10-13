@@ -2,7 +2,7 @@
 //  TranslationSwitchTesting.swift
 //  CarveFeatureTest
 //
-//  영어 현지화 결정 9 · 13 — 번역본 전환. 사이드바에서 번역본을 고르면 지금 장의 번역본만 바뀌고 같은 권 · 장 · 보던 절로 간다.
+//  영어 현지화 결정 9 · 13 · 19 — 번역본 전환. 헤더 제목 메뉴에서 번역본을 고르면 지금 장의 번역본만 바뀌고 같은 권 · 장 · 보던 절로 간다.
 //  그 번역본에 없는 절이면 바로 앞 절로, 전환은 장 이동과 같은 경로(캔버스 저장 flush → 새 장 load)를 탄다.
 //  `CarveNavigationFeature.State` · `CarveDetailFeature.State` 는 Equatable 이 아니라 상태 전이는 `reduce(into:)` 와 실제 Store 로,
 //  캔버스의 flush · load 순서는 `ChapterCanvasFeature` TestStore 로 본다.
@@ -134,7 +134,7 @@ struct TranslationSwitchTesting {
         }
     }
 
-    // MARK: 사이드바 고르기
+    // MARK: 헤더 제목 메뉴로 고르기(결정 19)
 
     @Test("번역본을 고르면 지금 장의 번역본만 바뀌고 같은 권 · 장 · 보던 절로 간다 — 헤더도 같은 장을 본다")
     func selectingTranslationKeepsBookChapterAndVerse() throws {
@@ -147,7 +147,7 @@ struct TranslationSwitchTesting {
             state.columnVisibility = .all
             state.drawnChapters = [.matthew: [1, 17]]
 
-            reduce(&state, .view(.translationSelected(.KJV)))
+            reduce(&state, .scope(.carveDetailAction(.scope(.headerAction(.view(.translationSelected(.KJV)))))))
 
             let kjv = BibleChapter(title: .matthew, chapter: 17, translation: .KJV)
             #expect(state.currentTitle == kjv)
@@ -173,7 +173,7 @@ struct TranslationSwitchTesting {
             state.columnVisibility = .all
             state.drawnChapters = [.matthew: [17]]
 
-            reduce(&state, .view(.translationSelected(.BSB)))
+            reduce(&state, .scope(.carveDetailAction(.scope(.headerAction(.view(.translationSelected(.BSB)))))))
 
             #expect(state.currentTitle == Self.bsbMatthew17)
             #expect(state.columnVisibility == .all)
@@ -204,11 +204,11 @@ struct TranslationSwitchTesting {
     func translationMenuTitles() {
         let korean = Locale(identifier: "ko")
         let english = Locale(identifier: "en")
-        #expect(CarveNavigationView.translationMenuTitle(.NKRV, locale: korean) == "개역개정")
-        #expect(CarveNavigationView.translationMenuTitle(.KJV, locale: korean) == "KJV · King James Version")
-        #expect(CarveNavigationView.translationMenuTitle(.BSB, locale: korean) == "BSB · Berean Standard Bible")
-        #expect(CarveNavigationView.translationMenuTitle(.NKRV, locale: english) == "NKRV · New Korean Revised Version")
-        #expect(CarveNavigationView.translationMenuTitle(.KJV, locale: english) == "KJV · King James Version")
+        #expect(HeaderView.translationMenuTitle(.NKRV, locale: korean) == "개역개정")
+        #expect(HeaderView.translationMenuTitle(.KJV, locale: korean) == "KJV · King James Version")
+        #expect(HeaderView.translationMenuTitle(.BSB, locale: korean) == "BSB · Berean Standard Bible")
+        #expect(HeaderView.translationMenuTitle(.NKRV, locale: english) == "NKRV · New Korean Revised Version")
+        #expect(HeaderView.translationMenuTitle(.KJV, locale: english) == "KJV · King James Version")
         // 메뉴는 `Translation.allCases` 순서다.
         #expect(Translation.allCases == [.NKRV, .KJV, .BSB])
     }
@@ -288,7 +288,7 @@ struct TranslationSwitchTesting {
             #expect(store.carveDetailState.viewingVerse == 21)
             try await waitUntil { spy.loadedChapters.value.contains(Self.nkrvMatthew17) }
 
-            store.send(.view(.translationSelected(.BSB)))
+            store.send(.scope(.carveDetailAction(.scope(.headerAction(.view(.translationSelected(.BSB)))))))
             try await waitUntil { spy.loadedChapters.value.last == Self.bsbMatthew17 }
             try await waitUntil { store.carveDetailState.sentenceWithDrawingState.count == 26 }
 

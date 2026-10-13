@@ -777,6 +777,40 @@
         }
       }
     },
+    "iPad 설정 앱의 새기다 화면에서 「언어」를 고르면 한국어와 English 중에 바꿀 수 있어요. 언어를 바꾸면 앱이 새로 시작돼요." : {
+      "comment" : "설정 › 언어 — 설명. 언어 이름(한국어 · English)은 옮기지 않는다",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In the Settings app, open Carve and choose Language to switch between 한국어 and English. The app restarts when the language changes."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPad 설정 앱의 새기다 화면에서 「언어」를 고르면 한국어와 English 중에 바꿀 수 있어요. 언어를 바꾸면 앱이 새로 시작돼요."
+          }
+        }
+      }
+    },
+    "iPad 설정에서 바꾸기" : {
+      "comment" : "설정 › 언어 — 설정 앱의 이 앱 화면을 여는 버튼",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Change in Settings"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPad 설정에서 바꾸기"
+          }
+        }
+      }
+    },
     "iPad의 저장 공간이 부족해 백업 파일을 만들지 못했어요. 공간을 비운 뒤 다시 시도해 주세요." : {
       "comment" : "설정 › 필사 백업 — 백업 만들기",
       "localizations" : {
@@ -1486,19 +1520,19 @@
         }
       }
     },
-    "기기 언어가 영어면 앱도 영어로 보여요." : {
+    "기기 언어가 영어면 앱도 영어로 보여요. 설정의 언어에서 앱 언어만 따로 바꿀 수도 있어요." : {
       "comment" : "패치노트 2.1 — 영어 화면 본문",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "If your device is in English, so is the app."
+            "value" : "If your device is in English, so is the app. You can also change just the app's language in Settings › Language."
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "기기 언어가 영어면 앱도 영어로 보여요."
+            "value" : "기기 언어가 영어면 앱도 영어로 보여요. 설정의 언어에서 앱 언어만 따로 바꿀 수도 있어요."
           }
         }
       }
@@ -3541,23 +3575,6 @@
         }
       }
     },
-    "사이드바에서 번역본을 바꿔 필사해요. 필사는 번역본마다 따로 저장돼요." : {
-      "comment" : "패치노트 2.1 — 영어 성경 본문",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Switch translations in the sidebar. Writing is saved per translation."
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "사이드바에서 번역본을 바꿔 필사해요. 필사는 번역본마다 따로 저장돼요."
-          }
-        }
-      }
-    },
     "사진 보관함" : {
       "comment" : "설정 › 의견 보내기",
       "localizations" : {
@@ -3838,6 +3855,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "설정의 필사 백업에서 암호를 건 파일로 필사를 백업하고 다시 불러와요. 백업 만들기는 광고 제거 구매에 포함되고, 불러오기는 무료예요."
+          }
+        }
+      }
+    },
+    "성경 번역본은 앱 언어와 따로 골라요. 필사 화면의 제목을 눌러 바꿔요." : {
+      "comment" : "설정 › 언어 — 설명",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bible translations are chosen separately from the app language. Tap the title on the writing screen to switch."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "성경 번역본은 앱 언어와 따로 골라요. 필사 화면의 제목을 눌러 바꿔요."
           }
         }
       }
@@ -4223,6 +4257,23 @@
         }
       }
     },
+    "앱 언어" : {
+      "comment" : "설정 › 언어",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App Language"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "앱 언어"
+          }
+        }
+      }
+    },
     "앱 정보" : {
       "comment" : "설정 › 앱 버전",
       "localizations" : {
@@ -4270,6 +4321,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "앱을 완전히 종료한 뒤 다시 열면 계정과 저장소를 다시 확인해요."
+          }
+        }
+      }
+    },
+    "언어" : {
+      "comment" : "설정 사이드바 › 화면 — 앱 언어 행",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Language"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "언어"
           }
         }
       }
@@ -5858,6 +5926,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "제목"
+          }
+        }
+      }
+    },
+    "제목을 눌러 번역본을 바꿔 필사해요. 필사는 번역본마다 따로 저장돼요." : {
+      "comment" : "패치노트 2.1 — 영어 성경 본문",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap the title to switch translations. Writing is saved per translation."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "제목을 눌러 번역본을 바꿔 필사해요. 필사는 번역본마다 따로 저장돼요."
           }
         }
       }

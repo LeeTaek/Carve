@@ -20,6 +20,8 @@ public extension InfoPlist {
                 "CFBundleShortVersionString": "$(MARKETING_VERSION)",
                 "CFBundleDisplayName": "새기다",
                 "UILaunchStoryboardName": "LaunchScreen",
+                // 기기의 선호 언어가 하나뿐이어도 설정 앱의 이 앱 화면에 「언어」 항목을 보인다 — 설정 › 언어가 그 화면을 연다(영어 현지화 결정 20).
+                "UIPrefersShowingLanguageSettings": true,
                 "UISupportedInterfaceOrientations": "UIInterfaceOrientationPortrait",
                 "FeedbackAddress": "$(FEEDBACK_ADDRESS)",
                 // 절 이미지 저장(시안 G1) — 추가 전용 권한만 쓴다. 보관함을 읽지 않으므로 읽기 권한 문구는 두지 않는다.

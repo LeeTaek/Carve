@@ -416,10 +416,10 @@ extension AppCoordinatorFeature {
     ///
     /// | 경로 | 여는 화면 |
     /// |---|---|
-    /// | `navigation` | 성경 탐색 — 헤더 제목을 누른 것처럼 탐색 열을 모두 연다 |
+    /// | `navigation` | 성경 탐색 — 탐색 열을 모두 열고 지금 장을 고른 목록으로 시작한다(`CarveNavigationFeature.openNavigation`) |
     /// | `chart` · `favorites` | 기록 차트 · 즐겨찾기 목록을 필사 화면 위에 쌓는다 |
     /// | `settings` | 설정의 첫 화면(iCloud) |
-    /// | `settings/<하위>` | 설정의 그 화면 — `icloud` · `draftRecovery` · `backup` · `widget` · `appearance` · `help` · `patchnote` · `sendFeedback` · `appVersion` · `removeAds` |
+    /// | `settings/<하위>` | 설정의 그 화면 — 하위 이름은 사이드바 행마다 하나(`routeName`): `icloud` · `backup` · `appearance` · `language` · `removeAds` 등 |
     /// | `verse/<절 번호>` | 시작 장(`-UITestChapter` 또는 마지막으로 연 장)의 그 절 |
     ///
     /// 이름은 대소문자를 가리지 않는다. 모르는 경로는 로그만 남기고 무시한다 — 앱은 경로 없이 시작한다.
@@ -460,8 +460,8 @@ extension AppCoordinatorFeature {
         state.pendingLaunchRoute = nil
         switch route {
         case .navigation:
-            // 헤더 제목을 누른 것과 같다 — 탐색 열을 모두 열고 현재 장을 고른 목록으로 시작한다. 서재 버튼은 열고 닫기를 바꾸므로 쓰지 않는다.
-            return .send(.root(.presented(.carve(.scope(.carveDetailAction(.scope(.headerAction(.view(.titleDidTapped)))))))))
+            // 탐색 열을 모두 열고 현재 장을 고른 목록으로 시작한다. 서재 버튼은 열고 닫기를 바꾸고, 헤더 제목은 번역본 메뉴라(결정 19) 쓰지 않는다.
+            return .send(.root(.presented(.carve(.openNavigation))))
         case .chart:
             state.path.append(.chart(.initialState))
         case .favorites:
@@ -486,6 +486,7 @@ private extension SettingsFeature.SidebarItem {
         case .backup: "backup"
         case .widget: "widget"
         case .appearance: "appearance"
+        case .language: "language"
         case .help: "help"
         case .patchnote: "patchnote"
         case .sendFeedback: "sendFeedback"
@@ -502,6 +503,7 @@ private extension SettingsFeature.SidebarItem {
         case .backup: .backup(.initialState)
         case .widget: .widget(.initialState)
         case .appearance: .appearance(.initialState)
+        case .language: .language(.initialState)
         case .help: .help(.initialState)
         case .patchnote: .patchnote(.initialState)
         case .sendFeedback: .sendFeedback(.initialState)

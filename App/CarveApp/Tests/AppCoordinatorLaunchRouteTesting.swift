@@ -28,9 +28,9 @@ struct AppCoordinatorLaunchRouteTesting {
         .root(.presented(.launchProgress(.syncCompleted)))
     }
 
-    /// 헤더 제목을 눌렀다 — 성경 탐색의 열을 모두 연다(`CarveNavigationFeature` 의 기존 액션).
-    private static func isTitleTap(_ action: AppCoordinatorFeature.Action) -> Bool {
-        guard case .root(.presented(.carve(.scope(.carveDetailAction(.scope(.headerAction(.view(.titleDidTapped)))))))) = action else {
+    /// 성경 탐색의 열을 모두 연다(`CarveNavigationFeature.openNavigation` — 헤더 제목은 번역본 메뉴다, 결정 19).
+    private static func isOpenNavigation(_ action: AppCoordinatorFeature.Action) -> Bool {
+        guard case .root(.presented(.carve(.openNavigation))) = action else {
             return false
         }
         return true
@@ -53,6 +53,7 @@ struct AppCoordinatorLaunchRouteTesting {
     func parsesEverySettingsSubroute() {
         let names: [String: SettingsFeature.SidebarItem] = [
             "icloud": .iCloud, "draftRecovery": .draftRecovery, "backup": .backup, "widget": .widget, "appearance": .appearance,
+            "language": .language,
             "help": .help, "patchnote": .patchnote, "sendFeedback": .sendFeedback, "appVersion": .appVersion, "removeAds": .removeAds
         ]
         #expect(Set(names.values) == Set(SettingsFeature.SidebarItem.allCases))
@@ -152,7 +153,7 @@ struct AppCoordinatorLaunchRouteTesting {
         await favorites.finish()
     }
 
-    @Test("navigation — 헤더 제목을 누른 것처럼 성경 탐색의 열을 모두 연다")
+    @Test("navigation — 성경 탐색의 열을 모두 열고 지금 장을 고른 목록으로 시작한다")
     func navigationRouteOpensNavigationColumns() async {
         let store = makeCoordinatorStore(CoordinatorFixture.launching(launchRoute: .navigation))
 
@@ -160,7 +161,7 @@ struct AppCoordinatorLaunchRouteTesting {
             $0.pendingLaunchRoute = nil
         }
         #expect(store.state.carve?.columnVisibility == .detailOnly)
-        await store.receive(Self.isTitleTap)
+        await store.receive(Self.isOpenNavigation)
         #expect(store.state.carve?.columnVisibility == .all)
         #expect(store.state.carve?.carveDetailState.headerState.isNavigationPresented == true)
         // 탐색을 열면 현재 성경의 필사 기록을 읽는다 — 이 시험 번들에서는 인메모리 시험 저장소를 읽기만 한다.

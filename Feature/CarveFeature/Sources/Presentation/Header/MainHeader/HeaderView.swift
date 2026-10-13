@@ -170,9 +170,17 @@ public struct HeaderView: View {
         }
     }
 
+    /// 헤더 제목 — 누르면 번역본 메뉴가 열린다(영어 현지화 결정 19). 고르면 같은 권 · 장 · 지금 보던 절로 간다(결정 9 —
+    /// `CarveNavigationFeature.switchTranslation`). 탐색 열은 서재 버튼으로 연다.
     private var titleButton: some View {
-        Button {
-            send(.titleDidTapped)
+        Menu {
+            Picker(selection: translationSelection) {
+                ForEach(Translation.allCases, id: \.self) { translation in
+                    Text(verbatim: Self.translationMenuTitle(translation)).tag(translation)
+                }
+            } label: {
+                Text("번역본", bundle: .module)
+            }
         } label: {
             VStack(spacing: 2) {
                 Text(verbatim: Self.titleText(store.currentTitle))
@@ -180,22 +188,38 @@ public struct HeaderView: View {
                     // 세로 화면에서 광고와 함께 두면 폭이 좁아진다. 줄바꿈 대신 줄여 그린다.
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
-                // 번역본 약칭은 지금 장의 번역본이다(결정 11).
-                Text(verbatim: Self.subtitleText(store.currentTitle))
-                    .font(CarveTypography.caption)
-                    .foregroundStyle(CarveColor.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                    .opacity(1 - collapseProgress)
-                    .frame(height: 14 * (1 - collapseProgress), alignment: .top)
+                // 번역본 약칭은 지금 장의 번역본이다(결정 11). 끝의 ⌄ 로 눌러서 번역본을 바꿀 수 있음을 알린다.
+                HStack(spacing: CarveSpacing.xxSmall) {
+                    Text(verbatim: Self.subtitleText(store.currentTitle))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                    Image(systemName: "chevron.down")
+                        .imageScale(.small)
+                        .accessibilityHidden(true)
+                }
+                .font(CarveTypography.caption)
+                .foregroundStyle(CarveColor.secondary)
+                .opacity(1 - collapseProgress)
+                .frame(height: 14 * (1 - collapseProgress), alignment: .top)
             }
             .foregroundStyle(CarveColor.ink)
             .multilineTextAlignment(.center)
             .padding(.horizontal, CarveSpacing.medium)
             .contentShape(Rectangle())
         }
+        .menuStyle(.button)
         .buttonStyle(.plain)
+        .tint(CarveColor.ink)
         .accessibilityLabel(Self.titleAccessibilityLabel(store.currentTitle))
+        .accessibilityValue(Text(verbatim: store.currentTitle.translation.fullName))
+    }
+
+    /// 번역본 메뉴의 선택값. 고르면 리듀서로 보낸다 — 지금 번역본은 공유 장(`currentTitle`)이 정한다.
+    private var translationSelection: Binding<Translation> {
+        Binding(
+            get: { store.currentTitle.translation },
+            set: { send(.translationSelected($0)) }
+        )
     }
 }
 
@@ -219,10 +243,19 @@ extension HeaderView {
         return "\(chapter.translation.displayName(locale: locale)) · \(testament) / \(chapter.title.localizedName(locale: locale))"
     }
 
-    /// 역할: 제목 버튼의 VoiceOver 이름(「창세기 1장, 성경과 장 목록 열기」).
-    /// 입력 · 출력: 지금 장 · 로케일(nil 이면 앱 언어) → 제목과 버튼이 하는 일.
+    /// 역할: 제목 메뉴의 VoiceOver 이름(「창세기 1장, 번역본 바꾸기」). 지금 번역본은 값(`accessibilityValue`)으로 읽는다.
+    /// 입력 · 출력: 지금 장 · 로케일(nil 이면 앱 언어) → 제목과 메뉴가 하는 일.
     /// 부작용: 없음.
     static func titleAccessibilityLabel(_ chapter: BibleChapter, locale: Locale? = nil) -> String {
-        CarveFeatureCatalog.string("\(titleText(chapter, locale: locale)), 성경과 장 목록 열기", locale: locale)
+        CarveFeatureCatalog.string("\(titleText(chapter, locale: locale)), 번역본 바꾸기", locale: locale)
+    }
+
+    /// 역할: 번역본 메뉴의 항목 이름 — 약칭과 전체 이름. 둘이 같으면(한국어의 개역개정) 한 번만 적는다.
+    /// 입력 · 출력: 번역본 · 로케일(nil 이면 앱 언어) → 「KJV · King James Version」 · 「개역개정」.
+    /// 부작용: 없음.
+    static func translationMenuTitle(_ translation: Translation, locale: Locale? = nil) -> String {
+        let abbreviation = translation.displayName(locale: locale)
+        let fullName = translation.fullName(locale: locale)
+        return abbreviation == fullName ? abbreviation : "\(abbreviation) · \(fullName)"
     }
 }

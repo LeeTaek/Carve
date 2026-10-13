@@ -63,6 +63,8 @@ public struct CarveNavigationFeature: Sendable {
         case drawingRecordLoaded(BibleTitle, BibleTitleDrawingRecord)
         /// 다른 화면(즐겨찾기 목록)에서 즐겨찾기가 바뀌었다 — 필사 화면의 별 표시를 다시 읽는다
         case refreshFavorites
+        /// 탐색 열을 모두 열고 지금 장을 고른 목록으로 시작한다 — 실행 인자 `-UITestRoute navigation` 이 쓴다(서재 버튼은 열고 닫기를 바꾼다)
+        case openNavigation
         case view(View)
         case scope(ScopeAction)
         
@@ -92,8 +94,6 @@ public struct CarveNavigationFeature: Sendable {
             case chapterTapped(BibleChapter)
             /// 사이드바가 화면에 나타남 — 하단 광고가 없거나 만료됐으면 받는다
             case sidebarAppeared
-            /// 사이드바 하단 번역본 고르기에서 번역본을 고름 — 같은 권 · 장 · 지금 보던 절로 간다(결정 9)
-            case translationSelected(Translation)
         }
     }
 
@@ -164,8 +164,12 @@ public struct CarveNavigationFeature: Sendable {
                     }
                 )
                 
-            case .scope(.carveDetailAction(.scope(.headerAction(.view(.titleDidTapped))))):
-                return handleTitleDidTapped(state: &state)
+            case .scope(.carveDetailAction(.scope(.headerAction(.view(.translationSelected(let translation)))))):
+                // 헤더 제목 메뉴에서 고른 번역본(결정 19) — 같은 권 · 장 · 지금 보던 절로 바꾼다(결정 9).
+                return switchTranslation(state: &state, to: translation)
+
+            case .openNavigation:
+                return openNavigation(state: &state)
 
             case .scope(.carveDetailAction(.scope(.headerAction(.view(.libraryDidTapped))))):
                 return toggleNavigation(state: &state)
@@ -244,9 +248,6 @@ public struct CarveNavigationFeature: Sendable {
             case .view(.sidebarAppeared):
                 return .send(.scope(.sidebarAdSlotAction(.startLoad)))
 
-            case .view(.translationSelected(let translation)):
-                return switchTranslation(state: &state, to: translation)
-
             default: return .none
             }
         }
@@ -259,8 +260,9 @@ public struct CarveNavigationFeature: Sendable {
 
 
 extension CarveNavigationFeature {
-    /// 제목(타이틀)을 탭했을 때 사이드바/장 선택 상태를 동기화하고 SplitView를 모두 표시.
-    private func handleTitleDidTapped(state: inout State) -> Effect<Action> {
+    /// 탐색 열을 모두 연다 — 사이드바 · 장 선택 상태를 지금 장에 맞추고 SplitView 를 모두 표시한다.
+    /// 헤더 제목은 번역본 메뉴라(결정 19) 실행 인자 경로(`openNavigation`)만 이 함수를 부른다.
+    private func openNavigation(state: inout State) -> Effect<Action> {
         let effect = selectCurrentChapter(state: &state)
         state.columnVisibility = .all
         syncHeaderNavigationState(state: &state)

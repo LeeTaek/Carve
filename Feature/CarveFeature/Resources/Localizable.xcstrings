@@ -52,19 +52,19 @@
         }
       }
     },
-    "%@, 성경과 장 목록 열기" : {
-      "comment" : "헤더 제목 버튼 VoiceOver 이름 — 참조(창세기 1장)",
+    "%@, 번역본 바꾸기" : {
+      "comment" : "헤더 제목 메뉴의 VoiceOver 이름. %@ 는 「창세기 1장」 같은 제목 — 누르면 번역본 메뉴가 열린다",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@, open book and chapter list"
+            "value" : "%@, change translation"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@, 성경과 장 목록 열기"
+            "value" : "%@, 번역본 바꾸기"
           }
         }
       }
@@ -837,7 +837,7 @@
       }
     },
     "번역본" : {
-      "comment" : "사이드바 번역본 고르기 이름 · VoiceOver 이름",
+      "comment" : "헤더 제목 메뉴 안의 번역본 고르기 이름",
       "localizations" : {
         "en" : {
           "stringUnit" : {

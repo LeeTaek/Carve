@@ -29,13 +29,13 @@ struct CarveFeatureEnglishCopyTesting {
         #expect(HeaderView.titleText(BibleChapter(title: .psalms, chapter: 23), locale: Self.english) == "Psalm 23")
         #expect(HeaderView.subtitleText(Self.kjvGenesis, locale: Self.english) == "KJV · Old Testament / Genesis")
         #expect(HeaderView.subtitleText(Self.nkrvMatthew, locale: Self.english) == "NKRV · New Testament / Matthew")
-        #expect(HeaderView.titleAccessibilityLabel(Self.kjvGenesis, locale: Self.english) == "Genesis 1, open book and chapter list")
+        #expect(HeaderView.titleAccessibilityLabel(Self.kjvGenesis, locale: Self.english) == "Genesis 1, change translation")
 
         // 한국어 기기는 KJV 를 봐도 「창세기 1장」 이다(결정 3).
         #expect(HeaderView.titleText(Self.kjvGenesis) == "창세기 1장")
         #expect(HeaderView.subtitleText(Self.kjvGenesis) == "KJV · 구약 / 창세기")
         #expect(HeaderView.subtitleText(Self.nkrvMatthew) == "개역개정 · 신약 / 마태복음")
-        #expect(HeaderView.titleAccessibilityLabel(Self.kjvGenesis) == "창세기 1장, 성경과 장 목록 열기")
+        #expect(HeaderView.titleAccessibilityLabel(Self.kjvGenesis) == "창세기 1장, 번역본 바꾸기")
     }
 
     // MARK: 성경 탐색

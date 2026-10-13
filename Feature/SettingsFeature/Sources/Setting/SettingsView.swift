@@ -66,6 +66,10 @@ public struct SettingsView: View {
                 NavigationLink(value: SettingsFeature.SidebarItem.appearance) {
                     sidebarRow(SettingsCatalog.string("화면 모드"), value: appearanceMode.title)
                 }
+                // 언어는 iOS 앱별 언어를 따른다 — 바꾸면 앱이 새로 시작하므로 설정이 떠 있는 동안 값이 바뀌지 않는다(결정 20).
+                NavigationLink(value: SettingsFeature.SidebarItem.language) {
+                    sidebarRow(SettingsCatalog.string("언어"), value: AppLanguage.current().nativeName)
+                }
             } header: {
                 Text("화면", bundle: .module)
             }
@@ -178,6 +182,10 @@ public struct SettingsView: View {
         case .appearance:
             if let store = store.scope(state: \.path?.appearance, action: \.path.appearance) {
                 AppearanceSettingsView(store: store)
+            }
+        case .language:
+            if let store = store.scope(state: \.path?.language, action: \.path.language) {
+                LanguageSettingsView(store: store)
             }
         case .help:
             if let store = store.scope(state: \.path?.help, action: \.path.help) {

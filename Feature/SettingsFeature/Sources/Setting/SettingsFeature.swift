@@ -66,6 +66,8 @@ public struct SettingsFeature: Sendable {
         case widget(WidgetSettingsFeature)
         /// 화면 모드 — 시스템 설정 · 라이트 · 다크.
         case appearance(AppearanceSettingsFeature)
+        /// 앱 언어 — 지금 언어와 iPad 설정의 이 앱 화면 열기(영어 현지화 결정 20).
+        case language(LanguageSettingsFeature)
         /// 필사 사용법과 첫 안내 다시 보기.
         case help(HelpFeature)
         /// 앱 업데이트 변경 사항.
@@ -86,6 +88,7 @@ public struct SettingsFeature: Sendable {
         case backup
         case widget
         case appearance
+        case language
         case help
         case patchnote
         case sendFeedback
@@ -152,6 +155,7 @@ extension SettingsFeature.Path.State {
         case .backup: .backup
         case .widget: .widget
         case .appearance: .appearance
+        case .language: .language
         case .help: .help
         case .patchnote: .patchnote
         case .sendFeedback: .sendFeedback
@@ -170,6 +174,7 @@ extension SettingsFeature.SidebarItem {
         case .backup: .backup(.initialState)
         case .widget: .widget(.initialState)
         case .appearance: .appearance(.initialState)
+        case .language: .language(.initialState)
         case .help: .help(.initialState)
         case .patchnote: .patchnote(.initialState)
         case .sendFeedback: .sendFeedback(.initialState)
