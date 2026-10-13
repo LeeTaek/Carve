@@ -15,6 +15,8 @@ import UIComponents
 @ViewAction(for: RemoveAdsFeature.self)
 public struct RemoveAdsView: View {
     @Bindable public var store: StoreOf<RemoveAdsFeature>
+    /// 화면 언어 — 앱 안에서 언어를 고르면 행 · 가격 설명 · 안내 문구도 바로 따라온다(즉시 전환 단계 3).
+    @Environment(\.locale) private var locale
 
     public init(store: StoreOf<RemoveAdsFeature>) {
         self.store = store
@@ -29,12 +31,12 @@ public struct RemoveAdsView: View {
 
                 if store.isAdFree {
                     CarveSettingsRow(
-                        SettingsCatalog.string("광고 없이 쓰는 중"),
-                        description: SettingsCatalog.string("광고 제거를 구매했어요."),
-                        value: SettingsCatalog.string("구매함")
+                        SettingsCatalog.string("광고 없이 쓰는 중", locale: locale),
+                        description: SettingsCatalog.string("광고 제거를 구매했어요.", locale: locale),
+                        value: SettingsCatalog.string("구매함", locale: locale)
                     )
                 } else {
-                    CarveSettingsRow(SettingsCatalog.string("광고 없이 쓰기"), description: priceDescription, value: "")
+                    CarveSettingsRow(SettingsCatalog.string("광고 없이 쓰기", locale: locale), description: priceDescription, value: "")
                     actions
                 }
 
@@ -46,7 +48,7 @@ public struct RemoveAdsView: View {
                     .fixedSize(horizontal: false, vertical: true)
 
                 if let notice = store.notice {
-                    Text(notice.message)
+                    Text(notice.message(locale: locale))
                         .font(CarveTypography.caption)
                         .foregroundStyle(CarveColor.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -87,25 +89,28 @@ public struct RemoveAdsView: View {
 
     private var priceDescription: String {
         if let product = store.product {
-            return SettingsCatalog.string("한 번 구매 · \(product.displayPrice)")
+            return SettingsCatalog.string("한 번 구매 · \(product.displayPrice)", locale: locale)
         }
-        return store.isLoadingProduct ? SettingsCatalog.string("가격을 불러오는 중") : SettingsCatalog.string("한 번 구매")
+        return store.isLoadingProduct
+            ? SettingsCatalog.string("가격을 불러오는 중", locale: locale)
+            : SettingsCatalog.string("한 번 구매", locale: locale)
     }
 }
 
 private extension RemoveAdsFeature.Notice {
-    var message: String {
+    /// 안내 한 줄 — 뷰는 환경 `locale` 을 넘긴다. 상태에는 안내의 종류만 두고 문구는 그릴 때 만든다.
+    func message(locale: Locale) -> String {
         switch self {
         case .pending:
-            SettingsCatalog.string("구매 승인을 기다리고 있어요. 승인되면 광고가 사라져요.")
+            SettingsCatalog.string("구매 승인을 기다리고 있어요. 승인되면 광고가 사라져요.", locale: locale)
         case .nothingToRestore:
-            SettingsCatalog.string("이 Apple 계정에서 복원할 구매 내역이 없어요.")
+            SettingsCatalog.string("이 Apple 계정에서 복원할 구매 내역이 없어요.", locale: locale)
         case .productUnavailable:
-            SettingsCatalog.string("지금은 구매할 수 없어요. 잠시 뒤 다시 시도해 주세요.")
+            SettingsCatalog.string("지금은 구매할 수 없어요. 잠시 뒤 다시 시도해 주세요.", locale: locale)
         case .purchaseFailed:
-            SettingsCatalog.string("구매를 마치지 못했어요. 다시 시도해 주세요.")
+            SettingsCatalog.string("구매를 마치지 못했어요. 다시 시도해 주세요.", locale: locale)
         case .restoreFailed:
-            SettingsCatalog.string("구매 내역을 확인하지 못했어요. 다시 시도해 주세요.")
+            SettingsCatalog.string("구매 내역을 확인하지 못했어요. 다시 시도해 주세요.", locale: locale)
         }
     }
 }

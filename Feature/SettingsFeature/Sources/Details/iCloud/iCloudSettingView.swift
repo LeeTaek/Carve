@@ -15,6 +15,9 @@ import UIComponents
 @ViewAction(for: CloudSettingsFeature.self)
 public struct CloudSettingView: View {
     @Bindable public var store: StoreOf<CloudSettingsFeature>
+    /// 화면 언어 — 앱 안에서 언어를 고르면 계정 상태 · 동기화 활동 · 보류 안내 문구도 바로 따라온다(즉시 전환 단계 3).
+    /// 떠 있는 대화상자(리듀서가 만든 문구)는 띄운 순간의 언어로 남는다.
+    @Environment(\.locale) private var locale
     
     public init(store: StoreOf<CloudSettingsFeature>) {
         self.store = store
@@ -31,19 +34,34 @@ public struct CloudSettingView: View {
     private var accountStatusCopy: AccountStatusCopy {
         switch store.availability {
         case .checking:
-            AccountStatusCopy(title: SettingsCatalog.string("iCloud 상태를 확인하는 중이에요"), detail: "")
+            AccountStatusCopy(title: SettingsCatalog.string("iCloud 상태를 확인하는 중이에요", locale: locale), detail: "")
         case .available where store.connectionHold != nil:
             // 로그인과 연결을 섞지 않는다 — 이번 실행은 보류라 아직 주고받지 않는다(아래 보류 안내가 까닭과 할 일을 말한다).
-            AccountStatusCopy(title: SettingsCatalog.string("iCloud에 로그인돼 있어요"), detail: SettingsCatalog.string("아직 이 기기의 필사는 iCloud와 연결되지 않았어요."))
+            AccountStatusCopy(
+                title: SettingsCatalog.string("iCloud에 로그인돼 있어요", locale: locale),
+                detail: SettingsCatalog.string("아직 이 기기의 필사는 iCloud와 연결되지 않았어요.", locale: locale)
+            )
         case .available:
-            AccountStatusCopy(title: SettingsCatalog.string("iCloud에 연결돼 있어요"), detail: SettingsCatalog.string("필사가 같은 계정의 다른 기기로 전해져요."))
+            AccountStatusCopy(
+                title: SettingsCatalog.string("iCloud에 연결돼 있어요", locale: locale),
+                detail: SettingsCatalog.string("필사가 같은 계정의 다른 기기로 전해져요.", locale: locale)
+            )
         case .noAccount:
-            AccountStatusCopy(title: SettingsCatalog.string("iCloud에 로그인돼 있지 않아요"), detail: SettingsCatalog.string("지금은 이 기기에만 저장돼요."))
+            AccountStatusCopy(
+                title: SettingsCatalog.string("iCloud에 로그인돼 있지 않아요", locale: locale),
+                detail: SettingsCatalog.string("지금은 이 기기에만 저장돼요.", locale: locale)
+            )
         case .restricted:
-            AccountStatusCopy(title: SettingsCatalog.string("iCloud 사용이 제한돼 있어요"), detail: SettingsCatalog.string("기기 설정에서 허용해야 동기화할 수 있어요."))
+            AccountStatusCopy(
+                title: SettingsCatalog.string("iCloud 사용이 제한돼 있어요", locale: locale),
+                detail: SettingsCatalog.string("기기 설정에서 허용해야 동기화할 수 있어요.", locale: locale)
+            )
         case .unknown:
             // 확인 실패와 "계정 없음" 을 같은 문구로 쓰지 않는다.
-            AccountStatusCopy(title: SettingsCatalog.string("iCloud 상태를 확인하지 못했어요"), detail: SettingsCatalog.string("계정이 없다는 뜻은 아니에요. 잠시 뒤 다시 열어 보세요."))
+            AccountStatusCopy(
+                title: SettingsCatalog.string("iCloud 상태를 확인하지 못했어요", locale: locale),
+                detail: SettingsCatalog.string("계정이 없다는 뜻은 아니에요. 잠시 뒤 다시 열어 보세요.", locale: locale)
+            )
         }
     }
 
@@ -70,22 +88,23 @@ public struct CloudSettingView: View {
         VStack(alignment: .leading, spacing: CarveSpacing.xSmall) {
             switch store.activity.summary {
             case .noRecord:
-                activityLine(SettingsCatalog.string("이번 실행에서는 아직 주고받은 기록이 없어요"), emphasized: false)
+                activityLine(SettingsCatalog.string("이번 실행에서는 아직 주고받은 기록이 없어요", locale: locale), emphasized: false)
             case .running:
-                activityLine(SettingsCatalog.string("동기화하는 중이에요"), emphasized: false)
+                activityLine(SettingsCatalog.string("동기화하는 중이에요", locale: locale), emphasized: false)
             case .failed(let failures):
                 // 해결되지 않은 실패를 모두 보인다 — 하나만 보이면 나머지가 해결된 것처럼 읽힌다.
                 ForEach(failures, id: \.self) { failure in
                     activityLine(failureText(failure), emphasized: true)
                 }
             case .succeeded(let lastImport, let lastExport):
+                // 「3분 전」 같은 상대 시각도 문장과 같은 언어로 적는다.
                 if let lastImport {
-                    let relative = lastImport.formatted(.relative(presentation: .named))
-                    activityLine(SettingsCatalog.string("마지막으로 받음 · \(relative)"), emphasized: false)
+                    let relative = lastImport.formatted(.relative(presentation: .named).locale(locale))
+                    activityLine(SettingsCatalog.string("마지막으로 받음 · \(relative)", locale: locale), emphasized: false)
                 }
                 if let lastExport {
-                    let relative = lastExport.formatted(.relative(presentation: .named))
-                    activityLine(SettingsCatalog.string("마지막으로 올림 · \(relative)"), emphasized: false)
+                    let relative = lastExport.formatted(.relative(presentation: .named).locale(locale))
+                    activityLine(SettingsCatalog.string("마지막으로 올림 · \(relative)", locale: locale), emphasized: false)
                 }
             }
         }
@@ -96,7 +115,7 @@ public struct CloudSettingView: View {
     /// 실행 중에 다시 연결하지 않으므로 「다시 시도」 · 로딩 표시를 두지 않는다(2026-09-28 결정).
     private func holdRow(_ hold: LegacySeparationHold) -> some View {
         let copy = CloudSettingsFeature.holdCopy(
-            hold, availability: store.availability, connectsOnRelaunch: store.connectsOnRelaunch
+            hold, availability: store.availability, connectsOnRelaunch: store.connectsOnRelaunch, locale: locale
         )
         return VStack(alignment: .leading, spacing: CarveSpacing.xSmall) {
             Text(copy.title)
@@ -120,12 +139,12 @@ public struct CloudSettingView: View {
     /// 받지 못한 것과 올리지 못한 것은 사용자에게 뜻이 다르다.
     private func failureText(_ failure: CloudSyncFailure) -> String {
         switch failure {
-        case .accountUnavailable: SettingsCatalog.string("iCloud 계정을 확인해 주세요")
-        case .accountCheckFailed: SettingsCatalog.string("iCloud 계정 상태를 확인하지 못했어요")
-        case .importFailed: SettingsCatalog.string("iCloud에서 필사를 받아오지 못했어요")
-        case .exportFailed: SettingsCatalog.string("필사를 iCloud에 올리지 못했어요 · 이 기기에는 저장돼 있어요")
-        case .setupFailed: SettingsCatalog.string("iCloud 동기화를 준비하지 못했어요")
-        case .unknown: SettingsCatalog.string("동기화 중 문제가 생겼어요")
+        case .accountUnavailable: SettingsCatalog.string("iCloud 계정을 확인해 주세요", locale: locale)
+        case .accountCheckFailed: SettingsCatalog.string("iCloud 계정 상태를 확인하지 못했어요", locale: locale)
+        case .importFailed: SettingsCatalog.string("iCloud에서 필사를 받아오지 못했어요", locale: locale)
+        case .exportFailed: SettingsCatalog.string("필사를 iCloud에 올리지 못했어요 · 이 기기에는 저장돼 있어요", locale: locale)
+        case .setupFailed: SettingsCatalog.string("iCloud 동기화를 준비하지 못했어요", locale: locale)
+        case .unknown: SettingsCatalog.string("동기화 중 문제가 생겼어요", locale: locale)
         }
     }
 

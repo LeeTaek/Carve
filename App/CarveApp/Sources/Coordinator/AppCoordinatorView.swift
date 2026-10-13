@@ -81,25 +81,9 @@ public struct AppCoordinatorView: View {
         .overlay {
             if store.showsRelaunchGuidance {
                 // 로그인 완료와 연결 완료를 구분한다 — 이 실행은 계속 이 기기에만 저장한다. 기다릴 것이 없으므로 로딩을 띄우지 않는다.
-                VStack(spacing: 16) {
-                    Text("iCloud 로그인을 확인했어요", bundle: .main, comment: "재실행 안내 카드 제목 — iCloud 로그인은 됐다")
-                    Text(
-                        "아직 이 기기의 필사는 iCloud와 연결되지 않았어요.\n\(CloudSettingsFeature.relaunchToConnect)",
-                        bundle: .main,
-                        comment: "재실행 안내 카드 본문 — %@ 는 설정의 「앱을 다시 열어 연결」 안내 문장"
-                    )
-                    .font(.caption)
-                    .multilineTextAlignment(.center)
-                    Button {
-                        store.send(.relaunchGuidanceDismissed)
-                    } label: {
-                        Text("확인", bundle: .main, comment: "안내 카드 닫기")
-                    }
+                RelaunchGuidanceCard {
+                    store.send(.relaunchGuidanceDismissed)
                 }
-                .padding(24)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
-                .accessibilityElement(children: .contain)
-                .accessibilityIdentifier("relaunchGuidance")
             }
         }
         .overlay {
@@ -164,6 +148,44 @@ public struct AppCoordinatorView: View {
         .preferredColorScheme(appearanceMode.colorScheme)
         // 설정 › 화면 › 언어에서 고른 언어를 이 창 전체에 내려보낸다 — 앱을 다시 시작하지 않고 바로 바뀐다(보관함 「Carve 앱 언어 즉시 전환」).
         .modifier(AppLanguageEnvironment())
+    }
+}
+
+/// 재실행 안내 카드 — iCloud 로그인은 확인했지만 이 실행은 아직 연결되지 않았다는 것과 앱을 다시 열라는 안내.
+///
+/// 본문에 넣는 설정의 안내 문장(`CloudSettingsFeature.relaunchToConnect`)은 미리 만드는 문구라 환경 `locale` 을 넘겨야 한다.
+/// `AppCoordinatorView` 자신은 루트 언어 수식어(`AppLanguageEnvironment`) 바깥이라 거기서 읽은 locale 은 고르기 전 언어다 —
+/// 수식어 안쪽(오버레이)에 그리는 이 하위 뷰가 환경 `locale` 을 읽는다(즉시 전환 단계 3).
+private struct RelaunchGuidanceCard: View {
+    /// 「확인」 — 카드를 닫는다. 코디네이터 스토어로 보내는 일은 부르는 쪽이 정한다.
+    private let onDismiss: () -> Void
+    /// 화면 언어 — 앱 안에서 언어를 고르면 본문의 안내 문장도 바로 따라온다.
+    @Environment(\.locale) private var locale
+
+    init(onDismiss: @escaping () -> Void) {
+        self.onDismiss = onDismiss
+    }
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Text("iCloud 로그인을 확인했어요", bundle: .main, comment: "재실행 안내 카드 제목 — iCloud 로그인은 됐다")
+            Text(
+                "아직 이 기기의 필사는 iCloud와 연결되지 않았어요.\n\(CloudSettingsFeature.relaunchToConnect(locale: locale))",
+                bundle: .main,
+                comment: "재실행 안내 카드 본문 — %@ 는 설정의 「앱을 다시 열어 연결」 안내 문장"
+            )
+            .font(.caption)
+            .multilineTextAlignment(.center)
+            Button {
+                onDismiss()
+            } label: {
+                Text("확인", bundle: .main, comment: "안내 카드 닫기")
+            }
+        }
+        .padding(24)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("relaunchGuidance")
     }
 }
 

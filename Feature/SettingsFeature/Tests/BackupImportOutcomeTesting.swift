@@ -21,6 +21,8 @@ import ComposableArchitecture
 @Suite("설정 — 필사 백업 · 불러오기 결과와 오류 안내")
 @MainActor
 struct BackupImportOutcomeTesting {
+    /// 문구를 꺼내는 언어 — 시험 언어(스킴 ko-KR)와 같은 한국어라 기대 문구는 한국어 원문 그대로다.
+    private static let koreanLocale = Locale(identifier: "ko_KR")
     private typealias Feature = BackupImportFeature
 
     /// 적용 결과를 받는 데까지 — 미리보기에서 「불러오기」 를 누르고 결과를 받는다.
@@ -50,7 +52,7 @@ struct BackupImportOutcomeTesting {
         let result = Feature.ImportResult.blocked(block, doneChapters: 2, tally: Feature.Tally(new: 2, same: 1))
 
         await apply(reporting: .success(report), expecting: result)
-        #expect(BackupCopy.resultTitle(result)
+        #expect(BackupCopy.resultTitle(result, locale: Self.koreanLocale)
             == "불러오기를 멈췄어요. iCloud 에 로그인한 뒤 앱을 다시 열면 불러올 수 있어요. 넣은 장 2개는 그대로 있어요.")
         #expect(!result.isCompleted)
     }
@@ -61,8 +63,8 @@ struct BackupImportOutcomeTesting {
         let result = Feature.ImportResult.blocked(.accountUnconfirmed, doneChapters: 0, tally: Feature.Tally())
 
         await apply(reporting: .success(report), expecting: result)
-        #expect(BackupCopy.resultTitle(result).contains(BackupCopy.importBlocked(.accountUnconfirmed)))
-        #expect(BackupCopy.resultTitle(result).hasSuffix("넣은 장 0개는 그대로 있어요."))
+        #expect(BackupCopy.resultTitle(result, locale: Self.koreanLocale).contains(BackupCopy.importBlocked(.accountUnconfirmed, locale: Self.koreanLocale)))
+        #expect(BackupCopy.resultTitle(result, locale: Self.koreanLocale).hasSuffix("넣은 장 0개는 그대로 있어요."))
     }
 
     @Test("iCloud 계정이 바뀌어 멈추면 「iCloud 계정이 바뀌어 불러오기를 멈췄어요. 넣은 장 N개는 그대로 있어요.」 와 그때까지의 실제 수")
@@ -75,7 +77,7 @@ struct BackupImportOutcomeTesting {
         let result = Feature.ImportResult.accountChanged(doneChapters: 3, tally: Feature.Tally(new: 1, archived: 2))
 
         await apply(reporting: .success(report), expecting: result)
-        #expect(BackupCopy.resultTitle(result) == "iCloud 계정이 바뀌어 불러오기를 멈췄어요. 넣은 장 3개는 그대로 있어요.")
+        #expect(BackupCopy.resultTitle(result, locale: Self.koreanLocale) == "iCloud 계정이 바뀌어 불러오기를 멈췄어요. 넣은 장 3개는 그대로 있어요.")
         #expect(result.tally?.inserted == 3)
     }
 
@@ -85,7 +87,7 @@ struct BackupImportOutcomeTesting {
         let result = Feature.ImportResult.generationChanged(tally: Feature.Tally())
 
         await apply(reporting: .success(report), expecting: result)
-        #expect(BackupCopy.resultTitle(result).hasPrefix("적용 중에 모든 필사가 지워져 멈췄어요."))
+        #expect(BackupCopy.resultTitle(result, locale: Self.koreanLocale).hasPrefix("적용 중에 모든 필사가 지워져 멈췄어요."))
     }
 
     @Test("저장에 실패하면 넣은 장은 그대로라고 알리고, 다시 열면 이어서 불러올 수 있다고 말한다")
@@ -94,8 +96,8 @@ struct BackupImportOutcomeTesting {
 
         await apply(reporting: .failure(.storeWriteFailed), expecting: result)
         #expect(result.tally == nil)
-        #expect(BackupCopy.resultTitle(result).contains("넣은 장은 그대로 있어요."))
-        #expect(BackupCopy.resultTitle(result).contains("이어서 불러올 수 있어요."))
+        #expect(BackupCopy.resultTitle(result, locale: Self.koreanLocale).contains("넣은 장은 그대로 있어요."))
+        #expect(BackupCopy.resultTitle(result, locale: Self.koreanLocale).contains("이어서 불러올 수 있어요."))
     }
 
     // MARK: 다 넣음 — 실제 수
@@ -107,18 +109,18 @@ struct BackupImportOutcomeTesting {
 
         await apply(reporting: .success(.completed(ImportFixture.tally)), expecting: result)
         #expect(result.isCompleted)
-        #expect(BackupCopy.resultTitle(result) == "불러오기를 마쳤어요.")
-        #expect(BackupCopy.insertedLine(tally) == "넣은 필사 7개 — 새 필사 2 · 이전 필사 기록 4 · 지운 절이라 기록에만 1")
-        #expect(BackupCopy.skippedLine(tally) == "건너뛴 것 4개 — 같은 필사 3 · 비운 기록 1")
-        #expect(BackupCopy.notInsertedLine(tally.unsupported) == "넣지 못한 것 2개 — 이 앱이 읽을 수 없는 내용이에요")
-        #expect(BackupCopy.savedLocally == "이 기기에 저장됐어요. iCloud 전송은 따로 진행돼요.")
+        #expect(BackupCopy.resultTitle(result, locale: Self.koreanLocale) == "불러오기를 마쳤어요.")
+        #expect(BackupCopy.insertedLine(tally, locale: Self.koreanLocale) == "넣은 필사 7개 — 새 필사 2 · 이전 필사 기록 4 · 지운 절이라 기록에만 1")
+        #expect(BackupCopy.skippedLine(tally, locale: Self.koreanLocale) == "건너뛴 것 4개 — 같은 필사 3 · 비운 기록 1")
+        #expect(BackupCopy.notInsertedLine(tally.unsupported, locale: Self.koreanLocale) == "넣지 못한 것 2개 — 이 앱이 읽을 수 없는 내용이에요")
+        #expect(BackupCopy.savedLocally(locale: Self.koreanLocale) == "이 기기에 저장됐어요. iCloud 전송은 따로 진행돼요.")
     }
 
     @Test("새로 넣은 것이 없으면 마쳤다고만 말한다")
     func completedWithoutInsertions() {
         let result = Feature.ImportResult.completed(Feature.Tally(same: 5))
 
-        #expect(BackupCopy.resultTitle(result) == "불러오기를 마쳤어요. 새로 넣은 필사는 없어요.")
+        #expect(BackupCopy.resultTitle(result, locale: Self.koreanLocale) == "불러오기를 마쳤어요. 새로 넣은 필사는 없어요.")
         #expect(result.tally?.inserted == 0)
     }
 
@@ -152,8 +154,8 @@ struct BackupImportOutcomeTesting {
         // 적용하지 않았다 — 검사만 했고 접근은 닫았다.
         #expect(log.value == [.accessOpened(url), .inspected(url, password: ImportFixture.password), .accessClosed(url)])
         #expect(failure.allowsRetry == allowsRetry)
-        #expect(!BackupCopy.inspectFailed(failure).isEmpty)
-        #expect(BackupCopy.inspectFailedNote == "확인하는 단계에서 멈춰서 필사는 바뀌지 않았어요.")
+        #expect(!BackupCopy.inspectFailed(failure, locale: Self.koreanLocale).isEmpty)
+        #expect(BackupCopy.inspectFailedNote(locale: Self.koreanLocale) == "확인하는 단계에서 멈춰서 필사는 바뀌지 않았어요.")
 
         if allowsRetry {
             await store.send(.view(.retryTapped)) {
@@ -178,8 +180,8 @@ struct BackupImportOutcomeTesting {
             log: log
         )
 
-        #expect(BackupCopy.retryTitle(.wrongPasswordOrDamaged) == "암호 다시 입력")
-        #expect(BackupCopy.retryTitle(.insufficientSpace) == BackupCopy.retryAction)
+        #expect(BackupCopy.retryTitle(.wrongPasswordOrDamaged, locale: Self.koreanLocale) == "암호 다시 입력")
+        #expect(BackupCopy.retryTitle(.insufficientSpace, locale: Self.koreanLocale) == BackupCopy.retryAction(locale: Self.koreanLocale))
         await store.send(.view(.retryTapped)) {
             $0.step = .password(.file(url))
         }

@@ -18,6 +18,8 @@ import UIComponents
 @ViewAction(for: SendFeedbackFeature.self)
 public struct SendFeedbackView: View {
     @Bindable public var store: StoreOf<SendFeedbackFeature>
+    /// 화면 언어 — 앱 안에서 언어를 고르면 묶음 제목 · 분류 이름 · 안내 문구도 바로 따라온다(즉시 전환 단계 3).
+    @Environment(\.locale) private var locale
 
     private static let titleLimit = 20
     private static let bodyLimit = 3000
@@ -36,25 +38,25 @@ public struct SendFeedbackView: View {
                     mailUnavailableNotice
                 }
 
-                CarveSettingsSection(SettingsCatalog.string("문의 분류")) {
+                CarveSettingsSection(SettingsCatalog.string("문의 분류", locale: locale)) {
                     feedbackTypeRow
                 }
 
-                CarveSettingsSection(SettingsCatalog.string("제목")) {
+                CarveSettingsSection(SettingsCatalog.string("제목", locale: locale)) {
                     titleField
                 }
 
-                CarveSettingsSection(SettingsCatalog.string("내용")) {
+                CarveSettingsSection(SettingsCatalog.string("내용", locale: locale)) {
                     bodyField
                 }
 
-                CarveSettingsSection(SettingsCatalog.string("첨부 사진 · 선택")) {
+                CarveSettingsSection(SettingsCatalog.string("첨부 사진 · 선택", locale: locale)) {
                     attachmentSection
                 }
 
                 CarveDivider()
 
-                CarveSettingsSection(SettingsCatalog.string("보내기 전에 확인해 주세요")) {
+                CarveSettingsSection(SettingsCatalog.string("보내기 전에 확인해 주세요", locale: locale)) {
                     agreements
                 }
 
@@ -114,14 +116,14 @@ public struct SendFeedbackView: View {
         Menu {
             Picker(selection: $store.feedbackInfo.feedbackType.sending(\.setFeedbackType)) {
                 ForEach(UserFeedback.FeedbackType.allCases, id: \.self) { type in
-                    Text(SendFeedbackFeature.feedbackTypeTitle(type))
+                    Text(SendFeedbackFeature.feedbackTypeTitle(type, locale: locale))
                 }
             } label: {
                 Text("문의 분류", bundle: .module)
             }
         } label: {
             HStack(spacing: CarveSpacing.small) {
-                Text(SendFeedbackFeature.feedbackTypeTitle(store.feedbackInfo.feedbackType))
+                Text(SendFeedbackFeature.feedbackTypeTitle(store.feedbackInfo.feedbackType, locale: locale))
                     .font(CarveTypography.body)
                     .foregroundStyle(CarveColor.ink)
                 Spacer(minLength: 0)
@@ -136,12 +138,12 @@ public struct SendFeedbackView: View {
             .contentShape(fieldShape)
         }
         .accessibilityLabel(Text("문의 분류", bundle: .module))
-        .accessibilityValue(SendFeedbackFeature.feedbackTypeTitle(store.feedbackInfo.feedbackType))
+        .accessibilityValue(SendFeedbackFeature.feedbackTypeTitle(store.feedbackInfo.feedbackType, locale: locale))
     }
 
     private var titleField: some View {
         VStack(alignment: .trailing, spacing: CarveSpacing.xxSmall) {
-            TextField(SettingsCatalog.string("제목을 적어 주세요"), text: $store.feedbackInfo.title.sending(\.view.setTitle))
+            TextField(SettingsCatalog.string("제목을 적어 주세요", locale: locale), text: $store.feedbackInfo.title.sending(\.view.setTitle))
                 .font(CarveTypography.body)
                 .foregroundStyle(CarveColor.ink)
                 .onChange(of: store.feedbackInfo.title) { _, newValue in
@@ -199,7 +201,7 @@ public struct SendFeedbackView: View {
                 Button {
                     send(.setAttachment(type))
                 } label: {
-                    Label(type.title, systemImage: type.image)
+                    Label(type.title(locale: locale), systemImage: type.image)
                 }
             }
         } label: {
@@ -272,15 +274,15 @@ public struct SendFeedbackView: View {
     private var agreements: some View {
         VStack(alignment: .leading, spacing: CarveSpacing.xxSmall) {
             AgreementCheckbox(
-                title: SettingsCatalog.string("작성한 의견을 개발자에게 보내요"),
-                detail: SettingsCatalog.string("필수"),
+                title: SettingsCatalog.string("작성한 의견을 개발자에게 보내요", locale: locale),
+                detail: SettingsCatalog.string("필수", locale: locale),
                 isChecked: store.agreeToDefaultNotice
             ) {
                 send(.toggleDefaultAgreement)
             }
             AgreementCheckbox(
-                title: SettingsCatalog.string("기종과 OS 정보를 함께 보내요"),
-                detail: SettingsCatalog.string("필수 · 의견을 확인한 뒤 바로 지워요."),
+                title: SettingsCatalog.string("기종과 OS 정보를 함께 보내요", locale: locale),
+                detail: SettingsCatalog.string("필수 · 의견을 확인한 뒤 바로 지워요.", locale: locale),
                 isChecked: store.agreeToGetDeviceInfo
             ) {
                 send(.togglePrivacyAgreement)
@@ -299,11 +301,11 @@ public struct SendFeedbackView: View {
             }
             .buttonStyle(SubmitButtonStyle())
             .disabled(!store.isFormComplete)
-            .accessibilityHint(store.missingRequirement?.hint ?? "")
+            .accessibilityHint(store.missingRequirement?.hint(locale: locale) ?? "")
             .accessibilityIdentifier("sendFeedback.send")
 
             if let missing = store.missingRequirement {
-                Text(missing.hint)
+                Text(missing.hint(locale: locale))
                     .font(CarveTypography.caption)
                     .foregroundStyle(CarveColor.secondary)
                     // 버튼의 접근성 힌트로 이미 읽는다.

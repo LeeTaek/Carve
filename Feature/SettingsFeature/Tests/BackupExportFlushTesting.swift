@@ -7,6 +7,7 @@
 //
 
 @testable import SettingsFeature
+import ClientInterfaces
 import Domain
 import Foundation
 import Testing
@@ -21,6 +22,8 @@ import ComposableArchitecture
 @Suite("설정 — 필사 백업 · flush 와 파일 만들기")
 @MainActor
 struct BackupExportFlushTesting {
+    /// 문구를 꺼내는 언어 — 시험 언어(스킴 ko-KR)와 같은 한국어라 기대 문구는 한국어 원문 그대로다.
+    private static let koreanLocale = Locale(identifier: "ko_KR")
     private typealias Feature = BackupExportFeature
 
     // MARK: flush 결과
@@ -55,6 +58,30 @@ struct BackupExportFlushTesting {
         #expect(exporter.calls.value == [StubBackupExporter.Call(password: "abcd1234", fileName: BackupTestTime.fileName)])
         #expect(exporter.discarded.value.isEmpty)
         #expect(store.state.exportedFile?.suggestedName == "새기다 필사 백업 2026-10-06")
+    }
+
+    @Test("기본 이름의 앞부분은 만드는 순간의 화면 언어다 — 앱 안에서 영어를 고르면 「Carve Backup 날짜」 로 만든다(즉시 전환 단계 3)")
+    func defaultNameFollowsInAppLanguage() async {
+        // Given: 설정 › 화면 › 언어에서 영어를 고른 저장소
+        let storage = InMemoryStorage()
+        withDependencies {
+            $0.defaultInMemoryStorage = storage
+        } operation: {
+            @Shared(.appLanguageOverride) var languageOverride: AppLanguage?
+            $languageOverride.withLock { $0 = .english }
+        }
+        let exporter = StubBackupExporter()
+        let requestID = UUID(5)
+        let store = makeExportStore(.flushing(requestID), exporter: exporter)
+        store.dependencies.defaultInMemoryStorage = storage
+        store.exhaustivity = .off
+
+        // When: 마지막 필기가 남아 파일을 만든다
+        await store.send(.canvasFlushFinished(id: requestID, outcome: .durable))
+        await store.receive(\.exportFinished)
+
+        // Then: 저장되는 파일 이름은 그 순간의 화면 언어(영어)로 지었다 — 날짜 부분은 언어와 무관하다
+        #expect(exporter.calls.value == [StubBackupExporter.Call(password: "abcd1234", fileName: "Carve Backup 2026-10-06.carvebackup")])
     }
 
     @Test("flush 가 durable 이 아니면 파일을 만들지 않고 안내한다 — 다시 시도는 새 id 로 묻고, 앞 id 의 늦은 답은 버린다",
@@ -171,8 +198,8 @@ struct BackupExportFlushTesting {
 
     @Test("진행 문구 — 장을 모으는 동안은 장 수를, 다 모은 뒤에는 암호를 걸어 쓰고 확인한다고 말한다")
     func progressCopy() {
-        #expect(BackupCopy.exporting(nil) == "백업 파일을 만드는 중이에요")
-        #expect(BackupCopy.exporting(Feature.ExportProgress(done: 3, total: 10)) == "필사를 모으는 중이에요 · 3/10장")
-        #expect(BackupCopy.exporting(Feature.ExportProgress(done: 10, total: 10)) == "암호를 걸어 파일을 쓰고, 다시 열어 확인하는 중이에요")
+        #expect(BackupCopy.exporting(nil, locale: Self.koreanLocale) == "백업 파일을 만드는 중이에요")
+        #expect(BackupCopy.exporting(Feature.ExportProgress(done: 3, total: 10), locale: Self.koreanLocale) == "필사를 모으는 중이에요 · 3/10장")
+        #expect(BackupCopy.exporting(Feature.ExportProgress(done: 10, total: 10), locale: Self.koreanLocale) == "암호를 걸어 파일을 쓰고, 다시 열어 확인하는 중이에요")
     }
 }
