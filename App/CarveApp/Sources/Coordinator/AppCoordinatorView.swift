@@ -191,7 +191,8 @@ private struct RelaunchGuidanceCard: View {
 
 /// 앱 안에서 고른 화면 언어를 환경 `locale` 로 내려보낸다.
 ///
-/// 고른 적이 없으면 기기 · 앱별 언어(`autoupdatingCurrent`)를 그대로 쓴다. 고른 뒤에는 그 언어로 바꾼 locale 이다 — 지역 · 시간제는 기기 것을 둔다.
+/// 고른 적이 없으면 iOS 선호 언어에서 앱이 옮긴 첫 언어(번들이 고른 언어와 같다), 고른 뒤에는 그 언어로 바꾼 locale 이다 — 지역 · 시간제는 기기 것을 둔다.
+/// 기기 locale(`autoupdatingCurrent`)을 그대로 넣지 않는다 — 선호 언어에 ko · en 이 없으면 그 언어가 번들과 달라 문구가 섞인다(`AppLanguage.displayLocale(override:preferredLanguages:base:)`).
 /// 규칙은 리듀서 · effect · 인프라가 쓰는 `AppLanguage.displayLocale()` 하나다 — 화면 문구와 리듀서가 만든 문구가 같은 언어가 된다.
 /// 수식어는 늘 같은 자리에 둔다 — 조건에 따라 붙였다 떼면 화면 identity 가 바뀌어 필사 화면이 장을 다시 읽는다(onAppear → 캔버스 load).
 private struct AppLanguageEnvironment: ViewModifier {

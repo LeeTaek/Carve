@@ -171,13 +171,13 @@ struct CarveDetailVerseImageTesting {
         store.send(Self.request)
         try await waitUntil { store.imageSaveNotice == .saved }
 
-        // 앱 안에서 고른 언어가 없으면 이미지의 언어는 iOS 가 고른 언어(`autoupdatingCurrent` — 시험은 ko-KR)다.
+        // 앱 안에서 고른 언어가 없으면 이미지의 언어는 iOS 선호 언어에서 앱이 옮긴 첫 언어(`AppLanguage.displayLocale()` — 시험은 ko-KR)다.
         #expect(renderer.rendered.value == [VerseImageContent(
             sentence: Self.sentence,
             setting: store.sentenceSetting,
             reference: "시편 23장 1절 · 개역개정",
             handwriting: Self.handwriting,
-            locale: .autoupdatingCurrent
+            locale: AppLanguage.korean.locale()
         )])
         #expect(photos.added.value == [Data("png".utf8)])
         #expect(store.isSavingVerseImage == false)

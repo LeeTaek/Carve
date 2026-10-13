@@ -155,8 +155,8 @@ struct LanguageSettingsFeatureTesting {
 
     // MARK: - 리듀서 · effect · 인프라의 화면 언어(즉시 전환 단계 3)
 
-    @Test("앱 안에서 고른 언어가 없으면 리듀서가 얻는 화면 언어는 iOS 가 고른 언어(autoupdatingCurrent)다")
-    func displayLocaleWithoutOverrideFollowsCurrentLocale() {
+    @Test("앱 안에서 고른 언어가 없으면 리듀서가 얻는 화면 언어는 iOS 선호 언어에서 앱이 옮긴 첫 언어다 — 시험은 ko-KR")
+    func displayLocaleWithoutOverrideFollowsPreferredLanguages() {
         // Given: 고른 언어를 넣지 않은 저장소
         let locale = withDependencies {
             $0.defaultInMemoryStorage = InMemoryStorage()
@@ -165,8 +165,35 @@ struct LanguageSettingsFeatureTesting {
             AppLanguage.displayLocale()
         }
 
-        // Then
-        #expect(locale.language.languageCode == Locale.autoupdatingCurrent.language.languageCode)
+        // Then: 스킴이 시험 언어 · 지역을 ko-KR 로 고정한다(`Workspace.swift` 의 `testLanguage` · `testRegion`)
+        #expect(locale.language.languageCode?.identifier == "ko")
+        #expect(locale.region?.identifier == "KR")
+    }
+
+    @Test(
+        "고른 언어가 없으면 선호 언어에서 앱이 옮긴 첫 언어로, 하나도 없으면 개발 언어 ko 로 — 번들과 같은 규칙이라 문구가 섞이지 않는다",
+        arguments: [
+            // 2026-10-13 iPadOS 26.2: 일본어 하나뿐인 기기는 번들이 ko 를 고르는데 `Locale.current` 는 en_JP 였다 — 그대로 쓰면 한 화면에 ko · en 이 섞였다.
+            (["ja-JP"], "ko"),
+            (["ja-JP", "en-JP"], "en"),
+            (["en-US", "ko-KR"], "en"),
+            (["ko-KR", "en-KR"], "ko")
+        ] as [([String], String)]
+    )
+    func displayLocaleWithoutOverrideFollowsBundleRule(preferredLanguages: [String], expected: String) {
+        let locale = AppLanguage.displayLocale(override: nil, preferredLanguages: preferredLanguages, base: Locale(identifier: "en_JP"))
+
+        #expect(locale.language.languageCode?.identifier == expected)
+        // 지역은 기준 로케일(기기) 것 그대로다.
+        #expect(locale.region?.identifier == "JP")
+    }
+
+    @Test("앱 안에서 고른 언어가 있으면 선호 언어와 상관없이 그 언어다")
+    func displayLocaleOverrideWinsOverPreferredLanguages() {
+        let locale = AppLanguage.displayLocale(override: .english, preferredLanguages: ["ko-KR"], base: Locale(identifier: "ko_KR"))
+
+        #expect(locale.language.languageCode?.identifier == "en")
+        #expect(locale.region?.identifier == "KR")
     }
 
     @Test("앱 안에서 영어를 고르면 리듀서가 얻는 화면 언어는 en 이고, 지역은 기기 것 그대로다")
