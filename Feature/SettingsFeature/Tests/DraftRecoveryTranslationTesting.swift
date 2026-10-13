@@ -48,6 +48,8 @@ private let translationInks: [Data] = (0..<4).map { offset in
 @Suite("설정 — 확인이 필요한 필기 · 번역본")
 @MainActor
 struct DraftRecoveryTranslationTesting {
+    /// 문구를 꺼내는 언어 — 시험 언어(스킴 ko-KR)와 같은 한국어. 리듀서는 고른 언어가 없어 이 언어로 결과 한 줄을 만든다.
+    private nonisolated static let koreanLocale = Locale(identifier: "ko_KR")
     private nonisolated static let accountA = AccountScope(key: "acct-a")
     private nonisolated static let korean = BibleChapter(title: .genesis, chapter: 1)
     private nonisolated static let english = BibleChapter(title: .genesis, chapter: 1, translation: .KJV)
@@ -179,7 +181,7 @@ struct DraftRecoveryTranslationTesting {
 
             // Then: KJV 필사만 바뀌고, 열린 KJV 장에 알렸다
             #expect(store.state.importMessage == DraftRecoveryFeature.ImportMessage(
-                text: DraftRecoveryCopy.imported(item.place, previousKept: true), needsAttention: false
+                text: DraftRecoveryCopy.imported(item.place, previousKept: true, locale: Self.koreanLocale), needsAttention: false
             ))
             #expect(try await fixture.current(Self.english) == translationInks[2])
             #expect(try await fixture.current(Self.korean) == translationInks[3])

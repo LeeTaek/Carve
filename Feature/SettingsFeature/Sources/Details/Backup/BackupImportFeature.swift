@@ -477,250 +477,268 @@ extension DependencyValues {
 
 /// 「백업 불러오기」 의 문구. 「원문」 은 공통 규칙의 문장 그대로다 — 고치지 않는다.
 /// 문구는 모듈 카탈로그에 ko · en 으로 두고 `SettingsCatalog` 로 꺼낸다 — 수는 카탈로그 복수형이다(영어 현지화 결정 5 · 8).
+/// 언어는 부르는 쪽이 넘긴다 — 시트 뷰(`BackupImportView`)는 환경 `locale` 을 넘긴다(즉시 전환 단계 3).
 extension BackupCopy {
     // MARK: 멈춘 불러오기
 
     /// 멈춘 작업을 찾는 동안.
-    static var importLoading: String { SettingsCatalog.string("불러오기를 준비하는 중이에요") }
+    static func importLoading(locale: Locale) -> String { SettingsCatalog.string("불러오기를 준비하는 중이에요", locale: locale) }
 
     /// 멈춘 불러오기 카드의 제목 — 같은 계정이면 이어 할 수 있고, 아니면 왜 잇지 않는가.
-    static func pendingJobTitle(_ job: BackupImportJob) -> String {
-        if job.canResume { return SettingsCatalog.string("멈춘 불러오기가 있어요") }
+    static func pendingJobTitle(_ job: BackupImportJob, locale: Locale) -> String {
+        if job.canResume { return SettingsCatalog.string("멈춘 불러오기가 있어요", locale: locale) }
         // 지금 연결된 계정이 있는데 대상 계정과 다르다 — 다른 계정에서 시작한 작업이다(원문).
-        guard job.writeBlock != nil else { return SettingsCatalog.string("다른 iCloud 계정에서 시작한 불러오기예요") }
+        guard job.writeBlock != nil else { return SettingsCatalog.string("다른 iCloud 계정에서 시작한 불러오기예요", locale: locale) }
         // 지금은 연결되지 않아 어느 계정인지 견줄 수 없다 — 다른 계정이라고 단정하지 않는다.
-        return SettingsCatalog.string("멈춘 불러오기를 지금은 이어서 할 수 없어요")
+        return SettingsCatalog.string("멈춘 불러오기를 지금은 이어서 할 수 없어요", locale: locale)
     }
 
     /// 멈춘 불러오기가 어디까지 넣었는가.
-    static func pendingJobProgress(_ job: BackupImportJob) -> String {
-        SettingsCatalog.string("\(job.totalChapters)장 중 \(job.doneChapters.count)장까지 넣었어요 · 넣은 필사 \(job.tally.insertCount)개")
+    static func pendingJobProgress(_ job: BackupImportJob, locale: Locale) -> String {
+        SettingsCatalog.string(
+            "\(job.totalChapters)장 중 \(job.doneChapters.count)장까지 넣었어요 · 넣은 필사 \(job.tally.insertCount)개",
+            locale: locale
+        )
     }
 
     /// 멈춘 불러오기로 무엇을 할 수 있는가.
-    static func pendingJobGuidance(_ job: BackupImportJob) -> String {
+    static func pendingJobGuidance(_ job: BackupImportJob, locale: Locale) -> String {
         if job.canResume {
-            return SettingsCatalog.string("이어서 불러오면 남은 장부터 넣어요. 암호는 저장하지 않아서 백업 암호를 다시 입력해야 해요.")
+            return SettingsCatalog.string("이어서 불러오면 남은 장부터 넣어요. 암호는 저장하지 않아서 백업 암호를 다시 입력해야 해요.", locale: locale)
         }
         if let block = job.writeBlock {
-            return importBlocked(block) + " " + SettingsCatalog.string("이미 넣은 필사는 그대로 있어요.")
+            return importBlocked(block, locale: locale) + " " + SettingsCatalog.string("이미 넣은 필사는 그대로 있어요.", locale: locale)
         }
-        return SettingsCatalog.string("지금 계정의 필사에는 이어서 넣지 않아요. 이미 넣은 필사는 그대로 있어요.")
+        return SettingsCatalog.string("지금 계정의 필사에는 이어서 넣지 않아요. 이미 넣은 필사는 그대로 있어요.", locale: locale)
     }
 
-    static var resumeAction: String { SettingsCatalog.string("이어서 불러오기") }
-    static var restartAction: String { SettingsCatalog.string("이 계정으로 처음부터") }
-    static var discardJobAction: String { SettingsCatalog.string("버리기") }
+    static func resumeAction(locale: Locale) -> String { SettingsCatalog.string("이어서 불러오기", locale: locale) }
+    static func restartAction(locale: Locale) -> String { SettingsCatalog.string("이 계정으로 처음부터", locale: locale) }
+    static func discardJobAction(locale: Locale) -> String { SettingsCatalog.string("버리기", locale: locale) }
     /// 버리기의 뜻 — 넣은 필사는 지우지 않는다.
-    static var discardJobNote: String {
-        SettingsCatalog.string("버리면 멈춘 불러오기의 기록과 이 iPad에 남겨 둔 백업 사본만 지워요. 이미 넣은 필사는 그대로 있어요.")
+    static func discardJobNote(locale: Locale) -> String {
+        SettingsCatalog.string("버리면 멈춘 불러오기의 기록과 이 iPad에 남겨 둔 백업 사본만 지워요. 이미 넣은 필사는 그대로 있어요.", locale: locale)
     }
 
     // MARK: 파일 · 암호
 
     /// 파일을 고르기 전 — 먼저 확인해 보여 주고, 「불러오기」 를 눌러야 넣는다.
-    static var chooseFilePrompt: String {
+    static func chooseFilePrompt(locale: Locale) -> String {
         SettingsCatalog.string("""
             불러올 백업 파일(.carvebackup)을 골라 주세요. 파일을 먼저 확인해 무엇이 들어오는지 보여 드리고, \
             ‘불러오기’를 눌러야 이 기기에 넣어요.
-            """)
+            """, locale: locale)
     }
-    static var chooseFileAction: String { SettingsCatalog.string("파일 고르기") }
-    static var chooseOtherFileAction: String { SettingsCatalog.string("다른 파일 고르기") }
+    static func chooseFileAction(locale: Locale) -> String { SettingsCatalog.string("파일 고르기", locale: locale) }
+    static func chooseOtherFileAction(locale: Locale) -> String { SettingsCatalog.string("다른 파일 고르기", locale: locale) }
 
     /// 고른 파일 한 줄 — 이름만 보인다(크기 · 시각은 읽지 않는다).
-    static func chosenFile(_ name: String) -> String {
-        SettingsCatalog.string("고른 파일: \(name)")
+    static func chosenFile(_ name: String, locale: Locale) -> String {
+        SettingsCatalog.string("고른 파일: \(name)", locale: locale)
     }
 
-    static var importPasswordPlaceholder: String { SettingsCatalog.string("백업 암호") }
+    static func importPasswordPlaceholder(locale: Locale) -> String { SettingsCatalog.string("백업 암호", locale: locale) }
 
     /// 암호를 받는 까닭 — 출처마다.
-    static func importPasswordPrompt(_ source: BackupImportFeature.Source) -> String {
+    static func importPasswordPrompt(_ source: BackupImportFeature.Source, locale: Locale) -> String {
         switch source {
-        case .file: SettingsCatalog.string("백업을 만들 때 정한 암호를 입력해 주세요.")
-        case .resume: SettingsCatalog.string("멈춘 불러오기를 이어 가려면 백업 암호를 다시 입력해 주세요.")
-        case .restart: SettingsCatalog.string("멈춘 불러오기의 백업 사본을 지금 계정으로 처음부터 확인해요. 백업 암호를 입력해 주세요.")
+        case .file:
+            SettingsCatalog.string("백업을 만들 때 정한 암호를 입력해 주세요.", locale: locale)
+        case .resume:
+            SettingsCatalog.string("멈춘 불러오기를 이어 가려면 백업 암호를 다시 입력해 주세요.", locale: locale)
+        case .restart:
+            SettingsCatalog.string("멈춘 불러오기의 백업 사본을 지금 계정으로 처음부터 확인해요. 백업 암호를 입력해 주세요.", locale: locale)
         }
     }
 
-    static var inspectAction: String { SettingsCatalog.string("확인") }
-    static var inspecting: String { SettingsCatalog.string("백업 파일을 확인하는 중이에요") }
+    static func inspectAction(locale: Locale) -> String { SettingsCatalog.string("확인", locale: locale) }
+    static func inspecting(locale: Locale) -> String { SettingsCatalog.string("백업 파일을 확인하는 중이에요", locale: locale) }
 
     // MARK: 검사 실패 — 저장소를 바꾸기 전
 
     /// 검사하지 못한 까닭과 할 일.
-    static func inspectFailed(_ failure: BackupImportFeature.ImportFailure) -> String {
+    static func inspectFailed(_ failure: BackupImportFeature.ImportFailure, locale: Locale) -> String {
         switch failure {
         case .wrongPasswordOrDamaged:
-            SettingsCatalog.string("암호가 맞지 않거나 파일이 손상됐어요. 암호를 확인해 다시 입력해 주세요.")
+            SettingsCatalog.string("암호가 맞지 않거나 파일이 손상됐어요. 암호를 확인해 다시 입력해 주세요.", locale: locale)
         case .unsupportedFormat:
-            SettingsCatalog.string("이 버전의 앱이 읽을 수 없는 형식의 백업이에요. 앱을 업데이트한 뒤 다시 불러와 주세요.")
+            SettingsCatalog.string("이 버전의 앱이 읽을 수 없는 형식의 백업이에요. 앱을 업데이트한 뒤 다시 불러와 주세요.", locale: locale)
         case .tooLarge:
-            SettingsCatalog.string("백업 파일이 너무 커서 불러올 수 없어요.")
+            SettingsCatalog.string("백업 파일이 너무 커서 불러올 수 없어요.", locale: locale)
         case .fileUnreadable:
-            SettingsCatalog.string("고른 파일을 읽지 못했어요. 파일이 이 iPad에 내려받아져 있는지 확인해 주세요.")
+            SettingsCatalog.string("고른 파일을 읽지 못했어요. 파일이 이 iPad에 내려받아져 있는지 확인해 주세요.", locale: locale)
         case .insufficientSpace:
-            SettingsCatalog.string("iPad의 저장 공간이 부족해 백업 파일을 확인하지 못했어요. 공간을 비운 뒤 다시 시도해 주세요.")
+            SettingsCatalog.string("iPad의 저장 공간이 부족해 백업 파일을 확인하지 못했어요. 공간을 비운 뒤 다시 시도해 주세요.", locale: locale)
         case .ioFailed, .storeWriteFailed, .inspectionExpired:
-            SettingsCatalog.string("백업 파일을 확인하지 못했어요. 다시 시도해 주세요.")
+            SettingsCatalog.string("백업 파일을 확인하지 못했어요. 다시 시도해 주세요.", locale: locale)
         case .storeUnreadable:
-            SettingsCatalog.string("저장된 필사를 읽지 못해 미리보기를 만들지 못했어요. 잠시 뒤 다시 시도해 주세요.")
+            SettingsCatalog.string("저장된 필사를 읽지 못해 미리보기를 만들지 못했어요. 잠시 뒤 다시 시도해 주세요.", locale: locale)
         case .jobNotFound:
-            SettingsCatalog.string("멈춘 불러오기를 찾지 못했어요. 이미 끝났거나 버린 불러오기예요.")
+            SettingsCatalog.string("멈춘 불러오기를 찾지 못했어요. 이미 끝났거나 버린 불러오기예요.", locale: locale)
         case .jobFromOtherAccount:
-            SettingsCatalog.string("다른 iCloud 계정에서 시작한 불러오기예요. 지금 계정의 필사에는 이어서 넣지 않아요.")
+            SettingsCatalog.string("다른 iCloud 계정에서 시작한 불러오기예요. 지금 계정의 필사에는 이어서 넣지 않아요.", locale: locale)
         case .unavailable:
-            SettingsCatalog.string("지금은 백업을 불러올 수 없어요. 앱을 다시 연 뒤 시도해 주세요.")
+            SettingsCatalog.string("지금은 백업을 불러올 수 없어요. 앱을 다시 연 뒤 시도해 주세요.", locale: locale)
         }
     }
 
     /// 검사 실패는 모두 저장소를 바꾸기 전이다.
-    static var inspectFailedNote: String { SettingsCatalog.string("확인하는 단계에서 멈춰서 필사는 바뀌지 않았어요.") }
-
-    /// 같은 출처로 다시 해 보는 버튼 — 암호가 틀렸을 수 있으면 그렇게 말한다.
-    static func retryTitle(_ failure: BackupImportFeature.ImportFailure) -> String {
-        failure == .wrongPasswordOrDamaged ? SettingsCatalog.string("암호 다시 입력") : retryAction
+    static func inspectFailedNote(locale: Locale) -> String {
+        SettingsCatalog.string("확인하는 단계에서 멈춰서 필사는 바뀌지 않았어요.", locale: locale)
     }
 
-    static var backAction: String { SettingsCatalog.string("돌아가기") }
+    /// 같은 출처로 다시 해 보는 버튼 — 암호가 틀렸을 수 있으면 그렇게 말한다.
+    static func retryTitle(_ failure: BackupImportFeature.ImportFailure, locale: Locale) -> String {
+        failure == .wrongPasswordOrDamaged ? SettingsCatalog.string("암호 다시 입력", locale: locale) : retryAction(locale: locale)
+    }
+
+    static func backAction(locale: Locale) -> String { SettingsCatalog.string("돌아가기", locale: locale) }
 
     // MARK: 미리보기
 
-    static var previewNew: String { SettingsCatalog.string("새 필사") }
-    static var previewSame: String { SettingsCatalog.string("같은 필사") }
-    static var previewArchived: String { SettingsCatalog.string("이전 필사 기록에 더할 것") }
-    static var previewProtectedCleared: String { SettingsCatalog.string("지운 절이라 기록에만") }
-    static var previewUnsupported: String { SettingsCatalog.string("넣을 수 없는 것") }
+    static func previewNew(locale: Locale) -> String { SettingsCatalog.string("새 필사", locale: locale) }
+    static func previewSame(locale: Locale) -> String { SettingsCatalog.string("같은 필사", locale: locale) }
+    static func previewArchived(locale: Locale) -> String { SettingsCatalog.string("이전 필사 기록에 더할 것", locale: locale) }
+    static func previewProtectedCleared(locale: Locale) -> String { SettingsCatalog.string("지운 절이라 기록에만", locale: locale) }
+    static func previewUnsupported(locale: Locale) -> String { SettingsCatalog.string("넣을 수 없는 것", locale: locale) }
 
     /// 수 한 칸.
-    static func count(_ value: Int) -> String {
-        SettingsCatalog.string("\(value)개")
+    static func count(_ value: Int, locale: Locale) -> String {
+        SettingsCatalog.string("\(value)개", locale: locale)
     }
 
     /// 넣을 수 없는 까닭 하나.
-    static func unsupportedReason(_ reason: BackupUnsupportedReason) -> String {
+    static func unsupportedReason(_ reason: BackupUnsupportedReason, locale: Locale) -> String {
         switch reason {
-        case .unknownTranslation: SettingsCatalog.string("모르는 번역본")
-        case .unknownBook: SettingsCatalog.string("모르는 성경 권")
-        case .outOfRange: SettingsCatalog.string("성경에 없는 장이나 절")
-        case .unknownDrawingVersion: SettingsCatalog.string("모르는 필기 형식")
-        case .undecodableMetadata: SettingsCatalog.string("읽지 못하는 위치 정보")
+        case .unknownTranslation: SettingsCatalog.string("모르는 번역본", locale: locale)
+        case .unknownBook: SettingsCatalog.string("모르는 성경 권", locale: locale)
+        case .outOfRange: SettingsCatalog.string("성경에 없는 장이나 절", locale: locale)
+        case .unknownDrawingVersion: SettingsCatalog.string("모르는 필기 형식", locale: locale)
+        case .undecodableMetadata: SettingsCatalog.string("읽지 못하는 위치 정보", locale: locale)
         }
     }
 
     /// 넣을 수 없는 것의 사유별 수 — 사유 순서는 판정 순서(`BackupUnsupportedReason.allCases`)다.
-    static func unsupportedDetail(_ counts: [BackupUnsupportedReason: Int]) -> String {
+    static func unsupportedDetail(_ counts: [BackupUnsupportedReason: Int], locale: Locale) -> String {
         BackupUnsupportedReason.allCases
             .compactMap { reason in
                 guard let matched = counts[reason], matched > 0 else { return nil }
-                return "\(unsupportedReason(reason)) \(matched)"
+                return "\(unsupportedReason(reason, locale: locale)) \(matched)"
             }
             .joined(separator: " · ")
     }
 
-    /// 고른 백업 한 줄 — 만든 때와 담은 수(manifest).
-    static func backupSummary(_ manifest: BackupManifest) -> String {
-        let created = DraftRecoveryCopy.dateText(manifest.createdAt)
-        return SettingsCatalog.string("\(created)에 만든 백업 · 필사 기록 \(manifest.counts.rows)개 · 남겨 둔 필기 \(manifest.counts.drafts)개")
+    /// 고른 백업 한 줄 — 만든 때와 담은 수(manifest). 만든 때도 같은 로케일의 서식이다.
+    static func backupSummary(_ manifest: BackupManifest, locale: Locale) -> String {
+        let created = DraftRecoveryCopy.dateText(manifest.createdAt, locale: locale)
+        return SettingsCatalog.string(
+            "\(created)에 만든 백업 · 필사 기록 \(manifest.counts.rows)개 · 남겨 둔 필기 \(manifest.counts.drafts)개",
+            locale: locale
+        )
     }
 
     /// 이어 하기의 미리보기 — 끝난 장은 건너뛴다.
-    static func resumedChapters(_ count: Int) -> String {
-        SettingsCatalog.string("앞서 넣은 \(count)장은 건너뛰고 남은 장부터 넣어요.")
+    static func resumedChapters(_ count: Int, locale: Locale) -> String {
+        SettingsCatalog.string("앞서 넣은 \(count)장은 건너뛰고 남은 장부터 넣어요.", locale: locale)
     }
 
     /// 미리보기 수의 뜻 — 넣기 직전에 다시 판정한다(설계 §4-1 9단계).
-    static var previewNote: String {
-        SettingsCatalog.string("미리보기 수는 지금 기준이에요. 넣기 직전에 절마다 다시 확인해서 실제로 넣는 수는 조금 다를 수 있어요.")
+    static func previewNote(locale: Locale) -> String {
+        SettingsCatalog.string("미리보기 수는 지금 기준이에요. 넣기 직전에 절마다 다시 확인해서 실제로 넣는 수는 조금 다를 수 있어요.", locale: locale)
     }
 
-    static var applyAction: String { SettingsCatalog.string("불러오기") }
+    static func applyAction(locale: Locale) -> String { SettingsCatalog.string("불러오기", locale: locale) }
 
     /// 대상 계정이 없는 검사 결과 — 「불러오기」 대신 보인다.
-    static func previewOnly(_ block: SyncedWriteBlock?) -> String {
-        SettingsCatalog.string("지금은 미리보기만 할 수 있어요.") + " " + importBlocked(block)
+    static func previewOnly(_ block: SyncedWriteBlock?, locale: Locale) -> String {
+        SettingsCatalog.string("지금은 미리보기만 할 수 있어요.", locale: locale) + " " + importBlocked(block, locale: locale)
     }
 
     /// 지금 불러올 수 없는 까닭 — 「확인이 필요한 필기」 가져오기(`DraftRecoveryCopy.importBlocked`)와 같은 `SyncedWriteBlock` 사유를 불러오기 말로 한다.
     /// 로그인하지 않고 시작한 실행은 연결이 보류되고, 2.0 은 실행 중에 저장소 연결을 바꾸지 않아 다시 열어야 연결된다 — 미로그인 · 보류는 같은 안내다.
-    static func importBlocked(_ block: SyncedWriteBlock?) -> String {
+    static func importBlocked(_ block: SyncedWriteBlock?, locale: Locale) -> String {
         switch block {
         case .signedOut, .connectionHeld:
-            SettingsCatalog.string("iCloud 에 로그인한 뒤 앱을 다시 열면 불러올 수 있어요.")
+            SettingsCatalog.string("iCloud 에 로그인한 뒤 앱을 다시 열면 불러올 수 있어요.", locale: locale)
         case .accountUnconfirmed:
-            SettingsCatalog.string("iCloud 계정을 확인하는 중이에요. 확인이 끝난 뒤 다시 불러와 주세요.")
+            SettingsCatalog.string("iCloud 계정을 확인하는 중이에요. 확인이 끝난 뒤 다시 불러와 주세요.", locale: locale)
         case .ownershipUnverified:
-            SettingsCatalog.string("이 iPad의 필사가 지금 iCloud 계정의 것인지 아직 확인하지 못했어요.")
+            SettingsCatalog.string("이 iPad의 필사가 지금 iCloud 계정의 것인지 아직 확인하지 못했어요.", locale: locale)
         case .knowledgeUnreadable:
-            SettingsCatalog.string("삭제 기록을 읽지 못했어요. 앱을 다시 열어 보세요.")
+            SettingsCatalog.string("삭제 기록을 읽지 못했어요. 앱을 다시 열어 보세요.", locale: locale)
         case .verseFromOtherSession:
-            SettingsCatalog.string("다른 계정을 쓰던 때의 필기라 지금 계정에 넣지 않아요.")
+            SettingsCatalog.string("다른 계정을 쓰던 때의 필기라 지금 계정에 넣지 않아요.", locale: locale)
         case nil:
-            SettingsCatalog.string("지금은 불러올 수 없어요. 앱을 다시 연 뒤 시도해 주세요.")
+            SettingsCatalog.string("지금은 불러올 수 없어요. 앱을 다시 연 뒤 시도해 주세요.", locale: locale)
         }
     }
 
     // MARK: 적용 · 결과
 
     /// 진행 한 줄 — 장 단위.
-    static func applying(_ progress: BackupImportFeature.ApplyProgress?) -> String {
-        guard let progress, progress.total > 0 else { return SettingsCatalog.string("필사를 넣는 중이에요") }
-        return SettingsCatalog.string("필사를 넣는 중이에요 · \(min(progress.done, progress.total))/\(progress.total)장")
+    static func applying(_ progress: BackupImportFeature.ApplyProgress?, locale: Locale) -> String {
+        guard let progress, progress.total > 0 else { return SettingsCatalog.string("필사를 넣는 중이에요", locale: locale) }
+        return SettingsCatalog.string("필사를 넣는 중이에요 · \(min(progress.done, progress.total))/\(progress.total)장", locale: locale)
     }
 
     /// 결과의 첫 줄 — 다 넣었는가, 왜 멈췄는가.
-    static func resultTitle(_ result: BackupImportFeature.ImportResult) -> String {
+    static func resultTitle(_ result: BackupImportFeature.ImportResult, locale: Locale) -> String {
         switch result {
         case .completed(let tally) where tally.inserted > 0:
-            SettingsCatalog.string("불러오기를 마쳤어요.")
+            SettingsCatalog.string("불러오기를 마쳤어요.", locale: locale)
         case .completed:
-            SettingsCatalog.string("불러오기를 마쳤어요. 새로 넣은 필사는 없어요.")
+            SettingsCatalog.string("불러오기를 마쳤어요. 새로 넣은 필사는 없어요.", locale: locale)
         case .blocked(let block, let doneChapters, _):
-            SettingsCatalog.string("불러오기를 멈췄어요. \(importBlocked(block)) 넣은 장 \(doneChapters)개는 그대로 있어요.")
+            SettingsCatalog.string("불러오기를 멈췄어요. \(importBlocked(block, locale: locale)) 넣은 장 \(doneChapters)개는 그대로 있어요.", locale: locale)
         case .accountChanged(let doneChapters, _):
             // 원문.
-            SettingsCatalog.string("iCloud 계정이 바뀌어 불러오기를 멈췄어요. 넣은 장 \(doneChapters)개는 그대로 있어요.")
+            SettingsCatalog.string("iCloud 계정이 바뀌어 불러오기를 멈췄어요. 넣은 장 \(doneChapters)개는 그대로 있어요.", locale: locale)
         case .generationChanged:
-            SettingsCatalog.string("적용 중에 모든 필사가 지워져 멈췄어요. ‘백업 불러오기’를 다시 열면 처음부터 다시 불러올 수 있어요.")
+            SettingsCatalog.string("적용 중에 모든 필사가 지워져 멈췄어요. ‘백업 불러오기’를 다시 열면 처음부터 다시 불러올 수 있어요.", locale: locale)
         case .failed(let failure):
-            applyFailed(failure)
+            applyFailed(failure, locale: locale)
         }
     }
 
     /// 넣은 것 — 실제 수.
-    static func insertedLine(_ tally: BackupImportFeature.Tally) -> String {
+    static func insertedLine(_ tally: BackupImportFeature.Tally, locale: Locale) -> String {
         SettingsCatalog.string("""
             넣은 필사 \(tally.inserted)개 — 새 필사 \(tally.new) · 이전 필사 기록 \(tally.archived) · \
             지운 절이라 기록에만 \(tally.protectedCleared)
-            """)
+            """, locale: locale)
     }
 
     /// 건너뛴 것 — 실제 수.
-    static func skippedLine(_ tally: BackupImportFeature.Tally) -> String {
-        SettingsCatalog.string("건너뛴 것 \(tally.skipped)개 — 같은 필사 \(tally.same) · 비운 기록 \(tally.skippedEmpty)")
+    static func skippedLine(_ tally: BackupImportFeature.Tally, locale: Locale) -> String {
+        SettingsCatalog.string("건너뛴 것 \(tally.skipped)개 — 같은 필사 \(tally.same) · 비운 기록 \(tally.skippedEmpty)", locale: locale)
     }
 
     /// 넣지 못한 것 — 해석할 수 없는 항목.
-    static func notInsertedLine(_ count: Int) -> String {
-        SettingsCatalog.string("넣지 못한 것 \(count)개 — 이 앱이 읽을 수 없는 내용이에요")
+    static func notInsertedLine(_ count: Int, locale: Locale) -> String {
+        SettingsCatalog.string("넣지 못한 것 \(count)개 — 이 앱이 읽을 수 없는 내용이에요", locale: locale)
     }
 
     /// 넣은 것이 있을 때 — 이 기기 반영과 iCloud 전송은 다르다(정책 §7-2).
-    static var savedLocally: String { SettingsCatalog.string("이 기기에 저장됐어요. iCloud 전송은 따로 진행돼요.") }
+    static func savedLocally(locale: Locale) -> String {
+        SettingsCatalog.string("이 기기에 저장됐어요. iCloud 전송은 따로 진행돼요.", locale: locale)
+    }
 
     /// 적용하지 못한 까닭과 할 일 — 넣은 장은 그대로이고, 멈춘 작업은 다시 열면 이어 할 수 있다.
-    static func applyFailed(_ failure: BackupImportFeature.ImportFailure) -> String {
+    static func applyFailed(_ failure: BackupImportFeature.ImportFailure, locale: Locale) -> String {
         switch failure {
         case .inspectionExpired:
-            SettingsCatalog.string("불러오기를 이어 가지 못했어요. ‘백업 불러오기’를 다시 열고 암호를 다시 입력하면 이어서 불러올 수 있어요.")
+            SettingsCatalog.string(
+                "불러오기를 이어 가지 못했어요. ‘백업 불러오기’를 다시 열고 암호를 다시 입력하면 이어서 불러올 수 있어요.", locale: locale
+            )
         case .jobNotFound:
-            SettingsCatalog.string("멈춘 불러오기를 찾지 못해 멈췄어요. 넣은 장은 그대로 있어요. 파일을 다시 골라 불러와 주세요.")
+            SettingsCatalog.string("멈춘 불러오기를 찾지 못해 멈췄어요. 넣은 장은 그대로 있어요. 파일을 다시 골라 불러와 주세요.", locale: locale)
         case .unavailable:
-            SettingsCatalog.string("지금은 백업을 불러올 수 없어요. 앱을 다시 연 뒤 시도해 주세요.")
+            SettingsCatalog.string("지금은 백업을 불러올 수 없어요. 앱을 다시 연 뒤 시도해 주세요.", locale: locale)
         case .storeWriteFailed, .storeUnreadable, .ioFailed, .insufficientSpace, .fileUnreadable, .wrongPasswordOrDamaged,
              .unsupportedFormat, .tooLarge, .jobFromOtherAccount:
-            SettingsCatalog.string("필사를 넣지 못해 멈췄어요. 넣은 장은 그대로 있어요. ‘백업 불러오기’를 다시 열면 이어서 불러올 수 있어요.")
+            SettingsCatalog.string(
+                "필사를 넣지 못해 멈췄어요. 넣은 장은 그대로 있어요. ‘백업 불러오기’를 다시 열면 이어서 불러올 수 있어요.", locale: locale
+            )
         }
     }
 }

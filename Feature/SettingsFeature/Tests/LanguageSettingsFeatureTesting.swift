@@ -235,13 +235,12 @@ struct LanguageSettingsFeatureTesting {
 
     @Test("언어 화면 문구는 영어로도 옮겨져 있다")
     func englishCopy() {
-        SettingsCatalog.$locale.withValue(Locale(identifier: "en")) {
-            #expect(SettingsCatalog.string("언어") == "Language")
-            #expect(SettingsCatalog.string("앱 언어") == "App Language")
-            #expect(SettingsCatalog.string("iPad 설정에서 바꾸기") == "Change in Settings")
-            #expect(SettingsCatalog.string("고른 언어는 바로 적용돼요. 일부 화면은 앱을 다시 열면 바뀌어요.")
-                == "Your choice applies right away. Some screens change the next time you open the app.")
-        }
+        let english = Locale(identifier: "en")
+        #expect(SettingsCatalog.string("언어", locale: english) == "Language")
+        #expect(SettingsCatalog.string("앱 언어", locale: english) == "App Language")
+        #expect(SettingsCatalog.string("iPad 설정에서 바꾸기", locale: english) == "Change in Settings")
+        #expect(SettingsCatalog.string("고른 언어는 바로 적용돼요. 일부 화면은 앱을 다시 열면 바뀌어요.", locale: english)
+            == "Your choice applies right away. Some screens change the next time you open the app.")
     }
 
     // MARK: - 도우미

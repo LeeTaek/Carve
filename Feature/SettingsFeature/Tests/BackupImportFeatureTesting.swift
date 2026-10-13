@@ -21,6 +21,8 @@ import ComposableArchitecture
 @Suite("설정 — 필사 백업 · 백업 불러오기")
 @MainActor
 struct BackupImportFeatureTesting {
+    /// 문구를 꺼내는 언어 — 시험 언어(스킴 ko-KR)와 같은 한국어라 기대 문구는 한국어 원문 그대로다.
+    private static let koreanLocale = Locale(identifier: "ko_KR")
     private typealias Feature = BackupImportFeature
 
     // MARK: 파일 → 암호 → 검사 → 미리보기
@@ -144,27 +146,27 @@ struct BackupImportFeatureTesting {
         #expect(!inspection.canApply)
         await store.send(.view(.applyTapped))
         #expect(log.value.isEmpty)
-        #expect(BackupCopy.previewOnly(block) == "지금은 미리보기만 할 수 있어요. " + BackupCopy.importBlocked(block))
+        #expect(BackupCopy.previewOnly(block, locale: Self.koreanLocale) == "지금은 미리보기만 할 수 있어요. " + BackupCopy.importBlocked(block, locale: Self.koreanLocale))
     }
 
     @Test("로그인하지 않았거나 연결이 보류된 실행은 「로그인한 뒤 앱을 다시 열면」 으로 안내한다 — 나머지 사유는 따로 말한다")
     func signedOutAndHeldShareRelaunchGuidance() {
         let relaunch = "iCloud 에 로그인한 뒤 앱을 다시 열면 불러올 수 있어요."
-        #expect(BackupCopy.importBlocked(.signedOut) == relaunch)
-        #expect(BackupCopy.importBlocked(.connectionHeld) == relaunch)
+        #expect(BackupCopy.importBlocked(.signedOut, locale: Self.koreanLocale) == relaunch)
+        #expect(BackupCopy.importBlocked(.connectionHeld, locale: Self.koreanLocale) == relaunch)
         let others: [SyncedWriteBlock] = [.accountUnconfirmed, .ownershipUnverified, .knowledgeUnreadable, .verseFromOtherSession]
-        #expect(Set(others.map { BackupCopy.importBlocked($0) }).count == others.count)
-        #expect(!others.map { BackupCopy.importBlocked($0) }.contains(relaunch))
+        #expect(Set(others.map { BackupCopy.importBlocked($0, locale: Self.koreanLocale) }).count == others.count)
+        #expect(!others.map { BackupCopy.importBlocked($0, locale: Self.koreanLocale) }.contains(relaunch))
         // 사유 없이 대상 계정이 없는 검사 결과(대역)도 빈 안내로 두지 않는다.
-        #expect(!BackupCopy.importBlocked(nil).isEmpty)
+        #expect(!BackupCopy.importBlocked(nil, locale: Self.koreanLocale).isEmpty)
     }
 
     @Test("미리보기의 넣을 수 없는 것은 사유별로 판정 순서대로 보인다")
     func unsupportedDetailFollowsReasonOrder() {
-        let detail = BackupCopy.unsupportedDetail(ImportFixture.preview.unsupported)
+        let detail = BackupCopy.unsupportedDetail(ImportFixture.preview.unsupported, locale: Self.koreanLocale)
         #expect(detail == "모르는 성경 권 1 · 읽지 못하는 위치 정보 2")
-        #expect(BackupCopy.unsupportedDetail([:]).isEmpty)
-        #expect(BackupCopy.resumedChapters(2) == "앞서 넣은 2장은 건너뛰고 남은 장부터 넣어요.")
+        #expect(BackupCopy.unsupportedDetail([:], locale: Self.koreanLocale).isEmpty)
+        #expect(BackupCopy.resumedChapters(2, locale: Self.koreanLocale) == "앞서 넣은 2장은 건너뛰고 남은 장부터 넣어요.")
     }
 
     // MARK: 적용 · 결과

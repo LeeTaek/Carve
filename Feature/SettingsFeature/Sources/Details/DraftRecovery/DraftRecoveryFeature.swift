@@ -7,6 +7,7 @@
 //
 
 import CarveToolkit
+import ClientInterfaces
 import Domain
 import Foundation
 
@@ -214,7 +215,8 @@ public struct DraftRecoveryFeature {
             case .draftChanged(let itemID, let stamp):
                 guard stamp == state.stamp, state.comparison?.itemID == itemID else { return .none }
                 closeComparison(&state)
-                state.importMessage = ImportMessage(text: DraftRecoveryCopy.draftChanged, needsAttention: true)
+                // 결과 한 줄은 만들 때의 화면 언어로 담는다 — 언어를 바꿔도 다시 만들 때까지 그대로다(즉시 전환 단계 3).
+                state.importMessage = ImportMessage(text: DraftRecoveryCopy.draftChanged(locale: AppLanguage.displayLocale()), needsAttention: true)
                 return startLoad(&state)
             case .view(.importTapped):
                 return importTapped(&state)
@@ -305,10 +307,12 @@ public struct DraftRecoveryFeature {
     /// 묶음마다 조회한다. **한 묶음을 읽지 못해도 나머지는 보인다** — 목록 전체를 막으면 멀쩡한 필기까지 보이지 않는다.
     ///
     /// 조회 **전후로** 계정 근거를 본다 — 그 사이 바뀌었으면 결과를 내지 않고 새 근거로 다시 읽게 알린다(P0-1).
+    /// 묶음 이름 · 자리 · 실패 문구는 조회를 시작할 때의 화면 언어(`AppLanguage.displayLocale()`)로 만든다 — 다시 읽으면 그때 언어로 새로 만든다.
     private func load(sequence: Int) -> Effect<Action> {
-        .run { [reader, repository, editEnvironment] send in
+        let locale = AppLanguage.displayLocale()
+        return .run { [reader, repository, editEnvironment] send in
             guard let reader else {
-                await send(.failed(sequence: sequence, SettingsCatalog.string("이 iPad의 보존 영역을 열지 못했어요. 앱을 다시 켜 보세요.")))
+                await send(.failed(sequence: sequence, SettingsCatalog.string("이 iPad의 보존 영역을 열지 못했어요. 앱을 다시 켜 보세요.", locale: locale)))
                 return
             }
             let environment = await editEnvironment.current()
@@ -319,7 +323,7 @@ public struct DraftRecoveryFeature {
                 scopes = try await reader.draftBuckets()
             } catch {
                 Log.error("확인이 필요한 필기 — 묶음 목록을 읽지 못했다", "\(error)")
-                await send(.failed(sequence: sequence, SettingsCatalog.string("이 iPad에 남겨 둔 필기를 읽지 못했어요. 파일은 그대로 있어요.")))
+                await send(.failed(sequence: sequence, SettingsCatalog.string("이 iPad에 남겨 둔 필기를 읽지 못했어요. 파일은 그대로 있어요.", locale: locale)))
                 return
             }
             var buckets: [Bucket] = []
@@ -330,10 +334,10 @@ public struct DraftRecoveryFeature {
                     // 내보낼 파일 자리는 목록과 함께 읽는다 — **대조한 묶음만.** 지금 계정에서 열어 보지 않는 묶음은 파일 자리도 들지 않는다(P0-1).
                     // 읽지 못하면 내보내기만 못 하고 나머지는 그대로 보인다.
                     let files = inventory.comparedWithStore ? (try? await reader.unreadableDraftFiles(in: scope)) ?? [] : []
-                    buckets.append(Bucket(inventory, files: files, environment: environment))
+                    buckets.append(Bucket(inventory, files: files, environment: environment, locale: locale))
                 } catch {
                     Log.error("확인이 필요한 필기 — 이 묶음을 읽지 못했다", scope.key, "\(error)")
-                    buckets.append(Bucket(unreadable: scope, environment: environment))
+                    buckets.append(Bucket(unreadable: scope, environment: environment, locale: locale))
                 }
             }
             let after = Stamp(await editEnvironment.current())
@@ -349,18 +353,20 @@ public struct DraftRecoveryFeature {
     }
 
     /// **읽지 못한 파일만** 지운다. 필기를 지우는 길은 이 화면에 없다(사용자 결정 2026-09-21).
+    /// 결과 한 줄은 지우기를 시작할 때의 화면 언어(`AppLanguage.displayLocale()`)로 만든다.
     private func removeUnreadable(in scope: AccountScope) -> Effect<Action> {
-        .run { [cleaner] send in
+        let locale = AppLanguage.displayLocale()
+        return .run { [cleaner] send in
             guard let cleaner else {
-                await send(.removedUnreadable(SettingsCatalog.string("이 iPad의 보존 영역을 열지 못해 지우지 못했어요.")))
+                await send(.removedUnreadable(SettingsCatalog.string("이 iPad의 보존 영역을 열지 못해 지우지 못했어요.", locale: locale)))
                 return
             }
             do {
                 let removed = try await cleaner.removeUnreadableDraftFiles(in: scope)
-                await send(.removedUnreadable(SettingsCatalog.string("읽지 못한 파일 \(removed)개를 지웠어요.")))
+                await send(.removedUnreadable(SettingsCatalog.string("읽지 못한 파일 \(removed)개를 지웠어요.", locale: locale)))
             } catch {
                 Log.error("확인이 필요한 필기 — 읽지 못한 파일을 지우지 못했다", scope.key, "\(error)")
-                await send(.removedUnreadable(SettingsCatalog.string("읽지 못한 파일을 지우지 못했어요. 파일은 그대로 있어요.")))
+                await send(.removedUnreadable(SettingsCatalog.string("읽지 못한 파일을 지우지 못했어요. 파일은 그대로 있어요.", locale: locale)))
             }
         }
     }
@@ -464,10 +470,13 @@ extension DraftRecoveryFeature {
 // MARK: - 조회 결과를 화면의 값으로
 
 extension DraftRecoveryFeature.Bucket {
-    init(_ inventory: VerseDraftRecoveryInventory, files: [URL], environment: DrawingEditEnvironment) {
+    /// 조회 결과의 한 묶음을 화면의 값으로 옮긴다.
+    /// - 입력 · 출력: 묶음 조회 결과 · 내보낼 파일 자리 · 편집 환경 · 문구 언어(조회를 시작할 때의 화면 언어) → 이름 · 자리를 그 언어로 담은 묶음.
+    /// - 부작용: 없음.
+    init(_ inventory: VerseDraftRecoveryInventory, files: [URL], environment: DrawingEditEnvironment, locale: Locale) {
         self.init(
             scope: inventory.scope,
-            title: DraftRecoveryCopy.bucketTitle(inventory.scope, environment: environment),
+            title: DraftRecoveryCopy.bucketTitle(inventory.scope, environment: environment, locale: locale),
             draftCount: inventory.summary.draftCount,
             draftBytes: inventory.summary.draftBytes,
             unreadableCount: inventory.summary.unreadableCount,
@@ -477,15 +486,15 @@ extension DraftRecoveryFeature.Bucket {
             inaccessibleCount: inventory.inaccessibleCount,
             readFailed: false,
             // 이 판이 모르는 권 · 번역본의 초안은 줄로 만들지 않는다(조회도 그런 장을 대조하지 않는다) — 수 · 용량에만 든다.
-            items: inventory.entries.compactMap { DraftRecoveryFeature.Item($0, scope: inventory.scope, environment: environment) },
-            unreadChapters: inventory.unreadChapters.map(DraftRecoveryCopy.chapterName)
+            items: inventory.entries.compactMap { DraftRecoveryFeature.Item($0, scope: inventory.scope, environment: environment, locale: locale) },
+            unreadChapters: inventory.unreadChapters.map { DraftRecoveryCopy.chapterName($0, locale: locale) }
         )
     }
 
     /// 묶음을 아예 읽지 못했다. 개수도 세지 못하므로 0 이 아니라 "읽지 못함" 으로 보인다.
-    init(unreadable scope: AccountScope, environment: DrawingEditEnvironment) {
+    init(unreadable scope: AccountScope, environment: DrawingEditEnvironment, locale: Locale) {
         self.init(
-            scope: scope, title: DraftRecoveryCopy.bucketTitle(scope, environment: environment),
+            scope: scope, title: DraftRecoveryCopy.bucketTitle(scope, environment: environment, locale: locale),
             draftCount: 0, draftBytes: 0, unreadableCount: 0, unreadableBytes: 0, unreadableFiles: [],
             comparedWithStore: false, inaccessibleCount: 0, readFailed: true, items: [], unreadChapters: []
         )
@@ -494,14 +503,15 @@ extension DraftRecoveryFeature.Bucket {
 
 extension DraftRecoveryFeature.Item {
     /// 조회 결과의 한 줄을 화면의 값으로 옮긴다.
-    /// - 입력 · 출력: 초안 한 줄 · 묶음 · 편집 환경 → 그 초안의 번역본 장을 든 줄. 키의 권 · 번역본을 이 판이 모르면 nil — 개역개정 · 창세기에 붙이지 않는다.
+    /// - 입력 · 출력: 초안 한 줄 · 묶음 · 편집 환경 · 문구 언어 → 그 초안의 번역본 장을 든 줄(자리 · 계정 근거는 그 언어로).
+    ///   키의 권 · 번역본을 이 판이 모르면 nil — 개역개정 · 창세기에 붙이지 않는다.
     /// - 부작용: 없음.
-    init?(_ entry: VerseDraftRecoveryEntry, scope: AccountScope, environment: DrawingEditEnvironment) {
+    init?(_ entry: VerseDraftRecoveryEntry, scope: AccountScope, environment: DrawingEditEnvironment, locale: Locale) {
         let key = entry.draft.key
         guard let chapter = key.bibleChapter else { return nil }
         self.init(
             id: "\(scope.key)/\(key.sessionID)/\(key.translation)/\(key.title)/\(key.chapter)/\(key.verse)",
-            place: DraftRecoveryCopy.place(key),
+            place: DraftRecoveryCopy.place(key, locale: locale),
             chapter: chapter,
             verse: key.verse,
             scope: scope,
@@ -509,7 +519,7 @@ extension DraftRecoveryFeature.Item {
             revision: entry.draft.revision,
             savedAt: entry.draft.savedAt,
             reason: entry.reason,
-            provenance: DraftRecoveryCopy.provenance(of: entry.draft, environment: environment),
+            provenance: DraftRecoveryCopy.provenance(of: entry.draft, environment: environment, locale: locale),
             injected: entry.draft.ownershipInjected == true,
             ink: entry.draft.lineData,
             currentUpdatedAt: entry.current?.updatedAt,

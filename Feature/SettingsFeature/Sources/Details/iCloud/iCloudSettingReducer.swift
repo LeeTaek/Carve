@@ -7,6 +7,7 @@
 //
 
 import CarveToolkit
+import ClientInterfaces
 import Domain
 import SwiftUI
 
@@ -107,9 +108,13 @@ public struct CloudSettingsFeature: Sendable {
             case .activityChanged(let activity):
                 state.activity = activity
             case .view(.databaseIsEmpty):
+                // 대화상자 문구는 띄우는 순간의 화면 언어로 만든다 — 이미 떠 있는 대화상자는 그 언어로 남는다(즉시 전환 단계 3).
+                let locale = AppLanguage.displayLocale()
                 // C14 연결 보류 중에는 전체 삭제를 시작하지 않는다(D6) — 예약했다가 연결 뒤 자동 실행하지도 않는다.
                 if holdState.isHeld {
-                    return .send(.presentPopover(body: Self.eraseHeldBody, confirmTitle: SettingsCatalog.string("확인"), action: .dismiss))
+                    return .send(.presentPopover(
+                        body: Self.eraseHeldBody(locale: locale), confirmTitle: SettingsCatalog.string("확인", locale: locale), action: .dismiss
+                    ))
                 }
                 return .run { [widgetVerseClient, draftReader] send in
                     // 「필사 데이터」 에는 즐겨찾기에 복사해 둔 필기와 위젯에 담은 말씀도 포함된다 — 셋을 함께 본다.
@@ -122,19 +127,19 @@ public struct CloudSettingsFeature: Sendable {
                     if hasDrawings || hasFavorites || hasWidgetVerses || (remainingDrafts ?? 1) > 0 {
                         // 문구와 구성은 시안 F2 를 따른다 — 지워지는 범위 · 되돌릴 수 없다는 경고 · 한 절만 비우는 대안.
                         await send(.presentPopover(
-                            title: SettingsCatalog.string("모든 필사 데이터를 지울까요?"),
-                            body: Self.eraseConfirmBody(remainingDrafts: remainingDrafts),
-                            emphasis: SettingsCatalog.string("지운 데이터는 되돌릴 수 없어요."),
-                            hint: SettingsCatalog.string("한 절만 비우려면 해당 절을 길게 눌러\n지우기를 선택해 주세요."),
-                            confirmTitle: SettingsCatalog.string("모두 지우기"),
-                            cancelTitle: SettingsCatalog.string("취소"),
+                            title: SettingsCatalog.string("모든 필사 데이터를 지울까요?", locale: locale),
+                            body: Self.eraseConfirmBody(remainingDrafts: remainingDrafts, locale: locale),
+                            emphasis: SettingsCatalog.string("지운 데이터는 되돌릴 수 없어요.", locale: locale),
+                            hint: SettingsCatalog.string("한 절만 비우려면 해당 절을 길게 눌러\n지우기를 선택해 주세요.", locale: locale),
+                            confirmTitle: SettingsCatalog.string("모두 지우기", locale: locale),
+                            cancelTitle: SettingsCatalog.string("취소", locale: locale),
                             role: .destructive,
                             action: .deleteAllData
                         ))
                     } else {
                         await send(.presentPopover(
-                            body: SettingsCatalog.string("지울 필사 데이터가 없어요."),
-                            confirmTitle: SettingsCatalog.string("확인"),
+                            body: SettingsCatalog.string("지울 필사 데이터가 없어요.", locale: locale),
+                            confirmTitle: SettingsCatalog.string("확인", locale: locale),
                             action: .dismiss
                         ))
                     }
@@ -151,9 +156,13 @@ public struct CloudSettingsFeature: Sendable {
                     confirmAction: action
                 ))
             case .removeAlliCloudData:
+                // 결과 대화상자도 삭제를 시작한 순간의 화면 언어로 만든다(즉시 전환 단계 3).
+                let locale = AppLanguage.displayLocale()
                 // 재시도 진입점도 막는다 — 확인 팝업의 「다시 시도」 는 이 액션으로 다시 들어온다(D6 "실행 진입점과 재시도 진입점을 모두").
                 if holdState.isHeld {
-                    return .send(.presentPopover(body: Self.eraseHeldBody, confirmTitle: SettingsCatalog.string("확인"), action: .dismiss))
+                    return .send(.presentPopover(
+                        body: Self.eraseHeldBody(locale: locale), confirmTitle: SettingsCatalog.string("확인", locale: locale), action: .dismiss
+                    ))
                 }
                 return .run { [widgetVerseClient, drawingDataEraser] send in
                     await send(.setLoading(true))
@@ -183,18 +192,18 @@ public struct CloudSettingsFeature: Sendable {
                     guard outcome == .completed, widgetCleared else {
                         // 「다시 시도」 는 같은 삭제를 다시 부른다. DB 삭제와 위젯 비우기 모두 멱등이다.
                         await send(.presentPopover(
-                            title: SettingsCatalog.string("필사 데이터를 모두 지우지 못했어요"),
-                            body: Self.eraseFailureBody(outcome: outcome, widgetCleared: widgetCleared),
-                            confirmTitle: SettingsCatalog.string("다시 시도"),
-                            cancelTitle: SettingsCatalog.string("닫기"),
+                            title: SettingsCatalog.string("필사 데이터를 모두 지우지 못했어요", locale: locale),
+                            body: Self.eraseFailureBody(outcome: outcome, widgetCleared: widgetCleared, locale: locale),
+                            confirmTitle: SettingsCatalog.string("다시 시도", locale: locale),
+                            cancelTitle: SettingsCatalog.string("닫기", locale: locale),
                             role: .destructive,
                             action: .deleteAllData
                         ))
                         return
                     }
                     await send(.presentPopover(
-                        body: SettingsCatalog.string("모든 필사 데이터를 지웠어요."),
-                        confirmTitle: SettingsCatalog.string("확인"),
+                        body: SettingsCatalog.string("모든 필사 데이터를 지웠어요.", locale: locale),
+                        confirmTitle: SettingsCatalog.string("확인", locale: locale),
                         action: .dismiss
                     ))
                 }
@@ -241,36 +250,41 @@ public struct CloudSettingsFeature: Sendable {
 
 extension CloudSettingsFeature {
     /// 연결 보류 중의 전체 삭제 거절 문구(정책 §12-6 C14 ③, 사용자 결정 2026-09-21).
-    static var eraseHeldBody: String {
-        SettingsCatalog.string("지금은 iCloud 연결이 보류되어 전체 삭제를 할 수 없어요.\n연결 문제를 해결한 뒤 다시 시도해 주세요.")
+    /// - Parameter locale: 문구 언어 — 리듀서는 띄우는 순간의 `AppLanguage.displayLocale()` 를 넘긴다.
+    static func eraseHeldBody(locale: Locale) -> String {
+        SettingsCatalog.string("지금은 iCloud 연결이 보류되어 전체 삭제를 할 수 없어요.\n연결 문제를 해결한 뒤 다시 시도해 주세요.", locale: locale)
     }
 
     /// 2.0.0 은 실행 중에 연결을 바꾸지 않는다 — 로그인과 소유가 확인되면 이 문장으로 재실행을 안내한다(2026-09-28 결정).
-    public static var relaunchToConnect: String { SettingsCatalog.string("연결을 완료하려면 앱을 완전히 종료한 뒤 다시 열어 주세요.") }
+    /// - Parameter locale: 문구 언어 — 뷰(설정의 보류 안내 · 앱 루트의 재실행 안내 카드)는 환경 `locale` 을 넘긴다.
+    public static func relaunchToConnect(locale: Locale) -> String {
+        SettingsCatalog.string("연결을 완료하려면 앱을 완전히 종료한 뒤 다시 열어 주세요.", locale: locale)
+    }
 
     /// 설정 화면의 보류 안내 — 지금은 이 기기에만 저장된다는 것 · 까닭 · 다음 실행에서 다시 판정한다는 것.
     ///
     /// 앱을 다시 열어야 연결 여부를 다시 판정한다. **재실행하면 연결된다고 말하는 것은 소유가 확인됐을 때뿐**이다 —
-    /// 다른 계정이면 다시 열어도 보류된다.
+    /// 다른 계정이면 다시 열어도 보류된다. 뷰는 환경 `locale` 을 넘긴다.
     static func holdCopy(
         _ hold: LegacySeparationHold,
         availability: CloudAccountAvailability,
-        connectsOnRelaunch: Bool
+        connectsOnRelaunch: Bool,
+        locale: Locale
     ) -> (title: String, detail: String) {
-        let title = SettingsCatalog.string("지금은 iCloud 연결이 보류돼 이 기기에만 저장돼요")
+        let title = SettingsCatalog.string("지금은 iCloud 연결이 보류돼 이 기기에만 저장돼요", locale: locale)
         if connectsOnRelaunch {
-            return (title, SettingsCatalog.string("iCloud 로그인과 이 기기 필사의 계정이 확인됐어요.") + " " + relaunchToConnect)
+            return (title, SettingsCatalog.string("iCloud 로그인과 이 기기 필사의 계정이 확인됐어요.", locale: locale) + " " + relaunchToConnect(locale: locale))
         }
         let reason: String = switch hold.reason {
-        case .ownershipUnverified: SettingsCatalog.string("이 기기의 옛 필사가 현재 계정에 속하는지 확인하지 못했어요.")
-        case .linkageUnknown: SettingsCatalog.string("이 기기의 옛 필사가 어느 계정의 것인지 확인하지 못했어요.")
+        case .ownershipUnverified: SettingsCatalog.string("이 기기의 옛 필사가 현재 계정에 속하는지 확인하지 못했어요.", locale: locale)
+        case .linkageUnknown: SettingsCatalog.string("이 기기의 옛 필사가 어느 계정의 것인지 확인하지 못했어요.", locale: locale)
         case .unlinkedRowsAwaitSeparation(let count):
-            SettingsCatalog.string("이 기기에 계정과 연결되지 않은 옛 필사 \(count)개가 있어요. 사본은 이 기기에 보관했어요.")
-        case .preservationFailed: SettingsCatalog.string("옛 필사의 사본을 남기지 못했어요.")
+            SettingsCatalog.string("이 기기에 계정과 연결되지 않은 옛 필사 \(count)개가 있어요. 사본은 이 기기에 보관했어요.", locale: locale)
+        case .preservationFailed: SettingsCatalog.string("옛 필사의 사본을 남기지 못했어요.", locale: locale)
         }
         let next = availability == .noAccount
-            ? SettingsCatalog.string("iCloud에 로그인한 뒤 앱을 완전히 종료하고 다시 열면 계정과 저장소를 다시 확인해요.")
-            : SettingsCatalog.string("앱을 완전히 종료한 뒤 다시 열면 계정과 저장소를 다시 확인해요.")
+            ? SettingsCatalog.string("iCloud에 로그인한 뒤 앱을 완전히 종료하고 다시 열면 계정과 저장소를 다시 확인해요.", locale: locale)
+            : SettingsCatalog.string("앱을 완전히 종료한 뒤 다시 열면 계정과 저장소를 다시 확인해요.", locale: locale)
         return (title, reason + " " + next)
     }
 
@@ -296,16 +310,21 @@ extension CloudSettingsFeature {
     ///
     /// 수는 `remainingDraftCount` 그대로 — **실제로 지워지는 초안 파일 수**다. 예전 문구는 "화면에 보이지 않게 남은 필기 N개" 라 해, 자동으로
     /// 표시되는 초안 · 다른 계정의 초안 · 읽지 못한 파일까지 센 수와 말이 달랐다(2026-09-21 후속 리뷰 P1-4).
-    static func eraseConfirmBody(remainingDrafts: Int?) -> String {
+    /// - Parameter locale: 문구 언어 — 리듀서는 확인 대화상자를 띄우는 순간의 `AppLanguage.displayLocale()` 를 넘긴다.
+    static func eraseConfirmBody(remainingDrafts: Int?, locale: Locale) -> String {
         var lines = [
-            SettingsCatalog.string("모든 장의 필기와 이전 필사 기록이 지워져요."),
-            SettingsCatalog.string("즐겨찾기와 위젯에 담은 말씀도 함께 사라져요.")
+            SettingsCatalog.string("모든 장의 필기와 이전 필사 기록이 지워져요.", locale: locale),
+            SettingsCatalog.string("즐겨찾기와 위젯에 담은 말씀도 함께 사라져요.", locale: locale)
         ]
         switch remainingDrafts {
         case .some(let remaining) where remaining > 0:
-            lines.append(SettingsCatalog.string("이 iPad에 남겨 둔 필기 \(remaining)개도 모두 지워져요(확인이 필요한 필기 · 다른 계정에서 쓴 것 · 읽지 못한 파일 포함)."))
+            lines.append(SettingsCatalog.string(
+                "이 iPad에 남겨 둔 필기 \(remaining)개도 모두 지워져요(확인이 필요한 필기 · 다른 계정에서 쓴 것 · 읽지 못한 파일 포함).", locale: locale
+            ))
         case .none:
-            lines.append(SettingsCatalog.string("이 iPad에 남겨 둔 필기도 모두 지워져요(확인이 필요한 필기 · 다른 계정에서 쓴 것 · 읽지 못한 파일 포함)."))
+            lines.append(SettingsCatalog.string(
+                "이 iPad에 남겨 둔 필기도 모두 지워져요(확인이 필요한 필기 · 다른 계정에서 쓴 것 · 읽지 못한 파일 포함).", locale: locale
+            ))
         default:
             break
         }
@@ -316,15 +335,16 @@ extension CloudSettingsFeature {
     ///
     /// 필사 행 삭제가 실패하면(`.failed`) 일부가 지워졌는지 증명하지 못한다(`DrawingEraseOutcome.failed`). 미저장분을
     /// 지키기로 한 판단과 "아무것도 지우지 않았다" 는 보장은 별개라, 이전 문구("아직 아무것도 지우지 않았어요")를 쓰지 않는다.
-    static func eraseFailureBody(outcome: DrawingEraseOutcome, widgetCleared: Bool) -> String {
-        guard outcome.drawingsCleared else { return SettingsCatalog.string("삭제를 완료하지 못했어요. 다시 시도해 주세요.") }
+    /// - Parameter locale: 문구 언어 — 리듀서는 삭제를 시작한 순간의 `AppLanguage.displayLocale()` 를 넘긴다.
+    static func eraseFailureBody(outcome: DrawingEraseOutcome, widgetCleared: Bool, locale: Locale) -> String {
+        guard outcome.drawingsCleared else { return SettingsCatalog.string("삭제를 완료하지 못했어요. 다시 시도해 주세요.", locale: locale) }
         switch (outcome, widgetCleared) {
         case (.partiallyFailed, false):
-            return SettingsCatalog.string("필기는 지웠지만 즐겨찾기와 위젯에 담은 말씀이 남았을 수 있어요.")
+            return SettingsCatalog.string("필기는 지웠지만 즐겨찾기와 위젯에 담은 말씀이 남았을 수 있어요.", locale: locale)
         case (.partiallyFailed, true):
-            return SettingsCatalog.string("필기는 지웠지만 즐겨찾기가 남았을 수 있어요.")
+            return SettingsCatalog.string("필기는 지웠지만 즐겨찾기가 남았을 수 있어요.", locale: locale)
         default:
-            return SettingsCatalog.string("필기와 즐겨찾기는 지웠지만 위젯에 담은 말씀이 남았을 수 있어요.")
+            return SettingsCatalog.string("필기와 즐겨찾기는 지웠지만 위젯에 담은 말씀이 남았을 수 있어요.", locale: locale)
         }
     }
 

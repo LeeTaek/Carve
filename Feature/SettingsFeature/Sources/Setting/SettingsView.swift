@@ -21,7 +21,7 @@ public struct SettingsView: View {
     @SharedReader(.appearanceMode) private var appearanceMode: AppearanceMode
     /// 이 실행에서 앱 안에서 바꾼 화면 언어. 사이드바 「언어」 행의 값만 바꾼다.
     @SharedReader(.appLanguageOverride) private var languageOverride: AppLanguage?
-    /// 화면 언어 — 미리 만드는 문구(패널 제목 · 행 이름 · 값)를 이 언어로 만든다(즉시 전환 단계 2 — 「화면」 묶음까지, 나머지 행은 단계 3).
+    /// 화면 언어 — 미리 만드는 문구(패널 제목 · 행 이름 · 값)를 이 언어로 만든다(즉시 전환 단계 2 · 3).
     @Environment(\.locale) private var locale
 
     public init(store: StoreOf<SettingsFeature>) {
@@ -80,12 +80,15 @@ public struct SettingsView: View {
             Section {
                 NavigationLink(value: SettingsFeature.SidebarItem.iCloud) {
                     // 연결 보류 중에는 「보류」 — 이 실행은 이 기기에만 저장한다(정책 §12-6 C14 ③). 까닭은 iCloud 화면이 말한다.
-                    sidebarRow("iCloud", value: store.isConnectionHeld ? SettingsCatalog.string("보류") : SettingsCatalog.string("켬"))
+                    sidebarRow(
+                        "iCloud",
+                        value: store.isConnectionHeld ? SettingsCatalog.string("보류", locale: locale) : SettingsCatalog.string("켬", locale: locale)
+                    )
                 }
                 // 확인이 필요한 필기의 지속적인 진입점(정책 §12-6 ④) — 개수는 화면을 열 때 센다.
-                NavigationLink(DraftRecoveryCopy.title, value: SettingsFeature.SidebarItem.draftRecovery)
+                NavigationLink(DraftRecoveryCopy.title(locale: locale), value: SettingsFeature.SidebarItem.draftRecovery)
                 // 필사 백업 — 백업 만들기 · 불러오기(2.1).
-                NavigationLink(BackupCopy.title, value: SettingsFeature.SidebarItem.backup)
+                NavigationLink(BackupCopy.title(locale: locale), value: SettingsFeature.SidebarItem.backup)
             } header: {
                 Text("저장", bundle: .module)
             }
@@ -100,7 +103,7 @@ public struct SettingsView: View {
                     Text("의견 보내기", bundle: .module)
                 }
                 NavigationLink(value: SettingsFeature.SidebarItem.appVersion) {
-                    sidebarRow(SettingsCatalog.string("앱 버전"), value: UIDevice.appVersion())
+                    sidebarRow(SettingsCatalog.string("앱 버전", locale: locale), value: UIDevice.appVersion())
                 }
             } header: {
                 Text("지원", bundle: .module)
@@ -108,7 +111,7 @@ public struct SettingsView: View {
             Section {
                 // 구매를 권하지 않고 설정에 한 줄로만 둔다(시안 K4).
                 NavigationLink(value: SettingsFeature.SidebarItem.removeAds) {
-                    sidebarRow(SettingsCatalog.string("광고 제거"), value: isAdFree ? SettingsCatalog.string("구매함") : "")
+                    sidebarRow(SettingsCatalog.string("광고 제거", locale: locale), value: isAdFree ? SettingsCatalog.string("구매함", locale: locale) : "")
                 }
                 if store.isPrivacyOptionsRequired {
                     // 동의가 필요한 지역에서는 광고 동의를 다시 고를 수 있는 진입점을 둬야 한다(UMP 개인정보 옵션).

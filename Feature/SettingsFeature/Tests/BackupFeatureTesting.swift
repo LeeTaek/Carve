@@ -90,14 +90,16 @@ struct BackupFeatureTesting {
 
     @Test("패치노트의 이번 출시는 2.1 — 영어 성경 · 영어 화면, 필사 백업 · 불러오기와 캔버스가 하나가 된 것을 알린다")
     func patchnoteAnnouncesBackup() throws {
-        let latest = try #require(PatchnoteFeature.releases.first)
-        #expect(latest == PatchnoteFeature.latest)
+        // 시험 언어(스킴 ko-KR)와 같은 한국어로 꺼낸다 — 기대 문구는 한국어 원문 그대로다.
+        let locale = Locale(identifier: "ko_KR")
+        let latest = try #require(PatchnoteFeature.releases(locale: locale).first)
+        #expect(latest == PatchnoteFeature.latest(locale: locale))
         #expect(latest.version == "2.1")
         #expect(latest.notes.map(\.title) == ["영어 성경 KJV · BSB", "영어 화면", "필사 백업 · 불러오기", "필사 캔버스는 하나로", "본문 표시를 바로잡았어요"])
         #expect(latest.notes[0].body.contains("번역본마다 따로"))
         #expect(latest.notes[2].body.contains("광고 제거 구매에 포함"))
         #expect(latest.notes[2].body.contains("불러오기는 무료"))
         // 지난 출시의 바뀐 점도 설정의 패치노트에 남는다.
-        #expect(PatchnoteFeature.releases.map(\.version) == ["2.1", "2.0"])
+        #expect(PatchnoteFeature.releases(locale: locale).map(\.version) == ["2.1", "2.0"])
     }
 }

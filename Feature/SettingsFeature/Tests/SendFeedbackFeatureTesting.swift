@@ -6,12 +6,16 @@
 //
 
 @testable import SettingsFeature
+import Foundation
 import Testing
 
 import ComposableArchitecture
 
 @MainActor
 struct SendFeedbackFeatureTesting {
+    /// 문구를 꺼내는 언어 — 시험 언어(스킴 ko-KR)와 같은 한국어. 리듀서는 고른 언어가 없어 이 언어로 안내를 만든다.
+    private static let koreanLocale = Locale(identifier: "ko_KR")
+
     // MARK: - 필수 항목 — 다 채울 때까지 보내기 버튼을 흐리게 막는다 (2026-09-29)
 
     /// 필수 항목을 모두 채운 상태.
@@ -31,7 +35,7 @@ struct SendFeedbackFeatureTesting {
 
         #expect(state.missingRequirement == .title)
         #expect(!state.isFormComplete)
-        #expect(state.missingRequirement?.hint == "보내려면 제목을 적어 주세요.")
+        #expect(state.missingRequirement?.hint(locale: Self.koreanLocale) == "보내려면 제목을 적어 주세요.")
     }
 
     @Test("기본 문의 본문 템플릿에 내용이 없으면 보낼 수 없고 내용을 적으라고 안내한다")
@@ -117,7 +121,7 @@ struct SendFeedbackFeatureTesting {
         await store.send(.view(.isEnableSendButton))
         await store.receive(\.sendFeedback) {
             $0.canSendMail = false
-            $0.path = .popup(SendFeedbackFeature.mailUnavailablePopup)
+            $0.path = .popup(SendFeedbackFeature.mailUnavailablePopup(locale: Self.koreanLocale))
         }
     }
 
@@ -142,7 +146,7 @@ struct SendFeedbackFeatureTesting {
         Self.reduce(&state, .sendFeedback, canSendMail: false)
 
         #expect(state.canSendMail == false)
-        #expect(state.path?.popup == SendFeedbackFeature.mailUnavailablePopup)
+        #expect(state.path?.popup == SendFeedbackFeature.mailUnavailablePopup(locale: Self.koreanLocale))
         #expect(state.path?.popup?.title == "메일을 보낼 수 없어요")
         #expect(state.path?.email == nil)
     }

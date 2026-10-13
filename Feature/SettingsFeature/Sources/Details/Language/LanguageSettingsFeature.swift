@@ -15,7 +15,8 @@ import ComposableArchitecture
 /// - 저장: iOS 앱별 언어와 같은 값(앱 도메인 `AppleLanguages`)에 쓴다 — 설정 앱 › 새기다 › 언어와 같은 값이라 둘 중 어디서 바꿔도 같다
 ///   (단일 진실, 2026-10-13 결정). 다음 실행부터 iOS 가 앱 전체에 그 언어를 쓴다.
 /// - 지금 실행: 고른 언어를 `appLanguageOverride` 에 넣는다. 앱 루트가 환경 `locale` 을 바꿔 키 기반 문구가 바로 바뀐다.
-///   미리 만든 문자열은 다음 실행부터 바뀐다(단계 2 · 3 에서 옮긴다).
+///   미리 만든 문자열도 뷰는 환경 `locale`, 리듀서 · effect 는 `AppLanguage.displayLocale()` 로 만들어 바로 따라온다(단계 2 · 3).
+///   리듀서가 상태에 담은 문구(떠 있는 대화상자 · 결과 한 줄)는 다시 만들 때까지 만든 순간의 언어로 남는다.
 /// - 「iPad 설정에서 바꾸기」 는 보조로 남긴다 — 설정 앱에서 바꾸면 iOS 가 앱을 종료해 새 언어로 다시 연다.
 ///   기기에 선호 언어가 하나뿐이어도 그 항목이 보이도록 앱 Info.plist 에 `UIPrefersShowingLanguageSettings` 를 켠다.
 @Reducer
