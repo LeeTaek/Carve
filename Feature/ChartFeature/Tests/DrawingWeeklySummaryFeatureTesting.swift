@@ -15,6 +15,9 @@ import UIComponents
 import UIKit
 
 struct DrawingWeeklySummaryFeatureTesting {
+    /// 한국어 화면 — 시험 스킴의 언어 · 지역(ko-KR)과 같다.
+    private static let korean = Locale(identifier: "ko_KR")
+
     // MARK: - 리듀서
 
     @Test("최근 필사 절을 누르면 그 절을 열도록 알린다")
@@ -231,7 +234,7 @@ struct DrawingWeeklySummaryFeatureTesting {
         var state = DrawingWeeklySummaryFeature.State()
         state.scrollPosition = fixedChartDay(-6)
 
-        #expect(state.weekAverageText == "0.0")
+        #expect(state.weekAverageText(locale: Self.korean) == "0.0")
         #expect(state.weekMaxCount == 0)
     }
 

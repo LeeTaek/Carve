@@ -11,6 +11,9 @@ import Foundation
 import Testing
 
 struct DailyRecordChartFeatureTesting {
+    /// 한국어 화면 — 시험 스킴의 언어 · 지역(ko-KR)과 같다.
+    private static let korean = Locale(identifier: "ko_KR")
+
     // MARK: - 페이지 · Y축 계산
 
     @Test("차트가 나타나면 폭을 기록하고 보이는 주를 가운데로 세 페이지를 만든다")
@@ -487,9 +490,10 @@ extension DailyRecordChartFeatureTesting {
             scrollPosition: start
         )
 
-        #expect(state.accessibilitySummary.contains("모두 14절, 하루 평균 2.0절"))
-        #expect(state.accessibilitySummary.contains("가장 많은 날은 \(fixedChartDay(0).chartMonthDayText) 8절"))
-        #expect(state.accessibilitySummary.contains("기록 없는 날은 없어요"))
+        let summary = state.accessibilitySummary(locale: Self.korean)
+        #expect(summary.contains("모두 14절, 하루 평균 2.0절"))
+        #expect(summary.contains("가장 많은 날은 \(fixedChartDay(0).chartMonthDayText(locale: Self.korean)) 8절"))
+        #expect(summary.contains("기록 없는 날은 없어요"))
     }
 
     @Test("기록이 없는 주는 가장 많은 날이 없고 7일 모두 없는 날로 센다")
@@ -501,9 +505,10 @@ extension DailyRecordChartFeatureTesting {
             scrollPosition: start
         )
 
-        #expect(state.accessibilitySummary.contains("모두 0절, 하루 평균 0.0절"))
-        #expect(state.accessibilitySummary.contains("가장 많은 날은 없어요"))
-        #expect(state.accessibilitySummary.contains("없는 날은 7일"))
+        let summary = state.accessibilitySummary(locale: Self.korean)
+        #expect(summary.contains("모두 0절, 하루 평균 0.0절"))
+        #expect(summary.contains("가장 많은 날은 없어요"))
+        #expect(summary.contains("없는 날은 7일"))
     }
 
     @Test("최댓값이 같은 날이 여럿이면 가장 이른 날을 말하고 하루 빈 날은 하루로 말한다")
@@ -515,7 +520,8 @@ extension DailyRecordChartFeatureTesting {
             scrollPosition: start
         )
 
-        #expect(state.accessibilitySummary.contains("가장 많은 날은 \(fixedChartDay(-5).chartMonthDayText) 4절"))
-        #expect(state.accessibilitySummary.contains("없는 날은 하루"))
+        let summary = state.accessibilitySummary(locale: Self.korean)
+        #expect(summary.contains("가장 많은 날은 \(fixedChartDay(-5).chartMonthDayText(locale: Self.korean)) 4절"))
+        #expect(summary.contains("없는 날은 하루"))
     }
 }

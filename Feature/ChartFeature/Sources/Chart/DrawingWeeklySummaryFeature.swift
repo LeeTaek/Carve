@@ -50,9 +50,11 @@ public struct DrawingWeeklySummaryFeature {
             Int(round(Double(weekTotalCount) / 7.0))
         }
 
-        /// 주간 합계를 7일로 나눈 값을 소수점 한 자리로 표시한다.
-        public var weekAverageText: String {
-            (Double(weekTotalCount) / 7.0).formatted(.number.precision(.fractionLength(1)))
+        /// 역할: 주간 합계를 7일로 나눈 값을 소수점 한 자리로 적는다(「1.7」).
+        /// 입력 · 출력: 로케일(뷰는 환경 locale) → 그 로케일의 수 서식으로 적은 평균.
+        /// 부작용: 없음.
+        public func weekAverageText(locale: Locale) -> String {
+            (Double(weekTotalCount) / 7.0).formatted(.number.precision(.fractionLength(1)).locale(locale))
         }
         
         public var weekMaxCount: Int {

@@ -11,6 +11,9 @@ import Foundation
 import Testing
 
 struct ChartModelTesting {
+    /// 한국어 화면 — 시험 스킴의 언어 · 지역(ko-KR)과 같다.
+    private static let korean = Locale(identifier: "ko_KR")
+
     @Test("최근 필사 항목은 성경 위치를 한글 표시 문자열로 만들고, 개역개정은 약칭을 생략한다(사용자 결정 17)")
     func recentVerseItemMessageUsesLocalizedBiblePosition() {
         let item = RecentVerseItem(
@@ -22,7 +25,7 @@ struct ChartModelTesting {
             updatedAt: Date(timeIntervalSince1970: 1_800)
         )
 
-        #expect(item.message == "요한복음 3장 16절")
+        #expect(item.message(locale: Self.korean) == "요한복음 3장 16절")
     }
 
     @Test("KJV 최근 필사 항목도 권 · 장절은 앱 언어(한국어)로 적고 뒤에 KJV 를 붙인다")
@@ -32,7 +35,7 @@ struct ChartModelTesting {
             updatedAt: Date(timeIntervalSince1970: 1_800)
         )
 
-        #expect(item.message == "요한복음 3장 16절 · KJV")
+        #expect(item.message(locale: Self.korean) == "요한복음 3장 16절 · KJV")
     }
 
     @Test("차트 목록의 장 참조(최근 장 · 가장 많이 쓴 장)는 KJV · BSB 만 약칭을 붙이고 개역개정은 생략한다 — 영어 기기도 같다(사용자 결정 17)")
@@ -42,9 +45,9 @@ struct ChartModelTesting {
         let kjv = BibleChapter(title: .psalms, chapter: 23, translation: .KJV)
         let bsb = BibleChapter(title: .john, chapter: 3, translation: .BSB)
 
-        #expect(BibleReference(chartChapter: nkrv).text == "시편 23장")
-        #expect(BibleReference(chartChapter: kjv).text == "시편 23장 · KJV")
-        #expect(BibleReference(chartChapter: bsb).text == "요한복음 3장 · BSB")
+        #expect(BibleReference(chartChapter: nkrv).text(locale: Self.korean) == "시편 23장")
+        #expect(BibleReference(chartChapter: kjv).text(locale: Self.korean) == "시편 23장 · KJV")
+        #expect(BibleReference(chartChapter: bsb).text(locale: Self.korean) == "요한복음 3장 · BSB")
         #expect(BibleReference(chartChapter: nkrv).text(locale: english) == "Psalm 23")
         #expect(BibleReference(chartChapter: kjv).text(locale: english) == "Psalm 23 · KJV")
         #expect(BibleReference(chartChapter: bsb, verses: .verse(16)).text(locale: english) == "John 3:16 · BSB")
