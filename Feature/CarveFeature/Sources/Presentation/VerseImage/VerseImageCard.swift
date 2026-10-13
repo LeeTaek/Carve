@@ -118,12 +118,16 @@ extension VerseImageCard {
     }
 
     /// 절 이미지를 PNG 로 그린다. 그리지 못하면 nil.
+    ///
+    /// 렌더러는 화면 밖에서 따로 그려 앱의 환경을 물려받지 않는다 — 내용의 locale 을 환경으로 넣어
+    /// 카드 문구(「나의 필사」 · 앱 이름)를 출처(`content.reference`)와 같은 언어로 그린다(즉시 전환 단계 3).
     /// - Parameters:
     ///   - content: 이미지 내용.
     ///   - scale: 배율.
     static func renderPNG(_ content: VerseImageContent, scale: CGFloat = renderScale) -> Data? {
         let card = VerseImageCard(content: content, handwriting: handwritingImage(content.handwriting, scale: scale))
             .environment(\.colorScheme, .light)
+            .environment(\.locale, content.locale)
         let renderer = ImageRenderer(content: card)
         renderer.scale = scale
         renderer.isOpaque = true

@@ -21,17 +21,22 @@ struct VerseImageCardTesting {
         OwnershipTestSupport.stroke(from: start, to: end, seed: 1, creationTime: 1_000)
     }
 
-    private static func content(ink: [PKStroke]?) -> VerseImageContent {
+    private static let korean = Locale(identifier: "ko")
+    private static let english = Locale(identifier: "en")
+
+    /// 이미지 내용 — 출처는 `locale` 로 짓는다. `reference` 를 주면 그 출처를 그대로 쓴다(카드 문구만 언어가 다른 경우를 보려고).
+    private static func content(ink: [PKStroke]?, locale: Locale = korean, reference: String? = nil) -> VerseImageContent {
         VerseImageContent(
             sentence: "여호와는 나의 목자시니 내가 부족함이 없으리로다",
             setting: .initialState,
-            reference: VerseImageContent.reference(chapter: BibleChapter(title: .psalms, chapter: 23), verse: 1),
+            reference: reference ?? VerseImageContent.reference(chapter: BibleChapter(title: .psalms, chapter: 23), verse: 1, locale: locale),
             handwriting: VerseImageHandwriting(
                 verse: 1,
                 writingSize: CGSize(width: 320, height: 60),
                 underlineAnchors: [30, 60],
                 inkData: ink.map { PKDrawing(strokes: $0).dataRepresentation() }
-            )
+            ),
+            locale: locale
         )
     }
 
@@ -42,7 +47,30 @@ struct VerseImageCardTesting {
 
     @Test("출처는 「권 장 절 · 번역본」 이다 — 시편도 앱의 다른 화면처럼 「장」 으로 적는다")
     func referenceText() {
-        #expect(VerseImageContent.reference(chapter: BibleChapter(title: .psalms, chapter: 23), verse: 1) == "시편 23장 1절 · 개역개정")
+        #expect(VerseImageContent.reference(chapter: BibleChapter(title: .psalms, chapter: 23), verse: 1, locale: Self.korean) == "시편 23장 1절 · 개역개정")
+    }
+
+    @Test("영어 locale 로 만든 내용은 출처가 영어다 — 「Genesis 1:1 · KJV」, 내용이 그 locale 을 함께 담는다")
+    func englishContentHasEnglishReference() {
+        let content = Self.content(ink: nil, locale: Self.english)
+        #expect(content.reference == "Psalm 23:1 · NKRV")
+        #expect(content.locale == Self.english)
+        #expect(VerseImageContent.reference(chapter: BibleChapter(title: .genesis, chapter: 1, translation: .KJV), verse: 1, locale: Self.english)
+            == "Genesis 1:1 · KJV")
+    }
+
+    @Test("카드 문구(앱 이름)는 내용의 locale 로 그린다 — 출처가 같아도 locale 이 다르면 다른 그림이고, 같으면 같은 그림이다")
+    func cardCopyFollowsContentLocale() throws {
+        let korean = Self.content(ink: nil, locale: Self.korean)
+        // 출처는 같게 두고 locale 만 바꾼다 — 그림이 달라지는 것은 렌더러가 넣은 locale 로 그린 카드 문구(「새기다」 · 「Carve」)뿐이다.
+        let english = Self.content(ink: nil, locale: Self.english, reference: korean.reference)
+
+        let koreanPNG = try #require(VerseImageCard.renderPNG(korean, scale: 1))
+        let koreanAgain = try #require(VerseImageCard.renderPNG(korean, scale: 1))
+        let englishPNG = try #require(VerseImageCard.renderPNG(english, scale: 1))
+
+        #expect(koreanPNG == koreanAgain)
+        #expect(koreanPNG != englishPNG)
     }
 
     @Test("카드 폭은 필사 폭에 좌우 여백을 더한 것이고, 배율만큼 픽셀이 커진다")

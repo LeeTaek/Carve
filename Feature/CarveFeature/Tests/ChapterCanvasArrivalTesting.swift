@@ -177,7 +177,7 @@ struct ChapterCanvasArrivalTesting: DraftTestSamples {
         await store.receive(\.arrivalChecked)
 
         #expect(store.state.arrival.notice == .arrived)
-        #expect(store.state.arrival.notice?.actionTitle == "확인하기")
+        #expect(store.state.arrival.notice?.actionTitle(locale: Locale(identifier: "ko")) == "확인하기")
         // 화면 · 세션은 그대로다 — 다시 읽지 않았다.
         #expect(verseOne(store) == Data([1]))
         #expect(store.state.loadedDrawings?.contains { $0.verse == 2 && $0.lineData == Data("create-mine".utf8) } == true)
@@ -326,7 +326,7 @@ struct ChapterCanvasArrivalTesting: DraftTestSamples {
         spy.releaseLoad()
         await store.receive(\.drawingsLoaded)
         #expect(store.state.arrival.notice == .reloadFailed(.check))
-        #expect(store.state.arrival.notice?.actionTitle == "다시 시도")
+        #expect(store.state.arrival.notice?.actionTitle(locale: Locale(identifier: "ko")) == "다시 시도")
         #expect(verseOne(store) == Data([1]))
         #expect(store.state.isInputEnabled)
 
@@ -375,7 +375,7 @@ extension ChapterCanvasArrivalTesting {
         #expect(drafts.stored(in: accountA) == [mine])
         #expect(store.state.drafts.hiddenCounts == [1: 1])
         #expect(store.state.arrival.notice == .draftsHidden(count: 1))
-        #expect(store.state.arrival.notice?.actionTitle == "필기 확인하기")
+        #expect(store.state.arrival.notice?.actionTitle(locale: Locale(identifier: "ko")) == "필기 확인하기")
         #expect(store.state.isInputEnabled)
 
         await store.send(.arrivalNoticeTapped)

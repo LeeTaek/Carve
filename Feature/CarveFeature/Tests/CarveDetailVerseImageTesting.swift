@@ -110,10 +110,21 @@ struct CarveDetailVerseImageTesting {
         renderer: RendererSpy,
         clock: TestClock<Duration> = TestClock(),
         openedURLs: LockIsolated<[URL]> = LockIsolated([]),
-        state: CarveDetailFeature.State? = nil
+        state: CarveDetailFeature.State? = nil,
+        languageOverride: AppLanguage? = nil
     ) -> StoreOf<CarveDetailFeature> {
+        // 앱 안에서 고른 화면 언어 — 설정 › 화면 › 언어와 같은 키에 넣어 리듀서의 `AppLanguage.displayLocale()` 이 읽게 한다.
+        let inMemoryStorage = InMemoryStorage()
+        if let languageOverride {
+            withDependencies {
+                $0.defaultInMemoryStorage = inMemoryStorage
+            } operation: {
+                @Shared(.appLanguageOverride) var selected: AppLanguage?
+                $selected.withLock { $0 = languageOverride }
+            }
+        }
         // 기본 인자는 격리되지 않은 문맥에서 계산돼 MainActor 인 `state()` 를 부를 수 없다 — 안에서 채운다.
-        Store(initialState: state ?? Self.state()) {
+        return Store(initialState: state ?? Self.state()) {
             CarveDetailFeature()
         } withDependencies: {
             $0.photoLibraryClient = photos
@@ -122,6 +133,9 @@ struct CarveDetailVerseImageTesting {
             $0.openURL = OpenURLEffect { url in
                 openedURLs.withValue { $0.append(url) }
                 return true
+            }
+            if languageOverride != nil {
+                $0.defaultInMemoryStorage = inMemoryStorage
             }
         }
     }
@@ -157,17 +171,34 @@ struct CarveDetailVerseImageTesting {
         store.send(Self.request)
         try await waitUntil { store.imageSaveNotice == .saved }
 
+        // 앱 안에서 고른 언어가 없으면 이미지의 언어는 iOS 가 고른 언어(`autoupdatingCurrent` — 시험은 ko-KR)다.
         #expect(renderer.rendered.value == [VerseImageContent(
             sentence: Self.sentence,
             setting: store.sentenceSetting,
             reference: "시편 23장 1절 · 개역개정",
-            handwriting: Self.handwriting
+            handwriting: Self.handwriting,
+            locale: .autoupdatingCurrent
         )])
         #expect(photos.added.value == [Data("png".utf8)])
         #expect(store.isSavingVerseImage == false)
 
         await clock.advance(by: CarveDetailFeature.imageSavedNoticeDuration)
         try await waitUntil { store.imageSaveNotice == nil }
+    }
+
+    @Test("앱 안에서 영어를 고르면 저장을 요청한 순간의 언어로 이미지 한 장을 만든다 — 출처는 「Psalm 23:1 · NKRV」, 렌더러도 같은 en locale 을 받는다")
+    func englishScreenMakesEnglishImage() async throws {
+        let renderer = RendererSpy()
+        let store = makeStore(photos: PhotoLibrarySpy(), renderer: renderer, languageOverride: .english)
+
+        store.send(Self.request)
+        try await waitUntil { store.imageSaveNotice == .saved }
+
+        let content = try #require(renderer.rendered.value.first)
+        #expect(content.reference == "Psalm 23:1 · NKRV")
+        #expect(content.locale.language.languageCode?.identifier == "en")
+        // 지역은 기기 것 그대로다(`AppLanguage.locale(base:)`) — 언어만 바뀐다.
+        #expect(content.locale.region == Locale.autoupdatingCurrent.region)
     }
 
     @Test("사진 추가 권한이 꺼져 있으면 안내 대신 확인창을 띄우고, 「설정 열기」 는 앱 설정을 연다")

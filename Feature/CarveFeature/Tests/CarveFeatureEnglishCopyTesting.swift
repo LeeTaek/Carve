@@ -4,7 +4,8 @@
 //
 //  영어 현지화(결정 3 · 5 · 8 · 11) — CarveFeature 화면 문구가 영어 로케일에서 카탈로그의 영어로 나오는지.
 //  시험은 ko-KR 로 돈다(결정 6). 영어는 로케일을 받는 경로(`…(locale:)`)로 언어를 실제로 골라 본다 —
-//  `String(localized:bundle:locale:)` 의 locale 은 언어를 고르지 않는다. 같은 함수의 한국어(로케일 없음) 결과도 함께 본다.
+//  `String(localized:bundle:locale:)` 의 locale 은 언어를 고르지 않는다. 같은 함수의 한국어(`ko`) 결과도 함께 본다.
+//  표시용 함수는 늘 로케일을 받는다(즉시 전환 단계 3) — 뷰는 환경 locale, 리듀서는 `AppLanguage.displayLocale()` 을 넘긴다.
 //
 
 @testable import CarveFeature
@@ -45,20 +46,22 @@ struct CarveFeatureEnglishCopyTesting {
     func navigationTitles() {
         #expect(CarveNavigationView.chapterListTitle(.genesis, chapter: 1, locale: Self.english) == "Genesis 1")
         #expect(CarveNavigationView.chapterListTitle(.genesis, chapter: nil, locale: Self.english) == "Genesis")
-        #expect(CarveNavigationView.chapterListTitle(.genesis, chapter: 1) == "창세기 1장")
+        #expect(CarveNavigationView.chapterListTitle(.genesis, chapter: 1, locale: Self.korean) == "창세기 1장")
 
         #expect(CarveNavigationView.titleAccessibilityLabel(.genesis, isSelected: true, locale: Self.english) == "Genesis, 50 chapters")
         #expect(CarveNavigationView.titleAccessibilityLabel(.obadiah, isSelected: true, locale: Self.english) == "Obadiah, 1 chapter")
         #expect(CarveNavigationView.titleAccessibilityLabel(.genesis, isSelected: false, locale: Self.english) == "Genesis")
-        #expect(CarveNavigationView.titleAccessibilityLabel(.genesis, isSelected: true) == "창세기, 총 50장")
+        #expect(CarveNavigationView.titleAccessibilityLabel(.genesis, isSelected: true, locale: Self.korean) == "창세기, 총 50장")
     }
 
-    @Test("권 검색은 앱 언어와 상관없이 한국어 · 영어 이름 어느 쪽으로도 맞는다")
+    @Test("권 검색은 화면 언어와 상관없이 한국어 · 영어 이름 어느 쪽으로도 맞는다")
     func titleSearchMatchesBothLanguages() {
-        #expect(CarveNavigationView.titleMatches(.genesis, searchText: "창세"))
-        #expect(CarveNavigationView.titleMatches(.genesis, searchText: "gen"))
-        #expect(CarveNavigationView.titleMatches(.samuel1, searchText: "1 Sam"))
-        #expect(!CarveNavigationView.titleMatches(.genesis, searchText: "출애굽"))
+        for locale in [Self.korean, Self.english] {
+            #expect(CarveNavigationView.titleMatches(.genesis, searchText: "창세", locale: locale))
+            #expect(CarveNavigationView.titleMatches(.genesis, searchText: "gen", locale: locale))
+            #expect(CarveNavigationView.titleMatches(.samuel1, searchText: "1 Sam", locale: locale))
+            #expect(!CarveNavigationView.titleMatches(.genesis, searchText: "출애굽", locale: locale))
+        }
     }
 
     // MARK: 이미지 출처
@@ -66,7 +69,7 @@ struct CarveFeatureEnglishCopyTesting {
     @Test("이미지 출처는 영어 기기에서 「Genesis 1:1 · KJV」 다")
     func verseImageReference() {
         #expect(VerseImageContent.reference(chapter: Self.kjvGenesis, verse: 1, locale: Self.english) == "Genesis 1:1 · KJV")
-        #expect(VerseImageContent.reference(chapter: Self.kjvGenesis, verse: 1) == "창세기 1장 1절 · KJV")
+        #expect(VerseImageContent.reference(chapter: Self.kjvGenesis, verse: 1, locale: Self.korean) == "창세기 1장 1절 · KJV")
     }
 
     // MARK: 즐겨찾기 날짜
@@ -93,7 +96,7 @@ struct CarveFeatureEnglishCopyTesting {
         #expect(english.contains("September"))
         #expect(english.contains("2026"))
         #expect(VerseDrawingHistoryView.dateText(nil, locale: Self.english) == "Unknown date")
-        #expect(VerseDrawingHistoryView.dateText(nil) == "날짜를 확인할 수 없어요")
+        #expect(VerseDrawingHistoryView.dateText(nil, locale: Self.korean) == "날짜를 확인할 수 없어요")
     }
 
     // MARK: 지우기 확인
@@ -112,8 +115,8 @@ struct CarveFeatureEnglishCopyTesting {
         #expect(String(state: try #require(failure.message)) == "Your writing on Genesis 1:1 is unchanged. Please try again.")
         #expect(failure.buttons.map { String(state: $0.label) } == ["Close", "Try Again"])
 
-        // 한국어(로케일 없음)는 예전 문구 그대로다.
-        let korean = ChapterCanvasFeature.confirmEraseAlert(chapter: Self.kjvGenesis, verse: 1)
+        // 한국어 로케일은 예전 문구 그대로다.
+        let korean = ChapterCanvasFeature.confirmEraseAlert(chapter: Self.kjvGenesis, verse: 1, locale: Self.korean)
         #expect(String(state: korean.title) == "창세기 1장 1절 필사 지우기")
         #expect(korean.buttons.map { String(state: $0.label) } == ["취소", "지우기"])
     }
@@ -124,11 +127,11 @@ struct CarveFeatureEnglishCopyTesting {
     func paletteAndFontNames() throws {
         let ink = try #require(ColorPalatteFeature.defaultColors.first)
         #expect(ColorPalatteView.colorName(ink, locale: Self.english) == "Ink black")
-        #expect(ColorPalatteView.colorName(ink) == "먹색")
+        #expect(ColorPalatteView.colorName(ink, locale: Self.korean) == "먹색")
         // 글꼴 이름은 Domain 한 곳에서 현지화한다 — 본문 설정 칸과 Domain 표기가 어긋나지 않는다.
         #expect(FontCase.allCases.map { SentenceSettingsView.fontName($0, locale: Self.english) }
             == ["Nanum Myeongjo", "Nanum Gothic", "Nanum Flower Scent"])
-        #expect(FontCase.allCases.map { SentenceSettingsView.fontName($0) } == ["나눔명조", "나눔고딕", "나눔손글씨 꽃내음"])
+        #expect(FontCase.allCases.map { SentenceSettingsView.fontName($0, locale: Self.korean) } == ["나눔명조", "나눔고딕", "나눔손글씨 꽃내음"])
         #expect(FontCase.allCases.map { SentenceSettingsView.fontName($0, locale: Self.english) }
             == FontCase.allCases.map { $0.title(locale: Self.english) })
     }
@@ -138,7 +141,43 @@ struct CarveFeatureEnglishCopyTesting {
     @Test("앱 안 로고의 앱 이름은 영어에서 Carve 다(결정 8)")
     func appName() {
         #expect(CarveFeatureCatalog.string("새기다", locale: Self.english) == "Carve")
-        #expect(CarveFeatureCatalog.string("새기다") == "새기다")
+        #expect(CarveFeatureCatalog.string("새기다", locale: Self.korean) == "새기다")
+    }
+
+    // MARK: 안내 · 사유
+
+    @Test("결과 안내 · 막은 사유 · 조회 실패 안내는 넘긴 로케일의 언어로 나온다 — 사유도 안내와 같은 언어다")
+    func noticesFollowLocale() {
+        #expect(SyncedWriteBlock.signedOut.reasonText(locale: Self.english) == "You're not signed in to iCloud")
+        #expect(SyncedWriteBlock.signedOut.reasonText(locale: Self.korean) == "iCloud 에 로그인하지 않았어요")
+        #expect(FavoriteListView.message(for: .blocked(.signedOut), locale: Self.english)
+            == "Favorites weren't changed. You're not signed in to iCloud")
+        #expect(FavoriteListView.message(for: .widgetAdded, locale: Self.korean) == "위젯에 담았어요")
+        #expect(FavoriteListView.message(for: .widgetLimitReached, locale: Self.english) == "The widget can hold up to 20 verses")
+        #expect(VerseDrawingHistoryView.blockedMessage(.signedOut, locale: Self.english)
+            == "Didn't switch to this version. You're not signed in to iCloud")
+
+        let storeFailure = DrawingLoadFailure(message: "boom")
+        #expect(LoadFailureNoticeView.message(for: storeFailure, locale: Self.english) == "Couldn't load the writing for this chapter")
+        #expect(LoadFailureNoticeView.message(for: storeFailure, locale: Self.korean) == "이 장의 필사를 불러오지 못했어요")
+        #expect(LoadFailureNoticeView.draftsMessage(locale: Self.english) == "Couldn't load the drafts kept on this device")
+    }
+
+    @Test("늦게 도착한 필사 안내의 문장 · 버튼은 상태에 담지 않고 보일 때 넘긴 로케일로 만든다")
+    func arrivalNoticeFollowsLocale() {
+        #expect(ArrivalNotice.arrived.message(locale: Self.english) == "New writing arrived")
+        #expect(ArrivalNotice.arrived.message(locale: Self.korean) == "다른 필사가 도착했어요")
+        #expect(ArrivalNotice.arrived.actionTitle(locale: Self.english) == "Review")
+        #expect(ArrivalNotice.reloadFailed(.check).actionTitle(locale: Self.english) == "Try Again")
+        #expect(ArrivalNotice.draftsHidden(count: 1).actionTitle(locale: Self.english) == "Review Drafts")
+        #expect(ArrivalNotice.confirming.actionTitle(locale: Self.english) == nil)
+    }
+
+    @Test("이전 필사 회차의 VoiceOver 이름은 날짜와 「지금 보이는 회차」 를 같은 언어로 읽는다")
+    func historyRowAccessibilityLabelFollowsLocale() {
+        #expect(VerseDrawingHistoryView.rowAccessibilityLabel(nil, isCurrent: true, locale: Self.english) == "Unknown date, Showing now")
+        #expect(VerseDrawingHistoryView.rowAccessibilityLabel(nil, isCurrent: true, locale: Self.korean) == "날짜를 확인할 수 없어요, 지금 보이는 회차")
+        #expect(VerseDrawingHistoryView.rowAccessibilityLabel(nil, isCurrent: false, locale: Self.english) == "Unknown date")
     }
 
     // MARK: 용어

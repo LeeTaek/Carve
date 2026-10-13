@@ -16,16 +16,19 @@ struct ArrivalNoticeView: View {
     let notice: ArrivalNotice
     let onAction: () -> Void
     let onDismiss: () -> Void
+    /// 화면 언어 — 안내 문장 · 버튼 제목 · 접근성 알림을 이 값으로 만든다(즉시 전환 단계 3).
+    @Environment(\.locale) private var locale
 
     var body: some View {
+        let actionTitle = notice.actionTitle(locale: locale)
         HStack(spacing: CarveSpacing.small) {
             leading
                 .accessibilityHidden(true)
-            Text(notice.message)
+            Text(notice.message(locale: locale))
                 .font(CarveTypography.body)
                 .foregroundStyle(CarveColor.ink)
                 .fixedSize(horizontal: false, vertical: true)
-            if let title = notice.actionTitle {
+            if let title = actionTitle {
                 Button(action: onAction) {
                     Text(title)
                         .font(CarveTypography.label)
@@ -49,13 +52,13 @@ struct ArrivalNoticeView: View {
             }
         }
         .padding(.leading, CarveSpacing.large)
-        .padding(.trailing, notice.actionTitle == nil ? CarveSpacing.large : CarveSpacing.small)
+        .padding(.trailing, actionTitle == nil ? CarveSpacing.large : CarveSpacing.small)
         .padding(.vertical, CarveSpacing.xSmall)
         .frame(minHeight: 60)
         .carveSurface(.solid, in: Capsule())
         .accessibilityElement(children: .contain)
         .onChange(of: notice, initial: true) { _, notice in
-            AccessibilityNotification.Announcement(notice.message).post()
+            AccessibilityNotification.Announcement(notice.message(locale: locale)).post()
         }
     }
 

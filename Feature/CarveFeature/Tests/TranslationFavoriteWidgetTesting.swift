@@ -186,18 +186,19 @@ struct TranslationFavoriteWidgetTesting {
         #expect(rendered.value.map(\.sentence) == [Self.kjvSentence])
     }
 
-    @Test("이미지 출처는 BibleReference 로 짓는다 — 영어 기기는 「Psalm 23:1 · KJV」, 합쳐진 절은 범위로 적는다")
+    @Test("이미지 출처는 BibleReference 로 짓는다 — 영어 화면은 「Psalm 23:1 · KJV」, 합쳐진 절은 범위로 적는다")
     func verseImageReferenceFollowsAppLanguage() {
         let english = Locale(identifier: "en")
+        let korean = Locale(identifier: "ko")
         #expect(VerseImageContent.reference(chapter: Self.kjvChapter, verse: 1, locale: english) == "Psalm 23:1 · KJV")
         #expect(VerseImageContent.reference(chapter: Self.nkrvChapter, verse: 1, locale: english) == "Psalm 23:1 · NKRV")
-        #expect(VerseImageContent.reference(chapter: Self.nkrvChapter, verse: 1) == "시편 23장 1절 · 개역개정")
+        #expect(VerseImageContent.reference(chapter: Self.nkrvChapter, verse: 1, locale: korean) == "시편 23장 1절 · 개역개정")
 
         let deuteronomy = BibleChapter(title: .deuteronomy, chapter: 6, translation: .BSB)
-        #expect(VerseImageContent.reference(chapter: deuteronomy, verse: 18, verseEnd: 19) == "신명기 6장 18-19절 · BSB")
+        #expect(VerseImageContent.reference(chapter: deuteronomy, verse: 18, verseEnd: 19, locale: korean) == "신명기 6장 18-19절 · BSB")
         #expect(VerseImageContent.reference(chapter: deuteronomy, verse: 18, verseEnd: 19, locale: english) == "Deuteronomy 6:18-19 · BSB")
         // 끝 절이 앞 절보다 크지 않으면 절 하나로 적는다.
-        #expect(VerseImageContent.reference(chapter: deuteronomy, verse: 18, verseEnd: 18) == "신명기 6장 18절 · BSB")
+        #expect(VerseImageContent.reference(chapter: deuteronomy, verse: 18, verseEnd: 18, locale: korean) == "신명기 6장 18절 · BSB")
     }
 
     // MARK: 즐겨찾기 목록
@@ -217,11 +218,12 @@ struct TranslationFavoriteWidgetTesting {
             $0.hasLoaded = true
         }
 
-        // 카드 — 참조는 앱 언어, 번역본 약칭은 그 아래 줄이다.
-        #expect(FavoriteListView.referenceText(Self.kjvKey) == "시편 23장 1절")
+        // 카드 — 참조는 화면 언어(뷰는 환경 locale 을 넘긴다), 번역본 약칭은 그 아래 줄이다.
+        let korean = Locale(identifier: "ko")
+        #expect(FavoriteListView.referenceText(Self.kjvKey, locale: korean) == "시편 23장 1절")
         #expect(FavoriteListView.referenceText(Self.kjvKey, locale: Locale(identifier: "en")) == "Psalm 23:1")
-        #expect(FavoriteListView.translationText(Self.kjvKey) == "KJV")
-        #expect(FavoriteListView.translationText(Self.nkrvKey) == "개역개정")
+        #expect(FavoriteListView.translationText(Self.kjvKey, locale: korean) == "KJV")
+        #expect(FavoriteListView.translationText(Self.nkrvKey, locale: korean) == "개역개정")
         #expect(FavoriteListView.translationText(Self.nkrvKey, locale: Locale(identifier: "en")) == "NKRV")
 
         await store.send(.view(.openVerseTapped(Self.kjvKey)))

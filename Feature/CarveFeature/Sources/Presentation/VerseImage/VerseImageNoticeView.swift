@@ -17,6 +17,8 @@ import UIComponents
 struct VerseImageNoticeView: View {
     let notice: CarveDetailFeature.ImageSaveNotice
     let onRetry: () -> Void
+    /// 화면 언어 — 안내 문구 · 접근성 알림을 이 값으로 만든다(즉시 전환 단계 3).
+    @Environment(\.locale) private var locale
 
     var body: some View {
         content
@@ -37,8 +39,8 @@ struct VerseImageNoticeView: View {
 
     private var message: String {
         switch notice {
-        case .saved: String(localized: "사진에 저장했어요", bundle: .module)
-        case .failed: String(localized: "저장하지 못했어요", bundle: .module)
+        case .saved: CarveFeatureCatalog.string("사진에 저장했어요", locale: locale)
+        case .failed: CarveFeatureCatalog.string("저장하지 못했어요", locale: locale)
         }
     }
 }

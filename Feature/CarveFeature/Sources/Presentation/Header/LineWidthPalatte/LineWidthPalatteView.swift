@@ -16,6 +16,8 @@ import UIComponents
 @ViewAction(for: LineWidthPalatteFeature.self)
 public struct LineWidthPalatteView: View {
     @Bindable public var store: StoreOf<LineWidthPalatteFeature>
+    /// 화면 언어 — 제목 · 슬라이더 이름을 이 값으로 만든다(즉시 전환 단계 3).
+    @Environment(\.locale) private var locale
 
     public init(store: StoreOf<LineWidthPalatteFeature>) {
         self.store = store
@@ -23,7 +25,7 @@ public struct LineWidthPalatteView: View {
 
     public var body: some View {
         VStack(spacing: 0) {
-            CarvePanelHeader(String(localized: "펜 굵기", bundle: .module)) {
+            CarvePanelHeader(CarveFeatureCatalog.string("펜 굵기", locale: locale)) {
                 Button { send(.done) } label: { Text("완료", bundle: .module) }
                     .font(CarveTypography.body)
                     .foregroundStyle(CarveColor.accent)
@@ -39,7 +41,7 @@ public struct LineWidthPalatteView: View {
                 quickPicks
 
                 CarveLabeledSlider(
-                    String(localized: "굵기 조절", bundle: .module),
+                    CarveFeatureCatalog.string("굵기 조절", locale: locale),
                     value: $store.lineWidth.sending(\.setWidth),
                     in: LineWidthPalatteFeature.widthRange,
                     step: LineWidthPalatteFeature.widthStep,
