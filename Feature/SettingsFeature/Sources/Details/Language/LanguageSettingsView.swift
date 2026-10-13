@@ -15,6 +15,8 @@ import UIComponents
 @ViewAction(for: LanguageSettingsFeature.self)
 public struct LanguageSettingsView: View {
     public let store: StoreOf<LanguageSettingsFeature>
+    /// 화면 언어 — 고르면 앱 루트가 바꾸고, 이 화면의 미리 만드는 문구(묶음 제목 · 항목 이름)도 바로 따라온다.
+    @Environment(\.locale) private var locale
 
     public init(store: StoreOf<LanguageSettingsFeature>) {
         self.store = store
@@ -23,7 +25,7 @@ public struct LanguageSettingsView: View {
     public var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: CarveSpacing.large) {
-                CarveSettingsSection(SettingsCatalog.string("앱 언어")) {
+                CarveSettingsSection(SettingsCatalog.string("앱 언어", locale: locale)) {
                     CarveSegmentedPicker(
                         selection: Binding(
                             get: { store.selection },
@@ -31,7 +33,7 @@ public struct LanguageSettingsView: View {
                         ),
                         items: AppLanguageSelection.allCases
                     ) { selection in
-                        Text(selection.title)
+                        Text(selection.title(locale: locale))
                     }
                 }
 

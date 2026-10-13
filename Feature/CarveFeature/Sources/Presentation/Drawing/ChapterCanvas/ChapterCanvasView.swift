@@ -100,10 +100,15 @@ struct ChapterCanvasView: UIViewControllerRepresentable {
         context.coordinator.store = store
         context.coordinator.onScroll = onScroll
 
+        // 컬럼은 컨트롤러가 따로 만든 `UIHostingController` 안에 있어 바깥 환경을 물려받지 않는다 — 앱 안에서 고른 화면 언어(환경 locale)를
+        // 넣는다. 환경이 바뀌면 이 갱신이 새 값으로 불린다(즉시 전환 단계 0 · 2). 그 뒤 새로 만들어지는 절 행도 이 값을 받는다.
         controller.setColumn(
-            Self.hostedColumn(column) { [weak controller] height in
-                controller?.setColumnHeight(height)
-            },
+            AnyView(
+                Self.hostedColumn(column) { [weak controller] height in
+                    controller?.setColumnHeight(height)
+                }
+                .environment(\.locale, context.environment.locale)
+            ),
             chapter: display.layout?.chapter
         )
         controller.apply(ChapterCanvasController.Configuration(

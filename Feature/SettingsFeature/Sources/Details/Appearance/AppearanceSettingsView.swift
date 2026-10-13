@@ -17,6 +17,8 @@ public struct AppearanceSettingsView: View {
     public let store: StoreOf<AppearanceSettingsFeature>
     /// 고른 화면 모드. 세그먼트는 이 값을 보여 주고, 바꾸면 리듀서가 같은 키에 쓴다.
     @SharedReader(.appearanceMode) private var appearanceMode: AppearanceMode
+    /// 화면 언어 — 앱 안에서 언어를 고르면 바로 바뀐다(즉시 전환 단계 2).
+    @Environment(\.locale) private var locale
 
     public init(store: StoreOf<AppearanceSettingsFeature>) {
         self.store = store
@@ -25,7 +27,7 @@ public struct AppearanceSettingsView: View {
     public var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: CarveSpacing.large) {
-                CarveSettingsSection(SettingsCatalog.string("화면 모드")) {
+                CarveSettingsSection(SettingsCatalog.string("화면 모드", locale: locale)) {
                     CarveSegmentedPicker(
                         selection: Binding(
                             get: { appearanceMode },
@@ -33,7 +35,7 @@ public struct AppearanceSettingsView: View {
                         ),
                         items: AppearanceMode.allCases
                     ) { mode in
-                        Text(mode.title)
+                        Text(mode.title(locale: locale))
                     }
                 }
 
@@ -53,12 +55,12 @@ public struct AppearanceSettingsView: View {
 }
 
 extension AppearanceMode {
-    /// 설정 화면(사이드바 값 · 세그먼트)에 적는 이름.
-    var title: String {
+    /// 설정 화면(사이드바 값 · 세그먼트)에 적는 이름. 뷰는 환경 `locale` 을 넘긴다.
+    func title(locale: Locale) -> String {
         switch self {
-        case .system: SettingsCatalog.string("시스템 설정")
-        case .light: SettingsCatalog.string("라이트")
-        case .dark: SettingsCatalog.string("다크")
+        case .system: SettingsCatalog.string("시스템 설정", locale: locale)
+        case .light: SettingsCatalog.string("라이트", locale: locale)
+        case .dark: SettingsCatalog.string("다크", locale: locale)
         }
     }
 }

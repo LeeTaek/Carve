@@ -18,6 +18,7 @@ import ComposableArchitecture
 @MainActor
 struct CarveFeatureEnglishCopyTesting {
     private static let english = Locale(identifier: "en")
+    private static let korean = Locale(identifier: "ko")
     private static let kjvGenesis = BibleChapter(title: .genesis, chapter: 1, translation: .KJV)
     private static let nkrvMatthew = BibleChapter(title: .matthew, chapter: 5)
 
@@ -31,11 +32,11 @@ struct CarveFeatureEnglishCopyTesting {
         #expect(HeaderView.subtitleText(Self.nkrvMatthew, locale: Self.english) == "NKRV · New Testament / Matthew")
         #expect(HeaderView.titleAccessibilityLabel(Self.kjvGenesis, locale: Self.english) == "Genesis 1, change translation")
 
-        // 한국어 기기는 KJV 를 봐도 「창세기 1장」 이다(결정 3).
-        #expect(HeaderView.titleText(Self.kjvGenesis) == "창세기 1장")
-        #expect(HeaderView.subtitleText(Self.kjvGenesis) == "KJV · 구약 / 창세기")
-        #expect(HeaderView.subtitleText(Self.nkrvMatthew) == "개역개정 · 신약 / 마태복음")
-        #expect(HeaderView.titleAccessibilityLabel(Self.kjvGenesis) == "창세기 1장, 번역본 바꾸기")
+        // 한국어 화면은 KJV 를 봐도 「창세기 1장」 이다(결정 3). 헤더는 환경 locale 을 넘긴다(즉시 전환 단계 2).
+        #expect(HeaderView.titleText(Self.kjvGenesis, locale: Self.korean) == "창세기 1장")
+        #expect(HeaderView.subtitleText(Self.kjvGenesis, locale: Self.korean) == "KJV · 구약 / 창세기")
+        #expect(HeaderView.subtitleText(Self.nkrvMatthew, locale: Self.korean) == "개역개정 · 신약 / 마태복음")
+        #expect(HeaderView.titleAccessibilityLabel(Self.kjvGenesis, locale: Self.korean) == "창세기 1장, 번역본 바꾸기")
     }
 
     // MARK: 성경 탐색

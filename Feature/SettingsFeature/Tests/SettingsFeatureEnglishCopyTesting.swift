@@ -196,7 +196,7 @@ struct SettingsFeatureEnglishCopyTesting {
             texts += BackupUnsupportedReason.allCases.map { BackupCopy.unsupportedReason($0) }
             texts += UserFeedback.FeedbackType.allCases.map { SendFeedbackFeature.feedbackTypeTitle($0) }
             texts += SendFeedbackFeature.AttachmentType.allCases.map(\.title)
-            texts += AppearanceMode.allCases.map(\.title)
+            texts += AppearanceMode.allCases.map { $0.title(locale: Self.englishLocale) }
             texts += PatchnoteFeature.releases.flatMap { $0.notes.flatMap { [$0.title, $0.body] } }
             return texts
         }

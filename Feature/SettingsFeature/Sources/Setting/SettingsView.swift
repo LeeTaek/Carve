@@ -21,6 +21,8 @@ public struct SettingsView: View {
     @SharedReader(.appearanceMode) private var appearanceMode: AppearanceMode
     /// 이 실행에서 앱 안에서 바꾼 화면 언어. 사이드바 「언어」 행의 값만 바꾼다.
     @SharedReader(.appLanguageOverride) private var languageOverride: AppLanguage?
+    /// 화면 언어 — 미리 만드는 문구(패널 제목 · 행 이름 · 값)를 이 언어로 만든다(즉시 전환 단계 2 — 「화면」 묶음까지, 나머지 행은 단계 3).
+    @Environment(\.locale) private var locale
 
     public init(store: StoreOf<SettingsFeature>) {
         self.store = store
@@ -28,7 +30,7 @@ public struct SettingsView: View {
 
     public var body: some View {
         VStack(spacing: 0) {
-            CarvePanelHeader(SettingsCatalog.string("설정")) {
+            CarvePanelHeader(SettingsCatalog.string("설정", locale: locale)) {
                 Button {
                     send(.backToCarve)
                 } label: {
@@ -66,11 +68,11 @@ public struct SettingsView: View {
             }
             Section {
                 NavigationLink(value: SettingsFeature.SidebarItem.appearance) {
-                    sidebarRow(SettingsCatalog.string("화면 모드"), value: appearanceMode.title)
+                    sidebarRow(SettingsCatalog.string("화면 모드", locale: locale), value: appearanceMode.title(locale: locale))
                 }
                 // 앱 안에서 고르면 바로 그 언어를 보인다. 설정 앱에서 바꾸면 iOS 가 앱을 다시 시작한 뒤의 언어다(시작 때 언어).
                 NavigationLink(value: SettingsFeature.SidebarItem.language) {
-                    sidebarRow(SettingsCatalog.string("언어"), value: (languageOverride ?? .launch).nativeName)
+                    sidebarRow(SettingsCatalog.string("언어", locale: locale), value: (languageOverride ?? .launch).nativeName)
                 }
             } header: {
                 Text("화면", bundle: .module)

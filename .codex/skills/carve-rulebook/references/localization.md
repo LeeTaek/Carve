@@ -64,13 +64,23 @@
    - 영어는 **언어를 실제로 고르는 경로**로 본다. `String(localized:bundle:locale:)` 의 locale 은 보간 값 서식에만 쓰이고 언어를 고르지 않는다.
      `LocalizedStringResource(…, locale: Locale(identifier: "en"), bundle: .atURL(Bundle.module.bundleURL))` 를 `String(localized:)` 로 풀거나,
      locale 을 받는 API(`localizedName(locale:)` · `BibleReference.text(locale:)` · `Translation.displayName(locale:)` · 모듈 `…Catalog.string(_:locale:)`)를 쓴다.
-   - 문구를 만드는 함수는 `locale: Locale? = nil` 을 받게 하면 영어 시험을 쓸 수 있다. 제품 코드는 nil(기기 언어)로 부른다. 영어 문구 시험은 모듈의 영어 시험 파일(예 `DomainEnglishCopyTesting` · `CarveFeatureEnglishCopyTesting`)에 둔다.
+   - 표시용 문구를 만드는 함수는 **`locale: Locale` 을 받는다(기본값 없음)** — 뷰는 환경 `locale` 을, 시험은 `Locale(identifier: "en")` 등을 넘긴다(아래 9).
+     옛 함수의 `locale: Locale? = nil`(nil = 기기 언어)은 즉시 전환 단계 3 에서 없앤다 — 새 코드는 nil 경로를 쓰지 않는다. 영어 문구 시험은 모듈의 영어 시험 파일(예 `DomainEnglishCopyTesting` · `CarveFeatureEnglishCopyTesting`)에 둔다.
    - 시험 헬퍼는 자기 시험 파일 안에 둔다. 여러 모듈이 함께 쓰는 공용 시험 헬퍼는 새로 만들지 않는다.
 8) **영어 문구는 짧고 평이하게 쓴다.** iPad 사이드바 · 팔레트처럼 폭이 좁은 곳에서 잘리지 않게 한다. 같은 한국어는 모듈이 달라도 같은 영어로 쓴다 —
    새 문구를 넣기 전에 다른 모듈 카탈로그에서 같은 한국어 키를 찾아 본다. 글꼴 표시 이름은 Domain `FontCase.title(locale:)` 하나만 쓴다
    (ko 「나눔명조」 · 「나눔고딕」 · 「나눔손글씨 꽃내음」, en 「Nanum Myeongjo」 · 「Nanum Gothic」 · 「Nanum Flower Scent」 — 번들 글꼴 파일의 패밀리 이름에 맞춘다, 결정 18).
 
 ---
+
+9) **화면 언어는 환경 `locale` 이 정한다 — 앱 안에서 언어를 고르면 다시 시작하지 않고 바뀐다**(2026-10-13, 즉시 전환 단계 1 · 2).
+   - 앱 루트(`AppCoordinatorView`)가 고른 언어(`appLanguageOverride`)로 환경 `locale` 을 바꾼다. 키 기반 `Text("…", bundle:)` 은 저절로 따라온다.
+   - 뷰에서 미리 만드는 문구(카탈로그 도우미 · 표시용 함수 · 접근성 이름 · 컴포넌트에 넘기는 `String`)는 `@Environment(\.locale) private var locale` 을 읽어 넘긴다.
+     그러면 SwiftUI 가 의존성을 알고 그 뷰를 다시 그린다. `Locale.current` · `.autoupdatingCurrent` 를 뷰 문구에 쓰지 않는다.
+   - **따로 만든 호스트에는 환경 locale 을 넣는다 — 만들 때와 갱신 때 모두.** 예: `ChapterCanvasView.updateUIViewController`(캔버스 컬럼),
+     `TouchIgnoringContextMenu`(절 행 — 호스트를 Coordinator 에 붙잡고 언어가 바뀐 때만 `rootView` 를 다시 넣는다). `ImageRenderer` 는 요청에 locale 을 담는다.
+   - 리듀서 · effect · Domain 은 한 번 얻은 locale 을 인자로 받고, 상태에는 해석한 문자열 대신 의미 값을 둔다(단계 3).
+   - 이미 떠 있는 알림은 표시된 순간의 언어로 남는다. 루트에서 `.id` 로 화면 전체를 다시 만들지 않는다 — 필사 화면이 장을 다시 읽어 캔버스 · undo 가 비워진다.
 
 ## 번역본 귀속 (결정 1 — 동결)
 
@@ -105,3 +115,4 @@
 - 참조 · 권 이름을 `BibleReference` · `localizedName` 으로 만들었는가, 약칭 규칙(5)을 지켰는가
 - SwiftData 행에 영어 `translation` 값을 쓰지 않았는가, `titleName` 을 `StoredBookKey` 로만 짓고 풀었는가
 - 영어 시험이 언어를 실제로 골랐는가(`String(localized:bundle:locale:)` 만으로는 영어가 나오지 않는다)
+- 뷰의 미리 만든 문구가 환경 `locale` 을 넘기는가, 따로 만든 호스트 · 렌더러에 locale 을 넣었는가(9)

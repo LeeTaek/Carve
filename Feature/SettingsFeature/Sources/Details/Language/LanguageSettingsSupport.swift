@@ -19,10 +19,10 @@ extension AppLanguage {
 }
 
 extension AppLanguageSelection {
-    /// 고르기 항목 이름. 언어는 그 언어로 적고(「한국어」 · 「English」), 시스템 설정만 화면 언어로 옮긴다.
-    var title: String {
+    /// 고르기 항목 이름. 언어는 그 언어로 적고(「한국어」 · 「English」), 시스템 설정만 화면 언어로 옮긴다 — 뷰는 환경 `locale` 을 넘긴다.
+    func title(locale: Locale) -> String {
         switch self {
-        case .system: SettingsCatalog.string("시스템 설정")
+        case .system: SettingsCatalog.string("시스템 설정", locale: locale)
         case .korean: AppLanguage.korean.nativeName
         case .english: AppLanguage.english.nativeName
         }

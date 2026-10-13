@@ -24,6 +24,13 @@ enum SettingsCatalog {
     /// 부작용: 없음.
     static func string(_ value: String.LocalizationValue) -> String {
         guard let locale else { return String(localized: value, bundle: .module) }
+        return string(value, locale: locale)
+    }
+
+    /// 역할: 카탈로그 문구를 주어진 언어로 꺼낸다 — 뷰는 환경 `locale` 을 넘긴다. 앱 안에서 언어를 고르면 다시 시작하지 않고 바뀐다(즉시 전환 단계 2).
+    /// 입력 · 출력: 문구(키 = 한국어 원문, 보간 값 포함) · 로케일 → 그 언어로 현지화된 문자열. 수는 카탈로그의 복수형 변형을 따른다.
+    /// 부작용: 없음.
+    static func string(_ value: String.LocalizationValue, locale: Locale) -> String {
         // 언어를 고르려면 `LocalizedStringResource` 의 locale 로 푼다(Domain `DomainCatalog` · `BibleSourceCopy` 와 같은 방법).
         let resource = LocalizedStringResource(value, locale: locale, bundle: .atURL(Bundle.module.bundleURL))
         return String(localized: resource)

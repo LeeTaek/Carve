@@ -181,10 +181,21 @@ struct LanguageSettingsFeatureTesting {
 
     @Test("언어 이름은 화면 언어와 상관없이 그 언어로 적고, 시스템 설정만 화면 언어로 옮긴다")
     func selectionTitles() {
-        let titles = SettingsCatalog.$locale.withValue(Locale(identifier: "en")) {
-            AppLanguageSelection.allCases.map(\.title)
-        }
-        #expect(titles == ["System", "한국어", "English"])
+        #expect(AppLanguageSelection.allCases.map { $0.title(locale: Locale(identifier: "en")) } == ["System", "한국어", "English"])
+        #expect(AppLanguageSelection.allCases.map { $0.title(locale: Locale(identifier: "ko")) } == ["시스템 설정", "한국어", "English"])
+    }
+
+    @Test("미리 만드는 문구는 넘긴 locale 의 언어로 꺼낸다 — 뷰는 환경 locale 을 넘겨 다시 시작하지 않고 바뀐다(즉시 전환 단계 2)")
+    func catalogStringFollowsGivenLocale() {
+        let english = Locale(identifier: "en_KR")
+        let korean = Locale(identifier: "ko_KR")
+        #expect(SettingsCatalog.string("설정", locale: english) == "Settings")
+        #expect(SettingsCatalog.string("설정", locale: korean) == "설정")
+        #expect(SettingsCatalog.string("화면 모드", locale: english) == "Appearance")
+        #expect(AppearanceMode.system.title(locale: english) == "System")
+        #expect(AppearanceMode.system.title(locale: korean) == "시스템 설정")
+        // 앱 안에서 고른 언어의 locale(지역 · 시간제 보존)로도 같은 문구가 나온다.
+        #expect(SettingsCatalog.string("설정", locale: AppLanguage.english.locale(base: korean)) == "Settings")
     }
 
     @Test("언어 화면 문구는 영어로도 옮겨져 있다")

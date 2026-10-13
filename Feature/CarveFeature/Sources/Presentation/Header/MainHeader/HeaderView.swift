@@ -18,6 +18,8 @@ public struct HeaderView: View {
     @Bindable public var store: StoreOf<HeaderFeature>
     /// 버튼 줄 폭. 헤더 광고를 둘 자리가 있는지 판단한다.
     @State private var rowWidth: CGFloat = 0
+    /// 화면 언어 — 앱 안에서 언어를 고르면 앱 루트가 바꾼다. 미리 만드는 문구(제목 · 접근성 이름)는 이 값으로 만든다(즉시 전환 단계 2).
+    @Environment(\.locale) private var locale
 
     public init(store: StoreOf<HeaderFeature>) {
         self.store = store
@@ -132,16 +134,16 @@ public struct HeaderView: View {
 
     private var navigationAccessibilityLabel: String {
         store.isNavigationPresented
-            ? String(localized: "성경 탐색 닫기", bundle: .module)
-            : String(localized: "성경 탐색 열기", bundle: .module)
+            ? CarveFeatureCatalog.string("성경 탐색 닫기", locale: locale)
+            : CarveFeatureCatalog.string("성경 탐색 열기", locale: locale)
     }
 
     private var trailingControls: some View {
         HStack(spacing: CarveSpacing.xxSmall) {
-            CarveIconButton(.previous, accessibilityLabel: String(localized: "이전 장", bundle: .module), visualScale: buttonVisualScale) {
+            CarveIconButton(.previous, accessibilityLabel: CarveFeatureCatalog.string("이전 장", locale: locale), visualScale: buttonVisualScale) {
                 send(.moveToBefore)
             }
-            CarveIconButton(.next, accessibilityLabel: String(localized: "다음 장", bundle: .module), visualScale: buttonVisualScale) {
+            CarveIconButton(.next, accessibilityLabel: CarveFeatureCatalog.string("다음 장", locale: locale), visualScale: buttonVisualScale) {
                 send(.moveToNext)
             }
             // 실기기 UI 테스트가 찾는 식별자. 접근성 이름(「다음 장」)이 문구 변경으로 바뀌어도 유지한다.
@@ -154,7 +156,7 @@ public struct HeaderView: View {
     private var sentenceSettingsButton: some View {
         CarveIconButton(
             .textFormat,
-            accessibilityLabel: String(localized: "본문 설정", bundle: .module),
+            accessibilityLabel: CarveFeatureCatalog.string("본문 설정", locale: locale),
             isSelected: store.sentenceSettings != nil,
             visualScale: buttonVisualScale
         ) {
@@ -176,21 +178,21 @@ public struct HeaderView: View {
         Menu {
             Picker(selection: translationSelection) {
                 ForEach(Translation.allCases, id: \.self) { translation in
-                    Text(verbatim: Self.translationMenuTitle(translation)).tag(translation)
+                    Text(verbatim: Self.translationMenuTitle(translation, locale: locale)).tag(translation)
                 }
             } label: {
                 Text("번역본", bundle: .module)
             }
         } label: {
             VStack(spacing: 2) {
-                Text(verbatim: Self.titleText(store.currentTitle))
+                Text(verbatim: Self.titleText(store.currentTitle, locale: locale))
                     .font(CarveTypography.scripture(ResourcesFontFamily.NanumMyeongjo.regular.font(size: 26 - 10 * collapseProgress)))
                     // 세로 화면에서 광고와 함께 두면 폭이 좁아진다. 줄바꿈 대신 줄여 그린다.
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
                 // 번역본 약칭은 지금 장의 번역본이다(결정 11). 끝의 ⌄ 로 눌러서 번역본을 바꿀 수 있음을 알린다.
                 HStack(spacing: CarveSpacing.xxSmall) {
-                    Text(verbatim: Self.subtitleText(store.currentTitle))
+                    Text(verbatim: Self.subtitleText(store.currentTitle, locale: locale))
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
                     Image(systemName: "chevron.down")
@@ -210,8 +212,8 @@ public struct HeaderView: View {
         .menuStyle(.button)
         .buttonStyle(.plain)
         .tint(CarveColor.ink)
-        .accessibilityLabel(Self.titleAccessibilityLabel(store.currentTitle))
-        .accessibilityValue(Text(verbatim: store.currentTitle.translation.fullName))
+        .accessibilityLabel(Self.titleAccessibilityLabel(store.currentTitle, locale: locale))
+        .accessibilityValue(Text(verbatim: store.currentTitle.translation.fullName(locale: locale)))
     }
 
     /// 번역본 메뉴의 선택값. 고르면 리듀서로 보낸다 — 지금 번역본은 공유 장(`currentTitle`)이 정한다.
@@ -227,16 +229,16 @@ public struct HeaderView: View {
 
 extension HeaderView {
     /// 역할: 헤더 제목(「창세기 1장」 · 「Genesis 1」). 권 이름 · 장 표기는 번역본이 아니라 앱 언어를 따른다(영어 현지화 결정 3).
-    /// 입력 · 출력: 지금 장 · 로케일(nil 이면 앱 언어) → 참조 문자열(`BibleReference`, 약칭 없음 — 부제가 적는다).
+    /// 입력 · 출력: 지금 장 · 로케일(뷰는 환경 locale 을 넘긴다) → 참조 문자열(`BibleReference`, 약칭 없음 — 부제가 적는다).
     /// 부작용: 없음.
-    static func titleText(_ chapter: BibleChapter, locale: Locale? = nil) -> String {
+    static func titleText(_ chapter: BibleChapter, locale: Locale) -> String {
         BibleReference(chapter: chapter).text(locale: locale)
     }
 
     /// 역할: 헤더 부제(「개역개정 · 구약 / 창세기」 · 「KJV · Old Testament / Genesis」).
-    /// 입력 · 출력: 지금 장 · 로케일(nil 이면 앱 언어) → 번역본 약칭 · 구약/신약 · 권 이름.
+    /// 입력 · 출력: 지금 장 · 로케일(뷰는 환경 locale 을 넘긴다) → 번역본 약칭 · 구약/신약 · 권 이름.
     /// 부작용: 없음.
-    static func subtitleText(_ chapter: BibleChapter, locale: Locale? = nil) -> String {
+    static func subtitleText(_ chapter: BibleChapter, locale: Locale) -> String {
         let testament = chapter.title.isOldtestment
             ? CarveFeatureCatalog.string("구약", locale: locale)
             : CarveFeatureCatalog.string("신약", locale: locale)
@@ -244,16 +246,16 @@ extension HeaderView {
     }
 
     /// 역할: 제목 메뉴의 VoiceOver 이름(「창세기 1장, 번역본 바꾸기」). 지금 번역본은 값(`accessibilityValue`)으로 읽는다.
-    /// 입력 · 출력: 지금 장 · 로케일(nil 이면 앱 언어) → 제목과 메뉴가 하는 일.
+    /// 입력 · 출력: 지금 장 · 로케일(뷰는 환경 locale 을 넘긴다) → 제목과 메뉴가 하는 일.
     /// 부작용: 없음.
-    static func titleAccessibilityLabel(_ chapter: BibleChapter, locale: Locale? = nil) -> String {
+    static func titleAccessibilityLabel(_ chapter: BibleChapter, locale: Locale) -> String {
         CarveFeatureCatalog.string("\(titleText(chapter, locale: locale)), 번역본 바꾸기", locale: locale)
     }
 
     /// 역할: 번역본 메뉴의 항목 이름 — 약칭과 전체 이름. 둘이 같으면(한국어의 개역개정) 한 번만 적는다.
-    /// 입력 · 출력: 번역본 · 로케일(nil 이면 앱 언어) → 「KJV · King James Version」 · 「개역개정」.
+    /// 입력 · 출력: 번역본 · 로케일(뷰는 환경 locale 을 넘긴다) → 「KJV · King James Version」 · 「개역개정」.
     /// 부작용: 없음.
-    static func translationMenuTitle(_ translation: Translation, locale: Locale? = nil) -> String {
+    static func translationMenuTitle(_ translation: Translation, locale: Locale) -> String {
         let abbreviation = translation.displayName(locale: locale)
         let fullName = translation.fullName(locale: locale)
         return abbreviation == fullName ? abbreviation : "\(abbreviation) · \(fullName)"

@@ -519,17 +519,19 @@ private extension CarveDetailView {
 private struct ChapterColumnHeader: View {
     let halfWidth: CGFloat
     let isLeftHanded: Bool
+    /// 화면 언어 — 캔버스 컬럼 호스트가 앱 루트의 값을 넣어 준다(`ChapterCanvasView.updateUIViewController`).
+    @Environment(\.locale) private var locale
 
     var body: some View {
         let margins = ChapterLayoutHosting.pageMargins(contentWidth: halfWidth * 2)
         let scripture = columnLabel(
-            String(localized: "말씀", bundle: .module),
+            CarveFeatureCatalog.string("말씀", locale: locale),
             alignment: .leading,
             leading: isLeftHanded ? margins.gutter : margins.outer,
             trailing: isLeftHanded ? margins.outer : margins.gutter
         )
         let writing = columnLabel(
-            String(localized: "나의 필사 · 절을 길게 눌러 더 보기", bundle: .module),
+            CarveFeatureCatalog.string("나의 필사 · 절을 길게 눌러 더 보기", locale: locale),
             alignment: isLeftHanded ? .leading : .trailing,
             leading: isLeftHanded ? margins.outer : margins.gutter,
             trailing: isLeftHanded ? margins.gutter : margins.outer
