@@ -9,6 +9,7 @@
 import CarveFeature
 import ChartFeature
 import ClientInterfaces
+import Combine
 import SettingsFeature
 import SwiftUI
 import UIComponents
@@ -161,6 +162,31 @@ public struct AppCoordinatorView: View {
         }
         // 이 창의 오버레이 · 팝오버까지 같은 모드를 따른다. 필사 영역은 모드와 무관하게 라이트로 그린다(결정 8-1 안 1).
         .preferredColorScheme(appearanceMode.colorScheme)
+        // 설정 › 화면 › 언어에서 고른 언어를 이 창 전체에 내려보낸다 — 앱을 다시 시작하지 않고 바로 바뀐다(보관함 「Carve 앱 언어 즉시 전환」).
+        .modifier(AppLanguageEnvironment())
+    }
+}
+
+/// 앱 안에서 고른 화면 언어를 환경 `locale` 로 내려보낸다.
+///
+/// 고른 적이 없으면 기기 · 앱별 언어(`autoupdatingCurrent`)를 그대로 쓴다. 고른 뒤에는 그 언어로 바꾼 locale 이다 — 지역 · 시간제는 기기 것을 둔다.
+/// 수식어는 늘 같은 자리에 둔다 — 조건에 따라 붙였다 떼면 화면 identity 가 바뀌어 필사 화면이 장을 다시 읽는다(onAppear → 캔버스 load).
+private struct AppLanguageEnvironment: ViewModifier {
+    @SharedReader(.appLanguageOverride) private var languageOverride: AppLanguage?
+    /// 기기의 지역 · 시간제 설정이 바뀐 횟수. 바뀌면 고른 언어의 locale 을 새 설정으로 다시 만든다.
+    @State private var localeRevision = 0
+
+    func body(content: Content) -> some View {
+        content
+            .environment(\.locale, effectiveLocale(revision: localeRevision))
+            .onReceive(NotificationCenter.default.publisher(for: NSLocale.currentLocaleDidChangeNotification)) { _ in
+                localeRevision += 1
+            }
+    }
+
+    /// `revision` 은 값을 쓰지 않고 지역 설정 변경을 body 의 의존으로 삼으려고 받는다.
+    private func effectiveLocale(revision _: Int) -> Locale {
+        languageOverride?.locale() ?? .autoupdatingCurrent
     }
 }
 

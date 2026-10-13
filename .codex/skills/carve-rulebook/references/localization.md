@@ -1,7 +1,10 @@
 # Localization Rules (Carve)
 
 ## Goal
-- 앱 화면을 **기기 언어**(ko · en)로 보인다. 앱 안에 언어 설정은 없다. 영어 앱 이름은 **Carve** 다.
+- 앱 화면을 **기기 언어 · iOS 앱별 언어**(ko · en)로 보인다. 영어 앱 이름은 **Carve** 다.
+- 설정 › 화면 › 언어에서 앱 안에서도 바꾼다(2026-10-13). 저장은 iOS 앱별 언어와 같은 값(앱 도메인 `AppleLanguages`, ClientInterfaces `AppLanguageClient`)이고,
+  지금 실행은 앱 루트가 환경 `locale` 을 바꿔 키 기반 `Text("…", bundle:)` 을 바로 바꾼다(`appLanguageOverride`). 미리 만든 `String` 은 다음 실행부터 바뀐다 —
+  그래서 **새 화면 문구는 키 기반 `Text("…", bundle:)` 를 우선한다.** `String` 경로를 환경 locale 에 맞추는 규칙은 즉시 전환 단계 2 에서 정한다.
 - 영어 성경(KJV · BSB) 필사와 개역개정 필사를 **섞지 않는다** — 이미 나간 2.0.0 · 1.3.0 기기와 같은 iCloud 저장소를 쓴다.
 - 결정의 원문과 이유는 설계 `docs/english-localization-design.md`(「결정 n」)다. 이 문서는 코드를 쓸 때 지킬 규칙만 둔다.
 

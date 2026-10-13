@@ -321,6 +321,7 @@ private struct AppStartupView: View {
             $0.verseDraftImportMarker = localPreservation
             $0.localDrawingChanges = localDrawingChanges
             $0.photoLibraryClient = PhotoKitLibraryClient()
+            $0.appLanguageClient = AppleLanguagesClient()
             $0.widgetVerseClient = AppGroupWidgetVerseClient()
             $0.analyticsClient = FirebaseAnalyticsClient()
             #if DEBUG

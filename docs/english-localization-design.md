@@ -17,7 +17,7 @@
 | 구분 | 2.1.0 |
 |---|---|
 | 성경 | 개역개정(지금) + **KJV · BSB**. 헤더 제목을 눌러 번역본을 고른다(결정 4 · 19) |
-| 화면 | 앱 UI 영어 현지화 — **기기 언어를 따른다**(결정 3). 앱 언어만 따로 바꾸려면 설정 › 화면 › 언어가 iOS 앱별 언어 화면을 연다(결정 20, §8-5). 영어 앱 이름은 **Carve**(결정 8) |
+| 화면 | 앱 UI 영어 현지화 — **기기 언어를 따른다**(결정 3). 앱 언어만 따로 바꾸려면 설정 › 화면 › 언어에서 고른다 — 저장은 iOS 앱별 언어와 같은 값이고, 화면은 다시 시작하지 않고 바뀐다(§8-5). 영어 앱 이름은 **Carve**(결정 8) |
 | 저장 | 스키마 · 마이그레이션 · CloudKit 설정 변경 없음. 영어 행은 권 이름 접두로 구분한다(§3, 결정 1) |
 | 배포 | **영국을 빼고 배포한다.** 출시 때 App Store Connect 배포 국가에서 영국을 뺀다(KJV 영국 권리 — §2-1). **2.0.0 이 지금 영국에 나가 있는지 출시 전에 확인한다** — 나가 있으면 영국 사용자는 2.1.0 으로 업데이트하거나 다시 받을 수 없게 된다 |
 | 범위 밖 | ESV · NIV(§2-1), 한영 대조 화면, 자동 번역, App Store 영어 메타데이터(결정 8), 영어 글꼴 추가(결정 12 — M1 뒤 후속 판단) |
@@ -295,19 +295,25 @@ M1 에서 모양을 보고 어색하면 글꼴 추가는 후속 작업으로 한
 
 - 이름은 Domain `FontCase.title(locale:)` 한 곳에서 꺼낸다 — CarveFeature 가 따로 번역하던 글꼴 이름을 이것으로 합치는 일과 「나눔손글씨 꽃내음」 반영은 레이어 5 t5a 다.
 
-### 8-5. 앱 언어 바꾸기 (결정 20, 2026-10-12)
+### 8-5. 앱 언어 바꾸기 (결정 20, 2026-10-12 → 앱 안 즉시 전환 2026-10-13)
 
-- 설정 사이드바 「화면」 묶음에 **「언어」** 행을 둔다(`SettingsFeature.SidebarItem.language` · `LanguageSettingsFeature`). 행 값과 화면은 지금 앱 언어를
-  그 언어 이름(「한국어」 · 「English」)으로 보이고, 「iPad 설정에서 바꾸기」 가 설정 앱의 이 앱 화면(`UIApplication.openSettingsURLString`)을 연다.
-- **언어는 앱 안에 저장하지 않는다 — iOS 앱별 언어(설정 › 새기다 › 언어)를 그대로 쓴다.** 바꾸면 iOS 가 앱을 새로 시작하므로 화면 · 권 이름(결정 3) · 날짜 서식이
-  한꺼번에 바뀐다. 지금 언어는 모듈 번들이 고른 현지화(`Bundle.module.preferredLocalizations`)로 읽는다(`AppLanguage.current`).
+- 설정 사이드바 「화면」 묶음에 **「언어」** 행을 둔다(`SettingsFeature.SidebarItem.language` · `LanguageSettingsFeature`).
+  화면은 **시스템 설정 · 한국어 · English 고르기**이고, 「iPad 설정에서 바꾸기」(설정 앱의 이 앱 화면)는 보조 링크로 남긴다.
+  행 값은 지금 화면 언어를 그 언어 이름(「한국어」 · 「English」)으로 보인다.
+- **저장은 iOS 앱별 언어와 같은 값이다(단일 진실, 2026-10-13 확정).** 앱 안 고르기도 앱 UserDefaults 도메인의 `AppleLanguages` 를
+  설정 앱과 같은 모양(`[고른 언어-지역, 나머지 선호 언어…]`)으로 쓰고, 「시스템 설정」은 키를 지운다 — 설정 앱의 「기본 설정」 선택도 키를 지운다.
+  17.5 · 18.6 · 26.2 · 27.0 시뮬레이터에서 앱이 쓴 값과 설정 앱 표시가 같았다. 구현: ClientInterfaces `AppLanguage` · `AppLanguageSelection` ·
+  `AppLanguageClient`(계약) — App `AppleLanguagesClient`(UserDefaults). 고른 상태는 앱 도메인만(`persistentDomain(forName:)`) 읽는다.
+- **지금 실행은 환경 `locale` 로 바로 바꾼다.** 고르면 `appLanguageOverride`(in-memory 공유 값)에 언어를 넣고, 앱 루트(`AppCoordinatorView`)가
+  `.environment(\.locale, …)` 로 내려보낸다. 키 기반 `Text("…", bundle:)` 은 즉시 바뀌고, 미리 만든 문자열(`String(localized:)` · 카탈로그 도우미 ·
+  리듀서가 만든 문구)과 시스템이 그리는 화면은 다음 실행부터 바뀐다 — 미리 만든 문자열은 즉시 전환 단계 2 · 3 에서 환경 locale 을 따르게 옮긴다.
+  locale 은 언어 코드만 바꾸고 지역 · 달력 · 시간제는 기기 것을 둔다(`AppLanguage.locale(base:)` — 언어 구성요소를 통째로 바꾸면 지역이 사라진다).
+- 설정 앱에서 바꾸면 iOS 가 앱을 종료하고(같은 값을 다시 골라도) 새 언어로 다시 연다. 앱 안에서 바꾸면 종료하지 않는다.
 - 기기의 선호 언어가 하나뿐이면 iOS 가 앱 화면의 「언어」 항목을 숨기므로, 앱 Info.plist 에 `UIPrefersShowingLanguageSettings = YES` 를 켠다
   (`Plugins/ProjectDescriptionHelpers/InfoPlist.swift`).
 - 번역본은 앱 언어와 따로다 — 헤더 제목 메뉴(결정 19). 언어 화면 설명에도 적는다.
-- 기각: 앱 안 고르기(시스템 · 한국어 · English). 설정 앱의 앱별 언어도 앱 자기 UserDefaults 의 `AppleLanguages`(예 `["en-KR", "ko-KR"]`)에 저장되므로
-  같은 키를 쓰면 효과는 같다(2026-10-12 시뮬레이터 확인). 그러나 설정 앱에서 바꾸면 iOS 가 앱을 종료해 바로 새 언어로 열리는 반면, 앱 안에서 바꾸면
-  사용자가 직접 앱을 닫았다 열어야 한다 — 앱이 스스로 끝내는 `exit()` 는 Apple 이 금한다. 재시작 없이 바로 바꾸려면 `String(localized:)` · 카탈로그 도우미 ·
-  날짜 서식 · Domain 권 이름 전체가 앱 전역 언어 값을 받아야 해 범위가 크다. 사용자가 설정 앱 쪽을 그대로 두기로 했다(2026-10-12).
+- 기각: 루트 `.id` 로 화면 전체 다시 만들기 — 필사 화면 onAppear 가 장을 다시 읽어 캔버스 상태 · undo 를 비운다. 번들 클래스 바꿔치기 — 모듈 번들이 여럿이고
+  Swift 6 탈출구가 필요하다. 자체 선택 키 — 설정 앱 언어 항목과 조종 장치가 둘이 된다.
 - 실행 인자: `-UITestRoute settings/language`.
 
 ## 9. 수동 확인 M1~M4 (결정 14)

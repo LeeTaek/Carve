@@ -19,6 +19,8 @@ public struct SettingsView: View {
     @SharedReader(.isAdFree) private var isAdFree: Bool
     /// 고른 화면 모드. 사이드바 행의 값만 바꾼다.
     @SharedReader(.appearanceMode) private var appearanceMode: AppearanceMode
+    /// 이 실행에서 앱 안에서 바꾼 화면 언어. 사이드바 「언어」 행의 값만 바꾼다.
+    @SharedReader(.appLanguageOverride) private var languageOverride: AppLanguage?
 
     public init(store: StoreOf<SettingsFeature>) {
         self.store = store
@@ -66,9 +68,9 @@ public struct SettingsView: View {
                 NavigationLink(value: SettingsFeature.SidebarItem.appearance) {
                     sidebarRow(SettingsCatalog.string("화면 모드"), value: appearanceMode.title)
                 }
-                // 언어는 iOS 앱별 언어를 따른다 — 바꾸면 앱이 새로 시작하므로 설정이 떠 있는 동안 값이 바뀌지 않는다(결정 20).
+                // 앱 안에서 고르면 바로 그 언어를 보인다. 설정 앱에서 바꾸면 iOS 가 앱을 다시 시작한 뒤의 언어다(시작 때 언어).
                 NavigationLink(value: SettingsFeature.SidebarItem.language) {
-                    sidebarRow(SettingsCatalog.string("언어"), value: AppLanguage.current().nativeName)
+                    sidebarRow(SettingsCatalog.string("언어"), value: (languageOverride ?? .launch).nativeName)
                 }
             } header: {
                 Text("화면", bundle: .module)
