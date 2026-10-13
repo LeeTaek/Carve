@@ -11,6 +11,9 @@ import Foundation
 import Testing
 
 struct DrawingWeeklySummaryStateTesting {
+    /// 한국어 화면 — 시험 스킴의 언어 · 지역(ko-KR)과 같다.
+    private static let korean = Locale(identifier: "ko_KR")
+
     @Test("현재 주 범위에 포함된 기록만 합계, 평균, 최댓값에 반영한다")
     func currentWeekMetricsIgnoreRecordsOutsideVisibleWeek() {
         let start = makeDate(year: 2026, month: 5, day: 18)
@@ -54,7 +57,7 @@ struct DrawingWeeklySummaryStateTesting {
             DailyRecord(date: start.addingTimeInterval(86_400 * 2), count: 7)
         ]
 
-        #expect(state.weekAverageText == "1.7")
+        #expect(state.weekAverageText(locale: Self.korean) == "1.7")
     }
 
     @Test("현재 주의 일별 권별 횟수를 합산해 가장 많이 필사한 권을 반환한다")

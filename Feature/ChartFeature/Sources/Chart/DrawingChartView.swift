@@ -14,6 +14,8 @@ import ComposableArchitecture
 @ViewAction(for: DrawingChartFeature.self)
 public struct DrawingChartView: View {
     @Bindable public var store: StoreOf<DrawingChartFeature>
+    /// 화면 언어 — 앱 안에서 언어를 고르면 앱 루트가 바꾼다. 빈 상태 컴포넌트에 넘기는 문구는 이 값으로 만든다(즉시 전환 단계 3).
+    @Environment(\.locale) private var locale
 
     public init(store: StoreOf<DrawingChartFeature>) {
         self.store = store
@@ -60,9 +62,9 @@ public struct DrawingChartView: View {
 
     private var emptyContent: some View {
         CarveEmptyState(
-            String(localized: "아직 기록이 없어요", bundle: .module, comment: "차트 빈 상태 제목 — 필사 기록이 하나도 없다"),
-            message: String(localized: "한 절이라도 필사하면 여기에 쌓여요.", bundle: .module, comment: "차트 빈 상태 설명"),
-            actionTitle: String(localized: "필사하러 가기", bundle: .module, comment: "차트 빈 상태 버튼 — 필사 화면으로 돌아간다")
+            ChartCatalog.string("아직 기록이 없어요", locale: locale),
+            message: ChartCatalog.string("한 절이라도 필사하면 여기에 쌓여요.", locale: locale),
+            actionTitle: ChartCatalog.string("필사하러 가기", locale: locale)
         ) {
             send(.backToWriting)
         }
