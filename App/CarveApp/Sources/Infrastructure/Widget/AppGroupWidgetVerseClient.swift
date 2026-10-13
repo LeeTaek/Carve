@@ -6,6 +6,7 @@
 //  Copyright © 2026 leetaek. All rights reserved.
 //
 
+import ClientInterfaces
 import Domain
 import Foundation
 import PencilKit
@@ -85,37 +86,36 @@ struct AppGroupWidgetVerseClient: WidgetVerseClient {
 
     /// 보관본을 위젯이 읽는 모양으로 옮겨 적는다. 번역본은 즐겨찾기 장의 번역본이다 — 딥링크(`deepLinkURL`)도 이 값으로 그 번역본 절을 연다.
     ///
-    /// 권 이름(`bookDisplayName`) · 참조(`referenceText` · `compactReferenceText`)는 **담을 때의 앱 언어**로 남는다 — 위젯은 Domain 을
-    /// 링크하지 않아 그 문자열을 그대로 쓰고, 기기 언어를 바꿔도 다시 담기 전까지 그대로다(영어 현지화 설계 §10 알려진 한계).
+    /// 권 이름(`bookDisplayName`) · 번역본 이름 · 참조(`referenceText` · `compactReferenceText`)는 **담는 순간의 화면 언어**
+    /// (`AppLanguage.displayLocale()` — 앱 안에서 고른 언어가 있으면 그 언어)로 만들어 그대로 남는다. 위젯은 Domain 을 링크하지 않아
+    /// 그 문자열을 그대로 쓰고, 언어를 바꿔도 다시 담기 전까지 그대로다(영어 현지화 설계 §10 알려진 한계). 위젯 자기 문구는 위젯이 App Group 의 화면 언어로 그린다.
     private static func payload(for favorite: FavoriteVerseSnapshot) -> VerseWidgetPayload {
         let chapter = favorite.key.chapter
         let verse = favorite.key.verse
+        let locale = AppLanguage.displayLocale()
         return VerseWidgetPayload(
             titleRawValue: chapter.title.rawValue,
-            bookDisplayName: chapter.title.localizedName,
+            bookDisplayName: chapter.title.localizedName(locale: locale),
             chapter: chapter.chapter,
             verse: verse,
             translation: chapter.translation.rawValue,
-            translationDisplayName: chapter.translation.displayName,
+            translationDisplayName: chapter.translation.displayName(locale: locale),
             sentence: favorite.sentence,
             designatedAt: Date(),
-            referenceText: BibleReference(chapter: chapter, verse: verse).text,
-            compactReferenceText: compactReference(chapter: chapter, verse: verse)
+            referenceText: BibleReference(chapter: chapter, verse: verse).text(locale: locale),
+            compactReferenceText: compactReference(chapter: chapter, verse: verse, locale: locale)
         )
     }
 
-    /// 위젯 머리의 짧은 참조(앱 언어) — ko 「시편 23:1」 · en 「Psalm 23:1」(시안 G4).
+    /// 위젯 머리의 짧은 참조 — ko 「시편 23:1」 · en 「Psalm 23:1」(시안 G4).
     ///
     /// 형식은 앱 카탈로그에 있다. 시편은 en 에서 단수 「Psalm」 이라 `BibleReference` 처럼 형식을 따로 둔다(영어 현지화 결정 3 · 11).
-    private static func compactReference(chapter: BibleChapter, verse: Int) -> String {
+    /// - Parameter locale: 쓸 언어 — 담는 순간의 화면 언어(`AppLanguage.displayLocale()`).
+    private static func compactReference(chapter: BibleChapter, verse: Int, locale: Locale) -> String {
         if chapter.title == .psalms {
-            return String(localized: "시편 \(chapter.chapter):\(verse)", bundle: .main, comment: "위젯 머리의 짧은 시편 참조 — 장:절. en 은 단수 Psalm")
+            return AppCatalog.string("시편 \(chapter.chapter):\(verse)", locale: locale)
         }
-        return String(
-            localized: "\(chapter.title.localizedName) \(chapter.chapter):\(verse)",
-            bundle: .main,
-            comment: "위젯 머리의 짧은 참조 — 권 이름, 장:절. 예: 창세기 1:1 · Genesis 1:1"
-        )
+        return AppCatalog.string("\(chapter.title.localizedName(locale: locale)) \(chapter.chapter):\(verse)", locale: locale)
     }
 
     /// 위젯이 읽은 페이로드를 다시 즐겨찾기 키(번역본 포함)로 되돌린다.

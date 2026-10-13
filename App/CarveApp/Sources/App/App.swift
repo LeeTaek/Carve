@@ -35,6 +35,8 @@ struct CarveApp: App {
         AppStorageFormatMigration.restorePrimitiveValues(in: .standard)
         // 지난 실행이 남긴 백업 · 불러오기의 평문 작업 폴더(`BackupWork`)를 지운다 — 이 실행의 백업 작업이 시작되기 전이다.
         BackupWorkDirectory.removeStale()
+        // 위젯이 이 실행의 화면 언어(iOS 앱별 언어)를 따르게 App Group 에 맞춘다 — 설정 앱에서 앱 언어를 바꾼 경우.
+        WidgetAppLanguage.publishLaunchLanguage()
         let purchaseClient = StoreKitPurchaseClient()
         self.purchaseClient = purchaseClient
 
