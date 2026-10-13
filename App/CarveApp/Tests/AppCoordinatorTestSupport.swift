@@ -145,7 +145,8 @@ enum CoordinatorFixture {
             chapter: 23,
             verse: 1,
             translation: Translation.NKRV.rawValue,
-            translationDisplayName: Translation.NKRV.displayName,
+            // 표시 이름은 위젯에 담는 순간의 화면 언어로 만든다 — 시험은 한국어(「시편」 과 같은 언어)를 명시한다.
+            translationDisplayName: Translation.NKRV.displayName(locale: Locale(identifier: "ko")),
             sentence: "여호와는 나의 목자시니 내가 부족함이 없으리로다",
             designatedAt: Date(timeIntervalSince1970: 0)
         ).deepLinkURL
