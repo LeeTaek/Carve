@@ -7,6 +7,7 @@
 //
 
 import CarveToolkit
+import ClientInterfaces
 import CoreGraphics
 import Domain
 import Foundation
@@ -546,7 +547,8 @@ public struct ChapterCanvasFeature {
             case .eraseRequested(let point):
                 // 진행 중이거나 실패해 안내 중인 지우기가 있으면 새로 열지 않는다 (중복 지우기 방지).
                 guard state.eraseTask == nil, let verse = Self.verse(at: point, state: state) else { return .none }
-                state.eraseAlert = Self.confirmEraseAlert(chapter: state.chapter, verse: verse)
+                // 확인창 문구는 띄우는 순간의 화면 언어로 만든다 — 떠 있는 동안 언어를 바꿔도 그대로다(즉시 전환 단계 3).
+                state.eraseAlert = Self.confirmEraseAlert(chapter: state.chapter, verse: verse, locale: AppLanguage.displayLocale())
                 return .none
 
             case .verseMenuRequested, .verseMenuDismissed, .verseMenuFavoriteTapped, .verseMenuHistoryTapped, .verseMenuImageTapped,

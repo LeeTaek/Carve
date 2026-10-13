@@ -19,6 +19,8 @@ struct SaveFailureNoticeView: View {
     /// 지금까지의 재시도 횟수. 1보다 크면 이미 자동으로 다시 시도해 봤다는 뜻이다.
     let retryCount: Int
     let onRetry: () -> Void
+    /// 화면 언어 — 안내 문구 · 접근성 알림을 이 값으로 만든다(즉시 전환 단계 3).
+    @Environment(\.locale) private var locale
 
     var body: some View {
         CarveStatusMessage(.failure, message: message, onRetry: onRetry)
@@ -30,7 +32,7 @@ struct SaveFailureNoticeView: View {
     private var message: String {
         // 처음 실패와 반복 실패를 같은 문구로 두지 않는다. 반복되면 사용자가 다른 조치를 생각할 수 있어야 한다.
         retryCount > 1
-            ? String(localized: "필사를 이 기기에 저장하지 못했어요. 저장 공간을 확인해 주세요", bundle: .module)
-            : String(localized: "필사를 이 기기에 저장하지 못했어요", bundle: .module)
+            ? CarveFeatureCatalog.string("필사를 이 기기에 저장하지 못했어요. 저장 공간을 확인해 주세요", locale: locale)
+            : CarveFeatureCatalog.string("필사를 이 기기에 저장하지 못했어요", locale: locale)
     }
 }

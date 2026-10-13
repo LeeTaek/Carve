@@ -180,7 +180,8 @@ struct ChapterCanvasDraftRetentionTesting: DraftTestSamples {
 
         let failure = try #require(store.state.blockingLoadFailure)
         #expect(failure.source == .drafts)
-        #expect(LoadFailureNoticeView.message(for: failure) == LoadFailureNoticeView.draftsMessage)
+        #expect(LoadFailureNoticeView.message(for: failure, locale: Locale(identifier: "ko"))
+            == LoadFailureNoticeView.draftsMessage(locale: Locale(identifier: "ko")))
         #expect(!store.state.isComposed)
         #expect(!ChapterCanvasView.Display(store.state).isInputEnabled)
 

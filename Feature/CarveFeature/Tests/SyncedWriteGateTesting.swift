@@ -289,7 +289,7 @@ struct SyncedWriteGateTesting {
 
         try await waitUntil { store.restoreBlock != nil }
         #expect(store.restoreBlock == .signedOut)
-        #expect(VerseDrawingHistoryView.blockedMessage(.signedOut).hasPrefix("이 회차로 바꾸지 않았어요"))
+        #expect(VerseDrawingHistoryView.blockedMessage(.signedOut, locale: Locale(identifier: "ko")).hasPrefix("이 회차로 바꾸지 않았어요"))
         // 지금 보이는 회차는 그대로다 — 목록 표시도 바꾸지 않았다.
         #expect(store.drawings.first { $0.isPresent } == present)
         #expect(store.drawings.representative() == present)

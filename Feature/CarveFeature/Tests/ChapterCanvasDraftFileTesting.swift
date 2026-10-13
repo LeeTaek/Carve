@@ -68,7 +68,8 @@ struct ChapterCanvasDraftFileTesting: DraftTestSamples {
         let failure = try #require(store.state.blockingLoadFailure)
         #expect(failure.source == .drafts)
         #expect(!store.state.isInputEnabled)
-        #expect(LoadFailureNoticeView.message(for: failure) == LoadFailureNoticeView.draftsMessage)
+        #expect(LoadFailureNoticeView.message(for: failure, locale: Locale(identifier: "ko"))
+            == LoadFailureNoticeView.draftsMessage(locale: Locale(identifier: "ko")))
 
         // 막힌 동안 같은 키 · 더 새 revision 으로 덮지 않았다.
         #expect(draftFiles(area).count == 1)

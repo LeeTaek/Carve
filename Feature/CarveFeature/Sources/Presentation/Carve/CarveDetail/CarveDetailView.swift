@@ -20,6 +20,8 @@ public struct CarveDetailView: View {
     /// 참조 객체이므로 `@State` 는 수명만 잡아 줄 뿐, 값이 바뀌어도 뷰를 다시 그리지 않는다.
     @State private var geometryCollector = VerseGeometryCollector()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// 화면 언어 — 로컬 저장 상태 한 줄을 이 값으로 만든다(즉시 전환 단계 3).
+    @Environment(\.locale) private var locale
 
     public init(store: StoreOf<CarveDetailFeature>) {
         self.store = store
@@ -462,9 +464,9 @@ private extension CarveDetailView {
     var localSaveText: String? {
         switch store.chapterCanvas.localSaveIndicator {
         case .none, .failed: nil
-        case .pending: String(localized: "저장 대기 중", bundle: .module)
-        case .saving: String(localized: "저장 중…", bundle: .module)
-        case .saved: String(localized: "이 기기에 저장됨", bundle: .module)
+        case .pending: CarveFeatureCatalog.string("저장 대기 중", locale: locale)
+        case .saving: CarveFeatureCatalog.string("저장 중…", locale: locale)
+        case .saved: CarveFeatureCatalog.string("이 기기에 저장됨", locale: locale)
         }
     }
 
