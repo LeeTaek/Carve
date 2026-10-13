@@ -22,7 +22,9 @@ public struct SendFeedbackFeature: Sendable {
 
     @ObservableState
     public struct State: Hashable, Sendable {
-        public static let initialState = Self()
+        /// 처음 상태. 화면을 열 때마다 만든다 — 본문 머리(`UserFeedback.initialState`)가 여는 순간의 화면 언어를 따르고,
+        /// 내용 판정(`missingRequirement`)이 보는 머리와 같은 언어가 된다(즉시 전환 단계 3). 한 번 만들어 두면 처음 연 때의 언어로 굳는다.
+        public static var initialState: Self { Self() }
         @Presents public var path: Path.State?
         public var feedbackInfo: UserFeedback = .initialState
         public var imageSelection: [PhotosPickerItem] = []

@@ -107,7 +107,9 @@ public struct LiveBackupExporter: BackupExporting {
         progress: @Sendable (BackupProgress) async -> Void
     ) async throws -> BackupExportResult {
         let startedAt = now()
-        let name = BackupExportFileName.sanitized(fileName) ?? BackupExportFileName.defaultName(for: startedAt)
+        // 기본 이름은 저장되는 표시 문자열이라 만드는 순간의 화면 언어로 짓는다(즉시 전환 단계 3).
+        let name = BackupExportFileName.sanitized(fileName)
+            ?? BackupExportFileName.defaultName(for: startedAt, locale: AppLanguage.displayLocale())
         let work: BackupWorkDirectory
         do {
             work = try BackupWorkDirectory.make(under: workRoot)

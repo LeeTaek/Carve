@@ -342,13 +342,10 @@ public enum BibleTitle: String, CaseIterable, Identifiable, Codable, Sendable {
 // MARK: - 권 이름
 
 extension BibleTitle {
-    /// 권 이름(앱 언어). ko 「창세기」 · en 「Genesis」. 권 목록 · 참조(`BibleReference`)에 쓴다.
-    /// 번역본이 아니라 앱(기기) 언어를 따른다 — 한국어 기기는 KJV 를 봐도 「창세기」 다.
-    public var localizedName: String { localizedName(locale: nil) }
-
-    /// 권 이름을 한 언어로 꺼낸다. 카탈로그 키는 `koreanTitle()` 의 한국어 원문이다.
-    /// - Parameter locale: 언어를 정할 로케일. nil 이면 앱(기기) 언어다.
-    public func localizedName(locale: Locale?) -> String {
+    /// 권 이름을 한 언어로 꺼낸다 — ko 「창세기」 · en 「Genesis」. 권 목록 · 참조(`BibleReference`)에 쓴다.
+    /// 번역본이 아니라 화면 언어를 따른다 — 한국어 화면은 KJV 를 봐도 「창세기」 다. 카탈로그 키는 `koreanTitle()` 의 한국어 원문이다.
+    /// - Parameter locale: 언어를 정할 로케일. 뷰는 환경 locale, 리듀서 · 인프라는 `AppLanguage.displayLocale()` 을 넘긴다.
+    public func localizedName(locale: Locale) -> String {
         switch self {
         case .genesis: DomainCatalog.string("창세기", locale: locale)
         case .exodus: DomainCatalog.string("출애굽기", locale: locale)

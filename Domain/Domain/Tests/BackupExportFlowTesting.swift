@@ -5,6 +5,7 @@
 //  필사 백업 내보내기 — 장 사이의 계정 · 세대 변경, 다 쓴 파일의 재검증, 파일 이름, 작업 폴더 정리 (설계 docs/backup-import-design.md §3-1 · §3-2).
 //
 
+import ClientInterfaces
 import Foundation
 import Testing
 
@@ -152,8 +153,10 @@ struct BackupExportFlowTesting {
         let seoul = try #require(TimeZone(identifier: "Asia/Seoul"))
         let utc = try #require(TimeZone(identifier: "UTC"))
         let date = Date(timeIntervalSinceReferenceDate: 813_009_600) // 2026-10-06 20:00 UTC = 2026-10-07 05:00 KST
-        #expect(BackupExportFileName.defaultName(for: date, timeZone: seoul) == "새기다 필사 백업 2026-10-07.carvebackup")
-        #expect(BackupExportFileName.defaultName(for: date, timeZone: utc) == "새기다 필사 백업 2026-10-06.carvebackup")
+        // 앞부분 언어는 부르는 쪽이 locale 로 준다 — 시험은 한국어를 명시한다.
+        let korean = Locale(identifier: "ko")
+        #expect(BackupExportFileName.defaultName(for: date, timeZone: seoul, locale: korean) == "새기다 필사 백업 2026-10-07.carvebackup")
+        #expect(BackupExportFileName.defaultName(for: date, timeZone: utc, locale: korean) == "새기다 필사 백업 2026-10-06.carvebackup")
         // 준 이름 — 경로 구분자 · 앞의 점 · 공백을 다듬고 확장자를 붙인다.
         #expect(BackupExportFileName.sanitized("내 백업") == "내 백업.carvebackup")
         #expect(BackupExportFileName.sanitized("내 백업.carvebackup") == "내 백업.carvebackup")
@@ -168,7 +171,9 @@ struct BackupExportFlowTesting {
         let named = try await exporter.export(password: BackupExportSample.password, fileName: "내 백업") { _ in }
         let unnamed = try await exporter.export(password: BackupExportSample.password) { _ in }
         #expect(named.fileURL.lastPathComponent == "내 백업.carvebackup")
-        #expect(unnamed.fileURL.lastPathComponent == BackupExportFileName.defaultName(for: BackupExportSample.now))
+        // 이름을 주지 않으면 만드는 순간의 화면 언어(`AppLanguage.displayLocale()` — 시험은 고른 언어가 없어 ko-KR)로 짓는다.
+        #expect(unnamed.fileURL.lastPathComponent == BackupExportFileName.defaultName(for: BackupExportSample.now, locale: AppLanguage.displayLocale()))
+        #expect(unnamed.fileURL.lastPathComponent.hasPrefix(BackupExportFileName.prefix))
         // 빈 저장소도 열 수 있는 빈 백업이다.
         #expect(unnamed.counts == BackupCounts(rows: 0, drafts: 0, blobs: 0))
         #expect(try harness.open(unnamed).items.isEmpty)

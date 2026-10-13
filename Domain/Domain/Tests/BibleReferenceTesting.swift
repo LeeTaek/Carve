@@ -5,11 +5,12 @@
 //  Created by Claude on 10/6/26.
 //
 
+import ClientInterfaces
 @testable import Domain
 import Foundation
 import Testing
 
-/// 권 이름(`BibleTitle.localizedName`)과 참조 문자열(`BibleReference`)의 표시 규칙을 본다(영어 현지화 결정 3 · 11).
+/// 권 이름(`BibleTitle.localizedName(locale:)`)과 참조 문자열(`BibleReference`)의 표시 규칙을 본다(영어 현지화 결정 3 · 11).
 /// 언어는 로케일로 명시한다 — 시험은 ko-KR 로 돈다.
 struct BibleReferenceTesting {
     private static let english = Locale(identifier: "en")
@@ -42,11 +43,14 @@ struct BibleReferenceTesting {
         #expect(BibleTitle.revelation.localizedName(locale: Self.english) == "Revelation")
     }
 
-    @Test("로케일을 주지 않으면 앱 언어(시험은 ko-KR)를 따른다")
-    func defaultLocaleFollowsAppLanguage() {
-        #expect(BibleTitle.genesis.localizedName == "창세기")
-        #expect(BibleReference(chapter: BibleChapter(title: .genesis, chapter: 1), verse: 1).text == "창세기 1장 1절")
-        #expect(Translation.NKRV.displayName == "개역개정")
+    @Test("리듀서 · 인프라가 얻는 화면 언어(AppLanguage.displayLocale())로 부르면 앱 언어(시험은 ko-KR — 앱 안에서 고른 언어 없음)를 따른다")
+    func displayLocaleFollowsAppLanguage() {
+        // 표시 함수는 늘 locale 을 받는다(즉시 전환 단계 3) — 뷰는 환경 locale, 뷰 밖은 이 locale 을 넘긴다.
+        let locale = AppLanguage.displayLocale()
+
+        #expect(BibleTitle.genesis.localizedName(locale: locale) == "창세기")
+        #expect(BibleReference(chapter: BibleChapter(title: .genesis, chapter: 1), verse: 1).text(locale: locale) == "창세기 1장 1절")
+        #expect(Translation.NKRV.displayName(locale: locale) == "개역개정")
     }
 
     // MARK: - 참조

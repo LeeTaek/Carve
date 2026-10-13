@@ -195,7 +195,7 @@
 | 권 목록 이름 | 시편 | **Psalms** |
 | 번역본 약칭을 붙인 참조 | 창세기 1장 1절 · KJV | Genesis 1:1 · KJV |
 
-- 권 이름은 `BibleTitle.localizedName`(Domain 카탈로그에 66권 ko · en — en 은 표준 이름 Genesis … 1 Samuel … Song of Solomon … Revelation),
+- 권 이름은 `BibleTitle.localizedName(locale:)`(Domain 카탈로그에 66권 ko · en — en 은 표준 이름 Genesis … 1 Samuel … Song of Solomon … Revelation),
   권 검색용 고정 영문은 `englishName` 이다. 참조 문자열은 **`BibleReference` 로만** 만든다(`Domain/Domain/Sources/Model/BibleReference.swift`).
 - `koreanTitle()` 의 호출부는 레이어 4 에서 옮겼다 — 제품 코드에서는 Debug(레이아웃 HUD)에만 남았다. 함수는 권 이름 카탈로그 키의 원문이라 그대로 둔다.
 
@@ -268,6 +268,7 @@
 - 영어 문구는 짧고 평이하게 쓴다. iPad 사이드바 · 팔레트처럼 폭이 좁은 곳에서 잘리지 않게 한다.
 - 영어 문구 검토(결정 7): 작업이 끝나면 `xcodebuild -exportLocalizations` 결과로 화면별 한영 대조표를 만들어 사용자 검토를 받고, 고친 문구는 별도 커밋으로 반영한다.
 - 기계 검사: `.swiftlint.yml` 의 `localized_text_needs_bundle`(error — 한글이 든 `Text` · `Button` · `Label` · `TextState` 리터럴에 `bundle:` 이 없는 경우, 레이어 5 t5a 가 더한다).
+  앱 안 즉시 전환(§8-5) 뒤로는 `String` 문구를 모듈 도우미 `…Catalog.string(_:locale:)` 로만 꺼낸다 — 직접 `String(localized:)` 는 `localized_string_outside_catalog` 가 막는다.
 - 코드를 쓸 때의 규칙(카탈로그 · 번들 · 수 · 날짜 · 시험 언어 · 번역본 귀속)은 룰북 `.codex/skills/carve-rulebook/references/localization.md` 에 옮겼다.
 
 ### 8-3. 시험 언어 (결정 6)
@@ -304,10 +305,27 @@ M1 에서 모양을 보고 어색하면 글꼴 추가는 후속 작업으로 한
   설정 앱과 같은 모양(`[고른 언어-지역, 나머지 선호 언어…]`)으로 쓰고, 「시스템 설정」은 키를 지운다 — 설정 앱의 「기본 설정」 선택도 키를 지운다.
   17.5 · 18.6 · 26.2 · 27.0 시뮬레이터에서 앱이 쓴 값과 설정 앱 표시가 같았다. 구현: ClientInterfaces `AppLanguage` · `AppLanguageSelection` ·
   `AppLanguageClient`(계약) — App `AppleLanguagesClient`(UserDefaults). 고른 상태는 앱 도메인만(`persistentDomain(forName:)`) 읽는다.
-- **지금 실행은 환경 `locale` 로 바로 바꾼다.** 고르면 `appLanguageOverride`(in-memory 공유 값)에 언어를 넣고, 앱 루트(`AppCoordinatorView`)가
-  `.environment(\.locale, …)` 로 내려보낸다. 키 기반 `Text("…", bundle:)` 은 즉시 바뀌고, 미리 만든 문자열(`String(localized:)` · 카탈로그 도우미 ·
-  리듀서가 만든 문구)과 시스템이 그리는 화면은 다음 실행부터 바뀐다 — 미리 만든 문자열은 즉시 전환 단계 2 · 3 에서 환경 locale 을 따르게 옮긴다.
+- **지금 실행은 환경 `locale` 로 바로 바꾼다 — 즉시 전환 완료(단계 1 · 2 · 3, 2026-10-13).** 고르면 `appLanguageOverride`(in-memory 공유 값)에 언어를 넣고,
+  앱 루트(`AppCoordinatorView`)가 `.environment(\.locale, AppLanguage.displayLocale())` 로 내려보낸다. 다시 시작하지 않고 앱 화면 전체가 바뀐다.
   locale 은 언어 코드만 바꾸고 지역 · 달력 · 시간제는 기기 것을 둔다(`AppLanguage.locale(base:)` — 언어 구성요소를 통째로 바꾸면 지역이 사라진다).
+  - 키 기반 `Text("…", bundle:)` 은 환경을 저절로 따른다.
+  - 뷰가 미리 만드는 문구(카탈로그 도우미 · 표시용 함수 · 접근성 이름 · 컴포넌트에 넘기는 `String`)는 환경 `locale` 을 읽어 넘긴다 — 바뀌면 SwiftUI 가 다시 그린다.
+    따로 만든 호스트(캔버스 컬럼 · 절 행 문맥 메뉴)는 만들 때와 갱신 때 locale 을 넣고, `ImageRenderer` 는 요청에 locale 을 담는다.
+  - 리듀서 · effect · 인프라는 문구를 만들 때 `AppLanguage.displayLocale()` 을 한 번 얻어 쓴다. 상태 구조는 그대로다(사용자 결정 — 만들 때의 언어).
+    저장되는 표시 문자열(위젯 payload 의 권 이름 · 참조, 백업 파일 이름, 의견 메일 본문 머리)도 쓰는 순간의 화면 언어다. 저장 키 · 저장 형식 · 분석 이벤트 이름 · 메일 제목 rawValue · 로그는 그대로다.
+  - 모듈 도우미(`DomainCatalog` · `CarveFeatureCatalog` · `ChartCatalog` · `SettingsCatalog` · `UIComponentsCatalog` · `AppCatalog`)와 Domain 표시 함수는
+    비옵셔널 `locale: Locale` 을 받는다 — locale 없는 편의 속성(`BibleTitle.localizedName` · `BibleReference.text` · `Translation.displayName` · `fullName` ·
+    `FontCase.title` · `UserFeedback.FeedbackType.localizedName`)과 `Locale?` · nil 경로는 지웠다. 위젯은 앱이 App Group 에 적은 화면 언어로 환경 locale 을 넣는다.
+  - 기계 검사(`.swiftlint.yml`, error): `localized_string_outside_catalog`(Sources 의 직접 `String(localized:)` — 도우미 `*Catalog.swift` · Debug · 프리뷰 · 갤러리 밖) ·
+    `view_no_current_locale`(뷰 파일의 `Locale.current` · `.autoupdatingCurrent`). 규칙 원문은 룰북 `references/localization.md` 9.
+- **남는 한계 — 앱 안에서 바꿔도 바로 바뀌지 않는 것.** 모두 다음 실행부터는 고른 언어다(앱 안 고르기도 `AppleLanguages` 에 저장한다).
+
+  | 무엇 | 언제 바뀌나 · 이유 |
+  |---|---|
+  | **떠 있는 알림 · 이미 만든 문구** — 확인창 · 대화상자 · 결과 한 줄 · 확인이 필요한 필기 목록 문구 등 리듀서가 만든 것 | 만든 순간의 언어로 남고, 다시 만들 때(닫고 다시 띄움 · 다시 읽음) 새 언어가 된다. 상태에 문자열을 담는 구조를 바꾸지 않았다(사용자 결정). 의미 값을 상태에 두고 뷰가 문장을 만드는 곳(도착 안내 `ArrivalNotice`)은 바로 바뀐다 |
+  | **시스템이 그리는 화면** — 사진 저장 권한 창 · 백업 문서 형식 이름 · 홈 화면 앱 이름(`InfoPlist.xcstrings`), 메일 작성 · 공유 시트 · 파일 고르기 | iOS 가 실행 시작 때 고른 번들 언어로 그린다. 앱이 환경 locale 로 바꿀 수 없다 |
+  | **위젯에 담은 참조** — 위젯 payload 의 권 이름 · 참조 · 번역본 이름 | 담는 순간의 화면 언어로 저장한다. 다시 담기 전까지 그대로다(§10). 위젯 자체 문구(빈 상태 · 「Carve · 번역본」)는 앱 안 고르기를 App Group 으로 받아 바로 바뀐다. 설정 앱에서 바꾸면 앱을 다시 열 때까지 위젯은 옛 언어다 |
+  | **UIKit · 시스템이 붙이는 접근성 문구** — VoiceOver 가 읽는 컨트롤 종류(「버튼」 · 「선택됨」), 시스템 컨트롤(뒤로 · 편집 메뉴 · PencilKit 도구 막대)의 이름, VoiceOver 음성 언어 | 시스템 번들의 문구라 실행 시작 때 언어다. 앱이 넣는 접근성 이름(`accessibilityLabel` 에 넘기는 문구)은 환경 locale 로 바로 바뀐다 |
 - 설정 앱에서 바꾸면 iOS 가 앱을 종료하고(같은 값을 다시 골라도) 새 언어로 다시 연다. 앱 안에서 바꾸면 종료하지 않는다.
 - 기기의 선호 언어가 하나뿐이면 iOS 가 앱 화면의 「언어」 항목을 숨기므로, 앱 Info.plist 에 `UIPrefersShowingLanguageSettings = YES` 를 켠다
   (`Plugins/ProjectDescriptionHelpers/InfoPlist.swift`).
@@ -338,7 +356,7 @@ M1 에서 모양을 보고 어색하면 글꼴 추가는 후속 작업으로 한
 
 | 한계 | 이유 · 후속 |
 |---|---|
-| **위젯의 권 이름은 지정할 때의 언어로 남는다** | 위젯은 Domain 을 링크하지 않아 앱이 지정할 때 만든 문자열(`VerseWidgetPayload.bookDisplayName`)을 그대로 쓴다. 기기 언어를 바꿔도 다시 지정하기 전까지 그대로다 |
+| **위젯의 권 이름은 지정할 때의 언어로 남는다** | 위젯은 Domain 을 링크하지 않아 앱이 지정할 때 만든 문자열(`VerseWidgetPayload.bookDisplayName`)을 그대로 쓴다. 기기 언어 · 앱 안 언어를 바꿔도 다시 지정하기 전까지 그대로다. 앱 안 즉시 전환의 다른 한계는 §8-5 |
 | **본문 설정 「가가」 아이콘은 한글판이다** | `CarveIcon.textFormat` 은 글꼴에 따라 모양이 바뀌지 않게 「가가」 글자를 윤곽선으로 고정한 그림이다. 영어 화면에서도 그대로 둔다 |
 | **영어 본문 글꼴은 나눔 그대로다** | §8-4. M1 뒤 후속 판단 |
 | 2.0.0 · 1.3.0 의 주간 요약 「최근 절」 이 영어 행을 창세기로 보인다 | 구버전 코드의 `?? .genesis`(§3-2). 이미 나간 버전이라 고칠 수 없다. M4 에서 실제 모습을 확인한다 |

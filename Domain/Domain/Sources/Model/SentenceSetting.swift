@@ -101,17 +101,14 @@ public enum FontCase: String, CaseIterable, Sendable, Codable {
         }
     }
     
-    /// UI에서 표시할 때 사용할 폰트 이름(앱 언어). 저장값은 `rawValue` 라 표기를 바꿔도 설정은 그대로다.
-    /// 본문 설정의 글꼴 고르기도 이 이름을 쓴다 — 글꼴 이름은 여기 한 곳에서 현지화한다.
+    /// UI에서 표시할 때 사용할 폰트 이름을 한 언어로 꺼낸다 — ko 「나눔명조」 · en 「Nanum Myeongjo」.
+    /// 저장값은 `rawValue` 라 표기를 바꿔도 설정은 그대로다. 본문 설정의 글꼴 고르기도 이 이름을 쓴다 — 글꼴 이름은 여기 한 곳에서 현지화한다.
     ///
     /// 한국어 이름은 실제 글꼴 파일의 패밀리 이름을 따른다 — 2.0 까지는 앱이 넣지 않은 다른 글꼴 이름으로 잘못 적었다.
     /// - `gothic`: 파일 `NanumGothic.ttf`, 패밀리 「나눔고딕」(2.0 까지 「나눔바른고딕」, 영어 현지화 t4c).
     /// - `flower`: 파일 `NanumFlowerScent`, 패밀리 「나눔손글씨 꽃내음」(2.0 까지 「나눔꽃향기」, 사용자 결정 18).
-    public var title: String { title(locale: nil) }
-
-    /// 폰트 이름을 한 언어로 꺼낸다 — ko 「나눔명조」 · en 「Nanum Myeongjo」.
-    /// - Parameter locale: 언어를 정할 로케일. nil 이면 앱(기기) 언어다.
-    public func title(locale: Locale?) -> String {
+    /// - Parameter locale: 언어를 정할 로케일. 뷰는 환경 locale, 리듀서 · 인프라는 `AppLanguage.displayLocale()` 을 넘긴다.
+    public func title(locale: Locale) -> String {
         switch self {
         case .flower: DomainCatalog.string("나눔손글씨 꽃내음", locale: locale)
         case .gothic: DomainCatalog.string("나눔고딕", locale: locale)

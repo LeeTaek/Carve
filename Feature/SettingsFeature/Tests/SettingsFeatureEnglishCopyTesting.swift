@@ -254,4 +254,25 @@ struct SettingsFeatureEnglishCopyTesting {
         #expect(state.path?.popup?.title == "Can't Send Mail")
         #expect(state.path?.popup?.confirmTitle == "OK")
     }
+
+    @Test("앱 안에서 영어를 고른 뒤 연 의견 보내기는 본문 머리가 영어이고, 머리만 남은 내용은 아직 적지 않은 것으로 본다")
+    func feedbackTemplateFollowsInAppLanguage() {
+        withDependencies {
+            $0.defaultInMemoryStorage = InMemoryStorage()
+        } operation: {
+            // Given: 설정 › 화면 › 언어에서 영어를 고른 저장소
+            @Shared(.appLanguageOverride) var languageOverride: AppLanguage?
+            $languageOverride.withLock { $0 = .english }
+
+            // When: 의견 보내기 화면을 열고 제목만 적는다 — 처음 상태는 여는 순간에 만든다
+            var state = SendFeedbackFeature.State.initialState
+            state.feedbackInfo.title = "Crash report"
+
+            // Then: 본문 머리는 영어이고, 내용 판정도 같은 머리를 떼고 본다
+            #expect(state.feedbackInfo.body == "- Message:")
+            #expect(state.missingRequirement == .body)
+            state.feedbackInfo.body += " The app closes on the writing screen."
+            #expect(state.missingRequirement == .agreements)
+        }
+    }
 }
