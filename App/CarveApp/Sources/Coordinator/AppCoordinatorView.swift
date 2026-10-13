@@ -81,25 +81,9 @@ public struct AppCoordinatorView: View {
         .overlay {
             if store.showsRelaunchGuidance {
                 // 로그인 완료와 연결 완료를 구분한다 — 이 실행은 계속 이 기기에만 저장한다. 기다릴 것이 없으므로 로딩을 띄우지 않는다.
-                VStack(spacing: 16) {
-                    Text("iCloud 로그인을 확인했어요", bundle: .main, comment: "재실행 안내 카드 제목 — iCloud 로그인은 됐다")
-                    Text(
-                        "아직 이 기기의 필사는 iCloud와 연결되지 않았어요.\n\(CloudSettingsFeature.relaunchToConnect)",
-                        bundle: .main,
-                        comment: "재실행 안내 카드 본문 — %@ 는 설정의 「앱을 다시 열어 연결」 안내 문장"
-                    )
-                    .font(.caption)
-                    .multilineTextAlignment(.center)
-                    Button {
-                        store.send(.relaunchGuidanceDismissed)
-                    } label: {
-                        Text("확인", bundle: .main, comment: "안내 카드 닫기")
-                    }
+                RelaunchGuidanceCard {
+                    store.send(.relaunchGuidanceDismissed)
                 }
-                .padding(24)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
-                .accessibilityElement(children: .contain)
-                .accessibilityIdentifier("relaunchGuidance")
             }
         }
         .overlay {
@@ -167,11 +151,52 @@ public struct AppCoordinatorView: View {
     }
 }
 
+/// 재실행 안내 카드 — iCloud 로그인은 확인했지만 이 실행은 아직 연결되지 않았다는 것과 앱을 다시 열라는 안내.
+///
+/// 본문에 넣는 설정의 안내 문장(`CloudSettingsFeature.relaunchToConnect`)은 미리 만드는 문구라 환경 `locale` 을 넘겨야 한다.
+/// `AppCoordinatorView` 자신은 루트 언어 수식어(`AppLanguageEnvironment`) 바깥이라 거기서 읽은 locale 은 고르기 전 언어다 —
+/// 수식어 안쪽(오버레이)에 그리는 이 하위 뷰가 환경 `locale` 을 읽는다(즉시 전환 단계 3).
+private struct RelaunchGuidanceCard: View {
+    /// 「확인」 — 카드를 닫는다. 코디네이터 스토어로 보내는 일은 부르는 쪽이 정한다.
+    private let onDismiss: () -> Void
+    /// 화면 언어 — 앱 안에서 언어를 고르면 본문의 안내 문장도 바로 따라온다.
+    @Environment(\.locale) private var locale
+
+    init(onDismiss: @escaping () -> Void) {
+        self.onDismiss = onDismiss
+    }
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Text("iCloud 로그인을 확인했어요", bundle: .main, comment: "재실행 안내 카드 제목 — iCloud 로그인은 됐다")
+            Text(
+                "아직 이 기기의 필사는 iCloud와 연결되지 않았어요.\n\(CloudSettingsFeature.relaunchToConnect(locale: locale))",
+                bundle: .main,
+                comment: "재실행 안내 카드 본문 — %@ 는 설정의 「앱을 다시 열어 연결」 안내 문장"
+            )
+            .font(.caption)
+            .multilineTextAlignment(.center)
+            Button {
+                onDismiss()
+            } label: {
+                Text("확인", bundle: .main, comment: "안내 카드 닫기")
+            }
+        }
+        .padding(24)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("relaunchGuidance")
+    }
+}
+
 /// 앱 안에서 고른 화면 언어를 환경 `locale` 로 내려보낸다.
 ///
 /// 고른 적이 없으면 기기 · 앱별 언어(`autoupdatingCurrent`)를 그대로 쓴다. 고른 뒤에는 그 언어로 바꾼 locale 이다 — 지역 · 시간제는 기기 것을 둔다.
+/// 규칙은 리듀서 · effect · 인프라가 쓰는 `AppLanguage.displayLocale()` 하나다 — 화면 문구와 리듀서가 만든 문구가 같은 언어가 된다.
 /// 수식어는 늘 같은 자리에 둔다 — 조건에 따라 붙였다 떼면 화면 identity 가 바뀌어 필사 화면이 장을 다시 읽는다(onAppear → 캔버스 load).
 private struct AppLanguageEnvironment: ViewModifier {
+    /// 고른 언어 — body 가 읽어 관찰하려고 둔다(iOS 17+ 는 body 에서 읽은 공유 값이 바뀔 때 다시 그린다). 지우면 언어를 골라도 화면이 그대로다.
+    /// 값은 `AppLanguage.displayLocale()` 이 같은 키에서 읽는다.
     @SharedReader(.appLanguageOverride) private var languageOverride: AppLanguage?
     /// 기기의 지역 · 시간제 설정이 바뀐 횟수. 바뀌면 고른 언어의 locale 을 새 설정으로 다시 만든다.
     @State private var localeRevision = 0
@@ -184,9 +209,12 @@ private struct AppLanguageEnvironment: ViewModifier {
             }
     }
 
-    /// `revision` 은 값을 쓰지 않고 지역 설정 변경을 body 의 의존으로 삼으려고 받는다.
+    /// 역할: 이 창의 환경 locale 을 만든다 — 리듀서 · effect · 인프라와 같은 `AppLanguage.displayLocale()` 을 쓴다.
+    /// 입력 · 출력: 지역 설정 변경 횟수(값은 쓰지 않고 지역 설정 변경을 body 의 의존으로 삼으려고 받는다) → 지금 화면 언어의 locale.
+    /// 부작용: 없음. 고른 언어 프로퍼티를 읽기만 해 body 의 의존으로 삼는다 — 값은 `displayLocale()` 이 쓴다.
     private func effectiveLocale(revision _: Int) -> Locale {
-        languageOverride?.locale() ?? .autoupdatingCurrent
+        _ = languageOverride
+        return AppLanguage.displayLocale()
     }
 }
 

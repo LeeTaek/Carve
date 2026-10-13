@@ -52,8 +52,9 @@
 | 성경 탐색 (권 · 장 고르기) | `CarveNavigationFeature` |
 | 필사 · 필기 | `BibleDrawing`(SwiftData 모델) · `DrawingDatabase` · 필사 화면 `CarveDetailFeature` |
 | 장 · 절 | `BibleChapter` · Verse(`BibleVerse` · 절 행 `SentencesWithDrawingFeature` 등) |
-| 번역본 (개역개정 · KJV · BSB) | `Translation`(`NKRV` · `KJV` · `BSB`) — 지금 번역본은 `BibleChapter.translation`. SwiftData 행의 권 이름 짓기 · 풀기는 `StoredBookKey` 만 쓴다(영어 행은 `KJV-` · `BSB-` 접두 · `translation` 열 nil). 참조 문자열은 `BibleReference`, 권 이름은 `BibleTitle.localizedName` |
+| 번역본 (개역개정 · KJV · BSB) | `Translation`(`NKRV` · `KJV` · `BSB`) — 지금 번역본은 `BibleChapter.translation`. SwiftData 행의 권 이름 짓기 · 풀기는 `StoredBookKey` 만 쓴다(영어 행은 `KJV-` · `BSB-` 접두 · `translation` 열 nil). 참조 문자열은 `BibleReference.text(locale:)`, 권 이름은 `BibleTitle.localizedName(locale:)` |
 | 현지화 · 영어 화면 | 모듈마다 `Resources/Localizable.xcstrings`(원문 ko, 키 = 한국어 문장) · 문구에 `bundle: .module`(앱 · 위젯은 `.main`). 규칙은 룰북 `references/localization.md` |
+| 앱 언어 고르기 · 즉시 전환 | 설정 › 화면 › 언어 `LanguageSettingsFeature` · `AppLanguage` · `AppLanguageSelection` · `AppLanguageClient`(저장 = 앱 도메인 `AppleLanguages`, 구현 `AppleLanguagesClient`). 화면 언어는 뷰 = 환경 `locale`, 뷰 밖 = `AppLanguage.displayLocale()`, 위젯 = App Group `VerseWidgetSharing.appLanguageKey`. 규칙은 룰북 `references/localization.md` 9 |
 | 필사 캔버스 · 단일 Canvas | `ChapterCanvasFeature`(리듀서 하나를 `ChapterCanvas*.swift` 여러 파일로 나눔) · `ChapterCanvasController`(PencilKit). 캔버스는 이것 하나뿐이다 — N-Canvas · `SingleCanvasFlag` 는 2.1 에서 지웠다 |
 | 절 메뉴 | `ChapterCanvasVerseMenu` · `VerseMenuOverlay` |
 | 이전 필사 내용 보기 | `VerseDrawingHistoryFeature` |

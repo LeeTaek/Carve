@@ -16,6 +16,8 @@ import UIComponents
 @ViewAction(for: WidgetSettingsFeature.self)
 public struct WidgetSettingsView: View {
     @Bindable public var store: StoreOf<WidgetSettingsFeature>
+    /// 화면 언어 — 앱 안에서 언어를 고르면 참조(권 이름 · 장절) · 번역본 약칭 · 빈 상태 문구도 바로 따라온다(즉시 전환 단계 3).
+    @Environment(\.locale) private var locale
 
     public init(store: StoreOf<WidgetSettingsFeature>) {
         self.store = store
@@ -106,7 +108,7 @@ public struct WidgetSettingsView: View {
 
     private func selectedRow(_ favorite: FavoriteVerseSnapshot) -> some View {
         VStack(alignment: .leading, spacing: CarveSpacing.xxSmall) {
-            Text(Self.referenceText(favorite.key, showsTranslation: true))
+            Text(Self.referenceText(favorite.key, showsTranslation: true, locale: locale))
                 .font(CarveTypography.body)
                 .foregroundStyle(CarveColor.ink)
             Text(favorite.sentence)
@@ -121,9 +123,9 @@ public struct WidgetSettingsView: View {
     /// 아직 고르지 않았을 때.
     private var emptyCard: some View {
         CarveEmptyState(
-            SettingsCatalog.string("아직 담은 말씀이 없어요"),
-            message: SettingsCatalog.string("즐겨찾기에서 말씀을 골라 홈 화면에 띄워요."),
-            actionTitle: SettingsCatalog.string("담을 말씀 고르기")
+            SettingsCatalog.string("아직 담은 말씀이 없어요", locale: locale),
+            message: SettingsCatalog.string("즐겨찾기에서 말씀을 골라 홈 화면에 띄워요.", locale: locale),
+            actionTitle: SettingsCatalog.string("담을 말씀 고르기", locale: locale)
         ) {
             send(.changeTapped)
         }
@@ -159,9 +161,9 @@ public struct WidgetSettingsView: View {
             Group {
                 if store.favorites.isEmpty {
                     CarveEmptyState(
-                        SettingsCatalog.string("아직 즐겨찾기한 말씀이 없어요"),
-                        message: SettingsCatalog.string("필사 화면에서 절을 길게 눌러 즐겨찾기에 추가해 보세요."),
-                        actionTitle: SettingsCatalog.string("닫기")
+                        SettingsCatalog.string("아직 즐겨찾기한 말씀이 없어요", locale: locale),
+                        message: SettingsCatalog.string("필사 화면에서 절을 길게 눌러 즐겨찾기에 추가해 보세요.", locale: locale),
+                        actionTitle: SettingsCatalog.string("닫기", locale: locale)
                     ) {
                         send(.setPickerPresented(false))
                     }
@@ -229,10 +231,10 @@ public struct WidgetSettingsView: View {
             .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: CarveSpacing.xxSmall) {
-                Text(Self.referenceText(favorite.key, showsTranslation: false))
+                Text(Self.referenceText(favorite.key, showsTranslation: false, locale: locale))
                     .font(CarveTypography.body)
                     .foregroundStyle(CarveColor.ink)
-                Text(favorite.key.translation.displayName)
+                Text(favorite.key.translation.displayName(locale: locale))
                     .font(CarveTypography.caption)
                     .foregroundStyle(CarveColor.secondary)
                 Text(favorite.sentence)
@@ -251,9 +253,9 @@ public struct WidgetSettingsView: View {
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
 
-    /// 「시편 23장 1절 · KJV」 · 「Psalm 23:1 · KJV」 — 앱 언어의 참조(`BibleReference`, 영어 현지화 결정 3 · 11).
+    /// 「시편 23장 1절 · KJV」 · 「Psalm 23:1 · KJV」 — 화면 언어의 참조(`BibleReference`, 영어 현지화 결정 3 · 11). 뷰는 환경 `locale` 을 넘긴다.
     /// 담긴 말씀 목록은 번역본이 섞여 약칭을 붙이고, 고르기 시트는 약칭을 아랫줄에 따로 적어 붙이지 않는다.
-    static func referenceText(_ key: FavoriteVerseKey, showsTranslation: Bool) -> String {
-        BibleReference(chapter: key.chapter, verse: key.verse, showsTranslation: showsTranslation).text(locale: SettingsCatalog.locale)
+    static func referenceText(_ key: FavoriteVerseKey, showsTranslation: Bool, locale: Locale) -> String {
+        BibleReference(chapter: key.chapter, verse: key.verse, showsTranslation: showsTranslation).text(locale: locale)
     }
 }

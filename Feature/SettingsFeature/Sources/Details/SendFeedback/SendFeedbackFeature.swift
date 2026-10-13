@@ -7,6 +7,7 @@
 //
 
 import CarveToolkit
+import ClientInterfaces
 import Domain
 import SwiftUI
 import PhotosUI
@@ -21,7 +22,9 @@ public struct SendFeedbackFeature: Sendable {
 
     @ObservableState
     public struct State: Hashable, Sendable {
-        public static let initialState = Self()
+        /// 처음 상태. 화면을 열 때마다 만든다 — 본문 머리(`UserFeedback.initialState`)가 여는 순간의 화면 언어를 따르고,
+        /// 내용 판정(`missingRequirement`)이 보는 머리와 같은 언어가 된다(즉시 전환 단계 3). 한 번 만들어 두면 처음 연 때의 언어로 굳는다.
+        public static var initialState: Self { Self() }
         @Presents public var path: Path.State?
         public var feedbackInfo: UserFeedback = .initialState
         public var imageSelection: [PhotosPickerItem] = []
@@ -143,8 +146,9 @@ public struct SendFeedbackFeature: Sendable {
                     state.path = .email(.init(mailInfo: state.feedbackInfo))
                 } else {
                     // 조용히 넘어가지 않는다 — 누른 사람은 보내졌는지 모른다. 왜 못 보내는지와 대안을 알린다.
+                    // 안내 문구는 띄우는 순간의 화면 언어로 만든다(즉시 전환 단계 3).
                     Log.debug("이메일을 보낼 수 없음 — 메일 계정이 없다")
-                    state.path = .popup(Self.mailUnavailablePopup)
+                    state.path = .popup(Self.mailUnavailablePopup(locale: AppLanguage.displayLocale()))
                 }
             case .path(.presented(.popup(.view(.confirm)))), .path(.presented(.popup(.view(.cancel)))):
                 state.path = nil
@@ -164,12 +168,13 @@ public struct SendFeedbackFeature: Sendable {
 
 extension SendFeedbackFeature {
     /// 메일 계정이 없어 보낼 수 없을 때의 안내(설정의 알림 대화상자, 시안 F2).
-    static var mailUnavailablePopup: PopupFeature.State {
+    /// - Parameter locale: 문구 언어 — 리듀서는 띄우는 순간의 `AppLanguage.displayLocale()` 를 넘긴다.
+    static func mailUnavailablePopup(locale: Locale) -> PopupFeature.State {
         PopupFeature.State(
-            title: SettingsCatalog.string("메일을 보낼 수 없어요"),
-            body: SettingsCatalog.string("이 iPad에 메일 계정이 설정돼 있지 않아요."),
-            hint: SettingsCatalog.string("설정 앱의 메일에서 계정을 추가한 뒤 다시 보내 주세요. App Store 리뷰로 의견을 남겨 주셔도 돼요."),
-            confirmTitle: SettingsCatalog.string("확인")
+            title: SettingsCatalog.string("메일을 보낼 수 없어요", locale: locale),
+            body: SettingsCatalog.string("이 iPad에 메일 계정이 설정돼 있지 않아요.", locale: locale),
+            hint: SettingsCatalog.string("설정 앱의 메일에서 계정을 추가한 뒤 다시 보내 주세요. App Store 리뷰로 의견을 남겨 주셔도 돼요.", locale: locale),
+            confirmTitle: SettingsCatalog.string("확인", locale: locale)
         )
     }
 
@@ -179,12 +184,12 @@ extension SendFeedbackFeature {
         case body
         case agreements
 
-        /// 보내기 버튼 아래 안내 — 버튼이 왜 꺼져 있는지와 무엇을 채울지 알린다.
-        public var hint: String {
+        /// 보내기 버튼 아래 안내 — 버튼이 왜 꺼져 있는지와 무엇을 채울지 알린다. 뷰는 환경 `locale` 을 넘긴다.
+        public func hint(locale: Locale) -> String {
             switch self {
-            case .title: SettingsCatalog.string("보내려면 제목을 적어 주세요.")
-            case .body: SettingsCatalog.string("보내려면 내용을 적어 주세요.")
-            case .agreements: SettingsCatalog.string("보내려면 필수 항목에 모두 동의해 주세요.")
+            case .title: SettingsCatalog.string("보내려면 제목을 적어 주세요.", locale: locale)
+            case .body: SettingsCatalog.string("보내려면 내용을 적어 주세요.", locale: locale)
+            case .agreements: SettingsCatalog.string("보내려면 필수 항목에 모두 동의해 주세요.", locale: locale)
             }
         }
     }
@@ -192,11 +197,11 @@ extension SendFeedbackFeature {
     public enum AttachmentType: String, CaseIterable {
         case photo = "사진 보관함"
         case file = "파일 선택"
-        /// 첨부 메뉴에 적는 이름(앱 언어). rawValue 는 그대로 둔다.
-        var title: String {
+        /// 첨부 메뉴에 적는 이름 — 뷰는 환경 `locale` 을 넘긴다. rawValue 는 그대로 둔다.
+        func title(locale: Locale) -> String {
             switch self {
-            case .photo: SettingsCatalog.string("사진 보관함")
-            case .file: SettingsCatalog.string("파일 선택")
+            case .photo: SettingsCatalog.string("사진 보관함", locale: locale)
+            case .file: SettingsCatalog.string("파일 선택", locale: locale)
             }
         }
         var image: String {
@@ -207,12 +212,12 @@ extension SendFeedbackFeature {
         }
     }
     
-    /// 문의 분류의 표시 이름(앱 언어). 메일 제목에 쓰는 `UserFeedback.FeedbackType` rawValue 는 한국어 그대로 둔다(영어 현지화 결정 8).
-    static func feedbackTypeTitle(_ type: UserFeedback.FeedbackType) -> String {
+    /// 문의 분류의 표시 이름 — 뷰는 환경 `locale` 을 넘긴다. 메일 제목에 쓰는 `UserFeedback.FeedbackType` rawValue 는 한국어 그대로 둔다(영어 현지화 결정 8).
+    static func feedbackTypeTitle(_ type: UserFeedback.FeedbackType, locale: Locale) -> String {
         switch type {
-        case .inquiry: SettingsCatalog.string("일반 문의")
-        case .proposal: SettingsCatalog.string("개선 및 제안")
-        case .etc: SettingsCatalog.string("기타")
+        case .inquiry: SettingsCatalog.string("일반 문의", locale: locale)
+        case .proposal: SettingsCatalog.string("개선 및 제안", locale: locale)
+        case .etc: SettingsCatalog.string("기타", locale: locale)
         }
     }
 

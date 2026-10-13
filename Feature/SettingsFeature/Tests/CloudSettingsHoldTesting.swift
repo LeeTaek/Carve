@@ -36,6 +36,8 @@ private struct SilentWidgetClient: WidgetVerseClient {
 @MainActor
 struct CloudSettingsHoldTesting {
     private let hold = LegacySeparationHold(reason: .unlinkedRowsAwaitSeparation(count: 2), jobID: "job")
+    /// 문구를 꺼내는 언어 — 시험 언어(스킴 ko-KR)와 같은 한국어. 리듀서는 고른 언어가 없어 이 언어로 대화상자를 만든다.
+    private static let koreanLocale = Locale(identifier: "ko_KR")
 
     private func makeStore(_ eraser: ForbiddenEraser) -> TestStoreOf<CloudSettingsFeature> {
         TestStore(initialState: .initialState) {
@@ -49,7 +51,7 @@ struct CloudSettingsHoldTesting {
 
     private var heldPopup: CloudSettingsFeature.Path.State {
         .popup(.init(
-            title: nil, body: CloudSettingsFeature.eraseHeldBody, emphasis: nil, hint: nil,
+            title: nil, body: CloudSettingsFeature.eraseHeldBody(locale: Self.koreanLocale), emphasis: nil, hint: nil,
             confirmTitle: "확인", cancelTitle: nil, role: .plain, confirmAction: .dismiss
         ))
     }
@@ -63,7 +65,7 @@ struct CloudSettingsHoldTesting {
         await store.receive(\.presentPopover) { $0.path = heldPopup }
 
         #expect(eraser.calls.value == 0)
-        #expect(CloudSettingsFeature.eraseHeldBody.contains("iCloud 연결이 보류되어 전체 삭제를 할 수 없어요"))
+        #expect(CloudSettingsFeature.eraseHeldBody(locale: Self.koreanLocale).contains("iCloud 연결이 보류되어 전체 삭제를 할 수 없어요"))
     }
 
     @Test("재시도 진입점 — 삭제 액션이 곧바로 들어와도 부르지 않는다")
@@ -94,20 +96,21 @@ struct CloudSettingsHoldTesting {
     /// 2.0.0 은 실행 중에 다시 연결하지 않는다(2026-09-28 결정) — 「다시 시도」 대신 앱을 다시 열어야 한다고 말한다.
     @Test("보류 안내는 지금은 이 기기에만 저장된다는 것 · 까닭 · 앱을 다시 열어야 한다는 것을 말한다")
     func holdCopyExplains() {
-        let unlinked = CloudSettingsFeature.holdCopy(hold, availability: .available, connectsOnRelaunch: false)
+        let locale = Self.koreanLocale
+        let unlinked = CloudSettingsFeature.holdCopy(hold, availability: .available, connectsOnRelaunch: false, locale: locale)
         #expect(unlinked.title.contains("이 기기에만 저장돼요"))
         #expect(unlinked.detail.contains("옛 필사 2개") && unlinked.detail.contains("앱을 완전히 종료한 뒤 다시 열면"))
         #expect(!unlinked.detail.contains("다시 시도"))
         // 소유를 확인하지 못했다 — 다시 열어도 다른 계정이면 보류된다. 연결을 완료한다고 약속하지 않는다.
-        #expect(!unlinked.detail.contains(CloudSettingsFeature.relaunchToConnect))
+        #expect(!unlinked.detail.contains(CloudSettingsFeature.relaunchToConnect(locale: locale)))
 
         let unknown = CloudSettingsFeature.holdCopy(
-            LegacySeparationHold(reason: .linkageUnknown(.tableMissing("x"))), availability: .available, connectsOnRelaunch: false
+            LegacySeparationHold(reason: .linkageUnknown(.tableMissing("x"))), availability: .available, connectsOnRelaunch: false, locale: locale
         )
         #expect(unknown.detail.contains("확인하지 못했어요"))
 
         let signedOut = CloudSettingsFeature.holdCopy(
-            LegacySeparationHold(reason: .ownershipUnverified), availability: .noAccount, connectsOnRelaunch: false
+            LegacySeparationHold(reason: .ownershipUnverified), availability: .noAccount, connectsOnRelaunch: false, locale: locale
         )
         #expect(signedOut.detail.contains("iCloud에 로그인한 뒤 앱을 완전히 종료하고 다시 열면"))
     }
@@ -115,7 +118,7 @@ struct CloudSettingsHoldTesting {
     @Test("로그인과 저장소 소유가 확인되면 재실행으로 연결을 완료하라고 안내한다")
     func holdCopyGuidesRelaunchWhenOwned() {
         let copy = CloudSettingsFeature.holdCopy(
-            LegacySeparationHold(reason: .ownershipUnverified), availability: .available, connectsOnRelaunch: true
+            LegacySeparationHold(reason: .ownershipUnverified), availability: .available, connectsOnRelaunch: true, locale: Self.koreanLocale
         )
         #expect(copy.title.contains("이 기기에만 저장돼요"))
         #expect(copy.detail.hasSuffix("연결을 완료하려면 앱을 완전히 종료한 뒤 다시 열어 주세요."))

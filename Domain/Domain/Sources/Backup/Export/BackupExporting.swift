@@ -16,7 +16,7 @@ import Foundation
 /// - 부르기 전에 열린 필사 화면의 flush 가 `.durable` 이어야 한다(캔버스 flush 계약) — 그 판정은 부르는 쪽(Feature)이 한다.
 /// - 구매(광고 제거) 여부는 묻지 않는다 — 판정은 Feature 가 한다.
 public protocol BackupExporting: Sendable {
-    /// 백업 파일을 만든다. 파일 이름은 기본 이름(앱 언어 — 「새기다 필사 백업 YYYY-MM-DD.carvebackup」 · 「Carve Backup YYYY-MM-DD.carvebackup」)이다.
+    /// 백업 파일을 만든다. 파일 이름은 기본 이름(만드는 순간의 화면 언어 — 「새기다 필사 백업 YYYY-MM-DD.carvebackup」 · 「Carve Backup YYYY-MM-DD.carvebackup」)이다.
     /// - Parameters:
     ///   - password: 사용자 암호 원문(8자 이상 · 두 번 입력 확인은 화면이 한다). 저장 · 기록하지 않는다.
     ///   - progress: 장 단위 진행. 시작할 때 `done == 0` 으로 한 번, 장을 마칠 때마다 한 번 부른다.
@@ -93,12 +93,12 @@ public struct BackupProgress: Equatable, Sendable {
 
 /// 백업 파일의 기본 이름 — ko 「새기다 필사 백업 YYYY-MM-DD.carvebackup」 · en 「Carve Backup YYYY-MM-DD.carvebackup」 (설계 §3-1 7단계).
 public enum BackupExportFileName {
-    /// 이름 앞부분의 한국어 원문. 파일 이름에는 앱 언어로 옮긴 `prefix(locale:)` 를 쓴다.
+    /// 이름 앞부분의 한국어 원문. 파일 이름에는 화면 언어로 옮긴 `prefix(locale:)` 를 쓴다.
     public static let prefix = "새기다 필사 백업"
 
     /// 이름 앞부분을 한 언어로 꺼낸다 — ko 「새기다 필사 백업」 · en 「Carve Backup」(영어 앱 이름 Carve, 영어 현지화 결정 8).
-    /// - Parameter locale: 언어를 정할 로케일. nil 이면 앱(기기) 언어다.
-    public static func prefix(locale: Locale?) -> String {
+    /// - Parameter locale: 언어를 정할 로케일. 파일 이름은 저장되는 표시 문자열이라 만드는 순간의 `AppLanguage.displayLocale()` 을 넘긴다.
+    public static func prefix(locale: Locale) -> String {
         DomainCatalog.string("새기다 필사 백업", locale: locale)
     }
 
@@ -106,9 +106,9 @@ public enum BackupExportFileName {
     /// - Parameters:
     ///   - date: 만든 날(리듀서는 `@Dependency(\.date)` 의 `date.now`).
     ///   - timeZone: 날짜를 읽을 시간대. 기본은 기기의 시간대.
-    ///   - locale: 앞부분 언어를 정할 로케일. nil(기본)이면 앱(기기) 언어다.
+    ///   - locale: 앞부분 언어를 정할 로케일 — 만드는 순간의 화면 언어(`AppLanguage.displayLocale()`).
     /// - Returns: 예: `새기다 필사 백업 2026-10-06.carvebackup` · `Carve Backup 2026-10-06.carvebackup`. 부작용 없음.
-    public static func defaultName(for date: Date, timeZone: TimeZone = .current, locale: Locale? = nil) -> String {
+    public static func defaultName(for date: Date, timeZone: TimeZone = .current, locale: Locale) -> String {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = timeZone
         let parts = calendar.dateComponents([.year, .month, .day], from: date)

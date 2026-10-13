@@ -21,6 +21,8 @@ import ComposableArchitecture
 @Suite("설정 — 필사 백업 · 멈춘 불러오기")
 @MainActor
 struct BackupImportResumeTesting {
+    /// 문구를 꺼내는 언어 — 시험 언어(스킴 ko-KR)와 같은 한국어라 기대 문구는 한국어 원문 그대로다.
+    private static let koreanLocale = Locale(identifier: "ko_KR")
     private typealias Feature = BackupImportFeature
 
     @Test("같은 계정의 멈춘 작업은 「이어서 불러오기」 — 암호를 다시 받아 끝난 장을 든 검사 결과로 미리보기, 처음부터는 받지 않는다")
@@ -36,8 +38,8 @@ struct BackupImportResumeTesting {
         await store.receive(.pendingJobLoaded(pending)) {
             $0.step = .pendingJob(pending)
         }
-        #expect(BackupCopy.pendingJobTitle(job) == "멈춘 불러오기가 있어요")
-        #expect(BackupCopy.pendingJobProgress(job) == "3장 중 1장까지 넣었어요 · 넣은 필사 3개")
+        #expect(BackupCopy.pendingJobTitle(job, locale: Self.koreanLocale) == "멈춘 불러오기가 있어요")
+        #expect(BackupCopy.pendingJobProgress(job, locale: Self.koreanLocale) == "3장 중 1장까지 넣었어요 · 넣은 필사 3개")
         // 같은 계정의 작업은 처음부터 하지 않는다 — 잇거나 버린다.
         await store.send(.view(.restartTapped))
         await store.send(.view(.resumeTapped)) {
@@ -66,8 +68,8 @@ struct BackupImportResumeTesting {
         let pending = Feature.PendingJob(job)
         let store = makeImportStore(.at(.pendingJob(pending)), importer: importer, log: log)
 
-        #expect(BackupCopy.pendingJobTitle(job) == "다른 iCloud 계정에서 시작한 불러오기예요")
-        #expect(BackupCopy.pendingJobGuidance(job) == "지금 계정의 필사에는 이어서 넣지 않아요. 이미 넣은 필사는 그대로 있어요.")
+        #expect(BackupCopy.pendingJobTitle(job, locale: Self.koreanLocale) == "다른 iCloud 계정에서 시작한 불러오기예요")
+        #expect(BackupCopy.pendingJobGuidance(job, locale: Self.koreanLocale) == "지금 계정의 필사에는 이어서 넣지 않아요. 이미 넣은 필사는 그대로 있어요.")
         // 다른 계정의 작업은 이어 하지 않는다 — 상태가 바뀌면 TestStore 가 실패한다.
         await store.send(.view(.resumeTapped))
         await store.send(.view(.restartTapped)) {
@@ -90,8 +92,8 @@ struct BackupImportResumeTesting {
     func unconnectedJobExplainsBlockInsteadOfOtherAccount() {
         let job = ImportFixture.job(canResume: false, writeBlock: .signedOut)
 
-        #expect(BackupCopy.pendingJobTitle(job) == "멈춘 불러오기를 지금은 이어서 할 수 없어요")
-        #expect(BackupCopy.pendingJobGuidance(job) == "iCloud 에 로그인한 뒤 앱을 다시 열면 불러올 수 있어요. 이미 넣은 필사는 그대로 있어요.")
+        #expect(BackupCopy.pendingJobTitle(job, locale: Self.koreanLocale) == "멈춘 불러오기를 지금은 이어서 할 수 없어요")
+        #expect(BackupCopy.pendingJobGuidance(job, locale: Self.koreanLocale) == "iCloud 에 로그인한 뒤 앱을 다시 열면 불러올 수 있어요. 이미 넣은 필사는 그대로 있어요.")
     }
 
     @Test("「버리기」 는 작업 기록과 사본만 지우고 멈춘 작업을 다시 본다 — 없으면 파일 고르기", arguments: [true, false])
@@ -126,7 +128,7 @@ struct BackupImportResumeTesting {
         await store.receive(.inspectFinished(.failure(.jobFromOtherAccount))) {
             $0.step = .inspectFailed(.jobFromOtherAccount, .resume(job))
         }
-        #expect(BackupCopy.inspectFailed(.jobFromOtherAccount).hasPrefix("다른 iCloud 계정에서 시작한 불러오기예요."))
+        #expect(BackupCopy.inspectFailed(.jobFromOtherAccount, locale: Self.koreanLocale).hasPrefix("다른 iCloud 계정에서 시작한 불러오기예요."))
         // 다른 계정의 작업은 암호를 다시 넣어도 잇지 않는다. 파일 고르기도 이 단계의 길이 아니다.
         await store.send(.view(.retryTapped))
         await store.send(.view(.chooseFileTapped))
@@ -153,7 +155,7 @@ struct BackupImportResumeTesting {
         await store.receive(.inspectFinished(.failure(.wrongPasswordOrDamaged))) {
             $0.step = .inspectFailed(.wrongPasswordOrDamaged, .resume(job))
         }
-        #expect(BackupCopy.retryTitle(.wrongPasswordOrDamaged) == "암호 다시 입력")
+        #expect(BackupCopy.retryTitle(.wrongPasswordOrDamaged, locale: Self.koreanLocale) == "암호 다시 입력")
         await store.send(.view(.retryTapped)) {
             $0.step = .password(.resume(job))
         }

@@ -16,6 +16,8 @@ import UIComponents
 /// 설정 → 앱 버전. 다른 설정 화면과 같은 틀(제목 한 줄 · 설정 묶음 · 값을 오른쪽에 적는 행)로 둔다(시안 F 「앱 버전 · 값」).
 public struct AppVersionView: View {
     @Bindable private var store: StoreOf<AppVersionFeature>
+    /// 화면 언어 — 앱 안에서 언어를 고르면 미리 만드는 문구(묶음 제목 · 행 이름)도 바로 따라온다(즉시 전환 단계 3).
+    @Environment(\.locale) private var locale
 
     public init(store: StoreOf<AppVersionFeature>) {
         self.store = store
@@ -48,8 +50,8 @@ public struct AppVersionView: View {
 
                 CarveDivider()
 
-                CarveSettingsSection(SettingsCatalog.string("앱 정보")) {
-                    CarveSettingsRow(SettingsCatalog.string("버전"), value: UIDevice.appVersion())
+                CarveSettingsSection(SettingsCatalog.string("앱 정보", locale: locale)) {
+                    CarveSettingsRow(SettingsCatalog.string("버전", locale: locale), value: UIDevice.appVersion())
                     #if DEBUG
                     // 개발 빌드에서만 — 어느 빌드를 시험하는지 가린다. 출시 빌드에는 보이지 않는다.
                     if let build = Self.buildNumber {
@@ -71,7 +73,7 @@ public struct AppVersionView: View {
         Button {
             store.send(.pushToBibleSource)
         } label: {
-            CarveSettingsRow(BibleSourceCopy.title) {
+            CarveSettingsRow(BibleSourceCopy.title(locale: locale)) {
                 Image(systemName: "chevron.right")
                     .font(CarveTypography.label)
                     .foregroundStyle(CarveColor.secondary)

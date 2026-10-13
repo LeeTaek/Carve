@@ -10,7 +10,7 @@ import Foundation
 import Testing
 
 /// 차트 문구(접근성 요약 · 절 수 단위 · 주 머리 · X축 라벨)가 영어로도 옮겨졌는지 본다(영어 현지화 결정 5 · 6 · 7).
-/// 언어는 로케일로 명시한다 — 시험은 ko-KR 로 돌므로 로케일 없는 경로는 한국어다.
+/// 언어는 로케일로 명시한다 — 문구 함수는 늘 로케일을 받는다(뷰는 환경 locale 을 넘긴다, 즉시 전환 단계 3).
 struct ChartFeatureEnglishCopyTesting {
     private static let english = Locale(identifier: "en")
     private static let korean = Locale(identifier: "ko")

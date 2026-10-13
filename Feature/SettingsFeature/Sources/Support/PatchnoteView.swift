@@ -19,6 +19,8 @@ public struct PatchnoteView: View {
 
     @Bindable public var store: StoreOf<PatchnoteFeature>
     private let style: Style
+    /// 화면 언어 — 앱 안에서 언어를 고르면 바뀐 점 · 제목도 바로 따라온다(즉시 전환 단계 3).
+    @Environment(\.locale) private var locale
 
     public init(store: StoreOf<PatchnoteFeature>, style: Style = .modal) {
         self.store = store
@@ -37,18 +39,20 @@ public struct PatchnoteView: View {
 
     /// 설정의 패치노트 — 모든 출시를 최근 것부터 보인다.
     private var detailContent: some View {
-        ScrollView {
+        let releases = PatchnoteFeature.releases(locale: locale)
+        return ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 Text("패치노트", bundle: .module)
                     .font(CarveTypography.sectionTitle)
                     .foregroundStyle(CarveColor.secondary)
 
-                ForEach(PatchnoteFeature.releases) { release in
-                    if release != PatchnoteFeature.latest {
+                ForEach(releases) { release in
+                    // 가장 최근 출시(맨 앞) 위에는 구분선을 두지 않는다.
+                    if release != releases.first {
                         CarveDivider()
                     }
                     VStack(alignment: .leading, spacing: CarveSpacing.xxSmall) {
-                        Text(Self.title(of: release))
+                        Text(Self.title(of: release, locale: locale))
                             .font(CarveTypography.title)
                             .foregroundStyle(CarveColor.ink)
                         Text("바뀐 점", bundle: .module)
@@ -68,9 +72,10 @@ public struct PatchnoteView: View {
 
     /// 업데이트 뒤 자동으로 띄우는 창 — 이번 출시만 보인다.
     private var modalContent: some View {
-        CarveModalCard(title: Self.title(of: PatchnoteFeature.latest), subtitle: SettingsCatalog.string("바뀐 점")) {
+        let latest = PatchnoteFeature.latest(locale: locale)
+        return CarveModalCard(title: Self.title(of: latest, locale: locale), subtitle: SettingsCatalog.string("바뀐 점", locale: locale)) {
             VStack(alignment: .leading, spacing: 24) {
-                notes(of: PatchnoteFeature.latest)
+                notes(of: latest)
             }
         } actions: {
             Button {
@@ -95,8 +100,9 @@ public struct PatchnoteView: View {
         }
     }
 
-    private static func title(of release: PatchnoteFeature.Release) -> String {
-        SettingsCatalog.string("새기다 \(release.version)")
+    /// 출시 제목(「새기다 2.1」 · 「Carve 2.1」) — 뷰는 환경 `locale` 을 넘긴다.
+    private static func title(of release: PatchnoteFeature.Release, locale: Locale) -> String {
+        SettingsCatalog.string("새기다 \(release.version)", locale: locale)
     }
 
     /// 한 출시의 바뀐 점 — 사이에 구분선을 둔다.

@@ -6,6 +6,7 @@
 //
 
 import CarveToolkit
+import ClientInterfaces
 import Domain
 import Foundation
 
@@ -15,11 +16,12 @@ extension DraftRecoveryFeature {
     // MARK: - 견주기
 
     /// 견줄 때 그 장만 읽는다 — 목록은 지금 필기의 바이트를 들고 있지 않다. 남겨 둔 필기도 **다시 읽어** 넣으면 무엇이 되는지 판정한다
-    /// (`VerseDraftImportRule`). 읽기 **전후로** 계정 근거가 목록의 것과 같은지 본다(P0-1).
+    /// (`VerseDraftImportRule`). 읽기 **전후로** 계정 근거가 목록의 것과 같은지 본다(P0-1). 실패 문구는 견주기를 시작할 때의 화면 언어로 만든다.
     func compare(_ item: Item, stamp: Stamp) -> Effect<Action> {
-        .run { [reader, repository, editEnvironment] send in
+        let locale = AppLanguage.displayLocale()
+        return .run { [reader, repository, editEnvironment] send in
             guard let reader else {
-                await send(.currentFailed(itemID: item.id, stamp: stamp, SettingsCatalog.string("이 iPad의 보존 영역을 열지 못했어요.")))
+                await send(.currentFailed(itemID: item.id, stamp: stamp, SettingsCatalog.string("이 iPad의 보존 영역을 열지 못했어요.", locale: locale)))
                 return
             }
             let environment = await editEnvironment.current()
@@ -48,7 +50,9 @@ extension DraftRecoveryFeature {
                 await send(.currentLoaded(itemID: item.id, stamp: stamp, ink: current?.lineData, updatedAt: current?.updateDate, check: check))
             } catch {
                 Log.error("확인이 필요한 필기 — 지금 필기를 읽지 못했다", item.place, "\(error)")
-                await send(.currentFailed(itemID: item.id, stamp: stamp, SettingsCatalog.string("지금 그 절의 필기를 읽지 못했어요. 없다는 뜻은 아니에요.")))
+                await send(.currentFailed(
+                    itemID: item.id, stamp: stamp, SettingsCatalog.string("지금 그 절의 필기를 읽지 못했어요. 없다는 뜻은 아니에요.", locale: locale)
+                ))
             }
         }
         .cancellable(id: CancelID.compare, cancelInFlight: true)
@@ -130,36 +134,39 @@ extension DraftRecoveryFeature {
         }
     }
 
-    /// 넣기의 결과 — **저장을 마친 뒤에만** 완료를 알린다.
+    /// 넣기의 결과 — **저장을 마친 뒤에만** 완료를 알린다. 결과 한 줄은 이때의 화면 언어(`AppLanguage.displayLocale()`)로 만든다.
     func finishImport(
         _ state: inout State, itemID: String, place: String, result: Result<VerseDraftImporter.Result, ImportFailure>
     ) -> Effect<Action> {
         // 계정 근거가 바뀌어 목록을 버렸으면 그 결과도 버린다 — 새 근거로 다시 읽은 목록이 사실을 보인다.
         guard state.importingItemID == itemID else { return .none }
         state.importingItemID = nil
+        let locale = AppLanguage.displayLocale()
         switch result {
         case .success(.imported(let previousKept, _)):
-            state.importMessage = ImportMessage(text: DraftRecoveryCopy.imported(place, previousKept: previousKept), needsAttention: false)
+            state.importMessage = ImportMessage(
+                text: DraftRecoveryCopy.imported(place, previousKept: previousKept, locale: locale), needsAttention: false
+            )
             return reloadAfterImport(&state)
         case .success(.alreadyApplied):
-            state.importMessage = ImportMessage(text: DraftRecoveryCopy.alreadyApplied(place), needsAttention: false)
+            state.importMessage = ImportMessage(text: DraftRecoveryCopy.alreadyApplied(place, locale: locale), needsAttention: false)
             return reloadAfterImport(&state)
         case .success(.draftChanged):
-            state.importMessage = ImportMessage(text: DraftRecoveryCopy.draftChanged, needsAttention: true)
+            state.importMessage = ImportMessage(text: DraftRecoveryCopy.draftChanged(locale: locale), needsAttention: true)
             return reloadAfterImport(&state)
         case .success(.currentChanged), .success(.cautionRequired):
             // 견준 뒤 그 절이 바뀌었거나 물을 것이 생겼다 — 넣지 않았다. 다시 견주어 새 판정을 보인다.
-            state.importMessage = ImportMessage(text: DraftRecoveryCopy.currentChanged, needsAttention: true)
+            state.importMessage = ImportMessage(text: DraftRecoveryCopy.currentChanged(locale: locale), needsAttention: true)
             guard let item = state.comparableItem(id: itemID), let stamp = state.stamp else { return reloadAfterImport(&state) }
             state.comparison = Comparison(itemID: itemID)
             state.pendingCaution = nil
             return compare(item, stamp: stamp)
         case .success(.unavailable):
-            state.importMessage = ImportMessage(text: DraftRecoveryCopy.importUnavailable, needsAttention: true)
+            state.importMessage = ImportMessage(text: DraftRecoveryCopy.importUnavailable(locale: locale), needsAttention: true)
         case .success(.blocked(let block)):
-            state.importMessage = ImportMessage(text: DraftRecoveryCopy.importBlocked(block), needsAttention: true)
+            state.importMessage = ImportMessage(text: DraftRecoveryCopy.importBlocked(block, locale: locale), needsAttention: true)
         case .failure:
-            state.importMessage = ImportMessage(text: DraftRecoveryCopy.importFailed, needsAttention: true)
+            state.importMessage = ImportMessage(text: DraftRecoveryCopy.importFailed(locale: locale), needsAttention: true)
         }
         return .none
     }

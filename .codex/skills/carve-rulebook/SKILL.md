@@ -53,7 +53,7 @@ description: Carve(iPad 성경 필사 앱)에서 TCA + MicroArchitecture + Tuist
 - ./references/navigation.md — Feature 안 · Feature 간 이동
 - ./references/testing.md — 시험 층 · 현재 시각과 기다림 · 의존성 testValue · TestStore 함정
 - ./references/concurrency.md — 규칙 6: 언어 모드 6 관례(State · 리듀서 · 격리) · 탈출구 · 안전하지 않은 우회 감사 표
-- ./references/localization.md — 현지화(카탈로그 · 키 · bundle · 수 · 날짜 · 옮기지 않는 것 · 시험 언어 · `localized_text_needs_bundle`)와 번역본 귀속(`StoredBookKey` 만 쓰기)
+- ./references/localization.md — 현지화(카탈로그 · 키 · bundle · 수 · 날짜 · 옮기지 않는 것 · 시험 언어 · `localized_text_needs_bundle`), 앱 안 언어 즉시 전환(환경 locale · `AppLanguage.displayLocale()` · `localized_string_outside_catalog` · `view_no_current_locale`)과 번역본 귀속(`StoredBookKey` 만 쓰기)
 
 
 ## Documentation rules (Comments)

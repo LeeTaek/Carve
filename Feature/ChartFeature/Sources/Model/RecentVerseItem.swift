@@ -27,9 +27,11 @@ public struct RecentVerseItem: Equatable, Identifiable, Sendable {
         self.drawingID = drawingID
     }
 
-    /// 화면에 적는 참조(「요한복음 3장 16절」 · 「요한복음 3장 16절 · KJV」). 번역본이 섞이는 목록이라 영어 번역본만 약칭을 붙인다(사용자 결정 17).
-    public var message: String {
-        BibleReference(chartChapter: verse.title, verses: .verse(verse.verse)).text
+    /// 역할: 화면에 적는 참조를 만든다. 번역본이 섞이는 목록이라 영어 번역본만 약칭을 붙인다(사용자 결정 17).
+    /// 입력 · 출력: 로케일(뷰는 환경 locale) → 「요한복음 3장 16절」 · 「요한복음 3장 16절 · KJV」 · 「John 3:16 · KJV」.
+    /// 부작용: 없음.
+    public func message(locale: Locale) -> String {
+        BibleReference(chartChapter: verse.title, verses: .verse(verse.verse)).text(locale: locale)
     }
 }
 

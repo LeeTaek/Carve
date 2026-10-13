@@ -387,13 +387,14 @@ extension BackupExportFeature {
         return .merge(stopTimeout, startExport(&state))
     }
 
-    /// 파일을 만든다 — 기본 이름은 오늘 날짜(`@Dependency(\.date)` · `\.timeZone`)다.
+    /// 파일을 만든다 — 기본 이름은 오늘 날짜(`@Dependency(\.date)` · `\.timeZone`)와, 만드는 순간의 화면 언어(`AppLanguage.displayLocale()`)로 옮긴
+    /// 앞부분이다(ko 「새기다 필사 백업」 · en 「Carve Backup」). 저장되는 이름이라 만든 뒤에는 언어를 바꿔도 그대로다(즉시 전환 단계 3).
     /// - 출력: `.exporting(nil)` 과, 진행 · 결과를 보내는 effect(흐름을 닫으면 취소 — 내보내기가 작업 폴더를 지운다).
     /// - 부작용: `backupExporter.export` — 앱 작업 폴더에 파일을 쓴다. 암호는 넘기기만 하고 기록하지 않는다.
     private func startExport(_ state: inout State) -> Effect<Action> {
         state.step = .exporting(nil)
         let password = state.password
-        let fileName = BackupExportFileName.defaultName(for: date.now, timeZone: timeZone)
+        let fileName = BackupExportFileName.defaultName(for: date.now, timeZone: timeZone, locale: AppLanguage.displayLocale())
         return .run { send in
             guard let exporter else {
                 Log.error("필사 백업 — 이 실행에 내보내기가 주입되지 않았다")

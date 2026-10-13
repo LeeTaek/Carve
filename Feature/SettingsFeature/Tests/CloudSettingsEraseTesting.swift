@@ -61,10 +61,12 @@ private final class WidgetClearSpy: WidgetVerseClient, @unchecked Sendable {
 /// 저장소가 비어도 초안만 남아 있을 수 있는데, 이전 문구는 그것을 말하지 않았고 "지울 필사 데이터가 없어요" 로 닫혔다.
 @Suite("설정 — 전체 삭제 문구")
 struct CloudSettingsEraseCopyTesting {
+    /// 문구를 꺼내는 언어 — 시험 언어(스킴 ko-KR)와 같은 한국어라 기대 문구는 한국어 원문 그대로다.
+    private static let koreanLocale = Locale(identifier: "ko_KR")
 
     @Test("남은 초안이 있으면 문구가 그 수까지 말한다 — 자동으로 표시되는 것 · 다른 계정 · 읽지 못한 파일까지 모두라는 것도")
     func bodyMentionsRemainingDrafts() {
-        let body = CloudSettingsFeature.eraseConfirmBody(remainingDrafts: 13)
+        let body = CloudSettingsFeature.eraseConfirmBody(remainingDrafts: 13, locale: Self.koreanLocale)
         #expect(body.contains("이 iPad에 남겨 둔 필기 13개도 모두 지워져요"))
         #expect(body.contains("확인이 필요한 필기"))
         #expect(body.contains("다른 계정에서 쓴 것 · 읽지 못한 파일 포함"))
@@ -74,13 +76,13 @@ struct CloudSettingsEraseCopyTesting {
 
     @Test("남은 초안을 세지 못했으면 수 없이 말하되 빼지 않는다")
     func bodyMentionsDraftsWithoutCountWhenUnknown() {
-        let body = CloudSettingsFeature.eraseConfirmBody(remainingDrafts: nil)
+        let body = CloudSettingsFeature.eraseConfirmBody(remainingDrafts: nil, locale: Self.koreanLocale)
         #expect(body.contains("이 iPad에 남겨 둔 필기도 모두 지워져요"))
     }
 
     @Test("남은 초안이 없으면 그 줄을 넣지 않는다")
     func bodyOmitsDraftLineWhenNone() {
-        let body = CloudSettingsFeature.eraseConfirmBody(remainingDrafts: 0)
+        let body = CloudSettingsFeature.eraseConfirmBody(remainingDrafts: 0, locale: Self.koreanLocale)
         #expect(!body.contains("남겨 둔 필기"))
         #expect(body.contains("모든 장의 필기와 이전 필사 기록이 지워져요"))
     }
@@ -119,7 +121,7 @@ struct CloudSettingsEraseCopyTesting {
         let draftFiles = files().filter { $0.hasSuffix(".json") || $0.contains(".unreadable-") }
         #expect(counted == 4)
         #expect(counted == draftFiles.count)
-        #expect(CloudSettingsFeature.eraseConfirmBody(remainingDrafts: counted).contains("남겨 둔 필기 \(counted)개"))
+        #expect(CloudSettingsFeature.eraseConfirmBody(remainingDrafts: counted, locale: Self.koreanLocale).contains("남겨 둔 필기 \(counted)개"))
 
         try await writer.eraseAllLocal()
         #expect(files().isEmpty)

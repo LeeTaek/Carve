@@ -58,6 +58,17 @@ public enum AppLanguage: String, CaseIterable, Hashable, Sendable {
         components.languageComponents.script = nil
         return Locale(components: components)
     }
+
+    /// 역할: 지금 화면 언어의 locale 을 얻는다 — 리듀서 · effect · 인프라가 문구(알림 · 안내 · 저장되는 표시 문자열)를 만들 때 한 번 얻어 쓴다.
+    ///   뷰는 이 함수를 부르지 않고 환경 `locale` 을 쓴다 — 앱 루트(`AppCoordinatorView`)가 같은 규칙으로 넣고, 바뀌면 SwiftUI 가 다시 그린다.
+    ///   얻은 locale 로 만든 문구는 상태에 그 언어로 남는다 — 언어를 바꿔도 다시 만들 때까지 그대로다(떠 있는 알림과 같다).
+    /// 입력 · 출력: 없음(이 실행에서 앱 안에서 고른 언어 `appLanguageOverride` 를 읽는다) → 고른 언어가 있으면 그 언어로 바꾼 locale
+    ///   (지역 · 달력 · 시간제는 기기 것 — `locale(base:)`), 없으면 `Locale.autoupdatingCurrent`(iOS 가 고른 언어 · 기기 지역).
+    /// 부작용: 없음 — 읽기만 한다. 고른 언어는 `defaultInMemoryStorage` 의존성의 저장소에서 읽으므로, 시험은 `withDependencies` 로 저장소를 넣는다.
+    public static func displayLocale() -> Locale {
+        @SharedReader(.appLanguageOverride) var languageOverride: AppLanguage?
+        return languageOverride?.locale() ?? .autoupdatingCurrent
+    }
 }
 
 /// 앱 언어 고르기 — 시스템 설정 따름 · 한국어 · English.
@@ -152,8 +163,9 @@ private struct UnimplementedAppLanguageClient: AppLanguageClient {
 public extension SharedReaderKey where Self == InMemoryKey<AppLanguage?>.Default {
     /// 이 실행에서 앱 안 고르기로 바꾼 화면 언어. nil 이면 실행을 시작할 때의 언어(iOS 가 고른 언어)를 그대로 쓴다.
     ///
-    /// 설정 › 화면 › 언어가 쓰고, 앱 루트(`AppCoordinatorView`)가 읽어 환경 `locale` 을 바꾼다. 키 기반 `Text("…", bundle:)` 은
-    /// 바로 바뀌고, 미리 만든 문자열(`String(localized:)` · 카탈로그 도우미)은 다음 실행부터 바뀐다 — 보관함 plan 단계 2 · 3 에서 옮긴다.
+    /// 설정 › 화면 › 언어가 쓰고, 앱 루트(`AppCoordinatorView`)가 읽어 환경 `locale` 을 바꾼다. 리듀서 · effect · 인프라는 이 값을 직접 읽지 않고
+    /// `AppLanguage.displayLocale()` 로 같은 규칙의 locale 을 얻는다. 키 기반 `Text("…", bundle:)` 은 환경을 따라 바로 바뀌고,
+    /// 미리 만든 문자열(카탈로그 도우미 · 표시용 함수)은 넘긴 locale 의 언어로 만든다 — 보관함 plan 「Carve 앱 언어 즉시 전환」 단계 2 · 3.
     static var appLanguageOverride: Self {
         Self[.inMemory("appLanguageOverride"), default: nil]
     }

@@ -17,6 +17,8 @@ import UIComponents
 struct WidgetNoticeView: View {
     let notice: CarveDetailFeature.WidgetNotice
     let onRetry: () -> Void
+    /// 화면 언어 — 안내 문구 · 접근성 알림을 이 값으로 만든다(즉시 전환 단계 3).
+    @Environment(\.locale) private var locale
 
     var body: some View {
         content
@@ -40,20 +42,20 @@ struct WidgetNoticeView: View {
     private var message: String {
         switch notice {
         case .added(let addedToFavorites):
-            // 3항 연산을 `String(localized:)` 안에 두면 컴파일러가 한쪽 문구만 카탈로그 추출에 넣는다 — 문구마다 따로 부른다.
+            // 3항 연산을 문구 안에 두면 컴파일러가 한쪽 문구만 카탈로그 추출에 넣는다 — 문구마다 따로 부른다.
             if addedToFavorites {
-                String(localized: "즐겨찾기에 추가하고 위젯에 담았어요", bundle: .module)
+                CarveFeatureCatalog.string("즐겨찾기에 추가하고 위젯에 담았어요", locale: locale)
             } else {
-                String(localized: "위젯에 담았어요", bundle: .module)
+                CarveFeatureCatalog.string("위젯에 담았어요", locale: locale)
             }
         case .alreadyAdded:
-            String(localized: "이미 위젯에 담긴 말씀이에요", bundle: .module)
+            CarveFeatureCatalog.string("이미 위젯에 담긴 말씀이에요", locale: locale)
         case .limitReached:
-            String(localized: "위젯에는 \(WidgetVerseLimit.maximum)개까지 담을 수 있어요", bundle: .module)
+            CarveFeatureCatalog.string("위젯에는 \(WidgetVerseLimit.maximum)개까지 담을 수 있어요", locale: locale)
         case .failed:
-            String(localized: "위젯에 담지 못했어요", bundle: .module)
+            CarveFeatureCatalog.string("위젯에 담지 못했어요", locale: locale)
         case .blocked(let block):
-            String(localized: "위젯에 담지 않았어요. \(block.reasonText)", bundle: .module)
+            CarveFeatureCatalog.string("위젯에 담지 않았어요. \(block.reasonText(locale: locale))", locale: locale)
         }
     }
 }

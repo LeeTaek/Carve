@@ -74,15 +74,13 @@ public struct DailyRecordChartFeature: Sendable {
                 <= today.addDays(-(DailyRecordChartFeature.pageDays - 1))
         }
 
-        /// VoiceOver가 막대를 하나씩 탐색하지 않아도 주간 흐름을 알 수 있는 요약이다(앱 언어).
-        var accessibilitySummary: String { accessibilitySummary(locale: nil) }
-
-        /// 역할: 보이는 7일의 합계 · 평균 · 가장 많은 날 · 기록 없는 날을 한 문장으로 만든다.
-        /// 입력 · 출력: 로케일(nil 이면 앱 · 기기 언어) → 「차트. 9월 4일부터 9월 10일까지. … 없는 날은 이틀.」 ·
+        /// 역할: VoiceOver가 막대를 하나씩 탐색하지 않아도 주간 흐름을 알 수 있게, 보이는 7일의 합계 · 평균 · 가장 많은 날 · 기록 없는 날을 한 문장으로 만든다.
+        /// 입력 · 출력: 로케일(뷰는 환경 locale) → 「차트. 9월 4일부터 9월 10일까지. … 없는 날은 이틀.」 ·
         ///   「Chart. September 4 to September 10. … 2 days with no record.」.
         ///   한국어 수사(하루 · 이틀)는 영어에서 숫자로 적는다 — 카탈로그 키가 ko 수사마다 따로 있다.
+        ///   날짜 · 수 서식만 로케일을 따르고, 보이는 7일의 경계(달력)는 그대로다.
         /// 부작용: 없음.
-        func accessibilitySummary(locale: Locale?) -> String {
+        func accessibilitySummary(locale: Locale) -> String {
             let calendar = Calendar.current
             let start = visibleStartDate
             let end = visibleEndDate
@@ -103,7 +101,7 @@ public struct DailyRecordChartFeature: Sendable {
             let endText = end.chartMonthDayText(locale: locale)
             let range = ChartCatalog.string("\(startText)부터 \(endText)까지", locale: locale)
             let totalText = ChartCatalog.string("\(total)절", locale: locale)
-            let averageNumber = average.formatted(.number.precision(.fractionLength(1)).locale(locale ?? .autoupdatingCurrent))
+            let averageNumber = average.formatted(.number.precision(.fractionLength(1)).locale(locale))
             let averageText = ChartCatalog.string("\(averageNumber)절", locale: locale)
             let maximumText: String
             if let maximumDate {

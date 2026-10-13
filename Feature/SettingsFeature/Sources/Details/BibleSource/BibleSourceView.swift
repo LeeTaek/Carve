@@ -13,6 +13,8 @@ import UIComponents
 /// 번역본 묶음을 구분선으로 나눠 위에서 아래로 적는다. 값이 길어(권리 · 주소) 이름 아래에 값을 두는 두 줄 행으로 둔다.
 public struct BibleSourceView: View {
     private let store: StoreOf<BibleSourceFeature>
+    /// 화면 언어 — 앱 안에서 언어를 고르면 이 화면의 미리 만드는 문구(제목 · 항목 이름 · 판 · 권리)도 바로 따라온다(즉시 전환 단계 3).
+    @Environment(\.locale) private var locale
 
     public init(store: StoreOf<BibleSourceFeature>) {
         self.store = store
@@ -21,7 +23,7 @@ public struct BibleSourceView: View {
     public var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: CarveSpacing.large) {
-                Text(BibleSourceCopy.summary)
+                Text(BibleSourceCopy.summary(locale: locale))
                     .font(CarveTypography.body)
                     .foregroundStyle(CarveColor.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -36,7 +38,7 @@ public struct BibleSourceView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(CarveColor.surface)
-        .navigationTitle(BibleSourceCopy.title)
+        .navigationTitle(BibleSourceCopy.title(locale: locale))
         .navigationBarTitleDisplayMode(.inline)
     }
 
@@ -44,10 +46,10 @@ public struct BibleSourceView: View {
     private func entrySection(_ entry: BibleSourceEntry) -> some View {
         VStack(alignment: .leading, spacing: CarveSpacing.small) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(entry.name())
+                Text(entry.name(locale: locale))
                     .font(CarveTypography.title)
                     .foregroundStyle(CarveColor.ink)
-                if let abbreviation = entry.abbreviation() {
+                if let abbreviation = entry.abbreviation(locale: locale) {
                     Text(abbreviation)
                         .font(CarveTypography.caption)
                         .foregroundStyle(CarveColor.secondary)
@@ -56,17 +58,17 @@ public struct BibleSourceView: View {
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.isHeader)
 
-            if let edition = entry.edition() {
-                detailRow(BibleSourceCopy.editionLabel, value: edition)
+            if let edition = entry.edition(locale: locale) {
+                detailRow(BibleSourceCopy.editionLabel(locale: locale), value: edition)
             }
-            if let rights = entry.rights() {
-                detailRow(BibleSourceCopy.rightsLabel, value: rights)
+            if let rights = entry.rights(locale: locale) {
+                detailRow(BibleSourceCopy.rightsLabel(locale: locale), value: rights)
             }
             if let officialSite = entry.officialSite {
-                detailRow(BibleSourceCopy.officialSiteLabel, value: officialSite)
+                detailRow(BibleSourceCopy.officialSiteLabel(locale: locale), value: officialSite)
             }
             if let textSource = entry.textSource {
-                detailRow(BibleSourceCopy.textSourceLabel, value: textSource)
+                detailRow(BibleSourceCopy.textSourceLabel(locale: locale), value: textSource)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
