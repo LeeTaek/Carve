@@ -153,6 +153,41 @@ struct LanguageSettingsFeatureTesting {
         #expect(korean.firstDayOfWeek == .monday)
     }
 
+    // MARK: - 리듀서 · effect · 인프라의 화면 언어(즉시 전환 단계 3)
+
+    @Test("앱 안에서 고른 언어가 없으면 리듀서가 얻는 화면 언어는 iOS 가 고른 언어(autoupdatingCurrent)다")
+    func displayLocaleWithoutOverrideFollowsCurrentLocale() {
+        // Given: 고른 언어를 넣지 않은 저장소
+        let locale = withDependencies {
+            $0.defaultInMemoryStorage = InMemoryStorage()
+        } operation: {
+            // When
+            AppLanguage.displayLocale()
+        }
+
+        // Then
+        #expect(locale.language.languageCode == Locale.autoupdatingCurrent.language.languageCode)
+    }
+
+    @Test("앱 안에서 영어를 고르면 리듀서가 얻는 화면 언어는 en 이고, 지역은 기기 것 그대로다")
+    func displayLocaleFollowsOverride() {
+        let locale = withDependencies {
+            $0.defaultInMemoryStorage = InMemoryStorage()
+        } operation: {
+            // Given: 설정 › 화면 › 언어(`LanguageSettingsFeature`)와 같은 키 · 같은 방식으로 영어를 넣는다
+            @Shared(.appLanguageOverride) var languageOverride: AppLanguage?
+            $languageOverride.withLock { $0 = .english }
+            // When
+            return AppLanguage.displayLocale()
+        }
+
+        // Then
+        #expect(locale.language.languageCode?.identifier == "en")
+        // 시험은 스킴이 한국 지역으로 고정한다(`Workspace.swift` 의 `testRegion`) — 언어만 바뀌고 지역 KR 은 남는다.
+        #expect(locale.region == Locale.autoupdatingCurrent.region)
+        #expect(locale.region?.identifier == "KR")
+    }
+
     // MARK: - 이름 · 문구
 
     @Test(
