@@ -26,12 +26,39 @@ public enum VerseWidgetSharing {
     public static let deepLinkScheme = "carve"
     /// 위젯 하나뿐이라 kind 도 하나다.
     public static let widgetKind = "CarveVerseWidget"
+    /// 앱 화면 언어를 적는 App Group UserDefaults(`UserDefaults(suiteName: appGroupID)`) 키 — 값은 앱 `AppLanguage` 의 rawValue(`ko` · `en`)다.
+    ///
+    /// 앱이 언어를 고를 때와 시작할 때 적고(`WidgetAppLanguage`), 위젯이 읽어 표시 locale 을 만든다(`displayLocale(in:base:)`).
+    /// 값이 없으면(이 키를 쓰기 전 앱 · 업데이트 뒤 앱을 아직 열지 않음) 위젯은 자기 언어(iOS 가 고른 위젯 번들 언어)를 쓴다.
+    public static let appLanguageKey = "appLanguage"
+    /// 위젯이 옮겨 둔 화면 언어 — 앱 `AppLanguage` 의 rawValue 와 같다(시험이 지킨다). 모르는 값은 적히지 않은 것으로 본다.
+    static let appLanguageCodes: Set<String> = ["ko", "en"]
 
     static let logger = Logger(subsystem: "kr.co.carve.leetaek", category: "Widget")
 
     /// App Group 컨테이너 루트. entitlement 가 없거나 그룹이 등록되지 않았으면 nil 이다.
     public static var containerURL: URL? {
         FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupID)
+    }
+
+    /// 역할: App Group 에 적힌 앱 화면 언어로 위젯의 표시 locale 을 만든다.
+    /// 입력 · 출력: App Group UserDefaults(없으면 nil)와 기준 locale → 적힌 언어로 바꾼 locale(`displayLocale(appLanguage:base:)`). 적힌 값이 없으면 기준 locale 그대로.
+    /// 부작용: 없음 — 읽기만 한다.
+    public static func displayLocale(in defaults: UserDefaults?, base: Locale) -> Locale {
+        displayLocale(appLanguage: defaults?.string(forKey: appLanguageKey), base: base)
+    }
+
+    /// 역할: 앱 화면 언어 코드로 위젯의 표시 locale 을 만든다 — 앱 `AppLanguage.locale(base:)` 와 같은 규칙이다(위젯은 ClientInterfaces 를 링크하지 않아 여기에 둔다).
+    /// 입력 · 출력: 언어 코드(`ko` · `en`)와 기준 locale → 언어 코드만 바꾸고 문자 체계(script)를 비운 locale. 지역 · 달력 · 시간제는 기준 locale 것을 둔다
+    ///   (예: `ko_KR@hours=h23` + `en` → `en_KR@hours=h23`). 코드가 없거나 모르는 값이면 기준 locale 그대로다(위젯 자기 언어).
+    /// 부작용: 없음.
+    public static func displayLocale(appLanguage: String?, base: Locale) -> Locale {
+        guard let appLanguage, appLanguageCodes.contains(appLanguage) else { return base }
+        var components = Locale.Components(locale: base)
+        // `languageComponents` 를 통째로 새로 넣으면 지역이 사라진다 — `ko_KR` 의 지역은 `languageComponents.region` 에 들어 있다.
+        components.languageComponents.languageCode = Locale.LanguageCode(appLanguage)
+        components.languageComponents.script = nil
+        return Locale(components: components)
     }
 }
 
