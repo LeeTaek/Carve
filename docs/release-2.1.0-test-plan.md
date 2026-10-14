@@ -115,7 +115,18 @@
 | G-6 | 개인정보 라벨에 Crashlytics(충돌 데이터 · 진단) 반영, 개인정보 매니페스트 DiskSpace `E174.1` 은 이미 있음 | 사용자, 제출 전 |
 | G-7 | Xcode Cloud 시작 조건 · 빌드 번호, develop → main PR(merge commit), 태그는 승인 뒤 | 사용자 |
 | G-8 | Apple Silicon 맥 배포 — 맥 TestFlight 로 받아져(2026-10-14), App Store 2.0.0 도 맥에 나가 있을 가능성이 높다. iPad 전용 설계인데 맥에서 검증한 적은 없다. App Store Connect › 가격 및 사용 가능 여부 › 「Apple Silicon Mac 에서 iPhone 및 iPad 앱」 을 확인하고 계속 낼지 정한다 | 사용자, 제출 전 |
-| G-9 | 출시 빌드의 dSYM 이 Crashlytics 에 있는지 — Xcode Cloud 의 자동 업로드가 콘솔에 닿지 않았다(T3-DSYM). 출시할 빌드의 아카이브 `dSYMs/` 의 앱 · 위젯 · `Resources.framework` UUID 가 콘솔 dSYM 목록에 「업로드됨」 인지 본다. 없으면 수동 업로드 | 사용자, 제출 전 |
+| G-9 | 출시 빌드의 dSYM 이 Crashlytics 에 있는지 — `ci_post_xcodebuild.sh`(`d200643f`)가 MAIN 아카이브 뒤에도 올린다. MAIN 빌드 로그의 `✅ dSYM 업로드 끝` 과 콘솔 dSYM 목록의 앱 · 위젯 · `Resources.framework` UUID 를 본다. 로그에 `[WARN]` 이면 아카이브 `dSYMs/` 를 수동 업로드 | 사용자, 제출 전 |
+
+**T4 결정(2026-10-14 사용자):**
+- G-1: 지금까지 N-Canvas 관련 이상이 없어 진행한다. 10-17 이후 이상이 보이면 사용자가 알린다.
+- G-2: **완료** — 영국 사용자가 없어 App Store Connect 배포 국가에서 영국을 지금 뺐다(10-14, 사용자).
+- G-3: 저작권 갱신 허락을 기다린다.
+- G-4: 대조표를 develop `d200643f` 기준으로 다시 뽑았다 — `~/Library/Caches/ios-dag/carve-english/review/en-review-2026-10-14.md`(742 항목, 10-12 표 대비 새로 생김 10 · 바뀜 1 · 없어짐 5, 위치 열 · 치환 복수형 풀어 씀). 검토는 사용자.
+- G-5: 패치노트는 그대로 둔다 — 「00 행」 은 48곳뿐이고 앱 안에서 되찾을 길이 없어 알리지 않는다. T5 에서 관련 문의가 오면 그때 다룬다.
+- G-6: 필요한 항목을 넣는다 — 2.1.0 에 새로 들어간 Crashlytics 의 「충돌 데이터」 · 「기타 진단 데이터」(앱에 든 SDK 매니페스트 기준).
+- G-7: 검토가 끝나면 배포 전에 한다.
+- G-8: Apple Silicon 맥에 계속 낸다.
+- G-9: 자동 업로드로 바꾸고 develop 빌드(`d200643f`)에서 확인했다 — 아카이브 로그 `✅ dSYM 업로드 끝`, 콘솔에 정상 표시(사용자 확인). MAIN 빌드는 제출 전에 같은 방법으로 본다.
 
 ## 7. T5 — 출시 후
 
@@ -166,7 +177,7 @@ T3 이번 세션 근거: `/private/tmp/carve-t3-20261014-codex/`의 `processes-b
 | BACKUP-L | 큰 백업 실측 | 보류 | 막지 않음 |
 | T3-WIN 후보 | iPadOS 27.2 가로 창 모드에서 접힌 머리글의 사이드바 버튼과 시스템 창 조작 점이 겹침(앞 세션 관찰) | 미판정 · 비차단 후보 | 전체 화면과 구별해 기록, 이번 세션 시작 캡처에서도 두 컨트롤이 근접함. 코드 수정 없이 후속 판독 |
 | T3-RC4 | 외부 SIGABRT 가 iPad(devicectl) · 맥(`kill`) 모두 앱 안 처리기에서 멈춰 앱이 죽지 않음, Crashlytics 기록 · 시스템 크래시 보고 없음 | 비차단(RC-4 는 ★ 아님) · 후속 조사 후보 | 외부 신호로는 이 빌드에서 충돌을 낼 수 없다 — Dia 콘솔도 첫 충돌 대기. dSYM 은 T3-DSYM 으로 따로 확인했다. 처리기 주인과 앱 안에서 난 abort 계열 충돌이 수집되는지는 시뮬레이터에서 따로 조사한다(Swift 트랩 · 잘못된 메모리 접근은 Mach 예외 경로라 신호 처리기와 별개) |
-| T3-DSYM | Xcode Cloud 빌드의 dSYM 이 Crashlytics 에 없었다 — `Crashlytics/run` 빌드 단계는 검증만 동기로 하고 업로드는 백그라운드라, 빌드가 끝나며 업로드가 끝나지 못한 것으로 본다(콘솔 목록이 비어 있었음) | 239 는 수동 업로드로 해결(RC-4) · 다음 빌드부터 CI 동기 업로드(사용자 결정 10-14) | `ci_scripts/ci_post_xcodebuild.sh` 가 아카이브 단계 뒤 `$CI_ARCHIVE_PATH/dSYMs` 의 앱 · 위젯 · 프레임워크 dSYM(매크로 플러그인 제외)을 `upload-symbols` 로 동기 업로드하고 UUID 를 로그에 남긴다. 실패해도 빌드는 막지 않는다(경고 → G-9 수동 업로드). 239 아카이브로 검증 모드(`--validate`) 실행 통과. 실제 업로드는 다음 Xcode Cloud 빌드의 로그와 콘솔 dSYM 목록으로 확인한다 |
+| T3-DSYM | Xcode Cloud 빌드의 dSYM 이 Crashlytics 에 없었다 — `Crashlytics/run` 빌드 단계는 검증만 동기로 하고 업로드는 백그라운드라, 빌드가 끝나며 업로드가 끝나지 못한 것으로 본다(콘솔 목록이 비어 있었음) | **해결** — 239 는 수동 업로드(RC-4), 다음 빌드부터 CI 동기 업로드(`d200643f`, 사용자 결정 10-14) · develop 빌드에서 로그와 콘솔 확인 | `ci_scripts/ci_post_xcodebuild.sh` 가 아카이브 단계 뒤 `$CI_ARCHIVE_PATH/dSYMs` 의 앱 · 위젯 · 프레임워크 dSYM(매크로 플러그인 제외)을 `upload-symbols` 로 동기 업로드하고 UUID 를 로그에 남긴다. 실패해도 빌드는 막지 않는다(경고 → G-9 수동 업로드). 239 아카이브로 검증 모드(`--validate`) 실행 통과. `d200643f` 의 DevelopBranch 빌드에서 아카이브 로그 `✅ dSYM 업로드 끝` 과 콘솔 정상 표시를 사용자가 확인했다(10-14) |
 
 수정 브랜치 검증(2026-10-14, Xcode 27.0 27A266a · iPad mini (A17 Pro) 26.2): 바꾼 파일 SwiftLint error 0(새 경고 0), 관련 스위트 9개, 전체 회귀 **1614/1626 통과 · 실패 0**(기준선 1609 → 1614).
 
