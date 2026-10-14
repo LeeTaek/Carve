@@ -160,9 +160,10 @@ struct BackupImporterCleanupTesting {
         #expect(record.jobID == inspection.jobID)
         #expect(record.targetScope == Sample.accountA)
         #expect(record.status == .stopped)
-        #expect(record.doneChapters == [Sample.genesis1])
+        // 계정이 바뀌어 멈추면 끝난 장 · 수를 비운다 — 이어 하면 처음부터 다시 판정한다(D12).
+        #expect(record.doneChapters.isEmpty)
         #expect(record.totalChapters == 2)
-        #expect(record.tally == BackupImportTally(new: 1))
+        #expect(record.tally == BackupImportTally())
         let text = try #require(String(data: json, encoding: .utf8))
         #expect(!text.contains(Sample.password))
         #expect(!text.contains(BackupArchivePassword.encoded(Sample.password)))

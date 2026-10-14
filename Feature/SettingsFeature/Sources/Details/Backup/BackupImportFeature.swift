@@ -688,11 +688,18 @@ extension BackupCopy {
             SettingsCatalog.string("불러오기를 마쳤어요.", locale: locale)
         case .completed:
             SettingsCatalog.string("불러오기를 마쳤어요. 새로 넣은 필사는 없어요.", locale: locale)
-        case .blocked(let block, let doneChapters, _):
-            SettingsCatalog.string("불러오기를 멈췄어요. \(importBlocked(block, locale: locale)) 넣은 장 \(doneChapters)개는 그대로 있어요.", locale: locale)
-        case .accountChanged(let doneChapters, _):
-            // 원문.
-            SettingsCatalog.string("iCloud 계정이 바뀌어 불러오기를 멈췄어요. 넣은 장 \(doneChapters)개는 그대로 있어요.", locale: locale)
+        // 쓰기가 막히거나 계정이 바뀌어 멈추면 이어 할 때 처음부터 다시 확인한다(`LiveBackupImporter.forgetDoneChapters`).
+        // 로그아웃 정리로 넣은 장이 사라질 수 있어 「넣은 장은 그대로 있어요」 라고 하지 않는다(2.1.0 출시 시험 D12).
+        case .blocked(let block, _, _):
+            SettingsCatalog.string(
+                "불러오기를 멈췄어요. \(importBlocked(block, locale: locale)) ‘백업 불러오기’를 다시 열면 처음부터 다시 확인해 빠진 필사만 넣어요.",
+                locale: locale
+            )
+        case .accountChanged:
+            SettingsCatalog.string(
+                "iCloud 계정이 바뀌어 불러오기를 멈췄어요. 같은 계정으로 ‘백업 불러오기’를 다시 열면 처음부터 다시 확인해 빠진 필사만 넣어요.",
+                locale: locale
+            )
         case .generationChanged:
             SettingsCatalog.string("적용 중에 모든 필사가 지워져 멈췄어요. ‘백업 불러오기’를 다시 열면 처음부터 다시 불러올 수 있어요.", locale: locale)
         case .failed(let failure):

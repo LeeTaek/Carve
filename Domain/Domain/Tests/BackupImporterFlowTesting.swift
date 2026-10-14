@@ -28,7 +28,7 @@ struct BackupImporterFlowTesting {
         )
     }
 
-    @Test("적용 중 다른 계정으로 바뀌면 그 장부터 0건 쓰고 accountChanged — 쓴 장은 그대로, 작업 기록은 남는다")
+    @Test("적용 중 다른 계정으로 바뀌면 그 장부터 0건 쓰고 accountChanged — 쓴 장은 그대로, 작업 기록은 남고 끝난 장은 비운다")
     func accountChangeStopsAtTheNextChapter() async throws {
         let harness = try BackupRestoreHarness()
         defer { harness.remove() }
@@ -49,6 +49,9 @@ struct BackupImporterFlowTesting {
         #expect(harness.changes.posted.map(\.chapter) == [Sample.genesis1])
         #expect(harness.workLeftovers().isEmpty)
         #expect(harness.jobLeftovers() == [inspection.jobID])
+        // 로그아웃 정리로 쓴 장이 사라질 수 있다 — 이어 할 때 처음부터 다시 판정하도록 작업 기록의 끝난 장 · 수를 비운다(D12).
+        let pending = try #require(await importer.pendingJob())
+        #expect(pending.doneChapters.isEmpty)
     }
 
     @Test("검사 뒤 적용 전에 다른 계정 저장소로 바뀌었으면 첫 장부터 0건 — 쓸 수 있는 B 계정이어도 accountChanged")
@@ -84,7 +87,7 @@ struct BackupImporterFlowTesting {
         #expect(harness.changes.posted.isEmpty)
     }
 
-    @Test("A 계정에서 멈춘 작업은 B 계정 환경에서 이어 하지 않고, A 로 돌아오면 끝난 장을 건너뛰고 잇는다")
+    @Test("A 계정에서 멈춘 작업은 B 계정 환경에서 이어 하지 않고, A 로 돌아오면 처음부터 다시 판정해 잇는다 — 남은 행은 같은 내용으로 건너뛴다")
     func otherAccountJobIsNotResumed() async throws {
         let harness = try BackupRestoreHarness()
         defer { harness.remove() }
@@ -100,7 +103,7 @@ struct BackupImporterFlowTesting {
 
         // Then: 다른 계정 작업 — 이어 하지 못한다(버리기 · 처음부터만). 이어 하려 해도 거절하고 기록은 남는다.
         #expect(pendingInB.targetScope == Sample.accountA)
-        #expect(pendingInB.doneChapters == [Sample.genesis1])
+        #expect(pendingInB.doneChapters.isEmpty)
         #expect(pendingInB.totalChapters == 2)
         #expect(!pendingInB.canResume)
         await #expect(throws: BackupImportError.jobFromOtherAccount) {
@@ -115,16 +118,60 @@ struct BackupImporterFlowTesting {
         #expect(pendingInA.canResume)
         let resumed = try await importer.resume(pendingInA, password: Sample.password)
         #expect(resumed.jobID == pendingInA.jobID)
-        #expect(resumed.doneChapters == [Sample.genesis1])
+        #expect(resumed.doneChapters.isEmpty)
         let report = try await importer.apply(resumed) { _ in }
 
-        // Then: 남은 장만 썼고 끝난 장은 다시 쓰지 않았다. 다 끝나 작업 기록을 지웠다.
-        #expect(report == .completed(BackupImportTally(new: 2)))
+        // Then: 앞서 쓴 장은 같은 내용이라 건너뛰고(다시 쓰지 않음) 남은 장을 썼다. 수는 이번 실행의 것이다. 다 끝나 작업 기록을 지웠다.
+        #expect(report == .completed(BackupImportTally(new: 1, same: 1)))
         #expect(try await harness.rows(Sample.genesis1).count == 1)
         #expect(try await harness.rows(Sample.genesis2).count == 1)
         #expect(harness.changes.posted.map(\.chapter) == [Sample.genesis1, Sample.genesis2])
         #expect(await importer.pendingJob() == nil)
         #expect(harness.jobLeftovers().isEmpty)
+    }
+
+    @Test("계정이 바뀐 사이 이 기기 행이 지워졌으면(로그아웃 정리) 같은 계정으로 이어 할 때 그 장을 다시 넣는다 — D12")
+    func resumeAfterAccountChangeReinsertsPurgedChapter() async throws {
+        let harness = try BackupRestoreHarness()
+        defer { harness.remove() }
+        let file = try harness.writeBackup([current(Sample.genesis1), current(Sample.genesis2)])
+        let environment = SwitchableBackupEnvironment(Sample.confirmed(Sample.accountA))
+        let importer = harness.importer(environment)
+        let first = try await importer.apply(try await importer.inspect(fileURL: file, password: Sample.password)) { progress in
+            if progress.done == 1 { environment.set(Sample.signedOut) }
+        }
+        #expect(first == .accountChanged(doneChapters: [Sample.genesis1], tally: BackupImportTally(new: 1)))
+
+        // When: 로그아웃 정리로 이 기기의 동기화 데이터가 비었다가, 같은 계정으로 다시 로그인한다.
+        try await harness.database.deleteAll(BibleDrawing.self)
+        #expect(try await harness.rows(Sample.genesis1).isEmpty)
+        environment.set(Sample.confirmed(Sample.accountA))
+        let pending = try #require(await importer.pendingJob())
+        #expect(pending.canResume)
+        let report = try await importer.apply(try await importer.resume(pending, password: Sample.password)) { _ in }
+
+        // Then: 사라진 1장도 다시 넣었다 — 끝난 장으로 건너뛰지 않는다. 수는 실제로 넣은 것이다.
+        #expect(report == .completed(BackupImportTally(new: 2)))
+        #expect(try await harness.rows(Sample.genesis1).count == 1)
+        #expect(try await harness.rows(Sample.genesis2).count == 1)
+        #expect(await importer.pendingJob() == nil)
+    }
+
+    @Test("쓰기 게이트가 막혀 멈춰도 끝난 장을 비운다 — 연결 보류가 풀린 뒤 이어 하면 처음부터 다시 판정한다")
+    func blockedStopForgetsDoneChapters() async throws {
+        let harness = try BackupRestoreHarness()
+        defer { harness.remove() }
+        let file = try harness.writeBackup([current(Sample.genesis1), current(Sample.genesis2)])
+        let environment = SwitchableBackupEnvironment(Sample.confirmed(Sample.accountA))
+        let importer = harness.importer(environment)
+        let report = try await importer.apply(try await importer.inspect(fileURL: file, password: Sample.password)) { progress in
+            if progress.done == 1 { environment.set(Sample.connectionHeld(Sample.accountA)) }
+        }
+
+        #expect(report == .blocked(.connectionHeld, doneChapters: [Sample.genesis1], tally: BackupImportTally(new: 1)))
+        let pending = try #require(await importer.pendingJob())
+        #expect(pending.doneChapters.isEmpty)
+        #expect(pending.tally == BackupImportTally())
     }
 
     @Test("다른 계정 작업은 「이 계정으로 처음부터」 — 새 대상 계정으로 다시 검사하고 옛 작업은 지운다")

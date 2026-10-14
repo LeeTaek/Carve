@@ -23,7 +23,9 @@ extension LiveBackupImporter {
     /// 4. 작업 기록에 그 장을 끝남으로 남기고, 저장소가 바뀌었으면 `LocalDrawingChange` 를 보내고, 진행을 알린다.
     /// 5. 다음 장이 있으면 그 환경의 서버 작업 표가 아직 유효한지 본다 — 아니면 `.accountChanged` 로 멈춘다.
     ///
-    /// 멈춰도 쓴 장은 되돌리지 않는다(이미 동기화됐을 수 있다). 다 쓰면 작업 기록 · 암호화 사본을 지운다. 어느 쪽이든 평문 작업 폴더는 지운다.
+    /// 멈춰도 쓴 장은 되돌리지 않는다(이미 동기화됐을 수 있다). 다만 계정이 바뀌거나 쓰기 게이트가 막혀 멈추면 작업 기록의 끝난 장을 비워
+    /// 이어 할 때 처음부터 다시 판정한다(`forgetDoneChapters` — 로그아웃 정리로 쓴 행이 사라질 수 있다). 다 쓰면 작업 기록 · 암호화 사본을 지운다.
+    /// 어느 쪽이든 평문 작업 폴더는 지운다.
     /// - Parameters:
     ///   - inspection: `inspect` · `resume` · `restart` 의 결과.
     ///   - progress: 장 단위 진행.
@@ -54,8 +56,10 @@ extension LiveBackupImporter {
         for (index, chapter) in remaining.enumerated() {
             let current = await environment.current()
             if let stop = Self.stopReason(before: chapter, environment: current, targetScope: inspection.targetScope) {
+                let report = Self.report(stop, record: record)
+                Self.forgetDoneChapters(&record)
                 markStopped(&record)
-                return Self.report(stop, record: record)
+                return report
             }
             let outcome: BackupChapterRestoreOutcome
             do {
@@ -87,8 +91,10 @@ extension LiveBackupImporter {
             // 다음 장으로 가기 전에, 이 장을 쓴 환경의 서버 작업 표가 아직 유효한지 본다.
             if index < remaining.count - 1, let token = current.serverWork, await !environment.isCurrent(token) {
                 Log.error("불러오기 — 장을 쓴 뒤 서버 작업 표가 무효가 돼 멈춘다", "\(chapter.title.rawValue).\(chapter.chapter)")
+                let report = Self.report(.accountChanged, record: record)
+                Self.forgetDoneChapters(&record)
                 markStopped(&record)
-                return Self.report(.accountChanged, record: record)
+                return report
             }
         }
 
@@ -125,6 +131,18 @@ extension LiveBackupImporter {
             }
         }
         return BackupChapterRestoreCommand(items: items, blobs: blobs)
+    }
+
+    /// 계정이 바뀌거나 쓰기 게이트가 막혀 멈출 때 작업 기록의 끝난 장 · 수를 비운다 — 이어 하면 처음부터 다시 판정한다.
+    ///
+    /// iCloud 로그아웃 · 계정 전환은 시스템이 이 기기의 동기화 데이터를 비워, 아직 올라가지 않은 장의 행이 사라질 수 있다(2.1.0 출시 시험 D12).
+    /// 끝난 장을 남겨 두면 이어 하기가 그 장을 건너뛰어 빠진 채 끝나고 결과 수도 실제와 달라진다. 다시 판정하면 남은 행은 같은 지문이라
+    /// 건너뛰고(`skipSame`) 사라진 행만 다시 넣는다 — 「모든 필사 삭제」 로 세대가 바뀌어 멈출 때(`generationChanged`)와 같은 규칙이다.
+    /// 이번 실행의 보고는 비우기 전에 만든다(멈춘 화면이 이번에 넣은 수를 보인다).
+    /// - Parameter record: 작업 기록 — 끝난 장 · 수를 비운다. 부작용 없음(쓰기는 `markStopped`).
+    static func forgetDoneChapters(_ record: inout BackupImportJobRecord) {
+        record.doneChapters = []
+        record.tally = BackupImportTally()
     }
 
     /// 작업을 「멈춤」 으로 남긴다 — 이어 하기(`pendingJob`) 대상이 된다.

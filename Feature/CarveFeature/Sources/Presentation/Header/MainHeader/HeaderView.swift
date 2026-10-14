@@ -167,8 +167,10 @@ public struct HeaderView: View {
             attachmentAnchor: .rect(.bounds),
             arrowEdge: .top
         ) { settingsStore in
+            // 높이는 기본 글자 크기에서 내용(영어 약 690pt — 「손가락 필사 허용」 설명이 두 줄)이 다 들어가는 값이다.
+            // 560 이면 그 설명 둘째 줄 중간에서 잘려 보였다(2.1.0 출시 시험 EN-UI1). 더 큰 글자나 낮은 화면에서는 시스템이 줄이고 안에서 민다.
             SentenceSettingsView(store: settingsStore)
-                .frame(width: 350, height: 560)
+                .frame(width: 350, height: 712)
         }
     }
 

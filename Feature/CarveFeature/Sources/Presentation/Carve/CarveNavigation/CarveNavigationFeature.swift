@@ -322,6 +322,8 @@ extension CarveNavigationFeature {
         // 장이 바뀌기 전에 읽는다 — 보던 장의 레이아웃 · 스크롤 위치로 정한다.
         let viewingVerse = state.carveDetailState.viewingVerse
         state.carveDetailState.scrollTargetVerse = viewingVerse
+        // 보던 절은 보이는 맨 위 절이므로 맨 위에 다시 둔다 — 아래쪽에 두면 바꿀 때마다 앞 절로 밀린다(2.1.0 출시 시험 EN-M1).
+        state.carveDetailState.scrollTargetAnchor = .top
         // 장 목록의 필사 기록은 번역본마다 따로다. 이전 번역본의 기록을 지우고, 탐색을 다시 열 때 새 번역본으로 읽는다.
         state.drawnChapters = [:]
         state.selectedTitle = chapter.title
