@@ -62,7 +62,7 @@ id = "\(bibleTitle.title.rawValue).\(bibleTitle.chapter).\(verse).\(Int(timestam
 
 ### 1-4. 최소 버전 게이트를 붙일 수단이 현재 없다
 
-의존성에 **Firebase Remote Config 가 없다**. Analytics · Messaging · Crashlytics 만 있다 ([Package.swift:26-28](../Plugins/ProjectDescriptionHelpers/Package.swift:26)). 원격 설정·강제 업데이트·킬 스위치에 해당하는 코드도 검색되지 않는다.
+의존성에 **Firebase Remote Config 가 없다**. 2.0.0 까지 앱 타깃이 링크한 Firebase 제품은 Analytics · Messaging 뿐이었다 ([Package.swift:26-28](../Plugins/ProjectDescriptionHelpers/Package.swift:26) · [Project.swift](../App/CarveApp/Project.swift)). Crashlytics 는 선언만 있고 타깃에 연결되지 않았다 — 2.1.0 에서 연결했다(2026-10-14 정정). 원격 설정·강제 업데이트·킬 스위치에 해당하는 코드도 검색되지 않는다.
 
 `firebase-ios-sdk` 자체는 이미 의존성이라 Remote Config **product 추가**는 비교적 싸다. 다만 아래 1-5 때문에 R28 해결책은 되지 못한다.
 
