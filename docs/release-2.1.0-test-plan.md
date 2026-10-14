@@ -1,6 +1,6 @@
 # 2.1.0 출시 시험 계획
 
-작성: 2026-10-14 · 대상: develop `7ed86dc3`(앱 버전 2.1.0) · 상태: **T1 통과 · T2 끝 — EN-M4 ★ 통과. 결함 3(EN-M1 · EN-UI1 · D12)은 `fix/2.1-release-test-findings` 에서 수정 · 확인(기준선 1614). 다음은 T3 실기기**(2026-10-14)
+작성: 2026-10-14 · 대상: develop `7ed86dc3`(앱 버전 2.1.0), T3 TestFlight 2.1.0(239) · 상태: **T1 통과 · T2 끝 — EN-M4 ★ 통과. 결함 3(EN-M1 · EN-UI1 · D12)은 `fix/2.1-release-test-findings` 에서 수정 · 확인(기준선 1614). T3 끝 — RC-1 ★ · RC-3 ★ 통과(구매 · 복원은 사용자 결정으로 건너뜀), RC-2 · RC-5 통과, RC-4 는 외부 신호로 충돌을 낼 수 없어 충돌 수신 · dSYM 미확인(T3-RC4). 다음은 T4 관문**(2026-10-14)
 
 > 2.0.0(main `118715de`) 이후 바뀐 것만 시험한다. 기능별 규칙 · 자동 시험 대응의 원문은 각 설계 문서다 —
 > [영어 현지화 설계](./english-localization-design.md) §9 · [필사 백업 · 불러오기 설계](./backup-import-design.md) §8 · §9 ·
@@ -25,7 +25,7 @@
 - **필사 알림은 2.1.0 에 넣지 않는다** — 다음 버전([제품 로드맵](./product-roadmap.md) §2).
 - **개역개정 출처 표기**(`BibleSourceEntry.swift` 의 TODO)는 저작권 갱신 신청 중이다. 허락이 나오면 문구를 채운다(T4).
 - 시뮬레이터에서 시험 계정 로그인이 필요한 항목은 **사용자가 로그인**한다.
-- 실기기는 **2대**이고 **맨 마지막**(T3)에 시험한다.
+- 실기기는 iPad **1대**이고 **맨 마지막**(T3)에 시험한다. 두 번째 기기는 맥에서 TestFlight 로 받은 후보다(2026-10-14 변경).
 
 ## 2. 순서
 
@@ -34,7 +34,7 @@
 | T1 | 자동 회귀 — 여러 런타임 · StoreKit UI 시험 · lint · Release 빌드 | Claude(무인) | 출시 차단 |
 | T2-a | 시뮬레이터, 계정 없이 | Claude | 항목별(표) |
 | T2-b | 시뮬레이터, 시험 계정 로그인(dev 저장소 · Debug) | Claude + 사용자 로그인 | 항목별(표) |
-| T3 | TestFlight 후보 · 실기기 2대 | 사용자(Claude 는 절차 · 판독) | 출시 차단 |
+| T3 | TestFlight 후보 · 실기기 iPad 1대 + 맥(TestFlight) | Claude 가 DeviceHub · computer-use 로 iPad · 맥을 조작 · 판독, 펜 필기 · 암호 · 결제 · 지우기는 사용자 | 출시 차단 |
 | T4 | 출시 관문 · 운영 확인 | 사용자 판정 | 출시 차단 |
 | T5 | 출시 후 관측 | 사용자 | 중단 기준 |
 
@@ -82,17 +82,26 @@
 
 ★ = 출시 차단. 표시 없는 항목은 실패하면 고칠지 · 알려진 제한으로 둘지 사용자와 정한다.
 
-## 5. T3 — TestFlight 실기기 (2대)
+## 5. T3 — TestFlight: 실기기 iPad 1대 + 맥 (2026-10-14 변경)
 
-Xcode Cloud 후보 빌드(Release · Production 컨테이너)로 한다. 실기기에서는 절 메뉴 항목(「지우기」 등)을 누르지 않는다(AGENTS.md).
+실기기는 iPad 1대뿐이다. 두 번째 기기는 **맥에서 TestFlight 로 받은 같은 후보**(Apple Silicon 에서 iPad 앱으로 실행 — 사용자가 설치 · 실행 확인)로 한다.
+둘 다 Release · 운영(Production) CloudKit 이라 같은 Apple ID 면 실제로 서로 주고받는다. 시뮬레이터는 Debug · dev 컨테이너라 TestFlight 기기와 동기화되지 않는다 — 백업 **파일**을 옮겨 불러오는 데만 쓴다.
 
-| ID | 무엇 | 판정 |
-|---|---|---|
-| RC-1 ★ | App Store 2.0.0 을 쓰던 iPad(실데이터)에 2.1 후보 덮어 설치 → 다른 iPad 에서 받기 | 필사 보존 · 재실행 연결 · 다른 iPad 수신, 패치노트 한 번 |
-| RC-2 | 언어 M5 — 권한 창 문구, 홈 화면 이름 「Carve」(영어 기기), 위젯 실제 동작 · 앱 안 언어와 위젯 언어 | 영어 · 한국어가 섞이지 않음 |
-| RC-3 ★ | 실제 광고 제거 상품(구매 또는 복원) → 백업 만들기 → iCloud Drive 저장 → 다른 iPad 에서 불러오기 | 저장 창 · 파일 고르기 창 · 보안 범위 접근 정상, 미리보기 = 결과 |
-| RC-4 | Crashlytics 시험 충돌 1회(시험용 빌드에서만) → 콘솔 도착 · dSYM 일치, Analytics 실시간 수집 | Release 에서 수집 켜짐. 2026-10-14 시뮬레이터 콘솔에 `[Crashlytics] The signal SIGABRT … SIGTRAP has a non-Crashlytics handler (GADRegisterSignalHandlers). This will interfere with reporting.` 이 떴다 — Swift 트랩(`fatalError` 등)과 SIGABRT 충돌이 둘 다 도착하는지 본다 |
-| RC-5 | 2.0.0 에서 남은 실기기 권장 항목을 영어 · KJV 로 한 번씩 — 위젯(라이트 · 다크 · 탭), 이미지 저장(Pencil · 긴 절), 회전 · 왼손 모드 | 막지 않음, 결과 기록 |
+- **빌드:** 두 기기 모두 develop `731d8c2d` 이후 Xcode Cloud 후보, 같은 빌드 번호. 맥 앱 · iPad 앱의 빌드 번호를 먼저 맞춘다.
+- **실데이터:** 두 기기 모두 사용자의 운영 데이터다. 쓰기 시험은 **지워도 되는 절 하나**(시작 전에 정한다)에서만 하고, 절 메뉴 「지우기」 는 그 절에서 사용자 확인 뒤에만 누른다(AGENTS.md).
+- **맥의 몫:** 동기화 · 파일 상대로만 쓴다. 마우스 필기 · 창 크기 · 위젯은 iPad 와 달라 iPad 동작 판정에 쓰지 않는다.
+- **역할:** iPad 는 Xcode 27 **DeviceHub**(`com.apple.dt.Devices`)의 「View Screen」 실시간 화면에 Claude 가 computer-use 로 터치 · 밀기 · Home 을 보내 조작한다
+  (2026-10-14 실측 — 홈 화면 페이지 넘김). iPad 화면 속 요소는 접근성 트리에 잡히지 않아 좌표로 누르고 캡처로 확인한다. **Apple Pencil 필기 · 암호 · 결제(구매 확인) · 되돌리기 어려운 동작(지우기 등)은 사용자**가 한다.
+  길게 누르기(절 메뉴)는 전체 화면 제어(`left_mouse_down` · `wait` · `left_mouse_up`)가 필요하다. 보조로 `devicectl device capture screenshot · process launch · openURL`, `settings appearance` 를 쓴다.
+  맥 앱도 computer-use 로 Claude 가 조작한다(앱 접근은 사용자 허락).
+
+| ID | 무엇 | 누가 | 판정 |
+|---|---|---|---|
+| RC-1 ★ | iPad: App Store 2.0.0(실데이터) → TestFlight 2.1 덮어 설치. 맥: 2.1 후보 첫 실행(새 기기 합류). iPad 의 시험 절에 한 획 → 맥을 앞으로 불러 받기 | 설치 · 획: 사용자 / 판독 · 맥: Claude | iPad 필사 보존 · 패치노트 한 번 · 설정 › iCloud 「연결돼 있어요」 와 받음 · 올림 시각, 맥이 실데이터를 다 받고 시험 획을 받음 |
+| RC-2 | iPad: 앱 안 언어 English ↔ 한국어, 위젯(앱 안 언어 따름), 권한 창 문구(처음 묻는 권한이 남았으면), 홈 화면 이름 「Carve」 는 기기 언어를 영어로 바꿀 때만(선택) | 사용자 · Claude 캡처 | 영어 · 한국어가 섞이지 않음(즉시 전환 M5) |
+| RC-3 ★ | iPad: 광고 제거 구매 또는 복원(TestFlight 샌드박스) → 백업 만들기 → iCloud Drive 저장. 맥: 그 파일 불러오기. 선택: 같은 파일을 새 시뮬레이터(시험 계정 · dev)로 옮겨 실제로 넣기 | iPad: 사용자 / 맥 · 시뮬레이터: Claude | 저장 창 · 파일 고르기 창 · 보안 범위 접근 정상, 맥 미리보기는 같은 계정이라 「같은 필사」 만 · 데이터 무변경, 시뮬레이터는 미리보기 = 결과 |
+| RC-4 | Crashlytics — 앱에 시험 충돌 버튼이 없다. iPad 앱에 `devicectl device process signal --signal SIGABRT` 로 한 번 충돌을 내고 다시 열어 콘솔 도착 · dSYM 일치를 본다(TestFlight 앱에 신호가 가는지는 해 봐야 안다 — 운영 Crashlytics 에 시험 충돌 1건이 남으므로 사용자 동의 뒤). Analytics 는 실시간 보고서 | Claude(동의 뒤) | Release 에서 수집 켜짐. 시뮬레이터 로그의 `GADRegisterSignalHandlers` 경고 — SIGABRT 가 도착하는지 본다 |
+| RC-5 | iPad: 위젯 라이트 · 다크(화면 모드는 Claude 가 바꾼다), 이미지 저장(Pencil · 긴 절 · 영어 · KJV), 회전 · 왼손 모드 | 사용자 · Claude 캡처 | 막지 않음, 결과 기록 |
 
 ## 6. T4 — 출시 관문 · 운영
 
@@ -105,6 +114,7 @@ Xcode Cloud 후보 빌드(Release · Production 컨테이너)로 한다. 실기�
 | G-5 | 패치노트 — 본문 파싱 수정으로 옛 「00 행」 필사가 안 보이는 영향을 알릴지 | 사용자 |
 | G-6 | 개인정보 라벨에 Crashlytics(충돌 데이터 · 진단) 반영, 개인정보 매니페스트 DiskSpace `E174.1` 은 이미 있음 | 사용자, 제출 전 |
 | G-7 | Xcode Cloud 시작 조건 · 빌드 번호, develop → main PR(merge commit), 태그는 승인 뒤 | 사용자 |
+| G-8 | Apple Silicon 맥 배포 — 맥 TestFlight 로 받아져(2026-10-14), App Store 2.0.0 도 맥에 나가 있을 가능성이 높다. iPad 전용 설계인데 맥에서 검증한 적은 없다. App Store Connect › 가격 및 사용 가능 여부 › 「Apple Silicon Mac 에서 iPhone 및 iPad 앱」 을 확인하고 계속 낼지 정한다 | 사용자, 제출 전 |
 
 ## 7. T5 — 출시 후
 
@@ -133,6 +143,13 @@ Xcode Cloud 후보 빌드(Release · Production 컨테이너)로 한다. 실기�
 | EN-M3 | 2026-10-14 | 기기 A(2.1, 로그인) | 통과 | 이미지: KJV 오바댜 1:1 「이미지 저장」(사진 권한 허용) → 저장 그림에 KJV 본문 · X 필기 · 출처 「오바댜 1장 1절 · KJV」(한국어 기기의 KJV 참조 표기 — EN-M2 에서 넘긴 확인). 위젯: 절 메뉴 「위젯에 추가」 → App Group `widget-verses.json` 에 `translation: KJV` · 「오바댜 1장 1절」 · KJV 본문 · 잉크 PNG(`widget-ink-1_31Obadiah_txt_1_1_KJV.png`). 창세기 1장(개역개정)을 보다가 홈에서 위젯 주소 `carve://verse?title=1-31Obadiah.txt&chapter=1&verse=1&translation=KJV` 를 열면 오바댜 1장 KJV 1절로 감(홈 화면 위젯 그림은 즉시 전환 M3 · t1d 로 갈음). 백업: A 의 백업(행 46)이 영어 행을 `translation` 열(`NKRV` 로 바뀐 뒤)이 아니라 접두로 KJV · BSB 로 담음 — EN-M4 관찰 ① 이 백업에 영향 없음을 실제 파일로 확인. 같은 파일을 다시 불러오면 「같은 필사 45 · 비운 기록 1」 · 행 수 48 → 48(반복 0건, D2). KJV 기록으로 돌아오는 것은 BACKUP-D10 |
 | BACKUP-D10 | 2026-10-14 | 기기 A(2.1, 로그인) | 통과 | KJV 오바댜 1:3 에 I1 → 백업 B2 → 획을 더해 I2 → 「지우기」(비운 현재 + I2 보관) → B2 불러오기: 미리보기 「지운 절이라 기록에만 1 · 같은 필사 47」, 결과 「넣은 필사 1 — 지운 절이라 기록에만 1」. 저장소: I1 이 보관 행(isPresent 0, 열 nil)으로 들어가고 현재는 비운 행 그대로. 화면: 3절 「이전 필사 2회」(I2 13:39 · I1 13:37), 현재 필사 빈 칸 — KJV 기록으로 돌아옴. 참고: 같은 날 두 번째 백업은 저장 창이 「대치 / 둘 다 유지」 를 묻는다(파일 이름이 날짜까지라 같음). 지우기 확인창 제목 「오바댜 1장 1절 필사 지우기」 에는 번역본이 없다 |
 | BACKUP-D12 | 2026-10-14 | 기기 A(2.1) · 사용자가 적용 중 로그아웃 → 같은 계정 다시 로그인 | 부분 통과 — **결함 1** | 요나 1 ~ 4장(장마다 한 절)을 담은 시험 백업을 적용하다 LLDB 로 1장 쓰기 직전에 멈추고 사용자가 iCloud 로그아웃 → 다시 돌리자 「iCloud 계정이 바뀌어 불러오기를 멈췄어요. 넣은 장 1개는 그대로 있어요.」, 작업 기록 `stopped` · 1장 완료 · 대상 계정 범위 기록(설계대로 그 장부터 멈춤). 같은 계정으로 다시 로그인 → 「멈춘 불러오기가 있어요 — 4장 중 1장까지 넣었어요」 · 「이어서 불러오기」 제시(같은 계정이라 맞음. 다른 계정 금지는 두 번째 계정이 없어 보지 않음). **결함:** 로그아웃 때 시스템이 이 기기의 동기화 데이터를 비워(행 0) 올라가기 전의 요나 1장 행이 사라졌는데, 작업 기록은 1장을 완료로 두어 이어서 불러오기가 1장을 건너뛰고 결과에 「넣은 필사 4개」 라고 보였다 — 실제 저장소에는 2 · 3 · 4장만. 같은 파일을 처음부터 다시 불러오면 「새 필사 1 · 같은 필사 3」 으로 1장이 돌아온다(복구 길은 있음). 계정이 바뀌어 멈춘 작업을 이을 때는 끝낸 장도 다시 판정하는 방향을 권한다(판정이 같은 내용을 건너뛰므로 중복 없음). 관찰: 다시 로그인한 첫 실행은 저장소가 비어 있는 동안 기기 안 초안(지우기 전 KJV 1:1 X · 1:3 I1 · I2)을 화면에 먼저 보이고, 서버 데이터가 오면 「다른 필사가 도착했어요 · 확인하기」 → 누르면 저장소대로(비운 상태) 돌아옴 — 2.0.0 의 늦게 도착한 필사 처리(P0-3) 그대로. 그 사이에 필기하면 지운 잉크 위에 이어 쓰게 되는 틈이 있다 |
+| RC-1 ★ | 2026-10-14 15:13~15:38 KST | TestFlight 2.1.0(239) · iPad mini (A17 Pro) iPadOS 27.2 + Apple Silicon 맥, Production 같은 계정 | 통과 | 앞 세션: iPad 로마서 1:1~3 기존 잉크 보존, 맥 로마서 1:17 기존 잉크 수신. 이번 세션: 사용자가 오바댜 1:1(NKRV)에 쓴 숫자 `1` 모양 잉크를 15:37 맥에서 확인, iPad 캡처와 일치. 맥 iCloud 「연결돼 있어요 · 받음 2분 전 · 올림 2분 전」(15:38), iPad 「연결돼 있어요 · 받음 20분 전 · 올림 4분 전」(15:38), 이후 영어 화면에서 받음 · 올림 모두 9초 전(15:41). 패치노트 자동 1회는 사용자가 확인(16:30 보고) |
+| RC-2 | 2026-10-14 15:39~15:42 KST | 같은 iPad · 창 모드 | 통과(권한 창 해당 없음) | 앱 안 English → 한국어 즉시 전환: 설정 · 탐색 · 장 제목 · 저장 안내 · Pencil 안내 전환 확인, NKRV 본문은 선택 번역본대로 한국어 유지. 영어 홈 위젯은 「로마서 1:17」 · 필기 그대로, 하단 「Carve · 개역개정」 — 지정 당시 권 · 번역본 이름을 유지하고 공통 문구만 전환하는 `VerseWidgetView` 동작과 일치. 새 권한 창은 나오지 않음. 한국어 복구와 15:57 홈 위젯 하단 「새기다 · 개역개정」 복구 확인(`rc2-widget-korean-restored.png`). 시작 시 선택은 「시스템 설정」(한국어), 15:51 원래 「시스템 설정」으로 복구 확인 |
+| RC-3 ★ | 2026-10-14 15:51~16:30 KST | 같은 후보 | 통과 — 구매 · 복원은 건너뜀 | iPad · 맥 모두 광고 제거 「구매함」, iPad 「광고 없이 쓰는 중」 확인. 구매 · 복원 버튼이 없어 신규 샌드박스 구매 · 복원 흐름은 보지 않음 — 사용자 결정으로 건너뜀. 대신 T1-3(StoreKit UI 2/2)과 맥 첫 실행이 아무 조작 없이 「구매함」(새 기기가 구매 권리를 알아봄). 사용자가 백업을 ‘나의 iPad’에 저장→AirDrop으로 맥 Downloads에 전달(2.9MB, 「새기다 필사 백업 2026-10-14.carvebackup」). 맥 iCloud Drive 비활성화(사용자 보고)라 iCloud Drive 경로는 iPad 단독으로 봄 — iPad 에서 iCloud Drive 에 저장 → 같은 iPad 에서 불러오기를 사용자가 확인(16:30 보고). 맥 백업 불러오기→파일 고르기에서 네이티브 열기 창 정상 표시. 지정 파일 열기 · 사용자 암호 입력→미리보기 「기록 112 · 새 필사 0 · 같은 필사 111 · 이전 기록 0 · 지운 절 기록 0 · 넣을 수 없는 것 0」. 실제 적용 결과 「넣은 필사 0 · 건너뜀 112 — 같은 필사 111 · 비운 기록 1」로 일치. 앱 결과상 필사 추가 없음, 저장소 직접 비교는 하지 않음. 새 시뮬레이터 적용은 선택 항목이라 미실행 |
+| RC-4 | 2026-10-14 15:32:38 · 16:39:51 KST | 같은 iPad · 맥 TestFlight 239 · Xcode 27.0(27A266a), Swift 6.4, devicectl 642.16 | **외부 신호로 충돌을 낼 수 없음 — 충돌 수신 · dSYM 미확인** | 전체 프로세스 JSON에서 `file:///…/CarveApp.app/CarveApp` PID 7711 확정(위젯 PID 7674). 이전 15:23:55 신호의 실제 충돌은 이전 PID 기록 · Carve 크래시 로그가 없어 판정 불가. 사용자 사전 동의에 따라 PID 7711에 SIGABRT 1회: 명령 success · deviceTimestamp `2026-10-14T06:32:38.371Z`. 직후 · 다시 launch 뒤에도 PID 7711 유지, `systemCrashLogs --search Carve` 0건, 화면 유지. 전송 성공만으로 충돌 · 수집 통과로 판정하지 않음. 16:01 Dia의 Firebase Carve 프로젝트 · 정확한 번들 이슈 URL을 새로고침해도 「앱이 감지되었으며 비정상 종료를 기다리는 중입니다」. 충돌 이슈 수신 미확인 · dSYM 일치 확인 불가(필터가 좁아 숨겨진 이슈 목록이 아니라 첫 충돌 대기 화면). 16:03 Analytics 실시간: 최근 30분 활성 2 · 5분 활성 1, `user_engagement 16` · `screen_view 7` · `mk_daily 2` · `session_start 1` 확인. 서비스 수신은 보이나 시험 iPad · 빌드 239로 특정하지 못함. iPad 에는 추가 신호 없음. **맥(16:39:51, 사용자 동의):** 같은 후보 2.1.0(239), 실행 파일 UUID `B83472DD-D7E6-3A39-A7C5-894802B12B55`(arm64). 16:38:56 에 띄운 PID 10840 에 `kill -ABRT` → 종료 코드 0(신호는 확실히 감)인데 1분 넘게 살아 있음. `~/Library/Logs/DiagnosticReports` 에 새 보고 없음, 앱 컨테이너의 Crashlytics 진행 기록(`Caches/com.crashlytics.data/…/reports/active`)에도 신호 기록이 생기지 않음. 같은 폴더의 Crashlytics 설정은 `collect_reports: true` · `status: activated` — 운영 빌드에서 SDK 는 켜져 돈다. 결론: 앱 안의 다른 신호 처리기가 외부 SIGABRT 를 받고 프로세스를 끝내지도 Crashlytics 에 넘기지도 않는다(iPad · 맥 같음). T2 시뮬레이터의 `GADRegisterSignalHandlers` 경고와 맞지만 처리기 주인은 확정하지 못함 — TestFlight 앱이라 디버거를 붙일 수 없고, 두 기기 모두 광고 제거 상태라 광고 SDK `start()` 는 부르지 않는다(`AdConsentCoordinator`). 추가 신호 없음 |
+| RC-5 | 2026-10-14 15:18~15:54 KST | 같은 iPad · 가로 창 모드 → 사용자 직접 세로 회전 | 주요 항목 통과 | 앞 세션: 시스템 light · dark에서 앱 · 위젯 밝은 종이 확인, dark 복구. 이번 세션: 사용자 세로 회전 뒤 1절 숫자 1 잉크 보존, 왼손 모드 켜면 필기 칸 · 잉크가 함께 왼쪽으로 이동, 꺼짐 복구. 본문 설정은 글자 20pt · 줄 간격 30 · 자간 1 · 손가락 필사 꺼짐(변경 없음). 사용자 승인 뒤 오바댜 1절 길게 누르기→이미지 저장, 「사진에 저장했어요」 확인(새 권한 창 없음). 15:47 사진 앱에서 긴 본문 전체 · 숫자 1 잉크 · 하단 「오바댜 1장 1절 · 개역개정」 출처를 확인, 잘림 없음(`rc5-nkrv-saved-photo.png`). 15:49 사용자 KJV 1절 Pencil 숫자 1→이미지 저장 완료, 15:50 사진 앱에서 긴 영어 본문 · 잉크 · 「오바댜 1장 1절 · KJV」 출처 확인(`rc5-kjv-saved-photo.png`). 15:54 CLI로 시스템 dark · Extra Small · landscapeLeft 복구 확인(`appearance-check.json` · `orientation-check.json`). 앱 자체 화면 모드는 시작부터 Light이며 미변경 |
+
+T3 이번 세션 근거: `/private/tmp/carve-t3-20261014-codex/`의 `processes-before.json` · `processes-after-signal.json` · `processes-after-launch.json` · `rc4-signal.json` · `crash-files-before.json` · `crash-files-after.json`, `rc1-ipad-pencil.png` · `rc2-english-settings.png` · `rc2-widget-english-initial.png` · `rc5-portrait-lefthand.png` · `rc5-nkrv-saved-photo.png` · `rc5-kjv-saved-photo.png` · `rc2-widget-korean-restored.png`. 맥 수신 잉크 · iCloud 및 중간 화면은 Codex 대화의 computer-use 캡처. 앞 세션 근거는 사용자 인계 경로의 `scratchpad/t3/`(읽기만 함). `devicectl`은 샌드박스에서 CoreDeviceService 초기화 시간 초과, 승인된 샌드박스 밖 실행에서는 정상. 코드 · 의존성 · 빌드 설정 변경 없음.
 
 ## 9. 시험에서 찾은 것과 처리 (2026-10-14 사용자 결정)
 
@@ -146,5 +163,9 @@ Xcode Cloud 후보 빌드(Release · Production 컨테이너)로 한다. 실기�
 | T1-2 흔들림 | `CanvasLightAppearanceTesting` 렌더 대기 1.2초 고정 | 후속 | 시험 보강 후보 |
 | BACKUP-D1 · D3 · D11 | 빈 저장소 · 두 기기 오프라인 | 건너뜀 | 계정 하나로 빈 저장소를 만들 수 없고, 단위 시험 · 10-06 확인으로 갈음 |
 | BACKUP-L | 큰 백업 실측 | 보류 | 막지 않음 |
+| T3-WIN 후보 | iPadOS 27.2 가로 창 모드에서 접힌 머리글의 사이드바 버튼과 시스템 창 조작 점이 겹침(앞 세션 관찰) | 미판정 · 비차단 후보 | 전체 화면과 구별해 기록, 이번 세션 시작 캡처에서도 두 컨트롤이 근접함. 코드 수정 없이 후속 판독 |
+| T3-RC4 | 외부 SIGABRT 가 iPad(devicectl) · 맥(`kill`) 모두 앱 안 처리기에서 멈춰 앱이 죽지 않음, Crashlytics 기록 · 시스템 크래시 보고 없음 | 비차단(RC-4 는 ★ 아님) · 후속 조사 후보 | 외부 신호로는 이 빌드에서 충돌을 낼 수 없다 — Dia 콘솔도 첫 충돌 대기. dSYM 업로드는 Crashlytics 콘솔 dSYM 목록에서 UUID `B83472DD-D7E6-3A39-A7C5-894802B12B55` 로 확인할 수 있다(사용자). 처리기 주인과 앱 안에서 난 abort 계열 충돌이 수집되는지는 시뮬레이터에서 따로 조사한다(Swift 트랩 · 잘못된 메모리 접근은 Mach 예외 경로라 신호 처리기와 별개) |
 
 수정 브랜치 검증(2026-10-14, Xcode 27.0 27A266a · iPad mini (A17 Pro) 26.2): 바꾼 파일 SwiftLint error 0(새 경고 0), 관련 스위트 9개, 전체 회귀 **1614/1626 통과 · 실패 0**(기준선 1609 → 1614).
+
+T3 종료 전 복구(2026-10-14): 시스템 dark · Extra Small · landscapeLeft는 CLI로 확인. 앱 언어는 원래 시스템 설정(한국어), 왼손 모드는 원래 꺼짐, 앱 자체 Light · 본문 20pt · 줄 간격 30 · 자간 1 · 손가락 필사 꺼짐은 유지. iPad는 오바댜 1장 개역개정으로 복귀, NKRV · KJV 시험 잉크는 지우지 않음. 맥은 백업 결과 화면. 패치노트 자동 1회는 뒤에 사용자가 확인했다.
