@@ -10,6 +10,7 @@ let dependencies: [TargetDependency] = [
     .ClientInterfaces,
     .FirebaseAnalytics,
     .FirebaseMessaging,
+    .FirebaseCrashlytics,
     .GoogleAds,
     .GoogleUMP,
 
@@ -40,14 +41,17 @@ let settings: Settings = .settings(
             "ADMOB_NATIVE_SIDEBAR_AD_UNIT_ID": "ca-app-pub-3940256099942544/3986624511",
             "ADMOB_NATIVE_HEADER_AD_UNIT_ID": "ca-app-pub-3940256099942544/3986624511",
             // Debug(시뮬레이터 · UI 시험 · 개발 실행)는 운영 GA4 로 이벤트를 보내지 않는다 — first_open 같은 자동 이벤트까지 막는다.
-            "FIREBASE_ANALYTICS_COLLECTION_ENABLED": "NO"
+            "FIREBASE_ANALYTICS_COLLECTION_ENABLED": "NO",
+            // 같은 이유로 Debug 충돌(UI 시험 · simctl 실행은 디버거가 없어 잡힌다)은 운영 Crashlytics 로 보내지 않는다.
+            "FIREBASE_CRASHLYTICS_COLLECTION_ENABLED": "NO"
         ]),
         .release(name: "Release", settings: [
             "CLOUDKIT_CONTAINER_ID": "iCloud.Carve.SwiftData.iCloud",
             "ADMOB_NATIVE_CHART_AD_UNIT_ID": "ca-app-pub-7073697298801242/6417626074",
             "ADMOB_NATIVE_SIDEBAR_AD_UNIT_ID": "ca-app-pub-7073697298801242/8915591660",
             "ADMOB_NATIVE_HEADER_AD_UNIT_ID": "ca-app-pub-7073697298801242/1591248377",
-            "FIREBASE_ANALYTICS_COLLECTION_ENABLED": "YES"
+            "FIREBASE_ANALYTICS_COLLECTION_ENABLED": "YES",
+            "FIREBASE_CRASHLYTICS_COLLECTION_ENABLED": "YES"
         ])
     ]
 )
