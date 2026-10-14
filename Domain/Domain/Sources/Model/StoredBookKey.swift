@@ -12,11 +12,13 @@ import Foundation
 /// | 행 | `titleName` | `translation` 열 |
 /// |---|---|---|
 /// | 개역개정 | `BibleTitle.rawValue`(예 `1-01Genesis.txt`) — 지금과 같다 | `.NKRV`(옛 행은 nil 일 수 있다) |
-/// | KJV · BSB | `"<Translation.rawValue>-<BibleTitle.rawValue>"`(예 `KJV-1-01Genesis.txt`) — 본문 리소스 파일 이름과 같다 | 늘 nil |
+/// | KJV · BSB | `"<Translation.rawValue>-<BibleTitle.rawValue>"`(예 `KJV-1-01Genesis.txt`) — 본문 리소스 파일 이름과 같다 | 쓸 때 nil |
 ///
 /// - 열에는 영어 값을 쓰지 않는다 — 이미 나간 2.0.0 기기가 모르는 열거값을 디코딩하다 죽을 수 있다.
 ///   구버전은 모르는 `titleName` 을 `BibleTitle(rawValue:)` 로 풀지 못해 건너뛴다.
 /// - 행을 읽을 때 번역본은 `titleName` 접두로 정하고, 접두가 없으면 열이 nil 이든 `.NKRV` 든 개역개정이다.
+/// - **영어 행의 열은 nil 로 남는다고 기대하지 않는다.** CloudKit 레코드에 없는 값은 받은 기기에서 스키마 기본값 `.NKRV` 로 채워지고,
+///   2.0.0 기기를 거치면 처음 쓴 기기의 행도 `.NKRV` 로 돌아온다(2.1.0 출시 시험 EN-M4). 그래서 영어 행을 열로 거르거나 열로 번역본을 정하지 않는다.
 /// - `"NKRV-"` 접두는 만들지 않는다 — 개역개정 행 형식이 지금과 같아야 구버전 · 이전 일치 검사 · 백업이 그대로다.
 /// - `titleName` 문자열을 직접 이어 붙이거나 자르지 않는다. 조회 술어의 `titleName == …` 도 `titleName(for:)` 로 짓는다.
 public enum StoredBookKey {

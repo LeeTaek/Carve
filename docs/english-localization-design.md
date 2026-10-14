@@ -1,7 +1,7 @@
 # 영어 현지화 설계 — KJV · BSB 와 영어 화면 (2.1.0)
 
-작성: 2026-10-06 · 갱신: 2026-10-12(구현 상태 §11-1 · 결정 17 ~ 20 · BSB 원본 주소) · 목표: **2.1.0**(결정 16) · 브랜치: `feat/english-localization`(← `release/2.1.0` `5a86357a`) ·
-상태: **구현됨(레이어 0 ~ 4 병합, 레이어 5 진행 중) / 수동 확인 M1 ~ M4 남음** — §11-1
+작성: 2026-10-06 · 갱신: 2026-10-12(구현 상태 §11-1 · 결정 17 ~ 20 · BSB 원본 주소) · 2026-10-14(상태 · §3-1 받은 영어 행의 열) · 목표: **2.1.0**(결정 16) · 브랜치: `feat/english-localization`(← `release/2.1.0` `5a86357a`) ·
+상태: **구현됨 — develop `7aaa4ab3` 병합 · 푸시 / 수동 확인 M1 ~ M4 는 [2.1.0 출시 시험](./release-2.1.0-test-plan.md)(M4 통과 2026-10-14)** — §11-1
 
 > 이 문서는 영어 성경(KJV · BSB)과 영어 화면을 2.1.0 에 넣는 **계약**이다. 「결정 n」 은 사용자 결정(인터뷰 기록 — 결정 1~16 은 2026-10-06, 실행 중 · 뒤에 더한 17 ~ 20 은 2026-10-12)의 번호이고
 > 이 문서에서 다시 정하지 않는다. 판본을 고른 이유(2026-10-02 결정)는 결과와 기각 이유만 옮겼다. 코드 줄 번호는 `5a86357a` 기준이다.
@@ -83,12 +83,15 @@
 | 행 | `titleName` | `translation` 열 | 읽을 때 번역본 |
 |---|---|---|---|
 | 개역개정 — 지금 · 앞으로 | `BibleTitle.rawValue`(예 `1-01Genesis.txt`) — **지금과 같다** | `.NKRV`(옛 행은 nil 일 수 있다) | NKRV |
-| KJV · BSB | `"<Translation.rawValue>-<BibleTitle.rawValue>"`(예 `KJV-1-01Genesis.txt`) — 본문 리소스 파일명과 같다 | **늘 nil** | 접두의 번역본 |
+| KJV · BSB | `"<Translation.rawValue>-<BibleTitle.rawValue>"`(예 `KJV-1-01Genesis.txt`) — 본문 리소스 파일명과 같다 | **쓸 때 nil**(받은 기기에서는 `.NKRV` 일 수 있다 — 아래) | 접두의 번역본 |
 | 접두를 모르거나 권 이름을 모름 | — | — | 풀지 못함(nil) — 지금처럼 건너뛴다 |
 
 - **SwiftData 의 `translation` 열**(`BibleDrawing` · `BiblePageDrawing` · `FavoriteVerse` · `VerseDrawingVersion`)**에는 `.NKRV` 나 nil 만 쓴다. 영어 값은 절대 쓰지 않는다.**
   이미 나간 2.0.0 기기가 모르는 열거값을 디코딩하다 죽을 수 있기 때문이다(U3 — 미검증, [데이터 호환성 결정](./data-compatibility-decision.md) §2).
 - 행을 읽을 때 번역본은 **`titleName` 접두로 먼저 정한다.** 접두가 없으면 열이 nil 이든 `.NKRV` 든 NKRV 다.
+- **영어 행의 열이 nil 로 남는다고 기대하지 않는다(2026-10-14 출시 시험 EN-M4).** CloudKit 레코드에 없는 값은 받은 기기에서 스키마 기본값 `.NKRV` 로 채워진다.
+  2.0.0 기기가 받아 채운 값이 서버로 올라가면 처음 쓴 2.1 기기의 행 · 지우기 보관 행도 `.NKRV` 가 된다. 2.1 의 조회 술어는 `titleName` 만,
+  백업은 접두(`BackupRowRecord.backupTranslation`)만 보므로 동작은 같다 — 앞으로도 영어 행을 열로 거르거나 열로 번역본을 정하지 않는다.
 - 짓고 푸는 곳은 Domain `StoredBookKey`(`Domain/Domain/Sources/Model/StoredBookKey.swift`) **하나뿐**이다. `titleName` 문자열을 직접 이어 붙이거나 자르지 않는다.
 
   | API | 뜻 |
@@ -382,7 +385,7 @@ M1 에서 모양을 보고 어색하면 글꼴 추가는 후속 작업으로 한
 ### 11-1. 구현 상태 (2026-10-12)
 
 통합 브랜치 `claude/dag-carve-english`(← `5a86357a`)에 레이어마다 태스크 브랜치를 병합했다. 레이어마다 전체 회귀 게이트(`Carve-Workspace`, iPad 시뮬레이터, Xcode 27)를
-실패 0 으로 통과한 뒤 다음 레이어로 갔다 — 통과 수는 [회귀 기준선](./regression-baseline.md) 한 곳에 둔다. 아직 `feat/english-localization` 에 병합하지 않았고 푸시하지 않았다.
+실패 0 으로 통과한 뒤 다음 레이어로 갔다 — 통과 수는 [회귀 기준선](./regression-baseline.md) 한 곳에 둔다. 레이어 5 까지 마친 뒤 `feat/english-localization` 에 병합했고(`5b42e794`), 2026-10-13 develop 에 병합 · 푸시했다(`7aaa4ab3`).
 
 | 레이어 | 태스크 · 커밋(병합) | 한 일 |
 |---|---|---|
@@ -400,7 +403,7 @@ M1 에서 모양을 보고 어색하면 글꼴 추가는 후속 작업으로 한
 | 4 | t4c `9594731e`(`9fa467d3`) | 차트 · UIComponents · 앱 · 위젯 · Domain 영어화 — 로케일 날짜 · 복수형, 위젯 payload 에 앱이 만든 참조, 글꼴 「나눔바른고딕」 → 「나눔고딕」, 백업 파일 이름 en |
 | 4 | t4a `c1611243`(`154762bc`) | CarveFeature 영어화(172키) — 참조는 `BibleReference`, 행 id 는 로케일과 무관한 `번역본/권/장/절`, 권 검색 한 · 영 |
 | 4 | t4b `b93cf4c4`(`2c735bb8`) | SettingsFeature 영어화(+390키) — Copy enum · Popup · 패치노트 2.0 · 2.1 · 앱 정보, 날짜 로케일 |
-| 5 | t5a — **진행 중** | 영어 누락 검사 · `localized_text_needs_bundle` lint · 2.1 패치노트 영어 · `CarveApp-StoreKit` 스킴 시험 언어 · 글꼴 이름 통일 · 결정 17 · 18 반영 · 모듈 사이 영어 용어 통일 |
+| 5 | t5a | 영어 누락 검사 · `localized_text_needs_bundle` lint · 2.1 패치노트 영어 · `CarveApp-StoreKit` 스킴 시험 언어 · 글꼴 이름 통일 · 결정 17 · 18 반영 · 모듈 사이 영어 용어 통일 |
 | 5 | t5b — 이 갱신 | AGENTS.md 용어 · 룰북 `references/localization.md` · 이 절 · 시뮬레이터 요령 · 백업 설계 순서 · 디자인 문서 글꼴 이름 |
 
 **남은 일 (DAG 뒤)**

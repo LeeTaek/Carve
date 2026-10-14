@@ -1,18 +1,28 @@
 # 회귀 기준선
 
-> 회귀 기준선 **1609** — `Carve-Workspace` 전체 회귀의 **통과 수**(Xcode 27 · iPad mini (A17 Pro) · iPadOS 26.2). **통과 수가 줄면 회귀다.**
+> 회귀 기준선 **1614** — `Carve-Workspace` 전체 회귀의 **통과 수**(Xcode 27 · iPad mini (A17 Pro) · iPadOS 26.2). **통과 수가 줄면 회귀다.**
 > 이 파일이 기준선의 유일한 원본이다. [AGENTS.md](../AGENTS.md) · [설계 문서](./single-canvas-design.md) · [런북](./phase-0a-d-device-test.md)은 여기를 가리킨다.
 
-## 현재 값 (2026-10-13, 커밋 `91f5d95e`, Xcode 27.0 27A266a · Swift 6.4 · 언어 모드 6)
+## 현재 값 (2026-10-14, 브랜치 `fix/2.1-release-test-findings`, Xcode 27.0 27A266a · Swift 6.4 · 언어 모드 6)
+
+| iPadOS 런타임 | 기기 | 통과 | 실패 | 건너뜀 | 예상 실패 | 총 |
+|---|---|---:|---:|---:|---:|---:|
+| 26.2 | iPad mini (A17 Pro) | 1614 | 0 | 8 | 4 | 1626 |
+
+- 2.1.0 출시 시험([시험 계획](./release-2.1.0-test-plan.md))에서 찾은 결함 수정 브랜치의 전체 회귀 값이다.
+- 1609 → 1614(시험 선언 1621 → 1626): 번역본 전환 맨 위 정렬(EN-M1) — CarveFeature `TranslationSwitchTesting` +3(외부 진입 아래 정렬 유지 · `scrollOffset(bringingTopOf:)` · 맨 위 정렬 왕복),
+  이어서 불러오기가 처음부터 다시 판정(D12) — Domain `BackupImporterFlowTesting` +2. 지운 시험 0. 기대값을 바꾼 시험: `BackupImporterFlowTesting` 2 · `BackupImporterCleanupTesting` 1 ·
+  `BackupImportOutcomeTesting` 3 · `SettingsFeatureEnglishCopyTesting` 1(끝난 장을 비우는 규칙 · 멈춤 문구).
+- 같은 날 develop `7ed86dc3` 의 여러 런타임 회귀: 26.2 1609 · 18.6 1609 · 27.0 1608(런타임 조건 건너뜀 +1) · 17.5 단독 1608(같음). 17.5 를 다른 기기와 동시에 돌리면
+  `CanvasLightAppearanceTesting/singleCanvasDrawsStoredInkColorInDark(source:)` 가 렌더 대기(1.2초 고정)에 걸려 흔들린다.
+
+### 이전 값 (2026-10-13, 커밋 `91f5d95e`, Xcode 27.0 27A266a · Swift 6.4 · 언어 모드 6)
 
 | iPadOS 런타임 | 기기 | 통과 | 실패 | 건너뜀 | 예상 실패 | 총 |
 |---|---|---:|---:|---:|---:|---:|
 | 26.2 | iPad mini (A17 Pro) | 1609 | 0 | 8 | 4 | 1621 |
 
-- 앱 언어 즉시 전환 DAG(통합 브랜치 `claude/dag-carve-instant-lang`) 뒤 수동 확인에서 찾은 회귀를 고친 브랜치(`claude/fix-display-locale-fallback`)의 전체 회귀 값이다. 17.5 · 18.6 · 27.0 은 이번에 돌리지 않았다 — 2.1.0 출시 전 여러 런타임 회귀에서 함께 잰다.
-- 1572 → 1609(시험 선언 1584 → 1621): 단계 1 · 2(앱 안 고르기 · 저장 · 헤더 · 설정 「화면」 · 캔버스 호스트) +15,
-  단계 3 DAG +20 — CarveFeature 6 · SettingsFeature 5(`displayLocale()` 2 포함) · UIComponents 2 · CarveAppTest(위젯 언어) 7,
-  고른 언어가 없을 때의 화면 언어 규칙(지원하지 않는 기기 언어에서 문구가 섞이던 회귀 수정) +2. 지운 시험 0.
+- 고른 언어가 없을 때의 화면 언어 규칙 시험 +2 까지의 값이다(앱 언어 즉시 전환 단계 1 · 2 · 3 포함).
 
 ### 이전 값 (2026-10-12, 커밋 `330ee2c2`, Xcode 27.0 27A266a · Swift 6.4 · 언어 모드 6)
 
@@ -64,3 +74,4 @@ rev.37(2026-09-29) 까지의 이력은 [설계 문서](./single-canvas-design.md
 | 2026-10-12 | 1572 | `330ee2c2` | 영어 현지화(KJV · BSB · 영어 UI) DAG 통합 브랜치 — 번역본 귀속 · 본문 · 전환 · 현지화 시험 156 추가, 지운 시험 0. 26.2 실패 0(다른 런타임은 출시 전 회귀에서) |
 | 2026-10-13 | 1607 | `76c04bb2` | 앱 언어 즉시 전환 — 단계 1 · 2(앱 안 고르기 · 헤더 · 설정 「화면」 · 캔버스 호스트) +15, 단계 3 DAG 통합 브랜치(모듈 전체 이행 · Domain 표시 API 비옵셔널 · lint) +20, 지운 시험 0. 26.2 실패 0(다른 런타임은 출시 전 회귀에서) |
 | 2026-10-13 | 1609 | `91f5d95e` | 수동 확인 M1-b 회귀 수정 — 고른 언어가 없을 때 화면 언어를 번들 규칙(선호 언어에서 앱이 옮긴 첫 언어)으로, 규칙 시험 +2. 26.2 실패 0 |
+| 2026-10-14 | 1614 | `fix/2.1-release-test-findings` | 2.1.0 출시 시험 결함 수정 — 번역본 전환 맨 위 정렬 +3, 계정 바뀜 뒤 이어서 불러오기 처음부터 다시 판정 +2, 지운 시험 0. 26.2 실패 0 |
