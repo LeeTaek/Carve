@@ -53,7 +53,9 @@ public extension InfoPlist {
                 ),
                 "ADMOB_NATIVE_CHART_AD_UNIT_ID": "$(ADMOB_NATIVE_CHART_AD_UNIT_ID)",
                 "ADMOB_NATIVE_SIDEBAR_AD_UNIT_ID": "$(ADMOB_NATIVE_SIDEBAR_AD_UNIT_ID)",
-                "ADMOB_NATIVE_HEADER_AD_UNIT_ID": "$(ADMOB_NATIVE_HEADER_AD_UNIT_ID)"
+                "ADMOB_NATIVE_HEADER_AD_UNIT_ID": "$(ADMOB_NATIVE_HEADER_AD_UNIT_ID)",
+                // Firebase Analytics 수집 스위치. 구성별 값(Debug NO · Release YES)은 앱 Project.swift 가 정한다.
+                "FIREBASE_ANALYTICS_COLLECTION_ENABLED": "$(FIREBASE_ANALYTICS_COLLECTION_ENABLED)"
             ]
         )
     }

@@ -38,13 +38,16 @@ let settings: Settings = .settings(
             // Debug 는 모든 위치에 Google 공개 테스트 네이티브 단위를 쓴다.
             "ADMOB_NATIVE_CHART_AD_UNIT_ID": "ca-app-pub-3940256099942544/3986624511",
             "ADMOB_NATIVE_SIDEBAR_AD_UNIT_ID": "ca-app-pub-3940256099942544/3986624511",
-            "ADMOB_NATIVE_HEADER_AD_UNIT_ID": "ca-app-pub-3940256099942544/3986624511"
+            "ADMOB_NATIVE_HEADER_AD_UNIT_ID": "ca-app-pub-3940256099942544/3986624511",
+            // Debug(시뮬레이터 · UI 시험 · 개발 실행)는 운영 GA4 로 이벤트를 보내지 않는다 — first_open 같은 자동 이벤트까지 막는다.
+            "FIREBASE_ANALYTICS_COLLECTION_ENABLED": "NO"
         ]),
         .release(name: "Release", settings: [
             "CLOUDKIT_CONTAINER_ID": "iCloud.Carve.SwiftData.iCloud",
             "ADMOB_NATIVE_CHART_AD_UNIT_ID": "ca-app-pub-7073697298801242/6417626074",
             "ADMOB_NATIVE_SIDEBAR_AD_UNIT_ID": "ca-app-pub-7073697298801242/8915591660",
-            "ADMOB_NATIVE_HEADER_AD_UNIT_ID": "ca-app-pub-7073697298801242/1591248377"
+            "ADMOB_NATIVE_HEADER_AD_UNIT_ID": "ca-app-pub-7073697298801242/1591248377",
+            "FIREBASE_ANALYTICS_COLLECTION_ENABLED": "YES"
         ])
     ]
 )
