@@ -2303,7 +2303,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The file didn't match when it was reopened to verify, so it wasn't saved. Please try again."
+            "value" : "The backup file failed verification when it was reopened, so it wasn't offered for saving. Please try again."
           }
         },
         "ko" : {
@@ -7068,7 +7068,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "To clear just one verse, touch and hold it\nand choose Delete."
+            "value" : "To clear just one verse, touch and hold it\nand choose Erase."
           }
         },
         "ko" : {

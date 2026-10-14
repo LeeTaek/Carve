@@ -121,7 +121,7 @@
 - G-1: 지금까지 N-Canvas 관련 이상이 없어 진행한다. 10-17 이후 이상이 보이면 사용자가 알린다.
 - G-2: **완료** — 영국 사용자가 없어 App Store Connect 배포 국가에서 영국을 지금 뺐다(10-14, 사용자).
 - G-3: 저작권 갱신 허락을 기다린다.
-- G-4: 대조표를 develop `d200643f` 기준으로 다시 뽑았다 — `~/Library/Caches/ios-dag/carve-english/review/en-review-2026-10-14.md`(742 항목, 10-12 표 대비 새로 생김 10 · 바뀜 1 · 없어짐 5, 위치 열 · 치환 복수형 풀어 씀). 검토는 사용자.
+- G-4: 대조표를 develop `d200643f` 기준으로 다시 뽑았다 — `~/Library/Caches/ios-dag/carve-english/review/en-review-2026-10-14.md`(742 항목, 10-12 표 대비 새로 생김 10 · 바뀜 1 · 없어짐 5, 위치 열 · 치환 복수형 풀어 씀). **사용자 검토 끝(10-14)** — 3개만 고침: iCloud 전체 삭제 안내 「…choose Delete」 → `Erase`(절 메뉴 이름과 맞춤), 주간 요약 타일 `This Week` → `Weekly Total`, 백업 만들기 검증 실패 안내를 「검증에 실패해 저장하도록 내놓지 않았다」 로(`…failed verification when it was reopened, so it wasn't offered for saving.`). ChartFeatureTest · SettingsFeatureTest 255/255 통과(Xcode 27.0 · iPad mini (A17 Pro) 26.2).
 - G-5: 패치노트는 그대로 둔다 — 「00 행」 은 48곳뿐이고 앱 안에서 되찾을 길이 없어 알리지 않는다. T5 에서 관련 문의가 오면 그때 다룬다.
 - G-6: 필요한 항목을 넣는다 — 2.1.0 에 새로 들어간 Crashlytics 의 「충돌 데이터」 · 「기타 진단 데이터」(앱에 든 SDK 매니페스트 기준).
 - G-7: 검토가 끝나면 배포 전에 한다.
