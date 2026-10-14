@@ -279,7 +279,7 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
 
         if let request = configuration.scrollRequest, request.token != appliedScrollToken, let layout = configuration.layout {
             appliedScrollToken = request.token
-            scroll(toVerse: request.verse, layout: layout)
+            scroll(toVerse: request.verse, anchor: request.anchor, layout: layout)
         }
         #if DEBUG
         displayProbe?.recordApply(revision: configuration.renderedRevision, data: configuration.renderedData)
@@ -355,39 +355,25 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
         canvas.setNeedsLayout()
     }
 
-    private func scroll(toVerse verse: Int, layout: ChapterLayout) {
+    private func scroll(toVerse verse: Int, anchor: ChapterCanvasFeature.ScrollAnchor, layout: ChapterLayout) {
         guard let region = layout.region(verse: verse) else { return }
-        let offsetY = Self.scrollOffset(
-            bringingBottomOf: region.writingRect,
-            viewportHeight: canvas.bounds.height,
-            contentInset: canvas.contentInset,
-            contentHeight: canvas.contentSize.height
-        )
+        let offsetY = switch anchor {
+        case .bottom:
+            Self.scrollOffset(
+                bringingBottomOf: region.writingRect,
+                viewportHeight: canvas.bounds.height,
+                contentInset: canvas.contentInset,
+                contentHeight: canvas.contentSize.height
+            )
+        case .top:
+            Self.scrollOffset(
+                bringingTopOf: region.captureRect,
+                viewportHeight: canvas.bounds.height,
+                contentInset: canvas.contentInset,
+                contentHeight: canvas.contentSize.height
+            )
+        }
         canvas.setContentOffset(CGPoint(x: 0, y: offsetY), animated: true)
-    }
-
-    /// 절이 화면 하단 근처에 오도록 하는 `contentOffset.y` (N-Canvas 의 `scrollTo(anchor: .bottom)` 과 같은 의미).
-    ///
-    /// 뷰포트 `[offset, offset + height]` 에서 헤더(`contentInset.top`)는 위쪽을, 하단 inset 은 아래쪽을 가리므로
-    /// **보이는 하단 = offset + height − inset.bottom** 이다. top inset 은 여기에 관여하지 않는다.
-    /// - Parameters:
-    ///   - rect: 대상 절의 `writingRect` (content 좌표).
-    ///   - viewportHeight: 캔버스 `bounds.height`.
-    ///   - contentInset: 캔버스 인셋.
-    ///   - contentHeight: `contentSize.height`.
-    ///   - bottomMargin: 절 하단과 보이는 하단 사이 여백.
-    /// - Returns: 범위 안으로 클램프된 offset y.
-    static func scrollOffset(
-        bringingBottomOf rect: CGRect,
-        viewportHeight: CGFloat,
-        contentInset: UIEdgeInsets,
-        contentHeight: CGFloat,
-        bottomMargin: CGFloat = 40
-    ) -> CGFloat {
-        let target = rect.maxY + bottomMargin - (viewportHeight - contentInset.bottom)
-        let minOffset = -contentInset.top
-        let maxOffset = max(minOffset, contentHeight - viewportHeight + contentInset.bottom)
-        return min(max(target, minOffset), maxOffset)
     }
 
     // MARK: PKCanvasViewDelegate — 편집 계약 (§8-1)
@@ -468,6 +454,59 @@ final class ChapterCanvasController: UIViewController, PKCanvasViewDelegate {
         let previous = lastReportedTop
         lastReportedTop = current
         onEvent?(.scrolled(previous: previous, current: current))
+    }
+}
+
+// MARK: - 절로 스크롤하는 offset (`scrollToVerse`)
+
+extension ChapterCanvasController {
+    /// 절 소유 영역 위쪽이 헤더 바로 아래(보이는 맨 위)에 오도록 하는 `contentOffset.y` — 번역본 전환(`ScrollAnchor.top`).
+    ///
+    /// 보이는 맨 위 = offset + inset.top 이고, 캔버스가 알리는 위치(`scrollViewDidScroll` 의 `current`)도 같은 값이다. 그래서 이 offset 이면
+    /// 다음 전환의 보던 절(`viewingVerse` — 보이는 맨 위 점을 소유한 절)이 이 절이 된다. 소유 영역은 반개구간이라 경계에 놓으면
+    /// 픽셀 반올림으로 앞 절에 걸릴 수 있어 `insideMargin` 만큼 안쪽에 둔다.
+    /// - Parameters:
+    ///   - rect: 대상 절의 `captureRect` (content 좌표).
+    ///   - viewportHeight: 캔버스 `bounds.height`.
+    ///   - contentInset: 캔버스 인셋.
+    ///   - contentHeight: `contentSize.height`.
+    ///   - insideMargin: 보이는 맨 위가 소유 영역 안쪽으로 들어가는 거리.
+    /// - Returns: 범위 안으로 클램프된 offset y — 장 끝 근처 절은 맨 위까지 올라가지 않는다.
+    static func scrollOffset(
+        bringingTopOf rect: CGRect,
+        viewportHeight: CGFloat,
+        contentInset: UIEdgeInsets,
+        contentHeight: CGFloat,
+        insideMargin: CGFloat = 1
+    ) -> CGFloat {
+        let target = rect.minY + insideMargin - contentInset.top
+        let minOffset = -contentInset.top
+        let maxOffset = max(minOffset, contentHeight - viewportHeight + contentInset.bottom)
+        return min(max(target, minOffset), maxOffset)
+    }
+
+    /// 절이 화면 하단 근처에 오도록 하는 `contentOffset.y` (N-Canvas 의 `scrollTo(anchor: .bottom)` 과 같은 의미).
+    ///
+    /// 뷰포트 `[offset, offset + height]` 에서 헤더(`contentInset.top`)는 위쪽을, 하단 inset 은 아래쪽을 가리므로
+    /// **보이는 하단 = offset + height − inset.bottom** 이다. top inset 은 여기에 관여하지 않는다.
+    /// - Parameters:
+    ///   - rect: 대상 절의 `writingRect` (content 좌표).
+    ///   - viewportHeight: 캔버스 `bounds.height`.
+    ///   - contentInset: 캔버스 인셋.
+    ///   - contentHeight: `contentSize.height`.
+    ///   - bottomMargin: 절 하단과 보이는 하단 사이 여백.
+    /// - Returns: 범위 안으로 클램프된 offset y.
+    static func scrollOffset(
+        bringingBottomOf rect: CGRect,
+        viewportHeight: CGFloat,
+        contentInset: UIEdgeInsets,
+        contentHeight: CGFloat,
+        bottomMargin: CGFloat = 40
+    ) -> CGFloat {
+        let target = rect.maxY + bottomMargin - (viewportHeight - contentInset.bottom)
+        let minOffset = -contentInset.top
+        let maxOffset = max(minOffset, contentHeight - viewportHeight + contentInset.bottom)
+        return min(max(target, minOffset), maxOffset)
     }
 }
 

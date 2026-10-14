@@ -38,6 +38,9 @@ public struct CarveDetailFeature: Sendable {
         var chapterCanvas = ChapterCanvasFeature.State(chapter: .initialState)
         /// 외부 진입(차트 등) · 번역본 전환으로 이동할 절 번호. 새 장의 본문 행이 들어오면 캔버스가 이 절(없으면 바로 앞 절)로 스크롤한다(`scrollToVerse`).
         var scrollTargetVerse: Int?
+        /// `scrollTargetVerse` 를 화면 어디에 둘지 — 외부 진입은 아래쪽(`.bottom`), 번역본 전환은 맨 위(`.top`, 보던 절을 같은 자리에 둬 밀리지 않게).
+        /// 옮긴 뒤 `.bottom` 으로 돌린다.
+        var scrollTargetAnchor: ChapterCanvasFeature.ScrollAnchor = .bottom
         /// 캔버스가 마지막으로 알린 스크롤 위치 — 헤더 바로 아래(보이는 맨 위)의 콘텐츠 y. 번역본을 바꿀 때 보던 절(`viewingVerse`)을 정한다.
         var visibleContentTop: CGFloat = 0
         /// 단일 Canvas 의 절 필사 기록 시트 (§8-7 히스토리 UI, B 구조). 롱프레스 → `ChapterCanvasFeature.Delegate.showHistory` 로 연다.
@@ -283,6 +286,7 @@ public struct CarveDetailFeature: Sendable {
 
             case .setScrollTarget(let verse):
                 state.scrollTargetVerse = verse.verse
+                state.scrollTargetAnchor = .bottom
                 return .none
                 
             case .view(.verseGeometryMeasured(let batch)):
@@ -575,10 +579,12 @@ extension CarveDetailFeature {
     /// 외부 진입 · 번역본 전환으로 정한 절(없으면 첫 절)로 캔버스를 스크롤한다.
     private func scrollToTop(state: inout State) -> Effect<Action> {
         let rows = state.sentenceWithDrawingState
-        let verse = state.scrollTargetVerse.flatMap { Self.scrollableVerse(for: $0, in: rows) } ?? rows.first?.sentence.verse
+        let target = state.scrollTargetVerse.flatMap { Self.scrollableVerse(for: $0, in: rows) }
+        let anchor = target == nil ? .bottom : state.scrollTargetAnchor
         state.scrollTargetVerse = nil
-        guard let verse else { return .none }
-        return .send(.scope(.chapterCanvasAction(.scrollToVerse(verse))))
+        state.scrollTargetAnchor = .bottom
+        guard let verse = target ?? rows.first?.sentence.verse else { return .none }
+        return .send(.scope(.chapterCanvasAction(.scrollToVerse(verse, anchor: anchor))))
     }
 
     /// 이동할 절을 지금 본문 행에서 찾는다(결정 9).

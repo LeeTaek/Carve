@@ -14,6 +14,7 @@ import Domain
 import Foundation
 import PencilKit
 import Testing
+import UIKit
 
 import ComposableArchitecture
 
@@ -155,6 +156,8 @@ struct TranslationSwitchTesting {
             let stored = try storedTitle(in: defaults)
             #expect(stored == kjv)
             #expect(state.carveDetailState.scrollTargetVerse == 12)
+            // 보던 절은 보이는 맨 위 절이므로 맨 위에 다시 둔다 — 아래쪽에 두면 바꿀 때마다 앞 절로 밀린다(EN-M1).
+            #expect(state.carveDetailState.scrollTargetAnchor == .top)
             // 장 이동과 같다 — 탐색을 닫고, 장 목록 선택은 지금 장이다.
             #expect(state.columnVisibility == .detailOnly)
             #expect(!state.carveDetailState.headerState.isNavigationPresented)
@@ -307,7 +310,69 @@ struct TranslationSwitchTesting {
             // 행이 바뀌면 뷰가 스크롤을 낸다(`CarveDetailView` 의 onChange) — 없는 21절 대신 20절로 간다.
             store.send(.scope(.carveDetailAction(.scrollToTop)))
             try await waitUntil { store.carveDetailState.chapterCanvas.scrollRequest?.verse == 20 }
+            #expect(store.carveDetailState.chapterCanvas.scrollRequest?.anchor == .top)
             #expect(store.carveDetailState.scrollTargetVerse == nil)
+            #expect(store.carveDetailState.scrollTargetAnchor == .bottom)
+        }
+    }
+
+    @Test("외부 진입(위젯 · 차트 · 실행 인자)의 이동 목표는 아래쪽 정렬이다 — 번역본 전환이 남긴 맨 위 정렬을 물려받지 않는다")
+    func externalScrollTargetKeepsBottomAnchor() async throws {
+        var state = CarveDetailFeature.State.initialState
+        state.scrollTargetAnchor = .top
+
+        reduce(&state, .setScrollTarget(BibleVerse(title: Self.nkrvMatthew17, verse: 5, sentence: "본문 5")))
+        #expect(state.scrollTargetVerse == 5)
+        #expect(state.scrollTargetAnchor == .bottom)
+
+        // 행이 들어오면 뷰가 `scrollToTop` 을 낸다 — 캔버스 스크롤 요청은 효과로 가므로 실제 Store 로 돌린다.
+        reduce(&state, .setSentence(Self.sentences(Self.nkrvMatthew17, verses: Array(1...10))))
+        let store = Store(initialState: state) { CarveDetailFeature() }
+        store.send(.scrollToTop)
+        try await waitUntil { store.chapterCanvas.scrollRequest != nil }
+        #expect(store.chapterCanvas.scrollRequest?.verse == 5)
+        #expect(store.chapterCanvas.scrollRequest?.anchor == .bottom)
+        #expect(store.scrollTargetVerse == nil)
+    }
+
+    @Test("scrollOffset(bringingTopOf:) 는 소유 영역 위쪽을 헤더 바로 아래(offset + top inset)에 1pt 안쪽으로 두고, 양 끝은 클램프한다")
+    func scrollOffsetBringingTopAlignsUnderHeaderAndClamps() {
+        let inset = UIEdgeInsets(top: 100, left: 0, bottom: 50, right: 0)
+        let offset = ChapterCanvasController.scrollOffset(
+            bringingTopOf: CGRect(x: 0, y: 900, width: 300, height: 100),
+            viewportHeight: 800, contentInset: inset, contentHeight: 3_000
+        )
+        // 900 + 1 − 100 = 801 — 보이는 맨 위(801 + 100 = 901)가 소유 영역 [900, 1000) 안이다.
+        #expect(offset == 801)
+
+        let first = ChapterCanvasController.scrollOffset(
+            bringingTopOf: CGRect(x: 0, y: 0, width: 300, height: 100),
+            viewportHeight: 800, contentInset: inset, contentHeight: 3_000
+        )
+        #expect(first == -99)
+
+        let last = ChapterCanvasController.scrollOffset(
+            bringingTopOf: CGRect(x: 0, y: 2_900, width: 300, height: 100),
+            viewportHeight: 800, contentInset: inset, contentHeight: 3_000
+        )
+        #expect(last == 2_250)   // 장 끝 근처 절은 맨 위까지 올라가지 않는다
+    }
+
+    @Test("맨 위 정렬로 옮긴 절이 다음 전환의 보던 절이다 — 번역본을 거듭 바꿔도 같은 절에 머문다(EN-M1)")
+    func topAnchoredVerseIsNextViewingVerse() throws {
+        var state = CarveDetailFeature.State.initialState
+        measuredDetail(&state, chapter: Self.nkrvMatthew17, verses: Array(1...27))
+        let layout = try #require(state.chapterLayout.layout)
+        let inset = UIEdgeInsets(top: 120, left: 0, bottom: 60, right: 0)
+        for verse in [2, 12, 20] {
+            let region = try #require(layout.region(verse: verse))
+            let offset = ChapterCanvasController.scrollOffset(
+                bringingTopOf: region.captureRect,
+                viewportHeight: 1_000, contentInset: inset, contentHeight: layout.totalHeight + 1_000
+            )
+            // 캔버스가 알리는 위치는 −(offset + inset.top) 이다(`scrollViewDidScroll`).
+            reduce(&state, .view(.headerAnimation(0, -(offset + inset.top))))
+            #expect(state.viewingVerse == verse)
         }
     }
 

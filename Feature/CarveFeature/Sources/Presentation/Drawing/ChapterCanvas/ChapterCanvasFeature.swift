@@ -232,6 +232,7 @@ public struct ChapterCanvasFeature {
 
         struct ScrollRequest: Equatable, Sendable {
             let verse: Int
+            var anchor: ScrollAnchor = .bottom
             let token: Int
         }
 
@@ -347,7 +348,7 @@ public struct ChapterCanvasFeature {
         case undoStateChanged(canUndo: Bool, canRedo: Bool)
         case undoTapped
         case redoTapped
-        case scrollToVerse(Int)
+        case scrollToVerse(Int, anchor: ScrollAnchor = .bottom)
         /// 캔버스를 길게 눌러 그 자리(content 좌표)의 절 필사 기록을 요청 (§8-7 히스토리 UI, B 구조).
         case historyRequested(at: CGPoint)
         /// 롱프레스 메뉴의 "지우기" — 그 자리(content 좌표)의 절을 보관 후 초기화한다 (UI-2). 먼저 확인창을 띄운다.
@@ -535,9 +536,9 @@ public struct ChapterCanvasFeature {
                 state.redoRequestVersion += 1
                 return .none
 
-            case .scrollToVerse(let verse):
+            case .scrollToVerse(let verse, let anchor):
                 state.scrollRequestToken += 1
-                state.scrollRequest = State.ScrollRequest(verse: verse, token: state.scrollRequestToken)
+                state.scrollRequest = State.ScrollRequest(verse: verse, anchor: anchor, token: state.scrollRequestToken)
                 return .none
 
             case .historyRequested(let point):
@@ -576,6 +577,17 @@ public struct ChapterCanvasFeature {
         .ifLet(\.$eraseAlert, action: \.eraseAlert)
         // 늦게 도착한 필사 — 획 · 저장 · 인계가 멎는 순간을 따로 세지 않고, 어느 액션 뒤든 조용해졌으면 이어 간다(P0-3).
         Reduce { state, _ in continueArrival(state: &state) }
+    }
+}
+
+extension ChapterCanvasFeature {
+    /// 절로 스크롤할 때 그 절을 화면 어디에 둘지(`scrollToVerse`).
+    public enum ScrollAnchor: Equatable, Sendable {
+        /// 절 필기 영역 아래쪽이 보이는 하단 근처 — 외부 진입(위젯 · 차트 · 실행 인자). N-Canvas `scrollTo(anchor: .bottom)` 과 같은 뜻이다.
+        case bottom
+        /// 절 소유 영역(`captureRect`) 위쪽이 헤더 바로 아래 — 번역본 전환. 보던 절(`CarveDetailFeature.State.viewingVerse`)이
+        /// 보이는 맨 위 절이므로 같은 자리에 둬야 바꿀 때마다 앞 절로 밀리지 않는다(2.1.0 출시 시험 EN-M1).
+        case top
     }
 }
 
