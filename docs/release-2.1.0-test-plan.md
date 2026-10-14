@@ -166,7 +166,7 @@ T3 이번 세션 근거: `/private/tmp/carve-t3-20261014-codex/`의 `processes-b
 | BACKUP-L | 큰 백업 실측 | 보류 | 막지 않음 |
 | T3-WIN 후보 | iPadOS 27.2 가로 창 모드에서 접힌 머리글의 사이드바 버튼과 시스템 창 조작 점이 겹침(앞 세션 관찰) | 미판정 · 비차단 후보 | 전체 화면과 구별해 기록, 이번 세션 시작 캡처에서도 두 컨트롤이 근접함. 코드 수정 없이 후속 판독 |
 | T3-RC4 | 외부 SIGABRT 가 iPad(devicectl) · 맥(`kill`) 모두 앱 안 처리기에서 멈춰 앱이 죽지 않음, Crashlytics 기록 · 시스템 크래시 보고 없음 | 비차단(RC-4 는 ★ 아님) · 후속 조사 후보 | 외부 신호로는 이 빌드에서 충돌을 낼 수 없다 — Dia 콘솔도 첫 충돌 대기. dSYM 은 T3-DSYM 으로 따로 확인했다. 처리기 주인과 앱 안에서 난 abort 계열 충돌이 수집되는지는 시뮬레이터에서 따로 조사한다(Swift 트랩 · 잘못된 메모리 접근은 Mach 예외 경로라 신호 처리기와 별개) |
-| T3-DSYM | Xcode Cloud 빌드의 dSYM 이 Crashlytics 에 없었다 — `Crashlytics/run` 빌드 단계는 검증만 동기로 하고 업로드는 백그라운드라, 빌드가 끝나며 업로드가 끝나지 못한 것으로 본다(콘솔 목록이 비어 있었음) | 239 는 수동 업로드로 해결(RC-4) · 다음 빌드는 결정 필요 | 출시 빌드마다 아카이브 dSYM 을 수동으로 올리거나(G-9), `ci_scripts/ci_post_xcodebuild.sh` 에서 `$CI_ARCHIVE_PATH/dSYMs` 를 `upload-symbols` 로 동기 업로드 — CI 변경이라 사용자 결정 |
+| T3-DSYM | Xcode Cloud 빌드의 dSYM 이 Crashlytics 에 없었다 — `Crashlytics/run` 빌드 단계는 검증만 동기로 하고 업로드는 백그라운드라, 빌드가 끝나며 업로드가 끝나지 못한 것으로 본다(콘솔 목록이 비어 있었음) | 239 는 수동 업로드로 해결(RC-4) · 다음 빌드부터 CI 동기 업로드(사용자 결정 10-14) | `ci_scripts/ci_post_xcodebuild.sh` 가 아카이브 단계 뒤 `$CI_ARCHIVE_PATH/dSYMs` 의 앱 · 위젯 · 프레임워크 dSYM(매크로 플러그인 제외)을 `upload-symbols` 로 동기 업로드하고 UUID 를 로그에 남긴다. 실패해도 빌드는 막지 않는다(경고 → G-9 수동 업로드). 239 아카이브로 검증 모드(`--validate`) 실행 통과. 실제 업로드는 다음 Xcode Cloud 빌드의 로그와 콘솔 dSYM 목록으로 확인한다 |
 
 수정 브랜치 검증(2026-10-14, Xcode 27.0 27A266a · iPad mini (A17 Pro) 26.2): 바꾼 파일 SwiftLint error 0(새 경고 0), 관련 스위트 9개, 전체 회귀 **1614/1626 통과 · 실패 0**(기준선 1609 → 1614).
 
