@@ -8,6 +8,7 @@
 
 import UIKit
 
+import ClientInterfaces
 import Resources
 
 /// 네이티브 광고 자리의 크기(시안 K2 · K3). 광고 SDK 를 모르는 Feature 가 자리를 잡을 때 쓴다.
@@ -324,9 +325,39 @@ public final class NativeAdContentView: UIView {
         addSubview(view)
     }
 
+    /// 역할: 광고 배지 문구를 한 언어로 적는다 — ko 「광고」 · en 「Ad」.
+    /// 입력 · 출력: 로케일 → 배지 문구. 부작용: 없음.
+    nonisolated static func adBadgeText(locale: Locale) -> String {
+        UIComponentsCatalog.string("광고", locale: locale)
+    }
+
+    /// 역할: 광고 배지를 한 언어로 다시 적는다.
+    ///   이 뷰는 인프라가 광고를 받을 때 따로 만든 UIKit 뷰라 SwiftUI 환경을 물려받지 않는다 — 붙이는 호스트(`AdSlotView`)가 환경 locale 을 넣는다.
+    /// 입력 · 출력: 로케일 → 없음.
+    /// 부작용: 배지 라벨 문구를 바꾼다(같으면 그대로 둔다).
+    func updateBadgeText(locale: Locale) {
+        let text = Self.adBadgeText(locale: locale)
+        guard adBadgeLabel.text != text else { return }
+        adBadgeLabel.text = text
+    }
+
+    /// 역할: 광고 뷰(인프라가 만든 컨테이너) 안의 공용 레이아웃을 찾아 배지를 한 언어로 다시 적는다.
+    /// 입력 · 출력: 로케일 · 광고 뷰(이 뷰 자신이거나 이 뷰를 하위에 둔 컨테이너) → 없음.
+    /// 부작용: 찾은 공용 레이아웃의 배지 라벨 문구를 바꾼다.
+    static func updateBadgeText(locale: Locale, in adView: UIView) {
+        if let contentView = adView as? NativeAdContentView {
+            contentView.updateBadgeText(locale: locale)
+            return
+        }
+        for subview in adView.subviews {
+            updateBadgeText(locale: locale, in: subview)
+        }
+    }
+
     /// AdMob 네이티브 필수 표시. 앱 언어로 옮겨 쓸 수 있고 15px 이상이어야 한다.
+    /// 만들 때는 지금 화면 언어(`AppLanguage.displayLocale()`)로 적고, 화면에 붙은 뒤에는 호스트가 환경 locale 로 다시 적는다(`updateBadgeText(locale:in:)`).
     private func configureBadge(font: UIFont, textColor: UIColor, backgroundColor: UIColor?, cornerRadius: CGFloat) {
-        adBadgeLabel.text = "광고"
+        adBadgeLabel.text = Self.adBadgeText(locale: AppLanguage.displayLocale())
         adBadgeLabel.font = font
         adBadgeLabel.textColor = textColor
         adBadgeLabel.backgroundColor = backgroundColor

@@ -49,14 +49,14 @@ public actor SwiftDatabaseActor {
         try self.modelContext.save()
     }
     
-    /// 주어진 ID에 해당하는 모델을 조회한 뒤, 비동기 쿼리 클로저를 통해 값을 수정하고 저장.
+    /// 주어진 ID에 해당하는 모델을 조회한 뒤, 쿼리 클로저를 통해 값을 수정하고 저장.
     /// - Parameters:
     ///   - id: 수정할 대상의 PersistentIdentifier.
-    ///   - query: 기존 값을 인자로 받아 비동기로 수정하는 클로저.
+    ///   - query: 기존 값을 인자로 받아 수정하는 클로저. 모델이 actor 밖으로 나가지 않도록 actor 안에서 동기로 부른다.
     public func update<T: PersistentModel>(_ id: PersistentIdentifier,
-                                           query: @Sendable @escaping (_ oldValue: T) async -> Void) async throws {
+                                           query: @Sendable (_ oldValue: T) -> Void) async throws {
         if let storedItem: T = self.fetch(id: id) {
-            await query(storedItem)
+            query(storedItem)
             try self.modelContext.save()
         } else {
             throw SwiftDatabaseActorError.storedDataIsNone
@@ -95,17 +95,17 @@ public actor SwiftDatabaseActor {
 
 // MARK: - Dependencies 의존성 주입
 extension SwiftDatabaseActor: DependencyKey {
-    public static var liveValue: SwiftDatabaseActor = {
+    public static let liveValue: SwiftDatabaseActor = {
         @Dependency(\.modelContainer) var container
         return SwiftDatabaseActor(modelContainer: container)
     }()
     
-    public static var testValue: SwiftDatabaseActor = {
+    public static let testValue: SwiftDatabaseActor = {
         @Dependency(\.modelContainer) var container
         return SwiftDatabaseActor(modelContainer: container)
     }()
     
-    public static var previewValue: SwiftDatabaseActor = {
+    public static let previewValue: SwiftDatabaseActor = {
         @Dependency(\.modelContainer) var container
         return SwiftDatabaseActor(modelContainer: container)
     }()

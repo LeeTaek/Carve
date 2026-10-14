@@ -187,14 +187,38 @@ public struct VerseDraftRecoveryQuery: Sendable {
         self.repository = repository
     }
 
-    /// 한 묶음에서 그 장을 다시 열어도 **자동으로 표시되지 않는** 초안.
+    /// 한 묶음에서 그 장을 다시 열어도 **자동으로 표시되지 않는** 초안 — 한 번역본만.
     /// - Parameters:
     ///   - scope: 볼 묶음.
     ///   - environment: 지금 편집 환경 — 무엇이 화면에 보이는지를 가리는 기준이다.
+    ///   - translation: 볼 번역본. 다른 번역본의 초안은 목록에 넣지 않는다. 모든 번역본은 `inventoryAcrossTranslations(in:environment:)`.
     public func inventory(
         in scope: AccountScope,
         environment: DrawingEditEnvironment,
         translation: Translation = .NKRV
+    ) async throws -> VerseDraftRecoveryInventory {
+        try await inventory(in: scope, environment: environment, translations: [translation])
+    }
+
+    /// 한 묶음에서 그 장을 다시 열어도 **자동으로 표시되지 않는** 초안 — **모든 번역본**을 한 목록으로(영어 현지화 결정 1 · 11).
+    ///
+    /// 장마다 그 장의 번역본으로 초안을 읽고 저장소와 견준다 — 같은 권 · 장의 KJV 와 개역개정은 따로 견준다.
+    /// 이 판이 모르는 번역본의 초안은 어느 장에도 붙이지 않아 목록에 오르지 않는다(수 · 용량에만 든다).
+    /// - Parameters:
+    ///   - scope: 볼 묶음.
+    ///   - environment: 지금 편집 환경 — 무엇이 화면에 보이는지를 가리는 기준이다.
+    public func inventoryAcrossTranslations(
+        in scope: AccountScope,
+        environment: DrawingEditEnvironment
+    ) async throws -> VerseDraftRecoveryInventory {
+        try await inventory(in: scope, environment: environment, translations: Set(Translation.allCases))
+    }
+
+    /// 고른 번역본들의 장만 대조한다. 대조하지 않는 묶음이면 수 · 용량만 둔다.
+    private func inventory(
+        in scope: AccountScope,
+        environment: DrawingEditEnvironment,
+        translations: Set<Translation>
     ) async throws -> VerseDraftRecoveryInventory {
         let summary = try await reader.draftSummary(in: scope)
         guard environment.readableDraftScopes.contains(scope) || environment.beforeConnectionDraftScopes.contains(scope) else {
@@ -208,14 +232,14 @@ public struct VerseDraftRecoveryQuery: Sendable {
         var entries: [VerseDraftRecoveryEntry] = []
         var inaccessible = 0
         var unread: [BibleChapter] = []
-        for chapter in summary.chapters {
+        for chapter in summary.chapters where translations.contains(chapter.translation) {
             do {
-                let result = try await self.entries(chapter: chapter, scope: scope, environment: environment, translation: translation)
+                let result = try await self.entries(chapter: chapter, scope: scope, environment: environment)
                 entries += result.entries
                 inaccessible += result.inaccessible
             } catch {
                 // 한 장을 읽지 못해도 나머지는 알린다 — 목록 전체를 막으면 멀쩡한 초안까지 보이지 않는다. 파일은 그대로 둔다.
-                Log.error("초안 복구 — 이 장을 대조하지 못했다", "\(chapter.title.rawValue).\(chapter.chapter)", "\(error)")
+                Log.error("초안 복구 — 이 장을 대조하지 못했다", Self.logName(chapter), "\(error)")
                 unread.append(chapter)
             }
         }
@@ -242,12 +266,13 @@ public struct VerseDraftRecoveryQuery: Sendable {
     /// 한 장에서 자동으로 표시되지 않는 이 묶음의 초안들. 초안이나 저장소를 읽지 못하면 던진다 — 부르는 쪽이 "대조하지 못한 장" 으로 남긴다.
     ///
     /// 두 갈래다 — 편집 화면이 판정하는 초안(`screenDrafts` · `plan`)과, 편집 화면에는 오르지 않는 연결 전 필기(`importPlan`).
+    /// 초안은 그 장의 번역본(`chapter.translation`)으로 읽고, 저장소도 그 번역본의 장으로 읽는다.
     private func entries(
         chapter: BibleChapter,
         scope: AccountScope,
-        environment: DrawingEditEnvironment,
-        translation: Translation
+        environment: DrawingEditEnvironment
     ) async throws -> ChapterEntries {
+        let translation = chapter.translation
         let drafts = try await reader.drafts(in: scope, chapter: chapter, translation: translation)
         let screenInScope = environment.readableDraftScopes.contains(scope)
             ? drafts.filter { VerseDraftRecoveryRule.reachesScreen($0, environment: environment) } : []
@@ -292,25 +317,41 @@ public struct VerseDraftRecoveryQuery: Sendable {
     }
 
     /// 확인된 계정에 연결된 뒤 안내할 **연결 전 필기** 수 — 가져오기를 기다리는 것만(목록의 「iCloud 연결 전에 쓴 필기」 와 같은 판정).
+    /// 한 번역본만 센다. 모든 번역본은 `beforeConnectionCountAcrossTranslations(environment:)`.
     ///
     /// 읽지 못한 묶음 · 장은 세지 않는다 — 안내를 띄울지 가리는 수일 뿐이고, 목록은 그 실패를 따로 알린다.
     public func beforeConnectionCount(environment: DrawingEditEnvironment, translation: Translation = .NKRV) async -> Int {
+        await beforeConnectionCount(environment: environment, translations: [translation])
+    }
+
+    /// 확인된 계정에 연결된 뒤 안내할 **연결 전 필기** 수 — **모든 번역본**(영어 현지화 결정 1). 모르는 번역본의 초안은 세지 않는다.
+    public func beforeConnectionCountAcrossTranslations(environment: DrawingEditEnvironment) async -> Int {
+        await beforeConnectionCount(environment: environment, translations: Set(Translation.allCases))
+    }
+
+    /// 고른 번역본들의 장에서 가져오기를 기다리는 연결 전 필기 수.
+    private func beforeConnectionCount(environment: DrawingEditEnvironment, translations: Set<Translation>) async -> Int {
         var count = 0
         for scope in environment.beforeConnectionDraftScopes {
             guard let summary = try? await reader.draftSummary(in: scope) else { continue }
-            for chapter in summary.chapters {
+            for chapter in summary.chapters where translations.contains(chapter.translation) {
                 do {
-                    let drafts = try await reader.drafts(in: scope, chapter: chapter, translation: translation)
+                    let drafts = try await reader.drafts(in: scope, chapter: chapter, translation: chapter.translation)
                         .filter { VerseDraftRecoveryRule.awaitsImport($0, environment: environment) }
                     guard !drafts.isEmpty else { continue }
                     let view = VerseDraftStoreView(snapshots: try await repository.load(chapter: chapter).snapshots)
                     count += VerseDraftRecoveryRule.importPlan(drafts: drafts, view: view).awaiting.count
                 } catch {
-                    Log.error("연결 전 필기 — 이 장을 세지 못했다", "\(chapter.title.rawValue).\(chapter.chapter)", "\(error)")
+                    Log.error("연결 전 필기 — 이 장을 세지 못했다", Self.logName(chapter), "\(error)")
                 }
             }
         }
         return count
+    }
+
+    /// 로그에 적는 장 이름 — 번역본 · 권 · 장.
+    private static func logName(_ chapter: BibleChapter) -> String {
+        "\(chapter.translation.rawValue)/\(chapter.title.rawValue).\(chapter.chapter)"
     }
 
     /// 왜 이 초안이 자동으로 표시되지 않는가 — 판정 자체는 편집 화면과 같은 규칙이 이미 했다. 여기서는 그 까닭만 읽는다.
@@ -340,11 +381,12 @@ public struct VerseDraftRecoveryQuery: Sendable {
         }
     }
 
-    /// 최근에 쓴 초안부터. 같은 시각이면 권 · 장 · 절 · 세션 순이다(같은 목록을 두 번 열어도 순서가 같다).
+    /// 최근에 쓴 초안부터. 같은 시각이면 권 · 장 · 절 · 번역본 · 세션 순이다(같은 목록을 두 번 열어도 순서가 같다).
     private static func newestFirst(_ lhs: VerseDraftRecoveryEntry, _ rhs: VerseDraftRecoveryEntry) -> Bool {
         if lhs.draft.savedAt != rhs.draft.savedAt { return lhs.draft.savedAt > rhs.draft.savedAt }
         let left = lhs.draft.key, right = rhs.draft.key
-        return (left.title, left.chapter, left.verse, left.sessionID) < (right.title, right.chapter, right.verse, right.sessionID)
+        return (left.title, left.chapter, left.verse, left.translation, left.sessionID)
+            < (right.title, right.chapter, right.verse, right.translation, right.sessionID)
     }
 }
 

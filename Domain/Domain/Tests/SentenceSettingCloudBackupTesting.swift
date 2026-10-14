@@ -103,7 +103,7 @@ struct SentenceSettingCloudBackupTesting {
         fontFamily: .flower,
         lineCount: 9
     )
-    /// 1.x 에서 설정을 건드리지 않은 사용자에게 저장된 값 — 그때 기본 글꼴은 나눔바른고딕(`gothic`)이었다.
+    /// 1.x 에서 설정을 건드리지 않은 사용자에게 저장된 값 — 그때 기본 글꼴은 나눔고딕(`gothic`, 1.x · 2.0 표기 「나눔바른고딕」)이었다.
     private static let legacyDefault = SentenceSetting(
         lineSpace: 30,
         fontSize: 20,

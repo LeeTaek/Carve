@@ -26,7 +26,7 @@ import SwiftUI
 /// 100 ms 간격으로 footprint 와 잔여 메모리를 재고, **최저 여유를 갱신할 때만** 찍는다.
 @MainActor
 final class ChapterCanvasMemoryProbe {
-    static let launchArgument = "-CanvasMemoryProbe"
+    static let launchArgument = LaunchArgument.canvasMemoryProbe
     private weak var controller: ChapterCanvasController?
     private var polling: Task<Void, Never>?
     private var lowestAvailable = Int.max

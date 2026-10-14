@@ -11,7 +11,6 @@ import CoreGraphics
 import Domain
 import Foundation
 import PencilKit
-import SwiftData
 import Testing
 
 import ComposableArchitecture
@@ -19,13 +18,6 @@ import ComposableArchitecture
 @Suite("Phase 3 — CarveDetailFeature · 단일 Canvas 히스토리 배선 (3/3)")
 @MainActor
 struct CarveDetailHistoryWiringTesting {
-    private static func makeModelContainer() throws -> ModelContainer {
-        try ModelContainer(
-            for: AppStoreSchema.schema,
-            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
-        )
-    }
-
     private func makeStore(spy: RepositorySpy) -> StoreOf<CarveDetailFeature> {
         Store(initialState: CarveDetailFeature.State.initialState) {
             CarveDetailFeature()
@@ -48,10 +40,10 @@ struct CarveDetailHistoryWiringTesting {
         #expect(store.chapterHistory?.title == chapter)
 
         // 시트가 isPresent 를 옮긴 뒤 알린다 (②). 여기서는 ③ 만 확인한다.
-        let modelContainer = try Self.makeModelContainer()
-        let modelContext = ModelContext(modelContainer)
-        let restored = BibleDrawing(bibleTitle: chapter, verse: 2)
-        modelContext.insert(restored)
+        let restored = VerseDrawingSnapshot(
+            verse: 2, rowID: BibleDrawingRowID(raw: "row-restored"), isPresent: true,
+            updateDate: nil, lineData: nil, drawingVersion: nil, metadata: nil
+        )
         store.send(.chapterHistory(.presented(.setPresentDrawing(restored))))
         #expect(store.chapterHistory == nil)
         // verseRowRestored → 미저장분 없음 → 곧바로 DB 재조회 (재합성 대기).
@@ -90,13 +82,6 @@ struct VerseDrawingHistoryListWiringTesting {
     private static let chapter = BibleChapter(title: .habakkuk, chapter: 3)
     private static let verse = 4
 
-    private static func makeModelContainer() throws -> ModelContainer {
-        try ModelContainer(
-            for: AppStoreSchema.schema,
-            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
-        )
-    }
-
     /// 실제 획이 하나 있는 `PKDrawing` 데이터. 길이만 있는 `Data([1, 2, 3])` 은 디코딩에 실패해 "획 없음" 이다.
     private static func inkData() -> Data {
         let path = PKStrokePath(
@@ -108,49 +93,41 @@ struct VerseDrawingHistoryListWiringTesting {
         return PKDrawing(strokes: [PKStroke(ink: PKInk(.pen, color: .black), path: path)]).dataRepresentation()
     }
 
-    private static func row(rowUUID: String, lineData: Data?, updateDate: Date, isPresent: Bool) -> BibleDrawing {
-        let row = BibleDrawing(bibleTitle: chapter, verse: verse, lineData: lineData,
-                               updateDate: updateDate, rowUUID: rowUUID)
-        row.isPresent = isPresent
-        return row
+    private static func row(rowUUID: String, lineData: Data?, updateDate: Date, isPresent: Bool) -> VerseDrawingSnapshot {
+        VerseDrawingSnapshot(
+            verse: verse, rowID: BibleDrawingRowID(raw: rowUUID), isPresent: isPresent,
+            updateDate: updateDate, lineData: lineData, drawingVersion: nil, metadata: nil
+        )
     }
 
     @Test("지우기가 남긴 빈 활성 행은 목록에 담기지 않는다 — 보관본만 남는다")
     func emptyActiveRowIsNotListed() throws {
         // 지우기 직후의 모양. 저장소는 `updateDate` 내림차순으로 주므로 빈 활성 행이 **맨 위**로 온다.
-        let modelContainer = try Self.makeModelContainer()
-        let modelContext = ModelContext(modelContainer)
         let active = Self.row(rowUUID: "row-active", lineData: nil,
                               updateDate: Date(timeIntervalSince1970: 900), isPresent: true)
         let archived = Self.row(rowUUID: "row-archive", lineData: Self.inkData(),
                                 updateDate: Date(timeIntervalSince1970: 100), isPresent: false)
-        modelContext.insert(active)
-        modelContext.insert(archived)
         let store = Store(initialState: VerseDrawingHistoryFeature.State(title: Self.chapter, verse: Self.verse)) {
             VerseDrawingHistoryFeature()
         }
 
         store.send(.setDrawings([active, archived]))
 
-        #expect(store.drawings.map(\.rowKey) == ["row-archive"])
+        #expect(store.drawings.map(\.rowID.raw) == ["row-archive"])
     }
 
     @Test("내용이 있는 회차는 순서 그대로 전부 담는다 — 조건이 항상 거짓이 된 게 아니다")
     func carvedRowsAreAllListedInOrder() throws {
-        let modelContainer = try Self.makeModelContainer()
-        let modelContext = ModelContext(modelContainer)
         let newer = Self.row(rowUUID: "row-newer", lineData: Self.inkData(),
                              updateDate: Date(timeIntervalSince1970: 900), isPresent: true)
         let older = Self.row(rowUUID: "row-older", lineData: Self.inkData(),
                              updateDate: Date(timeIntervalSince1970: 100), isPresent: false)
-        modelContext.insert(newer)
-        modelContext.insert(older)
         let store = Store(initialState: VerseDrawingHistoryFeature.State(title: Self.chapter, verse: Self.verse)) {
             VerseDrawingHistoryFeature()
         }
 
         store.send(.setDrawings([newer, older]))
 
-        #expect(store.drawings.map(\.rowKey) == ["row-newer", "row-older"])
+        #expect(store.drawings.map(\.rowID.raw) == ["row-newer", "row-older"])
     }
 }

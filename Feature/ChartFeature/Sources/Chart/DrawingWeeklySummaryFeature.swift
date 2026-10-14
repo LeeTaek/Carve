@@ -50,9 +50,11 @@ public struct DrawingWeeklySummaryFeature {
             Int(round(Double(weekTotalCount) / 7.0))
         }
 
-        /// 주간 합계를 7일로 나눈 값을 소수점 한 자리로 표시한다.
-        public var weekAverageText: String {
-            (Double(weekTotalCount) / 7.0).formatted(.number.precision(.fractionLength(1)))
+        /// 역할: 주간 합계를 7일로 나눈 값을 소수점 한 자리로 적는다(「1.7」).
+        /// 입력 · 출력: 로케일(뷰는 환경 locale) → 그 로케일의 수 서식으로 적은 평균.
+        /// 부작용: 없음.
+        public func weekAverageText(locale: Locale) -> String {
+            (Double(weekTotalCount) / 7.0).formatted(.number.precision(.fractionLength(1)).locale(locale))
         }
         
         public var weekMaxCount: Int {
@@ -72,6 +74,11 @@ public struct DrawingWeeklySummaryFeature {
             uniqueKeysWithValues: BibleTitle.allCases.enumerated().map { ($0.element, $0.offset) }
         )
 
+        /// 번역본 순서 비교용 인덱스 캐시 — `Translation.allCases` 의 나열 순서(개역개정 · KJV · BSB)다.
+        private static let translationOrder: [Translation: Int] = Dictionary(
+            uniqueKeysWithValues: Translation.allCases.enumerated().map { ($0.element, $0.offset) }
+        )
+
         /// `topChapter` 선정용 정렬 키.
         ///
         /// 합계가 같을 때 `Dictionary`의 순회 순서에 의존하면 프로세스마다 달라지는
@@ -81,6 +88,7 @@ public struct DrawingWeeklySummaryFeature {
         /// 1. 합계 내림차순 (가장 많이 필사한 권이 먼저)
         /// 2. 성경 순서 오름차순 (동점이면 창세기 쪽이 먼저)
         /// 3. 장 번호 오름차순 (같은 권이면 앞 장이 먼저)
+        /// 4. 번역본 순서 오름차순 (같은 장을 여러 번역본으로 같은 수만큼 썼으면 `Translation.allCases` 앞쪽이 먼저)
         private struct TopChapterRank: Comparable {
             /// 합계. 내림차순 비교를 위해 부호를 뒤집어 보관한다.
             let negatedCount: Int
@@ -88,20 +96,25 @@ public struct DrawingWeeklySummaryFeature {
             let titleOrder: Int
             /// 장 번호.
             let chapter: Int
+            /// `Translation.allCases` 기준 번역본 순서 인덱스.
+            let translationOrder: Int
 
             init(chapter: BibleChapter, count: Int) {
                 self.negatedCount = -count
                 self.titleOrder = State.bibleTitleOrder[chapter.title] ?? Int.max
                 self.chapter = chapter.chapter
+                self.translationOrder = State.translationOrder[chapter.translation] ?? Int.max
             }
 
             static func < (lhs: Self, rhs: Self) -> Bool {
                 if lhs.negatedCount != rhs.negatedCount { return lhs.negatedCount < rhs.negatedCount }
                 if lhs.titleOrder != rhs.titleOrder { return lhs.titleOrder < rhs.titleOrder }
-                return lhs.chapter < rhs.chapter
+                if lhs.chapter != rhs.chapter { return lhs.chapter < rhs.chapter }
+                return lhs.translationOrder < rhs.translationOrder
             }
         }
 
+        /// 이번 주 가장 많이 쓴 장(번역본 포함) — 같은 권 · 장도 번역본이 다르면 따로 센다.
         public var topChapter: (chapter: BibleChapter, count: Int)? {
             var merged: [BibleChapter: Int] = [:]
 
@@ -124,13 +137,18 @@ public struct DrawingWeeklySummaryFeature {
     public enum Action: ViewAction {
         case adSlot(SponsorAdSlotFeature.Action)
         case view(View)
+        /// 최근 절을 골랐다 — 코디네이터가 차트를 닫고 그 절을 연다. 절의 장(`BibleVerse.title`)에 번역본이 든다.
         case openVerse(BibleVerse)
+        /// 최근 장 · 가장 많이 쓴 장을 골랐다 — 코디네이터가 차트를 닫고 그 번역본의 장을 연다.
         case openChapter(BibleChapter)
         
         public enum View {
             case onAppear
+            /// 「최근」 의 절을 눌렀다.
             case recentVerseTapped(RecentVerseItem)
+            /// 「최근 장」 의 장을 눌렀다.
             case recentChapterTapped(BibleChapter)
+            /// 가장 많이 쓴 장 · 「이어서 쓰기」 를 눌렀다.
             case topChapterTapped
         }
     }
@@ -146,6 +164,7 @@ public struct DrawingWeeklySummaryFeature {
                 return .send(.adSlot(.startLoad))
                 
             case let .view(.recentVerseTapped(item)):
+                // 그 항목의 번역본 절로 연다 — 지금 필사 중인 번역본으로 바꾸지 않는다.
                 return .send(.openVerse(item.verse))
 
             case let .view(.recentChapterTapped(chapter)):

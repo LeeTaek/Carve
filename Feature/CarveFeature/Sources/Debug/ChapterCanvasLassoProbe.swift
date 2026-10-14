@@ -1,6 +1,7 @@
 // Copyright © 2026 leetaek. All rights reserved.
 
 #if DEBUG
+import CarveToolkit
 import Foundation
 import PencilKit
 import UIKit
@@ -11,7 +12,7 @@ import UIKit
 /// `xcrun simctl launch --console-pty` 로 받는다 (시뮬레이터에서 `Log.debug` 는 `log show` 에 남지 않는다 — AGENTS.md).
 @MainActor
 final class ChapterCanvasLassoProbe {
-    static let launchArgument = "-LassoProbe"
+    static let launchArgument = LaunchArgument.lassoProbe
 
     private weak var canvas: PKCanvasView?
     /// 직전 기록의 획 요약. 새로 생긴 획(`*`)과 사라진 획(`-`)을 표시하는 데만 쓴다.

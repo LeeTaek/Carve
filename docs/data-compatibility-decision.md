@@ -1,6 +1,6 @@
 # 데이터 호환성 결정 — COMPAT-0
 
-작성·갱신: 2026-09-09 · 갱신: 2026-09-17 · 브랜치: `codex/canvas-compatibility-plan` · 상태: **보류 종료 — U1 확정 · D2·D6 검증 이월(기기 확보 대기) · D3 은 SCOPE 에서 결정** (§5) → **2026-09-17 시뮬레이터 왕복: U4(D6) 관측 범위에서 보존 · R28 실측 · R27(D2) 재현 · 서로 모르는 편집은 나중 쪽이 덮어써 유실** (§5-2)
+작성·갱신: 2026-09-09 · 갱신: 2026-09-17 · 2026-10-06(D4 결정 · §1-2 정정) · 브랜치: `codex/canvas-compatibility-plan` · 상태: **보류 종료 — U1 확정 · D2·D6 검증 이월(기기 확보 대기) · D3 은 SCOPE 에서 결정** (§5) → **2026-09-17 시뮬레이터 왕복: U4(D6) 관측 범위에서 보존 · R28 실측 · R27(D2) 재현 · 서로 모르는 편집은 나중 쪽이 덮어써 유실** (§5-2) → **2026-10-06 D4 결정: 영어 행은 권 이름(`titleName`) 접두로 가르고 `translation` 열에는 영어 값을 쓰지 않는다 · 사실 정정(§1-2)** (§5)
 
 ## 0. 이 문서의 역할
 
@@ -22,16 +22,32 @@ R27 · R28 · 번역본 귀속은 **"필사 한 행을 무엇으로 식별하고
 
 `translation` 과 `drawingVersion` 은 **V3 부터 이미 있다**. V4 의 신규 필드는 `layoutMetadataData` · `rowUUID` 둘뿐이다 ([DrawingSchemaV4.swift](../Domain/Domain/Sources/SwiftData/Model/DrawingSchemaV4.swift) · [DrawingSchemaV3.swift](../Domain/Domain/Sources/SwiftData/Model/DrawingSchemaV3.swift)).
 
-### 1-2. `translation` 은 스키마에 있지만 **죽어 있다**
+### 1-2. `translation` 은 스키마에 있지만 **조회 조건으로 쓰이지 않는다**
+
+> **2026-10-06 정정.** 2026-09-09 판의 「읽는 곳 0건」 · 「술어 8곳 전부 `titleName` + `titleChapter`」 는 지금 코드(`5a86357a`)와 맞지 않아 고쳤다.
+> 읽는 곳은 있고, 술어는 10곳이며 권 조건이 없는 것도 있다. 번역본을 **조회 조건으로** 보는 곳이 없다는 결론은 그대로다.
 
 | 확인 항목 | 결과 |
 |---|---|
-| 필드 존재 | ✅ V2 · V3 · V4 전부. 기본값 `Translation.NKRV` |
-| `Translation` enum | ⚠️ **`case NKRV` 하나뿐** ([Translation.swift:12](../Domain/Domain/Sources/Model/Translation.swift:12)) |
-| 제품 코드에서 읽는 곳 | ⚠️ **0건.** [DrawingDataMigrationPlan.swift:63](../Domain/Domain/Sources/SwiftData/DrawingDataMigrationPlan.swift:63) 이 `.NKRV` 로 쓰는 한 줄이 전부 |
-| 조회 술어가 보는가 | ⛔ **`BibleDrawing` 술어 8곳 전부 `titleName` + `titleChapter`(+절)로만 필터링. 번역본을 보는 곳이 없다** |
+| 필드 존재 | ✅ `BibleDrawing` V2 ~ V4(V5 · V6 은 V4 모델), `BiblePageDrawing` V3 부터, `FavoriteVerse` V5 부터, `VerseDrawingVersion` V6. 기본값 `Translation.NKRV` |
+| `Translation` enum | ⚠️ **`case NKRV` 하나뿐** ([Translation.swift:12](../Domain/Domain/Sources/Model/Translation.swift:12)). 2.1.0 영어 현지화가 `KJV` · `BSB` 를 더하지만 SwiftData 열에는 쓰지 않는다(§5 D4) |
+| 제품 코드에서 쓰는 곳 | [DrawingDataMigrationPlan.swift:38](../Domain/Domain/Sources/SwiftData/DrawingDataMigrationPlan.swift:38) — V1→V2 이전의 `.NKRV`. [SwiftDataDrawingRepository+BackupRestore.swift:168](../Domain/Domain/Sources/SwiftData/SwiftDataDrawingRepository+BackupRestore.swift:168) — 백업 복원 행(항목 값 그대로, null 이면 nil). 즐겨찾기 행은 `FavoriteVerse` init(V5 · V6). (옛 판의 `:63` 은 1.3.0 `49f2dc27` 의 같은 파일 — §3-3) |
+| 제품 코드에서 읽는 곳 | ⚠️ **있다.** `BibleDrawing` — [SwiftDatabaseActor+Backup.swift:88](../Domain/Domain/Sources/SwiftData/SwiftDatabaseActor+Backup.swift:88)(백업 변환 `backupRecord`), [LegacyMigrationContentMatcher.swift](../Domain/Domain/Sources/SwiftData/LegacyMigrationContentMatcher.swift) 168 · 176 · 187 · 195행(이전 일치 검사 — V3 · V4 의 절 · 장 행). `FavoriteVerse` — [SwiftDataFavoriteVerseRepository.swift](../Domain/Domain/Sources/SwiftData/SwiftDataFavoriteVerseRepository.swift) 58 · 137 · 153행(`translation ?? .NKRV` — 거르기는 메모리에서). 2.0.0 도 즐겨찾기 · 이전 일치 검사에서 getter 를 부른다 — U3 가 실제 경로인 이유다 |
+| 조회 술어가 보는가 | ⛔ **`#Predicate<BibleDrawing>` 10곳 중 번역본을 보는 곳은 0곳.** 술어 없는 조회도 있다(아래) |
 
-술어 위치: [DrawingDatabase.swift](../Domain/Domain/Sources/SwiftData/DrawingDatabase.swift) 30 · 43 · 62 · 79 · 268 · 288행, [SwiftDataDrawingRepository.swift](../Domain/Domain/Sources/SwiftData/SwiftDataDrawingRepository.swift) 52 · 150행.
+`#Predicate<BibleDrawing>` 10곳(`5a86357a`, 모두 `Domain/Domain/Sources/SwiftData/`):
+
+| 조건 | 위치 | 쓰는 곳 |
+|---|---|---|
+| `titleName` + `titleChapter` | [SwiftDataDrawingRepository.swift:70](../Domain/Domain/Sources/SwiftData/SwiftDataDrawingRepository.swift:70) · [SwiftDatabaseActor+Backup.swift:35](../Domain/Domain/Sources/SwiftData/SwiftDatabaseActor+Backup.swift:35) · [SwiftDataDrawingRepository+BackupRestore.swift:115](../Domain/Domain/Sources/SwiftData/SwiftDataDrawingRepository+BackupRestore.swift:115) | 장 조회(`loadDrawingSnapshots`) · 백업 행 · 복원 판정 |
+| `titleName` + `titleChapter` + 절 | [SwiftDatabaseActor+DrawingDatabase.swift:30](../Domain/Domain/Sources/SwiftData/SwiftDatabaseActor+DrawingDatabase.swift:30) · [SwiftDataDrawingRepository+Import.swift:89](../Domain/Domain/Sources/SwiftData/SwiftDataDrawingRepository+Import.swift:89) | 이전 필사 · 대표 바꾸기 · 필기 가져오기 |
+| `titleName` + `titleChapter` + 행 키 | [SwiftDataDrawingRepository.swift:288](../Domain/Domain/Sources/SwiftData/SwiftDataDrawingRepository.swift:288) | 저장 · 지우기의 행 찾기 |
+| `titleName` 만 | [DrawingDatabase.swift:168](../Domain/Domain/Sources/SwiftData/DrawingDatabase.swift:168) | 권의 장 칠하기(`fetchDrawingRecord(title:)`) |
+| `updateDate` 만 — 권 조건 없음 | [SwiftDatabaseActor+DrawingDatabase.swift](../Domain/Domain/Sources/SwiftData/SwiftDatabaseActor+DrawingDatabase.swift) 78 · 96 · 110행 | 차트 · 최근 기록(`drawingActivities` · `recentDrawingActivities`) |
+
+술어 없는 조회 — 모든 행: [SwiftDatabaseActor+Backup.swift:54](../Domain/Domain/Sources/SwiftData/SwiftDatabaseActor+Backup.swift:54)(백업 장 목록 — 권 · 장만),
+[LegacyMigrationContentMatcher.swift](../Domain/Domain/Sources/SwiftData/LegacyMigrationContentMatcher.swift) 165 · 184행(V3 · V4 전체), [SwiftDataDrawingRepository.swift:108](../Domain/Domain/Sources/SwiftData/SwiftDataDrawingRepository.swift:108)(「모든 필사 삭제」 `delete(model:)`),
+`SwiftDatabaseActor` 의 `hasAny` · `databaseIsEmpty`(시작 화면 · iCloud 설정 — 행이 있는지만).
 
 ### 1-3. 행 `id` 에 번역본이 없고, 성경 이름이 **파일명**이다
 
@@ -63,8 +79,8 @@ id = "\(bibleTitle.title.rawValue).\(bibleTitle.chapter).\(verse).\(Int(timestam
 | # | 항목 | 상태 | 확인 방법 |
 |---|---|---|---|
 | **U1** | App Store 에 올라가 있는 실제 버전과 빌드 | ✅ **확인 완료 (2026-09-09)** — **1.3.0 (177) · 2026-03-23 빌드**. §3 참조 | 사용자가 App Store Connect 에서 확인 |
-| U2 | Production CloudKit 에 `CD_translation` 이 있는가 | ❓ 미확인 | CloudKit Dashboard — 운영 컨테이너 `CD_BibleDrawing` 필드 목록 |
-| U3 | 구버전이 모르는 `Translation` rawValue 를 만나면 어떻게 되는가 | ❓ 미확인. `Translation` 은 `String, Codable` 이라 `"WEB"` 을 출시본이 디코딩하지 못한다. nil 로 떨어지는지 행 자체가 안 읽히는지에 따라 등급이 달라진다 | 기기 2대 왕복 또는 V3 모델 스키마 테스트 |
+| U2 | Production CloudKit 에 `CD_translation` 이 있는가 | ✅ **사실상 확인 (2026-09-29)** — [로드맵](./release-2.0.0-roadmap.md) §7 출시 차단 5: Development 에서 `CD_BibleDrawing`(V4 필드 12개 — `translation` 포함) · `CD_FavoriteVerse`(`translation` 포함)를 확인한 뒤 사용자가 Production 에 배포했다. 배포 뒤 운영 대시보드의 필드 목록을 따로 조회하지는 않았다. 2026-10-06 D4 결정은 이 필드에 새 값을 쓰지 않아 결과에 기대지 않는다(§5) | CloudKit Dashboard — 운영 컨테이너 `CD_BibleDrawing` 필드 목록 |
+| U3 | 구버전이 모르는 `Translation` rawValue 를 만나면 어떻게 되는가 | ❓ 미확인. `Translation` 은 `String, Codable` 이라 `"WEB"` 을 출시본이 디코딩하지 못한다. nil 로 떨어지는지 행 자체가 안 읽히는지에 따라 등급이 달라진다. → **2026-10-06: 미검증 그대로 두고 피한다.** D4 결정으로 영어 행은 `translation` 열을 쓰지 않는다(nil) — 구버전이 모르는 rawValue 를 만날 일이 없다. 2.0.0 기기와의 공존은 영어 현지화 수동 확인 M4(출시 전 관문)가 본다 | 기기 2대 왕복 또는 V3 모델 스키마 테스트 |
 | **U4** | CloudKit 이 구버전 클라이언트의 쓰기에서 모르는 필드를 보존하는가 | ✅ **관측 범위에서 보존 (2026-09-17, §5-2)** — 1.3.0 이 편집해 올린 뒤에도 서버의 `CD_rowUUID` · `CD_layoutMetadataData` 가 해시까지 그대로였다. 시뮬레이터 2대 · 1회 · 쓰기 경로 두 가지로 한정. (이전 판정: ❓ **미확인 — U1 확정으로 중요도 상승.** 보존하지 않으면 출시본이 편집한 행에서 `rowUUID`·`layoutMetadataData` 가 사라진다. `b68b6101` 을 "additive schema" 라 부른 전제가 이것이다) | 기기 2대 왕복 (런북 §8-7 절차) → 시뮬레이터 2대 왕복 + 서버 레코드 조회 도구 ([테스트 계획](./icloud-sync-compatibility-test-plan.md) CK-A3) |
 
 ---
@@ -161,6 +177,11 @@ id = "\(bibleTitle.title.rawValue).\(bibleTitle.chapter).\(verse).\(Int(timestam
 
 BIBLE-EN 자체의 다른 준비물(판본·권리·본문 형식)은 이 결정과 독립적으로 병행할 수 있다. 본문 로더가 EUC-KR·`\r` 고정이라 판본별 인코딩·줄 구분 분기가 필요하고, 파일명이 곧 `BibleTitle` rawValue 이자 행 `id` 의 일부라 **번역본 차원은 파일명이 아니라 경로로 넣어야 한다** (§1-3).
 
+> **2026-10-06 결정 — A · B · C 가 아니라 권 이름 접두(§5 D4).** 영어 행은 `titleName` 에 번역본 접두를 붙여 따로 두고, `translation` 열에는 영어 값을 쓰지 않는다.
+> 구버전에게 영어 행은 모르는 권의 행이라 술어에 맞지 않거나 `guard let` 으로 건너뛰어 섞이지 않고, 열이 nil 이라 U3 도 만나지 않는다. `Translation` 에 case 는 더하지만
+> 앱 안의 값(장 · 초안 · 백업 파일 · 위젯)에만 쓴다. 「경로로」 는 리소스가 번들 루트에 **평평하게** 복사된다는 사실로 바뀌었다 — 폴더로 나누고 파일명에도 번역본을 붙인다
+> (`BibleText/KJV/KJV-1-01Genesis.txt`). 그 파일명이 영어 행의 `titleName` 과 같다. 근거 · 규칙은 [영어 현지화 설계](./english-localization-design.md) §3 · §5.
+
 ---
 
 ## 5. 결정 결과 — 2026-09-09 사용자 결정으로 **보류 종료**
@@ -173,8 +194,8 @@ BIBLE-EN 자체의 다른 준비물(판본·권리·본문 형식)은 이 결정
 | **D2** | R27 대응 | ⏸ **검증 이월.** 기기 확보 대기로 기록한다. 미확인 상태를 유지하며 통과로 바꾸지 않는다. → ⚠️ **2026-09-17 시뮬레이터로 재현** — 행이 둘이 되고 1.3.0 필기가 두 기기에서 가려진다 (§5-2). 통과가 아니라 위험 확인이며 대응은 SCOPE 에서 정한다 |
 | **D6** | U4 확인 (구버전 쓰기의 V4 필드 보존) | ⏸ **검증 이월.** D2 와 같은 사유·같은 절차 → ✅ **2026-09-17 관측: 보존** (§5-2, 범위 한정) |
 | **D3** | R28 대응 | ⏸ **알려진 위험으로 유지.** 대응 방식은 **SCOPE(출시 범위 확정) 시점에 결정**한다. 위험 수용이 결정된 상태가 아니다. **2026-09-17 실측으로 메커니즘을 확인했다** (§5-2) — 대응 결정은 여전히 SCOPE |
-| **D4** | 번역본 귀속 | ▶ **정책부터 정리한다.** 기존 한국어 데이터와 섞이지 않는 귀속 정책을 먼저 문서로 정하고, **실제 저장 경로 변경은 D2·D6·U2·U3 확인 결과에 맞춰 진행**한다 |
-| D5 | BIBLE-EN 의 2.0.0 포함 여부 | D4 정책과 확인 결과에 따름. SCOPE 에서 확정 |
+| **D4** | 번역본 귀속 | ▶ **정책부터 정리한다.** 기존 한국어 데이터와 섞이지 않는 귀속 정책을 먼저 문서로 정하고, **실제 저장 경로 변경은 D2·D6·U2·U3 확인 결과에 맞춰 진행**한다 → ✅ **2026-10-06 결정(영어 현지화 결정 1): 권 이름 접두로 가른다.** 영어 행은 `titleName = "<번역본>-<BibleTitle.rawValue>"`(예 `KJV-1-01Genesis.txt` — 본문 리소스 파일명과 같다)로 쓰고 `translation` 열은 nil 이다. 개역개정 행은 지금 그대로다(`titleName = rawValue`, 열 `.NKRV`). 행의 번역본은 `titleName` 접두로 정하고, 접두가 없으면 열이 nil 이든 `.NKRV` 든 NKRV 다. **SwiftData 의 `translation` 열(`BibleDrawing` · `BiblePageDrawing` · `FavoriteVerse` · `VerseDrawingVersion`)에는 `.NKRV` · nil 만 쓴다.** 짓고 푸는 곳은 Domain `StoredBookKey` 하나다. 스키마 · 마이그레이션 · CloudKit 배포는 없다. 구버전(2.0.0 · 1.3.0)은 영어 행을 술어로 고르지 않거나 `guard let` 으로 건너뛴다(main `DrawingChartFeature.swift:193` 등) — 크래시(U3)와 혼입을 피한다. 예외: 구버전 주간 요약 「최근 절」 은 모르는 권을 창세기로 보인다(쓰기 없음 — 설계 §3-2). 기각: §4-3 A(`Translation` case + 조회 조건 — U3 크래시 가능 · 구버전 혼입), 새 엔티티 V7(저장 경로 이중화 · Production 배포). 기다리던 확인: U2 는 사실상 확인, U3 는 미검증이지만 영어 행이 열을 쓰지 않아 피한다(§2). D2 · D6(R27 · U4)은 번역본과 상관없는 행 식별 · 필드 보존 문제라 이 결정을 막지 않는다. **출시 전 관문은 2.0.0 기기와의 iCloud 공존 확인(M4)** — [영어 현지화 설계](./english-localization-design.md) §3 · §9 |
+| D5 | BIBLE-EN 의 2.0.0 포함 여부 | D4 정책과 확인 결과에 따름. SCOPE 에서 확정 → 2.1.0 이월(2026-09-17) → **2.1.0 포함(2026-10-06, KJV · BSB + 영어 화면)** |
 
 **이월의 조건:** D2 · D6 는 기기 두 대가 확보되는 즉시 런북 §8-7 절차로 **한 세션에서** 확인할 수 있다. U2(`CD_translation` 승격 여부)는 기기가 필요 없는 CloudKit Dashboard 조회 1회이므로 별도로 먼저 처리할 수 있다.
 
@@ -220,16 +241,16 @@ D1~D5 의 결과에 따라 아래 중 필요한 것만 남는다. **결정만으
 
 - R27 중복 행 병합·정리
 - R28 데이터 방어 또는 어긋난 행 복구 경로
-- 번역본 조건을 조회 술어 8곳에 반영
-- `Translation` enum 확장과 구버전 디코딩 방어
+- ~~번역본 조건을 조회 술어 8곳에 반영~~ → D4(2026-10-06)로 바뀜: 술어의 `titleName` 을 `StoredBookKey` 로 짓는다(영어 현지화 2.1.0)
+- ~~`Translation` enum 확장과 구버전 디코딩 방어~~ → case 는 더하되 SwiftData 열에 쓰지 않아 구버전 디코딩 방어가 필요 없다(D4)
 - 최소 버전 게이트 (2.0.0 이후를 위한 투자로만, R28 대응이 아님)
 
 ---
 
 ## 7. 이 문서가 하지 않은 것
 
-- 실기기 검증 · CloudKit 콘솔 조회 · 구버전 왕복 테스트 (U2 · U3 · U4 미수행) — 2026-09-17 에 U4 는 시뮬레이터 왕복으로 관측했다(§5-2). U2 · U3 는 여전히 미수행
+- 실기기 검증 · CloudKit 콘솔 조회 · 구버전 왕복 테스트 (U2 · U3 · U4 미수행) — 2026-09-17 에 U4 는 시뮬레이터 왕복으로 관측했다(§5-2). U2 는 2026-09-29 Production 스키마 배포로 사실상 확인했고(§2), U3 는 여전히 미수행이다(D4 결정으로 피한다)
 - R28 판정의 변경 — **전제(출시본 = V4)를 정정했으나 등급은 유지했다.** 메커니즘이 코드로 재확인됐기 때문이다 (§3-3)
-- 영어 본문 확보 · 판본 권리 확인 (BIBLE-EN 범위)
+- 영어 본문 확보 · 판본 권리 확인 (BIBLE-EN 범위) → [영어 현지화 설계](./english-localization-design.md) §2(2026-10-06)
 
 **U1 확인에 사용한 경로 (2026-09-09):** App Store 판이 설치된 iPad mini 에서 `devicectl` 로 조회를 시도했다. 앱 실행(`process launch`)과 프로세스 확인은 되지만 **`info apps` 는 빈 목록을 반환하고**(설치돼 있는데도) `info files --domain-type appDataContainer` 는 `CoreDevice.ActionError error 3` 으로 거부된다. 런북 §6-1-0 의 "App Store 판 컨테이너는 못 읽는다" 가 Xcode 26.3 · iPadOS 27 에서도 유효하다. `info apps` 가 비는 것은 런북에 없던 관측이다. 결국 **버전·빌드는 사용자의 App Store Connect 확인으로 얻었고**, 저장소 대조로 커밋을 특정했다. 기기의 실제 sqlite 스키마 확인(Finder 백업 추출, 런북 §6-1)은 수행하지 않았다 — 현재 로컬에 백업이 없다.

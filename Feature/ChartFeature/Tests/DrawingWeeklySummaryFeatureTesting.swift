@@ -15,6 +15,9 @@ import UIComponents
 import UIKit
 
 struct DrawingWeeklySummaryFeatureTesting {
+    /// 한국어 화면 — 시험 스킴의 언어 · 지역(ko-KR)과 같다.
+    private static let korean = Locale(identifier: "ko_KR")
+
     // MARK: - 리듀서
 
     @Test("최근 필사 절을 누르면 그 절을 열도록 알린다")
@@ -34,6 +37,42 @@ struct DrawingWeeklySummaryFeatureTesting {
         // When / Then: 상태는 그대로이고 openVerse 만 나온다
         await store.send(.view(.recentVerseTapped(item)))
         await store.receive(\.openVerse, item.verse)
+    }
+
+    @Test("KJV 로 쓴 최근 절을 누르면 개역개정으로 바꾸지 않고 그 KJV 절을 열도록 알린다")
+    @MainActor
+    func recentKJVVerseTappedOpensKJVVerse() async {
+        // Given: 요한복음 3장 16절을 KJV 로 썼다
+        let johnKJV = BibleChapter(title: .john, chapter: 3, translation: .KJV)
+        let item = RecentVerseItem(verse: BibleVerse(title: johnKJV, verse: 16, sentence: ""), updatedAt: Date(timeIntervalSince1970: 1_800))
+        var state = DrawingWeeklySummaryFeature.State()
+        state.scrollPosition = fixedChartDay(0)
+        let store = TestStore(initialState: state) {
+            DrawingWeeklySummaryFeature()
+        } withDependencies: { fixedTimeDependencies(&$0) }
+
+        // When / Then: 연 절의 장이 KJV 장이다
+        await store.send(.view(.recentVerseTapped(item)))
+        await store.receive(\.openVerse, BibleVerse(title: johnKJV, verse: 16, sentence: ""))
+    }
+
+    @Test("KJV 장이 이번 주 가장 많이 쓴 장이면 그 KJV 장을 열도록 알린다")
+    @MainActor
+    func topKJVChapterTappedOpensKJVChapter() async {
+        // Given: 같은 요한복음 3장을 KJV 로 더 많이 썼다
+        let start = fixedChartDay(-6)
+        let john = BibleChapter(title: .john, chapter: 3)
+        let johnKJV = BibleChapter(title: .john, chapter: 3, translation: .KJV)
+        var state = DrawingWeeklySummaryFeature.State()
+        state.scrollPosition = start
+        state.chapterCountsByDay = [start: [john: 1, johnKJV: 4]]
+        let store = TestStore(initialState: state) {
+            DrawingWeeklySummaryFeature()
+        } withDependencies: { fixedTimeDependencies(&$0) }
+
+        // When / Then
+        await store.send(.view(.topChapterTapped))
+        await store.receive(\.openChapter, johnKJV)
     }
 
     @Test("최근 필사 장을 누르면 그 장을 열도록 알린다")
@@ -195,7 +234,7 @@ struct DrawingWeeklySummaryFeatureTesting {
         var state = DrawingWeeklySummaryFeature.State()
         state.scrollPosition = fixedChartDay(-6)
 
-        #expect(state.weekAverageText == "0.0")
+        #expect(state.weekAverageText(locale: Self.korean) == "0.0")
         #expect(state.weekMaxCount == 0)
     }
 

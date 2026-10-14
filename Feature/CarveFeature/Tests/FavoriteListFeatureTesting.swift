@@ -181,7 +181,9 @@ struct FavoriteListFeatureTesting {
         let thisYear = try #require(calendar.date(from: DateComponents(year: 2026, month: 9, day: 15, hour: 9)))
         let lastYear = try #require(calendar.date(from: DateComponents(year: 2025, month: 12, day: 31, hour: 23)))
 
-        #expect(FavoriteListView.addedDateText(thisYear, now: now, calendar: calendar) == "9월 15일 추가")
-        #expect(FavoriteListView.addedDateText(lastYear, now: now, calendar: calendar) == "2025년 12월 31일 추가")
+        // 뷰는 환경 locale 을 넘긴다 — 여기서는 한국어 화면.
+        let korean = Locale(identifier: "ko")
+        #expect(FavoriteListView.addedDateText(thisYear, now: now, calendar: calendar, locale: korean) == "9월 15일 추가")
+        #expect(FavoriteListView.addedDateText(lastYear, now: now, calendar: calendar, locale: korean) == "2025년 12월 31일 추가")
     }
 }

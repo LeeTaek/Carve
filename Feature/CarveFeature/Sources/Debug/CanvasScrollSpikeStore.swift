@@ -7,6 +7,7 @@
 //
 
 #if DEBUG
+import CarveToolkit
 import Domain
 import PencilKit
 import SwiftUI
@@ -43,21 +44,21 @@ struct SpikeLaunchOptions {
 
     static func parse(_ arguments: [String]) -> SpikeLaunchOptions {
         var options = SpikeLaunchOptions()
-        if let index = arguments.firstIndex(of: "-CanvasScrollSpikeJump"),
+        if let index = arguments.firstIndex(of: LaunchArgument.canvasScrollSpikeJump),
            index + 1 < arguments.count,
            let value = Double(arguments[index + 1]) {
             options.jumpOffset = CGFloat(value)
         }
-        if let index = arguments.firstIndex(of: "-CanvasScrollSpikeMode"),
+        if let index = arguments.firstIndex(of: LaunchArgument.canvasScrollSpikeMode),
            index + 1 < arguments.count,
            let mode = CanvasScrollSpikeMode(rawValue: arguments[index + 1].uppercased()) {
             options.mode = mode
         }
-        options.isLeftHanded = arguments.contains("-CanvasScrollSpikeLeftHanded")
-        options.isNarrow = arguments.contains("-CanvasScrollSpikeNarrow")
-        options.allowFingerDrawing = arguments.contains("-CanvasScrollSpikeAnyInput")
-        options.normalizeModeA = arguments.contains("-CanvasScrollSpikeNormalizeA")
-        options.autoRun = arguments.contains("-CanvasScrollSpikeAuto")
+        options.isLeftHanded = arguments.contains(LaunchArgument.canvasScrollSpikeLeftHanded)
+        options.isNarrow = arguments.contains(LaunchArgument.canvasScrollSpikeNarrow)
+        options.allowFingerDrawing = arguments.contains(LaunchArgument.canvasScrollSpikeAnyInput)
+        options.normalizeModeA = arguments.contains(LaunchArgument.canvasScrollSpikeNormalizeA)
+        options.autoRun = arguments.contains(LaunchArgument.canvasScrollSpikeAuto)
         return options
     }
 }

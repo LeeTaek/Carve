@@ -59,9 +59,13 @@ private let settingsInks: [Data] = (0..<4).map { offset in
 @Suite("설정 — 확인이 필요한 필기 · 넣기")
 @MainActor
 struct DraftRecoveryImportTesting {
-    private static let accountA = AccountScope(key: "acct-a")
-    private static let chapter = BibleChapter(title: .genesis, chapter: 1)
-    private static let metadata = DrawingLayoutMetadata(
+    /// 문구를 꺼내는 언어 — 시험 언어(스킴 ko-KR)와 같은 한국어. 리듀서는 고른 언어가 없어 이 언어로 결과 한 줄을 만든다.
+    private nonisolated static let koreanLocale = Locale(identifier: "ko_KR")
+    // nonisolated 인 `owned(_:)` 의 기본 인자로 쓴다 — MainActor 격리면 기본값이 격리를 넘는다.
+    private nonisolated static let accountA = AccountScope(key: "acct-a")
+    // nonisolated 인 `Fixture` 가 await 없이 읽는다.
+    private nonisolated static let chapter = BibleChapter(title: .genesis, chapter: 1)
+    private nonisolated static let metadata = DrawingLayoutMetadata(
         baseWritingWidth: 372, baseWritingHeight: 60, baseUnderlineAnchors: [0, 30], layoutSignature: "cl1-settings-import"
     )
 
@@ -176,7 +180,7 @@ struct DraftRecoveryImportTesting {
 
             #expect(store.state.importingItemID == nil)
             #expect(store.state.importMessage == DraftRecoveryFeature.ImportMessage(
-                text: DraftRecoveryCopy.imported(item.place, previousKept: true), needsAttention: false
+                text: DraftRecoveryCopy.imported(item.place, previousKept: true, locale: Self.koreanLocale), needsAttention: false
             ))
             #expect(store.state.comparison == nil)
             await store.receive(\.loaded)
@@ -232,7 +236,9 @@ struct DraftRecoveryImportTesting {
 
             await store.send(.view(.importTapped))
             await store.receive(\.imported)
-            #expect(store.state.importMessage == DraftRecoveryFeature.ImportMessage(text: DraftRecoveryCopy.currentChanged, needsAttention: true))
+            #expect(store.state.importMessage == DraftRecoveryFeature.ImportMessage(
+                text: DraftRecoveryCopy.currentChanged(locale: Self.koreanLocale), needsAttention: true
+            ))
             await store.receive(\.currentLoaded)
             #expect(store.state.comparison?.check?.currentFingerprint == arrived)
             // 아무것도 쓰지 않았다.
@@ -253,7 +259,9 @@ struct DraftRecoveryImportTesting {
             await store.send(.view(.importTapped))
             await store.receive(\.imported)
 
-            #expect(store.state.importMessage == DraftRecoveryFeature.ImportMessage(text: DraftRecoveryCopy.importFailed, needsAttention: true))
+            #expect(store.state.importMessage == DraftRecoveryFeature.ImportMessage(
+                text: DraftRecoveryCopy.importFailed(locale: Self.koreanLocale), needsAttention: true
+            ))
             #expect(store.state.comparison != nil)
             #expect(changes.posted.value.isEmpty)
             #expect(try await fixture.current()?.lineData == settingsInks[1])
@@ -279,7 +287,7 @@ struct DraftRecoveryImportTesting {
             await store.send(.view(.importTapped))
             #expect(store.state.importingItemID == nil)
             #expect(try await fixture.current()?.lineData == settingsInks[1])
-            #expect(DraftRecoveryCopy.importBlocked(.ownershipUnverified).contains("넣을 수 없어요"))
+            #expect(DraftRecoveryCopy.importBlocked(.ownershipUnverified, locale: Self.koreanLocale).contains("넣을 수 없어요"))
         }
     }
 

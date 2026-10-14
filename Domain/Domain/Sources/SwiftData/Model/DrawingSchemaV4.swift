@@ -34,11 +34,11 @@ import SwiftData
 /// 따라서 V3 → V4 는 lightweight migration 으로 처리됩니다.
 ///
 /// - Important: **forward-only 입니다 (§10-3).** V4 로 마이그레이션된 store 는 V3 빌드로
-///              되돌릴 수 없습니다. 되돌릴 수단은 feature flag off 뿐이며, 그때도 저장소는
-///              V4 인 채로 남습니다. 그래서 "기존 N Canvas 경로가 V4 저장소에서 동작하는지" 를
-///              Phase 1 에서 먼저 확보합니다.
+///              되돌릴 수 없습니다. 2.0.x 까지는 feature flag off(기존 N-Canvas 경로)로 단일 Canvas 를
+///              되돌릴 수 있었지만, 2.1 에서 flag 와 N-Canvas 경로를 지웠습니다 — forward-only 원칙은
+///              그대로입니다.
 public enum DrawingSchemaV4: VersionedSchema {
-    public static var versionIdentifier = Schema.Version(4, 0, 0)
+    public static let versionIdentifier = Schema.Version(4, 0, 0)
 
     public static var models: [any PersistentModel.Type] {
         [BibleDrawing.self, BiblePageDrawing.self]
@@ -105,13 +105,17 @@ public enum DrawingSchemaV4: VersionedSchema {
         public init() { }
 
         /// - Parameters:
-        ///   - bibleTitle: 성경 이름과 장.
+        ///   - bibleTitle: 성경 이름과 장(번역본 포함). 번역본은 `bibleTitle.translation` 이다 — 생략하면 `BibleChapter` 의 기본값 개역개정.
         ///   - verse: 절 번호.
         ///   - lineData: `PKDrawing.dataRepresentation()`.
         ///   - updateDate: 갱신 일시.
         ///   - layoutMetadataData: `DrawingLayoutMetadata` blob. 좌표 형식이 `3` 일 때만 의미가 있습니다.
         ///   - rowUUID: 행 식별자(§8-7). **선발급한 값이 있으면 반드시 그 값을 넘깁니다.**
         ///     기본값은 새 UUID 이므로 이 이니셜라이저로 만든 행은 항상 신규 행 취급입니다.
+        ///
+        /// 권 이름과 번역본 열은 `StoredBookKey` 로 짓습니다(영어 현지화 결정 1) — 개역개정은 `titleName = rawValue` · 열 `.NKRV`
+        /// (지금과 같다), KJV · BSB 는 `titleName = "<번역본>-<rawValue>"` · 열 nil 입니다. 열에는 영어 값을 쓰지 않습니다.
+        /// business `id` 도 이 `titleName` 으로 지어 번역본마다 다릅니다.
         public init(bibleTitle: BibleChapter,
                     verse: Int,
                     lineData: Data? = nil,
@@ -119,19 +123,21 @@ public enum DrawingSchemaV4: VersionedSchema {
                     layoutMetadataData: Data? = nil,
                     rowUUID: String? = UUID().uuidString
         ) {
+            let storedTitleName = StoredBookKey.titleName(for: bibleTitle)
             self.lineData = lineData
-            self.titleName = bibleTitle.title.rawValue
+            self.titleName = storedTitleName
             self.titleChapter = bibleTitle.chapter
             self.verse = verse
+            self.translation = StoredBookKey.translationColumn(for: bibleTitle.translation)
             self.creationDate = Date()
             self.updateDate = updateDate
             self.layoutMetadataData = layoutMetadataData
             self.rowUUID = rowUUID
             self.id = {
                 if let timestamp = creationDate?.timeIntervalSince1970 {
-                    return "\(bibleTitle.title.rawValue).\(bibleTitle.chapter).\(verse).\(Int(timestamp))"
+                    return "\(storedTitleName).\(bibleTitle.chapter).\(verse).\(Int(timestamp))"
                 } else {
-                    return "\(bibleTitle.title.rawValue).\(bibleTitle.chapter).\(verse).\(Date().timeIntervalSince1970)"
+                    return "\(storedTitleName).\(bibleTitle.chapter).\(verse).\(Date().timeIntervalSince1970)"
                 }
             }()
         }

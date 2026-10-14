@@ -7,6 +7,9 @@
 //
 
 import CarveToolkit
+// 알림 구독 토큰(`NSObjectProtocol`)에 Sendable 표기가 없다 — 해지 클로저(`SharedSubscription`, @Sendable)가 토큰을 쥔다.
+// Sharing 의 `AppStorageKey` 도 같은 이유로 Foundation 을 `@preconcurrency` 로 들인다.
+@preconcurrency import Foundation
 import UIKit
 
 import ComposableArchitecture
@@ -19,7 +22,7 @@ import ComposableArchitecture
 /// 기본 타입은 Sharing 의 `.appStorage("키")`, Codable 구조체 · 배열 · enum 은 `.codableAppStorage("키")` 를 쓴다.
 /// 2.0.0 이 JSON 으로 남긴 기본 타입 값은 `AppStorageFormatMigration` 이 앱 시작 때 되돌린다.
 extension SharedKey {
-    public static func codableAppStorage<Value: Codable>(_ key: String) -> Self
+    public static func codableAppStorage<Value: Codable & Sendable>(_ key: String) -> Self
     where Self == CodableAppStorageKey<Value> {
         CodableAppStorageKey(key)
     }
@@ -28,7 +31,7 @@ extension SharedKey {
 /// Codable 타입을 AppStorage(UserDefaults)에 저장하고, shared 상태로 연동하기 위한 Key
 /// UserDefaults에 저장할때 사용하는 키를 주입받고, 해당 키로 Encoding, Decoding하여 저장/반환
 /// UserDefaults.didChangeNotification를 구독하여 값 변경시 새로운 값 전파
-public struct CodableAppStorageKey<Value: Codable>: SharedKey {
+public struct CodableAppStorageKey<Value: Codable & Sendable>: SharedKey {
     /// 만들 때 꺼낸 저장소. `@Dependency` 래퍼를 들고 있으면 만든 곳의 의존성 문맥 전체(runtime 의 ModelContainer 포함)를 붙잡는다 —
     /// Sharing 은 이 키를 전역 공유 참조와 알림 구독에 오래 두므로, 재연결 때 옛 컨테이너가 해제되지 않았다(2026-09-28 iPadOS 18.6 실측).
     /// Sharing 의 `AppStorageKey` 처럼 저장소만 보관한다.

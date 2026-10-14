@@ -5,6 +5,7 @@
 //  Created by 이택성 on 1/22/24.
 //
 
+import CarveToolkit
 import Domain
 import SwiftData
 import SwiftUI
@@ -26,13 +27,18 @@ struct CarveApp: App {
     private let adConsent: AdConsentCoordinator
     /// 실행 뒤에 도착하는 본문 모양 iCloud 백업도 받도록 앱 수명 동안 유지한다.
     private let sentenceSettingBackup: SentenceSettingCloudBackup
+    /// 화면 바로 열기 · 광고 억제(Debug 실행 인자). Release 에서는 늘 빈 값이다.
+    private let uiTestLaunch: UITestLaunchOptions
 
     init() {
         // 2.0.0(Xcode 27 빌드)이 JSON 으로 쓴 기본 타입 설정을 되돌린다 — 설정을 읽는 Store · Debug 실행 인자 처리보다 먼저.
         AppStorageFormatMigration.restorePrimitiveValues(in: .standard)
+        // 지난 실행이 남긴 백업 · 불러오기의 평문 작업 폴더(`BackupWork`)를 지운다 — 이 실행의 백업 작업이 시작되기 전이다.
+        BackupWorkDirectory.removeStale()
+        // 위젯이 이 실행의 화면 언어(iOS 앱별 언어)를 따르게 App Group 에 맞춘다 — 설정 앱에서 앱 언어를 바꾼 경우.
+        WidgetAppLanguage.publishLaunchLanguage()
         let purchaseClient = StoreKitPurchaseClient()
         self.purchaseClient = purchaseClient
-        SingleCanvasFlag.resetStoredValueOnce(in: .standard)
 
         let sentenceSettingBackup = SentenceSettingCloudBackup()
         sentenceSettingBackup.start()
@@ -40,6 +46,9 @@ struct CarveApp: App {
 
         #if DEBUG
         UITestLaunchChapter.apply()
+        uiTestLaunch = UITestLaunchOptions.read()
+        #else
+        uiTestLaunch = UITestLaunchOptions()
         #endif
 
         let containerID = Self.makeContainerID()
@@ -52,7 +61,7 @@ struct CarveApp: App {
     var body: some Scene {
         WindowGroup {
             #if DEBUG
-            if ProcessInfo.processInfo.arguments.contains("-CanvasScrollSpike") {
+            if ProcessInfo.processInfo.arguments.contains(LaunchArgument.canvasScrollSpike) {
                 // SwiftData 사용자 저장소와 연결되지 않는 Debug 전용 레이아웃 하네스.
                 CanvasScrollSpikeView()
             } else {
@@ -70,7 +79,8 @@ struct CarveApp: App {
             purchaseClient: purchaseClient,
             nativeAdClient: nativeAdClient,
             adConsent: adConsent,
-            sentenceSettingBackup: sentenceSettingBackup
+            sentenceSettingBackup: sentenceSettingBackup,
+            uiTestLaunch: uiTestLaunch
         )
     }
 
@@ -85,6 +95,50 @@ private struct AppRuntime {
     let store: StoreOf<AppCoordinatorFeature>
 }
 
+/// 화면 바로 열기 · 억제 스위치(`LaunchArgument` 의 `-UITest…`) 가운데 Store 를 만들 때 쓰는 값.
+///
+/// Debug 빌드에서만 앱 시작 때 실행 인자에서 한 번 읽는다 — Release 에서는 늘 빈 값이라 아무것도 바꾸지 않는다.
+/// 경로의 뜻은 `AppCoordinatorFeature.UITestRoute`, 쓰는 법은 `docs/device-simulator-verification.md` 에 있다.
+private struct UITestLaunchOptions {
+    /// `-UITestRoute` — 시작 화면이 끝나면 코디네이터가 열 화면.
+    var route: AppCoordinatorFeature.UITestRoute?
+    /// `-UITestNoAds` — 네이티브 광고를 요청하지 않는다.
+    var suppressesAds = false
+
+    #if DEBUG
+    /// 실행 인자를 읽는다. 첫 실행 안내 · 패치노트 억제는 Store 를 만들기 전인 지금 저장해 둔다.
+    static func read(arguments: [String] = ProcessInfo.processInfo.arguments) -> Self {
+        @Dependency(\.appVersion) var appVersion
+        AppCoordinatorFeature.applyLaunchSuppression(arguments: arguments, appVersion: appVersion)
+        return Self(
+            route: AppCoordinatorFeature.UITestRoute.parse(arguments: arguments),
+            suppressesAds: arguments.contains(LaunchArgument.uiTestNoAds)
+        )
+    }
+    #endif
+}
+
+#if DEBUG
+/// `-UITestNoAds` 의 광고 클라이언트 — 광고를 요청하지 않는다(Debug 전용).
+///
+/// Debug 의 Google 시험 네이티브 광고는 「AdMob native ad validator」 팝업을 띄워 UI 테스트의 탭을 가린다.
+/// 광고 제거를 산 것과 같은 실패를 돌려주므로 광고 자리(`SponsorAdSlotFeature`)는 자리를 비운다.
+private struct UITestNoAdsClient: NativeAdClient {
+    @MainActor
+    func load(placement: NativeAdPlacement, adUnitId: String) async throws(NativeAdClientError) -> NativeAdToken {
+        throw .adFree
+    }
+
+    @MainActor
+    func view(for token: NativeAdToken) -> UIView? {
+        nil
+    }
+
+    @MainActor
+    func invalidate(token: NativeAdToken) {}
+}
+#endif
+
 /// 계정 확인과 저장소 소유 증명이 끝나기 전에는 `.private` ModelContainer 를 만들지 않는다.
 private struct AppStartupView: View {
     let containerID: ContainerID
@@ -92,6 +146,7 @@ private struct AppStartupView: View {
     let nativeAdClient: any NativeAdClient
     let adConsent: AdConsentCoordinator
     let sentenceSettingBackup: any SentenceSettingBackupClient
+    let uiTestLaunch: UITestLaunchOptions
 
     @State private var runtime: AppRuntime?
     @State private var didStart = false
@@ -102,8 +157,10 @@ private struct AppStartupView: View {
                 rootView(runtime)
                     .modelContainer(runtime.modelContainer)
             } else {
-                ProgressView("필사 저장소와 계정 소유를 확인하고 있어요")
-                    .task { await startIfNeeded() }
+                ProgressView {
+                    Text("필사 저장소와 계정 소유를 확인하고 있어요", bundle: .main, comment: "앱 시작 직후 — 저장소와 iCloud 계정 소유를 확인하는 동안")
+                }
+                .task { await startIfNeeded() }
             }
         }
         // 2.0.0 은 보류한 실행이 로그인 뒤 활성화돼도 저장소를 다시 연결하지 않는다. 실행 중 교체는 옛 컨테이너가 해제되지 않아
@@ -174,7 +231,8 @@ private struct AppStartupView: View {
             purchaseClient: purchaseClient,
             sentenceSettingBackup: sentenceSettingBackup,
             drawingEditEnvironment: drawingEditEnvironment,
-            localPreservation: localPreservation
+            localPreservation: localPreservation,
+            uiTestLaunch: uiTestLaunch
         )
         Task { await drawingEditEnvironment.start() }
         runtime = AppRuntime(modelContainer: modelContainer, store: store)
@@ -218,11 +276,15 @@ private struct AppStartupView: View {
         purchaseClient: any PurchaseClient,
         sentenceSettingBackup: any SentenceSettingBackupClient,
         drawingEditEnvironment: any DrawingEditEnvironmentClient,
-        localPreservation: LocalPreservationWriter
+        localPreservation: LocalPreservationWriter,
+        uiTestLaunch: UITestLaunchOptions
     ) -> StoreOf<AppCoordinatorFeature> {
         // actor 와 그것을 쥔 저장소의 기본값(`static` liveValue)은 처음 읽힌 문맥의 컨테이너로 한 번 만들어져 전역에 남는다.
         // 기본값에 기대지 않고 이 실행이 연 컨테이너로 직접 만들어 넘긴다(2026-09-28 iPadOS 18.6 실측).
         let database = SwiftDatabaseActor(modelContainer: modelContainer)
+        // 설정에서 넣은 필기(「확인이 필요한 필기」 · 「백업 불러오기」)를 그 아래 열린 필사 화면에 알린다 — 모두 같은 인스턴스를 봐야 한다.
+        let localDrawingChanges = LiveLocalDrawingChangeClient()
+        let backupRestorer = SwiftDataDrawingBackupRestorer(actor: database)
         return withDependencies {
             $0.containerId = containerID
             $0.modelContainer = modelContainer
@@ -230,6 +292,17 @@ private struct AppStartupView: View {
             $0.drawingRepository = SwiftDataDrawingRepository(actor: database)
             // 「확인이 필요한 필기」 의 가져오기 — 같은 actor 로 쓴다(저장소 세대 · 트랜잭션이 편집 화면과 같은 경계다).
             $0.drawingVerseImporter = SwiftDataDrawingRepository(actor: database)
+            // 「필사 백업」 의 내보내기 · 불러오기 · 장 단위 복원도 같은 actor 로 쓴다 — 「모든 필사 삭제」 가 이 actor 의 세대를 올리므로
+            // 장 사이 세대 확인(내보내기 `generationChanged` · 복원 `staleStoreGeneration`)이 그 삭제를 잡는다.
+            $0.drawingBackupRestorer = backupRestorer
+            $0.backupExporter = LiveBackupExporter(environment: drawingEditEnvironment, drafts: localPreservation, database: database)
+            $0.backupImporter = LiveBackupImporter(
+                environment: drawingEditEnvironment,
+                restorer: backupRestorer,
+                database: database,
+                changes: localDrawingChanges,
+                jobs: BackupImportJobStore()
+            )
             $0.favoriteVerseRepository = SwiftDataFavoriteVerseRepository(actor: database)
             // `@Dependency` 를 저장한 기본값도 처음 읽힌 runtime 문맥을 전역 캐시에 남긴다. 여기서(runtime 밖 문맥) 만들어 넘긴다.
             $0.drawingData = DrawingDatabase()
@@ -248,13 +321,22 @@ private struct AppStartupView: View {
             $0.verseDraftRecoveryReader = localPreservation
             $0.verseDraftUnreadableCleaner = localPreservation
             $0.verseDraftImportMarker = localPreservation
-            // 설정에서 넣은 필기를 그 아래 열린 필사 화면에 알린다 — 둘이 같은 인스턴스를 봐야 한다.
-            $0.localDrawingChanges = LiveLocalDrawingChangeClient()
+            $0.localDrawingChanges = localDrawingChanges
             $0.photoLibraryClient = PhotoKitLibraryClient()
+            $0.appLanguageClient = AppleLanguagesClient()
             $0.widgetVerseClient = AppGroupWidgetVerseClient()
             $0.analyticsClient = FirebaseAnalyticsClient()
+            #if DEBUG
+            // `-UITestNoAds` — 광고를 요청하지 않는다. Debug 시험 광고의 검증기 팝업이 UI 테스트를 가리지 않는다.
+            if uiTestLaunch.suppressesAds {
+                $0.nativeAdClient = UITestNoAdsClient()
+            }
+            #endif
         } operation: {
-            Store(initialState: .initialState) {
+            var initialState = AppCoordinatorFeature.State.initialState
+            // `-UITestRoute` 의 화면 — 시작 화면이 끝나면 코디네이터가 연다. Release 에서는 늘 nil 이다.
+            initialState.pendingLaunchRoute = uiTestLaunch.route
+            return Store(initialState: initialState) {
                 AppCoordinatorFeature()
             }
         }

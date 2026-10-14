@@ -57,9 +57,10 @@ private final class WidgetSpy: WidgetVerseClient, @unchecked Sendable {
 @Suite("N7 · N8 — 설정의 위젯 화면")
 @MainActor
 struct WidgetSettingsTesting {
-    private static let chapter = BibleChapter(title: .psalms, chapter: 23)
-    private static let first = FavoriteVerseKey(chapter: chapter, verse: 1)
-    private static let second = FavoriteVerseKey(chapter: chapter, verse: 2)
+    // `LockIsolated.setValue` 의 @Sendable 자동 클로저 안에서 쓴다 — MainActor 격리면 그 클로저가 읽지 못한다.
+    private nonisolated static let chapter = BibleChapter(title: .psalms, chapter: 23)
+    private nonisolated static let first = FavoriteVerseKey(chapter: chapter, verse: 1)
+    private nonisolated static let second = FavoriteVerseKey(chapter: chapter, verse: 2)
 
     private static func favorite(_ key: FavoriteVerseKey) -> FavoriteVerseSnapshot {
         FavoriteVerseSnapshot(

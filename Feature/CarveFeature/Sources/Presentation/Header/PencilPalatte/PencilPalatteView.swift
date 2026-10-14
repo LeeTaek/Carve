@@ -21,6 +21,8 @@ import UIComponents
 @ViewAction(for: PencilPalatteFeature.self)
 public struct PencilPalatteView: View {
     @Bindable public var store: StoreOf<PencilPalatteFeature>
+    /// 화면 언어 — 도구 이름 · 버튼 접근성 이름을 이 값으로 만든다(즉시 전환 단계 3).
+    @Environment(\.locale) private var locale
 
     /// 시안 M2 의 팔레트 크기.
     static let designWidth: CGFloat = 504
@@ -97,25 +99,29 @@ public struct PencilPalatteView: View {
                     }
                 }
             }
-            .accessibilityHint("길게 누르면 연필 · 펜 · 형광펜을 고릅니다")
+            .accessibilityHint(Text("길게 누르면 연필 · 펜 · 형광펜을 고릅니다", bundle: .module))
 
-            CarveIconButton(.eraser, accessibilityLabel: "지우개", isSelected: isErasing, background: .plain) {
+            CarveIconButton(.eraser, accessibilityLabel: CarveFeatureCatalog.string("지우개", locale: locale), isSelected: isErasing, background: .plain) {
                 send(.setPencilType(.monoline))
             }
 
-            CarveIconButton(.lasso, accessibilityLabel: "올가미", isSelected: store.isLassoSelected, background: .plain) {
+            CarveIconButton(
+                .lasso,
+                accessibilityLabel: CarveFeatureCatalog.string("올가미", locale: locale),
+                isSelected: store.isLassoSelected,
+                background: .plain
+            ) {
                 send(.selectLasso)
             }
-            .disabled(!store.isLassoAvailable)
-            .accessibilityHint("필기를 묶어 옮깁니다")
+            .accessibilityHint(Text("필기를 묶어 옮깁니다", bundle: .module))
         }
     }
 
     private func inkName(_ ink: PKInkingTool.InkType) -> String {
         switch ink {
-        case .pencil: "연필"
-        case .marker: "형광펜"
-        default: "펜"
+        case .pencil: CarveFeatureCatalog.string("연필", locale: locale)
+        case .marker: CarveFeatureCatalog.string("형광펜", locale: locale)
+        default: CarveFeatureCatalog.string("펜", locale: locale)
         }
     }
 
@@ -143,8 +149,8 @@ public struct PencilPalatteView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("펜 굵기 \(millimeters(store.pencilConfig.lineWidth))")
-        .accessibilityHint("탭하면 굵기를 고릅니다")
+        .accessibilityLabel(Text("펜 굵기 \(millimeters(store.pencilConfig.lineWidth))", bundle: .module))
+        .accessibilityHint(Text("탭하면 굵기를 고릅니다", bundle: .module))
         .popover(
             item: $store.scope(state: \.navigation?.lineWidthPalatte,
                                action: \.navigation.lineWidthPalatte),
@@ -170,8 +176,8 @@ public struct PencilPalatteView: View {
                         longPressGesture(action: .popoverColor(index))
                     )
                     .accessibilityElement()
-                    .accessibilityLabel("색상 \(index + 1)")
-                    .accessibilityHint("길게 누르면 색을 바꿉니다")
+                    .accessibilityLabel(Text("색상 \(index + 1)", bundle: .module))
+                    .accessibilityHint(Text("길게 누르면 색을 바꿉니다", bundle: .module))
                     .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
             }
         }
@@ -193,12 +199,12 @@ public struct PencilPalatteView: View {
 
     private var undoRedoButtons: some View {
         HStack(spacing: CarveSpacing.xxSmall) {
-            CarveIconButton(.undo, accessibilityLabel: "실행 취소", background: .plain) {
+            CarveIconButton(.undo, accessibilityLabel: CarveFeatureCatalog.string("실행 취소", locale: locale), background: .plain) {
                 send(.undo)
             }
             .disabled(!store.canUndo)
 
-            CarveIconButton(.redo, accessibilityLabel: "다시 실행", background: .plain) {
+            CarveIconButton(.redo, accessibilityLabel: CarveFeatureCatalog.string("다시 실행", locale: locale), background: .plain) {
                 send(.redo)
             }
             .disabled(!store.canRedo)
@@ -226,6 +232,8 @@ public struct PencilPalatteDockView: View {
     private let expand: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// 화면 언어 — 도구 이름 · 조작 안내 · 실행 취소 접근성 이름을 이 값으로 만든다(즉시 전환 단계 3).
+    @Environment(\.locale) private var locale
     /// 손가락 필사 허용(본문 설정). 펼친 팔레트 아래 조작 안내가 이 값을 따른다.
     @Shared(.appStorage("allowFingerDrawing")) private var allowFingerDrawing: Bool = false
     /// 화면에 그리는 펼침 상태. 리듀서가 바꾼 `isExpanded` 를 `withAnimation` 으로 옮겨 받아 폭 변화를 한 트랜잭션으로 묶는다.
@@ -316,7 +324,11 @@ public struct PencilPalatteDockView: View {
     ///    바깥의 `opacity` · `scaleEffect` 를 따르지 않으므로, 유리를 둔 채 숨기면 캡슐 옆에 아이콘이 그대로 보였다.
     ///    접을 때 유리가 다시 생기며 독립된 버튼으로 나타난다.
     private var undoButton: some View {
-        CarveIconButton(.undo, accessibilityLabel: "실행 취소", background: isShowingExpanded ? .plain : .floating) {
+        CarveIconButton(
+            .undo,
+            accessibilityLabel: CarveFeatureCatalog.string("실행 취소", locale: locale),
+            background: isShowingExpanded ? .plain : .floating
+        ) {
             store.send(.view(.undo))
         }
         .disabled(!store.canUndo)
@@ -334,7 +346,7 @@ public struct PencilPalatteDockView: View {
                 Text(gestureGuide)
                     .transition(.opacity)
             } else {
-                Text("\(compactToolName) · \(store.pencilConfig.lineWidth / 4, specifier: "%.1f") mm")
+                Text(verbatim: "\(compactToolName) · \(LineWidthPalatteView.millimeters(store.pencilConfig.lineWidth))")
                     .transition(.opacity)
             }
         }
@@ -351,7 +363,9 @@ public struct PencilPalatteDockView: View {
 
     /// 펼친 팔레트 아래 조작 안내. 손가락 필사를 허용하면 한 손가락은 필기라 스크롤은 두 손가락이 된다.
     private var gestureGuide: String {
-        allowFingerDrawing ? "두 손가락으로 스크롤 · 손가락으로 필사" : "손가락으로 스크롤 · Apple Pencil로 필사"
+        allowFingerDrawing
+            ? CarveFeatureCatalog.string("두 손가락으로 스크롤 · 손가락으로 필사", locale: locale)
+            : CarveFeatureCatalog.string("손가락으로 스크롤 · Apple Pencil로 필사", locale: locale)
     }
 
     private var compactToolButton: some View {
@@ -368,7 +382,7 @@ public struct PencilPalatteDockView: View {
             .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(compactToolName), \(store.pencilConfig.lineWidth / 4, specifier: "%.1f") 밀리미터. 탭하면 도구 팔레트를 펼칩니다")
+        .accessibilityLabel(Text("\(compactToolName), \(String(format: "%.1f", store.pencilConfig.lineWidth / 4)) 밀리미터. 탭하면 도구 팔레트를 펼칩니다", bundle: .module))
     }
 
     private var compactToolIcon: CarveIcon {
@@ -377,12 +391,12 @@ public struct PencilPalatteDockView: View {
     }
 
     private var compactToolName: String {
-        if store.isLassoSelected { return "올가미" }
+        if store.isLassoSelected { return CarveFeatureCatalog.string("올가미", locale: locale) }
         switch store.pencilConfig.pencilType {
-        case .monoline: return "지우개"
-        case .pencil: return "연필"
-        case .marker: return "형광펜"
-        default: return "펜"
+        case .monoline: return CarveFeatureCatalog.string("지우개", locale: locale)
+        case .pencil: return CarveFeatureCatalog.string("연필", locale: locale)
+        case .marker: return CarveFeatureCatalog.string("형광펜", locale: locale)
+        default: return CarveFeatureCatalog.string("펜", locale: locale)
         }
     }
 }

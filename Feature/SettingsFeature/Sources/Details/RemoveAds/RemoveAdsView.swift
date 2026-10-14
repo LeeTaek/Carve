@@ -15,6 +15,8 @@ import UIComponents
 @ViewAction(for: RemoveAdsFeature.self)
 public struct RemoveAdsView: View {
     @Bindable public var store: StoreOf<RemoveAdsFeature>
+    /// 화면 언어 — 앱 안에서 언어를 고르면 행 · 가격 설명 · 안내 문구도 바로 따라온다(즉시 전환 단계 3).
+    @Environment(\.locale) private var locale
 
     public init(store: StoreOf<RemoveAdsFeature>) {
         self.store = store
@@ -23,26 +25,30 @@ public struct RemoveAdsView: View {
     public var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: CarveSpacing.large) {
-                Text("광고 제거")
+                Text("광고 제거", bundle: .module)
                     .font(CarveTypography.sectionTitle)
                     .foregroundStyle(CarveColor.secondary)
 
                 if store.isAdFree {
-                    CarveSettingsRow("광고 없이 쓰는 중", description: "광고 제거를 구매했어요.", value: "구매함")
+                    CarveSettingsRow(
+                        SettingsCatalog.string("광고 없이 쓰는 중", locale: locale),
+                        description: SettingsCatalog.string("광고 제거를 구매했어요.", locale: locale),
+                        value: SettingsCatalog.string("구매함", locale: locale)
+                    )
                 } else {
-                    CarveSettingsRow("광고 없이 쓰기", description: priceDescription, value: "")
+                    CarveSettingsRow(SettingsCatalog.string("광고 없이 쓰기", locale: locale), description: priceDescription, value: "")
                     actions
                 }
 
                 CarveDivider()
 
-                Text("사이드바 · 필사 화면 · 차트의 광고가 모두 사라져요.")
+                Text("사이드바 · 필사 화면 · 차트의 광고가 모두 사라져요.", bundle: .module)
                     .font(CarveTypography.body)
                     .foregroundStyle(CarveColor.secondary)
                     .fixedSize(horizontal: false, vertical: true)
 
                 if let notice = store.notice {
-                    Text(notice.message)
+                    Text(notice.message(locale: locale))
                         .font(CarveTypography.caption)
                         .foregroundStyle(CarveColor.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -59,19 +65,23 @@ public struct RemoveAdsView: View {
 
     private var actions: some View {
         HStack(spacing: CarveSpacing.small) {
-            Button("구매") {
+            Button {
                 send(.purchaseTapped)
+            } label: {
+                Text("구매", bundle: .module)
             }
             .buttonStyle(.carve(.primary))
 
-            Button("구매 복원") {
+            Button {
                 send(.restoreTapped)
+            } label: {
+                Text("구매 복원", bundle: .module)
             }
             .buttonStyle(.carve(.secondary))
 
             if store.inProgress != nil {
                 ProgressView()
-                    .accessibilityLabel(store.inProgress == .restore ? "구매 내역 확인 중" : "구매 진행 중")
+                    .accessibilityLabel(store.inProgress == .restore ? Text("구매 내역 확인 중", bundle: .module) : Text("구매 진행 중", bundle: .module))
             }
         }
         .disabled(store.inProgress != nil)
@@ -79,25 +89,28 @@ public struct RemoveAdsView: View {
 
     private var priceDescription: String {
         if let product = store.product {
-            return "한 번 구매 · \(product.displayPrice)"
+            return SettingsCatalog.string("한 번 구매 · \(product.displayPrice)", locale: locale)
         }
-        return store.isLoadingProduct ? "가격을 불러오는 중" : "한 번 구매"
+        return store.isLoadingProduct
+            ? SettingsCatalog.string("가격을 불러오는 중", locale: locale)
+            : SettingsCatalog.string("한 번 구매", locale: locale)
     }
 }
 
 private extension RemoveAdsFeature.Notice {
-    var message: String {
+    /// 안내 한 줄 — 뷰는 환경 `locale` 을 넘긴다. 상태에는 안내의 종류만 두고 문구는 그릴 때 만든다.
+    func message(locale: Locale) -> String {
         switch self {
         case .pending:
-            "구매 승인을 기다리고 있어요. 승인되면 광고가 사라져요."
+            SettingsCatalog.string("구매 승인을 기다리고 있어요. 승인되면 광고가 사라져요.", locale: locale)
         case .nothingToRestore:
-            "이 Apple 계정에서 복원할 구매 내역이 없어요."
+            SettingsCatalog.string("이 Apple 계정에서 복원할 구매 내역이 없어요.", locale: locale)
         case .productUnavailable:
-            "지금은 구매할 수 없어요. 잠시 뒤 다시 시도해 주세요."
+            SettingsCatalog.string("지금은 구매할 수 없어요. 잠시 뒤 다시 시도해 주세요.", locale: locale)
         case .purchaseFailed:
-            "구매를 마치지 못했어요. 다시 시도해 주세요."
+            SettingsCatalog.string("구매를 마치지 못했어요. 다시 시도해 주세요.", locale: locale)
         case .restoreFailed:
-            "구매 내역을 확인하지 못했어요. 다시 시도해 주세요."
+            SettingsCatalog.string("구매 내역을 확인하지 못했어요. 다시 시도해 주세요.", locale: locale)
         }
     }
 }

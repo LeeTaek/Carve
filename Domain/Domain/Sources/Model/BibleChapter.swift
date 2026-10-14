@@ -9,22 +9,69 @@
 import Foundation
 import SwiftData
 
-/// 성경의 한 위치(책 + 장) 모델.
+/// 성경의 한 위치(번역본 + 책 + 장) 모델.
+///
+/// 지금 번역본은 `@Shared(.appStorage("title"))` 에 저장된 장의 `translation` 이다 — 별도 저장 키는 없다.
+/// 장을 여는 경로 · 즐겨찾기 · 위젯 · 차트 · 초안은 번역본을 따로 받지 않고 장과 함께 나른다.
 public struct BibleChapter: Sendable, Codable, Hashable {
+    /// 같은 번역본의 같은 권 · 장일 때만 같다.
     public static func == (lhs: BibleChapter, rhs: BibleChapter) -> Bool {
-        (lhs.title == rhs.title) && (lhs.chapter == rhs.chapter)
+        (lhs.title == rhs.title) && (lhs.chapter == rhs.chapter) && (lhs.translation == rhs.translation)
     }
-    
+
     /// 성경 책(창세기, 출애굽기 등).
     public var title: BibleTitle
     /// 장(chapter) 번호.
     public var chapter: Int
-    
+    /// 번역본. 옛 JSON(키 없음)은 개역개정이다.
+    public var translation: Translation
+
+    /// 개역개정 창세기 1장. 저장값이 없을 때의 옛 기본값이다 — 처음 설치 기본값은 `initial(preferredLanguages:)` 다.
     public static let initialState = BibleChapter.init(title: .genesis, chapter: 1)
-    
-    public init(title: BibleTitle, chapter: Int) {
+
+    public init(title: BibleTitle, chapter: Int, translation: Translation = .NKRV) {
         self.title = title
         self.chapter = chapter
+        self.translation = translation
+    }
+
+    /// 역할: 처음 설치했을 때 열 장을 정한다(영어 현지화 결정 4).
+    /// 입력 · 출력: 기기 선호 언어 목록(`Locale.preferredLanguages`) → 첫 언어가 `"ko"` 로 시작하면 개역개정 창세기 1장,
+    ///   아니면(빈 목록 포함) BSB 창세기 1장. 저장값이 있으면 호출부가 그 값을 그대로 쓴다.
+    /// 부작용: 없음.
+    public static func initial(preferredLanguages: [String]) -> BibleChapter {
+        let isKorean = preferredLanguages.first?.lowercased().hasPrefix("ko") ?? false
+        return BibleChapter(title: .genesis, chapter: 1, translation: isKorean ? .NKRV : .BSB)
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(title)
+        hasher.combine(chapter)
+        hasher.combine(translation)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case title
+        case chapter
+        case translation
+    }
+
+    /// `translation` 키가 없으면 개역개정이다 — 옛 `@Shared("title")` JSON · `-UITestChapter` JSON(`{"title":"1-19Psalms.txt","chapter":119}`)을 그대로 읽는다.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            title: try container.decode(BibleTitle.self, forKey: .title),
+            chapter: try container.decode(Int.self, forKey: .chapter),
+            translation: try container.decodeIfPresent(Translation.self, forKey: .translation) ?? .NKRV
+        )
+    }
+
+    /// 세 키를 모두 쓴다. 구버전은 모르는 `translation` 키를 무시하고 읽는다(합성 Decodable).
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(title, forKey: .title)
+        try container.encode(chapter, forKey: .chapter)
+        try container.encode(translation, forKey: .translation)
     }
 }
 
@@ -289,5 +336,155 @@ public enum BibleTitle: String, CaseIterable, Identifiable, Codable, Sendable {
             return index < 39
         }
         return false
+    }
+}
+
+// MARK: - 권 이름
+
+extension BibleTitle {
+    /// 권 이름을 한 언어로 꺼낸다 — ko 「창세기」 · en 「Genesis」. 권 목록 · 참조(`BibleReference`)에 쓴다.
+    /// 번역본이 아니라 화면 언어를 따른다 — 한국어 화면은 KJV 를 봐도 「창세기」 다. 카탈로그 키는 `koreanTitle()` 의 한국어 원문이다.
+    /// - Parameter locale: 언어를 정할 로케일. 뷰는 환경 locale, 리듀서 · 인프라는 `AppLanguage.displayLocale()` 을 넘긴다.
+    public func localizedName(locale: Locale) -> String {
+        switch self {
+        case .genesis: DomainCatalog.string("창세기", locale: locale)
+        case .exodus: DomainCatalog.string("출애굽기", locale: locale)
+        case .leviticus: DomainCatalog.string("레위기", locale: locale)
+        case .numbers: DomainCatalog.string("민수기", locale: locale)
+        case .deuteronomy: DomainCatalog.string("신명기", locale: locale)
+        case .joshua: DomainCatalog.string("여호수아", locale: locale)
+        case .judges: DomainCatalog.string("사사기", locale: locale)
+        case .ruth: DomainCatalog.string("룻기", locale: locale)
+        case .samuel1: DomainCatalog.string("사무엘상", locale: locale)
+        case .samuel2: DomainCatalog.string("사무엘하", locale: locale)
+        case .kings1: DomainCatalog.string("열왕기상", locale: locale)
+        case .kings2: DomainCatalog.string("열왕기하", locale: locale)
+        case .chronicles1: DomainCatalog.string("역대상", locale: locale)
+        case .chronicles2: DomainCatalog.string("역대하", locale: locale)
+        case .ezra: DomainCatalog.string("에스라", locale: locale)
+        case .nehemiah: DomainCatalog.string("느헤미야", locale: locale)
+        case .esther: DomainCatalog.string("에스더", locale: locale)
+        case .job: DomainCatalog.string("욥기", locale: locale)
+        case .psalms: DomainCatalog.string("시편", locale: locale)
+        case .proverbs: DomainCatalog.string("잠언", locale: locale)
+        case .ecclesiasters: DomainCatalog.string("전도서", locale: locale)
+        case .songOfSongs: DomainCatalog.string("아가", locale: locale)
+        case .isaiah: DomainCatalog.string("이사야", locale: locale)
+        case .jeremiah: DomainCatalog.string("예레미야", locale: locale)
+        case .lamentations: DomainCatalog.string("예레미야 애가", locale: locale)
+        case .ezekiel: DomainCatalog.string("에스겔", locale: locale)
+        case .daniel: DomainCatalog.string("다니엘", locale: locale)
+        case .hosea: DomainCatalog.string("호세아", locale: locale)
+        case .joel: DomainCatalog.string("요엘", locale: locale)
+        case .amos: DomainCatalog.string("아모스", locale: locale)
+        case .obadiah: DomainCatalog.string("오바댜", locale: locale)
+        case .jonah: DomainCatalog.string("요나", locale: locale)
+        case .micah: DomainCatalog.string("미가", locale: locale)
+        case .nahum: DomainCatalog.string("나훔", locale: locale)
+        case .habakkuk: DomainCatalog.string("하박국", locale: locale)
+        case .zephaniah: DomainCatalog.string("스바냐", locale: locale)
+        case .haggai: DomainCatalog.string("학개", locale: locale)
+        case .zechariah: DomainCatalog.string("스가랴", locale: locale)
+        case .malachi: DomainCatalog.string("말라기", locale: locale)
+        case .matthew: DomainCatalog.string("마태복음", locale: locale)
+        case .mark: DomainCatalog.string("마가복음", locale: locale)
+        case .luke: DomainCatalog.string("누가복음", locale: locale)
+        case .john: DomainCatalog.string("요한복음", locale: locale)
+        case .acts: DomainCatalog.string("사도행전", locale: locale)
+        case .romans: DomainCatalog.string("로마서", locale: locale)
+        case .corinthians1: DomainCatalog.string("고린도전서", locale: locale)
+        case .corinthians2: DomainCatalog.string("고린도후서", locale: locale)
+        case .galatians: DomainCatalog.string("갈라디아서", locale: locale)
+        case .ephesians: DomainCatalog.string("에베소서", locale: locale)
+        case .philippians: DomainCatalog.string("빌립보서", locale: locale)
+        case .colossians: DomainCatalog.string("골로새서", locale: locale)
+        case .thessalonians1: DomainCatalog.string("데살로니가전서", locale: locale)
+        case .thessalonians2: DomainCatalog.string("데살로니가후서", locale: locale)
+        case .timothy1: DomainCatalog.string("디모데전서", locale: locale)
+        case .timothy2: DomainCatalog.string("디모데후서", locale: locale)
+        case .titus: DomainCatalog.string("디도서", locale: locale)
+        case .philemon: DomainCatalog.string("빌레몬서", locale: locale)
+        case .hebrews: DomainCatalog.string("히브리서", locale: locale)
+        case .james: DomainCatalog.string("야고보서", locale: locale)
+        case .peter1: DomainCatalog.string("베드로전서", locale: locale)
+        case .peter2: DomainCatalog.string("베드로후서", locale: locale)
+        case .john1: DomainCatalog.string("요한일서", locale: locale)
+        case .john2: DomainCatalog.string("요한이서", locale: locale)
+        case .john3: DomainCatalog.string("요한삼서", locale: locale)
+        case .jude: DomainCatalog.string("유다서", locale: locale)
+        case .revelation: DomainCatalog.string("요한계시록", locale: locale)
+        }
+    }
+
+    /// 권 검색용 고정 영문 이름(Genesis … 1 Samuel … Song of Solomon … Revelation). 앱 언어와 상관없이 같다.
+    public var englishName: String {
+        switch self {
+        case .genesis: "Genesis"
+        case .exodus: "Exodus"
+        case .leviticus: "Leviticus"
+        case .numbers: "Numbers"
+        case .deuteronomy: "Deuteronomy"
+        case .joshua: "Joshua"
+        case .judges: "Judges"
+        case .ruth: "Ruth"
+        case .samuel1: "1 Samuel"
+        case .samuel2: "2 Samuel"
+        case .kings1: "1 Kings"
+        case .kings2: "2 Kings"
+        case .chronicles1: "1 Chronicles"
+        case .chronicles2: "2 Chronicles"
+        case .ezra: "Ezra"
+        case .nehemiah: "Nehemiah"
+        case .esther: "Esther"
+        case .job: "Job"
+        case .psalms: "Psalms"
+        case .proverbs: "Proverbs"
+        case .ecclesiasters: "Ecclesiastes"
+        case .songOfSongs: "Song of Solomon"
+        case .isaiah: "Isaiah"
+        case .jeremiah: "Jeremiah"
+        case .lamentations: "Lamentations"
+        case .ezekiel: "Ezekiel"
+        case .daniel: "Daniel"
+        case .hosea: "Hosea"
+        case .joel: "Joel"
+        case .amos: "Amos"
+        case .obadiah: "Obadiah"
+        case .jonah: "Jonah"
+        case .micah: "Micah"
+        case .nahum: "Nahum"
+        case .habakkuk: "Habakkuk"
+        case .zephaniah: "Zephaniah"
+        case .haggai: "Haggai"
+        case .zechariah: "Zechariah"
+        case .malachi: "Malachi"
+        case .matthew: "Matthew"
+        case .mark: "Mark"
+        case .luke: "Luke"
+        case .john: "John"
+        case .acts: "Acts"
+        case .romans: "Romans"
+        case .corinthians1: "1 Corinthians"
+        case .corinthians2: "2 Corinthians"
+        case .galatians: "Galatians"
+        case .ephesians: "Ephesians"
+        case .philippians: "Philippians"
+        case .colossians: "Colossians"
+        case .thessalonians1: "1 Thessalonians"
+        case .thessalonians2: "2 Thessalonians"
+        case .timothy1: "1 Timothy"
+        case .timothy2: "2 Timothy"
+        case .titus: "Titus"
+        case .philemon: "Philemon"
+        case .hebrews: "Hebrews"
+        case .james: "James"
+        case .peter1: "1 Peter"
+        case .peter2: "2 Peter"
+        case .john1: "1 John"
+        case .john2: "2 John"
+        case .john3: "3 John"
+        case .jude: "Jude"
+        case .revelation: "Revelation"
+        }
     }
 }

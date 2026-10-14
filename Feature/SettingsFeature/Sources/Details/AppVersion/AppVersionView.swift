@@ -16,6 +16,8 @@ import UIComponents
 /// 설정 → 앱 버전. 다른 설정 화면과 같은 틀(제목 한 줄 · 설정 묶음 · 값을 오른쪽에 적는 행)로 둔다(시안 F 「앱 버전 · 값」).
 public struct AppVersionView: View {
     @Bindable private var store: StoreOf<AppVersionFeature>
+    /// 화면 언어 — 앱 안에서 언어를 고르면 미리 만드는 문구(묶음 제목 · 행 이름)도 바로 따라온다(즉시 전환 단계 3).
+    @Environment(\.locale) private var locale
 
     public init(store: StoreOf<AppVersionFeature>) {
         self.store = store
@@ -31,6 +33,8 @@ public struct AppVersionView: View {
             switch store.case {
             case .lisence(let store):
                 LisenceView(store: store)
+            case .bibleSource(let store):
+                BibleSourceView(store: store)
             }
         }
     }
@@ -38,7 +42,7 @@ public struct AppVersionView: View {
     private var content: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: CarveSpacing.large) {
-                Text("앱 버전")
+                Text("앱 버전", bundle: .module)
                     .font(CarveTypography.sectionTitle)
                     .foregroundStyle(CarveColor.secondary)
 
@@ -46,14 +50,15 @@ public struct AppVersionView: View {
 
                 CarveDivider()
 
-                CarveSettingsSection("앱 정보") {
-                    CarveSettingsRow("버전", value: UIDevice.appVersion())
+                CarveSettingsSection(SettingsCatalog.string("앱 정보", locale: locale)) {
+                    CarveSettingsRow(SettingsCatalog.string("버전", locale: locale), value: UIDevice.appVersion())
                     #if DEBUG
                     // 개발 빌드에서만 — 어느 빌드를 시험하는지 가린다. 출시 빌드에는 보이지 않는다.
                     if let build = Self.buildNumber {
                         CarveSettingsRow("빌드", value: build)
                     }
                     #endif
+                    bibleSourceRow
                 }
             }
             .padding(CarveSpacing.large)
@@ -61,6 +66,22 @@ public struct AppVersionView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(CarveColor.surface)
+    }
+
+    /// 「성경 본문 출처」 로 들어가는 행 — 번역본마다 이름 · 판 · 권리 · 출처(영어 현지화 결정 11).
+    private var bibleSourceRow: some View {
+        Button {
+            store.send(.pushToBibleSource)
+        } label: {
+            CarveSettingsRow(BibleSourceCopy.title(locale: locale)) {
+                Image(systemName: "chevron.right")
+                    .font(CarveTypography.label)
+                    .foregroundStyle(CarveColor.secondary)
+                    .accessibilityHidden(true)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     /// 앱 아이콘과 이름 · 버전.
@@ -77,10 +98,10 @@ public struct AppVersionView: View {
                 }
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: CarveSpacing.xxSmall) {
-                Text("새기다")
+                Text("새기다", bundle: .module)
                     .font(CarveTypography.title)
                     .foregroundStyle(CarveColor.ink)
-                Text("버전 \(UIDevice.appVersion())")
+                Text("버전 \(UIDevice.appVersion())", bundle: .module)
                     .font(CarveTypography.body)
                     .foregroundStyle(CarveColor.secondary)
             }

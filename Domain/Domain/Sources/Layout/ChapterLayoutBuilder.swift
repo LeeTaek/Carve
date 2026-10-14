@@ -45,7 +45,7 @@ public struct VerseLayoutInput: Equatable, Sendable {
     /// `layout → totalHeight → contentSize/호스트 높이 → 컬럼 → 행 높이 → layout` 이 닫힌 고리가 될 수 있지만,
     /// ① 호스트 frame 높이는 `totalHeight` 가 아니라 **컬럼이 스스로 보고한 높이**이고
     /// ② 컬럼은 `ChapterCanvasView.hostedColumn` 의 `.fixedSize(horizontal: false, vertical: true)` 로 고정돼
-    /// 제안된 높이를 먹지 않으므로 행 높이가 제안에 의존하지 않는다 (N-Canvas 는 `ScrollView` 가 무한 높이를 제안해 애초에 없다).
+    /// 제안된 높이를 먹지 않으므로 행 높이가 제안에 의존하지 않는다.
     /// 그 `fixedSize` 를 없애면 고리가 닫히고 R16 이 되살아난다.
     public let measuredHeight: CGFloat?
     /// 절 **위**에 놓이는 추가 여백 (Phase 2 — 실측 파이프라인에서 추가).
@@ -57,9 +57,9 @@ public struct VerseLayoutInput: Equatable, Sendable {
     /// `writingRect` **안**에 포함되는 상단 여백 (Phase 2 — 실측 파이프라인에서 추가).
     ///
     /// 밑줄 anchor 는 이 값 아래에서 시작한다. 즉 근사 anchor 는 `topPadding + (index + 1) × lineSpace` 다.
-    /// 현재 N-Canvas 구조에서 장의 첫 절이 갖는 상단 여백 25pt 가 여기에 해당한다 —
-    /// 그 여백은 절의 캔버스 **안**에 있어서 legacy 절-로컬 좌표가 그만큼 아래에서 시작하므로,
-    /// `writingRect` 밖으로 빼면 legacy 데이터가 25pt 위로 밀려 보인다.
+    /// 장의 첫 절 상단 여백(CarveFeature `ChapterLayoutHosting.firstVerseTopPadding`)이 여기에 해당한다 —
+    /// 1.x 의 절별 캔버스(N-Canvas)는 그 여백(25pt)이 1절 캔버스 **안**에 있어서 legacy 절-로컬 좌표가 그만큼 아래에서 시작하므로,
+    /// `writingRect` 밖으로 빼면 legacy 데이터가 25pt 위로 밀려 보인다. 2.0 부터 값은 0 이다(열 라벨 줄이 그 간격을 맡는다).
     public let topPadding: CGFloat
 
     public init(

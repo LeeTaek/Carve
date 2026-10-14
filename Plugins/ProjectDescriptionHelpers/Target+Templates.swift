@@ -103,7 +103,7 @@ public extension Target {
             bundleId: bundleID + ".\(projName).Test",
             deploymentTargets: deploymentTarget,
             infoPlist: infoPlist,
-            sources: ["Tests/**"],
+            sources: testSources ?? ["Tests/**"],
             scripts: script,
             dependencies: dependencies
         )

@@ -23,7 +23,7 @@ public struct RemoveAdsFeature {
     public init() { }
 
     @ObservableState
-    public struct State: Hashable {
+    public struct State: Hashable, Sendable {
         public static let initialState = Self()
         /// 광고 제거를 샀는지
         public var isAdFree = false

@@ -91,7 +91,7 @@ public struct DrawingEditEnvironment: Equatable, Sendable {
 }
 
 /// 캔버스 초안 밖에서 동기화 저장소(`BibleDrawing` · `FavoriteVerse`)에 바로 쓰는 경로를 막는 사유 — 즐겨찾기 추가 · 해제 · 되돌리기,
-/// 위젯에 담으며 즐겨찾기로 보관, N-Canvas 저장 (정책 §12-6 결정 1, 2026-09-18).
+/// 위젯에 담으며 즐겨찾기로 보관 (정책 §12-6 결정 1, 2026-09-18).
 ///
 /// 소유가 확인된 유효 환경에서만 쓴다. 로그아웃 · 미확인 상태의 직접 동기화 쓰기는 계속 막는다.
 /// 메뉴만이 아니라 실제 쓰기 직전에 다시 본다.
@@ -133,7 +133,7 @@ public enum SyncedWriteBlock: Hashable, Sendable {
 /// (저장소 쓰기 · 이어 쓰기 · 전환 때 초안 보존)를 재현할 뿐이다. DEBUG 빌드 · 시뮬레이터 · 시험(dev) 컨테이너 · 실행 인자가 모두 맞을 때만
 /// 켜진다. 이 판정과 앱의 분기는 `#if DEBUG` 안이라 **Release 에는 켜는 경로가 없다** — 환경 쪽 분기(`injectsOwnership`)는 남지만 값이 늘 false 다(11차 리뷰 P2).
 public enum StoreOwnershipInjection {
-    public static let launchArgument = "-ACC1InjectStoreOwnership"
+    public static let launchArgument = LaunchArgument.acc1InjectStoreOwnership
 
     public static func isEnabled(containerID: ContainerID, arguments: [String] = ProcessInfo.processInfo.arguments) -> Bool {
         #if targetEnvironment(simulator)
@@ -221,8 +221,9 @@ public final class LiveDrawingEditEnvironment: DrawingEditEnvironmentClient, @un
 
     /// 계정 변경 알림을 구독하고 계정을 확인한다. 앱이 시작할 때 한 번 부른다.
     public func start() async {
-        lock.lock()
-        if observation == nil {
+        // async 함수 안에서는 lock()/unlock() 대신 withLock 으로 잠근다(Swift 6).
+        lock.withLock {
+            guard observation == nil else { return }
             // ★ 알림을 **동기로** 구독한다 — 확인하는 동안 온 알림을 놓치지 않는다.
             observation = notificationCenter.addObserver(forName: .CKAccountChanged, object: nil, queue: nil) { [weak self] _ in
                 self?.accountChangeNotified()
@@ -234,7 +235,6 @@ public final class LiveDrawingEditEnvironment: DrawingEditEnvironmentClient, @un
                 Task { await self.reevaluate() }
             }
         }
-        lock.unlock()
         await provider.refresh()
         notifySubscribers()
     }
@@ -258,9 +258,7 @@ public final class LiveDrawingEditEnvironment: DrawingEditEnvironmentClient, @un
 
     private func applyAccountChange() async {
         await provider.invalidate()
-        lock.lock()
-        unappliedNotifications -= 1
-        lock.unlock()
+        lock.withLock { unappliedNotifications -= 1 }
         notifySubscribers()
         await provider.refresh()
         notifySubscribers()

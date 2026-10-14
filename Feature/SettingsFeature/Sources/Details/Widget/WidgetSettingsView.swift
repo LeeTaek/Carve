@@ -16,6 +16,8 @@ import UIComponents
 @ViewAction(for: WidgetSettingsFeature.self)
 public struct WidgetSettingsView: View {
     @Bindable public var store: StoreOf<WidgetSettingsFeature>
+    /// 화면 언어 — 앱 안에서 언어를 고르면 참조(권 이름 · 장절) · 번역본 약칭 · 빈 상태 문구도 바로 따라온다(즉시 전환 단계 3).
+    @Environment(\.locale) private var locale
 
     public init(store: StoreOf<WidgetSettingsFeature>) {
         self.store = store
@@ -53,10 +55,10 @@ public struct WidgetSettingsView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: CarveSpacing.xxSmall) {
-            Text("위젯에 담은 말씀")
+            Text("위젯에 담은 말씀", bundle: .module)
                 .font(CarveTypography.sectionTitle)
                 .foregroundStyle(CarveColor.secondary)
-            Text("즐겨찾기에서 고른 말씀을 홈 화면에 띄워요. 여러 개를 담으면 한 시간에 하나씩 돌아가며 보여요.")
+            Text("즐겨찾기에서 고른 말씀을 홈 화면에 띄워요. 여러 개를 담으면 한 시간에 하나씩 돌아가며 보여요.", bundle: .module)
                 .font(CarveTypography.body)
                 .foregroundStyle(CarveColor.ink)
                 .fixedSize(horizontal: false, vertical: true)
@@ -68,7 +70,7 @@ public struct WidgetSettingsView: View {
     /// 지금 담긴 말씀들(시안 N7).
     private var selectedCard: some View {
         VStack(alignment: .leading, spacing: CarveSpacing.medium) {
-            Text("\(store.selected.count)개 담김 · 최대 \(WidgetVerseLimit.maximum)개")
+            Text("\(store.selected.count)개 담김 · 최대 \(WidgetVerseLimit.maximum)개", bundle: .module)
                 .font(CarveTypography.label)
                 .foregroundStyle(CarveColor.secondary)
 
@@ -79,13 +81,17 @@ public struct WidgetSettingsView: View {
             }
 
             HStack(spacing: CarveSpacing.medium) {
-                Button("담은 말씀 고르기") {
+                Button {
                     send(.changeTapped)
+                } label: {
+                    Text("담은 말씀 고르기", bundle: .module)
                 }
                 .buttonStyle(.carve(.secondary))
 
-                Button("위젯에서 모두 빼기") {
+                Button {
                     send(.clearTapped)
+                } label: {
+                    Text("위젯에서 모두 빼기", bundle: .module)
                 }
                 .buttonStyle(.plain)
                 .font(CarveTypography.body)
@@ -102,7 +108,7 @@ public struct WidgetSettingsView: View {
 
     private func selectedRow(_ favorite: FavoriteVerseSnapshot) -> some View {
         VStack(alignment: .leading, spacing: CarveSpacing.xxSmall) {
-            Text(Self.referenceText(favorite.key))
+            Text(Self.referenceText(favorite.key, showsTranslation: true, locale: locale))
                 .font(CarveTypography.body)
                 .foregroundStyle(CarveColor.ink)
             Text(favorite.sentence)
@@ -117,9 +123,9 @@ public struct WidgetSettingsView: View {
     /// 아직 고르지 않았을 때.
     private var emptyCard: some View {
         CarveEmptyState(
-            "아직 담은 말씀이 없어요",
-            message: "즐겨찾기에서 말씀을 골라 홈 화면에 띄워요.",
-            actionTitle: "담을 말씀 고르기"
+            SettingsCatalog.string("아직 담은 말씀이 없어요", locale: locale),
+            message: SettingsCatalog.string("즐겨찾기에서 말씀을 골라 홈 화면에 띄워요.", locale: locale),
+            actionTitle: SettingsCatalog.string("담을 말씀 고르기", locale: locale)
         ) {
             send(.changeTapped)
         }
@@ -129,16 +135,16 @@ public struct WidgetSettingsView: View {
     /// 앱에서 고르는 것과 홈 화면에 위젯을 두는 것은 별개다(시안 N7).
     private var homeScreenGuide: some View {
         VStack(alignment: .leading, spacing: CarveSpacing.small) {
-            Text("홈 화면에 위젯을 추가해 주세요")
+            Text("홈 화면에 위젯을 추가해 주세요", bundle: .module)
                 .font(.headline)
                 .foregroundStyle(CarveColor.ink)
-            Text("홈 화면을 길게 누르고 위젯 추가에서 새기다를 찾아 주세요.")
+            Text("홈 화면을 길게 누르고 위젯 추가에서 새기다를 찾아 주세요.", bundle: .module)
                 .font(CarveTypography.body)
                 .foregroundStyle(CarveColor.ink)
-            Text("앱에서 말씀을 골라도 홈 화면 위젯이 자동으로 생기지는 않아요.")
+            Text("앱에서 말씀을 골라도 홈 화면 위젯이 자동으로 생기지는 않아요.", bundle: .module)
                 .font(CarveTypography.label)
                 .foregroundStyle(CarveColor.secondary)
-            Text("담은 말씀은 홈 화면의 새기다 위젯에 함께 적용되고, 한 시간마다 차례가 넘어가요.")
+            Text("담은 말씀은 홈 화면의 새기다 위젯에 함께 적용되고, 한 시간마다 차례가 넘어가요.", bundle: .module)
                 .font(CarveTypography.label)
                 .foregroundStyle(CarveColor.secondary)
         }
@@ -155,9 +161,9 @@ public struct WidgetSettingsView: View {
             Group {
                 if store.favorites.isEmpty {
                     CarveEmptyState(
-                        "아직 즐겨찾기한 말씀이 없어요",
-                        message: "필사 화면에서 절을 길게 눌러 즐겨찾기에 추가해 보세요.",
-                        actionTitle: "닫기"
+                        SettingsCatalog.string("아직 즐겨찾기한 말씀이 없어요", locale: locale),
+                        message: SettingsCatalog.string("필사 화면에서 절을 길게 눌러 즐겨찾기에 추가해 보세요.", locale: locale),
+                        actionTitle: SettingsCatalog.string("닫기", locale: locale)
                     ) {
                         send(.setPickerPresented(false))
                     }
@@ -165,7 +171,7 @@ public struct WidgetSettingsView: View {
                 } else {
                     ScrollView {
                         VStack(alignment: .leading, spacing: CarveSpacing.medium) {
-                            Text("\(store.pickerSelection.count) / \(WidgetVerseLimit.maximum)개 선택 · 적용을 누르면 위젯이 바뀌어요.")
+                            Text("\(store.pickerSelection.count) / \(WidgetVerseLimit.maximum)개 선택 · 적용을 누르면 위젯이 바뀌어요.", bundle: .module)
                                 .font(CarveTypography.label)
                                 .foregroundStyle(CarveColor.secondary)
                             ForEach(store.favorites) { favorite in
@@ -184,17 +190,21 @@ public struct WidgetSettingsView: View {
                 }
             }
             .background(CarveColor.surface)
-            .navigationTitle("위젯에 담을 말씀")
+            .navigationTitle(Text("위젯에 담을 말씀", bundle: .module))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("취소") {
+                    Button {
                         send(.setPickerPresented(false))
+                    } label: {
+                        Text("취소", bundle: .module)
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("적용") {
+                    Button {
                         send(.pickerApplyTapped)
+                    } label: {
+                        Text("적용", bundle: .module)
                     }
                 }
             }
@@ -221,10 +231,10 @@ public struct WidgetSettingsView: View {
             .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: CarveSpacing.xxSmall) {
-                Text(Self.referenceText(favorite.key))
+                Text(Self.referenceText(favorite.key, showsTranslation: false, locale: locale))
                     .font(CarveTypography.body)
                     .foregroundStyle(CarveColor.ink)
-                Text(favorite.key.translation.displayName)
+                Text(favorite.key.translation.displayName(locale: locale))
                     .font(CarveTypography.caption)
                     .foregroundStyle(CarveColor.secondary)
                 Text(favorite.sentence)
@@ -243,8 +253,9 @@ public struct WidgetSettingsView: View {
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
 
-    /// 「시편 23장 1절」. 장 단위는 필사 화면 헤더 · 즐겨찾기 목록과 같은 「장」 이다.
-    static func referenceText(_ key: FavoriteVerseKey) -> String {
-        "\(key.chapter.title.koreanTitle()) \(key.chapter.chapter)장 \(key.verse)절"
+    /// 「시편 23장 1절 · KJV」 · 「Psalm 23:1 · KJV」 — 화면 언어의 참조(`BibleReference`, 영어 현지화 결정 3 · 11). 뷰는 환경 `locale` 을 넘긴다.
+    /// 담긴 말씀 목록은 번역본이 섞여 약칭을 붙이고, 고르기 시트는 약칭을 아랫줄에 따로 적어 붙이지 않는다.
+    static func referenceText(_ key: FavoriteVerseKey, showsTranslation: Bool, locale: Locale) -> String {
+        BibleReference(chapter: key.chapter, verse: key.verse, showsTranslation: showsTranslation).text(locale: locale)
     }
 }

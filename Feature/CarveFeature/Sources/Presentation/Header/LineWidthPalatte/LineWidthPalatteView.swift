@@ -16,6 +16,8 @@ import UIComponents
 @ViewAction(for: LineWidthPalatteFeature.self)
 public struct LineWidthPalatteView: View {
     @Bindable public var store: StoreOf<LineWidthPalatteFeature>
+    /// 화면 언어 — 제목 · 슬라이더 이름을 이 값으로 만든다(즉시 전환 단계 3).
+    @Environment(\.locale) private var locale
 
     public init(store: StoreOf<LineWidthPalatteFeature>) {
         self.store = store
@@ -23,8 +25,8 @@ public struct LineWidthPalatteView: View {
 
     public var body: some View {
         VStack(spacing: 0) {
-            CarvePanelHeader("펜 굵기") {
-                Button("완료") { send(.done) }
+            CarvePanelHeader(CarveFeatureCatalog.string("펜 굵기", locale: locale)) {
+                Button { send(.done) } label: { Text("완료", bundle: .module) }
                     .font(CarveTypography.body)
                     .foregroundStyle(CarveColor.accent)
                     .buttonStyle(.plain)
@@ -32,14 +34,14 @@ public struct LineWidthPalatteView: View {
             }
 
             VStack(alignment: .leading, spacing: CarveSpacing.medium) {
-                Text("굵기를 눌러 고르고, 아래에서 세밀하게 맞춰요.")
+                Text("굵기를 눌러 고르고, 아래에서 세밀하게 맞춰요.", bundle: .module)
                     .font(CarveTypography.label)
                     .foregroundStyle(CarveColor.secondary)
 
                 quickPicks
 
                 CarveLabeledSlider(
-                    "굵기 조절",
+                    CarveFeatureCatalog.string("굵기 조절", locale: locale),
                     value: $store.lineWidth.sending(\.setWidth),
                     in: LineWidthPalatteFeature.widthRange,
                     step: LineWidthPalatteFeature.widthStep,
@@ -86,7 +88,7 @@ public struct LineWidthPalatteView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("굵기 \(Self.millimeters(width))")
+                .accessibilityLabel(Text("굵기 \(Self.millimeters(width))", bundle: .module))
                 .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
             }
         }

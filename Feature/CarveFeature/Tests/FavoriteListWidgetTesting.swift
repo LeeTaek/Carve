@@ -16,9 +16,10 @@ import ComposableArchitecture
 @Suite("N6 · N9 — 즐겨찾기 목록의 위젯 담기")
 @MainActor
 struct FavoriteListWidgetTesting {
-    private static let chapter = BibleChapter(title: .psalms, chapter: 23)
-    private static let first = FavoriteVerseKey(chapter: chapter, verse: 1)
-    private static let second = FavoriteVerseKey(chapter: chapter, verse: 2)
+    // `LockIsolated.setValue` 의 Sendable 클로저에서 읽으므로 MainActor 에 두지 않는다(값 타입 상수).
+    private nonisolated static let chapter = BibleChapter(title: .psalms, chapter: 23)
+    private nonisolated static let first = FavoriteVerseKey(chapter: chapter, verse: 1)
+    private nonisolated static let second = FavoriteVerseKey(chapter: chapter, verse: 2)
 
     private static func favorite(_ key: FavoriteVerseKey, at seconds: TimeInterval) -> FavoriteVerseSnapshot {
         FavoriteVerseSnapshot(

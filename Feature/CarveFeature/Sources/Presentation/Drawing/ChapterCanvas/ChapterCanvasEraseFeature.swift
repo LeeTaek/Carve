@@ -10,6 +10,7 @@
 //
 
 import CarveToolkit
+import ClientInterfaces
 import Domain
 import Foundation
 
@@ -163,33 +164,40 @@ extension ChapterCanvasFeature {
         guard var task = state.eraseTask else { return .none }
         task.phase = .failed
         state.eraseTask = task
-        state.eraseAlert = Self.eraseFailureAlert(chapter: task.chapter, verse: task.verse)
+        // 알림 문구는 띄우는 순간의 화면 언어로 만든다 — 떠 있는 동안 언어를 바꿔도 그대로다(즉시 전환 단계 3).
+        state.eraseAlert = Self.eraseFailureAlert(chapter: task.chapter, verse: task.verse, locale: AppLanguage.displayLocale())
         return .none
     }
 
     /// 확인창. 권·장·절을 함께 보여 주고, 이 장의 undo 가 초기화된다는 것도 함께 알린다 (§9-5 — 조용히 날리지 않는다).
-    static func confirmEraseAlert(chapter: BibleChapter, verse: Int) -> AlertState<Action.EraseAlert> {
-        AlertState {
-            TextState("\(chapter.title.koreanTitle()) \(chapter.chapter)장 \(verse)절 필사 지우기")
+    /// 참조(「창세기 1장 1절」 · 「Genesis 1:1」)는 `BibleReference` 로 짓는다 — 화면 언어를 따른다(영어 현지화 결정 3).
+    /// - Parameter locale: 문구 언어. 리듀서는 띄우는 순간의 `AppLanguage.displayLocale()` 을, 시험은 고른 로케일을 넘긴다.
+    static func confirmEraseAlert(chapter: BibleChapter, verse: Int, locale: Locale) -> AlertState<Action.EraseAlert> {
+        let reference = BibleReference(chapter: chapter, verse: verse).text(locale: locale)
+        return AlertState {
+            TextState(verbatim: CarveFeatureCatalog.string("\(reference) 필사 지우기", locale: locale))
         } actions: {
-            ButtonState(role: .cancel) { TextState("취소") }
-            ButtonState(action: .confirm(verse: verse)) { TextState("지우기") }
+            ButtonState(role: .cancel) { TextState(verbatim: CarveFeatureCatalog.string("취소", locale: locale)) }
+            ButtonState(action: .confirm(verse: verse)) { TextState(verbatim: CarveFeatureCatalog.string("지우기", locale: locale)) }
         } message: {
-            TextState("""
+            TextState(verbatim: CarveFeatureCatalog.string("""
             이 절의 필사를 지울까요? 현재 필사는 이전 필사 기록에 남습니다.
             이 장의 되돌리기 기록은 초기화됩니다.
-            """)
+            """, locale: locale))
         }
     }
 
-    static func eraseFailureAlert(chapter: BibleChapter, verse: Int) -> AlertState<Action.EraseAlert> {
-        AlertState {
-            TextState("필사를 지우지 못했습니다")
+    /// 지우기 실패 확인창. 원래 필기가 그대로라는 것과 다시 시도를 함께 알린다.
+    /// - Parameter locale: 문구 언어. 리듀서는 띄우는 순간의 `AppLanguage.displayLocale()` 을, 시험은 고른 로케일을 넘긴다.
+    static func eraseFailureAlert(chapter: BibleChapter, verse: Int, locale: Locale) -> AlertState<Action.EraseAlert> {
+        let reference = BibleReference(chapter: chapter, verse: verse).text(locale: locale)
+        return AlertState {
+            TextState(verbatim: CarveFeatureCatalog.string("필사를 지우지 못했습니다", locale: locale))
         } actions: {
-            ButtonState(role: .cancel) { TextState("닫기") }
-            ButtonState(action: .retry) { TextState("다시 시도") }
+            ButtonState(role: .cancel) { TextState(verbatim: CarveFeatureCatalog.string("닫기", locale: locale)) }
+            ButtonState(action: .retry) { TextState(verbatim: CarveFeatureCatalog.string("다시 시도", locale: locale)) }
         } message: {
-            TextState("\(chapter.title.koreanTitle()) \(chapter.chapter)장 \(verse)절의 필사는 그대로 있습니다. 다시 시도해 주세요.")
+            TextState(verbatim: CarveFeatureCatalog.string("\(reference)의 필사는 그대로 있습니다. 다시 시도해 주세요.", locale: locale))
         }
     }
 }

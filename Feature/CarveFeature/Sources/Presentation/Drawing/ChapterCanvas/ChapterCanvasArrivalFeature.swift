@@ -77,22 +77,28 @@ enum ArrivalNotice: Equatable, Sendable {
     /// 다시 읽었더니 이 기기의 초안 N개가 자동으로 표시되지 않는다 — 「필기 확인하기」.
     case draftsHidden(count: Int)
 
-    var message: String {
+    /// 역할: 안내 문장. 상태에는 안내의 뜻(`ArrivalNotice`)만 두고 문장은 보일 때 만든다 — 언어를 바꾸면 떠 있는 안내도 바로 바뀐다.
+    /// 입력 · 출력: 로케일(뷰는 환경 locale 을 넘긴다) → 문장.
+    /// 부작용: 없음.
+    func message(locale: Locale) -> String {
         switch self {
-        case .arrived: "다른 필사가 도착했어요"
-        case .confirming: "지금 필기를 보존하고 새로 들어온 필사를 읽는 중이에요"
-        case .reloadFailed: "새로 들어온 필사를 불러오지 못했어요. 지금 화면과 필기는 그대로예요"
-        case .draftsHidden(let count): "이 iPad에서 쓴 필기 \(count)개는 새로 들어온 필사와 기준이 달라 자동으로 표시하지 않아요"
+        case .arrived: CarveFeatureCatalog.string("다른 필사가 도착했어요", locale: locale)
+        case .confirming: CarveFeatureCatalog.string("지금 필기를 보존하고 새로 들어온 필사를 읽는 중이에요", locale: locale)
+        case .reloadFailed: CarveFeatureCatalog.string("새로 들어온 필사를 불러오지 못했어요. 지금 화면과 필기는 그대로예요", locale: locale)
+        case .draftsHidden(let count):
+            CarveFeatureCatalog.string("이 iPad에서 쓴 필기 \(count)개는 새로 들어온 필사와 기준이 달라 자동으로 표시하지 않아요", locale: locale)
         }
     }
 
-    /// 버튼 제목. 없으면 버튼을 두지 않는다.
-    var actionTitle: String? {
+    /// 역할: 버튼 제목. 없으면 버튼을 두지 않는다.
+    /// 입력 · 출력: 로케일(뷰는 환경 locale 을 넘긴다) → 제목, 확인하는 중이면 nil.
+    /// 부작용: 없음.
+    func actionTitle(locale: Locale) -> String? {
         switch self {
-        case .arrived: "확인하기"
+        case .arrived: CarveFeatureCatalog.string("확인하기", locale: locale)
         case .confirming: nil
-        case .reloadFailed: "다시 시도"
-        case .draftsHidden: "필기 확인하기"
+        case .reloadFailed: CarveFeatureCatalog.string("다시 시도", locale: locale)
+        case .draftsHidden: CarveFeatureCatalog.string("필기 확인하기", locale: locale)
         }
     }
 }

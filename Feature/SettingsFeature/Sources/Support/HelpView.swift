@@ -13,6 +13,8 @@ import UIComponents
 @ViewAction(for: HelpFeature.self)
 public struct HelpView: View {
     @Bindable public var store: StoreOf<HelpFeature>
+    /// 화면 언어 — 앱 안에서 언어를 고르면 항목 제목 · 설명도 바로 따라온다(즉시 전환 단계 3).
+    @Environment(\.locale) private var locale
 
     public init(store: StoreOf<HelpFeature>) {
         self.store = store
@@ -21,49 +23,54 @@ public struct HelpView: View {
     public var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: CarveSpacing.large) {
-                Text("도움말")
+                Text("도움말", bundle: .module)
                     .font(CarveTypography.sectionTitle)
                     .foregroundStyle(CarveColor.secondary)
 
                 helpSection(
-                    title: "손가락으로 스크롤",
-                    body: "Apple Pencil은 필사에 쓰고, 화면은 손가락으로 밀어 올려요."
+                    title: SettingsCatalog.string("손가락으로 스크롤", locale: locale),
+                    body: SettingsCatalog.string("Apple Pencil은 필사에 쓰고, 화면은 손가락으로 밀어 올려요.", locale: locale)
                 ) {
                     // 손가락 필사 허용은 설정 패널이 아니라 필사 화면 위 본문 설정에 있다 — 그 버튼 모양을 문장 첫머리에 보여 준다.
                     CarveIconBadgeParagraph(
                         .textFormat,
-                        text: Text("\(Text("(본문 설정)").font(.caption2))에서 「손가락 필사 허용」을 켜면 손가락으로도 필사할 수 있어요. 이때는 두 손가락으로 스크롤해요.")
+                        text: Text(
+                            "\(Text("(본문 설정)", bundle: .module).font(.caption2))에서 「손가락 필사 허용」을 켜면 손가락으로도 필사할 수 있어요. 이때는 두 손가락으로 스크롤해요.",
+                            bundle: .module
+                        )
                     )
                     .font(CarveTypography.caption)
                     .foregroundStyle(CarveColor.secondary)
                     .accessibilityElement(children: .ignore)
-                    .accessibilityLabel("필사 화면 위 본문 설정에서 「손가락 필사 허용」을 켜면 손가락으로도 필사할 수 있어요. 이때는 두 손가락으로 스크롤해요.")
+                    .accessibilityLabel(Text("필사 화면 위 본문 설정에서 「손가락 필사 허용」을 켜면 손가락으로도 필사할 수 있어요. 이때는 두 손가락으로 스크롤해요.", bundle: .module))
                 }
                 indentedDivider
                 helpSection(
-                    title: "절을 길게 눌러 메뉴 열기",
-                    body: "이전 필사 보기 · 이미지 저장 · 위젯에 표시 · 지우기가 나와요."
+                    title: SettingsCatalog.string("절을 길게 눌러 메뉴 열기", locale: locale),
+                    body: SettingsCatalog.string("이전 필사 보기 · 이미지 저장 · 위젯에 표시 · 지우기가 나와요.", locale: locale)
                 )
                 indentedDivider
                 helpSection(
-                    title: "이미지로 저장하기",
-                    body: "본문과 필기를 한 장으로 합쳐 사진에 저장해요."
+                    title: SettingsCatalog.string("이미지로 저장하기", locale: locale),
+                    body: SettingsCatalog.string("본문과 필기를 한 장으로 합쳐 사진에 저장해요.", locale: locale)
                 )
                 indentedDivider
                 helpSection(
-                    title: "위젯에 표시하기",
-                    body: "지정한 순간의 모습이 위젯에 남아요. 홈 화면에 위젯을 먼저 추가해 주세요."
+                    title: SettingsCatalog.string("위젯에 표시하기", locale: locale),
+                    body: SettingsCatalog.string("지정한 순간의 모습이 위젯에 남아요. 홈 화면에 위젯을 먼저 추가해 주세요.", locale: locale)
                 )
 
                 CarveDivider()
 
                 VStack(alignment: .leading, spacing: CarveSpacing.small) {
-                    Text("최초 진입 안내를 다시 보려면")
+                    Text("최초 진입 안내를 다시 보려면", bundle: .module)
                         .font(CarveTypography.caption)
                         .foregroundStyle(CarveColor.secondary)
 
-                    Button("처음부터 다시 보기") {
+                    Button {
                         send(.restartFirstRunGuideTapped)
+                    } label: {
+                        Text("처음부터 다시 보기", bundle: .module)
                     }
                     .buttonStyle(.carve(.secondary))
                 }

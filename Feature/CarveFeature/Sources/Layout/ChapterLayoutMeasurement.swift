@@ -148,7 +148,8 @@ struct ChapterLayoutMeasurement: Equatable, Sendable {
     private(set) var textMeasurements: [Int: VerseTextMeasurement] = [:]
     /// 절별 소제목 높이 (소제목이 있는 절만).
     private(set) var titleHeights: [Int: CGFloat] = [:]
-    /// 절별 저장 band 수 (설계 §6-3 의 `N_saved`). metadata 가 없는 legacy 행은 없다. **레이아웃 입력이 아니다** — HUD 진단(`reflowSlacks`) 전용.
+    /// 절별 저장 band 수 (설계 §6-3 의 `N_saved`). metadata 가 없는 행(v1 · v2)은 없다. **레이아웃 입력이 아니다** — HUD 진단(`reflowSlacks`) 전용.
+    /// 단일 Canvas 가 장의 행을 읽은 뒤(`updateSavedBandCounts`) 채운다.
     private(set) var savedBandCounts: [Int: Int] = [:]
     /// 절별 캔버스 영역의 실측 frame (`ChapterLayoutHosting.coordinateSpaceName` 좌표). **검증 전용.**
     private(set) var measuredFrames: [Int: CGRect] = [:]
@@ -261,8 +262,8 @@ struct ChapterLayoutMeasurement: Equatable, Sendable {
     /// 다시 불러오면(설정 토글에 따른 재로드 등) 기하가 그대로여서 콜백이 다시 오지 않고, 여기서 지운 값은
     /// **아무도 복구할 수 없다.** 그 상태에서는 세 가지가 함께 무너진다 (R24, 2026-09-08 실기기 실측):
     ///
-    /// 1. `measuredFrames` 가 비어 `CarveDetailView.updateActiveCanvases()` 가 항상 즉시 반환한다
-    ///    → N-Canvas 에서 **새 행에 캔버스가 붙지 않아 필기가 보이지 않는다.**
+    /// 1. `measuredFrames` 가 비어 `columnOrigin` 이 nil 이 된다
+    ///    (그때 N-Canvas 에서는 **새 행에 캔버스가 붙지 않아 필기가 보이지 않았다**).
     /// 2. `canvasFramesInRow` 가 비어 레이아웃이 **실측 높이 대신 예측식으로 후퇴**한다 — R13 이 없앤 그 상태다
     ///    (시편 122편 `H` 3016.00 → 2977.00).
     /// 3. `frameDeltas` 가 비어 **Δ 안전망이 눈을 감는다** (`deltaMax=unmeasured`).
@@ -296,6 +297,15 @@ struct ChapterLayoutMeasurement: Equatable, Sendable {
         buildCount = 0
         measureStartedAt = now
         firstBuildDuration = nil
+    }
+
+    /// 장의 행을 읽은 뒤 절별 저장 band 수를 넣는다. HUD slack 진단(`reflowSlacks`) 전용이라 레이아웃을 다시 짓지 않는다.
+    /// - Parameters:
+    ///   - counts: 절 → 저장 band 수. metadata 가 있는 대표 행만.
+    ///   - chapter: 그 행을 읽은 장. 지금 측정 중인 장이 아니면 무시한다(늦게 도착한 이전 장 결과).
+    mutating func updateSavedBandCounts(_ counts: [Int: Int], chapter: BibleChapter) {
+        guard chapter == self.chapter else { return }
+        savedBandCounts = counts
     }
 
     /// 필사 컬럼 폭을 갱신한다.

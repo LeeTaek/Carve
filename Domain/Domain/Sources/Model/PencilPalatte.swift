@@ -7,7 +7,7 @@
 //
 
 import CarveToolkit
-import SwiftUI
+import CoreGraphics
 @preconcurrency import PencilKit
 
 /// 펜 색상, 펜 종류(Pencil/Marker 등), 선 두께 등 펜 설정 모델.

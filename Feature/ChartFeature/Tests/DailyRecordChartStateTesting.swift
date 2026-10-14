@@ -11,6 +11,9 @@ import Testing
 import ComposableArchitecture
 
 struct DailyRecordChartStateTesting {
+    /// 한국어 화면 — 시험 스킴의 언어 · 지역(ko-KR)과 같다.
+    private static let korean = Locale(identifier: "ko_KR")
+
     @Test("가장 오래된 주에서 큰 드래그도 짧은 반동 후 같은 주와 Y축으로 복귀한다")
     @MainActor
     func oldestWeekBouncesWithoutPaging() async {
@@ -69,10 +72,11 @@ struct DailyRecordChartStateTesting {
             scrollPosition: start
         )
 
-        #expect(state.accessibilitySummary.contains("9월 4일부터 9월 10일까지"))
-        #expect(state.accessibilitySummary.contains("모두 12절, 하루 평균 1.7절"))
-        #expect(state.accessibilitySummary.contains("가장 많은 날은 9월 6일 3절"))
-        #expect(state.accessibilitySummary.contains("없는 날은 이틀"))
+        let summary = state.accessibilitySummary(locale: Self.korean)
+        #expect(summary.contains("9월 4일부터 9월 10일까지"))
+        #expect(summary.contains("모두 12절, 하루 평균 1.7절"))
+        #expect(summary.contains("가장 많은 날은 9월 6일 3절"))
+        #expect(summary.contains("없는 날은 이틀"))
     }
 }
 

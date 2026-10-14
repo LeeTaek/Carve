@@ -17,7 +17,7 @@ import ComposableArchitecture
 /// 시안의 0.3 · 0.5 · 0.8 mm 는 비교용 값이고 실제 값은 사용자가 조절한 것을 쓴다(디자인 문서 5장).
 /// 칸을 고르면 그 칸이 선택되고, 슬라이더는 **선택한 칸의 값**을 바꾼다 — 고르는 즉시 펜에 반영한다.
 @Reducer
-public struct LineWidthPalatteFeature {
+public struct LineWidthPalatteFeature: Sendable {
     @ObservableState
     public struct State {
         @Shared(.codableAppStorage("lineWidthSet")) public var lineWidths: [CGFloat] = []

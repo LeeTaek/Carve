@@ -23,7 +23,7 @@ let settings: Settings = .settings(
         .automaticCodeSigning(devTeam: "H4MSW7FUBB")
         .otherLinkerFlags(["-all_load -Objc"])
         .debugInformationFormat(.dwarfWithDsym)
-        .marketingVersion("2.0.0")
+        .marketingVersion("2.1.0")
         .currentProjectVersion("1")
         .merging([
             "ENABLE_USER_SCRIPT_SANDBOXING": "YES",
@@ -59,9 +59,33 @@ let targets: [Target] = [
         bundleId: .defaultBundleID + ".UITests",
         deploymentTargets: .iOS("17.0"),
         infoPlist: .default,
-        sources: ["UITests/**"],
+        sources: [
+            "UITests/**",
+            // 실행 인자 이름은 CarveToolkit 이 갖는다. UI 테스트는 모듈을 링크하지 않고 소스로 함께 컴파일한다.
+            "../../Supports/CarveToolkit/Sources/LaunchArgument/LaunchArgument.swift"
+        ],
         resources: ["Support/Carve.storekit"],
         dependencies: [.target(name: projectName)]
+    ),
+    // 앱 단위 테스트. 호스트 앱 없이 돈다 — 앱 타깃에 의존하지 않고, 시험할 앱 소스만 함께 컴파일한다.
+    // 앱 타깃(Sources)에 새로 만든 파일은 여기서 컴파일되지 않는다. 코디네이터가 쓰는 타입은 아래 파일 안이나 Feature · Supports 모듈에 둔다.
+    .makeTestTarget(
+        projName: projectName,
+        target: .debug,
+        testSources: [
+            "Tests/**",
+            "Sources/Coordinator/AppCoordinatorFeature.swift",
+            "Sources/App/LaunchProgressFeature.swift",
+            "Widget/Shared/VerseWidgetPayload.swift"
+        ],
+        script: [.swiftLint],
+        dependencies: [
+            .CarveFeature,
+            .ChartFeature,
+            .SettingsFeature,
+            .ClientInterfaces,
+            .TCAArchitecture
+        ]
     ),
     // 위젯(시안 N6~N9). 앱이 이 타깃에 의존해야 Tuist 가 PlugIns 에 임베드한다 (WIDGET-0 §1).
     .makeWidgetExtensionTarget(
@@ -73,6 +97,8 @@ let targets: [Target] = [
             // 도는 순서 규칙은 Domain 이 갖고 Domain 테스트가 지킨다. 위젯은 링크하지 않고 소스로 함께 컴파일한다.
             "../../Domain/Domain/Sources/Widget/WidgetVerseRotation.swift"
         ],
+        // 위젯의 현지화 카탈로그(Localizable · InfoPlist). 위젯은 Feature 모듈을 링크하지 않아 자기 번들에 둔다.
+        resources: ["Widget/Resources/**"],
         entitlements: .file(path: .relativeToCurrentFile("Support/CarveWidget.entitlements"))
     ),
     .makeAppTarget(
@@ -95,12 +121,15 @@ let targets: [Target] = [
 /// 시뮬레이터에서 광고 제거 구매를 시험하는 스킴. 실행(Run)은 로컬 StoreKit 설정(`Support/Carve.storekit`)을 쓴다.
 /// 테스트는 `RemoveAdsStoreKitUITests` 를 켠다(`CARVE_STOREKIT_UITEST=1`) — 표준 `Carve-Workspace` 실행에서는 건너뛴다.
 /// Xcode Cloud · 아카이브는 자동 생성되는 `CarveApp` 스킴을 그대로 쓰므로 StoreKit 설정이 섞이지 않는다.
+/// 시험은 자동 스킴(`Project.makeModule` · `Workspace.swift`)과 같이 한국어 · 한국 지역으로 돈다(영어 현지화 결정 6) —
+/// `RemoveAdsStoreKitUITests` 의 한국어 단언이 시뮬레이터 언어와 상관없이 맞는다.
 let storeKitScheme: Scheme = .scheme(
     name: "\(projectName)-StoreKit",
     buildAction: .buildAction(targets: [.target(projectName)]),
     testAction: .targets(
         [.testableTarget(target: .target("\(projectName)UITests"))],
-        arguments: .arguments(environmentVariables: ["CARVE_STOREKIT_UITEST": "1"])
+        arguments: .arguments(environmentVariables: ["CARVE_STOREKIT_UITEST": "1"]),
+        options: .options(language: "ko", region: "KR")
     ),
     runAction: .runAction(
         configuration: .debug,

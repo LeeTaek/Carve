@@ -11,6 +11,9 @@ import Foundation
 import Testing
 
 struct DrawingWeeklySummaryStateTesting {
+    /// 한국어 화면 — 시험 스킴의 언어 · 지역(ko-KR)과 같다.
+    private static let korean = Locale(identifier: "ko_KR")
+
     @Test("현재 주 범위에 포함된 기록만 합계, 평균, 최댓값에 반영한다")
     func currentWeekMetricsIgnoreRecordsOutsideVisibleWeek() {
         let start = makeDate(year: 2026, month: 5, day: 18)
@@ -54,7 +57,7 @@ struct DrawingWeeklySummaryStateTesting {
             DailyRecord(date: start.addingTimeInterval(86_400 * 2), count: 7)
         ]
 
-        #expect(state.weekAverageText == "1.7")
+        #expect(state.weekAverageText(locale: Self.korean) == "1.7")
     }
 
     @Test("현재 주의 일별 권별 횟수를 합산해 가장 많이 필사한 권을 반환한다")
@@ -141,6 +144,49 @@ struct DrawingWeeklySummaryStateTesting {
             #expect(state.topChapter?.chapter == BibleChapter(title: .genesis, chapter: 1))
             #expect(state.topChapter?.count == 5)
         }
+    }
+
+    @Test("같은 장을 KJV 와 개역개정으로 쓴 수는 합치지 않고 따로 견준다")
+    func topChapterCountsTranslationsSeparately() {
+        let start = makeDate(year: 2026, month: 5, day: 18)
+        let john = BibleChapter(title: .john, chapter: 3)
+        let johnKJV = BibleChapter(title: .john, chapter: 3, translation: .KJV)
+        let genesis = BibleChapter(title: .genesis, chapter: 1)
+
+        var state = DrawingWeeklySummaryFeature.State()
+        state.scrollPosition = start
+        // 요한복음 3장은 합치면 6 이지만 번역본마다 3 · 3 이다 — 창세기 4 가 1위다.
+        state.chapterCountsByDay = [
+            start: [john: 2, johnKJV: 1, genesis: 4],
+            makeDate(year: 2026, month: 5, day: 20): [john: 1, johnKJV: 2]
+        ]
+
+        #expect(state.topChapter?.chapter == genesis)
+        #expect(state.topChapter?.count == 4)
+    }
+
+    @Test("같은 장을 여러 번역본으로 같은 수만큼 썼으면 삽입 순서와 무관하게 번역본 순서(개역개정 · KJV · BSB)가 앞선 쪽을 반환한다")
+    func topChapterBreaksTieByTranslationOrder() {
+        let start = makeDate(year: 2026, month: 5, day: 18)
+        let tied = Translation.allCases.map { BibleChapter(title: .john, chapter: 3, translation: $0) }
+
+        for _ in 0..<50 {
+            var counts: [BibleChapter: Int] = [:]
+            for chapter in tied.shuffled() {
+                counts[chapter] = 2
+            }
+            var state = DrawingWeeklySummaryFeature.State()
+            state.scrollPosition = start
+            state.chapterCountsByDay = [start: counts]
+
+            #expect(state.topChapter?.chapter == BibleChapter(title: .john, chapter: 3, translation: .NKRV))
+        }
+
+        // 개역개정이 없으면 KJV 가 BSB 보다 앞선다.
+        var state = DrawingWeeklySummaryFeature.State()
+        state.scrollPosition = start
+        state.chapterCountsByDay = [start: [tied[2]: 2, tied[1]: 2]]
+        #expect(state.topChapter?.chapter.translation == .KJV)
     }
 }
 

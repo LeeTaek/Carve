@@ -15,8 +15,9 @@ import ComposableArchitecture
 ///
 /// - 실패하거나 광고 제거를 사면 자리를 없앤다(시안 K4). 화면은 ``State/hasAd`` · ``State/occupiesSpace`` 로 표시 여부를 정한다.
 /// - 받은 광고는 ``adLifetime`` 뒤 만료된다. 계속 보이는 자리는 바로 새로 받고, 가끔 보이는 자리는 비웠다가 다음에 열 때 받는다.
+/// - 의존성만 가지므로 `Sendable` 이다 — effect 와 `MainActor.assumeIsolated` 안에서 `nativeAdClient` 를 그대로 쓴다.
 @Reducer
-public struct SponsorAdSlotFeature {
+public struct SponsorAdSlotFeature: Sendable {
     /// 네이티브 광고를 받은 뒤 보여줄 수 있는 시간. AdMob 은 1시간이 지나면 만료된다고 안내한다.
     public static let adLifetime: Duration = .seconds(60 * 60)
 

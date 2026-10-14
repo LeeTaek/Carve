@@ -18,6 +18,8 @@ import UIComponents
 struct FavoriteNoticeView: View {
     let notice: CarveDetailFeature.FavoriteNotice
     let onRetry: () -> Void
+    /// 화면 언어 — 안내 문구 · 접근성 알림을 이 값으로 만든다(즉시 전환 단계 3).
+    @Environment(\.locale) private var locale
 
     /// 안내 줄 높이(시안 52pt). 접힌 도구 원과 세로 가운데를 맞출 때 쓴다.
     static let height: CGFloat = 52
@@ -56,25 +58,36 @@ struct FavoriteNoticeView: View {
     private var message: String {
         switch notice {
         case .added:
-            "즐겨찾기에 추가했어요"
+            CarveFeatureCatalog.string("즐겨찾기에 추가했어요", locale: locale)
+        // 3항 연산을 문구 안에 두면 컴파일러가 한쪽 문구만 카탈로그 추출에 넣는다 — 문구마다 따로 부른다.
         case .failed(let change):
-            change.isAdding ? "즐겨찾기에 추가하지 못했어요" : "즐겨찾기를 해제하지 못했어요"
+            if change.isAdding {
+                CarveFeatureCatalog.string("즐겨찾기에 추가하지 못했어요", locale: locale)
+            } else {
+                CarveFeatureCatalog.string("즐겨찾기를 해제하지 못했어요", locale: locale)
+            }
         case let .blocked(change, block):
-            (change.isAdding ? "즐겨찾기에 추가하지 않았어요. " : "즐겨찾기를 해제하지 않았어요. ") + block.reasonText
+            if change.isAdding {
+                CarveFeatureCatalog.string("즐겨찾기에 추가하지 않았어요. \(block.reasonText(locale: locale))", locale: locale)
+            } else {
+                CarveFeatureCatalog.string("즐겨찾기를 해제하지 않았어요. \(block.reasonText(locale: locale))", locale: locale)
+            }
         }
     }
 }
 
 extension SyncedWriteBlock {
-    /// 동기화 저장소에 쓰지 않고 막은 사유 — 안내 문구의 뒷문장(정책 §12-6 결정 1).
-    var reasonText: String {
+    /// 역할: 동기화 저장소에 쓰지 않고 막은 사유 — 안내 문구의 뒷문장(정책 §12-6 결정 1).
+    /// 입력 · 출력: 로케일(안내 문구와 같은 값 — 뷰는 환경 locale 을 넘긴다) → 사유 문장.
+    /// 부작용: 없음.
+    func reasonText(locale: Locale) -> String {
         switch self {
-        case .signedOut: "iCloud 에 로그인하지 않았어요"
-        case .accountUnconfirmed: "iCloud 계정을 확인하는 중이에요"
-        case .ownershipUnverified: "이 기기의 필사가 지금 계정의 것인지 아직 확인하지 못했어요"
-        case .knowledgeUnreadable: "삭제 기록을 읽지 못했어요"
-        case .verseFromOtherSession: "이 절의 필기는 다른 계정 · 확인 전에 쓴 것이에요"
-        case .connectionHeld: "지금은 iCloud 연결이 보류되어 이 기기에만 저장돼요"
+        case .signedOut: CarveFeatureCatalog.string("iCloud 에 로그인하지 않았어요", locale: locale)
+        case .accountUnconfirmed: CarveFeatureCatalog.string("iCloud 계정을 확인하는 중이에요", locale: locale)
+        case .ownershipUnverified: CarveFeatureCatalog.string("이 기기의 필사가 지금 계정의 것인지 아직 확인하지 못했어요", locale: locale)
+        case .knowledgeUnreadable: CarveFeatureCatalog.string("삭제 기록을 읽지 못했어요", locale: locale)
+        case .verseFromOtherSession: CarveFeatureCatalog.string("이 절의 필기는 다른 계정 · 확인 전에 쓴 것이에요", locale: locale)
+        case .connectionHeld: CarveFeatureCatalog.string("지금은 iCloud 연결이 보류되어 이 기기에만 저장돼요", locale: locale)
         }
     }
 }

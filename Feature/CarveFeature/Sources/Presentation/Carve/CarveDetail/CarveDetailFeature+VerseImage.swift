@@ -83,11 +83,15 @@ extension CarveDetailFeature {
         guard let verse = state.sentenceWithDrawingState.first(where: { $0.sentence.verse == handwriting.verse })?.sentence else {
             return .none
         }
+        // 이미지 한 장은 한 언어다 — 요청한 순간의 화면 언어를 한 번 얻어 출처와 카드 문구(렌더러)가 함께 쓴다(즉시 전환 단계 3).
+        let locale = AppLanguage.displayLocale()
+        // 출처의 번역본은 그 절이 든 장(지금 본문)의 번역본이다 — KJV 장의 절은 「… · KJV」(영어 현지화 결정 11).
         let content = VerseImageContent(
             sentence: verse.sentenceScript,
             setting: state.sentenceSetting,
-            reference: VerseImageContent.reference(chapter: verse.title, verse: verse.verse),
-            handwriting: handwriting
+            reference: VerseImageContent.reference(chapter: verse.title, verse: verse.verse, verseEnd: verse.verseEnd, locale: locale),
+            handwriting: handwriting,
+            locale: locale
         )
         return startVerseImageSave(state: &state, content)
     }
@@ -139,12 +143,12 @@ extension CarveDetailFeature {
     /// 사진 추가 권한이 꺼져 있다는 확인창(시안 G2) — 저장을 조용히 실패시키지 않고 어디서 켜는지 말한다.
     static var photoPermissionDeniedAlert: AlertState<Action.PhotoPermissionAlert> {
         AlertState {
-            TextState("사진 접근이 꺼져 있어요")
+            TextState("사진 접근이 꺼져 있어요", bundle: .module)
         } actions: {
-            ButtonState(role: .cancel) { TextState("나중에") }
-            ButtonState(action: .openSettings) { TextState("설정 열기") }
+            ButtonState(role: .cancel) { TextState("나중에", bundle: .module) }
+            ButtonState(action: .openSettings) { TextState("설정 열기", bundle: .module) }
         } message: {
-            TextState("설정에서 사진 추가 권한을 켜면 저장할 수 있어요.")
+            TextState("설정에서 사진 추가 권한을 켜면 저장할 수 있어요.", bundle: .module)
         }
     }
 }

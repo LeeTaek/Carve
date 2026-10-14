@@ -12,7 +12,8 @@ import Dependencies
 
 /// `DrawingActivityRepository` 의 SwiftData 구현.
 ///
-/// 쿼리는 새로 쓰지 않고 `DrawingDatabase` 의 조회를 그대로 불러 스냅샷으로 옮긴다 — 정렬 · 범위 조건이 기존 차트와 같다.
+/// 쿼리는 새로 쓰지 않고 `DrawingDatabase` 의 조회를 그대로 부른다 — 정렬 · 범위 조건이 기존 차트와 같다.
+/// 스냅샷으로 옮기는 일은 actor 안에서 한다(`SwiftDatabaseActor.drawingActivities(in:)` 등). 모델은 actor 밖으로 나오지 않는다.
 public struct SwiftDataDrawingActivityRepository: DrawingActivityRepository {
     private let database: DrawingDatabase
 
@@ -27,16 +28,19 @@ public struct SwiftDataDrawingActivityRepository: DrawingActivityRepository {
     }
 
     public func activities(in range: DateInterval) async throws -> [DrawingActivity] {
-        try await database.fetchDrawings(in: range).map(DrawingActivity.init(drawing:))
+        try await database.fetchDrawings(in: range)
     }
 
     public func recentActivities(limit: Int) async throws -> [DrawingActivity] {
-        try await database.fetchRecentDrawings(limit: limit).map(DrawingActivity.init(drawing:))
+        try await database.fetchRecentDrawings(limit: limit)
     }
 }
 
 extension DrawingActivity {
-    /// 필사 행에서 차트가 읽는 값만 옮긴다.
+    /// 필사 행에서 차트가 읽는 값만 옮긴다. actor 안에서만 부른다.
+    ///
+    /// `titleName` 은 저장값 그대로 옮긴다 — 권 · 번역본은 `chapter` · `translation` 이 `StoredBookKey.decode` 로 푼다.
+    /// 모르는 권 이름의 행도 지금처럼 활동으로 남기고(날짜별 수에 든다), 장별로 셀 때 호출부가 건너뛴다(`chapter` 가 nil).
     init(drawing: BibleDrawing) {
         self.init(
             updateDate: drawing.updateDate,

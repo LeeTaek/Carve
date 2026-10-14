@@ -46,7 +46,8 @@ public struct HeaderFeature {
 
     @ObservableState
     public struct State {
-        @Shared(.codableAppStorage("title")) public var currentTitle: BibleChapter = .initialState
+        /// 지금 장(번역본 포함) — 탐색(`CarveNavigationFeature`)과 같은 공유 값이다. 저장값이 없으면 처음 설치 기본 장이다.
+        @Shared(.codableAppStorage("title")) public var currentTitle: BibleChapter = .firstLaunch
         public var headerHeight: CGFloat
         public var headerOffset: CGFloat
         public var lastHeaderOffset: CGFloat
@@ -72,14 +73,17 @@ public struct HeaderFeature {
             case down
             case none
         }
-        public static let initialState = Self(
-            headerHeight: 0,
-            headerOffset: 0,
-            lastHeaderOffset: 0,
-            shiftOffset: 0,
-            isPaletteExpanded: false,
-            showOnlyTitle: false
-        )
+        /// 팔레트 상태(`PKInkingTool.InkType`)를 담아 Sendable 이 아니므로 저장 프로퍼티 대신 계산 프로퍼티다.
+        public static var initialState: Self {
+            Self(
+                headerHeight: 0,
+                headerOffset: 0,
+                lastHeaderOffset: 0,
+                shiftOffset: 0,
+                isPaletteExpanded: false,
+                showOnlyTitle: false
+            )
+        }
     }
     public enum Action: ViewAction {
         case headerAnimation(CGFloat, CGFloat)
@@ -94,7 +98,8 @@ public struct HeaderFeature {
             case onAppear
             /// 서재 아이콘을 탭해 탐색 열림 상태를 전환한다.
             case libraryDidTapped
-            case titleDidTapped
+            /// 헤더 제목 메뉴에서 번역본을 고름 — 탐색 리듀서가 같은 권 · 장 · 지금 보던 절로 바꾼다(영어 현지화 결정 9 · 19)
+            case translationSelected(Translation)
             case setHeaderHeight(CGFloat)
             /// 하단 접힘 팔레트를 탭해 도구 목록을 펼친다.
             case expandPalette

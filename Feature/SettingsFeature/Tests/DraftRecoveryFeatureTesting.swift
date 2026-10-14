@@ -138,6 +138,8 @@ private final class ControlledEnvironment: DrawingEditEnvironmentClient, @unchec
 @Suite("설정 — 남은 필기")
 @MainActor
 struct DraftRecoveryFeatureTesting {
+    /// 문구를 꺼내는 언어 — 시험 언어(스킴 ko-KR)와 같은 한국어라 기대 문구는 한국어 원문 그대로다.
+    private static let koreanLocale = Locale(identifier: "ko_KR")
 
     private static let accountA = AccountScope(key: "acct-a")
     private static let accountB = AccountScope(key: "acct-b")
@@ -212,7 +214,8 @@ struct DraftRecoveryFeatureTesting {
         let readable = try #require(store.state.buckets.first { $0.scope == Self.accountA })
         #expect(readable.title == "지금 계정")
         #expect(readable.comparedWithStore)
-        #expect(readable.items.map(\.place) == ["창세기 1:3"])
+        // 번역본이 섞이는 목록이지만 개역개정은 약칭을 생략한다(사용자 결정 17).
+        #expect(readable.items.map(\.place) == ["창세기 1장 3절"])
         #expect(readable.items.first?.reason == .storeMoved)
         let unreadable = try #require(store.state.buckets.first { $0.scope == broken })
         #expect(unreadable.readFailed)
@@ -271,7 +274,7 @@ struct DraftRecoveryFeatureTesting {
         #expect(store.state.hiddenCount == 0)
         #expect(store.state.pendingCount == 0)
         #expect(store.state.unopenedCount == 1)
-        let detail = DraftRecoveryCopy.bucketDetail(bucket)
+        let detail = DraftRecoveryCopy.bucketDetail(bucket, locale: Self.koreanLocale)
         #expect(detail.contains("필기 1개"))
         #expect(!detail.contains("확인이 필요한"))
         // 그 묶음의 파일은 이 계정에서 다루지 않는다.
@@ -452,23 +455,28 @@ struct DraftRecoveryFeatureTesting {
     /// "그 장을 다시 열어도 자동으로 표시되지 않는 필기" 다 — 열린 캔버스에 지금 겹쳐 보이는지가 아니다(2026-09-21 후속 리뷰 확정).
     @Test("화면은 「확인이 필요한 필기」 로 부르고, 왜 자동으로 반영하지 않았는지와 무엇을 하면 되는지를 먼저 말한다 — 백업이 아니라는 것도")
     func copySaysWhyItNeedsConfirmation() {
-        #expect(DraftRecoveryCopy.title == "확인이 필요한 필기")
-        #expect(DraftRecoveryCopy.introduction.contains("현재 필사에 반영됐는지 확인이 필요한 내용"))
-        #expect(DraftRecoveryCopy.introduction.contains("자동으로 반영하지 않았어요"))
-        #expect(DraftRecoveryCopy.guidance.contains("사용할 내용을 선택해 주세요"))
-        #expect(DraftRecoveryCopy.storageNote.contains("iCloud 백업을 뜻하지 않아요"))
-        #expect(DraftRecoveryCopy.totalLine(draftCount: 3, draftBytes: 0).contains("남겨 둔 필기 3개"))
+        let locale = Self.koreanLocale
+        #expect(DraftRecoveryCopy.title(locale: locale) == "확인이 필요한 필기")
+        #expect(DraftRecoveryCopy.introduction(locale: locale).contains("현재 필사에 반영됐는지 확인이 필요한 내용"))
+        #expect(DraftRecoveryCopy.introduction(locale: locale).contains("자동으로 반영하지 않았어요"))
+        #expect(DraftRecoveryCopy.guidance(locale: locale).contains("사용할 내용을 선택해 주세요"))
+        #expect(DraftRecoveryCopy.storageNote(locale: locale).contains("iCloud 백업을 뜻하지 않아요"))
+        #expect(DraftRecoveryCopy.totalLine(draftCount: 3, draftBytes: 0, locale: locale).contains("남겨 둔 필기 3개"))
         // 항목마다 그 항목의 까닭만 — 연결 전 필기의 설명이 다른 까닭을 말하지 않는다.
-        #expect(DraftRecoveryCopy.reasonTitle(.beforeConnection) == "iCloud 연결 전에 쓴 필기")
-        #expect(!DraftRecoveryCopy.reasonDetail(.beforeConnection).contains("저장된 내용이 바뀌었"))
-        #expect(DraftRecoveryCopy.reasonTitle(.storeMoved) == "현재 필사와 내용이 달라요")
-        #expect(!DraftRecoveryCopy.reasonDetail(.storeMoved).contains("iCloud 계정을 확인할 수 없었"))
-        for text in [DraftRecoveryCopy.introduction, DraftRecoveryCopy.nothingPending, DraftRecoveryCopy.reasonDetail(.storeMoved)] {
+        #expect(DraftRecoveryCopy.reasonTitle(.beforeConnection, locale: locale) == "iCloud 연결 전에 쓴 필기")
+        #expect(!DraftRecoveryCopy.reasonDetail(.beforeConnection, locale: locale).contains("저장된 내용이 바뀌었"))
+        #expect(DraftRecoveryCopy.reasonTitle(.storeMoved, locale: locale) == "현재 필사와 내용이 달라요")
+        #expect(!DraftRecoveryCopy.reasonDetail(.storeMoved, locale: locale).contains("iCloud 계정을 확인할 수 없었"))
+        let texts = [
+            DraftRecoveryCopy.introduction(locale: locale), DraftRecoveryCopy.nothingPending(locale: locale),
+            DraftRecoveryCopy.reasonDetail(.storeMoved, locale: locale)
+        ]
+        for text in texts {
             #expect(!text.contains("화면에 보이지 않"))
         }
         // 보관만 하는 예전 필기는 확인할 필요가 없다고 말하고, 넣을 수 없는 필기는 그 제한을 말한다.
-        #expect(DraftRecoveryCopy.reasonDetail(.savedEarlier).contains("확인할 필요는 없지만"))
-        #expect(DraftRecoveryCopy.reasonDetail(.undisplayable).contains("넣을 수 없어요"))
+        #expect(DraftRecoveryCopy.reasonDetail(.savedEarlier, locale: locale).contains("확인할 필요는 없지만"))
+        #expect(DraftRecoveryCopy.reasonDetail(.undisplayable, locale: locale).contains("넣을 수 없어요"))
     }
 
     @Test("묶음을 펼쳤다 접는다")

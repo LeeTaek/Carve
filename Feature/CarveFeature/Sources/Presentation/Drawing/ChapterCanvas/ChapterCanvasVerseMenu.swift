@@ -7,6 +7,7 @@
 //
 
 import CoreGraphics
+import Domain
 import Foundation
 
 import ComposableArchitecture
@@ -135,5 +136,7 @@ extension ChapterCanvasFeature.Action {
         case widgetRequested(verse: Int, ink: Data?)
         /// 확인이 필요한 필기를 견주고 고르는 자리(설정 → 확인이 필요한 필기)를 열어 달라(정책 §12-6 ④). 캔버스는 넣지 않는다 — 넣기는 그 화면에서 사용자가 고른 절만 한다.
         case draftRecoveryRequested
+        /// 백업 전 flush 의 결과(설계 backup-import-design §5-2) — 요청(`backupFlushRequested`)마다 한 번만 답한다. 코디네이터가 설정의 내보내기로 돌려준다.
+        case backupFlushFinished(id: UUID, outcome: CanvasFlushOutcome)
     }
 }

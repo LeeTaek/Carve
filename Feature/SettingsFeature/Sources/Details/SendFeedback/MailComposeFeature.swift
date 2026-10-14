@@ -14,8 +14,8 @@ import ComposableArchitecture
 @Reducer
 public struct MailComposeFeature {
     @ObservableState
-    public struct State: Equatable, Hashable {
-        public static var initialState = Self(mailInfo: .initialState)
+    public struct State: Equatable, Hashable, Sendable {
+        public static let initialState = Self(mailInfo: .initialState)
         public var isPresent: Bool = false
         public var mailInfo: UserFeedback
         public init(mailInfo: UserFeedback) {

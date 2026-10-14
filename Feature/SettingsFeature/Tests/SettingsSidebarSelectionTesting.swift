@@ -15,28 +15,23 @@ import ComposableArchitecture
 @MainActor
 struct SettingsSidebarSelectionTesting {
     /// 사이드바 `List(selection:)` 은 선택 값을 행의 값과 비교해 선택을 표시한다. 예전에는 경로 상태를 그대로 썼기 때문에
-    /// 상세 화면의 상태가 바뀌는 순간(필사 캔버스 토글 · 광고 제거 상품 불러오기) 행의 값(`.canvas(.initialState)`)과 달라져
-    /// 선택 표시가 풀렸다(2026-09-15 시뮬레이터에서 확인).
+    /// 상세 화면의 상태가 바뀌는 순간(그때는 필사 캔버스 토글 · 광고 제거 상품 불러오기) 행의 값(처음 상태)과 달라져
+    /// 선택 표시가 풀렸다(2026-09-15 시뮬레이터에서 확인). 필사 캔버스 설정은 2.1 에서 지웠으므로 위젯 화면으로 본다.
     @Test("상세 화면의 상태가 바뀌어도 사이드바는 같은 행을 선택한 채로 둔다")
-    func detailStateChangeKeepsSelection() async throws {
-        let suite = "SettingsSidebarSelectionTesting.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite) }
-
-        let store = TestStore(initialState: SettingsFeature.State.initialState(path: .canvas(.initialState))) {
+    func detailStateChangeKeepsSelection() async {
+        let store = TestStore(initialState: SettingsFeature.State.initialState(path: .widget(.initialState))) {
             SettingsFeature()
-        } withDependencies: {
-            $0.defaultAppStorage = defaults
         }
-        var toggled = CanvasSettingsFeature.State()
-        toggled.isSingleCanvasEnabled.toggle()
+        var picking = WidgetSettingsFeature.State()
+        picking.isPickerPresented = true
 
-        await store.send(.path(.presented(.canvas(.view(.setSingleCanvasEnabled(toggled.isSingleCanvasEnabled)))))) {
-            $0.path = .canvas(toggled)
+        // 위젯 화면에서 말씀 고르는 시트를 연다 — 효과 없이 상세 상태만 바뀐다.
+        await store.send(.path(.presented(.widget(.view(.setPickerPresented(true)))))) {
+            $0.path = .widget(picking)
         }
         // 경로 상태는 더 이상 행을 처음 열 때의 값과 같지 않다 — 그래도 선택은 같은 행이다.
-        #expect(store.state.path != .canvas(.initialState))
-        #expect(store.state.selectedSidebarItem == .canvas)
+        #expect(store.state.path != .widget(.initialState))
+        #expect(store.state.selectedSidebarItem == .widget)
     }
 
     @Test("보고 있는 화면의 행을 다시 골라도 상세 상태를 처음으로 되돌리지 않는다")
@@ -73,5 +68,25 @@ struct SettingsSidebarSelectionTesting {
     @Test("사이드바 행마다 자기 화면을 연다", arguments: SettingsFeature.SidebarItem.allCases)
     func everyRowOpensItsOwnScreen(item: SettingsFeature.SidebarItem) {
         #expect(item.initialPath.sidebarItem == item)
+    }
+
+    @Test("「필사 백업」 행은 백업 화면을 처음 상태로 열고, 백업 만들기 흐름 중에 다시 골라도 그대로 둔다")
+    func backupRowOpensBackupScreen() async {
+        let store = TestStore(initialState: SettingsFeature.State.initialState(path: .iCloud(.initialState))) {
+            SettingsFeature()
+        }
+
+        await store.send(.selectSidebarItem(.backup)) {
+            $0.path = .backup(.initialState)
+        }
+        #expect(store.state.selectedSidebarItem == .backup)
+
+        var exporting = BackupFeature.State()
+        exporting.export.step = .password
+        let busy = TestStore(initialState: SettingsFeature.State.initialState(path: .backup(exporting))) {
+            SettingsFeature()
+        }
+        // 상태가 바뀌면 TestStore 가 실패한다 — 쓰던 흐름을 처음으로 되돌리지 않는다.
+        await busy.send(.selectSidebarItem(.backup))
     }
 }

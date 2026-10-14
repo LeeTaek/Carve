@@ -16,19 +16,30 @@ import UIComponents
 struct LoadFailureNoticeView: View {
     let failure: DrawingLoadFailure
     let onRetry: () -> Void
+    /// 화면 언어 — 안내 문구 · 접근성 알림을 이 값으로 만든다(즉시 전환 단계 3).
+    @Environment(\.locale) private var locale
 
     var body: some View {
-        CarveStatusMessage(.failure, message: Self.message(for: failure), onRetry: onRetry)
+        CarveStatusMessage(.failure, message: Self.message(for: failure, locale: locale), onRetry: onRetry)
             .onAppear {
-                AccessibilityNotification.Announcement(Self.message(for: failure)).post()
+                AccessibilityNotification.Announcement(Self.message(for: failure, locale: locale)).post()
             }
     }
 
-    static let message = "이 장의 필사를 불러오지 못했어요"
-    /// 이 기기에 남은 초안을 읽지 못했다 — 그 초안 위에 새 필기가 덮이지 않게 쓸 수 없게 둔다(정책 §12-6 구현 순서 ②).
-    static let draftsMessage = "이 기기에 남은 필기를 불러오지 못했어요"
+    /// 저장소에서 이 장의 필사를 읽지 못했다.
+    static func message(locale: Locale) -> String {
+        CarveFeatureCatalog.string("이 장의 필사를 불러오지 못했어요", locale: locale)
+    }
 
-    static func message(for failure: DrawingLoadFailure) -> String {
-        failure.source == .drafts ? draftsMessage : message
+    /// 이 기기에 남은 초안을 읽지 못했다 — 그 초안 위에 새 필기가 덮이지 않게 쓸 수 없게 둔다(정책 §12-6 구현 순서 ②).
+    static func draftsMessage(locale: Locale) -> String {
+        CarveFeatureCatalog.string("이 기기에 남은 필기를 불러오지 못했어요", locale: locale)
+    }
+
+    /// 역할: 조회 실패 안내 문구 — 무엇을 읽지 못했는지(저장소 · 기기에 남은 초안)에 따라 고른다.
+    /// 입력 · 출력: 조회 실패 · 로케일(뷰는 환경 locale 을 넘긴다) → 문구.
+    /// 부작용: 없음.
+    static func message(for failure: DrawingLoadFailure, locale: Locale) -> String {
+        failure.source == .drafts ? draftsMessage(locale: locale) : message(locale: locale)
     }
 }

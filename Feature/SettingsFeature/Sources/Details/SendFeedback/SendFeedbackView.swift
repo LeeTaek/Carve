@@ -18,6 +18,8 @@ import UIComponents
 @ViewAction(for: SendFeedbackFeature.self)
 public struct SendFeedbackView: View {
     @Bindable public var store: StoreOf<SendFeedbackFeature>
+    /// 화면 언어 — 앱 안에서 언어를 고르면 묶음 제목 · 분류 이름 · 안내 문구도 바로 따라온다(즉시 전환 단계 3).
+    @Environment(\.locale) private var locale
 
     private static let titleLimit = 20
     private static let bodyLimit = 3000
@@ -36,25 +38,25 @@ public struct SendFeedbackView: View {
                     mailUnavailableNotice
                 }
 
-                CarveSettingsSection("문의 분류") {
+                CarveSettingsSection(SettingsCatalog.string("문의 분류", locale: locale)) {
                     feedbackTypeRow
                 }
 
-                CarveSettingsSection("제목") {
+                CarveSettingsSection(SettingsCatalog.string("제목", locale: locale)) {
                     titleField
                 }
 
-                CarveSettingsSection("내용") {
+                CarveSettingsSection(SettingsCatalog.string("내용", locale: locale)) {
                     bodyField
                 }
 
-                CarveSettingsSection("첨부 사진 · 선택") {
+                CarveSettingsSection(SettingsCatalog.string("첨부 사진 · 선택", locale: locale)) {
                     attachmentSection
                 }
 
                 CarveDivider()
 
-                CarveSettingsSection("보내기 전에 확인해 주세요") {
+                CarveSettingsSection(SettingsCatalog.string("보내기 전에 확인해 주세요", locale: locale)) {
                     agreements
                 }
 
@@ -80,7 +82,7 @@ public struct SendFeedbackView: View {
             Image(systemName: "envelope.badge")
                 .foregroundStyle(CarveColor.accent)
                 .accessibilityHidden(true)
-            Text("이 iPad에 메일 계정이 설정돼 있지 않아 지금은 보낼 수 없어요. 설정 앱의 메일에서 계정을 추가하거나 App Store 리뷰로 남겨 주세요.")
+            Text("이 iPad에 메일 계정이 설정돼 있지 않아 지금은 보낼 수 없어요. 설정 앱의 메일에서 계정을 추가하거나 App Store 리뷰로 남겨 주세요.", bundle: .module)
                 .font(CarveTypography.body)
                 .foregroundStyle(CarveColor.ink)
                 .fixedSize(horizontal: false, vertical: true)
@@ -95,10 +97,10 @@ public struct SendFeedbackView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: CarveSpacing.xxSmall) {
-            Text("의견 보내기")
+            Text("의견 보내기", bundle: .module)
                 .font(CarveTypography.sectionTitle)
                 .foregroundStyle(CarveColor.secondary)
-            Text("메일 앱으로 개발자에게 버그 제보나 기능 개선 의견을 보낼 수 있어요. 회신이 필요하면 보내신 메일 주소로 답장해요.")
+            Text("메일 앱으로 개발자에게 버그 제보나 기능 개선 의견을 보낼 수 있어요. 회신이 필요하면 보내신 메일 주소로 답장해요.", bundle: .module)
                 .font(CarveTypography.body)
                 .foregroundStyle(CarveColor.ink)
                 .fixedSize(horizontal: false, vertical: true)
@@ -112,17 +114,16 @@ public struct SendFeedbackView: View {
     /// 분류 — 제목 · 내용 칸과 같은 모양의 선택 칸. 고른 값은 강조색으로 적는다.
     private var feedbackTypeRow: some View {
         Menu {
-            Picker(
-                "문의 분류",
-                selection: $store.feedbackInfo.feedbackType.sending(\.setFeedbackType)
-            ) {
+            Picker(selection: $store.feedbackInfo.feedbackType.sending(\.setFeedbackType)) {
                 ForEach(UserFeedback.FeedbackType.allCases, id: \.self) { type in
-                    Text(type.rawValue)
+                    Text(SendFeedbackFeature.feedbackTypeTitle(type, locale: locale))
                 }
+            } label: {
+                Text("문의 분류", bundle: .module)
             }
         } label: {
             HStack(spacing: CarveSpacing.small) {
-                Text(store.feedbackInfo.feedbackType.rawValue)
+                Text(SendFeedbackFeature.feedbackTypeTitle(store.feedbackInfo.feedbackType, locale: locale))
                     .font(CarveTypography.body)
                     .foregroundStyle(CarveColor.ink)
                 Spacer(minLength: 0)
@@ -136,13 +137,13 @@ public struct SendFeedbackView: View {
             .background(CarveColor.fill, in: fieldShape)
             .contentShape(fieldShape)
         }
-        .accessibilityLabel("문의 분류")
-        .accessibilityValue(store.feedbackInfo.feedbackType.rawValue)
+        .accessibilityLabel(Text("문의 분류", bundle: .module))
+        .accessibilityValue(SendFeedbackFeature.feedbackTypeTitle(store.feedbackInfo.feedbackType, locale: locale))
     }
 
     private var titleField: some View {
         VStack(alignment: .trailing, spacing: CarveSpacing.xxSmall) {
-            TextField("제목을 적어 주세요", text: $store.feedbackInfo.title.sending(\.view.setTitle))
+            TextField(SettingsCatalog.string("제목을 적어 주세요", locale: locale), text: $store.feedbackInfo.title.sending(\.view.setTitle))
                 .font(CarveTypography.body)
                 .foregroundStyle(CarveColor.ink)
                 .onChange(of: store.feedbackInfo.title) { _, newValue in
@@ -171,7 +172,7 @@ public struct SendFeedbackView: View {
                 .padding(CarveSpacing.xSmall)
                 .frame(height: 200)
                 .background(CarveColor.fill, in: fieldShape)
-                .accessibilityLabel("문의 내용")
+                .accessibilityLabel(Text("문의 내용", bundle: .module))
             counter(store.feedbackInfo.body.count, limit: Self.bodyLimit)
         }
     }
@@ -188,7 +189,7 @@ public struct SendFeedbackView: View {
             if !store.feedbackInfo.attachment.isEmpty {
                 selectedImageList
             }
-            Text("사진은 \(Self.attachmentLimit)장까지 붙일 수 있어요.")
+            Text("사진은 \(Self.attachmentLimit)장까지 붙일 수 있어요.", bundle: .module)
                 .font(CarveTypography.caption)
                 .foregroundStyle(CarveColor.secondary)
         }
@@ -200,11 +201,15 @@ public struct SendFeedbackView: View {
                 Button {
                     send(.setAttachment(type))
                 } label: {
-                    Label(type.rawValue, systemImage: type.image)
+                    Label(type.title(locale: locale), systemImage: type.image)
                 }
             }
         } label: {
-            Label("사진 첨부", systemImage: "paperclip")
+            Label {
+                Text("사진 첨부", bundle: .module)
+            } icon: {
+                Image(systemName: "paperclip")
+            }
                 .font(CarveTypography.body)
                 .foregroundStyle(CarveColor.ink)
                 .padding(.horizontal, CarveSpacing.medium)
@@ -255,7 +260,7 @@ public struct SendFeedbackView: View {
                                         .contentShape(Rectangle())
                                 }
                                 .buttonStyle(.plain)
-                                .accessibilityLabel("\(index + 1)번째 사진 빼기")
+                                .accessibilityLabel(Text("\(index + 1)번째 사진 빼기", bundle: .module))
                             }
                     }
                 }
@@ -269,15 +274,15 @@ public struct SendFeedbackView: View {
     private var agreements: some View {
         VStack(alignment: .leading, spacing: CarveSpacing.xxSmall) {
             AgreementCheckbox(
-                title: "작성한 의견을 개발자에게 보내요",
-                detail: "필수",
+                title: SettingsCatalog.string("작성한 의견을 개발자에게 보내요", locale: locale),
+                detail: SettingsCatalog.string("필수", locale: locale),
                 isChecked: store.agreeToDefaultNotice
             ) {
                 send(.toggleDefaultAgreement)
             }
             AgreementCheckbox(
-                title: "기종과 OS 정보를 함께 보내요",
-                detail: "필수 · 의견을 확인한 뒤 바로 지워요.",
+                title: SettingsCatalog.string("기종과 OS 정보를 함께 보내요", locale: locale),
+                detail: SettingsCatalog.string("필수 · 의견을 확인한 뒤 바로 지워요.", locale: locale),
                 isChecked: store.agreeToGetDeviceInfo
             ) {
                 send(.togglePrivacyAgreement)
@@ -289,16 +294,18 @@ public struct SendFeedbackView: View {
     /// 아래에 무엇이 남았는지 적는다. 메일 계정이 없으면 누를 때 안내를 띄운다.
     private var sendFeedbackButton: some View {
         VStack(alignment: .leading, spacing: CarveSpacing.xSmall) {
-            Button("의견 보내기") {
+            Button {
                 send(.isEnableSendButton)
+            } label: {
+                Text("의견 보내기", bundle: .module)
             }
             .buttonStyle(SubmitButtonStyle())
             .disabled(!store.isFormComplete)
-            .accessibilityHint(store.missingRequirement?.hint ?? "")
+            .accessibilityHint(store.missingRequirement?.hint(locale: locale) ?? "")
             .accessibilityIdentifier("sendFeedback.send")
 
             if let missing = store.missingRequirement {
-                Text(missing.hint)
+                Text(missing.hint(locale: locale))
                     .font(CarveTypography.caption)
                     .foregroundStyle(CarveColor.secondary)
                     // 버튼의 접근성 힌트로 이미 읽는다.
@@ -351,7 +358,7 @@ private struct AgreementCheckbox: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityValue(isChecked ? "선택됨" : "선택 안 됨")
+        .accessibilityValue(isChecked ? Text("선택됨", bundle: .module) : Text("선택 안 됨", bundle: .module))
         .accessibilityAddTraits(isChecked ? .isSelected : [])
     }
 }

@@ -6,6 +6,7 @@
 //  Copyright © 2024 leetaek. All rights reserved.
 //
 
+import CarveToolkit
 import Domain
 import SwiftUI
 import CarveFeature
@@ -16,10 +17,11 @@ import SettingsFeature
 import ComposableArchitecture
 
 @Reducer
-public struct AppCoordinatorFeature {
+public struct AppCoordinatorFeature: Sendable {
     @ObservableState
     public struct State {
-        public static var initialState = Self()
+        /// 처음 상태. 차트 · 설정 화면 상태(광고 자리의 `UIView` 등)를 담아 `Sendable` 이 아니므로 저장하지 않고 매번 만든다.
+        public static var initialState: Self { Self() }
         /// 보류 중 로그인과 저장소 소유가 확인됐다 — 로딩 없이 재실행을 안내한다(2026-09-28 결정).
         public var showsRelaunchGuidance = false
         /// 이번 실행에서 재실행 안내를 이미 띄웠다. 닫은 뒤 다시 띄우지 않는다 — 설정의 iCloud 화면은 계속 같은 안내를 보인다.
@@ -28,6 +30,9 @@ public struct AppCoordinatorFeature {
         public var beforeConnectionNotice: Int?
         /// 이번 실행에서 연결 전 필기 안내를 이미 띄웠다. 「나중에」 로 닫으면 다음 실행까지 다시 띄우지 않는다.
         var didShowBeforeConnectionNotice = false
+        /// 2.0.x 에서 「필사 캔버스」 를 끄고(절마다 쓰는 캔버스) 쓰던 사용자에게 그 캔버스가 없어졌다고 알리는 막지 않는 안내(2.1 결정 6).
+        /// 필사 화면에 처음 들어갈 때 정하고, 어느 버튼으로 닫든 저장된 키를 지워 다시 띄우지 않는다.
+        public var showsCanvasRemovalNotice = false
         /// 현재 루트 화면 (트리기반)
         @Presents public var root: Root.State? = .launchProgress(.initialState)
         /// 업데이트 패치노트 표시 상태
@@ -38,8 +43,10 @@ public struct AppCoordinatorFeature {
         @Shared(.appStorage("lastSeenAppVersion")) public var lastSeenAppVersion: String?
         /// 루트 화면 위에 Push될 화면 Path. (스택 기반)
         public var path: StackState<Path.State> = .init()
-        /// 위젯을 눌러 앱이 시작됐을 때 필사 화면이 준비되면 이동할 절.
+        /// 위젯을 눌러 앱이 시작됐을 때 필사 화면이 준비되면 이동할 절. 링크의 번역본은 절의 장(`BibleVerse.title`)에 함께 담겨 그대로 간다.
         var pendingWidgetVerse: BibleVerse?
+        /// `-UITestRoute` 로 받은 화면 — 필사 화면이 준비되면(위젯 보류 절과 같은 때) 연다. 실행 인자는 Debug 빌드에서만 읽으므로 Release 에서는 늘 nil 이다.
+        var pendingLaunchRoute: UITestRoute?
         // analytics key
         public var currentScreenKey: String {
             if settings != nil {
@@ -68,10 +75,14 @@ public struct AppCoordinatorFeature {
         }
     }
     @Dependency(\.analyticsClient) private var analyticsClient
+    /// 지금 앱의 마케팅 버전 — 마지막으로 본 버전과 견주어 패치노트를 띄운다.
+    @Dependency(\.appVersion) private var appVersion
     @Dependency(\.legacySeparationHoldState) private var holdState
     @Dependency(\.drawingEditEnvironment) private var editEnvironment
     @Dependency(\.verseDraftRecoveryReader) private var draftReader
     @Dependency(\.drawingRepository) private var drawingRepository
+    /// 2.0.x 의 「필사 캔버스」 설정이 남은 `UserDefaults`(앱은 `.standard`) — N-Canvas 제거 안내를 띄울지 읽고, 닫으면 그 키를 지운다.
+    @Dependency(\.defaultAppStorage) private var appStorage
 
     private enum CancelID { case relaunchGuidance, beforeConnection }
     
@@ -94,6 +105,10 @@ public struct AppCoordinatorFeature {
         case beforeConnectionNoticeReviewTapped
         /// 연결 전 필기 안내의 「나중에」 — 필기는 그대로 남는다.
         case beforeConnectionNoticeDismissed
+        /// N-Canvas 제거 안내의 「의견 보내기」 — 안내를 닫고(키를 지움) 설정의 「의견 보내기」 를 연다.
+        case canvasRemovalNoticeFeedbackTapped
+        /// N-Canvas 제거 안내의 「확인」 — 안내를 닫고 키를 지운다.
+        case canvasRemovalNoticeDismissed
     }
     
     @Reducer
@@ -113,11 +128,17 @@ public struct AppCoordinatorFeature {
         case favorites(FavoriteListFeature)
     }
     
-    /// 위젯이 넘긴 URL 의 절. 앱이 아는 권이 아니면 nil.
+    /// 위젯이 넘긴 URL 의 절 — 링크의 번역본 장으로 연다(영어 현지화 설계 §7).
+    ///
+    /// - 입력: 위젯이 만든 URL(`VerseWidgetPayload.deepLinkURL`).
+    /// - 출력: 권 · 장 · 절 · 번역본을 담은 절. 앱이 아는 권이 아니거나 **번역본을 모르면 nil** — 개역개정으로 바꾸지 않고 링크를 무시한다.
+    /// - 부작용: 없음.
     static func verse(from url: URL) -> BibleVerse? {
         guard let link = VerseWidgetDeepLink.parse(url),
-              let title = BibleTitle(rawValue: link.titleRawValue) else { return nil }
-        return BibleVerse(title: BibleChapter(title: title, chapter: link.chapter), verse: link.verse, sentence: "")
+              let title = BibleTitle(rawValue: link.titleRawValue),
+              let translation = Translation(rawValue: link.translation) else { return nil }
+        let chapter = BibleChapter(title: title, chapter: link.chapter, translation: translation)
+        return BibleVerse(title: chapter, verse: link.verse, sentence: "")
     }
 
     /// 보류 중 편집 환경이 바뀔 때마다(로그인 · 앱 활성화) 다시 읽는다. 재실행하면 연결되면 안내하고 구독을 멈춘다.
@@ -153,8 +174,9 @@ public struct AppCoordinatorFeature {
                 }
                 guard ready else { return }
             }
+            // 모든 번역본의 연결 전 필기를 센다 — 설정의 「확인이 필요한 필기」 도 모든 번역본을 한 목록으로 보인다.
             let found = await VerseDraftRecoveryQuery(reader: draftReader, repository: drawingRepository)
-                .beforeConnectionCount(environment: environment)
+                .beforeConnectionCountAcrossTranslations(environment: environment)
             if found > 0 { await send(.beforeConnectionDraftsFound(found)) }
         }
         .cancellable(id: CancelID.beforeConnection, cancelInFlight: true)
@@ -173,22 +195,26 @@ public struct AppCoordinatorFeature {
                 guard case .launchProgress(let launch)? = state.root, launch.route == .enterWriting else {
                     break
                 }
-                let currentVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+                let currentVersion = appVersion
                 let previousVersion = state.lastSeenAppVersion
                 state.$lastSeenAppVersion.withLock { $0 = currentVersion }
                 state.root = .carve(.initialState)
                 if let previousVersion, previousVersion != currentVersion {
                     state.patchnote = .initialState
                 }
+                // 2.0.x 에서 「필사 캔버스」 를 끈 사용자면 그 캔버스가 없어졌다고 한 번 알린다(2.1 결정 6).
+                state.showsCanvasRemovalNotice = resolveCanvasRemovalNotice()
                 // 보류 중이면 로그인 · 소유가 확인되는지 지켜보다가 재실행을 안내한다. 연결을 기다리는 로딩은 띄우지 않는다.
                 // 연결된 실행이면 가져오기를 기다리는 연결 전 필기가 있는지 보고 안내한다(2026-09-29).
                 let guidance: Effect<Action> = holdState.isHeld ? observeRelaunchGuidance() : observeBeforeConnectionDrafts()
+                // `-UITestRoute`(Debug)로 받은 화면도 같은 때 연다 — 시작 화면(새 설치 복원 대기의 「먼저 시작하기」 포함)이 끝난 뒤다.
+                let launchRoute = openPendingLaunchRoute(state: &state)
                 // 위젯을 눌러 시작했다면 필사 화면이 준비된 지금 그 절로 간다.
                 if let verse = state.pendingWidgetVerse {
                     state.pendingWidgetVerse = nil
-                    return .merge(guidance, .send(.root(.presented(.carve(.moveToVerse(verse))))))
+                    return .merge(guidance, launchRoute, .send(.root(.presented(.carve(.moveToVerse(verse))))))
                 }
-                return guidance
+                return .merge(guidance, launchRoute)
 
             case .connectionEnvironmentChanged(let environment):
                 guard !state.didShowRelaunchGuidance, environment.connectsOnRelaunch else { break }
@@ -213,6 +239,13 @@ public struct AppCoordinatorFeature {
             case .beforeConnectionNoticeDismissed:
                 state.beforeConnectionNotice = nil
 
+            case .canvasRemovalNoticeFeedbackTapped:
+                dismissCanvasRemovalNotice(state: &state)
+                state.settings = SettingsFeature.State.initialState(path: .sendFeedback(.initialState))
+
+            case .canvasRemovalNoticeDismissed:
+                dismissCanvasRemovalNotice(state: &state)
+
             case .openedURL(let url):
                 guard let verse = Self.verse(from: url) else { break }
                 // 위젯에서 들어왔다 — 설정 · 다른 화면을 닫고 그 절을 연다.
@@ -234,6 +267,18 @@ public struct AppCoordinatorFeature {
             ))))):
                 state.settings = SettingsFeature.State.initialState(path: .draftRecovery(.initialState))
                 return .send(.root(.presented(.carve(.view(.closeNavigationBar)))))
+
+            // 설정의 「백업 만들기」 가 백업 전에 마지막 필기가 이 기기에 남았는지 묻는다(설계 backup-import-design §5-2 ②).
+            case .settings(.presented(.path(.presented(.backup(.export(.delegate(.canvasFlushRequested(let id)))))))):
+                return relayBackupFlushRequest(state: state, id: id)
+
+            // 필사 화면이 답했다 — 설정으로 돌려주고, 설정이 그 id 를 기다리는 「백업 만들기」 에 넘긴다(§5-2 ④).
+            case .root(.presented(.carve(.scope(.carveDetailAction(
+                .scope(.chapterCanvasAction(.delegate(.backupFlushFinished(let id, let outcome))))
+            ))))):
+                // 설정이 닫혔으면 기다리는 내보내기가 없다 — 답을 버린다.
+                guard state.settings != nil else { break }
+                return .send(.settings(.presented(.canvasFlushFinished(id: id, outcome: outcome))))
                 
             case .root(.presented(.carve(.view(.moveToChart)))):
                 state.path.append(.chart(.initialState))
@@ -306,3 +351,202 @@ public struct AppCoordinatorFeature {
         .forEach(\.path, action: \.path)
     }
 }
+
+// MARK: - 백업 전 flush 중계 (설계 backup-import-design §5-2)
+
+extension AppCoordinatorFeature {
+    /// 「백업 만들기」 의 flush 요청을 필사 화면으로 넘긴다. Feature 끼리는 서로를 모르므로 코디네이터가 잇는다.
+    ///
+    /// - 입력: 코디네이터 상태와 요청 id.
+    /// - 출력: 필사 화면이 있으면 그 캔버스로 `backupFlushRequested(id:)` — 캔버스가 같은 id 로 답한다(`delegate(.backupFlushFinished)`).
+    ///   없으면(아직 시작 화면) 지킬 편집이 없으므로 곧바로 설정에 `.durable`.
+    /// - 부작용: 없음(액션만 보낸다). 설정이 열려 있는 동안 캔버스 입력은 막혀 있어(`AppCoordinatorView.allowsHitTesting`) flush 뒤에 새 획이 끼지 않는다.
+    private func relayBackupFlushRequest(state: State, id: UUID) -> Effect<Action> {
+        guard case .carve? = state.root else {
+            return .send(.settings(.presented(.canvasFlushFinished(id: id, outcome: .durable))))
+        }
+        return .send(.root(.presented(.carve(.scope(.carveDetailAction(.scope(.chapterCanvasAction(.backupFlushRequested(id: id)))))))))
+    }
+}
+
+// MARK: - N-Canvas 제거 안내 (2.1 결정 6)
+
+extension AppCoordinatorFeature {
+    /// 2.0.x 의 「필사 캔버스」 설정이 쓰던 `UserDefaults` 키. 2.1 은 이 값을 읽는 곳이 없고, 안내를 정할 때만 본다.
+    enum CanvasRemovalNotice {
+        /// 「단일 캔버스 사용」 토글 값. Bool false 로 남아 있으면 그 사용자는 절마다 쓰는 캔버스(N-Canvas)로 쓰고 있었다.
+        static let singleCanvasEnabledKey = "singleCanvasEnabled"
+        /// 2.0.x 가 토글 값을 설치당 한 번 지웠는지 적던 키 — 함께 지운다.
+        static let storedValueResetKey = "singleCanvasStoredValueReset"
+    }
+
+    /// 필사 화면에 들어갈 때 N-Canvas 제거 안내를 띄울지 정한다.
+    ///
+    /// - 입력: `appStorage` 의 `singleCanvasEnabled`. 2.0.0(Xcode 27 빌드)이 JSON 으로 쓴 값은 앱 시작 때 `AppStorageFormatMigration` 이 Bool 로 되돌려 둔다.
+    /// - 출력: 그 값이 Bool false 로 저장돼 있으면 true(안내를 띄운다 — 키는 버튼을 누를 때 지운다).
+    /// - 부작용: 키가 없거나 false 가 아니면 안내 없이 두 키를 곧바로 지운다 — 읽는 곳이 없는 값이다.
+    private func resolveCanvasRemovalNotice() -> Bool {
+        if appStorage.object(forKey: CanvasRemovalNotice.singleCanvasEnabledKey) as? Bool == false {
+            return true
+        }
+        removeCanvasRemovalKeys()
+        return false
+    }
+
+    /// N-Canvas 제거 안내를 닫는다. 입력: 코디네이터 상태. 부작용: 두 키를 지워 다음 실행에서도 다시 띄우지 않는다.
+    private func dismissCanvasRemovalNotice(state: inout State) {
+        state.showsCanvasRemovalNotice = false
+        removeCanvasRemovalKeys()
+    }
+
+    /// 2.0.x 「필사 캔버스」 설정의 두 키를 지운다. 부작용: `appStorage` 에서 키를 지운다(없으면 아무것도 바뀌지 않는다).
+    private func removeCanvasRemovalKeys() {
+        appStorage.removeObject(forKey: CanvasRemovalNotice.singleCanvasEnabledKey)
+        appStorage.removeObject(forKey: CanvasRemovalNotice.storedValueResetKey)
+    }
+}
+
+// MARK: - 화면 바로 열기 (`-UITestRoute`)
+
+extension AppCoordinatorFeature {
+    /// `-UITestRoute <경로>` 가 여는 화면. UI 테스트 · 시뮬레이터 확인이 탭 단계 없이 그 화면에서 시작한다.
+    ///
+    /// 앱 진입점이 Debug 빌드에서만 실행 인자를 한 번 읽어(`parse`) `State.pendingLaunchRoute` 에 넣고, 시작 화면이 끝나 필사 화면에 들어간 직후
+    /// (위젯 보류 절과 같은 때) 연다. 시작 화면 — 새 설치 복원 대기의 「먼저 시작하기」 — 은 건너뛰지 않는다.
+    ///
+    /// | 경로 | 여는 화면 |
+    /// |---|---|
+    /// | `navigation` | 성경 탐색 — 탐색 열을 모두 열고 지금 장을 고른 목록으로 시작한다(`CarveNavigationFeature.openNavigation`) |
+    /// | `chart` · `favorites` | 기록 차트 · 즐겨찾기 목록을 필사 화면 위에 쌓는다 |
+    /// | `settings` | 설정의 첫 화면(iCloud) |
+    /// | `settings/<하위>` | 설정의 그 화면 — 하위 이름은 사이드바 행마다 하나(`routeName`): `icloud` · `backup` · `appearance` · `language` · `removeAds` 등 |
+    /// | `verse/<절 번호>` | 시작 장(`-UITestChapter` 또는 마지막으로 연 장)의 그 절 |
+    ///
+    /// 이름은 대소문자를 가리지 않는다. 모르는 경로는 로그만 남기고 무시한다 — 앱은 경로 없이 시작한다.
+    enum UITestRoute: Equatable, Sendable {
+        case navigation
+        case chart
+        case favorites
+        /// 설정. nil 이면 설정의 첫 화면이다.
+        case settings(SettingsFeature.SidebarItem?)
+        /// 시작 장의 절 번호(1 이상).
+        case verse(Int)
+
+        /// 경로 문자열을 읽는다. 모르는 경로 · 설정 하위 이름이나 1 보다 작은 절 번호면 nil.
+        init?(_ value: String) {
+            let parts = value.lowercased().split(separator: "/", omittingEmptySubsequences: false).map(String.init)
+            switch parts {
+            case ["navigation"]: self = .navigation
+            case ["chart"]: self = .chart
+            case ["favorites"]: self = .favorites
+            case ["settings"]: self = .settings(nil)
+            default:
+                guard parts.count == 2 else { return nil }
+                if parts[0] == "settings",
+                   let item = SettingsFeature.SidebarItem.allCases.first(where: { $0.routeName.lowercased() == parts[1] }) {
+                    self = .settings(item)
+                } else if parts[0] == "verse", let verse = Int(parts[1]), verse > 0 {
+                    self = .verse(verse)
+                } else {
+                    return nil
+                }
+            }
+        }
+    }
+
+    /// `-UITestRoute` 로 받은 화면을 연다. 필사 화면(`root == .carve`)에 막 들어간 때 부르고, 받은 경로가 없으면 아무것도 하지 않는다.
+    private func openPendingLaunchRoute(state: inout State) -> Effect<Action> {
+        guard let route = state.pendingLaunchRoute else { return .none }
+        state.pendingLaunchRoute = nil
+        switch route {
+        case .navigation:
+            // 탐색 열을 모두 열고 현재 장을 고른 목록으로 시작한다. 서재 버튼은 열고 닫기를 바꾸고, 헤더 제목은 번역본 메뉴라(결정 19) 쓰지 않는다.
+            return .send(.root(.presented(.carve(.openNavigation))))
+        case .chart:
+            state.path.append(.chart(.initialState))
+        case .favorites:
+            state.path.append(.favorites(.initialState))
+        case .settings(let item):
+            state.settings = item.map { SettingsFeature.State.initialState(path: $0.routePath) } ?? .initialState
+        case .verse(let verse):
+            // 장은 시작 장(`-UITestChapter` 또는 마지막으로 연 장)이다. 위젯 절처럼 본문 없이 보낸다.
+            guard case .carve(let carve)? = state.root else { return .none }
+            return .send(.root(.presented(.carve(.moveToVerse(BibleVerse(title: carve.currentTitle, verse: verse, sentence: ""))))))
+        }
+        return .none
+    }
+}
+
+private extension SettingsFeature.SidebarItem {
+    /// `-UITestRoute settings/<이름>` 의 이름.
+    var routeName: String {
+        switch self {
+        case .iCloud: "icloud"
+        case .draftRecovery: "draftRecovery"
+        case .backup: "backup"
+        case .widget: "widget"
+        case .appearance: "appearance"
+        case .language: "language"
+        case .help: "help"
+        case .patchnote: "patchnote"
+        case .sendFeedback: "sendFeedback"
+        case .appVersion: "appVersion"
+        case .removeAds: "removeAds"
+        }
+    }
+
+    /// 이 행이 여는 화면의 처음 상태. `SettingsFeature` 의 같은 표(`initialPath`)는 모듈 밖에 보이지 않아 여기에 다시 둔다.
+    var routePath: SettingsFeature.Path.State {
+        switch self {
+        case .iCloud: .iCloud(.initialState)
+        case .draftRecovery: .draftRecovery(.initialState)
+        case .backup: .backup(.initialState)
+        case .widget: .widget(.initialState)
+        case .appearance: .appearance(.initialState)
+        case .language: .language(.initialState)
+        case .help: .help(.initialState)
+        case .patchnote: .patchnote(.initialState)
+        case .sendFeedback: .sendFeedback(.initialState)
+        case .appVersion: .appVersion(.initialState)
+        case .removeAds: .removeAds(.initialState)
+        }
+    }
+}
+
+#if DEBUG
+extension AppCoordinatorFeature.UITestRoute {
+    /// 실행 인자에서 경로를 읽는다(Debug 전용). 인자가 없으면 nil 이고, 값이 없거나 모르는 경로면 로그만 남기고 nil 이다 — 앱은 경로 없이 시작한다.
+    static func parse(arguments: [String]) -> Self? {
+        guard let index = arguments.firstIndex(of: LaunchArgument.uiTestRoute) else { return nil }
+        let value = arguments.indices.contains(index + 1) ? arguments[index + 1] : ""
+        guard let route = Self(value) else {
+            Log.info("UITEST 화면 경로를 읽지 못해 무시함", value)
+            return nil
+        }
+        Log.info("UITEST 화면 경로", value)
+        return route
+    }
+}
+
+extension AppCoordinatorFeature {
+    /// 억제 스위치를 저장한다(Debug 전용). 앱 진입점이 Store 를 만들기 전에 한 번 부른다 — `UITestLaunchChapter` 와 같은 방식이다.
+    ///
+    /// - `-UITestSkipFirstRunGuide`: 필사 화면(`CarveNavigationFeature`)과 같은 `@Shared(.appStorage("hasSeenFirstRunGuide"))` 를 true 로 쓴다.
+    /// - `-UITestSkipPatchnote`: **앞서 들어간 설치**의 `lastSeenAppVersion` 만 지금 버전으로 바꾼다. 비어 있는 새 설치는 원래 패치노트를 띄우지 않고,
+    ///   시작 화면이 같은 값으로 새 설치(복원 대기 · 「먼저 시작하기」)를 가리므로 그대로 둔다.
+    static func applyLaunchSuppression(arguments: [String], appVersion: String) {
+        if arguments.contains(LaunchArgument.uiTestSkipFirstRunGuide) {
+            @Shared(.appStorage("hasSeenFirstRunGuide")) var hasSeenFirstRunGuide = false
+            $hasSeenFirstRunGuide.withLock { $0 = true }
+            Log.info("UITEST 첫 실행 안내 억제")
+        }
+        if arguments.contains(LaunchArgument.uiTestSkipPatchnote) {
+            @Shared(.appStorage("lastSeenAppVersion")) var lastSeenAppVersion: String?
+            if lastSeenAppVersion != nil {
+                $lastSeenAppVersion.withLock { $0 = appVersion }
+            }
+            Log.info("UITEST 패치노트 억제", appVersion)
+        }
+    }
+}
+#endif

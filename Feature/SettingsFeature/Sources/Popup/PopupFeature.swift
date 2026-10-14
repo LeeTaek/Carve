@@ -17,8 +17,8 @@ import ComposableArchitecture
 @Reducer
 public struct PopupFeature {
     @ObservableState
-    public struct State: Hashable {
-        public static var initialState = Self()
+    public struct State: Hashable, Sendable {
+        public static let initialState = Self()
         public var title: String?
         public var body: String = ""
         /// 되돌릴 수 없다는 줄. 빨간 글씨로 따로 세운다.
@@ -39,7 +39,7 @@ public struct PopupFeature {
         case destructive
     }
 
-    public enum ConfirmAction: Equatable {
+    public enum ConfirmAction: Equatable, Sendable {
         case dismiss
         case deleteAllData
     }

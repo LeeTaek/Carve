@@ -14,12 +14,14 @@ import SwiftData
 import Dependencies
 
 /// CloudKit 컨테이너 식별자와 로컬 SwiftData DB 파일 경로를 관리.
-public class ContainerID {
+///
+/// 만든 뒤 바뀌지 않는 값이라 의존성(`containerId`)으로 여러 격리에서 함께 읽는다.
+public final class ContainerID: Sendable {
     /// 기본값(초기 상태)로 사용하는 ContainerID. 실제 컨테이너 ID는 앱 시작 시 주입.
-    public static var initialState = ContainerID(id: "")
-    public var id: String
+    public static let initialState = ContainerID(id: "")
+    public let id: String
     /// 로컬 SwiftData SQLite 파일 경로. dev/prod 여부에 따라 경로 설정.
-    public var localDBPath: String
+    public let localDBPath: String
     
     public init(id: String) {
         self.id = id
@@ -29,6 +31,10 @@ public class ContainerID {
 
 /// CloudKit 동기화 상태를 관리하는 컨테이너 객체.
 /// SwiftData와 NSPersistentCloudKitContainer 이벤트를 관찰하여 동기화 진행 상태를 표현.
+///
+/// 상태(`syncState` · `activity` 와 그 publisher · 관찰 구독)는 **MainActor 에서만** 읽고 쓴다 — 타입 단위로 격리한다.
+/// `init` 과 상태를 쓰지 않는 판정 함수만 `nonisolated` 다. 의존성 기본값이 비격리 문맥에서 만든다.
+@MainActor
 public final class PersistentCloudKitContainer: ObservableObject {
     /// 현재 CloudKit 동기화 상태. LaunchProgressFeature에서 구독하여 사용.
     ///
@@ -95,7 +101,8 @@ public final class PersistentCloudKitContainer: ObservableObject {
         }
     }
     
-    public init() {
+    /// 비격리다 — 의존성 기본값(`liveValue` 등)이 비격리 문맥에서 만든다. 저장 프로퍼티를 처음 채우기만 한다.
+    public nonisolated init() {
         // 현재 장 Fetch
         if let titleData = UserDefaults.standard.data(forKey: "title"),
            let decodedTitle = try? JSONDecoder().decode(BibleChapter.self, from: titleData) {
@@ -118,19 +125,45 @@ public final class PersistentCloudKitContainer: ObservableObject {
         var migration: Double = 120
     }
 
-    /// 알림 구독 한 벌 — 끊을 때 셋을 함께 정리한다.
-    private struct Observation {
+    /// 알림 구독 한 벌 — 끊을 때 셋을 함께 정리한다. 놓이면(컨테이너 해제 · `stopObserving()`) 스스로 정리한다.
+    ///
+    /// 정리를 컨테이너의 `deinit` 에 두지 않는다 — MainActor 에 격리된 컨테이너의 `deinit` 은 비격리라 Sendable 이 아닌
+    /// 구독 토큰을 읽을 수 없다. 이 객체는 컨테이너만 쥐므로 컨테이너가 해제될 때 함께 해제되며 정리한다.
+    private final class Observation {
         let center: NotificationCenter
         let token: any NSObjectProtocol
         let continuation: AsyncStream<CloudSyncEvent>.Continuation
         let task: Task<Void, Never>
+
+        init(
+            center: NotificationCenter,
+            token: any NSObjectProtocol,
+            continuation: AsyncStream<CloudSyncEvent>.Continuation,
+            task: Task<Void, Never>
+        ) {
+            self.center = center
+            self.token = token
+            self.continuation = continuation
+            self.task = task
+        }
+
+        /// 구독을 끊는다. 여러 번 불러도 된다.
+        func cancel() {
+            center.removeObserver(token)
+            continuation.finish()
+            task.cancel()
+        }
+
+        deinit {
+            cancel()
+        }
     }
 
     /// 계정을 확인하고, 초기 import 의 결론이나 제한 시간까지 기다린다. **한 번만** 기다린다.
     public func observeCloudKitSyncProgress() async {
         // ★ 계정을 조회하기 **전에** 구독을 시작한다. 이전 구현은 계정 조회가 끝난 뒤에야
         //   구독을 열어, 그 사이에 도착한 이벤트를 놓쳤다.
-        guard let deadline = await beginInitialWait() else { return }
+        guard let deadline = beginInitialWait() else { return }
         // 설정 화면과 같은 조회를 쓴다 — 조회 실패를 "계정 없음" 으로 단정하지 않는 규칙이 한곳에 있다.
         @Dependency(\.cloudAccountStatus) var accountStatus
         do {
@@ -155,7 +188,7 @@ public final class PersistentCloudKitContainer: ObservableObject {
             // 기다리던 호출이 취소됐으면 어떤 오류로 끝났든 상태를 바꾸지 않는다. 취소는 시간 초과 작업에도 함께 전해지고,
             // 어느 쪽 오류가 먼저 올라올지는 정해져 있지 않다.
             guard !Task.isCancelled else { return }
-            await concludeInitialWait(after: error)
+            concludeInitialWait(after: error)
         }
     }
 
@@ -201,7 +234,7 @@ public final class PersistentCloudKitContainer: ObservableObject {
     ///
     /// 이전 구현은 마이그레이션 모드에서도 계정 없음 · 확인 실패 · import 실패 · 시간 초과를 일반 모드와 같은 상태로 보내,
     /// 시작 화면이 V1 전용 컨테이너를 쥔 채 필사 화면에 들어갔다.
-    static func migrationOutcome(_ outcome: CloudSyncState) -> CloudSyncState {
+    nonisolated static func migrationOutcome(_ outcome: CloudSyncState) -> CloudSyncState {
         switch outcome {
         case .syncCompleted: .migrationCompleted
         case .failed(let reason): .migrationEndedWithoutImport(reason)
@@ -221,7 +254,7 @@ public final class PersistentCloudKitContainer: ObservableObject {
     /// | 그 밖 | `failed(.unknown)` — 확인하지 못한 오류를 "시간이 걸린다" 로 말하지 않는다 |
     ///
     /// 이전 구현은 계정 조회가 던진 오류와 취소까지 하나의 `catch` 에서 `stillWaiting` 으로 보냈다.
-    static func initialWaitOutcome(after error: Error) -> CloudSyncState? {
+    nonisolated static func initialWaitOutcome(after error: Error) -> CloudSyncState? {
         switch error {
         case is TaskTimeoutError:
             Log.debug("CloudKit 초기 import 가 제한 시간 안에 끝나지 않았다", "\(error)")
@@ -265,20 +298,12 @@ public final class PersistentCloudKitContainer: ObservableObject {
         observation = Observation(center: source.center, token: token, continuation: continuation, task: task)
     }
 
-    deinit {
-        guard let observation else { return }
-        observation.center.removeObserver(observation.token)
-        observation.continuation.finish()
-        observation.task.cancel()
-    }
-
     /// 관찰을 멈춘다. 앱이 살아 있는 동안은 부를 일이 없고, 테스트·해제 때만 쓴다.
+    /// 컨테이너가 해제될 때는 `Observation` 이 함께 해제되며 정리한다.
     @MainActor
     public func stopObserving() {
         guard let observation else { return }
-        observation.center.removeObserver(observation.token)
-        observation.continuation.finish()
-        observation.task.cancel()
+        observation.cancel()
         self.observation = nil
     }
 
@@ -323,8 +348,8 @@ public final class PersistentCloudKitContainer: ObservableObject {
         }
     }
 
-    /// CloudKit 알림에서 판정에 필요한 값만 남긴 `CloudSyncEvent` 를 꺼낸다.
-    static func cloudKitEvent(from notification: Notification) -> CloudSyncEvent? {
+    /// CloudKit 알림에서 판정에 필요한 값만 남긴 `CloudSyncEvent` 를 꺼낸다. 알림을 보낸 스레드에서 부르므로 비격리다.
+    nonisolated static func cloudKitEvent(from notification: Notification) -> CloudSyncEvent? {
         guard let event = notification.userInfo?[NSPersistentCloudKitContainer.eventNotificationUserInfoKey]
             as? NSPersistentCloudKitContainer.Event else { return nil }
         Log.debug("cloudEvent", event.debugDescription)

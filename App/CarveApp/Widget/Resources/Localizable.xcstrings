@@ -1,0 +1,91 @@
+{
+  "sourceLanguage" : "ko",
+  "strings" : {
+    "말씀" : {
+      "comment" : "위젯 갤러리의 위젯 이름",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verse"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "말씀"
+          }
+        }
+      }
+    },
+    "새기다 · %@" : {
+      "comment" : "위젯 카드 아래 — 앱 이름 · 번역본 약칭. 영어 앱 이름은 Carve",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carve · %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "새기다 · %@"
+          }
+        }
+      }
+    },
+    "새기다 앱의 즐겨찾기에서 고를 수 있어요." : {
+      "comment" : "위젯 빈 상태 설명 — 앱 이름(영어 Carve)의 즐겨찾기에서 고른다",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can pick one from Favorites in Carve."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "새기다 앱의 즐겨찾기에서 고를 수 있어요."
+          }
+        }
+      }
+    },
+    "즐겨찾기에서 고른 말씀을 홈 화면에 띄워요. 여러 개를 고르면 한 시간에 하나씩 돌아가며 보여 줘요." : {
+      "comment" : "위젯 갤러리의 위젯 설명",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shows verses you pick from Favorites on your Home Screen. Pick several and they rotate every hour."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "즐겨찾기에서 고른 말씀을 홈 화면에 띄워요. 여러 개를 고르면 한 시간에 하나씩 돌아가며 보여 줘요."
+          }
+        }
+      }
+    },
+    "표시할 말씀을 골라 주세요" : {
+      "comment" : "위젯 빈 상태 제목 — 담은 말씀이 없다",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose a verse to show"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "표시할 말씀을 골라 주세요"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

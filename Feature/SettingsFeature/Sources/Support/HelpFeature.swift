@@ -13,7 +13,7 @@ public struct HelpFeature {
     public init() { }
 
     @ObservableState
-    public struct State: Equatable, Hashable {
+    public struct State: Equatable, Hashable, Sendable {
         public static let initialState = Self()
     }
 

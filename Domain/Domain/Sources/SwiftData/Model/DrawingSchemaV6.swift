@@ -11,9 +11,9 @@ import SwiftData
 
 /// 절 필기의 **불변 버전**과 **전체 삭제 기준점**을 위한 additive 스키마 (정책 §5 · §12-5 · §12-6).
 ///
-/// V5 의 필사 행(`BibleDrawing`) · 구 구조 행(`BiblePageDrawing`)은 **형태를 바꾸지 않고 그대로 싣는다.** 2.0.0 은
-/// `BibleDrawing` 에 쓰지 않는다(C9) — legacy 행은 1.3.0 과 주고받는 원본이고, 2.0.0 의 편집은 새 엔티티
-/// `VerseDrawingVersion` 에 버전으로 쌓는다. 즐겨찾기에는 삭제 기준점 집합(`K`) 하나를 더한다(S9).
+/// V5 의 필사 행(`BibleDrawing`) · 구 구조 행(`BiblePageDrawing`)은 **형태를 바꾸지 않고 그대로 싣는다.** 2.0.x · 2.1 은
+/// `BibleDrawing` 에 쓴다. 이 두 엔티티(`VerseDrawingVersion` · `DrawingEraseEpoch`)에 쓰는 경로는 아직 없다
+/// (2.1 결정 — docs/backup-import-design.md). 즐겨찾기에는 삭제 기준점 집합(`K`) 하나를 더한다(S9).
 ///
 /// ## 구버전과의 관계 (ENT-P1 · F19 ~ F21)
 ///
@@ -30,7 +30,7 @@ import SwiftData
 /// - Important: forward-only 다. V6 로 마이그레이션된 저장소는 V5 빌드로 열 수 없다 — V5 빌드는 이 저장소를
 ///              "모르는 저장소" 로 가려 막는다(MIG-F1). **TestFlight 에 한 번 나간 뒤에는 필드를 고치지 말고 V7 로 올린다.**
 public enum DrawingSchemaV6: VersionedSchema {
-    public static var versionIdentifier = Schema.Version(6, 0, 0)
+    public static let versionIdentifier = Schema.Version(6, 0, 0)
 
     public static var models: [any PersistentModel.Type] {
         [
@@ -58,6 +58,11 @@ public enum DrawingSchemaV6: VersionedSchema {
 
         public init() { }
 
+        /// 새 즐겨찾기 행. 권 이름과 `translation` 열은 `StoredBookKey` 로 짓는다(영어 현지화 결정 1) —
+        /// 개역개정은 지금처럼 `rawValue` · `.NKRV`, KJV · BSB 는 `"<번역본>-<rawValue>"` · nil 이다(열에는 영어 값을 쓰지 않는다).
+        /// - Parameters:
+        ///   - chapter: 권 · 장. 번역본은 `translation` 인자를 따른다.
+        ///   - translation: 이 즐겨찾기의 번역본.
         public init(
             chapter: BibleChapter,
             verse: Int,
@@ -69,10 +74,10 @@ public enum DrawingSchemaV6: VersionedSchema {
             knownEraseEpochs: Set<String> = []
         ) {
             self.favoriteID = favoriteID
-            self.titleName = chapter.title.rawValue
+            self.titleName = StoredBookKey.titleName(title: chapter.title, translation: translation)
             self.titleChapter = chapter.chapter
             self.verse = verse
-            self.translation = translation
+            self.translation = StoredBookKey.translationColumn(for: translation)
             self.sentence = sentence
             self.lineData = lineData
             self.createdDate = createdDate

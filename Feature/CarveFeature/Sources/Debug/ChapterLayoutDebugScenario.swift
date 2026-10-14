@@ -23,15 +23,15 @@ import ComposableArchitecture
 /// | `-ChapterLayoutAutoScroll` | settle 8 s 뒤 1 s 간격으로 11단계에 걸쳐 마지막 절까지 스크롤 (§18-3 (C) "flick 11회" 근사) |
 /// | `-ChapterLayoutAutoNext` | settle 8 s 뒤 다음 장으로 이동 (§18-3 (B) "장 전환 진입") |
 enum ChapterLayoutDebugScenario {
-    static let scrollArgument = "-ChapterLayoutAutoScroll"
-    static let nextChapterArgument = "-ChapterLayoutAutoNext"
+    static let scrollArgument = LaunchArgument.chapterLayoutAutoScroll
+    static let nextChapterArgument = LaunchArgument.chapterLayoutAutoNext
 
     static var isScrollEnabled: Bool { ProcessInfo.processInfo.arguments.contains(scrollArgument) }
     static var isNextChapterEnabled: Bool { ProcessInfo.processInfo.arguments.contains(nextChapterArgument) }
 
     /// §18-3 (C) 근사. 절 목록을 11등분해 각 지점의 절이 화면 하단에 오도록 스크롤한다.
     ///
-    /// 스크롤 수단은 호출부가 준다 — N-Canvas 는 `ScrollViewProxy`, 단일 Canvas 는 `scrollToVerse` 액션.
+    /// 스크롤 수단은 호출부가 준다 — 단일 Canvas 의 `scrollToVerse` 액션.
     /// - Parameters:
     ///   - verses: 스크롤 대상 절 번호 (본문 순서).
     ///   - scrollTo: 절 하나로 스크롤하는 클로저.

@@ -17,6 +17,9 @@ import ComposableArchitecture
 /// 즐겨찾기는 **추가한 당시의 본문 · 필기를 보존한다** (2026-09-15 결정). 필기는 캔버스가 지금 보이는 것
 /// (저장 대기 중인 획 포함, `ChapterCanvasFeature.currentInk`)을 넘기고, 본문은 이 장의 절 행에서 읽는다.
 /// 표시는 저장을 기다리지 않고 먼저 바꾸며, 실패하면 되돌리고 「다시 시도」 를 둔다.
+///
+/// 즐겨찾기는 **지금 장의 번역본** 것이다(영어 현지화 결정 1) — 키(`FavoriteVerseKey`)의 번역본은 `favoriteChapter` 의 번역본이고,
+/// 같은 권 · 장 · 절이라도 번역본이 다르면 다른 즐겨찾기다.
 extension CarveDetailFeature {
     /// 필사 화면 아래 즐겨찾기 결과 안내.
     enum FavoriteNotice: Equatable {
@@ -104,6 +107,12 @@ extension CarveDetailFeature {
     }
 
     /// 장의 즐겨찾기 표시를 읽는다. 다른 장이면 이전 장의 표시부터 비운다.
+    ///
+    /// 장은 번역본까지 같아야 같은 장이다(`BibleChapter ==`) — 같은 권 · 장이라도 번역본을 바꾸면 표시를 비우고 다시 읽는다.
+    /// - Parameters:
+    ///   - state: Feature 상태.
+    ///   - chapter: 지금 본문의 장(번역본 포함). 그 번역본의 즐겨찾기만 읽는다.
+    /// - Returns: 저장소를 읽어 `favoritesLoaded` 를 보내는 효과. 실패하면 로그만 남긴다.
     func loadFavorites(state: inout State, chapter: BibleChapter) -> Effect<Action> {
         if state.favoriteChapter != chapter {
             // 이전 장의 별 표시를 새 장 본문에 남기지 않는다.
@@ -113,8 +122,8 @@ extension CarveDetailFeature {
         let editCount = state.favoriteEditCount
         return .run { [favoriteRepository] send in
             do {
-                // 번역본은 아직 하나뿐이다. BIBLE-EN 이 들어오면 지금 보는 번역본을 넘긴다.
-                let verses = try await favoriteRepository.favoriteVerses(in: chapter, translation: .NKRV)
+                // 지금 보는 번역본(장의 번역본)의 즐겨찾기만 별로 보인다 — 같은 절의 다른 번역본 즐겨찾기는 켜지 않는다(영어 현지화 결정 1).
+                let verses = try await favoriteRepository.favoriteVerses(in: chapter, translation: chapter.translation)
                 await send(.favoritesLoaded(chapter: chapter, editCount: editCount, verses: verses))
             } catch {
                 // 읽지 못하면 별 표시 없이 둔다 — 필사에는 영향이 없다.
@@ -135,6 +144,7 @@ extension CarveDetailFeature {
             Log.error("즐겨찾기 — 이 장을 아직 읽지 못해 누름을 무시했다", "verse=\(verse)")
             return .none
         }
+        // 키의 번역본은 장의 번역본이다 — KJV 장에서 고른 절은 KJV 즐겨찾기다. 같은 절의 개역개정 즐겨찾기는 건드리지 않는다.
         let key = FavoriteVerseKey(chapter: chapter, verse: verse)
         guard !state.favoriteVerses.contains(verse) else {
             return applyFavoriteChange(state: &state, .remove(key))
@@ -142,7 +152,7 @@ extension CarveDetailFeature {
         let sentence = state.sentenceWithDrawingState.first { $0.sentence.verse == verse }?.sentence.sentenceScript ?? ""
         let favorite = FavoriteVerseSnapshot(key: key, sentence: sentence, lineData: ink, createdDate: date.now)
         // 보이기만 하는 초안(다른 계정 · 확인 전)을 이어 보는 절이다 — 그 잉크를 즐겨찾기로 옮기지 않는다(11차 리뷰 P0-2).
-        guard !state.usesSingleCanvas || !state.chapterCanvas.inheritsOtherSessionInk(verse: verse) else {
+        guard !state.chapterCanvas.inheritsOtherSessionInk(verse: verse) else {
             return showFavoriteNotice(state: &state, .blocked(.add(favorite), .verseFromOtherSession),
                                       duration: Self.favoriteFailureNoticeDuration)
         }

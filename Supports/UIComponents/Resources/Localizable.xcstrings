@@ -1,0 +1,44 @@
+{
+  "sourceLanguage" : "ko",
+  "strings" : {
+    "%@%@" : {
+      "comment" : "번역하지 않음 — 아이콘 자리(빈 이미지)와 이어지는 글을 한 Text 로 잇는 보간",
+      "shouldTranslate" : false
+    },
+    "광고" : {
+      "comment" : "네이티브 광고 배지(AdMob 필수 표시) — 짧게",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ad"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "광고"
+          }
+        }
+      }
+    },
+    "다시 시도" : {
+      "comment" : "결과 알림 줄의 다시 시도 버튼 기본 제목",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Try Again"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다시 시도"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

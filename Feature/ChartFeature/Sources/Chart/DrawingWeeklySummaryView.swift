@@ -6,6 +6,7 @@
 //  Copyright © 2026 leetaek. All rights reserved.
 //
 
+import Domain
 import SwiftUI
 import UIComponents
 
@@ -14,6 +15,8 @@ import ComposableArchitecture
 @ViewAction(for: DrawingWeeklySummaryFeature.self)
 public struct DrawingWeeklySummaryView: View {
     @Bindable public var store: StoreOf<DrawingWeeklySummaryFeature>
+    /// 화면 언어 — 앱 안에서 언어를 고르면 앱 루트가 바꾼다. 미리 만드는 문구(타일 제목 · 참조 · 평균)는 이 값으로 만든다(즉시 전환 단계 3).
+    @Environment(\.locale) private var locale
 
     public init(store: StoreOf<DrawingWeeklySummaryFeature>) {
         self.store = store
@@ -26,15 +29,15 @@ public struct DrawingWeeklySummaryView: View {
                 alignment: .leading,
                 spacing: 16
             ) {
-                TileCard(title: "한 주 동안") {
+                TileCard(title: ChartCatalog.string("한 주 동안", locale: locale)) {
                     latestDrawingHistoryTile
                 }
 
-                TileCard(title: "하루 평균") {
+                TileCard(title: ChartCatalog.string("하루 평균", locale: locale)) {
                     weeklyAverageTile
                 }
 
-                TileCard(title: "가장 많이 쓴 장") {
+                TileCard(title: ChartCatalog.string("가장 많이 쓴 장", locale: locale)) {
                     topChapterTile
                 }
             }
@@ -67,12 +70,12 @@ public struct DrawingWeeklySummaryView: View {
 
     private var latestDrawingHistoryTile: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("\(store.weekTotalCount)절")
+            Text("\(store.weekTotalCount)절", bundle: .module, comment: "절 수 — 영어는 복수형(1 verse · 3 verses)")
                 .font(.title2)
                 .foregroundStyle(CarveColor.ink)
                 .monospacedDigit()
 
-            Text("최근")
+            Text("최근", bundle: .module, comment: "주간 요약 — 최근에 필사한 절 목록 머리")
                 .font(CarveTypography.caption)
                 .foregroundStyle(CarveColor.secondary)
                 .padding(.top, 6)
@@ -90,7 +93,7 @@ public struct DrawingWeeklySummaryView: View {
                     Button {
                         send(.recentVerseTapped(item))
                     } label: {
-                        Text("• \(item.message)")
+                        Text(verbatim: "• \(item.message(locale: locale))")
                     }
                     .font(CarveTypography.label)
                     .foregroundStyle(CarveColor.ink)
@@ -105,12 +108,12 @@ public struct DrawingWeeklySummaryView: View {
 
     private var weeklyAverageTile: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("\(store.weekAverageText)절")
+            Text("\(store.state.weekAverageText(locale: locale))절", bundle: .module, comment: "평균 절 수(소수 한 자리, 예: 1.7절 · 1.7 verses)")
                 .font(.title2)
                 .foregroundStyle(CarveColor.ink)
                 .monospacedDigit()
 
-            Text("최근 장")
+            Text("최근 장", bundle: .module, comment: "주간 요약 — 최근에 필사한 장 목록 머리")
                 .font(CarveTypography.caption)
                 .foregroundStyle(CarveColor.secondary)
                 .padding(.top, 6)
@@ -131,7 +134,7 @@ public struct DrawingWeeklySummaryView: View {
                     Button {
                         send(.recentChapterTapped(item))
                     } label: {
-                        Text("• \(item.title.koreanTitle()) \(item.chapter)장")
+                        Text(verbatim: "• \(BibleReference(chartChapter: item).text(locale: locale))")
                     }
                     .font(CarveTypography.label)
                     .foregroundStyle(CarveColor.ink)
@@ -151,11 +154,12 @@ public struct DrawingWeeklySummaryView: View {
                     send(.topChapterTapped)
                 } label: {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("\(topChapter.chapter.title.koreanTitle()) \(topChapter.chapter.chapter)장")
+                        // 번역본이 섞이는 자리라 영어 번역본만 약칭을 붙인다(영어 현지화 결정 11 · 사용자 결정 17).
+                        Text(verbatim: BibleReference(chartChapter: topChapter.chapter).text(locale: locale))
                             .font(.title3)
                             .foregroundStyle(CarveColor.ink)
                             .lineLimit(2)
-                        Text("\(topChapter.count)절")
+                        Text("\(topChapter.count)절", bundle: .module, comment: "절 수 — 영어는 복수형(1 verse · 3 verses)")
                             .font(CarveTypography.label)
                             .foregroundStyle(CarveColor.secondary)
                             .monospacedDigit()
@@ -163,7 +167,7 @@ public struct DrawingWeeklySummaryView: View {
                 }
                 .buttonStyle(.plain)
             } else {
-                Text("기록 없음")
+                Text("기록 없음", bundle: .module, comment: "주간 요약 — 가장 많이 쓴 장이 없다")
                     .font(.title3)
                     .foregroundStyle(CarveColor.secondary)
             }
@@ -171,8 +175,10 @@ public struct DrawingWeeklySummaryView: View {
             Spacer(minLength: 0)
 
             if store.topChapter != nil {
-                Button("이어서 쓰기") {
+                Button {
                     send(.topChapterTapped)
+                } label: {
+                    Text("이어서 쓰기", bundle: .module, comment: "주간 요약 — 가장 많이 쓴 장을 열어 이어서 필사한다")
                 }
                 .font(CarveTypography.label)
                 .foregroundStyle(CarveColor.accent)

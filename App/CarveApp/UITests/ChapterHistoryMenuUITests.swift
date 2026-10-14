@@ -12,6 +12,8 @@
 
 import XCTest
 
+/// `XCUIApplication` · `XCUIElement` 는 MainActor 다 — 시험 클래스를 타입 단위로 MainActor 에 둔다.
+@MainActor
 final class ChapterHistoryMenuUITests: XCTestCase {
 
     /// 절 메뉴 항목 식별자 (`VerseMenuOverlay`).

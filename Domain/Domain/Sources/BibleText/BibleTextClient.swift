@@ -32,33 +32,30 @@ public extension DependencyValues {
     }
 }
 
+/// 번들 본문 리소스에서 장을 읽는다.
+///
+/// 파일은 장의 번역본이 정한다 — 이름은 `Translation.resourceFileName(for:)`(개역개정 `1-01Genesis.txt`, 영어 `KJV-1-01Genesis.txt`),
+/// 인코딩은 `Translation.textEncoding`(개역개정 CP949, 영어 UTF-8)이다. 리소스는 번들 루트에 평평하게 들어가므로 하위 폴더 없이 이름으로 찾는다.
+/// 줄 문법은 번역본과 상관없이 같아(`장:절 [<소제목>] 본문`, 줄 CR) 파서는 하나다.
 struct ResourceBibleTextClient: BibleTextClient {
+    /// 역할: 장의 번역본 본문 파일을 읽어 그 장의 절 목록을 만든다.
+    /// 입력 · 출력: 번역본이 든 장 → 절 목록. 리소스가 없으면 빈 목록, 읽기 · 디코딩에 실패하면 `fetchSentenceError`.
+    /// 부작용: 번들 파일 읽기.
     func fetch(chapter: BibleChapter) throws -> [BibleVerse] {
-        let encodingEUCKR = CFStringConvertEncodingToNSStringEncoding(0x0422)
+        let translation = chapter.translation
 
-        guard let textPath = ResourcesResources.bundle.path(forResource: chapter.title.rawValue, ofType: nil) else {
+        guard let textPath = ResourcesResources.bundle.path(
+            forResource: translation.resourceFileName(for: chapter.title),
+            ofType: nil
+        ) else {
             return []
         }
 
         do {
-            let bible = try String(
-                contentsOfFile: textPath,
-                encoding: String.Encoding(rawValue: encodingEUCKR)
-            )
+            let bible = try String(contentsOfFile: textPath, encoding: translation.textEncoding)
 
-            return try bible.components(separatedBy: "\r")
-                .filter {
-                    guard let num = $0.components(separatedBy: ":").first,
-                          let first = Int(num) else {
-                        throw BibleTextClientError.chapterConvertError
-                    }
-                    return first == chapter.chapter
-                }
-                .map { sentence in
-                    BibleVerse(title: chapter, sentence: sentence)
-                }
-        } catch let error as BibleTextClientError {
-            throw error
+            // 절 번호 없이 이어지는 줄 · 합쳐진 절 · 시편 권 표시는 파서가 앞 절 · 소제목으로 정리한다.
+            return BibleChapterTextParser.verses(in: bible, chapter: chapter)
         } catch {
             throw BibleTextClientError.fetchSentenceError
         }

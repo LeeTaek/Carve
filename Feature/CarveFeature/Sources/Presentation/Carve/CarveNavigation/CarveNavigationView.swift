@@ -18,10 +18,14 @@ import UIComponents
 public struct CarveNavigationView: View {
     @Bindable public var store: StoreOf<CarveNavigationFeature>
     @Environment(\.scenePhase) private var scenePhase
+    /// 화면 언어 — 권 이름 · 장 목록 제목 · 검색 칸 · 버튼 접근성 이름을 이 값으로 만든다(즉시 전환 단계 3).
+    @Environment(\.locale) private var locale
     @State private var searchText = ""
     @State private var testament: Testament
     /// 구약 · 신약이 각자 기억하는 목록의 첫 행. 두 구분의 스크롤을 분리한다.
     @State private var listAnchors: [Testament: BibleTitle] = [:]
+    /// 장 목록 ScrollView 의 높이. 선택한 장으로 옮길 때 목록 끝을 넘지 않는 위치를 고르는 데 쓴다.
+    @State private var chapterListHeight: CGFloat = 0
     
     public init(store: StoreOf<CarveNavigationFeature>) {
         self.store = store
@@ -74,25 +78,28 @@ public struct CarveNavigationView: View {
     /// 성경 선택 열. 탐색을 열어도 detail을 대체하지 않으므로 필사 화면은 계속 유지된다.
     private var sideBar: some View {
         VStack(spacing: CarveSpacing.small) {
-            Text("새기다")
+            // 앱 안 로고 — 앱 이름(ko 「새기다」 · en 「Carve」, 영어 현지화 결정 8).
+            Text("새기다", bundle: .module)
                 .font(CarveTypography.scripture(ResourcesFontFamily.NanumMyeongjo.regular.font(size: 22)))
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            TextField("성경 · 장 검색", text: $searchText)
+            TextField(CarveFeatureCatalog.string("성경 · 장 검색", locale: locale), text: $searchText)
                 .textFieldStyle(.plain)
                 .padding(.horizontal, CarveSpacing.medium)
                 .frame(height: CarveSize.minimumHitTarget)
                 .background(CarveColor.fill, in: RoundedRectangle(cornerRadius: CarveRadius.control, style: .continuous))
 
-            Picker("성경 구분", selection: $testament) {
-                Text("구약").tag(Testament.old)
-                Text("신약").tag(Testament.new)
+            Picker(selection: $testament) {
+                Text("구약", bundle: .module).tag(Testament.old)
+                Text("신약", bundle: .module).tag(Testament.new)
+            } label: {
+                Text("성경 구분", bundle: .module)
             }
             .pickerStyle(.segmented)
 
             ScrollView {
                 LazyVStack(spacing: 0) {
-                    Text("성경")
+                    Text("성경", bundle: .module)
                         .font(CarveTypography.caption)
                         .foregroundStyle(CarveColor.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -123,15 +130,16 @@ public struct CarveNavigationView: View {
                         .accessibilitySortPriority(-1)
                 }
                 HStack(spacing: CarveSpacing.xSmall) {
+                    // 번역본 고르기는 헤더 제목 메뉴로 옮겼다(영어 현지화 결정 19).
                     Spacer(minLength: 0)
                     // 차트 바로 왼쪽(시안 N3). 목록은 차트와 같이 앱 스택에 올린다.
-                    CarveIconButton(.star, accessibilityLabel: "즐겨찾기") {
+                    CarveIconButton(.star, accessibilityLabel: CarveFeatureCatalog.string("즐겨찾기", locale: locale)) {
                         send(.moveToFavorites)
                     }
-                    CarveIconButton(.chart, accessibilityLabel: "필사 차트") {
+                    CarveIconButton(.chart, accessibilityLabel: CarveFeatureCatalog.string("필사 차트", locale: locale)) {
                         send(.moveToChart)
                     }
-                    CarveIconButton(.settings, accessibilityLabel: "앱 설정") {
+                    CarveIconButton(.settings, accessibilityLabel: CarveFeatureCatalog.string("앱 설정", locale: locale)) {
                         send(.moveToSetting)
                     }
                 }
@@ -151,7 +159,10 @@ public struct CarveNavigationView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVGrid(
-                    columns: Array(repeating: GridItem(.fixed(CarveSize.minimumHitTarget), spacing: CarveSpacing.xSmall), count: 5),
+                    columns: Array(
+                        repeating: GridItem(.fixed(CarveSize.minimumHitTarget), spacing: CarveSpacing.xSmall),
+                        count: Self.chapterColumnCount
+                    ),
                     spacing: CarveSpacing.xSmall
                 ) {
                     ForEach(1...browsingTitle.lastChapter, id: \.self) { chapter in
@@ -160,20 +171,26 @@ public struct CarveNavigationView: View {
                     }
                 }
                 .padding(CarveSpacing.large)
+                .id(Self.chapterGridID)
             }
-            .onAppear {
-                if let chapter = store.selectedChapter {
-                    proxy.scrollTo(chapter, anchor: .center)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+                // 높이를 알아야 끝을 넘지 않는 위치를 고를 수 있으므로, 처음 높이를 받을 때 선택한 장으로 옮긴다.
+                let isFirstLayout = chapterListHeight == 0
+                chapterListHeight = height
+                if isFirstLayout {
+                    scrollToSelectedChapter(proxy)
                 }
             }
-            .onChange(of: store.selectedChapter) { _, chapter in
+            .onAppear {
+                scrollToSelectedChapter(proxy)
+            }
+            .onChange(of: store.selectedChapter) { _, _ in
                 // 성경을 고르면 필사 기록을 받은 뒤 정해진 기본 장으로 옮긴다.
-                guard let chapter else { return }
-                proxy.scrollTo(chapter, anchor: .center)
+                scrollToSelectedChapter(proxy)
             }
         }
         // 성경을 고른 직후 필사 기록을 읽는 동안은 선택한 장이 없어 성경 이름만 보인다.
-        .navigationTitle(store.selectedChapter.map { "\(browsingTitle.koreanTitle()) \($0)장" } ?? browsingTitle.koreanTitle())
+        .navigationTitle(Self.chapterListTitle(browsingTitle, chapter: store.selectedChapter, locale: locale))
         .background(CarveColor.surface)
     }
     
@@ -192,6 +209,19 @@ public struct CarveNavigationView: View {
         }
     }
 
+    /// 선택한 장이 보이도록 장 목록을 옮긴다.
+    private func scrollToSelectedChapter(_ proxy: ScrollViewProxy) {
+        guard let chapter = store.selectedChapter, chapterListHeight > 0 else { return }
+        switch Self.chapterListScroll(to: chapter, lastChapter: browsingTitle.lastChapter, viewportHeight: chapterListHeight) {
+        case .top:
+            proxy.scrollTo(Self.chapterGridID, anchor: .top)
+        case .bottom:
+            proxy.scrollTo(Self.chapterGridID, anchor: .bottom)
+        case .center(let chapter):
+            proxy.scrollTo(chapter, anchor: .center)
+        }
+    }
+
     /// 지금 보고 있는 구분의 스크롤 위치. 구분을 바꾸면 그 구분이 기억한 자리로 돌아간다.
     private var scrollAnchor: Binding<BibleTitle?> {
         Binding(
@@ -207,7 +237,7 @@ public struct CarveNavigationView: View {
     private var filteredTitles: [BibleTitle] {
         let titles = testament == .old ? Array(BibleTitle.allCases[0..<39]) : Array(BibleTitle.allCases[39..<66])
         guard !searchText.isEmpty else { return titles }
-        return titles.filter { $0.koreanTitle().localizedCaseInsensitiveContains(searchText) }
+        return titles.filter { Self.titleMatches($0, searchText: searchText, locale: locale) }
     }
 
     /// 장 목록이 보여 줄 성경. 성경 열에서 고른 성경이 없으면 현재 성경이다.
@@ -221,12 +251,12 @@ public struct CarveNavigationView: View {
             send(.bibleTitleTapped(title))
         } label: {
             HStack(spacing: CarveSpacing.small) {
-                Text(title.koreanTitle())
+                Text(verbatim: title.localizedName(locale: locale))
                     .font(CarveTypography.body)
                 Spacer(minLength: 0)
                 if isSelected {
                     // 선택한 성경의 마지막 장을 보여준다. 선택한 장은 장 목록에서 강조한다.
-                    Text("\(title.lastChapter)장")
+                    Text("\(title.lastChapter)장", bundle: .module)
                         .font(CarveTypography.caption)
                         .foregroundStyle(CarveColor.accent)
                 }
@@ -237,7 +267,7 @@ public struct CarveNavigationView: View {
             .background(isSelected ? CarveColor.selected : .clear, in: RoundedRectangle(cornerRadius: CarveRadius.control, style: .continuous))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(isSelected ? "\(title.koreanTitle()), 총 \(title.lastChapter)장" : title.koreanTitle())
+        .accessibilityLabel(Self.titleAccessibilityLabel(title, isSelected: isSelected, locale: locale))
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
@@ -251,7 +281,8 @@ public struct CarveNavigationView: View {
         return Button {
             // selectedChapter 는 목록의 강조만 나타낸다. 도메인 이동 액션으로 보내야
             // 장 상태·detail 전환·본문 로딩이 한 흐름으로 처리된다.
-            send(.chapterTapped(BibleChapter(title: browsingTitle, chapter: chapter)))
+            // 장 목록은 지금 번역본의 장을 연다 — 번역본은 헤더 제목 메뉴에서 따로 바꾼다.
+            send(.chapterTapped(BibleChapter(title: browsingTitle, chapter: chapter, translation: store.currentTitle.translation)))
         } label: {
             Text(chapter.description)
                 .font(CarveTypography.body)
@@ -260,9 +291,71 @@ public struct CarveNavigationView: View {
                 .background(background, in: RoundedRectangle(cornerRadius: CarveRadius.control, style: .continuous))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(chapter)장")
-        .accessibilityValue(isDrawn ? "필사 기록 있음" : "")
+        // 장 번호만 적힌 버튼이라 권 이름을 함께 읽는다(「창세기 1장」 · 「Genesis 1」).
+        .accessibilityLabel(BibleReference(title: browsingTitle, chapter: chapter).text(locale: locale))
+        .accessibilityValue(isDrawn ? Text("필사 기록 있음", bundle: .module) : Text(verbatim: ""))
         .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+}
+
+/// 장 목록을 선택한 장으로 옮기는 방법.
+enum ChapterListScroll: Equatable {
+    /// 목록 맨 위. 장이 첫 화면 안에 있거나 목록이 한 화면에 들어온다.
+    case top
+    /// 목록 맨 아래. 장이 마지막 화면 안에 있다.
+    case bottom
+    /// 장을 가운데로.
+    case center(Int)
+}
+
+extension CarveNavigationView {
+    /// 역할: 장 목록 열의 제목(「창세기 1장」 · 「Genesis 1」). 성경을 고른 직후 장을 정하기 전에는 권 이름만 적는다.
+    /// 입력 · 출력: 보고 있는 권 · 선택한 장(nil 이면 권 이름만) · 로케일(뷰는 환경 locale 을 넘긴다) → 제목 문자열.
+    /// 부작용: 없음.
+    static func chapterListTitle(_ title: BibleTitle, chapter: Int?, locale: Locale) -> String {
+        guard let chapter else { return title.localizedName(locale: locale) }
+        return BibleReference(title: title, chapter: chapter).text(locale: locale)
+    }
+
+    /// 역할: 권 검색어가 이 권에 맞는가. 화면 언어 이름 · 한국어 이름 · 고정 영문 이름(`englishName`) 중 하나라도 맞으면 맞다 —
+    ///   화면 언어와 상관없이 한국어 · 영어 어느 쪽으로 찾아도 나온다.
+    /// 입력 · 출력: 권 · 검색어 · 로케일(뷰는 환경 locale 을 넘긴다) → 맞으면 true.
+    /// 부작용: 없음.
+    static func titleMatches(_ title: BibleTitle, searchText: String, locale: Locale) -> Bool {
+        [title.localizedName(locale: locale), title.localizedName(locale: Locale(identifier: "ko")), title.englishName]
+            .contains { $0.localizedCaseInsensitiveContains(searchText) }
+    }
+
+    /// 역할: 성경 목록 행의 VoiceOver 이름. 고른 권은 장 수를 함께 읽는다(「창세기, 총 50장」 · 「Genesis, 50 chapters」).
+    /// 입력 · 출력: 권 · 고른 권인가 · 로케일(뷰는 환경 locale 을 넘긴다) → 이름.
+    /// 부작용: 없음.
+    static func titleAccessibilityLabel(_ title: BibleTitle, isSelected: Bool, locale: Locale) -> String {
+        let name = title.localizedName(locale: locale)
+        guard isSelected else { return name }
+        return "\(name), \(CarveFeatureCatalog.string("총 \(title.lastChapter)장", locale: locale))"
+    }
+
+    static let chapterColumnCount = 5
+    /// 장 그리드 전체의 스크롤 id. 목록 맨 위 · 맨 아래로 옮길 때 쓴다.
+    static let chapterGridID = "chapterGrid"
+
+    /// 선택한 장을 가운데로 맞추되, 그러려면 목록 끝을 넘어야 하는 장은 그 끝에 붙인다.
+    ///
+    /// iPadOS 27.2 는 `scrollTo(_:anchor: .center)` 를 목록 끝에서 멈추지 않는다. 맨 위 장(창세기 1장 등)을 가운데로 맞추면
+    /// 목록이 위로 당겨진 채 남아 큰 제목과 장 목록이 함께 아래로 내려앉고, 한 번 스크롤해야 제자리로 돌아온다(26.x 는 끝에서 멈춘다).
+    /// 레이아웃 차이(큰 제목 높이 등)를 감안해 끝에서 한 행 안쪽까지는 끝에 붙인다.
+    static func chapterListScroll(to chapter: Int, lastChapter: Int, viewportHeight: CGFloat) -> ChapterListScroll {
+        let rowPitch = CarveSize.minimumHitTarget + CarveSpacing.xSmall
+        let row = CGFloat((chapter - 1) / chapterColumnCount)
+        let rowCount = CGFloat((lastChapter + chapterColumnCount - 1) / chapterColumnCount)
+        let contentHeight = CarveSpacing.large * 2 + rowCount * rowPitch - CarveSpacing.xSmall
+        guard contentHeight > viewportHeight else { return .top }
+
+        let rowCenter = CarveSpacing.large + row * rowPitch + CarveSize.minimumHitTarget / 2
+        let centeredOffset = rowCenter - viewportHeight / 2
+        if centeredOffset <= rowPitch { return .top }
+        if centeredOffset >= contentHeight - viewportHeight - rowPitch { return .bottom }
+        return .center(chapter)
     }
 }
 

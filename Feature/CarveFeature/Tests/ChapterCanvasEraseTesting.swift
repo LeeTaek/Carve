@@ -43,7 +43,8 @@ struct ChapterCanvasEraseTesting {
         await store.send(.eraseRequested(at: Self.pointInVerse))
         let alert = try #require(store.state.eraseAlert)
         let title = String(state: alert.title)
-        #expect(title.contains(CanvasTestSupport.chapter.title.koreanTitle()))
+        // 확인창은 띄우는 순간의 화면 언어(`AppLanguage.displayLocale()`)로 만든다 — 시험은 ko-KR 이고 앱 안에서 고른 언어가 없다.
+        #expect(title.contains(CanvasTestSupport.chapter.title.localizedName(locale: Locale(identifier: "ko"))))
         #expect(title.contains("\(CanvasTestSupport.chapter.chapter)장"))
         #expect(title.contains("\(Self.verse)절"))
         let message = String(state: try #require(alert.message))

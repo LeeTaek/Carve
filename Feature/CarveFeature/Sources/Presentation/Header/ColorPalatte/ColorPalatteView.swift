@@ -18,6 +18,8 @@ import UIComponents
 @ViewAction(for: ColorPalatteFeature.self)
 public struct ColorPalatteView: View {
     @Bindable public var store: StoreOf<ColorPalatteFeature>
+    /// 화면 언어 — 제목 · 묶음 제목 · 색 이름을 이 값으로 만든다(즉시 전환 단계 3).
+    @Environment(\.locale) private var locale
 
     /// 시안의 6 × 2 배치. 타일은 44pt 터치 영역을 갖는다(디자인 문서 5장).
     private static let columns = Array(
@@ -31,8 +33,8 @@ public struct ColorPalatteView: View {
 
     public var body: some View {
         VStack(spacing: 0) {
-            CarvePanelHeader("필기 색상") {
-                Button("완료") { send(.done) }
+            CarvePanelHeader(CarveFeatureCatalog.string("필기 색상", locale: locale)) {
+                Button { send(.done) } label: { Text("완료", bundle: .module) }
                     .font(CarveTypography.body)
                     .foregroundStyle(CarveColor.accent)
                     .buttonStyle(.plain)
@@ -40,10 +42,10 @@ public struct ColorPalatteView: View {
             }
 
             VStack(alignment: .leading, spacing: CarveSpacing.small) {
-                sectionTitle("기본 색상")
+                sectionTitle(CarveFeatureCatalog.string("기본 색상", locale: locale))
                 colorGrid
 
-                sectionTitle("선택한 색상")
+                sectionTitle(CarveFeatureCatalog.string("선택한 색상", locale: locale))
                 InkPreview(
                     color: Color(uiColor: store.selectedColor.color),
                     lineWidth: store.pencilConfig.lineWidth
@@ -88,7 +90,7 @@ public struct ColorPalatteView: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(Self.colorName(color))
+                .accessibilityLabel(Self.colorName(color, locale: locale))
                 .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
             }
         }
@@ -100,7 +102,7 @@ public struct ColorPalatteView: View {
     /// 필사 화면에서 밑줄과 섞여 사용자가 왜 흐린지 알기 어렵다.
     private var customColorRow: some View {
         ColorPicker(selection: customColorBinding, supportsOpacity: false) {
-            Text("다른 색상 고르기")
+            Text("다른 색상 고르기", bundle: .module)
                 .font(CarveTypography.body)
                 .foregroundStyle(CarveColor.ink)
         }
@@ -116,15 +118,21 @@ public struct ColorPalatteView: View {
         )
     }
 
-    /// VoiceOver 가 읽을 색 이름. 시안 P1 의 12색 순서와 같다.
-    static func colorName(_ color: UIColor) -> String {
+    /// 역할: VoiceOver 가 읽을 색 이름. 시안 P1 의 12색 순서와 같다.
+    /// 입력 · 출력: 색 · 로케일(뷰는 환경 locale 을 넘긴다) → 이름. 기본 색이 아니면 「색상」.
+    /// 부작용: 없음.
+    static func colorName(_ color: UIColor, locale: Locale) -> String {
         let names = [
-            "먹색", "초록", "갈색", "붉은색", "파랑", "보라",
-            "노랑", "흰색", "회색", "짙은 초록", "분홍", "베이지"
+            CarveFeatureCatalog.string("먹색", locale: locale), CarveFeatureCatalog.string("초록", locale: locale),
+            CarveFeatureCatalog.string("갈색", locale: locale), CarveFeatureCatalog.string("붉은색", locale: locale),
+            CarveFeatureCatalog.string("파랑", locale: locale), CarveFeatureCatalog.string("보라", locale: locale),
+            CarveFeatureCatalog.string("노랑", locale: locale), CarveFeatureCatalog.string("흰색", locale: locale),
+            CarveFeatureCatalog.string("회색", locale: locale), CarveFeatureCatalog.string("짙은 초록", locale: locale),
+            CarveFeatureCatalog.string("분홍", locale: locale), CarveFeatureCatalog.string("베이지", locale: locale)
         ]
         guard let index = ColorPalatteFeature.defaultColors.firstIndex(where: { $0.isSameColor(as: color) }),
               index < names.count else {
-            return "색상"
+            return CarveFeatureCatalog.string("색상", locale: locale)
         }
         return names[index]
     }
