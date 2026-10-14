@@ -471,7 +471,10 @@ id          = ("row-" | "draft-") + SHA-256(정규 문자열) 소문자 hex 64�
 1. 작업 기록에 끝난 장이면 건너뛴다(이어 하기). 다시 써도 같은 지문은 `skipSame` 이라 결과는 같다.
 2. `DrawingEditEnvironmentClient.current()` 로 **최신 환경**을 읽는다. `SyncedWriteBlock.check(env) != nil` 이면 그 장부터 멈추고 `.blocked(사유, doneChapters:, tally:)`,
    `env.storeOwnership != targetScope`(대상 계정이 없던 검사 포함)면 `.accountChanged(doneChapters:, tally:)` 다(`LiveBackupImporter.stopReason`). 이미 쓴 장은
-   그대로 둔다 — 이미 동기화됐을 수 있어 되돌리지 않는다. 작업 기록은 「멈춤」 으로 남는다(이어 하기 대상).
+   그대로 둔다 — 이미 동기화됐을 수 있어 되돌리지 않는다. 작업 기록은 「멈춤」 으로 남고(이어 하기 대상), **끝난 장 · 수를 비운다**
+   (`LiveBackupImporter.forgetDoneChapters` — 이어 하면 처음부터 다시 판정한다. 2026-10-14 출시 시험 D12: iCloud 로그아웃 · 계정 전환은 시스템이 이 기기의
+   동기화 데이터를 비워, 올라가기 전의 장이 사라졌는데 끝난 장으로 건너뛰어 빠진 채 끝났다. 다시 판정하면 남은 행은 `skipSame` 으로 건너뛴다). 장을 쓴 뒤
+   서버 작업 표가 무효가 돼 `.accountChanged` 로 멈출 때(5 아래)도 같다. 멈춘 화면의 보고는 비우기 전에 만들어 이번에 넣은 수를 보인다.
 3. 그 장의 항목과 항목이 가리키는 blob 바이트로 명령을 만든다(`BackupChapterRestoreCommand(items:blobs:)` — 지원 판정을 **이 바이트로** 다시 계산해 미리보기와 같다).
    `DrawingBackupRestoring.restore(command, chapter:, generation:)` — 같은 actor 구간에서 세대를 확인하고, 그 장의 행을 `BackupRowRecord` 로 **다시 읽어 판정을 다시 한
    뒤**(미리보기 뒤 동기화로 바뀐 것 반영) 넣을 행과 대표 고정을 **한 트랜잭션**으로 쓴다(아래). 세대가 적용을 시작할 때와 다르면(그 사이 「모든 필사 삭제」)
@@ -666,6 +669,7 @@ null 묶음(개역개정)에 섞이지 않는다. 장 단위 조회도 번역본
   세대 바뀜 · 쓰기 실패 · 취소) `stopped` 이고 둘 다 이어 하기 대상이다. 적용을 시작하면 이 작업 밖의 기록은 지운다 — 작업 기록은 늘 하나다.
 - `pendingJob()` 은 적용을 시작한 끝나지 않은 작업 중 가장 최근 것 하나(`BackupImportJob`)를 내놓고, **지금 환경의 계정 범위가 `targetScope` 와 같을 때만**
   `canResume` 이다 — 「이어서 불러오기」: 암호 → `resume(_:password:)`(같은 작업 id 로 사본을 다시 검사) → 끝난 장을 건너뛰고 적용.
+  끝난 장이 남는 것은 쓰기 실패 · 취소 · 앱 종료로 멈춘 경우뿐이다 — 막힘 · 계정 바뀜 · 세대 바뀜은 끝난 장을 비워 처음부터 다시 판정한다(위 2 · 3).
 - 다르면 이어 하지 않는다 — **A 계정에서 일부 적용한 작업을 B 계정 저장소에 잇지 않는다**(`resume` 은 `jobFromOtherAccount`). 「버리기」(`discard(_ job:)`) 또는
   「이 계정으로 처음부터」(`restart(_:password:)` — 사본을 새로 검사해 새 작업 · 새 `targetScope` 를 만들고, 새 검사가 되면 옛 작업을 지운다)만 보인다(지금 연결되지
   않았으면 처음부터 해도 미리보기까지다).

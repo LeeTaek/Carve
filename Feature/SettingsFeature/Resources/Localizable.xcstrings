@@ -459,31 +459,19 @@
         }
       }
     },
-    "iCloud 계정이 바뀌어 불러오기를 멈췄어요. 넣은 장 %lld개는 그대로 있어요." : {
-      "comment" : "설정 › 필사 백업 — 백업 불러오기 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+    "iCloud 계정이 바뀌어 불러오기를 멈췄어요. 같은 계정으로 ‘백업 불러오기’를 다시 열면 처음부터 다시 확인해 빠진 필사만 넣어요." : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기",
       "localizations" : {
         "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Import stopped because your iCloud account changed. The %lld chapter already added stays as it is."
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Import stopped because your iCloud account changed. The %lld chapters already added stay as they are."
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import stopped because your iCloud account changed. Open ‘Import Backup’ again with the same account to recheck from the start and add only what's missing."
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iCloud 계정이 바뀌어 불러오기를 멈췄어요. 넣은 장 %lld개는 그대로 있어요."
+            "value" : "iCloud 계정이 바뀌어 불러오기를 멈췄어요. 같은 계정으로 ‘백업 불러오기’를 다시 열면 처음부터 다시 확인해 빠진 필사만 넣어요."
           }
         }
       }
@@ -3400,41 +3388,19 @@
         }
       }
     },
-    "불러오기를 멈췄어요. %@ 넣은 장 %lld개는 그대로 있어요." : {
-      "comment" : "설정 › 필사 백업 — 백업 불러오기 — 형식 문자열(%lld 는 수, %@ 는 문구)",
+    "불러오기를 멈췄어요. %@ ‘백업 불러오기’를 다시 열면 처음부터 다시 확인해 빠진 필사만 넣어요." : {
+      "comment" : "설정 › 필사 백업 — 백업 불러오기 — 형식 문자열(%@ 는 문구)",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Import stopped. %1$@ The %#@chapters@."
-          },
-          "substitutions" : {
-            "chapters" : {
-              "argNum" : 2,
-              "formatSpecifier" : "lld",
-              "variations" : {
-                "plural" : {
-                  "one" : {
-                    "stringUnit" : {
-                      "state" : "translated",
-                      "value" : "%arg chapter already added stays as it is"
-                    }
-                  },
-                  "other" : {
-                    "stringUnit" : {
-                      "state" : "translated",
-                      "value" : "%arg chapters already added stay as they are"
-                    }
-                  }
-                }
-              }
-            }
+            "value" : "Import stopped. %@ Open ‘Import Backup’ again to recheck from the start and add only what's missing."
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "불러오기를 멈췄어요. %@ 넣은 장 %lld개는 그대로 있어요."
+            "value" : "불러오기를 멈췄어요. %@ ‘백업 불러오기’를 다시 열면 처음부터 다시 확인해 빠진 필사만 넣어요."
           }
         }
       }

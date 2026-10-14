@@ -42,13 +42,9 @@ struct SettingsFeatureEnglishCopyTesting {
         #expect(BackupCopy.resultTitle(.completed(tally), locale: english) == "Import finished.")
         #expect(BackupCopy.resultTitle(.completed(Import.Tally(same: 1)), locale: english) == "Import finished. No new writing was added.")
         #expect(BackupCopy.resultTitle(.blocked(.signedOut, doneChapters: 2, tally: tally), locale: english)
-            == "Import stopped. Sign in to iCloud and reopen the app to import. The 2 chapters already added stay as they are.")
-        #expect(BackupCopy.resultTitle(.blocked(.connectionHeld, doneChapters: 1, tally: tally), locale: english)
-            == "Import stopped. Sign in to iCloud and reopen the app to import. The 1 chapter already added stays as it is.")
-        #expect(BackupCopy.resultTitle(.accountChanged(doneChapters: 1, tally: tally), locale: english)
-            == "Import stopped because your iCloud account changed. The 1 chapter already added stays as it is.")
+            == "Import stopped. Sign in to iCloud and reopen the app to import. Open ‘Import Backup’ again to recheck from the start and add only what's missing.")
         #expect(BackupCopy.resultTitle(.accountChanged(doneChapters: 3, tally: tally), locale: english)
-            == "Import stopped because your iCloud account changed. The 3 chapters already added stay as they are.")
+            == "Import stopped because your iCloud account changed. Open ‘Import Backup’ again with the same account to recheck from the start and add only what's missing.")
         #expect(BackupCopy.resultTitle(.generationChanged(tally: tally), locale: english).hasPrefix("Stopped because all writing was deleted while adding."))
     }
 

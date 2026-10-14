@@ -44,7 +44,7 @@ struct BackupImportOutcomeTesting {
 
     // MARK: 멈춤
 
-    @Test("쓰기 게이트가 막혀 멈추면 그 사유와 넣은 장 수를 보인다 — 미로그인 · 보류는 로그인 뒤 다시 열기",
+    @Test("쓰기 게이트가 막혀 멈추면 그 사유와 다시 열면 처음부터 다시 확인한다는 안내를 보인다 — 미로그인 · 보류는 로그인 뒤 다시 열기",
           arguments: [SyncedWriteBlock.signedOut, .connectionHeld])
     func blockedReportShowsRelaunchGuidance(block: SyncedWriteBlock) async {
         let tally = BackupImportTally(new: 2, same: 1)
@@ -53,7 +53,9 @@ struct BackupImportOutcomeTesting {
 
         await apply(reporting: .success(report), expecting: result)
         #expect(BackupCopy.resultTitle(result, locale: Self.koreanLocale)
-            == "불러오기를 멈췄어요. iCloud 에 로그인한 뒤 앱을 다시 열면 불러올 수 있어요. 넣은 장 2개는 그대로 있어요.")
+            == "불러오기를 멈췄어요. iCloud 에 로그인한 뒤 앱을 다시 열면 불러올 수 있어요. ‘백업 불러오기’를 다시 열면 처음부터 다시 확인해 빠진 필사만 넣어요.")
+        // 로그아웃 정리로 넣은 장이 사라질 수 있어 「그대로 있어요」 라고 하지 않는다(D12). 이번에 넣은 수는 수 줄이 보인다.
+        #expect(result.tally?.inserted == 2)
         #expect(!result.isCompleted)
     }
 
@@ -64,10 +66,10 @@ struct BackupImportOutcomeTesting {
 
         await apply(reporting: .success(report), expecting: result)
         #expect(BackupCopy.resultTitle(result, locale: Self.koreanLocale).contains(BackupCopy.importBlocked(.accountUnconfirmed, locale: Self.koreanLocale)))
-        #expect(BackupCopy.resultTitle(result, locale: Self.koreanLocale).hasSuffix("넣은 장 0개는 그대로 있어요."))
+        #expect(BackupCopy.resultTitle(result, locale: Self.koreanLocale).hasSuffix("처음부터 다시 확인해 빠진 필사만 넣어요."))
     }
 
-    @Test("iCloud 계정이 바뀌어 멈추면 「iCloud 계정이 바뀌어 불러오기를 멈췄어요. 넣은 장 N개는 그대로 있어요.」 와 그때까지의 실제 수")
+    @Test("iCloud 계정이 바뀌어 멈추면 같은 계정으로 다시 열면 처음부터 다시 확인한다고 말하고, 이번에 넣은 실제 수를 보인다")
     func accountChangedReport() async {
         let tally = BackupImportTally(new: 1, archived: 2)
         let report = BackupImportReport.accountChanged(
@@ -77,7 +79,8 @@ struct BackupImportOutcomeTesting {
         let result = Feature.ImportResult.accountChanged(doneChapters: 3, tally: Feature.Tally(new: 1, archived: 2))
 
         await apply(reporting: .success(report), expecting: result)
-        #expect(BackupCopy.resultTitle(result, locale: Self.koreanLocale) == "iCloud 계정이 바뀌어 불러오기를 멈췄어요. 넣은 장 3개는 그대로 있어요.")
+        #expect(BackupCopy.resultTitle(result, locale: Self.koreanLocale)
+            == "iCloud 계정이 바뀌어 불러오기를 멈췄어요. 같은 계정으로 ‘백업 불러오기’를 다시 열면 처음부터 다시 확인해 빠진 필사만 넣어요.")
         #expect(result.tally?.inserted == 3)
     }
 
