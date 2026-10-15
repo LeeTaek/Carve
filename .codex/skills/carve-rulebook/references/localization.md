@@ -6,6 +6,7 @@
   지금 실행은 앱 루트가 환경 `locale` 을 바꿔(`appLanguageOverride`) **다시 시작하지 않고 화면 전체가 바뀐다** — 키 기반 `Text("…", bundle:)` 은 저절로,
   미리 만드는 `String` 은 넘긴 locale 의 언어로(아래 9, 즉시 전환 단계 1 · 2 · 3). 새 화면 문구는 키 기반 `Text("…", bundle:)` 를 우선한다.
 - 영어 성경(KJV · BSB) 필사와 개역개정 필사를 **섞지 않는다** — 이미 나간 2.0.0 · 1.3.0 기기와 같은 iCloud 저장소를 쓴다.
+  2.2 의 필사책끼리도 같은 방식으로 섞지 않는다(아래 「필사책 귀속」, 설계 `docs/notebook-design.md`).
 - 결정의 원문과 이유는 설계 `docs/english-localization-design.md`(「결정 n」)다. 이 문서는 코드를 쓸 때 지킬 규칙만 둔다.
 
 ---
@@ -125,6 +126,43 @@
   같은 절의 번역본이 섞이지 않고, 영어 행의 열이 nil 이고, 개역개정 행 형식이 그대로인지).
 - 실제 두 기기 공존(2.0.0 기기와 iCloud)은 설계 §9 M4 가 출시 전 관문으로 본다.
 
+## 필사책 귀속 (2.2 회차별 필사책 — 동결)
+
+**다른 필사책의 행은 권 이름(`titleName`) 앞에 필사책 접두를 붙여 구분한다. 기본 필사책 행은 지금 형식 그대로다. 필사책 정보(이름 · 상태 · 시각)는 V7 엔티티 `DrawingNotebook` 에 둔다.**
+번역본 귀속과 같은 방식 · 같은 근거다. 결정의 원문과 이유는 설계 `docs/notebook-design.md`(「결정 n」 · 혼재 버전 규칙 ①~⑥)다.
+
+| 행 | `titleName` | `translation` 열 | 읽을 때 필사책 |
+|---|---|---|---|
+| 기본 필사책(지금까지의 모든 필사) | 번역본 귀속 그대로 — `1-19Psalms.txt` · `KJV-1-19Psalms.txt` | 번역본 귀속 그대로 | `NotebookID.default` |
+| 다른 필사책 | `"nb_" + NotebookID.rawValue + "~" + 기본 형식`(예 `nb_0f3a…~KJV-1-19Psalms.txt`) — rawValue 는 소문자 16진 32자리 | 번역본 귀속 그대로 — 필사책을 열에 적지 않는다 | 접두의 필사책 |
+| 접두 형식이 틀림(대문자 · 길이 · `~` 없음 · `nb_default~`) | — | — | 풀지 못함(nil) — 건너뛴다 |
+
+1) **혼재 버전 규칙(동결).** 같은 iCloud 를 2.0.0 · 2.1 기기가 함께 쓴다. 옛 앱은 `BibleDrawing` 을 `titleName ==` 로만 찾고 모르는 `titleName` 은 건너뛴다 — 이 동작에 기댄다.
+   - ① 기본 필사책 행 형식(`titleName` · `translation` 열 · business id)을 바꾸지 않는다. 기존 행은 고치지 않는다.
+   - ② 필사책을 `translation` 등 기존 열로 판정하지 않는다 — 옛 앱이 레코드에 없는 열을 스키마 기본값으로 채워 되올린다(2.1.0 출시 시험 EN-M4 관찰 ①).
+   - ③ `FavoriteVerse` 에 필사책 접두를 쓰지 않는다(즐겨찾기 · 위젯은 필사책 공통 사본). V6 의 `VerseDrawingVersion` · `DrawingEraseEpoch` 에는 아무것도 쓰지 않는다(운영 배포 대상이 는다).
+   - ④ `DrawingNotebook` 상태는 열거형 열이 아니라 String 열이고, 모르는 값 · nil 은 active 로 읽는다(`NotebookStatus(stored:)`) — 번역본 귀속 1) 의 U3 와 같은 이유.
+   - ⑤ 백업은 `formatVersion` 2 로 쓴다. 2.2 는 1 · 2 를 모두 읽고 1 은 전부 기본 필사책이다. 2.1 은 형식 2 파일 전체를 거부하고 업데이트를 안내한다.
+   - ⑥ 지운 필사책의 행이 늦게 오거나 메타데이터보다 행이 먼저 오면 「이름 없는 필사책」 으로 보인다 — 숨기거나 기본 필사책에 합치지 않는다.
+2) **짓고 푸는 것은 Domain `StoredBookKey` 만 쓴다** — `titleName(for: NotebookChapter)` · `titleName(title:translation:notebook:)` · `decodeRow(_:)`(`StoredRowKey` — 권 · 번역본 · 필사책).
+   `"nb_"` · `"~"` 를 직접 이어 붙이거나 자르지 않고, 조회 술어의 `titleName == …` 도 page 로 짓는다. 기본 필사책에 접두(`nb_default~`)를 만들지 않는다.
+   옛 `titleName(for: BibleChapter)` · `titleName(title:translation:)` · `decode(_:)` 의 뜻은 「기본 필사책」 이고(옛 `decode` 는 접두 행에 nil) 과도기 뒤 지운다 — 새 코드는 부르지 않는다.
+   기기 안 초안 파일 이름도 같은 토큰을 앞에 붙인다(기본 필사책은 지금 이름 그대로).
+3) **저장 경로는 `NotebookChapter`(필사책 + 장)를 기본값 없는 인자로 나른다** — 저장소 · 캔버스 · 초안 · 이전 필사 · 탐색 칠하기 · 가져오기 · 백업.
+   `NotebookChapter.init(notebook:chapter:)` 와 page · notebook 인자에 기본값(`.default`)을 두지 않는다 — 빠뜨린 곳이 조용히 기본 필사책에 쓰지 않고 컴파일 오류로 드러나게.
+   `BibleChapter` 에 필사책 필드를 더하지 않는다(`==` 가 바뀌면 탐색 선택 비교가 흔들린다). 본문 · 탐색 선택 · 위젯은 `BibleChapter` 그대로다.
+   DTO 에 더하는 필드(`VerseDrawingSnapshot.notebook` · `DrawingActivity.page`)만 init 끝에 기본값을 둘 수 있다.
+4) **지금 필사책은 `@Shared(.currentNotebookID)`**(`.appStorage("currentNotebookID")`, 기본 「default」, 기기마다 — 동기화하지 않는다). 읽을 때 `NotebookID(rawValue:)` 가 nil 이거나
+   목록에 없으면(다른 기기에서 지움) 기본이다. 위젯 · 필사 알림 · 즐겨찾기에서 여는 장은 지금 필사책으로 연다.
+5) **표시.** 필사책 이름은 사용자 입력이라 옮기지 않는다(`Text(verbatim:)` 꼴). 메타데이터에 이름이 없는 기본 필사책은 화면 언어의 「첫 번째 필사」(en 「First Notebook」),
+   그 밖의 이름 없는 필사책은 「이름 없는 필사책」(en 「Untitled Notebook」). 영어 용어: 필사 = Writing, 필사책 = Notebook, 책장 = Notebooks.
+   이름 제안은 ko 「두 번째 필사」 … 「열 번째 필사」 · 「11번째 필사」 꼴, en 「Notebook 2」 꼴 — 서수를 문자열로 잇지 않고 카탈로그로 쓴다(3). 쓴 절 수는 복수형, 시작 월은 환경 locale 서식(4).
+   기존 문서의 「회차」 는 절의 보관 행(`isPresent`)이다 — 필사책을 코드 · 문서 · 화면에서 「회차」 라고 부르지 않는다.
+- 기계 검사: lint 없음 — 리뷰와 시험으로 본다(`StoredBookKeyNotebookTesting` · `NotebookIDTesting` · `DrawingSchemaV7MigrationTesting` · `NotebookDrawingIsolationTesting` ·
+  `NotebookRepositoryTesting` · `NotebookDraftTesting` · `BackupNotebookRoundTripTesting` · `NotebookSwitchTesting` — 기본 필사책 행 형식이 옛 함수와 같고, 같은 절의 필사책이 섞이지 않고,
+  옛 술어(`titleName == rawValue`)로 찾으면 접두 행이 잡히지 않는지).
+- 실제 두 기기 공존(2.0.0 · 2.1 기기와 iCloud)은 설계 §9 공존 C1 · C2 가 출시 전 관문으로 본다.
+
 ---
 
 ## Checklist (리뷰)
@@ -132,6 +170,7 @@
 - 수 · 날짜를 이어 붙이거나 `ko_KR` 로 고정하지 않았는가
 - 참조 · 권 이름을 `BibleReference.text(locale:)` · `localizedName(locale:)` 으로 만들었는가, 약칭 규칙(5)을 지켰는가
 - SwiftData 행에 영어 `translation` 값을 쓰지 않았는가, `titleName` 을 `StoredBookKey` 로만 짓고 풀었는가
+- 필사책: 기본 필사책 행 형식을 그대로 두고 필사책을 열이 아니라 `StoredBookKey` 접두로만 갈랐는가, 저장 경로가 `NotebookChapter` 를 기본값 없이 나르는가, `FavoriteVerse` · V6 엔티티에 필사책을 쓰지 않았는가, 필사책 이름(사용자 입력)을 옮기지 않았는가
 - 영어 시험이 언어를 실제로 골랐는가(`String(localized:bundle:locale:)` 만으로는 영어가 나오지 않는다)
 - 뷰의 미리 만든 문구가 환경 `locale` 을 넘기는가, 따로 만든 호스트 · 렌더러에 locale 을 넣었는가(9)
 - 리듀서 · effect · 인프라가 문구를 `AppLanguage.displayLocale()` 로 만드는가, 새 표시 함수가 비옵셔널 `locale: Locale` 을 받는가,
