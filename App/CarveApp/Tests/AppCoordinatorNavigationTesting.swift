@@ -138,7 +138,8 @@ struct AppCoordinatorNavigationTesting {
         let store = makeCoordinatorStore(CoordinatorFixture.writing(path: [.chart(.initialState)]))
         let chartID = try #require(store.state.path.ids.last)
 
-        await store.send(.path(.element(id: chartID, action: .chart(.drawingWeeklySummary(.openChapter(chapter))))))
+        // 차트는 그 기록의 필사책 · 장을 보낸다 — 필사 화면이 필사책을 맞춘 뒤(`openPage`) 장 이동으로 연다.
+        await store.send(.path(.element(id: chartID, action: .chart(.drawingWeeklySummary(.openChapter(NotebookChapter(notebook: .default, chapter: chapter)))))))
         #expect(store.state.pathScreens.isEmpty)
         await store.receive(\.root.presented.carve.moveToChapter, chapter)
         await store.finish()
@@ -149,9 +150,11 @@ struct AppCoordinatorNavigationTesting {
         let store = makeCoordinatorStore(CoordinatorFixture.writing(path: [.chart(.initialState)]))
         let chartID = try #require(store.state.path.ids.last)
 
-        await store.send(.path(.element(id: chartID, action: .chart(.drawingWeeklySummary(.openVerse(Self.verse))))))
+        let page = NotebookChapter(notebook: .default, chapter: Self.verse.title)
+        await store.send(.path(.element(id: chartID, action: .chart(.drawingWeeklySummary(.openVerse(page, verse: Self.verse.verse))))))
         #expect(store.state.pathScreens.isEmpty)
-        await store.receive(\.root.presented.carve.moveToVerse, Self.verse)
+        // 차트 기록에는 본문이 없다 — 위젯 절처럼 빈 문장으로 간다.
+        await store.receive(\.root.presented.carve.moveToVerse, BibleVerse(title: Self.verse.title, verse: Self.verse.verse, sentence: ""))
         await store.finish()
     }
 
@@ -163,7 +166,10 @@ struct AppCoordinatorNavigationTesting {
         // 최근 절
         let verseStore = makeCoordinatorStore(CoordinatorFixture.writing(path: [.chart(.initialState)]))
         let verseChartID = try #require(verseStore.state.path.ids.last)
-        await verseStore.send(.path(.element(id: verseChartID, action: .chart(.drawingWeeklySummary(.openVerse(verse))))))
+        await verseStore.send(.path(.element(
+            id: verseChartID,
+            action: .chart(.drawingWeeklySummary(.openVerse(NotebookChapter(notebook: .default, chapter: johnKJV), verse: 16)))
+        )))
         #expect(verseStore.state.pathScreens.isEmpty)
         await verseStore.receive(\.root.presented.carve.moveToVerse, verse)
         await verseStore.finish()
@@ -171,7 +177,10 @@ struct AppCoordinatorNavigationTesting {
         // 최근 장 · 가장 많이 쓴 장
         let chapterStore = makeCoordinatorStore(CoordinatorFixture.writing(path: [.chart(.initialState)]))
         let chapterChartID = try #require(chapterStore.state.path.ids.last)
-        await chapterStore.send(.path(.element(id: chapterChartID, action: .chart(.drawingWeeklySummary(.openChapter(johnKJV))))))
+        await chapterStore.send(.path(.element(
+            id: chapterChartID,
+            action: .chart(.drawingWeeklySummary(.openChapter(NotebookChapter(notebook: .default, chapter: johnKJV))))
+        )))
         #expect(chapterStore.state.pathScreens.isEmpty)
         await chapterStore.receive(\.root.presented.carve.moveToChapter, johnKJV)
         await chapterStore.finish()

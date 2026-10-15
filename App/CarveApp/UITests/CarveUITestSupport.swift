@@ -110,7 +110,7 @@ extension XCTestCase {
     ///
     /// 탭으로 화면을 찾아가지 않는다 — 세로 · 가로마다 다른 길(「성경 탐색 열기」 → 「사이드바 보기」 → 「앱 설정」 → 목록 올리기)이 시험을 깨뜨렸다.
     /// 새 설치 복원 대기의 「먼저 시작하기」 는 건너뛰지 않으므로 보이면 시험이 누른다.
-    /// - Parameter route: `navigation` · `chart` · `favorites` · `settings` · `settings/<하위>`(예: `settings/removeAds`) · `verse/<절 번호>`.
+    /// - Parameter route: `navigation` · `chart` · `favorites` · `notebooks` · `settings` · `settings/<하위>`(예: `settings/removeAds`) · `verse/<절 번호>`.
     ///   절의 장은 `startChapterArguments` 로 정한다. 모르는 경로는 앱이 무시한다.
     func routeArguments(_ route: String) -> [String] {
         [LaunchArgument.uiTestRoute, route]

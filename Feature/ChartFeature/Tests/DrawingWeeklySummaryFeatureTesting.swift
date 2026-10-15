@@ -18,6 +18,17 @@ struct DrawingWeeklySummaryFeatureTesting {
     /// 한국어 화면 — 시험 스킴의 언어 · 지역(ko-KR)과 같다.
     private static let korean = Locale(identifier: "ko_KR")
 
+    /// 기본이 아닌 필사책 — 두 번째로 만든 필사책.
+    private static let secondNotebook = NotebookID.make(uuid: UUID(uuidString: "0F3A1C2D-0000-4000-8000-000000000002")!)
+
+    /// 그 필사책 · 장의 그 절을 열라는 알림인가. 위임 값이 튜플이라 `Equatable` 로 견주지 못해 꺼내어 본다.
+    private static func isOpenVerse(_ page: NotebookChapter, verse: Int) -> (DrawingWeeklySummaryFeature.Action) -> Bool {
+        { action in
+            guard case let .openVerse(receivedPage, receivedVerse) = action else { return false }
+            return receivedPage == page && receivedVerse == verse
+        }
+    }
+
     // MARK: - 리듀서
 
     @Test("최근 필사 절을 누르면 그 절을 열도록 알린다")
@@ -34,9 +45,31 @@ struct DrawingWeeklySummaryFeatureTesting {
             DrawingWeeklySummaryFeature()
         } withDependencies: { fixedTimeDependencies(&$0) }
 
-        // When / Then: 상태는 그대로이고 openVerse 만 나온다
+        // When / Then: 상태는 그대로이고 openVerse 만 나온다 — 필사책을 풀지 않은 항목은 기본 필사책이다
         await store.send(.view(.recentVerseTapped(item)))
-        await store.receive(\.openVerse, item.verse)
+        await store.receive(Self.isOpenVerse(NotebookChapter(notebook: .default, chapter: item.verse.title), verse: 16))
+    }
+
+    @Test("다른 필사책에서 고친 최근 절을 누르면 지금 필사책이 아니라 그 필사책의 절을 열도록 알린다(2.2 결정 10)")
+    @MainActor
+    func recentVerseInOtherNotebookOpensThatNotebook() async {
+        // Given: 두 번째 필사책에서 요한복음 3장 16절(KJV)을 고쳤다
+        let johnKJV = BibleChapter(title: .john, chapter: 3, translation: .KJV)
+        let item = RecentVerseItem(
+            verse: BibleVerse(title: johnKJV, verse: 16, sentence: ""),
+            updatedAt: Date(timeIntervalSince1970: 1_800),
+            notebook: Self.secondNotebook
+        )
+        var state = DrawingWeeklySummaryFeature.State()
+        state.scrollPosition = fixedChartDay(0)
+        let store = TestStore(initialState: state) {
+            DrawingWeeklySummaryFeature()
+        } withDependencies: { fixedTimeDependencies(&$0) }
+        #expect(item.page == NotebookChapter(notebook: Self.secondNotebook, chapter: johnKJV))
+
+        // When / Then: 그 필사책 · 번역본의 장에서 그 절을 연다
+        await store.send(.view(.recentVerseTapped(item)))
+        await store.receive(Self.isOpenVerse(NotebookChapter(notebook: Self.secondNotebook, chapter: johnKJV), verse: 16))
     }
 
     @Test("KJV 로 쓴 최근 절을 누르면 개역개정으로 바꾸지 않고 그 KJV 절을 열도록 알린다")
@@ -53,7 +86,7 @@ struct DrawingWeeklySummaryFeatureTesting {
 
         // When / Then: 연 절의 장이 KJV 장이다
         await store.send(.view(.recentVerseTapped(item)))
-        await store.receive(\.openVerse, BibleVerse(title: johnKJV, verse: 16, sentence: ""))
+        await store.receive(Self.isOpenVerse(NotebookChapter(notebook: .default, chapter: johnKJV), verse: 16))
     }
 
     @Test("KJV 장이 이번 주 가장 많이 쓴 장이면 그 KJV 장을 열도록 알린다")
@@ -72,7 +105,7 @@ struct DrawingWeeklySummaryFeatureTesting {
 
         // When / Then
         await store.send(.view(.topChapterTapped))
-        await store.receive(\.openChapter, johnKJV)
+        await store.receive(\.openChapter, NotebookChapter(notebook: .default, chapter: johnKJV))
     }
 
     @Test("최근 필사 장을 누르면 그 장을 열도록 알린다")
@@ -86,7 +119,7 @@ struct DrawingWeeklySummaryFeatureTesting {
         } withDependencies: { fixedTimeDependencies(&$0) }
 
         await store.send(.view(.recentChapterTapped(chapter)))
-        await store.receive(\.openChapter, chapter)
+        await store.receive(\.openChapter, NotebookChapter(notebook: .default, chapter: chapter))
     }
 
     @Test("이번 주 가장 많이 쓴 장을 누르면 그 장을 열도록 알린다")
@@ -105,7 +138,7 @@ struct DrawingWeeklySummaryFeatureTesting {
 
         // When / Then
         await store.send(.view(.topChapterTapped))
-        await store.receive(\.openChapter, john)
+        await store.receive(\.openChapter, NotebookChapter(notebook: .default, chapter: john))
     }
 
     @Test("이번 주 기록이 없으면 가장 많이 쓴 장을 눌러도 아무 일도 없다")

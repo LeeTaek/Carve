@@ -47,6 +47,7 @@ enum RootScreen: Equatable {
 enum PathScreen: Equatable {
     case chart
     case favorites
+    case notebooks
 }
 
 extension AppCoordinatorFeature.State {
@@ -65,6 +66,7 @@ extension AppCoordinatorFeature.State {
             switch screen {
             case .chart: .chart
             case .favorites: .favorites
+            case .notebooks: .notebooks
             }
         }
     }
