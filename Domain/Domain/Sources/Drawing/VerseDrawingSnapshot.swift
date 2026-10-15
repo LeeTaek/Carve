@@ -59,11 +59,17 @@ public struct VerseDrawingSnapshot: Equatable, Sendable {
     public let drawingVersion: Int?
     /// `drawingVersion == 3` 일 때만 존재.
     public let metadata: DrawingLayoutMetadata?
-    /// 이 행의 번역본. 저장소는 행의 `titleName` 을 `StoredBookKey.decode` 로 풀어 채운다 —
-    /// 접두가 없는 행은 `translation` 열이 nil 이든 `.NKRV` 든 개역개정이다.
+    /// 이 행의 번역본. 저장소는 행의 `titleName` 을 `StoredBookKey.decodeRow` 로 풀어 채운다 —
+    /// 번역본 접두가 없는 행은 `translation` 열이 nil 이든 `.NKRV` 든 개역개정이다.
     public let translation: Translation
+    /// 이 행의 필사책(2.2 「회차별 필사책」). 저장소는 행의 `titleName` 을 `StoredBookKey.decodeRow` 로 풀어 채운다 —
+    /// 필사책 접두(`"nb_<토큰>~"`)가 없는 행은 기본 필사책이다.
+    public let notebook: NotebookID
 
-    /// - Parameter translation: 행의 번역본. 생략하면 개역개정이다(번역본 이전 호출부).
+    /// - Parameters:
+    ///   - translation: 행의 번역본. 생략하면 개역개정이다(번역본 이전 호출부).
+    ///   - notebook: 행의 필사책. 생략하면 기본 필사책이다(필사책 이전 호출부) — 값을 옮기는 DTO 라 기본값을 둔다.
+    ///     저장 경로의 인자(`NotebookChapter`)에는 기본값이 없다(결정 12).
     public init(
         verse: Int,
         rowID: BibleDrawingRowID,
@@ -72,7 +78,8 @@ public struct VerseDrawingSnapshot: Equatable, Sendable {
         lineData: Data?,
         drawingVersion: Int?,
         metadata: DrawingLayoutMetadata?,
-        translation: Translation = .NKRV
+        translation: Translation = .NKRV,
+        notebook: NotebookID = .default
     ) {
         self.verse = verse
         self.rowID = rowID
@@ -82,6 +89,7 @@ public struct VerseDrawingSnapshot: Equatable, Sendable {
         self.drawingVersion = drawingVersion
         self.metadata = metadata
         self.translation = translation
+        self.notebook = notebook
     }
 
     /// 좌표 형식이 확정된 행인가 (`drawingVersion == 3` + metadata).
@@ -128,6 +136,9 @@ public enum VerseDrawingMutation: Equatable, Sendable {
 // MARK: - 저장 실패
 
 /// `DrawingRepository.apply` 의 실패. batch 는 전부 성공하거나 전부 실패한다 (P8).
+///
+/// - Note: 과도기 값 `unsupportedNotebook` 은 case 가 아니라 `DrawingRepository.swift` 확장의 고정 값(`persistenceFailed`)이다 —
+///   과도기 기본 구현과 함께 t4 에서 지우므로 여기에 case 로 더하지 않는다.
 public enum DrawingRepositoryError: Error, Equatable, Sendable {
     /// `replace` 가 가리킨 행이 없다.
     case rowNotFound(BibleDrawingRowID)

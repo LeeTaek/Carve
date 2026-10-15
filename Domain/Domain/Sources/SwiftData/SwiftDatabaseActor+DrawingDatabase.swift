@@ -23,12 +23,13 @@ public struct BiblePageDrawingSnapshot: Equatable, Sendable {
 extension SwiftDatabaseActor {
     // MARK: 절 단위 행
 
-    /// 한 절의 행 — `updateDate` 최신순이다(`DrawingDatabase.fetchVerseSnapshots(chapter:verse:)` 가 이 조건 · 정렬로 읽는다).
+    /// 한 절의 행 — `updateDate` 최신순이다(`DrawingDatabase.fetchVerseSnapshots(page:verse:)` 가 이 조건 · 정렬로 읽는다).
     ///
-    /// 장의 번역본 행만 읽는다 — 술어의 `titleName` 은 `StoredBookKey.titleName(for:)` 다(개역개정은 열이 nil 인 옛 행 포함).
-    private func verseDrawings(chapter: BibleChapter, verse: Int) throws -> [BibleDrawing] {
-        let titleName = StoredBookKey.titleName(for: chapter)
-        let chapterNumber = chapter.chapter
+    /// 그 필사책 · 번역본의 행만 읽는다 — 술어의 `titleName` 은 `StoredBookKey.titleName(for: page)` 다
+    /// (기본 필사책의 개역개정은 열이 nil 인 옛 행 포함). 필사책은 `titleName` 접두로만 가른다(혼재 버전 규칙 ②).
+    private func verseDrawings(page: NotebookChapter, verse: Int) throws -> [BibleDrawing] {
+        let titleName = StoredBookKey.titleName(for: page)
+        let chapterNumber = page.chapter.chapter
         let predicate = #Predicate<BibleDrawing> {
             $0.titleName == titleName
             && $0.titleChapter == chapterNumber
@@ -41,32 +42,45 @@ extension SwiftDatabaseActor {
         return storedDrawing
     }
 
-    /// 한 절의 모든 행을 스냅샷으로 읽는다 — 이력 화면용.
+    /// 필사책 안의 한 절의 모든 행을 스냅샷으로 읽는다 — 이력 화면용.
     /// - Parameters:
-    ///   - chapter: 성경의 이름과 장(번역본 포함). 그 번역본의 행만 읽는다.
+    ///   - page: 필사책과 장(번역본 포함). 그 필사책 · 번역본의 행만 읽는다.
     ///   - verse: 절 번호.
     /// - Returns: 행마다 하나, `updateDate` 최신순. 행 키는 `rowKey`(`rowUUID` 또는 business `id`)다.
-    public func verseDrawingSnapshots(chapter: BibleChapter, verse: Int) throws -> [VerseDrawingSnapshot] {
-        try verseDrawings(chapter: chapter, verse: verse).compactMap(VerseDrawingSnapshot.init(drawing:))
+    public func verseDrawingSnapshots(page: NotebookChapter, verse: Int) throws -> [VerseDrawingSnapshot] {
+        try verseDrawings(page: page, verse: verse).compactMap(VerseDrawingSnapshot.init(drawing:))
     }
 
-    /// 한 절에서 `presentRowID` 행만 대표(`isPresent == true`)로 두고 나머지는 내린 뒤 저장한다.
+    /// 필사책 안의 한 절에서 `presentRowID` 행만 대표(`isPresent == true`)로 두고 나머지는 내린 뒤 저장한다.
     ///
-    /// 장의 번역본 행만 바꾼다 — 같은 권 · 장 · 절의 다른 번역본 행의 `isPresent` 는 그대로다.
+    /// 그 필사책 · 번역본의 행만 바꾼다 — 같은 권 · 장 · 절의 다른 필사책 · 번역본 행의 `isPresent` 는 그대로다.
     /// - Parameters:
-    ///   - chapter: 성경의 이름과 장(번역본 포함).
+    ///   - page: 필사책과 장(번역본 포함).
     ///   - verse: 절 번호.
     ///   - presentRowID: 대표로 둘 행의 키.
-    public func markPresentDrawing(chapter: BibleChapter, verse: Int, presentRowID: BibleDrawingRowID) throws {
-        for row in try verseDrawings(chapter: chapter, verse: verse) {
+    public func markPresentDrawing(page: NotebookChapter, verse: Int, presentRowID: BibleDrawingRowID) throws {
+        for row in try verseDrawings(page: page, verse: verse) {
             row.isPresent = (row.rowKey == presentRowID.raw)
         }
         try modelContext.save()
     }
 
+    /// **기본 필사책**의 한 절을 읽는다 — `verseDrawingSnapshots(page:verse:)` 로 넘긴다.
+    /// - Note: 뜻은 「기본 필사책」 이다. 새 코드는 `page:` 를 쓴다. t4 에서 지운다.
+    public func verseDrawingSnapshots(chapter: BibleChapter, verse: Int) throws -> [VerseDrawingSnapshot] {
+        try verseDrawingSnapshots(page: NotebookChapter(notebook: .default, chapter: chapter), verse: verse)
+    }
+
+    /// **기본 필사책**의 한 절에서 대표를 옮긴다 — `markPresentDrawing(page:verse:presentRowID:)` 로 넘긴다.
+    /// - Note: 뜻은 「기본 필사책」 이다. 새 코드는 `page:` 를 쓴다. t4 에서 지운다.
+    public func markPresentDrawing(chapter: BibleChapter, verse: Int, presentRowID: BibleDrawingRowID) throws {
+        try markPresentDrawing(page: NotebookChapter(notebook: .default, chapter: chapter), verse: verse, presentRowID: presentRowID)
+    }
+
     // MARK: 필사 활동
     //
-    // 차트 · 최근 기록은 `updateDate` 로만 거르고 **모든 번역본**의 행을 읽는다. 행의 번역본은 `DrawingActivity.chapter` 가 푼다.
+    // 차트 · 최근 기록은 `updateDate` 로만 거르고 **모든 필사책 · 번역본**의 행을 읽는다(필사책 결정 10 — 합산).
+    // 행의 필사책 · 장 · 번역본은 `DrawingActivity.page` 가 `StoredBookKey.decodeRow` 로 푼다.
 
     /// 기간 안에 고친 행의 활동 — `updateDate` 최신순이다. 고친 시각이 없는 행은 빠진다.
     /// - Parameter range: 조회 기간(시작 포함, 끝 제외).
@@ -144,13 +158,14 @@ extension SwiftDatabaseActor {
 extension VerseDrawingSnapshot {
     /// 필사 행을 스냅샷으로 옮긴다. actor 안에서만 부른다(@Model 은 actor 밖으로 나가지 않는다).
     ///
-    /// 번역본은 행의 `titleName` 을 `StoredBookKey.decode` 로 푼 값이다 — 접두가 없으면 `translation` 열이 nil 이든 `.NKRV` 든 개역개정이다.
-    /// 절 번호가 없거나 `titleName` 을 풀지 못하는 행(모르는 권 이름)은 nil 이다 — 호출부는 건너뛴다.
-    /// 조회 술어가 `StoredBookKey.titleName(for:)` 로 거르므로 장 조회에서 푸는 데 실패하는 행은 없다.
+    /// 번역본 · 필사책은 행의 `titleName` 을 `StoredBookKey.decodeRow` 로 푼 값이다 — 번역본 접두가 없으면 `translation` 열이 nil 이든
+    /// `.NKRV` 든 개역개정이고, 필사책 접두가 없으면 기본 필사책이다.
+    /// 절 번호가 없거나 `titleName` 을 풀지 못하는 행(모르는 권 이름 · 형식이 깨진 필사책 접두)은 nil 이다 — 호출부는 건너뛴다.
+    /// 조회 술어가 `StoredBookKey.titleName(for: page)` 로 거르므로 장 조회에서 푸는 데 실패하는 행은 없다.
     init?(drawing row: BibleDrawing) {
         guard let verse = row.verse,
               let titleName = row.titleName,
-              let key = StoredBookKey.decode(titleName) else { return nil }
+              let key = StoredBookKey.decodeRow(titleName) else { return nil }
         self.init(
             verse: verse,
             rowID: BibleDrawingRowID(raw: row.rowKey),
@@ -159,7 +174,8 @@ extension VerseDrawingSnapshot {
             lineData: row.lineData,
             drawingVersion: row.drawingVersion,
             metadata: DrawingLayoutMetadata.decode(blob: row.layoutMetadataData),
-            translation: key.translation
+            translation: key.translation,
+            notebook: key.notebook
         )
     }
 }
