@@ -174,17 +174,12 @@ public struct HeaderView: View {
         }
     }
 
-    /// 헤더 제목 — 누르면 번역본 메뉴가 열린다(영어 현지화 결정 19). 고르면 같은 권 · 장 · 지금 보던 절로 간다(결정 9 —
+    /// 헤더 제목 — 누르면 번역본 고르기 팝오버가 열린다(영어 현지화 결정 19). 고르면 같은 권 · 장 · 지금 보던 절로 간다(결정 9 —
     /// `CarveNavigationFeature.switchTranslation`). 탐색 열은 서재 버튼으로 연다.
+    /// 시스템 `Menu` 대신 본문 설정과 같은 앱 팝오버 표면에 그린다(`TranslationPickerView`).
     private var titleButton: some View {
-        Menu {
-            Picker(selection: translationSelection) {
-                ForEach(Translation.allCases, id: \.self) { translation in
-                    Text(verbatim: Self.translationMenuTitle(translation, locale: locale)).tag(translation)
-                }
-            } label: {
-                Text("번역본", bundle: .module)
-            }
+        Button {
+            send(.titleDidTapped)
         } label: {
             VStack(spacing: 2) {
                 Text(verbatim: Self.titleText(store.currentTitle, locale: locale))
@@ -211,18 +206,24 @@ public struct HeaderView: View {
             .padding(.horizontal, CarveSpacing.medium)
             .contentShape(Rectangle())
         }
-        .menuStyle(.button)
         .buttonStyle(.plain)
-        .tint(CarveColor.ink)
         .accessibilityLabel(Self.titleAccessibilityLabel(store.currentTitle, locale: locale))
         .accessibilityValue(Text(verbatim: store.currentTitle.translation.fullName(locale: locale)))
+        .popover(isPresented: translationPickerPresented, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
+            // 지금 번역본은 공유 장(`currentTitle`)이 정한다. 고르면 리듀서로 보내고, 헤더 리듀서가 팝오버를 닫는다.
+            TranslationPickerView(selection: store.currentTitle.translation) { translation in
+                send(.translationSelected(translation))
+            }
+        }
     }
 
-    /// 번역본 메뉴의 선택값. 고르면 리듀서로 보낸다 — 지금 번역본은 공유 장(`currentTitle`)이 정한다.
-    private var translationSelection: Binding<Translation> {
+    /// 번역본 고르기 팝오버의 표시 여부. 바깥을 눌러 닫히면 리듀서에 알린다.
+    private var translationPickerPresented: Binding<Bool> {
         Binding(
-            get: { store.currentTitle.translation },
-            set: { send(.translationSelected($0)) }
+            get: { store.isTranslationPickerPresented },
+            set: { isPresented in
+                if !isPresented { send(.translationPickerDismissed) }
+            }
         )
     }
 }
@@ -254,7 +255,7 @@ extension HeaderView {
         CarveFeatureCatalog.string("\(titleText(chapter, locale: locale)), 번역본 바꾸기", locale: locale)
     }
 
-    /// 역할: 번역본 메뉴의 항목 이름 — 약칭과 전체 이름. 둘이 같으면(한국어의 개역개정) 한 번만 적는다.
+    /// 역할: 번역본 고르기 항목의 VoiceOver 이름 — 약칭과 전체 이름. 둘이 같으면(한국어의 개역개정) 한 번만 적는다.
     /// 입력 · 출력: 번역본 · 로케일(뷰는 환경 locale 을 넘긴다) → 「KJV · King James Version」 · 「개역개정」.
     /// 부작용: 없음.
     static func translationMenuTitle(_ translation: Translation, locale: Locale) -> String {

@@ -59,6 +59,8 @@ public struct HeaderFeature {
         public var palatteSetting: PencilPalatteFeature.State = .initialState
         /// 헤더 본문 설정 버튼에 붙는 팝오버 상태.
         @Presents public var sentenceSettings: SentenceSettingsFeature.State?
+        /// 헤더 제목을 눌러 연 번역본 고르기 팝오버(영어 현지화 결정 19). 고르거나 바깥을 누르면 닫힌다.
+        public var isTranslationPickerPresented: Bool = false
         /// 필기 열을 왼쪽에 둘지. 헤더 버튼 위치는 바꾸지 않는다 — 서재 쪽에 버튼이 늘면 헤더 광고 자리가 사라진다.
         @Shared(.appStorage("isLeftHanded")) public var isLeftHanded: Bool = false
         /// 탭으로 전환한 축소 헤더 상태. 광고 영역이 생겨도 헤더는 항상 남는다.
@@ -98,7 +100,11 @@ public struct HeaderFeature {
             case onAppear
             /// 서재 아이콘을 탭해 탐색 열림 상태를 전환한다.
             case libraryDidTapped
-            /// 헤더 제목 메뉴에서 번역본을 고름 — 탐색 리듀서가 같은 권 · 장 · 지금 보던 절로 바꾼다(영어 현지화 결정 9 · 19)
+            /// 헤더 제목을 탭해 번역본 고르기 팝오버를 연다(영어 현지화 결정 19).
+            case titleDidTapped
+            /// 번역본 고르기 팝오버가 고르지 않고 닫힘 — 바깥을 누르는 등.
+            case translationPickerDismissed
+            /// 번역본 고르기에서 번역본을 고름 — 탐색 리듀서가 같은 권 · 장 · 지금 보던 절로 바꾼다(영어 현지화 결정 9 · 19)
             case translationSelected(Translation)
             case setHeaderHeight(CGFloat)
             /// 하단 접힘 팔레트를 탭해 도구 목록을 펼친다.
@@ -179,7 +185,17 @@ public struct HeaderFeature {
 
             case .view(.sentenceSettingsDidTapped):
                 state.sentenceSettings = .initialState
-                
+
+            case .view(.titleDidTapped):
+                state.isTranslationPickerPresented = true
+
+            case .view(.translationPickerDismissed):
+                state.isTranslationPickerPresented = false
+
+            case .view(.translationSelected):
+                // 번역본 전환은 탐색 리듀서가 한다(`CarveNavigationFeature.switchTranslation`). 헤더는 고르기 팝오버만 닫는다.
+                state.isTranslationPickerPresented = false
+
             case .toggleCompact:
                 state.isManuallyCollapsed.toggle()
                 

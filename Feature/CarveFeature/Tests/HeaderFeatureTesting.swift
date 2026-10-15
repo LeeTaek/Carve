@@ -147,6 +147,37 @@ struct HeaderFeatureTesting {
         #expect(state.sentenceSettings != nil)
     }
 
+    @Test("헤더 제목을 누르면 번역본 고르기 팝오버를 연다")
+    func titleDidTappedPresentsTranslationPicker() async {
+        var state = HeaderFeature.State.initialState
+
+        _ = HeaderFeature().reduce(into: &state, action: .view(.titleDidTapped))
+
+        #expect(state.isTranslationPickerPresented)
+    }
+
+    @Test("번역본을 고르면 헤더는 고르기 팝오버만 닫는다 — 번역본 전환은 탐색 리듀서가 한다")
+    func translationSelectedClosesPickerOnly() async {
+        var state = HeaderFeature.State.initialState
+        state.isTranslationPickerPresented = true
+        let title = state.currentTitle
+
+        _ = HeaderFeature().reduce(into: &state, action: .view(.translationSelected(.KJV)))
+
+        #expect(!state.isTranslationPickerPresented)
+        #expect(state.currentTitle == title)
+    }
+
+    @Test("고르지 않고 바깥을 눌러 닫으면 고르기 팝오버 상태를 내린다")
+    func translationPickerDismissedClosesPicker() async {
+        var state = HeaderFeature.State.initialState
+        state.isTranslationPickerPresented = true
+
+        _ = HeaderFeature().reduce(into: &state, action: .view(.translationPickerDismissed))
+
+        #expect(!state.isTranslationPickerPresented)
+    }
+
     @Test("축소 헤더는 상태바가 높아도 44pt 버튼 줄을 담도록 늘어나고, 펼친 높이는 그대로다")
     func displayedHeightContainsControlsForTallerStatusBar() {
         // 상태바 24pt: 시안 규격 78pt 그대로.

@@ -214,7 +214,7 @@
 
   - 이유: 레이어 3(t3c)이 결정 11 대로 섞이는 목록의 개역개정에도 「 · 개역개정」 을 붙여, 영어 필사가 없는 한국어 사용자 화면까지 바뀌었다 — 사용자가 개역개정 생략을 골랐다.
     반영은 레이어 5 t5a 다(`RecentVerseItem` · `DrawingWeeklySummaryView` · `DraftRecoveryCopy.place` · `DraftRecoveryFeature`).
-- 번역본 고르기는 **헤더 제목 메뉴**다(결정 19, 2026-10-12 — 처음에는 디자인 시안 `k3-sidebar-native-ad.svg` · `j2-dark-navigation.svg` 의 사이드바 하단 「개역개정 ⌄」 자리였으나 어색해 옮겼다). 제목을 누르면 메뉴가 열리고 항목은 약칭과 전체 이름을 함께 보인다. 부제 끝의 ⌄ 가 누를 수 있음을 알린다. 제목은 더 이상 탐색 열을 열지 않는다 — 탐색은 서재 버튼, 실행 인자 `-UITestRoute navigation` 은 `CarveNavigationFeature.openNavigation`.
+- 번역본 고르기는 **헤더 제목 메뉴**다(결정 19, 2026-10-12 — 처음에는 디자인 시안 `k3-sidebar-native-ad.svg` · `j2-dark-navigation.svg` 의 사이드바 하단 「개역개정 ⌄」 자리였으나 어색해 옮겼다). 제목을 누르면 번역본 고르기 팝오버(`TranslationPickerView` — 본문 설정과 같은 앱 팝오버 표면, 2026-10-15 시스템 `Menu` 에서 바꿈)가 열리고, 항목은 약칭과 전체 이름을 함께 보이며 지금 번역본은 선택 바탕 · 체크로 표시한다. 고르는 순간 닫힌다. 부제 끝의 ⌄ 가 누를 수 있음을 알린다. 제목은 더 이상 탐색 열을 열지 않는다 — 탐색은 서재 버튼, 실행 인자 `-UITestRoute navigation` 은 `CarveNavigationFeature.openNavigation`.
 
 ### 6-3. 「성경 본문 출처」 화면
 

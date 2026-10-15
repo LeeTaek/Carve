@@ -135,7 +135,7 @@ struct TranslationSwitchTesting {
         }
     }
 
-    // MARK: 헤더 제목 메뉴로 고르기(결정 19)
+    // MARK: 헤더 제목의 번역본 고르기(결정 19)
 
     @Test("번역본을 고르면 지금 장의 번역본만 바뀌고 같은 권 · 장 · 보던 절로 간다 — 헤더도 같은 장을 본다")
     func selectingTranslationKeepsBookChapterAndVerse() throws {
@@ -147,6 +147,8 @@ struct TranslationSwitchTesting {
             #expect(state.carveDetailState.viewingVerse == 12)
             state.columnVisibility = .all
             state.drawnChapters = [.matthew: [1, 17]]
+            // 헤더 제목을 눌러 연 번역본 고르기 팝오버에서 고른다.
+            state.carveDetailState.headerState.isTranslationPickerPresented = true
 
             reduce(&state, .scope(.carveDetailAction(.scope(.headerAction(.view(.translationSelected(.KJV)))))))
 
@@ -165,16 +167,19 @@ struct TranslationSwitchTesting {
             #expect(state.selectedChapter == 17)
             // 필사 기록은 번역본마다 따로다 — 이전 번역본으로 칠한 장 목록을 남기지 않는다.
             #expect(state.drawnChapters.isEmpty)
+            // 고르면 고르기 팝오버는 닫힌다.
+            #expect(!state.carveDetailState.headerState.isTranslationPickerPresented)
         }
     }
 
-    @Test("지금 번역본을 다시 고르면 아무것도 바꾸지 않는다")
+    @Test("지금 번역본을 다시 고르면 아무것도 바꾸지 않고 고르기 팝오버만 닫는다")
     func selectingCurrentTranslationIsNoOp() throws {
         try withEmptyAppStorage { _ in
             var state = CarveNavigationFeature.State.initialState
             state.$currentTitle.withLock { $0 = Self.bsbMatthew17 }
             state.columnVisibility = .all
             state.drawnChapters = [.matthew: [17]]
+            state.carveDetailState.headerState.isTranslationPickerPresented = true
 
             reduce(&state, .scope(.carveDetailAction(.scope(.headerAction(.view(.translationSelected(.BSB)))))))
 
@@ -182,6 +187,7 @@ struct TranslationSwitchTesting {
             #expect(state.columnVisibility == .all)
             #expect(state.drawnChapters == [.matthew: [17]])
             #expect(state.carveDetailState.scrollTargetVerse == nil)
+            #expect(!state.carveDetailState.headerState.isTranslationPickerPresented)
         }
     }
 
@@ -203,7 +209,7 @@ struct TranslationSwitchTesting {
         }
     }
 
-    @Test("번역본 고르기 메뉴는 약칭과 전체 이름을 함께 보이고, 둘이 같으면 한 번만 적는다")
+    @Test("번역본 고르기 항목 이름은 약칭과 전체 이름을 함께 적고, 둘이 같으면 한 번만 적는다")
     func translationMenuTitles() {
         let korean = Locale(identifier: "ko")
         let english = Locale(identifier: "en")
@@ -212,7 +218,7 @@ struct TranslationSwitchTesting {
         #expect(HeaderView.translationMenuTitle(.BSB, locale: korean) == "BSB · Berean Standard Bible")
         #expect(HeaderView.translationMenuTitle(.NKRV, locale: english) == "NKRV · New Korean Revised Version")
         #expect(HeaderView.translationMenuTitle(.KJV, locale: english) == "KJV · King James Version")
-        // 메뉴는 `Translation.allCases` 순서다.
+        // 고르기 목록은 `Translation.allCases` 순서다(`TranslationPickerView`).
         #expect(Translation.allCases == [.NKRV, .KJV, .BSB])
     }
 
