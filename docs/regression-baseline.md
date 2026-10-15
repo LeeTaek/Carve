@@ -1,9 +1,19 @@
 # 회귀 기준선
 
-> 회귀 기준선 **1619** — `Carve-Workspace` 전체 회귀의 **통과 수**(Xcode 27 · iPad mini (A17 Pro) · iPadOS 26.2). **통과 수가 줄면 회귀다.**
+> 회귀 기준선 **1624** — `Carve-Workspace` 전체 회귀의 **통과 수**(Xcode 27 · iPad mini (A17 Pro) · iPadOS 26.2). **통과 수가 줄면 회귀다.**
 > 이 파일이 기준선의 유일한 원본이다. [AGENTS.md](../AGENTS.md) · [설계 문서](./single-canvas-design.md) · [런북](./phase-0a-d-device-test.md)은 여기를 가리킨다.
 
-## 현재 값 (2026-10-15, 브랜치 `claude/settings-late-ondisappear`, Xcode 27.0 27A266a · Swift 6.4 · 언어 모드 6)
+## 현재 값 (2026-10-15, 브랜치 `claude/layout-polish-2.1`, Xcode 27.0 27A266a · Swift 6.4 · 언어 모드 6)
+
+| iPadOS 런타임 | 기기 | 통과 | 실패 | 건너뜀 | 예상 실패 | 총 |
+|---|---|---:|---:|---:|---:|---:|
+| 26.2 | iPad mini (A17 Pro) | 1624 | 0 | 8 | 4 | 1636 |
+
+- 2.1 화면 배치 다듬기(큰 글자 · 영어 줄바꿈 · iPadOS 17.5 절 번호 · 17 설정 선택 행 · 탐색 「뒤로」) 브랜치의 전체 회귀 값이다(로컬 develop `fc6f68f7` 위).
+- 1619 → 1624(시험 선언 1631 → 1636): develop `5c6ea85f`(헤더 번역본 고르기 팝오버)의 CarveFeature `HeaderFeatureTesting` +3 — 그 커밋에서 기준선을 올리지 않았다,
+  절 번호를 맞추는 본문 첫 줄 기준선 — CarveFeature `VerseTextBaselineTesting` +2. 지운 시험 0. 기대값을 바꾼 시험 0.
+
+### 이전 값 (2026-10-15, 브랜치 `claude/settings-late-ondisappear`, Xcode 27.0 27A266a · Swift 6.4 · 언어 모드 6)
 
 | iPadOS 런타임 | 기기 | 통과 | 실패 | 건너뜀 | 예상 실패 | 총 |
 |---|---|---:|---:|---:|---:|---:|

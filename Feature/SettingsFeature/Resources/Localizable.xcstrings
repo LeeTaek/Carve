@@ -1,6 +1,10 @@
 {
   "sourceLanguage" : "ko",
   "strings" : {
+    "%@ %@ %@" : {
+      "comment" : "번역하지 않음 — 설정 사이드바 바닥글 둘째 줄의 문장 조각과 본문 설정 표식을 한 문단으로 잇는 보간",
+      "shouldTranslate" : false
+    },
     "%@에 만든 백업 · 필사 기록 %lld개 · 남겨 둔 필기 %lld개" : {
       "comment" : "설정 › 필사 백업 — 백업 불러오기 — 형식 문자열(%lld 는 수, %@ 는 문구)",
       "localizations" : {

@@ -7,6 +7,7 @@
 //
 
 import CarveToolkit
+import Domain
 import SwiftUI
 
 import ComposableArchitecture
@@ -91,9 +92,26 @@ public struct VerseTextView: View {
             .accessibilityHidden(true)
     }
 
-    /// 각 절의 내용 문장
+    /// 역할: 본문 블록(위 여백 포함) 위에서 첫 줄 기준선까지의 높이 — 절 번호를 이 높이에 맞춘다.
+    /// 입력 · 출력: 줄 실측(밑줄 offset — 첫 값 = 첫 줄 기준선 + descender + 위 여백) · 본문 설정 → 높이(pt).
+    ///   실측이 있으면 첫 밑줄에서 descender 를 뺀 값, 실측 전(빈 배열)이면 위 여백 + 글꼴 ascender 다.
+    /// 부작용: 없음.
+    ///
+    /// ⚠️ SwiftUI 의 `firstTextBaseline` 을 쓰지 않는다. iPadOS 17.5 는 줄 실측(`Text.LayoutKey`)을 읽는 `Text` 의 기준선을 `HStack` 에 넘기지 않고
+    ///    블록 바닥(높이)을 기준선으로 써, 번호가 마지막 줄 옆에 붙었다(2026-10-15 시뮬레이터 — 실측을 읽지 않으면 첫 줄, 18.6 · 26.2 는 실측을 읽어도 첫 줄).
+    ///    창세기 1장 나눔명조 20pt 에서 실측 33.5 · 글꼴 수치 33.4 다(SwiftUI 가 픽셀에 맞춘 차이). 어느 값이든 번호가 블록 안이라 행 높이는 그대로다.
+    static func firstBaseline(underlineOffsets: [CGFloat], sentenceSetting: SentenceSetting) -> CGFloat {
+        let uiFont = sentenceSetting.fontFamily.font(size: sentenceSetting.fontSize)
+        if let firstUnderline = underlineOffsets.first {
+            return firstUnderline - uiFont.descender.magnitude
+        }
+        return sentenceSetting.textVerticalPadding + uiFont.ascender
+    }
+
+    /// 각 절의 내용 문장. 절 번호는 본문 블록의 첫 줄 기준선(`firstBaseline`)에 맞춘다.
     public var sentenceDescription: some View {
         let sentenceSetting = store.sentenceSetting
+        let firstBaseline = Self.firstBaseline(underlineOffsets: store.underlineOffsets, sentenceSetting: sentenceSetting)
 
         return HStack(alignment: .firstTextBaseline, spacing: 0) {
             verseNumberView(store.verse, verseEnd: store.verseEnd)
@@ -111,6 +129,9 @@ public struct VerseTextView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.vertical, sentenceSetting.textVerticalPadding)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .alignmentGuide(.firstTextBaseline) { _ in
+                    firstBaseline
+                }
         }
     }
 }

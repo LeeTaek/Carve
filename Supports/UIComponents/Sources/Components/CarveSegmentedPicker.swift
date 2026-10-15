@@ -12,6 +12,8 @@ import SwiftUI
 ///
 /// 항목은 트랙 폭을 나눠 가진다. 선택은 글자색만이 아니라 바탕 모양으로도 보이고, 각 항목은 버튼이라
 /// VoiceOver 가 선택된 항목을 알린다. 항목 한 칸의 높이는 44pt 다.
+///
+/// 접근성 글자 크기에서는 항목을 세로로 쌓는다. 셋을 한 줄에 두면 칸이 좁아 「Sys-tem」 · 「Eng-lish」 처럼 단어 중간에서 끊겼다(2026-10-13).
 public struct CarveSegmentedPicker<SelectionValue: Hashable, Content: View>: View {
     @Binding private var selection: SelectionValue
     private let items: [SelectionValue]
@@ -20,6 +22,7 @@ public struct CarveSegmentedPicker<SelectionValue: Hashable, Content: View>: Vie
     @Namespace private var namespace
     @Environment(\.carveBackdrop) private var backdrop
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     /// - Parameters:
     ///   - selection: 선택 값.
@@ -36,12 +39,13 @@ public struct CarveSegmentedPicker<SelectionValue: Hashable, Content: View>: Vie
     }
 
     public var body: some View {
-        HStack(spacing: 0) {
+        let layout = isStacked ? AnyLayout(VStackLayout(spacing: 0)) : AnyLayout(HStackLayout(spacing: 0))
+        layout {
             ForEach(items, id: \.self) { item in
                 segment(item)
             }
         }
-        .padding(.horizontal, CarveSpacing.xxSmall)
+        .padding(isStacked ? .vertical : .horizontal, CarveSpacing.xxSmall)
         .background(
             backdrop.controlFill,
             in: RoundedRectangle(cornerRadius: CarveRadius.control, style: .continuous)
@@ -68,7 +72,7 @@ public struct CarveSegmentedPicker<SelectionValue: Hashable, Content: View>: Vie
                     if isSelected {
                         RoundedRectangle(cornerRadius: CarveRadius.inner, style: .continuous)
                             .fill(CarveColor.selected)
-                            .padding(.vertical, CarveSpacing.xxSmall)
+                            .padding(isStacked ? .horizontal : .vertical, CarveSpacing.xxSmall)
                             .matchedGeometryEffect(id: "selection", in: namespace)
                     }
                 }
@@ -76,5 +80,10 @@ public struct CarveSegmentedPicker<SelectionValue: Hashable, Content: View>: Vie
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    /// 항목을 세로로 쌓는가 — 접근성 글자 크기.
+    private var isStacked: Bool {
+        dynamicTypeSize.isAccessibilitySize
     }
 }
