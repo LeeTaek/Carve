@@ -219,8 +219,8 @@ public struct CloudSettingView: View {
             }
         }
         .disabled(store.isLoading)
+        // 사라질 때는 보내지 않는다 — 설정이 경로를 바꾸거나 닫으면서 구독을 끝내고, 그 뒤에 온 액션은 받을 상태가 없다(룰북 navigation.md).
         .onAppear { send(.onAppear) }
-        .onDisappear { send(.onDisappear) }
         // 시안 F2 는 확인 대화상자를 화면 가운데에 띄우고 뒤를 가린다. 팝오버는 버튼에 붙어 한쪽으로 뜨므로
         // 전체를 덮는 표현으로 바꾼다 — 바탕은 `PopupView` 가 직접 그린다.
         .settingsPopup($store.scope(state: \.path?.popup, action: \.path.popup))

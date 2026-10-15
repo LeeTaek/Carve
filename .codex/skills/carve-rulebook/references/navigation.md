@@ -65,6 +65,16 @@ Feature 내부의 다음 항목은 외부 노출을 피한다.
 
 ---
 
+## 화면이 사라질 때 — 정리 액션을 보내지 않는다
+- 규칙: 부모가 `ifLet`(`@Presents`) · `forEach`(`StackState`)로 띄운 화면은 `.onDisappear` 에서 액션을 보내지 않는다. 그 화면의 효과(구독 · 조회)는
+  부모가 상태를 nil 이나 다른 case 로 바꾸는 순간 TCA 가 모두 취소한다. 상태는 남는데 화면만 사라질 때도 끊어야 하는 효과는 `.task { await send(.task).finish() }` 로 뷰 수명에 묶는다.
+- 이유: SwiftUI 는 부모가 상태를 바꾼 **뒤에** onDisappear 를 부른다. 그 액션은 받을 자식 상태가 없어 `ifCaseLet` · `ifLet` 경고를 내고 버려진다 —
+  2026-10-15 설정의 iCloud · 확인이 필요한 필기 · 광고 제거 화면이 하위 화면 이동 · 「완료」 닫기마다 이렇게 경고했고, 구독 정리는 부모의 자동 취소가 이미 하고 있었다.
+- 본보기 시험: `SettingsDetailLifecycleTesting` · `AppCoordinatorSettingsLifecycleTesting` — 떠난 뒤 `finish()` 와 끝나지 않는 구독 대역의 끝남 수로 정리를 확인한다.
+- 기계 검사: 없음(리뷰).
+
+---
+
 ## Testing checklist
 - Feature 내부 네비게이션:
   - 해당 Feature의 Reducer 테스트에서 state 변화로 검증한다.

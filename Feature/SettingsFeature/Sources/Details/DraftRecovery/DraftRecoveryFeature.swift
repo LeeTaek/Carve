@@ -123,8 +123,6 @@ public struct DraftRecoveryFeature {
 
         public enum View {
             case onAppear
-            /// 화면이 사라졌다 — 편집 환경 구독을 멈춘다.
-            case onDisappear
             case reload
             /// 묶음을 펼치거나 접는다.
             case open(AccountScope?)
@@ -170,8 +168,6 @@ public struct DraftRecoveryFeature {
                 let observe = observeEnvironment()
                 guard !state.isLoading else { return observe }
                 return .merge(observe, startLoad(&state))
-            case .view(.onDisappear):
-                return .cancel(id: CancelID.environment)
             case .view(.reload):
                 guard !state.isLoading else { return .none }
                 return startLoad(&state)
@@ -294,7 +290,8 @@ public struct DraftRecoveryFeature {
         return load(sequence: state.loadSequence)
     }
 
-    /// 편집 환경의 변화를 구독한다.
+    /// 편집 환경의 변화를 구독한다. 화면이 다시 나타나면 앞선 구독을 끊고 새로 잇는다.
+    /// 화면을 떠날 때(설정이 다른 항목으로 옮기거나 닫을 때)는 부모의 `ifLet` 이 이 구독을 취소한다 — 사라질 때 보내는 액션이 없다(2026-10-15).
     private func observeEnvironment() -> Effect<Action> {
         .run { [editEnvironment] send in
             for await _ in editEnvironment.changes() {

@@ -143,6 +143,5 @@ struct CloudSettingsHoldTesting {
 
         await store.send(.view(.onAppear))
         await store.receive(\.connectionChecked) { $0.connectsOnRelaunch = true }
-        await store.send(.view(.onDisappear))
     }
 }
