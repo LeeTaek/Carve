@@ -24,11 +24,11 @@ extension SwiftDatabaseActor {
     /// 다르면 아무것도 쓰지 않고 `currentChanged`, 이미 가져올 내용이면 `alreadyApplied` 다. **세대가 다르면**(견준 뒤 전체 삭제) 던진다.
     /// 같은 명령을 다시 보내도(저장 뒤 결과를 잃은 재시도) 행이 늘지 않는다 — 새 행이 이미 그 내용이면 `alreadyApplied` 다.
     ///
-    /// **번역본은 행의 권 이름으로 가린다**(영어 현지화 결정 1) — 명령의 번역본(없으면 장의 번역본)의 행만 읽고 쓴다. 같은 절의 다른 번역본
-    /// 행은 건드리지 않는다. 새 영어 행은 권 이름 `"<번역본>-<rawValue>"` · `translation` 열 nil 이다(열에는 영어 값을 쓰지 않는다).
+    /// **필사책 · 번역본은 행의 권 이름으로 가린다**(영어 현지화 결정 1 · 2.2 필사책 결정 1) — 명령의 page(`command.page`)의 행만 읽고 쓴다.
+    /// 같은 절의 다른 번역본 · 다른 필사책 행은 건드리지 않는다. 새 행은 `BibleDrawing(page:…)` 로 지어 권 이름 · 열이 `StoredBookKey` 를 따른다 —
+    /// 기본 필사책은 2.2 이전 형식 그대로, 그 밖은 `"nb_<토큰>~"` 접두, 영어는 `"<번역본>-<rawValue>"` · `translation` 열 nil 이다.
     public func importVerseDrawing(
         _ command: VerseDrawingImportCommand,
-        chapter: BibleChapter,
         generation: DrawingStoreGeneration,
         now: Date
     ) throws -> VerseDrawingImportOutcome {
@@ -36,11 +36,11 @@ extension SwiftDatabaseActor {
             Log.error("가져오기 거절 — 견준 뒤 필사 데이터가 전부 지워졌다", "명령 세대=\(generation.raw)", "지금 세대=\(drawingStoreGeneration)")
             throw DrawingRepositoryError.staleStoreGeneration
         }
-        let rowChapter = command.target(in: chapter)
+        let page = command.page
         do {
             // 쓰기 전에 모두 확인한다 — iOS 17 SwiftData 의 rollback 은 외부 저장 Data 를 가진 기존 모델의 메모리 값을 복원하지 못할 수 있다.
             let blob = try importBlob(command)
-            let rows = try verseRows(chapter: rowChapter, verse: command.verse)
+            let rows = try verseRows(page: page, verse: command.verse)
             let current = rows.map { importSnapshot($0, verse: command.verse) }.representative()
             let incoming = command.lineData.map {
                 VerseContentFingerprint.make(lineData: $0, drawingVersion: 3, layoutMetadataBlob: blob)
@@ -56,10 +56,8 @@ extension SwiftDatabaseActor {
             if let existing = rows.first(where: { $0.rowKey == command.rowID.raw }) {
                 target = existing
             } else {
-                target = BibleDrawing(bibleTitle: rowChapter, verse: command.verse, lineData: nil, updateDate: now, rowUUID: command.rowID.raw)
-                // 권 이름 · 열은 `StoredBookKey` 로 짓는다 — 개역개정은 지금과 같고, 영어는 접두 · nil 이다.
-                target.titleName = StoredBookKey.titleName(for: rowChapter)
-                target.translation = StoredBookKey.translationColumn(for: rowChapter.translation)
+                // 권 이름 · 열 · business id 는 `BibleDrawing(page:…)` 가 `StoredBookKey` 로 짓는다 — 기본 필사책 개역개정은 지금과 같다.
+                target = BibleDrawing(page: page, verse: command.verse, lineData: nil, updateDate: now, rowUUID: command.rowID.raw)
                 modelContext.insert(target)
             }
             target.lineData = command.lineData
@@ -89,10 +87,30 @@ extension SwiftDatabaseActor {
         }
     }
 
-    /// 그 절의 모든 행(대표 · 보관 · 빈 행) — 그 장의 번역본 것만. 번역본은 권 이름(`StoredBookKey`)으로 가린다.
-    private func verseRows(chapter: BibleChapter, verse: Int) throws -> [BibleDrawing] {
-        let titleName = StoredBookKey.titleName(for: chapter)
-        let chapterNumber = chapter.chapter
+    /// 옛 판 — `importVerseDrawing(_:generation:now:)` 로 넘긴다(`SwiftDataDrawingRepository` 의 `DrawingVerseImporting` 옛 판이 부른다).
+    /// - Parameter chapter: 과도기 인자 — 권 · 장이 `command.page` 와 다르면 아무것도 쓰지 않고 던진다(어느 장에 쓸지 엇갈린 명령).
+    ///   필사책 · 번역본은 `command.page` 가 정한다. t4 에서 지운다.
+    public func importVerseDrawing(
+        _ command: VerseDrawingImportCommand,
+        chapter: BibleChapter,
+        generation: DrawingStoreGeneration,
+        now: Date
+    ) throws -> VerseDrawingImportOutcome {
+        let page = command.page
+        guard chapter.title == page.chapter.title, chapter.chapter == page.chapter.chapter else {
+            Log.error("가져오기 거절 — 명령의 장과 받은 장이 다르다", page.chapter.title.rawValue, "\(page.chapter.chapter)", chapter.title.rawValue, "\(chapter.chapter)")
+            throw Self.importPageMismatch
+        }
+        return try importVerseDrawing(command, generation: generation, now: now)
+    }
+
+    /// 명령의 장과 받은 장이 다르다 — 아무것도 쓰지 않았다(과도기 인자 검사, t4 에서 지운다).
+    static let importPageMismatch = DrawingRepositoryError.persistenceFailed("importPageMismatch — 가져오기 명령의 장과 받은 장이 다르다")
+
+    /// 그 절의 모든 행(대표 · 보관 · 빈 행) — 그 page(필사책 · 번역본)의 것만. 필사책 · 번역본은 권 이름(`StoredBookKey.titleName(for: page)`)으로 가린다.
+    private func verseRows(page: NotebookChapter, verse: Int) throws -> [BibleDrawing] {
+        let titleName = StoredBookKey.titleName(for: page)
+        let chapterNumber = page.chapter.chapter
         let predicate = #Predicate<BibleDrawing> {
             $0.titleName == titleName && $0.titleChapter == chapterNumber && $0.verse == verse
         }
