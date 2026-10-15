@@ -131,7 +131,7 @@ public struct CarveDetailView: View {
                     geometryCollector.onFlush = { batch in
                         send(.verseGeometryMeasured(batch))
                     }
-                    send(.fetchSentence)
+                    send(.appeared)
                     startDebugScenarioIfNeeded()
                 }
                 // scenePhase 훅은 여기 두지 않는다 — 사이드바가 열리면 이 뷰가 트리에서 빠져 훅이 돌지 않는다.
@@ -245,7 +245,8 @@ public struct CarveDetailView: View {
         // 레이아웃 좌표계의 원점. 헤더 padding·스크롤 offset 은 이 공간 밖이다.
         .coordinateSpace(name: ChapterLayoutHosting.coordinateSpaceName)
         .overlay(alignment: .topLeading) { layoutDebugOverlay }
-        .id("\(store.sentenceSetting)-\(halfWidth)")
+        // 설정 · 폭이 바뀌면 컬럼을 새로 짓는다. 백그라운드 배치 뒤 다시 활성이 되면 세대를 올려 새로 잰다(`CarveDetailFeature+Background`).
+        .id("\(store.sentenceSetting)-\(halfWidth)-\(store.columnMeasureGeneration)")
     }
 
     /// Phase 2 디버그 오버레이 — `writingRect` / `captureRect` / `underlineAnchors` / 실측 frame / dirtyBounds.

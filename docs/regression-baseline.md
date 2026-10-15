@@ -1,9 +1,19 @@
 # 회귀 기준선
 
-> 회귀 기준선 **1624** — `Carve-Workspace` 전체 회귀의 **통과 수**(Xcode 27 · iPad mini (A17 Pro) · iPadOS 26.2). **통과 수가 줄면 회귀다.**
+> 회귀 기준선 **1636** — `Carve-Workspace` 전체 회귀의 **통과 수**(Xcode 27 · iPad mini (A17 Pro) · iPadOS 26.2). **통과 수가 줄면 회귀다.**
 > 이 파일이 기준선의 유일한 원본이다. [AGENTS.md](../AGENTS.md) · [설계 문서](./single-canvas-design.md) · [런북](./phase-0a-d-device-test.md)은 여기를 가리킨다.
 
-## 현재 값 (2026-10-15, 브랜치 `claude/layout-polish-2.1`, Xcode 27.0 27A266a · Swift 6.4 · 언어 모드 6)
+## 현재 값 (2026-10-15, 브랜치 `claude/friendly-euler-e3b287`, Xcode 27.0 27A266a · Swift 6.4 · 언어 모드 6)
+
+| iPadOS 런타임 | 기기 | 통과 | 실패 | 건너뜀 | 예상 실패 | 총 |
+|---|---|---:|---:|---:|---:|---:|
+| 26.2 | iPad mini (A17 Pro) | 1636 | 0 | 8 | 4 | 1648 |
+
+- iPadOS 17 · 18 의 홈 → 복귀 결함(획 372pt 밀림 · 새 획 막힘 · 닫아 둔 장 목록 열 열림) 수정 브랜치의 전체 회귀 값이다(develop `556a1aac` 에서 출발).
+- 1624 → 1636(시험 선언 1636 → 1648): 백그라운드 배치의 컬럼 실측 미루기 · 복귀 재측정 · 나타날 때 같은 장 다시 읽기 건너뛰기 — CarveFeature `CarveDetailBackgroundLayoutTesting` +8,
+  백그라운드 동안 분할 화면이 바꾼 열 표시 되돌리기 — CarveFeature `CarveNavigationFeatureTesting` +4. 지운 시험 0. 기대값을 바꾼 시험 0.
+
+### 이전 값 (2026-10-15, 브랜치 `claude/layout-polish-2.1`, Xcode 27.0 27A266a · Swift 6.4 · 언어 모드 6)
 
 | iPadOS 런타임 | 기기 | 통과 | 실패 | 건너뜀 | 예상 실패 | 총 |
 |---|---|---:|---:|---:|---:|---:|
@@ -96,3 +106,5 @@ rev.37(2026-09-29) 까지의 이력은 [설계 문서](./single-canvas-design.md
 | 2026-10-13 | 1609 | `91f5d95e` | 수동 확인 M1-b 회귀 수정 — 고른 언어가 없을 때 화면 언어를 번들 규칙(선호 언어에서 앱이 옮긴 첫 언어)으로, 규칙 시험 +2. 26.2 실패 0 |
 | 2026-10-14 | 1614 | `fix/2.1-release-test-findings` | 2.1.0 출시 시험 결함 수정 — 번역본 전환 맨 위 정렬 +3, 계정 바뀜 뒤 이어서 불러오기 처음부터 다시 판정 +2, 지운 시험 0. 26.2 실패 0 |
 | 2026-10-15 | 1619 | `claude/settings-late-ondisappear` | 설정 하위 화면의 늦은 onDisappear(`ifCaseLet` · `ifLet` 경고) 제거 — 하위 화면을 떠날 때 구독 정리 시험 +5, 지운 시험 0. 26.2 실패 0 |
+| 2026-10-15 | 1624 | `claude/layout-polish-2.1` | 2.1 화면 배치 다듬기 — 헤더 번역본 고르기 팝오버 +3(`5c6ea85f` 에서 올리지 않은 것) · 본문 첫 줄 기준선 +2, 지운 시험 0. 26.2 실패 0 |
+| 2026-10-15 | 1636 | `claude/friendly-euler-e3b287` | iPadOS 17 · 18 홈 → 복귀 결함(앱 전환기 스냅샷의 compact 재배치) — 백그라운드 컬럼 실측 미루기 · 복귀 재측정 +8, 분할 화면 열 표시 되돌리기 +4, 지운 시험 0. 26.2 실패 0 |

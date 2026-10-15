@@ -63,6 +63,12 @@ public struct CarveNavigationView: View {
             if phase != .active {
                 send(.appWillResignActive)
             }
+            // 백그라운드에서 돌아오는 길(background → inactive → active)의 inactive 도 아직 백그라운드로 본다.
+            switch phase {
+            case .background: send(.sceneEnteredBackground)
+            case .active: send(.sceneBecameActive)
+            default: break
+            }
         }
         .onAppear {
             send(.presentFirstRunGuide)
