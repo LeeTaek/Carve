@@ -137,10 +137,10 @@ public struct DrawingWeeklySummaryFeature {
     public enum Action: ViewAction {
         case adSlot(SponsorAdSlotFeature.Action)
         case view(View)
-        /// 최근 절을 골랐다 — 코디네이터가 차트를 닫고 그 절을 연다. 절의 장(`BibleVerse.title`)에 번역본이 든다.
-        case openVerse(BibleVerse)
-        /// 최근 장 · 가장 많이 쓴 장을 골랐다 — 코디네이터가 차트를 닫고 그 번역본의 장을 연다.
-        case openChapter(BibleChapter)
+        /// 최근 절을 골랐다 — 코디네이터가 차트를 닫고 그 필사책 · 번역본의 장에서 그 절을 연다(2.2 결정 10).
+        case openVerse(NotebookChapter, verse: Int)
+        /// 최근 장 · 가장 많이 쓴 장을 골랐다 — 코디네이터가 차트를 닫고 그 필사책 · 번역본의 장을 연다.
+        case openChapter(NotebookChapter)
         
         public enum View {
             case onAppear
@@ -164,15 +164,17 @@ public struct DrawingWeeklySummaryFeature {
                 return .send(.adSlot(.startLoad))
                 
             case let .view(.recentVerseTapped(item)):
-                // 그 항목의 번역본 절로 연다 — 지금 필사 중인 번역본으로 바꾸지 않는다.
-                return .send(.openVerse(item.verse))
+                // 그 항목의 필사책 · 번역본 절로 연다 — 지금 필사 중인 필사책 · 번역본으로 바꾸지 않는다.
+                return .send(.openVerse(item.page, verse: item.verse.verse))
 
             case let .view(.recentChapterTapped(chapter)):
-                return .send(.openChapter(chapter))
+                // 장 목록은 아직 필사책을 담지 않는다 — 기본 필사책의 장으로 연다.
+                return .send(.openChapter(NotebookChapter(notebook: .default, chapter: chapter)))
 
             case .view(.topChapterTapped):
                 guard let chapter = state.topChapter?.chapter else { return .none }
-                return .send(.openChapter(chapter))
+                // 가장 많이 쓴 장은 필사책을 담지 않는다 — 기본 필사책의 장으로 연다.
+                return .send(.openChapter(NotebookChapter(notebook: .default, chapter: chapter)))
                 
             default:
                 return .none

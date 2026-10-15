@@ -37,6 +37,8 @@ public struct CarveNavigationFeature: Sendable {
         /// 앱 전역에 공유하는 현재 장(번역본 포함). 지금 번역본은 이 장의 `translation` 이다(결정 13).
         /// 저장값이 없으면(처음 설치) 기기 언어로 정한 장이다(`BibleChapter.firstLaunch`).
         @Shared(.codableAppStorage("title")) public var currentTitle: BibleChapter = .firstLaunch
+        /// 지금 필사책의 `NotebookID.rawValue`(기기마다, 2.2 결정 13). 읽을 때는 `currentNotebook` 을 쓴다 — 깨진 값은 기본 필사책으로 읽는다.
+        @Shared(.currentNotebookID) public var currentNotebookID: String
         /// 최초 필사 안내 팝업 상태
         @Presents public var firstRunGuide: FirstRunGuideFeature.State?
         /// 최초 필사 안내를 한 번이라도 표시했는지 저장한다.
@@ -55,12 +57,21 @@ public struct CarveNavigationFeature: Sendable {
                 carveDetailState: .initialState
             )
         }
+
+        /// 지금 필사책. 저장값이 필사책 ID 형식이 아니면(깨진 값) 기본 필사책이다.
+        public var currentNotebook: NotebookID {
+            NotebookID(rawValue: currentNotebookID) ?? .default
+        }
     }
     public enum Action: ViewAction, CarveToolkit.ScopeAction, BindableAction {
         case binding(BindingAction<State>)
         case firstRunGuide(PresentationAction<FirstRunGuideFeature.Action>)
         case moveToChapter(BibleChapter)
         case moveToVerse(BibleVerse)
+        /// 지금 필사책을 바꾸고 지금 장을 그 필사책으로 다시 연다 — 책장에서 필사책을 고르거나, 책장에 머문 채 지금 필사책이 바뀌면 코디네이터가 보낸다.
+        case switchNotebook(NotebookID)
+        /// 필사책과 장을 함께 연다 — 차트의 최근 장 · 절을 고르면 코디네이터가 보낸다. `verse` 가 있으면 그 절로 간다.
+        case openPage(NotebookChapter, verse: Int?)
         /// 장 목록에 쓸 성경 한 권의 필사 기록을 받음
         case drawingRecordLoaded(BibleTitle, BibleTitleDrawingRecord)
         /// 다른 화면(즐겨찾기 목록)에서 즐겨찾기가 바뀌었다 — 필사 화면의 별 표시를 다시 읽는다
@@ -78,6 +89,8 @@ public struct CarveNavigationFeature: Sendable {
             case moveToChart
             /// 즐겨찾기 목록으로 이동 — 화면 전환은 `AppCoordinatorFeature` 가 한다
             case moveToFavorites
+            /// 책장(필사책 고르기 · 관리)으로 이동 — 화면 전환은 `AppCoordinatorFeature` 가 한다
+            case moveToNotebooks
             /// NavigationSplitView를 닫고 DetailOnly로 변경
             case closeNavigationBar
             /// detail Content 안에서 네비게이션 래핑
@@ -177,6 +190,17 @@ public struct CarveNavigationFeature: Sendable {
                     }
                 )
                 
+            case .switchNotebook(let notebook):
+                // 지금은 지금 필사책 키만 바꾼다. 열린 장을 그 필사책으로 다시 읽는 일은 필사 화면 저장 경로가 필사책을 나를 때 더한다.
+                state.$currentNotebookID.withLock { $0 = notebook.rawValue }
+                return .none
+
+            case let .openPage(page, verse):
+                // 필사책을 먼저 바꾸고, 장 · 절은 위젯 · 즐겨찾기와 같은 장 이동(`moveToChapter` · `moveToVerse`)으로 연다.
+                state.$currentNotebookID.withLock { $0 = page.notebook.rawValue }
+                guard let verse else { return .send(.moveToChapter(page.chapter)) }
+                return .send(.moveToVerse(BibleVerse(title: page.chapter, verse: verse, sentence: "")))
+
             case .scope(.carveDetailAction(.scope(.headerAction(.view(.translationSelected(let translation)))))):
                 // 헤더 제목 메뉴에서 고른 번역본(결정 19) — 같은 권 · 장 · 지금 보던 절로 바꾼다(결정 9).
                 return switchTranslation(state: &state, to: translation)
@@ -206,6 +230,10 @@ public struct CarveNavigationFeature: Sendable {
 
             case .view(.moveToFavorites):
                 Log.debug("move To favorites")
+                return .none
+
+            case .view(.moveToNotebooks):
+                Log.debug("move To notebooks")
                 return .none
 
             case .refreshFavorites:

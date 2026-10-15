@@ -6,6 +6,7 @@
 //
 
 @testable import CarveFeature
+import Domain
 import Foundation
 import Testing
 
@@ -216,6 +217,111 @@ struct CarveNavigationFeatureTesting {
 
         #expect(state.columnVisibility == .detailOnly)
         #expect(!state.carveDetailState.headerState.isNavigationPresented)
+    }
+
+    // MARK: 지금 필사책 (2.2 회차별 필사책 결정 13 · 15)
+
+    /// 기본이 아닌 필사책 — 두 번째로 만든 필사책.
+    private static let secondNotebook = NotebookID.make(uuid: UUID(uuidString: "0F3A1C2D-0000-4000-8000-000000000002")!)
+
+    /// 이 시험만의 UserDefaults 에 붙은 처음 상태로 `operation` 을 돌린다 — 지금 필사책 · 지금 장 키가 다른 시험과 섞이지 않는다.
+    private func withNavigationState(_ operation: (inout CarveNavigationFeature.State, UserDefaults) throws -> Void) throws {
+        let suite = "CarveNavigationFeatureTesting.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        var state = withDependencies {
+            $0.defaultAppStorage = defaults
+        } operation: {
+            CarveNavigationFeature.State.initialState
+        }
+        try operation(&state, defaults)
+    }
+
+    @Test("처음에는 기본 필사책이고, 필사책 바꾸기는 지금 필사책 키(기기마다)에 그 ID 를 쓴다")
+    func switchNotebookWritesCurrentNotebookKey() throws {
+        try withNavigationState { state, defaults in
+            #expect(state.currentNotebook == .default)
+            let currentTitle = state.currentTitle
+
+            _ = CarveNavigationFeature().reduce(into: &state, action: .switchNotebook(Self.secondNotebook))
+
+            #expect(state.currentNotebook == Self.secondNotebook)
+            #expect(defaults.string(forKey: "currentNotebookID") == Self.secondNotebook.rawValue)
+            // 장은 그대로다 — 같은 장을 그 필사책으로 다시 연다.
+            #expect(state.currentTitle == currentTitle)
+
+            _ = CarveNavigationFeature().reduce(into: &state, action: .switchNotebook(.default))
+            #expect(defaults.string(forKey: "currentNotebookID") == NotebookID.default.rawValue)
+        }
+    }
+
+    @Test("저장된 지금 필사책이 필사책 ID 형식이 아니면 기본 필사책으로 읽는다")
+    func corruptedCurrentNotebookReadsAsDefault() throws {
+        try withNavigationState { state, _ in
+            for broken in ["", "nb_default", "0F3A1C2D00004000800000000000000 2", "0F3A1C2D000040008000000000000002"] {
+                state.$currentNotebookID.withLock { $0 = broken }
+                #expect(state.currentNotebook == .default, "「\(broken)」")
+            }
+        }
+    }
+
+    @Test("필사책과 장을 함께 열면 지금 필사책을 그 필사책으로 바꾼다 — 장 · 절은 장 이동으로 이어서 연다")
+    func openPageWritesNotebookBeforeMovingToChapter() throws {
+        try withNavigationState { state, defaults in
+            let johnKJV = BibleChapter(title: .john, chapter: 3, translation: .KJV)
+
+            _ = CarveNavigationFeature().reduce(
+                into: &state,
+                action: .openPage(NotebookChapter(notebook: Self.secondNotebook, chapter: johnKJV), verse: 16)
+            )
+
+            #expect(state.currentNotebook == Self.secondNotebook)
+            #expect(defaults.string(forKey: "currentNotebookID") == Self.secondNotebook.rawValue)
+        }
+    }
+
+    @Test("위젯 · 필사 알림 · 즐겨찾기의 장 이동은 지금 필사책을 바꾸지 않는다(결정 15)")
+    func moveToChapterKeepsCurrentNotebook() throws {
+        try withNavigationState { state, _ in
+            let reducer = CarveNavigationFeature()
+            _ = reducer.reduce(into: &state, action: .switchNotebook(Self.secondNotebook))
+            let psalms = BibleChapter(title: .psalms, chapter: 23)
+
+            _ = reducer.reduce(into: &state, action: .moveToChapter(psalms))
+            _ = reducer.reduce(into: &state, action: .moveToVerse(BibleVerse(title: psalms, verse: 1, sentence: "")))
+
+            #expect(state.currentTitle == psalms)
+            #expect(state.currentNotebook == Self.secondNotebook)
+        }
+    }
+
+    @Test("책장 열기는 화면 전환을 코디네이터에 맡기고 필사 화면 상태를 바꾸지 않는다")
+    func moveToNotebooksLeavesStateToCoordinator() throws {
+        try withNavigationState { state, _ in
+            state.columnVisibility = .all
+            let currentTitle = state.currentTitle
+
+            _ = CarveNavigationFeature().reduce(into: &state, action: .view(.moveToNotebooks))
+
+            #expect(state.columnVisibility == .all)
+            #expect(state.currentTitle == currentTitle)
+            #expect(state.currentNotebook == .default)
+        }
+    }
+}
+
+/// 책장의 화면 경계 — 지금은 뒤로 버튼만 위임으로 나간다. 고르기 · 지우기 위임은 책장 내용과 함께 시험한다.
+@MainActor
+struct NotebookShelfBoundaryTesting {
+    @Test("책장의 뒤로 버튼은 필사 화면으로 돌아가라고 알리고, 나타남은 아무것도 하지 않는다")
+    func backTappedDelegatesBackToWriting() async {
+        let store = TestStore(initialState: NotebookShelfFeature.State.initialState) {
+            NotebookShelfFeature()
+        }
+
+        await store.send(.view(.onAppear))
+        await store.send(.view(.backTapped))
+        await store.receive(\.delegate.backToWriting)
     }
 }
 

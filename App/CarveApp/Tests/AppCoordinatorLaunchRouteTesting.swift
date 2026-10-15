@@ -43,6 +43,8 @@ struct AppCoordinatorLaunchRouteTesting {
         #expect(Route("navigation") == .navigation)
         #expect(Route("chart") == .chart)
         #expect(Route("favorites") == .favorites)
+        #expect(Route("notebooks") == .notebooks)
+        #expect(Route("Notebooks") == .notebooks)
         #expect(Route("settings") == .settings(nil))
         #expect(Route("verse/16") == .verse(16))
         #expect(Route("Settings/RemoveAds") == .settings(.removeAds))
@@ -64,7 +66,10 @@ struct AppCoordinatorLaunchRouteTesting {
 
     @Test("모르는 경로 · 빈 하위 이름 · 1 보다 작은 절 번호는 읽지 않는다")
     func rejectsUnknownRoutes() {
-        let invalid = ["", "bogus", "/chart", "chart/1", "settings/", "settings/unknown", "settings/removeAds/extra", "verse", "verse/0", "verse/-1", "verse/abc"]
+        let invalid = [
+            "", "bogus", "/chart", "chart/1", "notebook", "notebooks/1", "settings/", "settings/unknown", "settings/removeAds/extra",
+            "verse", "verse/0", "verse/-1", "verse/abc"
+        ]
         for value in invalid {
             #expect(Route(value) == nil, "「\(value)」")
         }
@@ -151,6 +156,19 @@ struct AppCoordinatorLaunchRouteTesting {
         }
         #expect(favorites.state.pathScreens == [.favorites])
         await favorites.finish()
+    }
+
+    @Test("notebooks — 필사 화면에 들어가며 책장을 위에 쌓는다")
+    func notebooksRouteIsPushed() async {
+        #expect(Route.parse(arguments: ["/Applications/Carve.app/Carve", LaunchArgument.uiTestRoute, "notebooks"]) == .notebooks)
+        let store = makeCoordinatorStore(CoordinatorFixture.launching(launchRoute: .notebooks))
+
+        await store.send(Self.syncCompleted) {
+            $0.pendingLaunchRoute = nil
+        }
+        #expect(store.state.rootScreen == .carve)
+        #expect(store.state.pathScreens == [.notebooks])
+        await store.finish()
     }
 
     @Test("navigation — 성경 탐색의 열을 모두 열고 지금 장을 고른 목록으로 시작한다")

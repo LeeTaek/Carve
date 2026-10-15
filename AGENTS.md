@@ -142,7 +142,7 @@ mise x -- swiftlint lint --quiet --config .swiftlint.yml <파일들>
 - ⚠️ **`-CanvasReuseStrokesOnApply` 는 D9 H 수정을 끄고 결함을 재현하는 opt-out 이다** — 기본 검증은 이 인자 **없이** 돈다.
 - **Instruments 기록 중에는 `pgrep`/`pkill` 로 프로세스를 건드리지 않는다** — 트레이스가 메타데이터 없이 저장돼 `xctrace export` 가 실패한다.
 - 광고 제거 구매 · 복원은 `CarveApp-StoreKit` 스킴의 `RemoveAdsStoreKitUITests` 로 본다. 표준 `Carve-Workspace` 실행에서는 건너뛴다.
-- **UI 테스트 · 시뮬레이터 확인은 화면을 탭으로 찾아가지 않고 실행 인자로 연다** — `-UITestRoute <경로>`(`navigation` · `chart` · `favorites` · `settings[/<하위>]` · `verse/<절>`)와
+- **UI 테스트 · 시뮬레이터 확인은 화면을 탭으로 찾아가지 않고 실행 인자로 연다** — `-UITestRoute <경로>`(`navigation` · `chart` · `favorites` · `notebooks` · `settings[/<하위>]` · `verse/<절>`)와
   억제 스위치 `-UITestSkipFirstRunGuide` · `-UITestSkipPatchnote` · `-UITestNoAds`(모두 Debug 전용). 전체 목록은 `LaunchArgument`, 쓰는 법은 위 문서의 「화면 바로 열기」 절.
 
 ## 변경 정책
