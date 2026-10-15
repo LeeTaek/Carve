@@ -307,7 +307,7 @@ struct TranslationFavoriteDraftTesting {
             #expect(try await importer.importDraft(request, environment: Self.owned) == .imported(previousKept: false, recorded: true))
             let calls = await spy.calls
             #expect(calls.map(\.chapter) == [Self.genesis1KJV])
-            #expect(calls.first?.command.translation == .KJV)
+            #expect(calls.first?.command.page == NotebookChapter(notebook: .default, chapter: Self.genesis1KJV))
 
             let skipped = VerseDraftImportRequest(key: unknown.key, scope: .localOnly, revision: 1, expectedCurrentFingerprint: nil)
             #expect(skipped.chapter == nil)
@@ -329,7 +329,8 @@ struct TranslationFavoriteDraftTesting {
             [.create(verse: 1, rowID: koreanRow, data: importInk(1), metadata: Self.metadata)], chapter: Self.genesis1, generation: koreanGeneration
         )
         let command = VerseDrawingImportCommand(
-            verse: 1, rowID: .issue(), lineData: importInk(2), metadata: Self.metadata, expectedCurrentFingerprint: nil, translation: .KJV
+            verse: 1, rowID: .issue(), lineData: importInk(2), metadata: Self.metadata, expectedCurrentFingerprint: nil,
+            page: NotebookChapter(notebook: .default, chapter: Self.genesis1KJV)
         )
 
         let outcome = try await repository.importVerse(command, chapter: Self.genesis1KJV, generation: koreanGeneration)

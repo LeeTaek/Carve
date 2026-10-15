@@ -46,7 +46,8 @@ struct VerseDrawingImportTransactionTesting {
         _ harness: RepositoryHarness, verse: Int = 1, rowID: BibleDrawingRowID = .issue(), ink: Data?, expected: String?
     ) -> VerseDrawingImportCommand {
         VerseDrawingImportCommand(
-            verse: verse, rowID: rowID, lineData: ink, metadata: ink == nil ? nil : harness.metadata(verse: verse), expectedCurrentFingerprint: expected
+            verse: verse, rowID: rowID, lineData: ink, metadata: ink == nil ? nil : harness.metadata(verse: verse), expectedCurrentFingerprint: expected,
+            page: NotebookChapter(notebook: .default, chapter: harness.chapter)
         )
     }
 

@@ -76,7 +76,8 @@ public struct VerseDraftStoreRow: Equatable, Sendable {
 /// 한 장의 저장소 내용 — 초안 판정(`VerseDraftRecoveryRule.plan`)이 쓰는 입력을 한 번에 만든다.
 ///
 /// 편집 화면과 복구 화면(④)이 **같은 규칙**으로 대표 행을 고르고 같은 지문을 견주게 하는 자리다. 따로 만들면 한쪽이 보이는 초안을
-/// 다른 쪽이 "보이지 않게 남은 것" 으로 알린다.
+/// 다른 쪽이 "보이지 않게 남은 것" 으로 알린다. 스냅샷은 초안과 **같은 page**(필사책 + 장 — `DrawingRepository.load(_ page:)`)의 것이어야 한다(2.2) —
+/// 다른 필사책의 대표와 견주면 그 필사책의 필기를 이 필사책의 것으로 친다.
 public struct VerseDraftStoreView: Equatable, Sendable {
     /// 절마다의 대표 행(§8-7).
     public let representatives: [Int: VerseDrawingSnapshot]
@@ -151,8 +152,9 @@ enum VerseDraftContinuation: Equatable, Sendable {
 ///   후보가 있으면 그중 가장 늦게 쓴 것을 보인다.
 public enum VerseDraftRecoveryRule {
     /// - Parameters:
-    ///   - drafts: 지금 계정 근거 묶음에 있는 이 장의 초안.
-    ///   - storeContent: 절마다 저장소의 지금 대표 내용 지문. 없는 절은 빈 절이다(행 없음 · 비움).
+    ///   - drafts: 지금 계정 근거 묶음에 있는 이 page(필사책 + 장)의 초안. 절로만 묶으므로 **다른 필사책 · 번역본의 초안을 섞지 않는다**(2.2).
+    ///   - storeContent: 절마다 그 page 의 저장소 지금 대표 내용 지문(`VerseDraftStoreView` — `DrawingRepository.load(_ page:)`).
+    ///     없는 절은 빈 절이다(행 없음 · 비움).
     ///   - environment: 지금 편집 환경.
     ///   - sessionID: 지금 편집 세션. 없으면 모든 초안이 다른 세션의 것이다.
     ///   - storedRevisions: 행마다 지금 세션이 저장소 저장까지 마친 가장 새 revision.
@@ -421,7 +423,7 @@ public extension VerseDraftRecoveryRule {
         return drafts
     }
 
-    /// 연결 전 필기를 지금 저장소와 견준다.
+    /// 연결 전 필기를 지금 저장소와 견준다 — 초안과 `view` 는 같은 page(필사책 + 장)의 것이다.
     ///
     /// - 가져온 기록이 있고 그 행이 남아 있으면, 또는 지금 필사와 같으면 **역할이 끝났다**(목록에 넣지 않는다).
     /// - 좌표 정보가 없으면 넣을 수 없다 — 표시 실패로 알린다(P0-2b 와 같은 판정).
