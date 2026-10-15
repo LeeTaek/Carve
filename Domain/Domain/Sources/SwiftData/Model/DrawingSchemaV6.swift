@@ -189,11 +189,4 @@ public typealias VerseDrawingVersion = DrawingSchemaV6.VerseDrawingVersion
 /// 앱 코드가 쓰는 **현재 스키마**의 전체 삭제 기준점 모델.
 public typealias DrawingEraseEpoch = DrawingSchemaV6.DrawingEraseEpoch
 
-/// 앱이 저장소를 여는 스키마 — **현재 스키마 버전의 모델 전체**다.
-///
-/// 저장소를 여는 곳은 모두 이것을 쓴다. 모델 일부만 주면 마이그레이션 플랜의 마지막 버전과 맞지 않아 열리지 않거나,
-/// 시험이 앱과 다른 스키마를 검증하게 된다.
-public enum AppStoreSchema {
-    public static var models: [any PersistentModel.Type] { DrawingSchemaV6.models }
-    public static var schema: Schema { Schema(models) }
-}
+// 앱이 저장소를 여는 스키마(`AppStoreSchema`)는 V7 로 옮겼다 — `DrawingSchemaV7.swift`. V7 은 위 세 모델 클래스를 그대로 싣는다.

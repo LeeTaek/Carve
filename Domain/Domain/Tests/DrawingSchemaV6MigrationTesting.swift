@@ -43,7 +43,7 @@ struct DrawingSchemaV6MigrationTesting {
         try context.save()
     }
 
-    @Test("V6 는 6.0.0 이고 필사 행 두 클래스를 그대로 싣고 즐겨찾기 · 버전 · 기준점을 싣는다 — 플랜의 마지막 스키마다")
+    @Test("V6 는 6.0.0 이고 필사 행 두 클래스를 그대로 싣고 즐겨찾기 · 버전 · 기준점을 싣는다 — 플랜의 여섯 번째 스키마다")
     func versionModelsAndPlanPosition() {
         #expect(DrawingSchemaV6.versionIdentifier == Schema.Version(6, 0, 0))
         let models = DrawingSchemaV6.models.map { ObjectIdentifier($0) }
@@ -54,8 +54,10 @@ struct DrawingSchemaV6MigrationTesting {
             ObjectIdentifier(DrawingSchemaV6.VerseDrawingVersion.self),
             ObjectIdentifier(DrawingSchemaV6.DrawingEraseEpoch.self)
         ])
-        #expect(DrawingDataMigrationPlan.schemas.last?.versionIdentifier == Schema.Version(6, 0, 0))
-        #expect(AppStoreSchema.models.map { ObjectIdentifier($0) } == models)
+        // V6 는 여섯 번째 스키마다. 앱 스키마(`AppStoreSchema`)는 2026-10-15 부터 V7 이다(`DrawingSchemaV7MigrationTesting`) —
+        // V7 은 이 다섯 클래스를 그대로 싣고 필사책 엔티티만 더한다.
+        #expect(DrawingDataMigrationPlan.schemas[5].versionIdentifier == Schema.Version(6, 0, 0))
+        #expect(Array(AppStoreSchema.models.prefix(models.count)).map { ObjectIdentifier($0) } == models)
         #expect(FavoriteVerse.self == DrawingSchemaV6.FavoriteVerse.self)
     }
 
@@ -93,7 +95,8 @@ struct DrawingSchemaV6MigrationTesting {
         #expect(favorites.first?.knownEraseEpochs == nil)
         #expect(EraseEpochSetCoding.decode(favorites.first?.knownEraseEpochs) == [])
         #expect(try context.fetch(FetchDescriptor<VerseDrawingVersion>()).isEmpty)
-        #expect(LocalStoreLoader.storeKind(at: url) == .known(Schema.Version(6, 0, 0)))
+        // 앱 스키마로 열면 현재 스키마(2026-10-15 부터 V7)까지 올라간다 — V6 를 거쳐 간다.
+        #expect(LocalStoreLoader.storeKind(at: url) == .known(Schema.Version(7, 0, 0)))
     }
 
     @Test("버전 · 기준점을 저장하고 다시 열어도 그대로다 — 큰 획이 외부 저장으로 빠져도 같다")

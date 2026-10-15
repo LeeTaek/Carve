@@ -104,8 +104,10 @@ public enum DrawingSchemaV4: VersionedSchema {
 
         public init() { }
 
+        /// 필사책 안의 장에 새 행을 만든다(2.2 「회차별 필사책」).
+        ///
         /// - Parameters:
-        ///   - bibleTitle: 성경 이름과 장(번역본 포함). 번역본은 `bibleTitle.translation` 이다 — 생략하면 `BibleChapter` 의 기본값 개역개정.
+        ///   - page: 필사책과 장(번역본 포함). **기본값이 없다** — 필사책을 빠뜨리면 컴파일이 막혀야 한다(결정 12).
         ///   - verse: 절 번호.
         ///   - lineData: `PKDrawing.dataRepresentation()`.
         ///   - updateDate: 갱신 일시.
@@ -113,33 +115,58 @@ public enum DrawingSchemaV4: VersionedSchema {
         ///   - rowUUID: 행 식별자(§8-7). **선발급한 값이 있으면 반드시 그 값을 넘깁니다.**
         ///     기본값은 새 UUID 이므로 이 이니셜라이저로 만든 행은 항상 신규 행 취급입니다.
         ///
-        /// 권 이름과 번역본 열은 `StoredBookKey` 로 짓습니다(영어 현지화 결정 1) — 개역개정은 `titleName = rawValue` · 열 `.NKRV`
-        /// (지금과 같다), KJV · BSB 는 `titleName = "<번역본>-<rawValue>"` · 열 nil 입니다. 열에는 영어 값을 쓰지 않습니다.
-        /// business `id` 도 이 `titleName` 으로 지어 번역본마다 다릅니다.
-        public init(bibleTitle: BibleChapter,
+        /// 권 이름과 번역본 열은 `StoredBookKey` 로 짓습니다(영어 현지화 결정 1 · 필사책 결정 1) — 기본 필사책은 지금과 같고
+        /// (개역개정 `titleName = rawValue` · 열 `.NKRV`, KJV · BSB `titleName = "<번역본>-<rawValue>"` · 열 nil),
+        /// 그 밖의 필사책은 그 `titleName` 앞에 `"nb_<토큰>~"` 을 붙입니다. 열은 필사책과 무관하게 번역본으로만 정합니다(혼재 버전 규칙 ②).
+        /// business `id` 도 이 `titleName` 으로 지어 번역본 · 필사책마다 다릅니다.
+        public init(page: NotebookChapter,
                     verse: Int,
                     lineData: Data? = nil,
                     updateDate: Date? = Date.now,
                     layoutMetadataData: Data? = nil,
                     rowUUID: String? = UUID().uuidString
         ) {
-            let storedTitleName = StoredBookKey.titleName(for: bibleTitle)
+            let storedTitleName = StoredBookKey.titleName(for: page)
+            let chapter = page.chapter
             self.lineData = lineData
             self.titleName = storedTitleName
-            self.titleChapter = bibleTitle.chapter
+            self.titleChapter = chapter.chapter
             self.verse = verse
-            self.translation = StoredBookKey.translationColumn(for: bibleTitle.translation)
+            self.translation = StoredBookKey.translationColumn(for: chapter.translation)
             self.creationDate = Date()
             self.updateDate = updateDate
             self.layoutMetadataData = layoutMetadataData
             self.rowUUID = rowUUID
             self.id = {
                 if let timestamp = creationDate?.timeIntervalSince1970 {
-                    return "\(storedTitleName).\(bibleTitle.chapter).\(verse).\(Int(timestamp))"
+                    return "\(storedTitleName).\(chapter.chapter).\(verse).\(Int(timestamp))"
                 } else {
-                    return "\(storedTitleName).\(bibleTitle.chapter).\(verse).\(Date().timeIntervalSince1970)"
+                    return "\(storedTitleName).\(chapter.chapter).\(verse).\(Date().timeIntervalSince1970)"
                 }
             }()
+        }
+
+        /// **기본 필사책**의 장에 새 행을 만든다 — `init(page:…)` 에 기본 필사책으로 넘긴다.
+        ///
+        /// - Parameters:
+        ///   - bibleTitle: 성경 이름과 장(번역본 포함). 번역본은 `bibleTitle.translation` 이다 — 생략하면 `BibleChapter` 의 기본값 개역개정.
+        ///   - 나머지는 `init(page:verse:lineData:updateDate:layoutMetadataData:rowUUID:)` 와 같다.
+        /// - Note: 뜻은 「기본 필사책」 이다 — 행 형식은 2.2 이전과 같다. 새 코드는 `init(page:…)` 를 쓴다. t4 에서 지운다.
+        public convenience init(bibleTitle: BibleChapter,
+                                verse: Int,
+                                lineData: Data? = nil,
+                                updateDate: Date? = Date.now,
+                                layoutMetadataData: Data? = nil,
+                                rowUUID: String? = UUID().uuidString
+        ) {
+            self.init(
+                page: NotebookChapter(notebook: .default, chapter: bibleTitle),
+                verse: verse,
+                lineData: lineData,
+                updateDate: updateDate,
+                layoutMetadataData: layoutMetadataData,
+                rowUUID: rowUUID
+            )
         }
 
         public convenience init(bibleTitle: BibleChapter,

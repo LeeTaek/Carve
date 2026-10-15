@@ -97,10 +97,13 @@ struct LegacySeparationPerformanceProbeTesting {
             + "\(files)개 · \(Self.megabytes(Self.size(of: area.separationDirectory))) | \(Self.megabytes(peak)) |"
     }
 
-    /// 앱 스키마로 행을 넣는다. 필기 바이트는 행마다 조금씩 다르게 — 같은 내용이 되지 않게.
+    /// V6 스키마로 행을 넣는다. 필기 바이트는 행마다 조금씩 다르게 — 같은 내용이 되지 않게.
+    ///
+    /// 앱 스키마가 아니라 V6 로 고정한다 — 판독기가 검증한 모양(V3 · V6)이어야 게이트가 판정까지 간다.
+    /// 앱 스키마(2026-10-15 부터 V7)는 G-2 관측 전까지 판독기가 「알 수 없음」 으로 막는다.
     private func seed(_ url: URL, count: Int, ink: Int) throws {
         let container = try ModelContainer(
-            for: AppStoreSchema.schema, migrationPlan: DrawingDataMigrationPlan.self,
+            for: Schema(DrawingSchemaV6.models),
             configurations: ModelConfiguration(url: url, cloudKitDatabase: .none)
         )
         let context = ModelContext(container)
