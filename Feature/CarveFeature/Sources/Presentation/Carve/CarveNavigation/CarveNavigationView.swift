@@ -35,6 +35,7 @@ public struct CarveNavigationView: View {
     public var body: some View {
         NavigationSplitView(columnVisibility: $store.columnVisibility) {
             sideBar
+                .modifier(SidebarToggleRemovalBeforeIOS26())
                 .navigationSplitViewColumnWidth(min: 280, ideal: 300, max: 320)
         } content: {
             contentList
@@ -356,6 +357,22 @@ extension CarveNavigationView {
         if centeredOffset <= rowPitch { return .top }
         if centeredOffset >= contentHeight - viewportHeight - rowPitch { return .bottom }
         return .center(chapter)
+    }
+}
+
+/// iPadOS 26 미만에서 탐색 분할 화면의 「첫 열 보이기」 단추를 없앤다.
+///
+/// 17 · 18 은 탐색을 열면(`all`) 성경 목록 열과 장 목록 열이 함께 보여 이 단추가 쓰일 일이 없다. 그런데 장 · 설정 버튼으로 열을 접은(`detailOnly`) 뒤
+/// 다시 열면 장 목록 열 위에 「뒤로」 로 남아, 누르면 성경 목록 열이 숨었다(17.5 · 18.6, 2026-10-15 — 바깥을 눌러 닫은 뒤에는 남지 않는다).
+/// 단추는 SwiftUI 툴바가 아니라 분할 화면이 다는 것이라, 장 목록 열에 `toolbar(removing:)` · `navigationBarBackButtonHidden` 을 붙여서는 없어지지 않고
+/// 첫 열에 붙여야 없어진다. 26 은 세로에서 장 목록 열만 열고 이 단추(사이드바 모양)로 성경 목록을 여므로 그대로 둔다.
+private struct SidebarToggleRemovalBeforeIOS26: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content
+        } else {
+            content.toolbar(removing: .sidebarToggle)
+        }
     }
 }
 
