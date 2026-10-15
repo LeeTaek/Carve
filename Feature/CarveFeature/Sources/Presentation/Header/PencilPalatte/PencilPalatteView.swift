@@ -144,11 +144,17 @@ public struct PencilPalatteView: View {
                 .font(CarveTypography.body)
                 .monospacedDigit()
                 .foregroundStyle(CarveColor.ink)
-                .fixedSize()
+                // 팔레트는 시안 크기(504 × 64)로 고정이라 큰 글자에서 이 글자가 색 칸을 덮었다(2026-10-13). 열 라벨 줄과 같이
+                // 시스템 최대 글자(xxxLarge)까지만 키우고, 그래도 넘치면 남은 자리에 맞춰 줄인다 — 자리는 아래 `layoutPriority` 가 먼저 받는다.
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                 .frame(minWidth: CarveSize.minimumHitTarget, minHeight: CarveSize.minimumHitTarget)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        // 뒤의 `Spacer` 와 자리를 나누지 않고 글자 폭을 먼저 받는다(전에는 `fixedSize` 로 늘 제 폭이었다).
+        .layoutPriority(1)
         .accessibilityLabel(Text("펜 굵기 \(millimeters(store.pencilConfig.lineWidth))", bundle: .module))
         .accessibilityHint(Text("탭하면 굵기를 고릅니다", bundle: .module))
         .popover(
@@ -340,20 +346,25 @@ public struct PencilPalatteDockView: View {
     }
 
     /// 팔레트 아래 한 줄. 펼치면 조작 안내(시안 M2), 접으면 현재 도구와 굵기(시안 C3 「펜 · 0.5 mm」).
+    ///
+    /// 도크 높이가 고정(`height`)이라 큰 글자에서 안내가 팔레트 폭을 넘어 본문 위로 크게 겹쳤다(2026-10-13). 열 라벨 줄과 같이
+    /// 시스템 최대 글자(xxxLarge)까지만 키우고, 펼친 안내는 팔레트 폭에 맞춰 줄인다. 접힌 줄은 짧아 전처럼 제 폭으로 원 아래 가운데에 둔다.
     private func caption(expandedWidth: CGFloat) -> some View {
         ZStack {
             if isShowingExpanded {
                 Text(gestureGuide)
+                    .minimumScaleFactor(0.7)
                     .transition(.opacity)
             } else {
                 Text(verbatim: "\(compactToolName) · \(LineWidthPalatteView.millimeters(store.pencilConfig.lineWidth))")
+                    .fixedSize()
                     .transition(.opacity)
             }
         }
         .font(CarveTypography.caption)
         .foregroundStyle(CarveColor.secondary)
         .lineLimit(1)
-        .fixedSize()
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         .frame(
             width: isShowingExpanded ? expandedWidth : CarveSize.floatingToolButton,
             height: Self.captionHeight

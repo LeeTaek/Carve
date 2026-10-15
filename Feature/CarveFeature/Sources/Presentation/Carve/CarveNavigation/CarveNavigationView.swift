@@ -287,6 +287,11 @@ public struct CarveNavigationView: View {
         } label: {
             Text(chapter.description)
                 .font(CarveTypography.body)
+                // 칸이 44pt 고정이라 큰 글자에서 두 자리 장이 「3…」 로 잘렸다(2026-10-13). 열 라벨 줄과 같이 시스템 최대 글자(xxxLarge)까지만
+                // 키우고(시편 「150」 도 한 칸에 든다), 그래도 넘치면 칸에 맞춰 줄인다.
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                 .frame(width: CarveSize.minimumHitTarget, height: CarveSize.minimumHitTarget)
                 .foregroundStyle(foreground)
                 .background(background, in: RoundedRectangle(cornerRadius: CarveRadius.control, style: .continuous))

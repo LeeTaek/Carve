@@ -144,6 +144,79 @@ public struct CarveIconBadgeParagraph: View {
     }
 }
 
+/// 버튼 표식을 문장 **가운데**에 끼운 문단. 표식이 글자처럼 줄을 따라 흘러, 좁은 폭 · 큰 글자에서도 표식 앞뒤가 단어 단위로 줄바꿈된다.
+///
+/// 표식을 뷰로 옆에 두면(`HStack`) 표식 왼쪽 문장이 표식 폭만큼 좁은 칸에서 따로 줄바꿈돼 「with the writing / screen's」 처럼 갈라졌다
+/// (설정 사이드바 바닥글, 2026-10-13 영어 · 큰 글자). 그래서 ``CarveIconBadge`` 와 같은 모양을 그림으로 그려 `Text` 안에 넣는다.
+/// 문단은 부르는 쪽이 표식 `Text` 를 받아 만든다 — 글꼴 · 색 · 접근성 이름도 부르는 쪽에서 준다.
+public struct CarveIconBadgeInlineParagraph: View {
+    private let icon: CarveIcon
+    private let paragraph: (Text) -> Text
+    /// 표식 한 변. ``CarveIconBadge`` 와 같은 값 · 같은 기준으로 커진다.
+    @ScaledMetric(relativeTo: .caption) private var side: CGFloat = CarveIconBadge.baseSide
+    /// 기준선에서 한글 가운데까지의 높이 — 표식 가운데를 여기에 맞춘다(``CarveIconBadgeParagraph`` 와 같다).
+    @ScaledMetric(relativeTo: .caption) private var midline: CGFloat = 4
+
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorSchemeContrast) private var contrast
+
+    /// 그림자 자리로 표식 둘레에 비우는 폭. 넓히면 표식이 든 줄만 위아래로 벌어진다 — 그림자(반경 2)가 조금 잘리는 대신 1pt 로 둔다.
+    private static let shadowInset: CGFloat = 1
+
+    /// - Parameters:
+    ///   - icon: 표식 아이콘.
+    ///   - paragraph: 표식 `Text` 를 받아 문단을 만든다(예: `Text("\(앞 문장) \(badge) \(뒤 문장)", bundle: .module)`).
+    public init(_ icon: CarveIcon, paragraph: @escaping (Text) -> Text) {
+        self.icon = icon
+        self.paragraph = paragraph
+    }
+
+    public var body: some View {
+        paragraph(badge)
+            .lineSpacing(2)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// 표식 그림. ``CarveIconBadge`` 처럼 유리를 쓰는 조건에서는 밝은 면 · 옅은 그림자, 아니면 헤더와 같은 불투명 표면 · 테두리다.
+    private var badge: Text {
+        let side = side
+        let inset = Self.shadowInset
+        let usesGlassLook = usesGlassLook
+        let isDark = colorScheme == .dark
+        let fill = usesGlassLook ? (isDark ? CarveColor.surface : CarveColor.canvas) : CarveColor.surface
+        // 에셋 이름으로 만든 `Image`(SVG)는 이 그림 안에서 그려지지 않았다(iOS 26.2) — 같은 에셋을 `UIImage` 로 읽어 템플릿으로 그린다.
+        let image = Image(uiImage: icon.asset.image).renderingMode(.template)
+        let drawing = Image(size: CGSize(width: side + inset * 2, height: side + inset * 2)) { context in
+            let frame = CGRect(x: inset, y: inset, width: side, height: side)
+            let shape = RoundedRectangle(cornerRadius: CarveRadius.control * side / CarveSize.minimumHitTarget, style: .continuous)
+                .path(in: frame)
+            if usesGlassLook {
+                context.drawLayer { layer in
+                    layer.addFilter(.shadow(color: .black.opacity(isDark ? 0.4 : 0.14), radius: 2, x: 0, y: 1))
+                    layer.fill(shape, with: .color(fill))
+                }
+            } else {
+                context.fill(shape, with: .color(fill))
+                context.stroke(shape, with: .color(CarveColor.divider), lineWidth: 1)
+            }
+            var glyph = context.resolve(image)
+            glyph.shading = .color(CarveColor.ink)
+            context.draw(glyph, in: frame.insetBy(dx: side * 0.15, dy: side * 0.15))
+        }
+        // 그림 아래 끝이 기준선에 놓이므로, 표식 가운데가 기준선 위 `midline` 에 오게 내린다.
+        return Text(drawing).baselineOffset(midline - inset - side / 2)
+    }
+
+    /// 헤더 버튼이 유리인 조건(iOS 26 이상 · 투명도 줄이기 · 대비 늘리기가 꺼짐) — ``CarveIconBadge`` 와 같다.
+    private var usesGlassLook: Bool {
+        if #available(iOS 26.0, *) {
+            return allowsGlass(reduceTransparency: reduceTransparency, contrast: contrast)
+        }
+        return false
+    }
+}
+
 private struct CarveIconButtonStyle: ButtonStyle {
     let isSelected: Bool
     let background: CarveIconButton.Background
