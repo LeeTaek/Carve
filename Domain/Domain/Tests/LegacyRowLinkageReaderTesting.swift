@@ -30,7 +30,10 @@ enum LinkageFixture {
         return directory
     }
 
-    /// 앱 스키마(V6) 저장소 — `BibleDrawing` 절 1 · 2 · 3 을 넣고 닫는다. 미러링 표를 붙이고, 계정 식별 키는 아직 없다(로그인한 적 없는 모양, F33).
+    /// V6 저장소 — `BibleDrawing` 절 1 · 2 · 3 을 넣고 닫는다. 미러링 표를 붙이고, 계정 식별 키는 아직 없다(로그인한 적 없는 모양, F33).
+    ///
+    /// 앱 스키마가 아니라 `DrawingSchemaV6` 모델로 고정한다 — 판독기가 검증한 모양(`validatedSchemaMajors` [3, 6])의 표본이라는 뜻을 지킨다.
+    /// 앱 스키마는 2026-10-15 부터 V7(필사책)이고, V7 저장소는 G-2 관측 전까지 「알 수 없음」 이다(`v7StoreIsUnvalidatedModel`).
     static func makeV6Store(in directory: URL, page: Bool = false, favorite: Bool = false) throws -> URL {
         let url = directory.appendingPathComponent("Carve.sqlite")
         try seedV6(at: url, page: page, favorite: favorite)
@@ -48,8 +51,7 @@ enum LinkageFixture {
 
     private static func seedV6(at url: URL, page: Bool, favorite: Bool) throws {
         let container = try ModelContainer(
-            for: AppStoreSchema.schema,
-            migrationPlan: DrawingDataMigrationPlan.self,
+            for: Schema(DrawingSchemaV6.models),
             configurations: ModelConfiguration(url: url, cloudKitDatabase: .none)
         )
         let context = ModelContext(container)
@@ -432,7 +434,10 @@ extension LegacyRowLinkageReaderTesting {
         let fresh = directory.appendingPathComponent("Carve.sqlite")
         _ = try ModelContainer(for: AppStoreSchema.schema, migrationPlan: DrawingDataMigrationPlan.self, configurations: ModelConfiguration(url: fresh, cloudKitDatabase: .none))
         let reading = elsewhere.judge(storeAt: fresh)
-        #expect(reading.verdict == .allLinked && !reading.mirroringAttached)
+        // 새 설치는 지금 앱 스키마(V7) 저장소를 만든다 — 판독기 검증 범위(V3 · V6) 밖이라 G-2 관측 전까지 「알 수 없음」 이다.
+        withKnownIssue("G-2: V7 판독기 관측 전") {
+            #expect(reading.verdict == .allLinked && !reading.mirroringAttached)
+        }
     }
 
     @Test("iPadOS 17·18의 엄격한 linked metadata profile을 읽고 미지 OS 19는 보류한다")
@@ -512,8 +517,11 @@ extension LegacyRowLinkageReaderTesting {
 
         let reading = reader.judge(storeAt: url)
 
-        #expect(reading.verdict == .allLinked && !reading.mirroringAttached)
-        #expect(reading.summary.contains("미러링 표 없음"))
+        // 새 설치는 지금 앱 스키마(V7) 저장소를 만든다 — 판독기 검증 범위(V3 · V6) 밖이라 G-2 관측 전까지 「알 수 없음」 이다.
+        withKnownIssue("G-2: V7 판독기 관측 전") {
+            #expect(reading.verdict == .allLinked && !reading.mirroringAttached)
+            #expect(reading.summary.contains("미러링 표 없음"))
+        }
     }
 
     @Test("미러링 표가 하나도 없는데 legacy 행이 있으면 「알 수 없음」 — 관측한 적 없는 모양")
@@ -647,6 +655,29 @@ extension LegacyRowLinkageReaderTesting {
 
             #expect(reason(narrow.judge(storeAt: url)) == .unvalidatedEntity(.favoriteVerse))
         }
+    }
+
+    /// 앱 스키마가 V7(필사책)로 올라가면 업데이트한 기기의 저장소는 V7 이 된다. 판독기는 V7 모양을 사람이 관측하기 전까지 검증하지 않았으므로
+    /// 「모두 대응 있음」 모양이어도 판정하지 않고 막는다 — 첫 로그인 · 계정 전환 · 1.3.0 업그레이드 증명은 보류(실패 닫힘)되는 것이 맞다.
+    /// 검증 범위 확장은 사람 관측 뒤 별도 작업(plan G-2)이고, 그때 이 시험을 고친다.
+    @Test("V7 저장소(필사책 스키마)는 판독기 검증 범위 밖이라 「알 수 없음(unvalidatedModel)」 이다 — G-2 관측 전까지 실패 닫힘")
+    func v7StoreIsUnvalidatedModel() throws {
+        let directory = try LinkageFixture.makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = try LinkageFixture.makeV6Store(in: directory)
+        for pk in 1...3 { try LinkageFixture.link(url, entity: .bibleDrawing, primaryKey: Int64(pk)) }
+        try LinkageFixture.addIdentityKeys(url)
+        #expect(reader.judge(storeAt: url).verdict == .allLinked)
+
+        // 앱 스키마로 연다 — 업데이트한 앱이 저장소를 여는 것과 같다(V6 → V7 lightweight).
+        _ = try ModelContainer(for: AppStoreSchema.schema, migrationPlan: DrawingDataMigrationPlan.self, configurations: ModelConfiguration(url: url, cloudKitDatabase: .none))
+        #expect(LocalStoreLoader.storeKind(at: url) == .known(Schema.Version(7, 0, 0)))
+
+        let reading = reader.judge(storeAt: url)
+
+        #expect(!reader.validatedSchemaMajors.contains(7))
+        #expect(reason(reading) == .unvalidatedModel("known(7.0.0)"))
+        #expect(reading.rows.isEmpty && reading.linkedCount == 0 && reading.unlinkedCount == 0)
     }
 
     @Test("「알 수 없음」 은 행 목록을 주지 않는다 — 부분 결과로 분리하지 못하게")
