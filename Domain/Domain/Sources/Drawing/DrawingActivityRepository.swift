@@ -15,12 +15,12 @@ import Dependencies
 /// 필사 한 행의 활동 기록 — 차트가 날짜별 · 장별로 세는 데 필요한 값만 옮긴 스냅샷이다.
 ///
 /// `BibleDrawing` 모델을 Feature 로 넘기지 않기 위한 값이다. 필기(`lineData`)는 담지 않는다.
-/// 차트 · 최근 기록 조회는 모든 번역본의 행을 담는다 — 번역본은 `chapter` · `translation` 으로 읽는다.
+/// 차트 · 최근 기록 조회는 모든 필사책 · 번역본의 행을 담는다(필사책 결정 10 — 합산) — 필사책 · 장 · 번역본은 `page` · `chapter` · `translation` 으로 읽는다.
 public struct DrawingActivity: Equatable, Sendable {
     /// 마지막으로 고친 시각.
     public let updateDate: Date?
-    /// 행에 저장된 권 이름 그대로 — 개역개정은 `BibleTitle.rawValue`, KJV · BSB 는 번역본 접두가 붙는다(`StoredBookKey`).
-    /// 권 · 번역본은 이 문자열을 직접 풀지 말고 `chapter` 로 읽는다.
+    /// 행에 저장된 권 이름 그대로 — 개역개정은 `BibleTitle.rawValue`, KJV · BSB 는 번역본 접두, 기본이 아닌 필사책은 그 앞에 필사책 접두가 붙는다(`StoredBookKey`).
+    /// 권 · 번역본 · 필사책은 이 문자열을 직접 풀지 말고 `page` · `chapter` 로 읽는다.
     public let titleName: String?
     /// 장 번호.
     public let titleChapter: Int?
@@ -34,27 +34,39 @@ public struct DrawingActivity: Equatable, Sendable {
         self.verse = verse
     }
 
-    /// 역할: 장(번역본 포함)으로 활동을 만든다 — 저장 행과 같은 `titleName` 을 `StoredBookKey` 로 짓는다.
-    /// 입력 · 출력: 고친 시각 · 장 · 절 → 활동. 부작용 없음.
-    public init(updateDate: Date?, chapter: BibleChapter, verse: Int?) {
+    /// 역할: 필사책 안의 장(번역본 포함)으로 활동을 만든다 — 저장 행과 같은 `titleName` 을 `StoredBookKey.titleName(for: page)` 로 짓는다.
+    /// 입력 · 출력: 고친 시각 · 필사책과 장 · 절 → 활동. 부작용 없음.
+    public init(updateDate: Date?, page: NotebookChapter, verse: Int?) {
         self.init(
             updateDate: updateDate,
-            titleName: StoredBookKey.titleName(for: chapter),
-            titleChapter: chapter.chapter,
+            titleName: StoredBookKey.titleName(for: page),
+            titleChapter: page.chapter.chapter,
             verse: verse
         )
     }
 
-    /// 행의 권 · 장 · 번역본 — `titleName` 을 `StoredBookKey.decode` 로 푼다.
-    /// 권 이름을 모르거나(`decode` 가 nil) 장 번호가 없으면 nil 이다 — 호출부는 지금처럼 건너뛴다.
-    public var chapter: BibleChapter? {
-        guard let titleName, let titleChapter, let key = StoredBookKey.decode(titleName) else { return nil }
-        return BibleChapter(title: key.title, chapter: titleChapter, translation: key.translation)
+    /// 역할: **기본 필사책**의 장(번역본 포함)으로 활동을 만든다 — `init(updateDate:page:verse:)` 로 넘긴다.
+    /// 입력 · 출력: 고친 시각 · 장 · 절 → 활동. 부작용 없음.
+    /// - Note: 뜻은 「기본 필사책」 이다. 새 코드는 `init(updateDate:page:verse:)` 를 쓴다. t4 에서 지운다.
+    public init(updateDate: Date?, chapter: BibleChapter, verse: Int?) {
+        self.init(updateDate: updateDate, page: NotebookChapter(notebook: .default, chapter: chapter), verse: verse)
     }
 
-    /// 행의 번역본 — 접두가 없으면 개역개정이다. 권 이름을 모르면(`decode` 가 nil) nil 이다.
+    /// 행의 필사책 · 권 · 장 · 번역본 — `titleName` 을 `StoredBookKey.decodeRow` 로 푼다. 모든 필사책의 행이 풀린다.
+    /// 권 이름을 모르거나 필사책 접두가 깨졌거나(`decodeRow` 가 nil) 장 번호가 없으면 nil 이다 — 호출부는 지금처럼 건너뛴다.
+    public var page: NotebookChapter? {
+        guard let titleName, let titleChapter, let key = StoredBookKey.decodeRow(titleName) else { return nil }
+        return key.page(chapter: titleChapter)
+    }
+
+    /// 행의 권 · 장 · 번역본 — `page` 의 장이다. 필사책은 가리지 않는다(차트 · 주간 요약은 모든 필사책 합산, 결정 10).
+    public var chapter: BibleChapter? {
+        page?.chapter
+    }
+
+    /// 행의 번역본 — 번역본 접두가 없으면 개역개정이다. 권 이름을 모르면(`decodeRow` 가 nil) nil 이다. 장 번호가 없어도 읽힌다.
     public var translation: Translation? {
-        titleName.flatMap(StoredBookKey.decode)?.translation
+        titleName.flatMap(StoredBookKey.decodeRow)?.translation
     }
 }
 
