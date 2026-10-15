@@ -14,7 +14,7 @@ import Dependencies
 public enum DrawingEraseOutcome: Equatable, Sendable {
     /// 전부 지웠다.
     case completed
-    /// 필사 행은 지웠지만 뒤따른 삭제(구 구조 행 · 즐겨찾기 · 보존 영역)가 실패했다.
+    /// 필사 행은 지웠지만 뒤따른 삭제(구 구조 행 · 즐겨찾기 · 필사책 정보 · 보존 영역)가 실패했다.
     ///
     /// 필사 행이 사라졌으므로 **열린 장은 옛 잉크와 미저장분을 버려야 한다.** 그러지 않으면 다음 저장이
     /// 방금 지운 필사를 새 행으로 되살린다 (`ChapterCanvasDataClear`).
@@ -39,8 +39,14 @@ public protocol DrawingDataEraser: Sendable {
 
 /// 앱이 실제로 쓰는 구현.
 ///
+/// 지우는 순서: 필사 행(`BibleDrawing`) → 구 구조 행(`BiblePageDrawing`) → 즐겨찾기(`FavoriteVerse`) → 필사책 정보(`DrawingNotebook`) → 기기 보존 영역.
+///
 /// 필사 행을 **가장 먼저** 지운다 — 무엇이 지워졌는지를 필사 행 하나로 판정할 수 있게 하기 위함이다.
 /// 각 삭제는 따로 반영되며 서로 원자적이지 않다(SwiftData 배치 삭제).
+///
+/// 필사 행은 모든 필사책의 행이다(2.2 「회차별 필사책」 — 기본 필사책 행과 `titleName` 접두 행 모두). 필사책 정보(이름 · 완료 표시)도 함께 지워
+/// 지운 뒤 책장에는 기본 필사책 하나만 남는다. 필사책 하나를 지우는 경로(`SwiftDataNotebookRepository.delete`)는 세대를 바꾸지 않는다 —
+/// 세대를 올리는 것은 이 전체 삭제뿐이다.
 ///
 /// 필사 행 삭제는 저장소 세대도 함께 올린다 (`eraseAllDrawingRows`). 삭제 전에 요청된 저장이 뒤늦게 실행돼도
 /// 행을 되살리지 못하게 하기 위함이다 (`DrawingStoreGeneration`).
@@ -72,8 +78,9 @@ public struct SwiftDataDrawingDataEraser: DrawingDataEraser {
         do {
             try await database.deleteAll(BiblePageDrawing.self)
             try await database.deleteAll(FavoriteVerse.self)
+            try await database.deleteAll(DrawingNotebook.self)
         } catch {
-            Log.error("전체 삭제 — 필사 행은 지웠지만 구 구조 행 · 즐겨찾기를 지우지 못했다", "\(error)")
+            Log.error("전체 삭제 — 필사 행은 지웠지만 구 구조 행 · 즐겨찾기 · 필사책 정보를 지우지 못했다", "\(error)")
             return .partiallyFailed
         }
         do {

@@ -39,12 +39,15 @@ public protocol NotebookRepository: Sendable {
 }
 
 private enum NotebookRepositoryKey: DependencyKey {
-    /// 실제 SwiftData 구현은 아직 없다(t1b 가 바꾼다). 주입하지 않고 부르면 문제로 알린다.
-    static let liveValue: any NotebookRepository = UnimplementedNotebookRepository()
+    /// SwiftData 구현. actor 를 주입하지 않으면 부를 때의 의존성 actor(`createSwiftDataActor` — 앱이 연 저장소)를 쓴다.
+    static let liveValue: any NotebookRepository = SwiftDataNotebookRepository()
     /// 테스트 기본값은 **아무 저장소도 건드리지 않는다** — 공유 SwiftData actor 를 깨우지 않는다(룰북 testing.md).
     /// 필사책을 확인하는 시험은 자기 대역이나 인메모리 저장소를 주입한다.
     static let testValue: any NotebookRepository = EmptyNotebookRepository()
-    static let previewValue: any NotebookRepository = EmptyNotebookRepository()
+    /// 미리보기 — 미리보기 actor(인메모리 저장소)를 쓰는 SwiftData 구현.
+    static var previewValue: any NotebookRepository {
+        SwiftDataNotebookRepository(actor: .previewValue)
+    }
 }
 
 public extension DependencyValues {
@@ -66,7 +69,7 @@ private let defaultNotebookOnly = NotebookSnapshot(
     hasMetadata: false
 )
 
-/// 비어 있는 필사책 저장소 — 목록은 기본 필사책 하나, 쓰기는 버린다. 테스트 · 미리보기 기본값이다.
+/// 비어 있는 필사책 저장소 — 목록은 기본 필사책 하나, 쓰기는 버린다. 테스트 기본값이다.
 private struct EmptyNotebookRepository: NotebookRepository {
     func notebooks() async throws -> [NotebookSnapshot] {
         [defaultNotebookOnly]
@@ -79,28 +82,4 @@ private struct EmptyNotebookRepository: NotebookRepository {
     func setCompleted(_ id: NotebookID, _ completed: Bool, now: Date) async throws {}
 
     func delete(_ id: NotebookID) async throws {}
-}
-
-/// 주입하지 않았을 때 — 저장한 척하지 않고 문제로 알린다. 목록은 기본 필사책 하나로 돌려 화면이 비지 않게 한다.
-private struct UnimplementedNotebookRepository: NotebookRepository {
-    func notebooks() async throws -> [NotebookSnapshot] {
-        reportIssue("NotebookRepository 를 주입하지 않았다 — notebooks()")
-        return [defaultNotebookOnly]
-    }
-
-    func create(id: NotebookID, name: String, now: Date) async throws {
-        reportIssue("NotebookRepository 를 주입하지 않았다 — create(id:name:now:)")
-    }
-
-    func rename(_ id: NotebookID, to name: String, now: Date) async throws {
-        reportIssue("NotebookRepository 를 주입하지 않았다 — rename(_:to:now:)")
-    }
-
-    func setCompleted(_ id: NotebookID, _ completed: Bool, now: Date) async throws {
-        reportIssue("NotebookRepository 를 주입하지 않았다 — setCompleted(_:_:now:)")
-    }
-
-    func delete(_ id: NotebookID) async throws {
-        reportIssue("NotebookRepository 를 주입하지 않았다 — delete(_:)")
-    }
 }
