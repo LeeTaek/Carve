@@ -46,6 +46,8 @@ public struct CarveNavigationFeature: Sendable {
         @Shared(.appStorage("hasSeenFirstRunGuide")) public var hasPresentedFirstRunGuide = false
         /// 탐색 사이드바 하단 네이티브 광고(시안 K3). 사이드바를 열 때 받고, 만료되면 비웠다가 다음에 열 때 받는다.
         public var sidebarAdSlot: SponsorAdSlotFeature.State = .init(placement: .sidebarCard)
+        /// 앱이 백그라운드에 들어가 아직 다시 활성이 되지 않았다. 그동안 분할 화면이 바인딩으로 바꾸는 열 표시는 받지 않는다.
+        var isInBackground = false
 
         public static var initialState: Self {
             State(
@@ -88,6 +90,10 @@ public struct CarveNavigationFeature: Sendable {
             case restartFirstRunGuide
             /// 앱이 비활성화되기 전 단일 Canvas의 미저장분을 저장
             case appWillResignActive
+            /// 앱이 백그라운드로 들어갔다 — 다시 활성이 될 때까지 시스템 배치가 바꾸는 열 표시 · 필사 컬럼 실측을 받지 않는다
+            case sceneEnteredBackground
+            /// 앱이 다시 활성이 됐다
+            case sceneBecameActive
             /// 성경 열에서 성경을 선택
             case bibleTitleTapped(BibleTitle)
             /// 장 선택 버튼에서 도메인 장 이동을 요청
@@ -122,6 +128,13 @@ public struct CarveNavigationFeature: Sendable {
         BindingReducer()
             .onChange(of: \.columnVisibility) { oldValue, newValue in
                 Reduce { state, _ in
+                    // iPadOS 18 은 백그라운드에서 앱 전환기 스냅샷을 compact 폭으로 찍는다. 그때 분할 화면이 접히며 열 표시를
+                    // `detailOnly` → `doubleColumn` 으로 써 넣어, 돌아오면 닫아 둔 장 목록 열이 열려 있었다(2026-10-15 18.6).
+                    // 사용자가 연 것이 아니므로 되돌린다. 리듀서가 직접 바꾼 값(장 이동 등)은 이 바인딩 경로를 지나지 않는다.
+                    if state.isInBackground {
+                        state.columnVisibility = oldValue
+                        return .none
+                    }
                     syncHeaderNavigationState(state: &state)
                     // 시스템 제스처로 탐색을 연 경우에도 현재 장을 선택한 목록으로 시작한다.
                     guard oldValue == .detailOnly, newValue != .detailOnly else { return .none }
@@ -226,6 +239,14 @@ public struct CarveNavigationFeature: Sendable {
 
             case .view(.appWillResignActive):
                 return .send(.scope(.carveDetailAction(.view(.appWillResignActive))))
+
+            case .view(.sceneEnteredBackground):
+                state.isInBackground = true
+                return .send(.scope(.carveDetailAction(.view(.sceneEnteredBackground))))
+
+            case .view(.sceneBecameActive):
+                state.isInBackground = false
+                return .send(.scope(.carveDetailAction(.view(.sceneBecameActive))))
 
             case .view(.chapterTapped(let chapter)):
                 return .send(.moveToChapter(chapter))

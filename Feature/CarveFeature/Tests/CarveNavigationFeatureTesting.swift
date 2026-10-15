@@ -152,6 +152,71 @@ struct CarveNavigationFeatureTesting {
         _ = reducer.reduce(into: &state, action: .drawingRecordLoaded(.psalms, .init(drawnChapters: [119], latestChapter: 119)))
         #expect(state.selectedChapter == nil)
     }
+
+    // MARK: 백그라운드 배치 — iPadOS 18 은 앱 전환기 스냅샷을 compact 폭으로 찍으며 분할 화면을 접었다 편다
+
+    @Test("백그라운드 동안 분할 화면이 바인딩으로 바꾼 열 표시는 받지 않는다 — 돌아와도 닫아 둔 장 목록 열이 열리지 않는다")
+    func backgroundColumnVisibilityChangeIsRefused() {
+        // Given: 탐색 열을 닫아 둔 채 홈으로 나갔다
+        var state = CarveNavigationFeature.State.initialState
+        let reducer = CarveNavigationFeature()
+        _ = reducer.reduce(into: &state, action: .view(.sceneEnteredBackground))
+        #expect(state.isInBackground)
+
+        // When: 스냅샷 배치에서 분할 화면이 접히며 열 표시를 써 넣는다(18.6 실측 detailOnly → doubleColumn)
+        _ = reducer.reduce(into: &state, action: .binding(.set(\.columnVisibility, .doubleColumn)))
+
+        // Then: 받지 않는다 — 헤더의 탐색 버튼도, 장 선택도 그대로다
+        #expect(state.columnVisibility == .detailOnly)
+        #expect(!state.carveDetailState.headerState.isNavigationPresented)
+        #expect(state.selectedTitle == nil)
+
+        // When: 다시 활성이 된다
+        _ = reducer.reduce(into: &state, action: .view(.sceneBecameActive))
+
+        // Then: 닫힌 그대로다
+        #expect(!state.isInBackground)
+        #expect(state.columnVisibility == .detailOnly)
+    }
+
+    @Test("탐색 열을 연 채 나갔으면 백그라운드 배치가 바꾸려 해도 연 그대로 남는다")
+    func backgroundKeepsOpenNavigation() {
+        var state = CarveNavigationFeature.State.initialState
+        state.columnVisibility = .all
+        state.carveDetailState.headerState.isNavigationPresented = true
+        let reducer = CarveNavigationFeature()
+
+        _ = reducer.reduce(into: &state, action: .view(.sceneEnteredBackground))
+        _ = reducer.reduce(into: &state, action: .binding(.set(\.columnVisibility, .doubleColumn)))
+
+        #expect(state.columnVisibility == .all)
+        #expect(state.carveDetailState.headerState.isNavigationPresented)
+    }
+
+    @Test("활성일 때 분할 화면이 연 열 표시는 그대로 받고 지금 장을 고른다(시스템 제스처)")
+    func activeColumnVisibilityChangeIsAccepted() {
+        var state = CarveNavigationFeature.State.initialState
+
+        _ = CarveNavigationFeature().reduce(into: &state, action: .binding(.set(\.columnVisibility, .doubleColumn)))
+
+        #expect(state.columnVisibility == .doubleColumn)
+        #expect(state.carveDetailState.headerState.isNavigationPresented)
+        #expect(state.selectedTitle == state.currentTitle.title)
+        #expect(state.selectedChapter == state.currentTitle.chapter)
+    }
+
+    @Test("백그라운드여도 리듀서가 직접 바꾸는 열 표시는 되돌리지 않는다 — 바인딩 경로만 막는다")
+    func reducerVisibilityChangeInBackgroundIsKept() {
+        var state = CarveNavigationFeature.State.initialState
+        state.columnVisibility = .all
+        let reducer = CarveNavigationFeature()
+
+        _ = reducer.reduce(into: &state, action: .view(.sceneEnteredBackground))
+        _ = reducer.reduce(into: &state, action: .view(.closeNavigationBar))
+
+        #expect(state.columnVisibility == .detailOnly)
+        #expect(!state.carveDetailState.headerState.isNavigationPresented)
+    }
 }
 
 /// 장 목록을 선택한 장으로 옮길 때 목록 끝을 넘지 않는다(iPadOS 27.2 가로에서 제목과 목록이 내려앉던 문제).

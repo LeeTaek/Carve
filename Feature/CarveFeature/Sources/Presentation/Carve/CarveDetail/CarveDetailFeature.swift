@@ -32,6 +32,17 @@ public struct CarveDetailFeature: Sendable {
         /// 진행 중인 측정 구간의 `os_signpost` ID (`ChapterLayoutSignpost`).
         var layoutSignpostID: UInt64?
 
+        // MARK: 백그라운드 배치 (`CarveDetailFeature+Background.swift`)
+
+        /// 앱이 백그라운드에 들어가 아직 다시 활성이 되지 않았다. 그동안 온 컬럼 실측 · 폭은 믿지 않고 미룬다.
+        var isInBackground = false
+        /// 백그라운드 동안 컬럼 실측이나 폭이 들어왔다 — 다시 활성이 되면 컬럼을 새로 잰다.
+        var hasBackgroundMeasurement = false
+        /// 백그라운드 동안 들어온 마지막 필사 컬럼 폭. 다시 활성이 되면 평소 폭 변경처럼 적용한다.
+        var deferredWritingWidth: CGFloat?
+        /// 컬럼을 새로 재는 세대. 뷰가 컬럼 `.id` 에 넣으므로 올리면 모든 행이 지금 배치를 다시 보고한다.
+        var columnMeasureGeneration = 0
+
         // MARK: 단일 Canvas (설계 §13 Phase 3 — 2.1 부터 필사 화면의 유일한 경로)
 
         /// 단일 Canvas 상태 — 장 하나를 캔버스 하나로 읽고 쓴다.
@@ -153,6 +164,8 @@ public struct CarveDetailFeature: Sendable {
         
         @CasePathable
         public enum View {
+            /// 필사 화면이 나타났다 — 본문을 읽는다. 백그라운드 배치에서 다시 나타난 것이면 보고 있던 장을 다시 읽지 않는다
+            case appeared
             /// 성경 구절 fetch
             case fetchSentence
             /// 밖에서 필사 데이터가 지워졌는지 확인한다 (공유 세대 비교).
@@ -181,6 +194,10 @@ public struct CarveDetailFeature: Sendable {
             case layoutHostingChanged(writingWidth: CGFloat)
             /// 앱이 비활성/백그라운드로 감 — 단일 Canvas 의 미저장분을 저장한다 (§8-5, best-effort)
             case appWillResignActive
+            /// 앱이 백그라운드로 들어갔다 — 다시 활성이 될 때까지 컬럼 실측 · 폭을 미룬다
+            case sceneEnteredBackground
+            /// 앱이 다시 활성이 됐다 — 미룬 폭을 적용하고, 백그라운드 동안 실측이 왔으면 컬럼을 새로 잰다
+            case sceneBecameActive
             /// 디버그 시나리오에서 단일 Canvas의 특정 절로 스크롤
             case scrollToVerse(Int)
             /// 디버그 시나리오에서 다음 장으로 이동
@@ -250,6 +267,12 @@ public struct CarveDetailFeature: Sendable {
                     .send(.scope(.chapterCanvasAction(.drawingDataCleared)))
                 )
 
+            case .view(.appeared):
+                // 백그라운드 배치에서 화면이 다시 나타난 것은 사용자의 이동이 아니다 — 보고 있던 장을 다시 읽지 않는다.
+                // 장 이동 · 딥링크 · 번역본 전환은 `fetchSentence` 를 직접 보내므로 여기를 지나지 않는다.
+                if Self.isRedundantBackgroundFetch(state) { return .none }
+                return .send(.view(.fetchSentence))
+
             case .view(.fetchSentence):
                 let oldChapter = state.headerState.currentTitle
                                 
@@ -290,10 +313,12 @@ public struct CarveDetailFeature: Sendable {
                 return .none
                 
             case .view(.verseGeometryMeasured(let batch)):
+                if state.isInBackground { return deferBackgroundMeasurement(state: &state) }
                 applyVerseGeometry(state: &state, batch: batch)
                 return forwardLayoutToSingleCanvas(state: &state)
 
             case .view(.layoutHostingChanged(let writingWidth)):
+                if state.isInBackground { return deferBackgroundMeasurement(state: &state, writingWidth: writingWidth) }
                 if state.chapterLayout.setWritingWidth(writingWidth) {
                     rebuildLayoutIfNeeded(state: &state)
                 }
@@ -302,6 +327,13 @@ public struct CarveDetailFeature: Sendable {
             case .view(.appWillResignActive):
                 // 단일 Canvas 의 미저장분을 저장한다. 없으면 no-op.
                 return .send(.scope(.chapterCanvasAction(.flushPending)))
+
+            case .view(.sceneEnteredBackground):
+                state.isInBackground = true
+                return .none
+
+            case .view(.sceneBecameActive):
+                return resumeFromBackground(state: &state)
 
             case .view(.saveRetryTapped):
                 // `flushPending` 이 곧 실패한 저장의 재시도다 (§8-5). 사용자가 기다리지 않고 지금 시도하게 한다.
@@ -524,7 +556,7 @@ extension CarveDetailFeature {
 
     /// 입력이 전부 모였으면 레이아웃을 (재)계산하고 계측을 남긴다.
     /// - Parameter state: Feature 상태.
-    private func rebuildLayoutIfNeeded(state: inout State) {
+    func rebuildLayoutIfNeeded(state: inout State) {
         let wasBuilt = state.chapterLayout.buildCount > 0
         guard let layout = state.chapterLayout.rebuildIfComplete(
             setting: state.sentenceSetting,
@@ -602,7 +634,7 @@ extension CarveDetailFeature {
     ///
     /// `columnOrigin` 의 y 는 0 이다 — 헤더는 `contentInset.top` 으로 비우므로 콘텐츠 좌표는 헤더와 무관하다.
     /// Δ 안전망(설계 §14 — D9 R13)은 여기서 판정을 넘겨 캔버스의 새 획 입력만 닫는다.
-    private func forwardLayoutToSingleCanvas(state: inout State) -> Effect<Action> {
+    func forwardLayoutToSingleCanvas(state: inout State) -> Effect<Action> {
         guard let layout = state.chapterLayout.layout else { return .none }
         var effects: [Effect<Action>] = []
         if let origin = state.chapterLayout.columnOrigin,
