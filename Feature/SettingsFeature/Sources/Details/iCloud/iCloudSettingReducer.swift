@@ -41,7 +41,8 @@ public struct CloudSettingsFeature: Sendable {
     @Dependency(\.legacySeparationHoldState) private var holdState
     @Dependency(\.drawingEditEnvironment) private var editEnvironment
 
-    /// 화면이 떠 있는 동안만 활동 · 편집 환경을 구독한다.
+    /// 활동 · 편집 환경 구독. 화면이 다시 나타나면 앞선 구독을 끊고 새로 잇는다.
+    /// 화면을 떠날 때(설정이 다른 항목으로 옮기거나 닫을 때)는 부모의 `ifLet` 이 이 화면의 효과를 모두 취소한다 — 사라질 때 보내는 액션이 없다(2026-10-15).
     private enum CancelID { case activity, connection }
     @Dependency(\.widgetVerseClient) private var widgetVerseClient
     @Dependency(\.drawingDataEraser) private var drawingDataEraser
@@ -77,8 +78,6 @@ public struct CloudSettingsFeature: Sendable {
             case databaseIsEmpty
             /// 화면이 나타났다. 계정 상태를 **그때 조회한다** — 미리 켜 두지 않는다.
             case onAppear
-            /// 화면이 사라졌다. 활동 구독을 멈춘다.
-            case onDisappear
         }
     }
     public var body: some Reducer<State, Action> {
@@ -99,8 +98,6 @@ public struct CloudSettingsFeature: Sendable {
                     .cancellable(id: CancelID.activity, cancelInFlight: true),
                     observeHeldConnection()
                 )
-            case .view(.onDisappear):
-                return .merge(.cancel(id: CancelID.activity), .cancel(id: CancelID.connection))
             case .accountChecked(let availability):
                 state.availability = availability
             case .connectionChecked(let environment):

@@ -1,9 +1,19 @@
 # 회귀 기준선
 
-> 회귀 기준선 **1614** — `Carve-Workspace` 전체 회귀의 **통과 수**(Xcode 27 · iPad mini (A17 Pro) · iPadOS 26.2). **통과 수가 줄면 회귀다.**
+> 회귀 기준선 **1619** — `Carve-Workspace` 전체 회귀의 **통과 수**(Xcode 27 · iPad mini (A17 Pro) · iPadOS 26.2). **통과 수가 줄면 회귀다.**
 > 이 파일이 기준선의 유일한 원본이다. [AGENTS.md](../AGENTS.md) · [설계 문서](./single-canvas-design.md) · [런북](./phase-0a-d-device-test.md)은 여기를 가리킨다.
 
-## 현재 값 (2026-10-14, 브랜치 `fix/2.1-release-test-findings`, Xcode 27.0 27A266a · Swift 6.4 · 언어 모드 6)
+## 현재 값 (2026-10-15, 브랜치 `claude/settings-late-ondisappear`, Xcode 27.0 27A266a · Swift 6.4 · 언어 모드 6)
+
+| iPadOS 런타임 | 기기 | 통과 | 실패 | 건너뜀 | 예상 실패 | 총 |
+|---|---|---:|---:|---:|---:|---:|
+| 26.2 | iPad mini (A17 Pro) | 1619 | 0 | 8 | 4 | 1631 |
+
+- 설정 하위 화면이 사라질 때 보내던 정리 액션(onDisappear)을 지운 브랜치의 전체 회귀 값이다(develop `814ff37d` 에서 출발).
+- 1614 → 1619(시험 선언 1626 → 1631): 하위 화면을 떠날 때 구독 정리 — SettingsFeature `SettingsDetailLifecycleTesting` +3(iCloud · 확인이 필요한 필기 · 광고 제거에서 다른 항목으로),
+  CarveApp `AppCoordinatorSettingsLifecycleTesting` +2(「완료」 로 닫기). 지운 시험 0. 기대값을 바꾼 시험: `RemoveAdsFeatureTesting` 3(onDisappear 대신 효과 취소) · `CloudSettingsHoldTesting` 1(onDisappear 줄 삭제).
+
+### 이전 값 (2026-10-14, 브랜치 `fix/2.1-release-test-findings`, Xcode 27.0 27A266a · Swift 6.4 · 언어 모드 6)
 
 | iPadOS 런타임 | 기기 | 통과 | 실패 | 건너뜀 | 예상 실패 | 총 |
 |---|---|---:|---:|---:|---:|---:|
@@ -75,3 +85,4 @@ rev.37(2026-09-29) 까지의 이력은 [설계 문서](./single-canvas-design.md
 | 2026-10-13 | 1607 | `76c04bb2` | 앱 언어 즉시 전환 — 단계 1 · 2(앱 안 고르기 · 헤더 · 설정 「화면」 · 캔버스 호스트) +15, 단계 3 DAG 통합 브랜치(모듈 전체 이행 · Domain 표시 API 비옵셔널 · lint) +20, 지운 시험 0. 26.2 실패 0(다른 런타임은 출시 전 회귀에서) |
 | 2026-10-13 | 1609 | `91f5d95e` | 수동 확인 M1-b 회귀 수정 — 고른 언어가 없을 때 화면 언어를 번들 규칙(선호 언어에서 앱이 옮긴 첫 언어)으로, 규칙 시험 +2. 26.2 실패 0 |
 | 2026-10-14 | 1614 | `fix/2.1-release-test-findings` | 2.1.0 출시 시험 결함 수정 — 번역본 전환 맨 위 정렬 +3, 계정 바뀜 뒤 이어서 불러오기 처음부터 다시 판정 +2, 지운 시험 0. 26.2 실패 0 |
+| 2026-10-15 | 1619 | `claude/settings-late-ondisappear` | 설정 하위 화면의 늦은 onDisappear(`ifCaseLet` · `ifLet` 경고) 제거 — 하위 화면을 떠날 때 구독 정리 시험 +5, 지운 시험 0. 26.2 실패 0 |

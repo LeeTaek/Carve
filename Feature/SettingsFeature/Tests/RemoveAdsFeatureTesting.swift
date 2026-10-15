@@ -26,7 +26,7 @@ struct RemoveAdsFeatureTesting {
         let client = StubPurchaseClient(isAdFree: adFreeShared(in: defaults))
         let store = makeStore(client: client, appStorage: defaults)
 
-        await store.send(.view(.onAppear)) {
+        let appear = await store.send(.view(.onAppear)) {
             $0.isLoadingProduct = true
         }
         await store.receive(\.adFreeChanged)
@@ -34,7 +34,8 @@ struct RemoveAdsFeatureTesting {
             $0.isLoadingProduct = false
             $0.product = stubProduct
         }
-        await store.send(.view(.onDisappear))
+        // 화면을 떠나면 설정의 `ifLet` 이 권한 구독을 끝낸다 — 여기서는 그 취소를 대신한다.
+        await appear.cancel()
     }
 
     @Test("구매가 끝나면 공유 권한이 바뀌어 구매함으로 보인다")
@@ -45,7 +46,7 @@ struct RemoveAdsFeatureTesting {
         let client = StubPurchaseClient(isAdFree: adFreeShared(in: defaults))
         let store = makeStore(client: client, appStorage: defaults)
 
-        await store.send(.view(.onAppear)) {
+        let appear = await store.send(.view(.onAppear)) {
             $0.isLoadingProduct = true
         }
         await store.receive(\.adFreeChanged)
@@ -63,7 +64,8 @@ struct RemoveAdsFeatureTesting {
         await store.receive(\.purchaseResponse) {
             $0.inProgress = nil
         }
-        await store.send(.view(.onDisappear))
+        // 화면을 떠나면 설정의 `ifLet` 이 권한 구독을 끝낸다 — 여기서는 그 취소를 대신한다.
+        await appear.cancel()
     }
 
     @Test("보호자 승인을 기다리면 안내만 띄우고 구매함으로 바꾸지 않는다")
@@ -140,7 +142,7 @@ struct RemoveAdsFeatureTesting {
         state.notice = .nothingToRestore
         let store = makeStore(initialState: state, client: client, appStorage: defaults)
 
-        await store.send(.view(.onAppear))
+        let appear = await store.send(.view(.onAppear))
         await store.receive(\.adFreeChanged)
 
         await store.send(.view(.restoreTapped)) {
@@ -153,7 +155,8 @@ struct RemoveAdsFeatureTesting {
         await store.receive(\.restoreResponse) {
             $0.inProgress = nil
         }
-        await store.send(.view(.onDisappear))
+        // 화면을 떠나면 설정의 `ifLet` 이 권한 구독을 끝낸다 — 여기서는 그 취소를 대신한다.
+        await appear.cancel()
     }
 
     @Test("요청이 진행 중이면 구매 · 복원을 다시 받지 않고, 이미 샀으면 구매를 받지 않는다")

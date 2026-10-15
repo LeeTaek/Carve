@@ -59,8 +59,8 @@ public struct RemoveAdsView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(CarveColor.surface)
+        // 사라질 때는 보내지 않는다 — 설정이 경로를 바꾸거나 닫으면서 구독을 끝내고, 그 뒤에 온 액션은 받을 상태가 없다(룰북 navigation.md).
         .onAppear { send(.onAppear) }
-        .onDisappear { send(.onDisappear) }
     }
 
     private var actions: some View {

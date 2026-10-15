@@ -64,11 +64,11 @@ public struct RemoveAdsFeature {
             case onAppear
             case purchaseTapped
             case restoreTapped
-            /// 화면이 사라짐 — 권한 구독을 끊는다.
-            case onDisappear
         }
     }
 
+    /// 권한 구독. 화면이 다시 나타나면 앞선 구독을 끊고 새로 잇는다.
+    /// 화면을 떠날 때(설정이 다른 항목으로 옮기거나 닫을 때)는 부모의 `ifLet` 이 이 구독을 취소한다 — 사라질 때 보내는 액션이 없다(2026-10-15).
     private enum CancelID {
         case adFree
     }
@@ -78,9 +78,6 @@ public struct RemoveAdsFeature {
     public var body: some Reducer<State, Action> {
         Reduce { state, action in
             switch action {
-            case .view(.onDisappear):
-                return .cancel(id: CancelID.adFree)
-
             case .view(.onAppear):
                 let isAdFree = SharedReader<Bool>(.isAdFree)
                 let observeAdFree = Effect<Action>.publisher {
