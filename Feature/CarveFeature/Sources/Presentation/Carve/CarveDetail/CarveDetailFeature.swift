@@ -270,6 +270,11 @@ public struct CarveDetailFeature: Sendable {
             case .view(.drawingDataRevisionChanged):
                 guard state.seenDrawingDataRevision != state.drawingDataRevision else { return .none }
                 state.seenDrawingDataRevision = state.drawingDataRevision
+                // 전체 삭제는 모든 필사책과 필사책 정보를 지우고 지금 필사책을 기본으로 돌린다(필사책 설계 §7) — 헤더 부제도 이름 없는 기본 필사책
+                // (「첫 번째 필사」)이다. 목록을 다시 읽지 않는다 — iCloud 에서 이름이 다시 오면 도착 확인이 고친다.
+                state.headerState.notebookName = ""
+                state.headerState.isDefaultNotebook = state.currentNotebook.isDefault
+                state.headerState.isNotebookNameLoaded = true
                 // 즐겨찾기 표시도 함께 지워졌다. 캔버스는 미저장분까지 버리고 DB 에서 다시 합성한다 — 레이아웃은 그대로라 다시 재지 않는다.
                 let cleared: Effect<Action> = .merge(
                     .send(.reloadFavorites),

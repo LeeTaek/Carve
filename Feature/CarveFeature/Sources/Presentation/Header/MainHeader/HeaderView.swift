@@ -189,9 +189,18 @@ public struct HeaderView: View {
                     .minimumScaleFactor(0.5)
                 // 번역본 약칭은 지금 장의 번역본이다(결정 11). 끝의 ⌄ 로 눌러서 번역본을 바꿀 수 있음을 알린다.
                 HStack(spacing: CarveSpacing.xxSmall) {
+                    // 첫 칸은 지금 필사책 이름(2.2 결정 9). 긴 이름은 이 칸만 줄여 번역본 · 구약/신약 · 권 이름을 남긴다.
+                    if let notebookLabel {
+                        Text(verbatim: notebookLabel)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                        Text(verbatim: "·")
+                            .accessibilityHidden(true)
+                    }
                     Text(verbatim: Self.subtitleText(store.currentTitle, locale: locale))
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
+                        .layoutPriority(1)
                     Image(systemName: "chevron.down")
                         .imageScale(.small)
                         .accessibilityHidden(true)
@@ -208,13 +217,34 @@ public struct HeaderView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(Self.titleAccessibilityLabel(store.currentTitle, locale: locale))
-        .accessibilityValue(Text(verbatim: store.currentTitle.translation.fullName(locale: locale)))
+        .accessibilityValue(Text(verbatim: Self.titleAccessibilityValue(
+            notebookLabel: notebookLabel,
+            translation: store.currentTitle.translation,
+            locale: locale
+        )))
         .popover(isPresented: translationPickerPresented, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
             // 지금 번역본은 공유 장(`currentTitle`)이 정한다. 고르면 리듀서로 보내고, 헤더 리듀서가 팝오버를 닫는다.
-            TranslationPickerView(selection: store.currentTitle.translation) { translation in
-                send(.translationSelected(translation))
-            }
+            // 끝의 「책장 열기」 는 필사책을 고르는 책장으로 간다(2.2 결정 9).
+            TranslationPickerView(
+                selection: store.currentTitle.translation,
+                onSelect: { translation in
+                    send(.translationSelected(translation))
+                },
+                onOpenNotebooks: {
+                    send(.notebooksTapped)
+                }
+            )
         }
+    }
+
+    /// 헤더 부제 첫 칸의 지금 필사책 이름. 아직 읽지 않았으면 nil — 칸을 두지 않는다.
+    private var notebookLabel: String? {
+        Self.notebookLabel(
+            name: store.notebookName,
+            isDefault: store.isDefaultNotebook,
+            isLoaded: store.isNotebookNameLoaded,
+            locale: locale
+        )
     }
 
     /// 번역본 고르기 팝오버의 표시 여부. 바깥을 눌러 닫히면 리듀서에 알린다.
@@ -246,6 +276,24 @@ extension HeaderView {
             ? CarveFeatureCatalog.string("구약", locale: locale)
             : CarveFeatureCatalog.string("신약", locale: locale)
         return "\(chapter.translation.displayName(locale: locale)) · \(testament) / \(chapter.title.localizedName(locale: locale))"
+    }
+
+    /// 역할: 헤더 부제 첫 칸의 지금 필사책 이름(「두 번째 필사」 — 이름이 없으면 「첫 번째 필사」 · 「이름 없는 필사책」, 2.2 결정 9).
+    ///   사용자가 지은 이름은 옮기지 않는다(`NotebookNaming`).
+    /// 입력 · 출력: 저장된 이름(빈 문자열 = 이름 없음) · 기본 필사책인가 · 이름을 읽었는가 · 로케일(뷰는 환경 locale 을 넘긴다) → 이름. 읽기 전이면 nil.
+    /// 부작용: 없음.
+    static func notebookLabel(name: String, isDefault: Bool, isLoaded: Bool, locale: Locale) -> String? {
+        guard isLoaded else { return nil }
+        return NotebookNaming.displayName(name, isDefault: isDefault, locale: locale)
+    }
+
+    /// 역할: 제목 메뉴의 VoiceOver 값 — 지금 필사책 이름과 지금 번역본 전체 이름(「두 번째 필사, 개역개정」 · 「Notebook 2, King James Version」).
+    /// 입력 · 출력: 필사책 이름(읽기 전이면 nil — 번역본만) · 번역본 · 로케일 → 값.
+    /// 부작용: 없음.
+    static func titleAccessibilityValue(notebookLabel: String?, translation: Translation, locale: Locale) -> String {
+        let fullName = translation.fullName(locale: locale)
+        guard let notebookLabel else { return fullName }
+        return "\(notebookLabel), \(fullName)"
     }
 
     /// 역할: 제목 메뉴의 VoiceOver 이름(「창세기 1장, 번역본 바꾸기」). 지금 번역본은 값(`accessibilityValue`)으로 읽는다.

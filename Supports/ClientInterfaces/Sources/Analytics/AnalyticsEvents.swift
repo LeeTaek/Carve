@@ -24,6 +24,8 @@ public enum AnalyticsFeatureName: String, Sendable, Equatable {
     case carve = "Carve"
     case settings = "Settings"
     case chart = "Chart"
+    /// 필사책(2.2 회차별 필사책) — 책장에서 새 필사책을 만들면 `feature_complete` 로 남긴다.
+    case notebook = "Notebook"
     case domain = "Domain"
     case infra = "Infra"
     case buildCI = "BuildCI"
