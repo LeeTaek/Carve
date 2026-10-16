@@ -52,7 +52,7 @@ extension ChapterCanvasFeature {
     /// content 좌표가 가리키는 절의 메뉴 가용성.
     ///
     /// 편집 메뉴 구성은 **동기 콜백**(`UIEditMenuInteractionDelegate`)이라 DB 를 다녀올 수 없다. 다행히
-    /// `loadDrawingSnapshots(chapter:)` 는 그 장의 **모든 행**을 주고 그대로 `loadedDrawings` 에 있으므로
+    /// `loadDrawingSnapshots(page:)` 는 그 필사책 장의 **모든 행**을 주고 그대로 `loadedDrawings` 에 있으므로
     /// (대표만 걸러 오지 않는다) 두 판정 모두 메모리에서 끝난다.
     ///
     /// - Important: `canErase` 는 **저장분만 보면 안 된다.** 획을 하나 긋고 곧바로 롱프레스하면 그 획은 아직
