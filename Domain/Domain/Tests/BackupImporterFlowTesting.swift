@@ -43,7 +43,7 @@ struct BackupImporterFlowTesting {
         }
 
         // Then
-        #expect(report == .accountChanged(doneChapters: [Sample.genesis1], tally: BackupImportTally(new: 1)))
+        #expect(report == .accountChanged(doneChapters: [Sample.page(Sample.genesis1)], tally: BackupImportTally(new: 1)))
         #expect(try await harness.rows(Sample.genesis1).count == 1)
         #expect(try await harness.rows(Sample.genesis2).isEmpty)
         #expect(harness.changes.posted.map(\.chapter) == [Sample.genesis1])
@@ -140,7 +140,7 @@ struct BackupImporterFlowTesting {
         let first = try await importer.apply(try await importer.inspect(fileURL: file, password: Sample.password)) { progress in
             if progress.done == 1 { environment.set(Sample.signedOut) }
         }
-        #expect(first == .accountChanged(doneChapters: [Sample.genesis1], tally: BackupImportTally(new: 1)))
+        #expect(first == .accountChanged(doneChapters: [Sample.page(Sample.genesis1)], tally: BackupImportTally(new: 1)))
 
         // When: 로그아웃 정리로 이 기기의 동기화 데이터가 비었다가, 같은 계정으로 다시 로그인한다.
         try await harness.database.deleteAll(BibleDrawing.self)
@@ -168,7 +168,7 @@ struct BackupImporterFlowTesting {
             if progress.done == 1 { environment.set(Sample.connectionHeld(Sample.accountA)) }
         }
 
-        #expect(report == .blocked(.connectionHeld, doneChapters: [Sample.genesis1], tally: BackupImportTally(new: 1)))
+        #expect(report == .blocked(.connectionHeld, doneChapters: [Sample.page(Sample.genesis1)], tally: BackupImportTally(new: 1)))
         let pending = try #require(await importer.pendingJob())
         #expect(pending.doneChapters.isEmpty)
         #expect(pending.tally == BackupImportTally())
@@ -245,7 +245,7 @@ struct BackupImporterFlowTesting {
         let file = try harness.writeBackup(entries)
         let importer = harness.importer(
             StubDrawingEditEnvironment(Sample.confirmed(Sample.accountA)),
-            restorer: FailingOnceRestorer(base: harness.restorer, failing: Sample.genesis2)
+            restorer: FailingOnceRestorer(base: harness.restorer, failing: Sample.page(Sample.genesis2))
         )
 
         // When: 둘째 장에서 쓰기에 실패한다.
@@ -260,7 +260,7 @@ struct BackupImporterFlowTesting {
         #expect(try await harness.rows(Sample.exodus3).isEmpty)
         #expect(harness.workLeftovers().isEmpty)
         let pending = try #require(await importer.pendingJob())
-        #expect(pending.doneChapters == [Sample.genesis1])
+        #expect(pending.doneChapters == [Sample.page(Sample.genesis1)])
         #expect(pending.canResume)
 
         // When: 암호를 다시 넣고 잇는다.
@@ -305,7 +305,7 @@ struct BackupImporterFlowTesting {
         let second = try await importer.apply(inspection) { _ in }
 
         // Then
-        #expect(inspection.preview == BackupImportPreview(same: 4, chapters: [Sample.genesis1]))
+        #expect(inspection.preview == BackupImportPreview(same: 4, notebooks: 1, chapters: [Sample.page(Sample.genesis1)]))
         #expect(second == .completed(BackupImportTally(same: 4)))
         #expect(try await harness.rows() == rowsAfterFirst)
         #expect(harness.changes.posted == postedAfterFirst)

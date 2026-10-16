@@ -14,8 +14,16 @@ import UniformTypeIdentifiers
 ///
 /// 컨테이너(Apple Encrypted Archive)는 `BackupArchive` 가 다루고, 이 타입은 그 안의 이름 · JSON 규칙만 정한다.
 public enum BackupFormat {
-    /// 백업 형식 버전. 앱 버전 · 스키마 버전과 별개다(정책 §6-3). 읽을 때 이 값이 아니면 파일 전체를 거부한다.
-    public static let formatVersion = 1
+    /// 쓰는 백업 형식 버전. 앱 버전 · 스키마 버전과 별개다(정책 §6-3).
+    ///
+    /// 2(2.2 「회차별 필사책」) — 항목의 절 키에 필사책(`BackupVerseKey.notebook`), manifest 에 필사책 목록(`BackupManifest.notebooks`)을 더했다.
+    /// 2.1 은 형식이 다르면 파일 전체를 거부하고 업데이트를 안내한다(혼재 버전 규칙 ⑤) — 형식 1 에 키만 더하면 2.1 이 모르는 키를 버리고
+    /// 다른 필사책 항목을 기본 필사책 행에 합치기 때문에 버전을 올렸다.
+    public static let formatVersion = 2
+    /// 읽을 수 있는 형식 버전 — 1(2.1 · 필사책 없음 — 전부 기본 필사책)과 2. 그 밖은 파일 전체를 거부한다(`unsupportedFormat`).
+    public static let readableFormatVersions: Set<Int> = [1, 2]
+    /// 필사책(절 키의 `notebook` · manifest 의 `notebooks`)을 담기 시작한 형식 버전. 이보다 앞선 파일은 필사책 키를 읽지 않는다(전부 기본 필사책).
+    public static let notebookFormatVersion = 2
     /// 파일 확장자.
     public static let fileExtension = "carvebackup"
     /// 내보내는 형식 식별자 — 앱 Info.plist 의 `UTExportedTypeDeclarations` 와 짝이다.

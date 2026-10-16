@@ -40,9 +40,10 @@ enum ImportFixture {
     static let password = "abcd1234"
     static let jobID = "00000000-0000-0000-0000-0000000000C1"
     static let otherJobID = "00000000-0000-0000-0000-0000000000C2"
-    static let genesis1 = BibleChapter(title: .genesis, chapter: 1)
-    static let genesis2 = BibleChapter(title: .genesis, chapter: 2)
-    static let exodus3 = BibleChapter(title: .exodus, chapter: 3)
+    /// 판정 · 적용 · 작업 기록의 단위는 필사책 안의 장이다(형식 2) — 기본 필사책의 장.
+    static let genesis1 = NotebookChapter(notebook: .default, chapter: BibleChapter(title: .genesis, chapter: 1))
+    static let genesis2 = NotebookChapter(notebook: .default, chapter: BibleChapter(title: .genesis, chapter: 2))
+    static let exodus3 = NotebookChapter(notebook: .default, chapter: BibleChapter(title: .exodus, chapter: 3))
 
     /// 검사 때의 미리보기.
     static let preview = BackupImportPreview(
@@ -63,7 +64,7 @@ enum ImportFixture {
         jobID: String = jobID,
         targetScope: AccountScope? = account,
         writeBlock: SyncedWriteBlock? = nil,
-        doneChapters: [BibleChapter] = []
+        doneChapters: [NotebookChapter] = []
     ) -> BackupInspection {
         BackupInspection(jobID: jobID, targetScope: targetScope, writeBlock: writeBlock, preview: preview, doneChapters: doneChapters)
     }

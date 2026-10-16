@@ -62,7 +62,7 @@ struct BackupRestoreRoundTripTesting {
         #expect(inspection.targetScope == Sample.accountA)
         #expect(inspection.preview.new == 7)
         #expect(inspection.preview.archived == 1)
-        #expect(inspection.preview.chapters == [Sample.genesis1])
+        #expect(inspection.preview.chapters == [Sample.page(Sample.genesis1)])
         #expect(report == .completed(BackupImportTally(new: 7, archived: 1)))
 
         // Then: 항목마다 원본 그대로인 행이 하나씩 있다.
@@ -176,7 +176,7 @@ struct BackupRestoreRoundTripTesting {
             #expect(match?.rowKey != original.rowKey)
         }
         // Then: 절마다 대표의 내용 · 시각이 내보낸 저장소와 같다(2절은 비운 행).
-        let exportedRows = try await source.database.backupRows(chapter: Sample.genesis1).rows
+        let exportedRows = try await source.database.backupRows(page: Sample.page(Sample.genesis1)).rows
         for verse in 1...4 {
             let before = DrawingRepresentativeRule.pick(exportedRows.filter { $0.verse == verse })
             let after = try await harness.representative(verse: verse)

@@ -11,7 +11,7 @@ import Foundation
 /// 풀린 백업을 **저장소를 바꾸기 전에** 검사한다 (설계 §4-2). 어긋나면 파일 전체를 거부한다.
 ///
 /// 색인 파일(`manifest.json` · `items.json`)의 크기 상한(`maxIndexBytes`)은 디코딩 전에 `BackupPayload.load` 가 이 타입의 `readIndexFile` 로 본다.
-/// 순서는 싼 것부터다 — 형식 버전 → 항목 수 → manifest blob 목록(이름 · 해시 · 중복 · 크기 상한) → `counts` → 항목(중복 id · 같은 id 다른 지문 ·
+/// 순서는 싼 것부터다 — 형식 버전(읽을 수 있는 1 · 2) → 항목 수 · 필사책 목록 수 → manifest blob 목록(이름 · 해시 · 중복 · 크기 상한) → `counts` → 항목(중복 id · 같은 id 다른 지문 ·
 /// manifest 에 없는 blob 참조) → 참조되지 않는 blob → blob 실제 크기 · SHA-256 → blob 바이트로 다시 계산한 내용 지문.
 /// 파일 크기를 묻는 API(필수 사유 API)를 쓰지 않고, 읽은 바이트 수로 크기를 본다 — 상한 + 1 바이트까지만 읽는다.
 public enum BackupPayloadValidator {
@@ -23,10 +23,13 @@ public enum BackupPayloadValidator {
     ///   - limits: 상한.
     /// - Throws: 첫 번째로 어긋난 것의 `BackupFormatError`. 부작용 없음(파일을 읽기만 한다).
     public static func validate(manifest: BackupManifest, items: [BackupItem], blobDirectory: URL, limits: BackupLimits) throws {
-        guard manifest.formatVersion == BackupFormat.formatVersion else {
+        guard BackupFormat.readableFormatVersions.contains(manifest.formatVersion) else {
             throw BackupFormatError.unsupportedFormat(formatVersion: manifest.formatVersion)
         }
-        guard items.count <= limits.maxItems else { throw BackupFormatError.limitExceeded(.items) }
+        // 필사책 목록도 항목 수 상한 안이다 — 필사책 토큰 형식은 보지 않는다(형식이 아닌 레코드는 불러오기가 그것만 건너뛴다).
+        guard items.count <= limits.maxItems, manifest.notebooks.count <= limits.maxItems else {
+            throw BackupFormatError.limitExceeded(.items)
+        }
 
         let blobNames = try checkBlobEntries(manifest.blobs, limits: limits)
         let rows = items.filter { $0.kind == .row }.count

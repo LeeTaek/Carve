@@ -30,6 +30,11 @@ public enum BackupUnsupportedReason: String, Codable, Hashable, Sendable, CaseIt
 /// `DrawingCodec` 이 이미 첫 밑줄(`storageOrigin`) 기준으로 보여 주는 상태라, 건너뛰면 필기를 잃는다.
 ///
 /// 한계: 절 번호는 1 이상인지만 본다. 그 장의 마지막 절은 본문(`BibleText`)을 읽어야 알 수 있어 이 판정(파일 · 본문을 모르는 순수 규칙)에서 보지 않는다.
+///
+/// **알 수 없는 필사책(형식 2)** — 절 키의 필사책 토큰이 `NotebookID` 형식이 아닌 항목은 그 항목만 건너뛴다(`hasUnknownNotebook`).
+/// 사유 열거형(`BackupUnsupportedReason`)에 넣지 않고 따로 센다(`BackupImportPreview.unknownNotebook`) — 설정 화면이 그 열거형을 빠짐없이
+/// `switch` 하고 있어 경우를 더하면 화면 모듈이 컴파일되지 않는다. 사유 문구를 화면에 더할 때(t2c) 열거형으로 옮길 수 있다.
+/// 그런 항목은 어느 필사책 장에도 놓지 않는다(`BackupImportPlanner.page(of:)` 가 nil) — 판정 · 복원 쓰기에 들지 않아 기본 필사책에 섞일 수 없다.
 public enum BackupItemSupport {
     /// 이 앱이 아는 좌표 형식(nil 은 따로 허용한다 — `DrawingCodec` 은 nil · 1 을 같은 legacy 로, 2 · 3 을 각자 해석한다).
     public static let knownDrawingVersions: Set<Int> = [1, 2, 3]
@@ -43,6 +48,13 @@ public enum BackupItemSupport {
         reason(item) { name in
             try? Data(contentsOf: BackupPayload.blobURL(named: name, in: blobDirectory))
         }
+    }
+
+    /// 항목의 필사책 토큰이 `NotebookID` 형식이 아닌가(「알 수 없는 필사책」). 토큰이 없으면(기본 필사책) false.
+    /// - Parameter item: 검증을 마친 항목.
+    /// - Returns: 건너뛸 항목이면 true. 부작용 없음.
+    public static func hasUnknownNotebook(_ item: BackupItem) -> Bool {
+        item.verse.notebookID == nil
     }
 
     /// 항목을 해석할 수 없는 이유 — 메타데이터 바이트를 읽는 방법을 받는다(필요할 때만 부른다).

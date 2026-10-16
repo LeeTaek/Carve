@@ -28,7 +28,7 @@ public protocol BackupImporting: Sendable {
     /// - Throws: `BackupImportError`, 취소면 `CancellationError`. 실패하면 평문 작업 폴더와 새 작업 기록을 지운다.
     func inspect(fileURL: URL, password: String) async throws -> BackupInspection
 
-    /// 검사 결과를 장 단위로 적용한다(권 순서 → 장 순서, 작업 기록의 끝난 장은 건너뛴다).
+    /// 검사 결과를 장 단위로 적용한다(필사책 → 권 순서 → 장 순서, 작업 기록의 끝난 장은 건너뛴다). 필사책 목록(형식 2)은 장보다 먼저 쓴다.
     ///
     /// 적용을 시작하면 이 작업 밖의 끝나지 않은 작업 기록은 지운다 — 새 적용이 앞선 작업을 대신한다(작업 기록은 늘 하나다).
     /// - Parameters:
@@ -86,8 +86,8 @@ public struct BackupInspection: Equatable, Sendable {
     public let preview: BackupImportPreview
     /// 파일의 manifest(만든 시각 · 앱 버전 · 수). 시험 대역이 만든 검사 결과면 nil.
     public let manifest: BackupManifest?
-    /// 작업 기록에 이미 끝난 장 — 이어 하기면 적용이 건너뛴다.
-    public let doneChapters: [BibleChapter]
+    /// 작업 기록에 이미 끝난 장(필사책 · 번역본 포함) — 이어 하기면 적용이 건너뛴다.
+    public let doneChapters: [NotebookChapter]
     /// 평문 작업 폴더(`BackupWork/<UUID>/`) — 적용이 끝나거나 `discard` 하면 지운다.
     public let workDirectory: BackupWorkDirectory?
     /// 검증을 마친 풀린 백업 — 적용이 장마다 항목 · blob 을 읽는다.
@@ -100,7 +100,7 @@ public struct BackupInspection: Equatable, Sendable {
         writeBlock: SyncedWriteBlock? = nil,
         preview: BackupImportPreview,
         manifest: BackupManifest? = nil,
-        doneChapters: [BibleChapter] = [],
+        doneChapters: [NotebookChapter] = [],
         workDirectory: BackupWorkDirectory? = nil
     ) {
         self.init(
@@ -122,7 +122,7 @@ public struct BackupInspection: Equatable, Sendable {
         writeBlock: SyncedWriteBlock?,
         preview: BackupImportPreview,
         manifest: BackupManifest?,
-        doneChapters: [BibleChapter],
+        doneChapters: [NotebookChapter],
         workDirectory: BackupWorkDirectory?,
         payload: BackupPayload?
     ) {
@@ -142,16 +142,16 @@ public struct BackupInspection: Equatable, Sendable {
 
 /// 적용의 결과 (설계 §4-1 9단계). 멈춰도 이미 쓴 장은 그대로다 — 이미 동기화됐을 수 있어 되돌리지 않는다.
 ///
-/// `doneChapters` 는 이 작업에서 끝난 장 전부(이어 한 앞 실행 포함, 권 → 장 순서), `tally` 는 그 장들의 실제 결정 수다.
+/// `doneChapters` 는 이 작업에서 끝난 장 전부(이어 한 앞 실행 포함, 필사책 → 권 → 장 순서), `tally` 는 그 장들의 실제 결정 수다.
 public enum BackupImportReport: Equatable, Sendable {
     /// 모든 장을 썼다. 작업 기록 · 암호화 사본을 지웠다.
     case completed(BackupImportTally)
     /// 쓰기 게이트가 막혀 그 장부터 멈췄다(로그아웃 · 계정 확인 중 · 소유 근거 없음 · 연결 보류 등).
-    case blocked(SyncedWriteBlock, doneChapters: [BibleChapter], tally: BackupImportTally)
+    case blocked(SyncedWriteBlock, doneChapters: [NotebookChapter], tally: BackupImportTally)
     /// 저장소 소유가 대상 계정과 달라졌거나 서버 작업 표가 무효가 돼 멈췄다 — 다른 계정의 저장소에 잇지 않는다.
-    case accountChanged(doneChapters: [BibleChapter], tally: BackupImportTally)
+    case accountChanged(doneChapters: [NotebookChapter], tally: BackupImportTally)
     /// 적용 중 「모든 필사 삭제」 로 저장소 세대가 바뀌어 멈췄다. 앞서 쓴 장도 지워졌으므로 끝난 장은 비운다.
-    case generationChanged(doneChapters: [BibleChapter], tally: BackupImportTally)
+    case generationChanged(doneChapters: [NotebookChapter], tally: BackupImportTally)
 
     /// 끝난 장들의 실제 결정 수.
     public var tally: BackupImportTally {
@@ -223,8 +223,8 @@ public struct BackupImportJob: Equatable, Sendable {
     public let jobID: String
     /// 그 작업의 대상 계정 범위. nil 이면 미리보기만 하던 작업이다.
     public let targetScope: AccountScope?
-    /// 끝난 장(권 → 장 순서).
-    public let doneChapters: [BibleChapter]
+    /// 끝난 장(필사책 → 권 → 장 순서).
+    public let doneChapters: [NotebookChapter]
     /// 적용할 장 수(지원 항목이 있는 장).
     public let totalChapters: Int
     /// 끝난 장들의 실제 결정 수.
@@ -240,7 +240,7 @@ public struct BackupImportJob: Equatable, Sendable {
     public init(
         jobID: String,
         targetScope: AccountScope?,
-        doneChapters: [BibleChapter],
+        doneChapters: [NotebookChapter],
         totalChapters: Int,
         tally: BackupImportTally,
         updatedAt: Date,

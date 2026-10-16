@@ -14,10 +14,11 @@ import Foundation
 /// 필사 백업 불러오기 (`BackupImporting`).
 ///
 /// **검사** — 지금 환경으로 대상 계정 범위를 정하고 → 고른 파일을 작업 기록 폴더로 복사(암호화 사본)하고 → 평문 작업 폴더(`BackupWorkDirectory`)에
-/// 풀어(`BackupArchive.read` — 상한은 `BackupLimits`) → 디코딩 · 검증(`BackupPayload.load`)하고 → 항목마다 지원 판정 → 장마다 저장소 행
-/// (`backupRows(chapter:)`)과 판정기로 미리보기를 만든다. 저장소는 바꾸지 않는다.
+/// 풀어(`BackupArchive.read` — 상한은 `BackupLimits`) → 디코딩 · 검증(`BackupPayload.load` — 형식 1 · 2)하고 → 항목마다 지원 판정 → 필사책 안의
+/// 장마다 저장소 행(`backupRows(page:)`)과 판정기로 미리보기를 만든다. 저장소는 바꾸지 않는다. 형식 1 파일은 전부 기본 필사책이다.
 ///
-/// **적용** — 장마다 최신 환경 · 쓰기 게이트 · 대상 계정을 다시 보고 `DrawingBackupRestoring` 으로 한 트랜잭션씩 쓴다(LiveBackupImporter+Apply.swift).
+/// **적용** — 필사책 목록을 먼저 쓰고, 장마다 최신 환경 · 쓰기 게이트 · 대상 계정을 다시 보고 `DrawingBackupRestoring` 으로 한 트랜잭션씩 쓴다
+/// (LiveBackupImporter+Apply.swift).
 ///
 /// 평문은 작업 폴더에만 있고 적용이 끝나거나(성공 · 멈춤 · 실패) `discard` 하면 지운다. 앱 시작의 `BackupWorkDirectory.removeStale()` 이 남은 것을 지운다.
 /// 암호는 어디에도 남기지 않는다 — 이어 할 때 다시 받는다.
@@ -169,9 +170,10 @@ public struct LiveBackupImporter: BackupImporting {
         }
     }
 
-    /// 미리보기 — 항목마다 지원 판정(blob 파일로 메타데이터를 푼다)을 하고, 장마다 지금 저장소 행과 판정기로 결정별 수를 모은다.
+    /// 미리보기 — 항목마다 지원 판정(blob 파일로 메타데이터를 푼다)을 하고, 필사책 안의 장마다 지금 저장소 행과 판정기로 결정별 수를 모은다.
     ///
-    /// 장 하나씩 읽고 놓는다 — 저장소 전체의 바이트를 한꺼번에 들지 않는다. 결과는 `BackupImportPlanner.preview` 와 같다.
+    /// 장 하나씩 읽고 놓는다 — 저장소 전체의 바이트를 한꺼번에 들지 않는다. 결과는 `BackupImportPlanner.preview` 와 같다
+    /// (파일 수준 수 — 놓을 수 없는 항목 · 알 수 없는 필사책 · 필사책 수 — 는 `BackupImportPlanner.filePreview`).
     /// - Throws: 저장소를 읽지 못하면 `storeUnreadable`, 취소면 `CancellationError`. 부작용 없음(읽기만 한다).
     func preview(of payload: BackupPayload) async throws -> BackupImportPreview {
         var unsupported: [String: BackupUnsupportedReason] = [:]
@@ -180,20 +182,25 @@ public struct LiveBackupImporter: BackupImporting {
                 unsupported[item.id] = reason
             }
         }
-        var preview = BackupImportPreview(plans: [], unplaced: BackupImportPlanner.unplaced(items: payload.items, unsupported: unsupported))
-        let grouped = BackupImportPlanner.itemsByChapter(payload.items)
-        for chapter in BackupImportPlanner.ordered(Array(grouped.keys)) {
+        var preview = BackupImportPlanner.filePreview(items: payload.items, unsupported: unsupported, notebooks: payload.manifest.notebooks)
+        let grouped = BackupImportPlanner.itemsByPage(payload.items)
+        for page in BackupImportPlanner.ordered(Array(grouped.keys)) {
             try Task.checkCancellation()
             let load: BackupRowLoad
             do {
-                load = try await database.backupRows(chapter: chapter)
+                load = try await database.backupRows(page: page)
             } catch {
-                Log.error("불러오기 — 미리보기에서 이 장의 필사 행을 읽지 못했다", "\(chapter.title.rawValue).\(chapter.chapter)", "\(error)")
+                Log.error("불러오기 — 미리보기에서 이 장의 필사 행을 읽지 못했다", Self.label(page), "\(error)")
                 throw BackupImportError.storeUnreadable
             }
-            preview.add(BackupImportPlanner.plan(items: grouped[chapter] ?? [], unsupported: unsupported, current: load.rows, chapter: chapter))
+            preview.add(BackupImportPlanner.plan(items: grouped[page] ?? [], unsupported: unsupported, current: load.rows, page: page))
         }
         return preview
+    }
+
+    /// 로그에 남길 장 이름 — 저장소 행의 `titleName`(필사책 접두 포함)과 장 번호.
+    static func label(_ page: NotebookChapter) -> String {
+        "\(StoredBookKey.titleName(for: page)).\(page.chapter.chapter)"
     }
 
     // MARK: - 닫기 · 이어 하기

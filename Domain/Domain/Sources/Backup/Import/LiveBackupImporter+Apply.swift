@@ -12,9 +12,13 @@ import CarveToolkit
 import Foundation
 
 extension LiveBackupImporter {
-    /// 검사 결과를 장 단위로 적용한다(권 순서 → 장 순서).
+    /// 검사 결과를 장 단위로 적용한다(필사책 → 권 순서 → 장 순서).
     ///
-    /// 시작할 때 저장소 세대를 한 번 읽고, 다른 작업 기록을 지운 뒤(새 적용이 앞선 작업을 대신한다) 작업을 「적용 중」 으로 남긴다. 장마다:
+    /// 시작할 때 저장소 세대를 한 번 읽고, 다른 작업 기록을 지운 뒤(새 적용이 앞선 작업을 대신한다) 작업을 「적용 중」 으로 남긴다.
+    ///
+    /// **필사책 목록(형식 2)을 장보다 먼저 쓴다** — 최신 환경 · 쓰기 게이트 · 대상 계정을 장과 같은 규칙으로 본 뒤
+    /// `DrawingBackupRestoring.restoreNotebooks`(같은 ID 면 `updatedAt` 이 늦은 쪽) 한 트랜잭션. 행보다 먼저 써서 불러오는 동안 다른 필사책이
+    /// 「이름 없는 필사책」 으로 보이는 틈을 줄인다. 이어 하기도 다시 쓴다(같은 값이면 바뀌지 않는다). 그다음 장마다:
     /// 1. 작업 기록에 끝난 장이면 건너뛴다(이어 하기 — 다시 써도 같은 지문은 `skipSame` 이라 결과는 같다).
     /// 2. `DrawingEditEnvironmentClient.current()` 로 **최신 환경**을 읽는다 — 쓰기 게이트가 막혔으면 `.blocked(사유)`, 저장소 소유가
     ///    대상 계정과 다르면 `.accountChanged` 로 그 장부터 멈춘다.
@@ -45,17 +49,45 @@ extension LiveBackupImporter {
         record.updatedAt = now()
         persist(record)
 
-        let chapters = inspection.preview.chapters
-        let itemsByChapter = BackupImportPlanner.itemsByChapter(payload.items)
+        let pages = inspection.preview.chapters
+        let itemsByPage = BackupImportPlanner.itemsByPage(payload.items)
         let generation = await database.backupStoreGeneration()
         let alreadyDone = Set(record.doneChapters)
-        let remaining = chapters.filter { !alreadyDone.contains($0) }
-        var doneCount = chapters.count - remaining.count
-        await progress(BackupProgress(done: doneCount, total: chapters.count))
+        let remaining = pages.filter { !alreadyDone.contains($0) }
+        var doneCount = pages.count - remaining.count
+        await progress(BackupProgress(done: doneCount, total: pages.count))
 
-        for (index, chapter) in remaining.enumerated() {
+        // 필사책 목록 — 장보다 먼저, 장과 같은 게이트를 지난 뒤에만 쓴다.
+        if !payload.manifest.notebooks.isEmpty {
             let current = await environment.current()
-            if let stop = Self.stopReason(before: chapter, environment: current, targetScope: inspection.targetScope) {
+            if let stop = Self.stopReason(before: "필사책 목록", environment: current, targetScope: inspection.targetScope) {
+                let report = Self.report(stop, record: record)
+                Self.forgetDoneChapters(&record)
+                markStopped(&record)
+                return report
+            }
+            do {
+                try Task.checkCancellation()
+                let outcome = try await restorer.restoreNotebooks(payload.manifest.notebooks, generation: generation)
+                Log.info(
+                    "불러오기 — 필사책 목록을 썼다",
+                    "새=\(outcome.inserted)", "바꿈=\(outcome.updated)", "그대로=\(outcome.unchanged)", "건너뜀=\(outcome.skipped)"
+                )
+            } catch DrawingRepositoryError.staleStoreGeneration {
+                Log.error("불러오기 — 적용 중 모든 필사가 지워져 멈춘다", "필사책 목록")
+                record.doneChapters = []
+                record.tally = BackupImportTally()
+                markStopped(&record)
+                return Self.report(.generationChanged, record: record)
+            } catch {
+                markStopped(&record)
+                throw Self.applyFailure(error, label: "필사책 목록")
+            }
+        }
+
+        for (index, page) in remaining.enumerated() {
+            let current = await environment.current()
+            if let stop = Self.stopReason(before: Self.label(page), environment: current, targetScope: inspection.targetScope) {
                 let report = Self.report(stop, record: record)
                 Self.forgetDoneChapters(&record)
                 markStopped(&record)
@@ -64,10 +96,10 @@ extension LiveBackupImporter {
             let outcome: BackupChapterRestoreOutcome
             do {
                 try Task.checkCancellation()
-                let command = try Self.command(for: itemsByChapter[chapter] ?? [], payload: payload)
-                outcome = try await restorer.restore(command, chapter: chapter, generation: generation)
+                let command = try Self.command(for: itemsByPage[page] ?? [], payload: payload)
+                outcome = try await restorer.restore(command, page: page, generation: generation)
             } catch DrawingRepositoryError.staleStoreGeneration {
-                Log.error("불러오기 — 적용 중 모든 필사가 지워져 멈춘다", "\(chapter.title.rawValue).\(chapter.chapter)")
+                Log.error("불러오기 — 적용 중 모든 필사가 지워져 멈춘다", Self.label(page))
                 // 앞서 쓴 장의 행도 지워졌다 — 이어 하면 처음부터 다시 판정한다.
                 record.doneChapters = []
                 record.tally = BackupImportTally()
@@ -75,22 +107,22 @@ extension LiveBackupImporter {
                 return Self.report(.generationChanged, record: record)
             } catch {
                 markStopped(&record)
-                throw Self.applyFailure(error, chapter: chapter)
+                throw Self.applyFailure(error, label: Self.label(page))
             }
 
-            record.doneChapters.append(chapter)
+            record.doneChapters.append(page)
             record.tally.add(outcome)
             record.updatedAt = now()
             persist(record)
             if outcome.changedStore {
-                changes.post(LocalDrawingChange(chapter: chapter, date: now()))
+                changes.post(LocalDrawingChange(page: page, date: now()))
             }
             doneCount += 1
-            await progress(BackupProgress(done: doneCount, total: chapters.count))
+            await progress(BackupProgress(done: doneCount, total: pages.count))
 
             // 다음 장으로 가기 전에, 이 장을 쓴 환경의 서버 작업 표가 아직 유효한지 본다.
             if index < remaining.count - 1, let token = current.serverWork, await !environment.isCurrent(token) {
-                Log.error("불러오기 — 장을 쓴 뒤 서버 작업 표가 무효가 돼 멈춘다", "\(chapter.title.rawValue).\(chapter.chapter)")
+                Log.error("불러오기 — 장을 쓴 뒤 서버 작업 표가 무효가 돼 멈춘다", Self.label(page))
                 let report = Self.report(.accountChanged, record: record)
                 Self.forgetDoneChapters(&record)
                 markStopped(&record)
@@ -101,21 +133,25 @@ extension LiveBackupImporter {
         jobs.remove(record.jobID)
         Log.info(
             "불러오기 — 모든 장을 썼다",
-            "장=\(chapters.count)", "새=\(record.tally.new)", "보관=\(record.tally.archived)",
+            "장=\(pages.count)", "새=\(record.tally.new)", "보관=\(record.tally.archived)",
             "지운 절 보호=\(record.tally.protectedCleared)", "같음=\(record.tally.same)", "고정=\(record.tally.pinned)"
         )
         return .completed(record.tally)
     }
 
-    /// 장 하나를 쓰기 전에 멈출 까닭 — 쓰기 게이트가 막혔거나 저장소 소유가 대상 계정과 다르면(대상 계정이 없던 검사 포함).
-    /// - Returns: 멈출 까닭. 써도 되면 nil. 부작용 없음.
-    static func stopReason(before chapter: BibleChapter, environment: DrawingEditEnvironment, targetScope: AccountScope?) -> BackupImportStop? {
+    /// 장 하나(또는 필사책 목록)를 쓰기 전에 멈출 까닭 — 쓰기 게이트가 막혔거나 저장소 소유가 대상 계정과 다르면(대상 계정이 없던 검사 포함).
+    /// - Parameters:
+    ///   - label: 로그에 남길 쓸 것의 이름(장이면 `label(_:)`).
+    ///   - environment: 방금 읽은 최신 환경.
+    ///   - targetScope: 검사 때 정한 대상 계정.
+    /// - Returns: 멈출 까닭. 써도 되면 nil. 부작용 없음(로그만).
+    static func stopReason(before label: String, environment: DrawingEditEnvironment, targetScope: AccountScope?) -> BackupImportStop? {
         if let block = SyncedWriteBlock.check(environment) {
-            Log.error("불러오기 — 쓰기 게이트가 막혀 이 장부터 멈춘다", "\(chapter.title.rawValue).\(chapter.chapter)", "사유=\(block)")
+            Log.error("불러오기 — 쓰기 게이트가 막혀 이 장부터 멈춘다", label, "사유=\(block)")
             return .blocked(block)
         }
         guard let targetScope, environment.storeOwnership == targetScope else {
-            Log.error("불러오기 — 저장소 소유가 대상 계정과 달라 이 장부터 멈춘다", "\(chapter.title.rawValue).\(chapter.chapter)")
+            Log.error("불러오기 — 저장소 소유가 대상 계정과 달라 이 장부터 멈춘다", label)
             return .accountChanged
         }
         return nil
@@ -153,7 +189,7 @@ extension LiveBackupImporter {
         persist(record)
     }
 
-    /// 멈춘 까닭과 작업 기록으로 보고를 만든다 — 끝난 장(권 → 장 순서)과 그 장들의 수.
+    /// 멈춘 까닭과 작업 기록으로 보고를 만든다 — 끝난 장(필사책 → 권 → 장 순서)과 그 장들의 수.
     /// - Returns: 보고. 부작용 없음.
     static func report(_ reason: BackupImportStop, record: BackupImportJobRecord) -> BackupImportReport {
         let done = BackupImportPlanner.ordered(record.doneChapters)
@@ -165,15 +201,16 @@ extension LiveBackupImporter {
     }
 
     /// 적용 중 오류를 알릴 오류로 바꾼다 — 취소는 그대로, 평문 blob 을 읽지 못하면 `inspectionExpired`, 그 밖의 저장 실패는 `storeWriteFailed`.
-    static func applyFailure(_ error: any Error, chapter: BibleChapter) -> any Error {
+    /// - Parameter label: 로그에 남길 쓰던 것의 이름(장이면 `label(_:)`).
+    static func applyFailure(_ error: any Error, label: String) -> any Error {
         switch error {
         case is CancellationError:
             return error
         case is BackupFormatError, is BackupChapterRestoreError:
-            Log.error("불러오기 — 평문 작업 폴더의 blob 을 쓸 수 없어 멈춘다", "\(chapter.title.rawValue).\(chapter.chapter)", "\(error)")
+            Log.error("불러오기 — 평문 작업 폴더의 blob 을 쓸 수 없어 멈춘다", label, "\(error)")
             return BackupImportError.inspectionExpired
         default:
-            Log.error("불러오기 — 이 장을 쓰지 못해 멈춘다(쓴 장은 그대로)", "\(chapter.title.rawValue).\(chapter.chapter)", "\(error)")
+            Log.error("불러오기 — 이 장을 쓰지 못해 멈춘다(쓴 장은 그대로)", label, "\(error)")
             return BackupImportError.storeWriteFailed
         }
     }
