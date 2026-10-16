@@ -141,7 +141,7 @@ struct ChapterCanvasDraftFileTesting: DraftTestSamples {
         await store.receive(\.draftsSaved)
 
         // 잉크는 초안에 남았다 — 좌표 정보만 없다. 초안 저장을 실패로 끝내지 않는다(그 획의 사본은 이것뿐이다).
-        let saved = try #require(try await area.writer.drafts(in: accountA, chapter: CanvasTestSupport.chapter).first)
+        let saved = try #require(try await area.writer.drafts(in: accountA, page: CanvasTestSupport.chapter.inDefaultNotebook).first)
         #expect(saved.lineData == Data("ink-without-layout".utf8))
         #expect(saved.layoutMetadataData == nil)
 

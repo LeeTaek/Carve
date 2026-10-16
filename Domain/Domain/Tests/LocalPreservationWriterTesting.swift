@@ -46,7 +46,7 @@ struct LocalPreservationWriterTesting {
         chapter: BibleChapter? = nil
     ) -> VerseDraft {
         VerseDraft(
-            key: VerseDraftKey(sessionID: session, chapter: chapter ?? self.chapter, verse: verse),
+            key: VerseDraftKey(sessionID: session, page: (chapter ?? self.chapter).inDefaultNotebook, verse: verse),
             revision: revision,
             rowID: BibleDrawingRowID(raw: "row-\(verse)"),
             lineData: Data(ink.utf8),
@@ -171,7 +171,7 @@ struct LocalPreservationWriterTesting {
             try Data("깨진 값".utf8).write(to: generationURL)
             let writer = LocalPreservationWriter(area: areas.preservation, eraseState: areas.eraseState)
             #expect(await writer.currentGeneration() == nil)
-            await #expect(throws: LocalPreservationWriter.WriterError.self) { try await writer.drafts(in: account, chapter: chapter) }
+            await #expect(throws: LocalPreservationWriter.WriterError.self) { try await writer.drafts(in: account, page: chapter.inDefaultNotebook) }
 
             try JSONEncoder().encode(UInt64(2)).write(to: generationURL)
 
@@ -230,9 +230,9 @@ struct LocalPreservationWriterTesting {
                 #expect(outcome == .written)
             }
 
-            let found = try await writer.drafts(in: account, chapter: chapter)
+            let found = try await writer.drafts(in: account, page: chapter.inDefaultNotebook)
             #expect(found.map { "\($0.key.verse)/\($0.key.sessionID)" } == ["1/session-2", "2/session-1"])
-            let eleven = try await writer.drafts(in: account, chapter: otherChapter)
+            let eleven = try await writer.drafts(in: account, page: otherChapter.inDefaultNotebook)
             #expect(eleven.map(\.key.chapter) == [11])
         }
     }
@@ -250,7 +250,7 @@ struct LocalPreservationWriterTesting {
             let outcome = try await writer.saveDraft(next, superseding: [old.ref, next.ref])
             #expect(outcome == .written)
 
-            let remaining = try await writer.drafts(in: account, chapter: chapter)
+            let remaining = try await writer.drafts(in: account, page: chapter.inDefaultNotebook)
             #expect(remaining.map { "\($0.key.verse)/\($0.key.sessionID)" } == ["1/session-new", "2/session-old"])
         }
     }
@@ -267,7 +267,7 @@ struct LocalPreservationWriterTesting {
             let next = draft(verse: 1, revision: 3, session: "session-new", ink: "이어 씀")
             #expect(try await writer.saveDraft(next, superseding: [shown.ref]) == .written)
 
-            let remaining = try await writer.drafts(in: account, chapter: chapter)
+            let remaining = try await writer.drafts(in: account, page: chapter.inDefaultNotebook)
             #expect(remaining.map { "\($0.key.sessionID)/\($0.revision)" } == ["session-new/3", "session-old/2"])
         }
     }
@@ -282,12 +282,12 @@ struct LocalPreservationWriterTesting {
             try await writer.markDraftStored(draft(verse: 1).key, scope: account, throughRevision: 3)
             try await writer.markDraftStored(draft(verse: 2).key, scope: account, throughRevision: 4)
 
-            let found = try await writer.drafts(in: account, chapter: chapter)
+            let found = try await writer.drafts(in: account, page: chapter.inDefaultNotebook)
             #expect(found.map(\.storeState) == [.stored, nil])
             #expect(found.map(\.revision) == [3, 5])
             // 표식을 단 초안 위에 더 새 revision 이 오면 표식 없는 새 초안이 된다.
             _ = try await writer.saveDraft(draft(verse: 1, revision: 6))
-            #expect(try await writer.drafts(in: account, chapter: chapter).first?.storeState == nil)
+            #expect(try await writer.drafts(in: account, page: chapter.inDefaultNotebook).first?.storeState == nil)
         }
     }
 
@@ -300,15 +300,15 @@ struct LocalPreservationWriterTesting {
             _ = try await writer.saveDraft(first)
             try await writer.markDraftStored(first.key, scope: account, throughRevision: 1)
             let firstSent = try #require(first.contentFingerprint)
-            #expect(try await writer.drafts(in: account, chapter: chapter).first?.sentFingerprints == [firstSent])
+            #expect(try await writer.drafts(in: account, page: chapter.inDefaultNotebook).first?.sentFingerprints == [firstSent])
 
             // 다음 revision 은 그 기록을 이어받고(아직 넣기 전), 넣고 나면 자기 내용을 앞에 더한다.
             let second = draft(verse: 1, revision: 2, ink: "고침")
             let secondSent = try #require(second.contentFingerprint)
             _ = try await writer.saveDraft(second)
-            #expect(try await writer.drafts(in: account, chapter: chapter).first?.sentFingerprints == [firstSent])
+            #expect(try await writer.drafts(in: account, page: chapter.inDefaultNotebook).first?.sentFingerprints == [firstSent])
             try await writer.markDraftStored(second.key, scope: account, throughRevision: 2)
-            let after = try #require(try await writer.drafts(in: account, chapter: chapter).first)
+            let after = try #require(try await writer.drafts(in: account, page: chapter.inDefaultNotebook).first)
             #expect(after.sentFingerprints == [secondSent, firstSent])
             #expect(after.storeState == .stored)
         }
@@ -327,7 +327,7 @@ struct LocalPreservationWriterTesting {
             let firstSent = try #require(first.contentFingerprint)
             try await writer.markDraftStored(first.key, scope: account, throughRevision: 1, contentFingerprint: firstSent)
 
-            let kept = try #require(try await writer.drafts(in: account, chapter: chapter).first)
+            let kept = try #require(try await writer.drafts(in: account, page: chapter.inDefaultNotebook).first)
             #expect(kept.revision == 2)
             #expect(kept.sentFingerprints == [firstSent])
             // 파일의 내용(revision 2)은 아직 저장소에 없다 — 표식을 달지 않는다.
@@ -348,7 +348,7 @@ struct LocalPreservationWriterTesting {
             let next = draft(verse: 1, revision: 2, session: "session-new", ink: "이어 씀")
             #expect(try await writer.saveDraft(next, superseding: [VerseDraftRef(key: old.key, revision: 1)]) == .written)
 
-            let remaining = try await writer.drafts(in: account, chapter: chapter)
+            let remaining = try await writer.drafts(in: account, page: chapter.inDefaultNotebook)
             #expect(remaining.map(\.key.sessionID) == ["session-new"])
             #expect(remaining.first?.sentFingerprints == [oldSent])
         }
@@ -365,7 +365,7 @@ struct LocalPreservationWriterTesting {
             let late = draft(verse: 1, generation: 0, session: "session-new")
             let outcome = try await writer.saveDraft(late, superseding: [old.ref])
             #expect(outcome == .rejectedByErase(current: 1))
-            let remaining = try await writer.drafts(in: account, chapter: chapter)
+            let remaining = try await writer.drafts(in: account, page: chapter.inDefaultNotebook)
             #expect(remaining.isEmpty)
         }
     }
@@ -395,7 +395,7 @@ extension LocalPreservationWriterTesting {
             }
 
             let relaunched = LocalPreservationWriter(area: areas.preservation, eraseState: areas.eraseState)
-            let recovered = try await relaunched.drafts(in: account, chapter: chapter)
+            let recovered = try await relaunched.drafts(in: account, page: chapter.inDefaultNotebook)
 
             // 무손실 · 무중복 — 그 초안이 파일에서 한 벌만, 표식 · 내용 그대로 돌아온다.
             #expect(recovered == [sending])
@@ -427,7 +427,7 @@ extension LocalPreservationWriterTesting {
             )
             #expect(settled.settled == [sending])
             #expect(settled.shown.isEmpty)
-            #expect(try await relaunched.drafts(in: account, chapter: chapter) == [sending])
+            #expect(try await relaunched.drafts(in: account, page: chapter.inDefaultNotebook) == [sending])
         }
     }
 }

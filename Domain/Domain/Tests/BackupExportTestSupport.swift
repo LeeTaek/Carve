@@ -65,9 +65,10 @@ enum BackupExportSample {
 
     // MARK: - 초안
 
-    /// 초안 하나. 잉크에는 풀리는 메타데이터가 붙는다(화면에 겹칠 수 있는 초안).
+    /// 초안 하나. 잉크에는 풀리는 메타데이터가 붙는다(화면에 겹칠 수 있는 초안). 필사책을 주지 않으면 기본 필사책의 초안이다.
     static func draft(
         chapter: BibleChapter = genesis1,
+        notebook: NotebookID = .default,
         verse: Int,
         session: String = "session-1",
         ink: Data?,
@@ -82,7 +83,7 @@ enum BackupExportSample {
         case .empty, .version: nil
         }
         return VerseDraft(
-            key: VerseDraftKey(sessionID: session, chapter: chapter, verse: verse),
+            key: VerseDraftKey(sessionID: session, page: NotebookChapter(notebook: notebook, chapter: chapter), verse: verse),
             revision: revision,
             rowID: BibleDrawingRowID(raw: "draft-row-\(verse)"),
             lineData: ink,
@@ -181,7 +182,7 @@ struct BackupExportRowSeed {
     /// 모델을 만든다 — 컨테이너가 이미 있어야 한다(iOS 17).
     func makeRow() -> BibleDrawing {
         let row = BibleDrawing(
-            bibleTitle: chapter,
+            page: page,
             verse: verse ?? 0,
             lineData: lineData,
             updateDate: updateDate,

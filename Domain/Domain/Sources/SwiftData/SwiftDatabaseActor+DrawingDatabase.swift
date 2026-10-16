@@ -65,18 +65,6 @@ extension SwiftDatabaseActor {
         try modelContext.save()
     }
 
-    /// **기본 필사책**의 한 절을 읽는다 — `verseDrawingSnapshots(page:verse:)` 로 넘긴다.
-    /// - Note: 뜻은 「기본 필사책」 이다. 새 코드는 `page:` 를 쓴다. t4 에서 지운다.
-    public func verseDrawingSnapshots(chapter: BibleChapter, verse: Int) throws -> [VerseDrawingSnapshot] {
-        try verseDrawingSnapshots(page: NotebookChapter(notebook: .default, chapter: chapter), verse: verse)
-    }
-
-    /// **기본 필사책**의 한 절에서 대표를 옮긴다 — `markPresentDrawing(page:verse:presentRowID:)` 로 넘긴다.
-    /// - Note: 뜻은 「기본 필사책」 이다. 새 코드는 `page:` 를 쓴다. t4 에서 지운다.
-    public func markPresentDrawing(chapter: BibleChapter, verse: Int, presentRowID: BibleDrawingRowID) throws {
-        try markPresentDrawing(page: NotebookChapter(notebook: .default, chapter: chapter), verse: verse, presentRowID: presentRowID)
-    }
-
     // MARK: 필사 활동
     //
     // 차트 · 최근 기록은 `updateDate` 로만 거르고 **모든 필사책 · 번역본**의 행을 읽는다(필사책 결정 10 — 합산).

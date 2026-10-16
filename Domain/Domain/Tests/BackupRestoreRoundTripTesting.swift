@@ -86,7 +86,7 @@ struct BackupRestoreRoundTripTesting {
             #expect(representative.lineData == entry.ink, "\(entry.sourceKey)")
             #expect(representative.updateDate == entry.updatedAt, "\(entry.sourceKey)")
         }
-        #expect(harness.changes.posted == [LocalDrawingChange(chapter: Sample.genesis1, date: Sample.now)])
+        #expect(harness.changes.posted == [LocalDrawingChange(page: Sample.genesis1.inDefaultNotebook, date: Sample.now)])
     }
 
     @Test("「비운 현재 + 잉크 보관」 을 빈 저장소에 불러오면 비운 행이 대표로 남고, 지운 필기는 이전 필사 기록에만 있다")
@@ -114,7 +114,7 @@ struct BackupRestoreRoundTripTesting {
         #expect(rows.first { $0.lineData == Sample.ink("erased") }?.isPresent == false)
 
         // Then: 화면(장 조회의 대표)은 비운 행 — 절은 비어 보인다. 지운 필기는 「이전 필사 내용 보기」 에만 있다.
-        let load = try await SwiftDataDrawingRepository(actor: harness.database).load(chapter: Sample.genesis1)
+        let load = try await SwiftDataDrawingRepository(actor: harness.database).load(Sample.genesis1.inDefaultNotebook)
         let representative = try #require(load.snapshots.representativesByVerse()[2])
         #expect(representative.lineData == nil)
         #expect(load.snapshots.contains { $0.lineData == Sample.ink("erased") && !$0.isPresent })

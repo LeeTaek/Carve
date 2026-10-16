@@ -30,7 +30,7 @@ private struct TranslationTextStub: BibleTextClient {
     }
 }
 
-/// 초안을 어느 번역본으로 읽었는지 남기는 초안 저장소. 읽기는 늘 빈 목록이다.
+/// 초안을 어느 번역본(읽은 page 의 번역본)으로 읽었는지 남기는 초안 저장소. 읽기는 늘 빈 목록이다.
 private struct TranslationRecordingDraftStore: VerseDraftStore {
     let requested = LockIsolated<[Translation]>([])
 
@@ -38,8 +38,8 @@ private struct TranslationRecordingDraftStore: VerseDraftStore {
         .written
     }
 
-    func drafts(in scope: AccountScope, chapter: BibleChapter, translation: Translation) async throws -> [VerseDraft] {
-        requested.withValue { $0.append(translation) }
+    func drafts(in scope: AccountScope, page: NotebookChapter) async throws -> [VerseDraft] {
+        requested.withValue { $0.append(page.chapter.translation) }
         return []
     }
 
@@ -456,7 +456,7 @@ struct TranslationSwitchAttributionTesting: EditSessionTestHelpers {
         #expect(!drafts.requested.value.isEmpty)
         #expect(drafts.requested.value.allSatisfy { $0 == .KJV })
         // 초안 키도 장의 번역본을 따른다.
-        #expect(VerseDraftKey(sessionID: "s", chapter: kjv, verse: 1).translation == "KJV")
+        #expect(VerseDraftKey(sessionID: "s", page: kjv.inDefaultNotebook, verse: 1).translation == "KJV")
     }
 
     @Test("저장 명령을 겹친 행은 장의 번역본이다 — KJV 장의 loadedDrawings 에 개역개정 행이 섞이지 않는다")

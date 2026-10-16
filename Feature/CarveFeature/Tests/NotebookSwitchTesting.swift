@@ -89,7 +89,6 @@ struct NotebookSwitchCanvasTesting {
         await store.send(.layoutCompleted(CanvasTestSupport.layout))
         #expect(store.state.isComposed)
         #expect(inputs.value.last == [])
-        #expect(repository.legacyCalls.value == 0)
     }
 
     @Test("저장에 실패한 A 의 획은 B 로 바꾼 뒤에도 A 의 것으로 남고 B 에 겹쳐 보이지 않는다 — 다시 시도하면 A 로 저장된다")
@@ -156,7 +155,6 @@ struct NotebookSwitchCanvasTesting {
         #expect(store.state.loadedDrawings?.map(\.rowID) == [NotebookFixture.rowInSecond])
         #expect(store.state.loadedDrawings?.first?.notebook == NotebookFixture.second)
         #expect(repository.appliedPages.value == [NotebookFixture.firstPage, NotebookFixture.secondPage])
-        #expect(repository.legacyCalls.value == 0)
     }
 
     @Test("지우기(보관)가 도는 사이 필사책을 바꿔도 보관은 지우기를 시작한 page 의 행에만 한다")
@@ -182,7 +180,6 @@ struct NotebookSwitchCanvasTesting {
         #expect(repository.archivedPages.value == [NotebookFixture.firstPage])
         #expect(store.state.page == NotebookFixture.secondPage)
         #expect(store.state.eraseTask == nil)
-        #expect(repository.legacyCalls.value == 0)
     }
 
     @Test("설정에서 다른 필사책의 같은 장에 넣은 필기는 열린 page 에 반영하지 않는다 — 같은 page 면 저장소를 다시 읽어 본다")
@@ -266,7 +263,7 @@ struct NotebookSwitchDraftTesting {
         #expect(draft.key.page == NotebookFixture.secondPage)
     }
 
-    @Test("캔버스는 초안을 page 로 읽는다 — 다른 필사책도 옛 장 요구로 읽지 않는다")
+    @Test("캔버스는 초안을 page 로 읽는다 — 다른 필사책은 그 필사책의 page 로 읽는다")
     func draftsAreReadByPage() async throws {
         let environment = DrawingEditEnvironment.ownedForTesting
         let drafts = PageDraftStore(generation: environment.eraseGeneration)
@@ -275,7 +272,6 @@ struct NotebookSwitchDraftTesting {
 
         #expect(!drafts.requested.value.isEmpty)
         #expect(drafts.requested.value.allSatisfy { $0 == NotebookFixture.secondPage })
-        #expect(drafts.legacyCalls.value == 0)
     }
 
     @Test("절 행 · 이전 필사 시트의 ID 는 필사책마다 다르다 — 기본 필사책은 필사 행과 같은 권 키 그대로다")

@@ -18,10 +18,12 @@ import Dependencies
 /// > 한계 — 로컬 원자성 ≠ CloudKit 원자성 (§8-6). 로컬 트랜잭션이 절 3개를 한 번에 커밋해도 CloudKit 에는
 /// > CKRecord 3개로 개별 동기화된다. 다른 기기가 일시적으로 찢어진 상태를 볼 수 있다.
 public protocol DrawingRepository: Sendable {
-    /// 장의 **모든 행**을 읽는다 (히스토리 행 포함). 대표 행 선택은 호출부가 `representativesByVerse()` 로 한다.
-    /// - Parameter chapter: 대상 장.
+    /// 필사책 안의 장의 **모든 행**을 읽는다 (히스토리 행 포함). 대표 행 선택은 호출부가 `representativesByVerse()` 로 한다.
+    ///
+    /// 그 필사책 · 번역본의 행(`StoredBookKey.titleName(for: page)`)만 본다 — 다른 필사책 · 번역본의 같은 권 · 장 행은 섞이지 않는다(2.2 결정 1).
+    /// - Parameter page: 필사책과 대상 장(번역본 포함). **기본값이 없다** — 빠뜨리면 지금 필사책이 아닌 기본 필사책을 조용히 읽는다(결정 12).
     /// - Returns: 절 → 행 키 순으로 정렬된 스냅샷과 **그 조회 시점의** 저장소 세대.
-    func load(chapter: BibleChapter) async throws -> DrawingChapterLoad
+    func load(_ page: NotebookChapter) async throws -> DrawingChapterLoad
 
     /// 한 편집의 모든 절 저장을 단일 트랜잭션으로 적용한다.
     ///
@@ -29,9 +31,9 @@ public protocol DrawingRepository: Sendable {
     /// 조회한 뒤에 필사 데이터가 전부 지워졌다는 뜻이고, 그 조회를 기준으로 만든 명령을 쓰면 지운 필사가 되살아난다.
     /// - Parameters:
     ///   - mutations: 절별 저장 명령. 같은 rowID 가 둘 이상 있으면 안 된다 (coalescing 은 호출부 책임, §8-3).
-    ///   - chapter: 대상 장. `create` 가 행을 만들 때의 권·장이다.
+    ///   - page: 필사책과 대상 장. `create` 는 그 필사책의 행으로 만든다. **기본값이 없다**(결정 12).
     ///   - generation: 이 명령들이 기준으로 삼은 조회의 세대 (`DrawingChapterLoad.generation`).
-    func apply(_ mutations: [VerseDrawingMutation], chapter: BibleChapter, generation: DrawingStoreGeneration) async throws
+    func apply(_ mutations: [VerseDrawingMutation], page: NotebookChapter, generation: DrawingStoreGeneration) async throws
 
     /// 절의 현재 필사를 **보관 행**으로 남기고 활성 행을 빈 상태로 되돌린다 — 한 트랜잭션 (UI-2 "지우기").
     ///
@@ -45,6 +47,8 @@ public protocol DrawingRepository: Sendable {
     /// | 활성 행 | 행을 유지한 채 `lineData = nil`, **`isPresent = true`** (대표 유지), `updateDate` 갱신 |
     /// | 아무것도 안 함 | 활성 행이 없거나 이미 획이 없으면 `alreadyEmpty` — 쓰기 0건 |
     ///
+    /// 보관 행은 그 필사책의 행이다 — 다른 필사책의 같은 절 행은 건드리지 않는다.
+    ///
     /// - Important: **호출 전에 미저장분이 전부 저장돼 있어야 한다.** 이 메서드는 DB 의 활성 행 내용을 보관하므로,
     ///              진행 중 편집·대기 저장이 남아 있으면 "방금까지 쓴 내용" 이 아니라 그 이전 내용을 보관한다 (§8-5 flush).
     ///              `alreadyEmpty` 판정도 같은 이유로 flush 이후여야 한다 — DB 는 비었는데 미저장 획이 화면에 있을 수 있다.
@@ -55,65 +59,9 @@ public protocol DrawingRepository: Sendable {
     /// > 다른 기기가 둘 중 하나만 먼저 볼 수 있다.
     /// - Parameters:
     ///   - command: 대상 절·활성 행·보관 행 식별자. `archiveRowID` 는 **재시도에도 같은 값**이어야 한다.
-    ///   - chapter: 대상 장.
+    ///   - page: 필사책과 대상 장. **기본값이 없다**(결정 12).
     /// - Returns: 실제로 보관했는지 여부.
-    func archiveAndReset(
-        _ command: VerseDrawingArchiveCommand,
-        chapter: BibleChapter
-    ) async throws -> VerseDrawingArchiveOutcome
-
-    // MARK: 필사책 저장 경로 (2.2 「회차별 필사책」 — 추가 → 이전 → 제거)
-    //
-    // 위 세 요구(`chapter:`)의 뜻은 「기본 필사책」 이다. 아래 세 요구가 필사책을 함께 나르고, Feature 호출부가 옮긴 뒤(L2) t4 에서 위 세 요구를 지운다.
-    // 필사책(`page`)에는 기본값을 두지 않는다 — 빠뜨리면 지금 필사책이 아닌 기본 필사책에 조용히 써진다(결정 12).
-
-    /// 필사책 안의 장의 **모든 행**을 읽는다 — `load(chapter:)` 와 같은 계약이고, 그 필사책의 행(`StoredBookKey.titleName(for: page)`)만 본다.
-    /// - Parameter page: 필사책과 대상 장.
-    /// - Returns: 절 → 행 키 순으로 정렬된 스냅샷과 **그 조회 시점의** 저장소 세대.
-    func load(_ page: NotebookChapter) async throws -> DrawingChapterLoad
-
-    /// 한 편집의 모든 절 저장을 단일 트랜잭션으로 적용한다 — `apply(_:chapter:generation:)` 와 같은 계약이고, `create` 는 그 필사책의 행으로 만든다.
-    /// - Parameters:
-    ///   - mutations: 절별 저장 명령.
-    ///   - page: 필사책과 대상 장.
-    ///   - generation: 이 명령들이 기준으로 삼은 조회의 세대.
-    func apply(_ mutations: [VerseDrawingMutation], page: NotebookChapter, generation: DrawingStoreGeneration) async throws
-
-    /// 절의 현재 필사를 보관 행으로 남기고 활성 행을 비운다 — `archiveAndReset(_:chapter:)` 와 같은 계약이고, 보관 행은 그 필사책의 행이다.
-    /// - Parameters:
-    ///   - command: 대상 절 · 활성 행 · 보관 행 식별자.
-    ///   - page: 필사책과 대상 장.
     func archiveAndReset(_ command: VerseDrawingArchiveCommand, page: NotebookChapter) async throws -> VerseDrawingArchiveOutcome
-}
-
-/// 필사책 저장 경로의 **과도기 기본 구현** — 기본 필사책이면 옛 `chapter:` 요구로 넘기고, 그 밖은 `unsupportedNotebook` 을 던진다.
-///
-/// 구현(`SwiftDataDrawingRepository`)이 필사책 요구를 채우기 전(t1a)에도, 시험 대역이 옛 요구만 구현해도 그대로 컴파일 · 동작한다.
-/// 구현이 채우면 이 기본 구현은 쓰이지 않는다. t4 에서 옛 요구와 함께 지운다.
-public extension DrawingRepository {
-    func load(_ page: NotebookChapter) async throws -> DrawingChapterLoad {
-        guard page.notebook.isDefault else { throw DrawingRepositoryError.unsupportedNotebook }
-        return try await load(chapter: page.chapter)
-    }
-
-    func apply(_ mutations: [VerseDrawingMutation], page: NotebookChapter, generation: DrawingStoreGeneration) async throws {
-        guard page.notebook.isDefault else { throw DrawingRepositoryError.unsupportedNotebook }
-        try await apply(mutations, chapter: page.chapter, generation: generation)
-    }
-
-    func archiveAndReset(_ command: VerseDrawingArchiveCommand, page: NotebookChapter) async throws -> VerseDrawingArchiveOutcome {
-        guard page.notebook.isDefault else { throw DrawingRepositoryError.unsupportedNotebook }
-        return try await archiveAndReset(command, chapter: page.chapter)
-    }
-}
-
-public extension DrawingRepositoryError {
-    /// 저장소 구현이 아직 기본이 아닌 필사책을 다루지 못한다 — 과도기 기본 구현(위)이 던진다. **아무것도 읽거나 쓰지 않았다.**
-    ///
-    /// `DrawingRepositoryError` 는 `VerseDrawingSnapshot.swift` 에 있어(이 태스크의 소유 파일 밖) 새 case 를 더하지 못해
-    /// `persistenceFailed` 의 고정 값으로 둔다 — `==` · `#expect(throws:)` 로 가려낼 수 있고, 화면은 저장 실패로 다룬다.
-    /// 과도기 기본 구현과 함께 t4 에서 지운다.
-    static let unsupportedNotebook = DrawingRepositoryError.persistenceFailed("unsupportedNotebook — 기본이 아닌 필사책의 저장 경로가 아직 없다")
 }
 
 /// 필사 저장소의 세대. 필사 행을 **전부 지울 때만** 바뀐다 (설정 → 「모든 필사 데이터 삭제」).

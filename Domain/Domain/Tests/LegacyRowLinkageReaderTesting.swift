@@ -56,7 +56,7 @@ enum LinkageFixture {
         )
         let context = ModelContext(container)
         for verse in 1...3 {
-            context.insert(BibleDrawing(bibleTitle: chapter, verse: verse, lineData: RealLegacyLineData.data, rowUUID: "row-\(verse)"))
+            context.insert(BibleDrawing(page: chapter.inDefaultNotebook, verse: verse, lineData: RealLegacyLineData.data, rowUUID: "row-\(verse)"))
         }
         if page {
             context.insert(BiblePageDrawing(bibleTitle: chapter, fullLineData: RealLegacyLineData.data))

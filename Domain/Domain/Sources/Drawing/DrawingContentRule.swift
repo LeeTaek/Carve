@@ -26,8 +26,8 @@ import Foundation
 /// |---|---|
 /// | `VerseDrawingHistoryFeature` 의 `setDrawings` | 히스토리 목록에서 빈 행을 숨긴다(`fetchVerseSnapshots` 결과를 거른다) |
 /// | `ChapterCanvasFeature.menuAvailability(at:state:)` | "이전 필사 내용 보기" · "지우기" 를 띄울지 |
-/// | `SwiftDatabaseActor.archiveAndResetVerseDrawing(_:chapter:now:)` | 보관본을 만들지 |
-/// | `SwiftDatabaseActor.fetchDrawingRecord(title:)` | 탐색 장 목록에서 필사한 장으로 칠하고 기본 장을 고를지 |
+/// | `SwiftDatabaseActor.archiveAndResetVerseDrawing(_:page:now:)` | 보관본을 만들지 |
+/// | `SwiftDatabaseActor.fetchDrawingRecord(notebook:title:translation:)` | 탐색 장 목록에서 필사한 장으로 칠하고 기본 장을 고를지 |
 public enum DrawingContentRule {
     /// `lineData` 에 획이 하나라도 있는가.
     ///
@@ -43,7 +43,7 @@ public enum DrawingContentRule {
 public extension Array where Element == BibleDrawing {
     /// 히스토리 목록에 보여 줄 행들 — **빈 행을 숨긴다** (§8-7). 이력 화면과 같은 기준을 Domain 시험이 이것으로 확인한다.
     ///
-    /// 받은 정렬(`fetchVerseSnapshots(chapter:verse:)` 와 같은 `updateDate` 내림차순)을 그대로 유지한다. 걸러내기만 한다.
+    /// 받은 정렬(`fetchVerseSnapshots(page:verse:)` 와 같은 `updateDate` 내림차순)을 그대로 유지한다. 걸러내기만 한다.
     ///
     /// - Important: 목록 표시 전용이다. 대표 선택이나 저장 경로에 끼워 넣지 말 것 — `DrawingContentRule` 의
     ///              경고를 보라.

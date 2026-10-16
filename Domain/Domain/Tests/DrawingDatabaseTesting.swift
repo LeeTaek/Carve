@@ -28,7 +28,7 @@ final class DrawingDatabaseTesting {
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
         let actor = SwiftDatabaseActor(modelContainer: container)
-        let drawing = BibleDrawing.init(bibleTitle: .initialState, verse: 1)
+        let drawing = BibleDrawing.init(page: BibleChapter.initialState.inDefaultNotebook, verse: 1)
         // 모델은 actor 로 넘긴 뒤 다시 만지지 않는다 — 넣은 행은 행 식별자(rowUUID)로 알아본다.
         let expectedRowUUID = drawing.rowUUID
         // when

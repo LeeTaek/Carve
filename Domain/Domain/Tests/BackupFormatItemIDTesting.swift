@@ -23,7 +23,7 @@ struct BackupFormatItemIDTesting {
                 == "row-d90a394f7b558515fafcee8c6811da45b9378eb3ed5513218d445afcd3c2cbf6"
         )
         let draftKey = BackupItemID.draftSourceKey(
-            draftScope: "local", sessionID: "S1", translation: "NKRV", title: "1-01Genesis.txt", chapter: 1, verse: 4, revision: 7
+            draftScope: "local", sessionID: "S1", translation: "NKRV", title: "1-01Genesis.txt", chapter: 1, verse: 4, revision: 7, notebook: nil
         )
         #expect(draftKey == "local|S1|NKRV|1-01Genesis.txt|1|4|7")
         #expect(

@@ -43,11 +43,6 @@ private struct ReaderStub: VerseDraftRecoveryReading {
         }
     }
 
-    /// 옛 요구(뜻은 기본 필사책) — 과도기 동안 경계가 요구한다. page 판으로 넘긴다.
-    func drafts(in scope: AccountScope, chapter: BibleChapter, translation: Translation) async throws -> [VerseDraft] {
-        try await drafts(in: scope, page: NotebookChapter(notebook: .default, chapter: chapter))
-    }
-
     func unreadableDraftFiles(in scope: AccountScope) async throws -> [URL] {
         reads.withValue { $0.append(scope) }
         return unreadable[scope] ?? []
@@ -90,20 +85,6 @@ private final class RepositoryStub: DrawingRepository, @unchecked Sendable {
     func archiveAndReset(_ command: VerseDrawingArchiveCommand, page: NotebookChapter) async throws -> VerseDrawingArchiveOutcome {
         Issue.record("남은 필기 화면이 저장소에 썼다")
         return .alreadyEmpty
-    }
-
-    // 옛 요구(뜻은 기본 필사책) — 과도기 동안 저장소 경계가 요구한다. page 판으로 넘긴다.
-
-    func load(chapter: BibleChapter) async throws -> DrawingChapterLoad {
-        try await load(NotebookChapter(notebook: .default, chapter: chapter))
-    }
-
-    func apply(_ mutations: [VerseDrawingMutation], chapter: BibleChapter, generation: DrawingStoreGeneration) async throws {
-        try await apply(mutations, page: NotebookChapter(notebook: .default, chapter: chapter), generation: generation)
-    }
-
-    func archiveAndReset(_ command: VerseDrawingArchiveCommand, chapter: BibleChapter) async throws -> VerseDrawingArchiveOutcome {
-        try await archiveAndReset(command, page: NotebookChapter(notebook: .default, chapter: chapter))
     }
 }
 

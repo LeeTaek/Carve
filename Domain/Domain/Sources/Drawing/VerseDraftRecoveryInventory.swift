@@ -22,10 +22,8 @@ public protocol VerseDraftRecoveryReading: Sendable {
     /// 그 묶음의 개수 · 용량 · 초안이 남은 page(필사책 + 장).
     func draftSummary(in scope: AccountScope) async throws -> DraftBucketSummary
     /// 그 묶음에서 필사책 안의 한 장의 초안들(번역본은 `page.chapter.translation`). 그 장의 초안을 하나라도 읽지 못하면 던진다.
+    /// - Parameter page: 필사책과 장. **기본값이 없다**(결정 12).
     func drafts(in scope: AccountScope, page: NotebookChapter) async throws -> [VerseDraft]
-    /// 그 묶음에서 **기본 필사책**의 한 장의 초안들. 그 장의 초안을 하나라도 읽지 못하면 던진다.
-    /// - Note: 뜻은 「기본 필사책」 이다 — 새 코드는 `drafts(in:page:)` 를 쓴다. t4 에서 지운다.
-    func drafts(in scope: AccountScope, chapter: BibleChapter, translation: Translation) async throws -> [VerseDraft]
     /// 읽지 못해 옆으로 옮긴 파일들 — 되살릴 수 없고 내보내기만 한다.
     func unreadableDraftFiles(in scope: AccountScope) async throws -> [URL]
 }
@@ -37,15 +35,6 @@ public protocol VerseDraftRecoveryReading: Sendable {
 public protocol VerseDraftUnreadableCleaning: Sendable {
     /// - Returns: 실제로 지운 파일 수.
     func removeUnreadableDraftFiles(in scope: AccountScope) async throws -> Int
-}
-
-/// 필사책 요구의 **과도기 기본 구현** — 옛 요구만 구현한 시험 대역이 그대로 컴파일 · 동작하게 한다. 기본 필사책이면 옛 요구로 넘기고,
-/// 그 밖은 `DrawingRepositoryError.unsupportedNotebook` 을 던진다(아무것도 읽지 않았다). `LocalPreservationWriter` 는 직접 구현한다. t4 에서 지운다.
-public extension VerseDraftRecoveryReading {
-    func drafts(in scope: AccountScope, page: NotebookChapter) async throws -> [VerseDraft] {
-        guard page.notebook.isDefault else { throw DrawingRepositoryError.unsupportedNotebook }
-        return try await drafts(in: scope, chapter: page.chapter, translation: page.chapter.translation)
-    }
 }
 
 extension LocalPreservationWriter: VerseDraftRecoveryReading {}
@@ -121,12 +110,6 @@ public struct DraftBucketSummary: Equatable, Sendable {
     /// 읽을 수 있는 초안 파일 수를 번역본별로 — 파일 이름으로 센다(모든 필사책). 모르는 번역본의 파일은 `draftCount` 에만 든다.
     public let draftCountByTranslation: [Translation: Int]
 
-    /// **기본 필사책**에서 초안이 남아 있는 장.
-    /// - Note: 뜻은 「기본 필사책」 이다 — 다른 필사책까지는 `pages`. t4 에서 지운다.
-    public var chapters: [BibleChapter] {
-        pages.filter(\.notebook.isDefault).map(\.chapter)
-    }
-
     public init(
         scope: AccountScope, draftCount: Int, draftBytes: Int64, unreadableCount: Int, unreadableBytes: Int64, pages: [NotebookChapter],
         draftCountByTranslation: [Translation: Int] = [:]
@@ -138,18 +121,6 @@ public struct DraftBucketSummary: Equatable, Sendable {
         self.unreadableBytes = unreadableBytes
         self.pages = pages
         self.draftCountByTranslation = draftCountByTranslation
-    }
-
-    /// 장 목록이 모두 **기본 필사책**인 요약.
-    /// - Note: 뜻은 「기본 필사책」 이다 — 새 코드는 `init(…pages:…)` 를 쓴다. t4 에서 지운다.
-    public init(
-        scope: AccountScope, draftCount: Int, draftBytes: Int64, unreadableCount: Int, unreadableBytes: Int64, chapters: [BibleChapter],
-        draftCountByTranslation: [Translation: Int] = [:]
-    ) {
-        self.init(
-            scope: scope, draftCount: draftCount, draftBytes: draftBytes, unreadableCount: unreadableCount, unreadableBytes: unreadableBytes,
-            pages: chapters.map { NotebookChapter(notebook: .default, chapter: $0) }, draftCountByTranslation: draftCountByTranslation
-        )
     }
 }
 
@@ -235,12 +206,6 @@ public struct VerseDraftRecoveryInventory: Equatable, Sendable {
     public let inaccessibleCount: Int
     /// 대조하지 못한 page(필사책 + 장) — 초안이나 저장소를 읽지 못했다. **파일은 그대로 남는다**(지우지 않는다).
     public let unreadPages: [NotebookChapter]
-
-    /// 대조하지 못한 장 — 모든 필사책(`unreadPages` 의 장). 같은 권 · 장이 두 필사책에 있으면 두 번 든다.
-    /// - Note: 필사책을 담지 않는다 — 새 코드는 `unreadPages` 를 쓴다. t4 에서 지운다.
-    public var unreadChapters: [BibleChapter] {
-        unreadPages.map(\.chapter)
-    }
 
     public init(
         scope: AccountScope, summary: DraftBucketSummary, comparedWithStore: Bool,
@@ -350,12 +315,6 @@ public struct VerseDraftRecoveryQuery: Sendable {
     /// 그 장만 읽는다. 행이 없거나 비운 절이면 nil 이다 — "지금 그 절에는 필기가 없다" 는 뜻이다.
     public func currentVerse(page: NotebookChapter, verse: Int) async throws -> VerseDrawingSnapshot? {
         VerseDraftStoreView(snapshots: try await repository.load(page).snapshots).representatives[verse]
-    }
-
-    /// 비교의 한쪽 — **기본 필사책**에서 그 절의 지금 대표 행.
-    /// - Note: 뜻은 「기본 필사책」 이다 — 새 코드는 `currentVerse(page:verse:)` 를 쓴다. t4 에서 지운다.
-    public func currentVerse(chapter: BibleChapter, verse: Int) async throws -> VerseDrawingSnapshot? {
-        try await currentVerse(page: NotebookChapter(notebook: .default, chapter: chapter), verse: verse)
     }
 
     /// 한 장의 결과 — 목록에 오를 초안과, 이 환경에서 열어 보지 않은 초안 수.

@@ -42,32 +42,12 @@ public struct SwiftDataDrawingRepository: DrawingRepository {
     public func archiveAndReset(_ command: VerseDrawingArchiveCommand, page: NotebookChapter) async throws -> VerseDrawingArchiveOutcome {
         try await actor.archiveAndResetVerseDrawing(command, page: page, now: Date())
     }
-
-    // MARK: 옛 장 경로 — 뜻은 「기본 필사책」 (t4 에서 지운다)
-
-    public func load(chapter: BibleChapter) async throws -> DrawingChapterLoad {
-        try await load(NotebookChapter(notebook: .default, chapter: chapter))
-    }
-
-    public func apply(_ mutations: [VerseDrawingMutation], chapter: BibleChapter, generation: DrawingStoreGeneration) async throws {
-        try await apply(mutations, page: NotebookChapter(notebook: .default, chapter: chapter), generation: generation)
-    }
-
-    public func archiveAndReset(
-        _ command: VerseDrawingArchiveCommand,
-        chapter: BibleChapter
-    ) async throws -> VerseDrawingArchiveOutcome {
-        try await archiveAndReset(command, page: NotebookChapter(notebook: .default, chapter: chapter))
-    }
 }
 
 extension SwiftDataDrawingRepository: DrawingVerseImporting {
-    public func importVerse(
-        _ command: VerseDrawingImportCommand,
-        chapter: BibleChapter,
-        generation: DrawingStoreGeneration
-    ) async throws -> VerseDrawingImportOutcome {
-        try await actor.importVerseDrawing(command, chapter: chapter, generation: generation, now: Date())
+    /// 가져온 내용을 `command.page`(필사책 + 장)의 새 대표 행으로 넣는다 — actor 의 한 트랜잭션(`importVerseDrawing(_:generation:now:)`).
+    public func importVerse(_ command: VerseDrawingImportCommand, generation: DrawingStoreGeneration) async throws -> VerseDrawingImportOutcome {
+        try await actor.importVerseDrawing(command, generation: generation, now: Date())
     }
 }
 
@@ -104,18 +84,6 @@ extension SwiftDatabaseActor {
             snapshots: try loadDrawingSnapshots(page: page),
             generation: DrawingStoreGeneration(raw: drawingStoreGeneration)
         )
-    }
-
-    /// **기본 필사책**의 장을 읽는다 — `loadDrawingSnapshots(page:)` 로 넘긴다.
-    /// - Note: 뜻은 「기본 필사책」 이다. 새 코드는 `loadDrawingSnapshots(page:)` 를 쓴다. t4 에서 지운다.
-    public func loadDrawingSnapshots(chapter: BibleChapter) throws -> [VerseDrawingSnapshot] {
-        try loadDrawingSnapshots(page: NotebookChapter(notebook: .default, chapter: chapter))
-    }
-
-    /// **기본 필사책**의 장과 세대를 읽는다 — `loadChapterDrawings(page:)` 로 넘긴다.
-    /// - Note: 뜻은 「기본 필사책」 이다. 새 코드는 `loadChapterDrawings(page:)` 를 쓴다. t4 에서 지운다.
-    public func loadChapterDrawings(chapter: BibleChapter) throws -> DrawingChapterLoad {
-        try loadChapterDrawings(page: NotebookChapter(notebook: .default, chapter: chapter))
     }
 
     /// 필사 행을 전부 지우고 저장소 세대를 올린다 — **한 actor 구간** (설정 → 「모든 필사 데이터 삭제」).
@@ -308,27 +276,6 @@ extension SwiftDatabaseActor {
             modelContext.rollback()
             throw DrawingRepositoryError.persistenceFailed(error.localizedDescription)
         }
-    }
-
-    /// **기본 필사책**의 장에 저장 명령을 적용한다 — `applyDrawingMutations(_:page:generation:now:)` 로 넘긴다.
-    /// - Note: 뜻은 「기본 필사책」 이다. 새 코드는 `page:` 를 쓴다. t4 에서 지운다.
-    public func applyDrawingMutations(
-        _ mutations: [VerseDrawingMutation],
-        chapter: BibleChapter,
-        generation: DrawingStoreGeneration,
-        now: Date
-    ) throws {
-        try applyDrawingMutations(mutations, page: NotebookChapter(notebook: .default, chapter: chapter), generation: generation, now: now)
-    }
-
-    /// **기본 필사책**의 절을 보관하고 비운다 — `archiveAndResetVerseDrawing(_:page:now:)` 로 넘긴다.
-    /// - Note: 뜻은 「기본 필사책」 이다. 새 코드는 `page:` 를 쓴다. t4 에서 지운다.
-    public func archiveAndResetVerseDrawing(
-        _ command: VerseDrawingArchiveCommand,
-        chapter: BibleChapter,
-        now: Date
-    ) throws -> VerseDrawingArchiveOutcome {
-        try archiveAndResetVerseDrawing(command, page: NotebookChapter(notebook: .default, chapter: chapter), now: now)
     }
 
     // MARK: 내부

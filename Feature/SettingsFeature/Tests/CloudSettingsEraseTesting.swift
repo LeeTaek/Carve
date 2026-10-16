@@ -100,7 +100,7 @@ struct CloudSettingsEraseCopyTesting {
         let chapter = BibleChapter(title: .genesis, chapter: 1)
         func draft(_ verse: Int, _ scope: AccountScope, revision: Int = 1) -> VerseDraft {
             VerseDraft(
-                key: VerseDraftKey(sessionID: "s-\(scope.key)", chapter: chapter, verse: verse), revision: revision,
+                key: VerseDraftKey(sessionID: "s-\(scope.key)", page: NotebookChapter(notebook: .default, chapter: chapter), verse: verse), revision: revision,
                 rowID: BibleDrawingRowID(raw: "row-\(verse)"), lineData: Data("획".utf8), drawingVersion: 3, layoutMetadataData: nil,
                 base: .empty, baseFingerprint: nil, account: .confirmed(AccountServerWorkToken(scope: scope, generation: 1)),
                 knownEpochs: [], storeOwnership: nil, eraseGeneration: 0, savedAt: Date(timeIntervalSince1970: 1_000)

@@ -28,25 +28,25 @@ struct VerseDraftRecoveryInventoryTesting {
 
     // MARK: - 대역
 
-    /// 장 조회만 답하는 저장소. 복구 화면의 조회는 **쓰지 않는다** — 쓰기가 오면 시험이 깨진다.
+    /// 장 조회만 답하는 저장소 — 심은 행은 기본 필사책의 장이다. 복구 화면의 조회는 **쓰지 않는다** — 쓰기가 오면 시험이 깨진다.
     private actor StubRepository: DrawingRepository {
-        private let chapters: [BibleChapter: [VerseDrawingSnapshot]]
+        private let pages: [NotebookChapter: [VerseDrawingSnapshot]]
         private(set) var loadCount = 0
 
         init(_ chapters: [BibleChapter: [VerseDrawingSnapshot]]) {
-            self.chapters = chapters
+            self.pages = Dictionary(uniqueKeysWithValues: chapters.map { ($0.key.inDefaultNotebook, $0.value) })
         }
 
-        func load(chapter: BibleChapter) async throws -> DrawingChapterLoad {
+        func load(_ page: NotebookChapter) async throws -> DrawingChapterLoad {
             loadCount += 1
-            return DrawingChapterLoad(snapshots: chapters[chapter] ?? [], generation: DrawingStoreGeneration(raw: 0))
+            return DrawingChapterLoad(snapshots: pages[page] ?? [], generation: DrawingStoreGeneration(raw: 0))
         }
 
-        func apply(_ mutations: [VerseDrawingMutation], chapter: BibleChapter, generation: DrawingStoreGeneration) async throws {
+        func apply(_ mutations: [VerseDrawingMutation], page: NotebookChapter, generation: DrawingStoreGeneration) async throws {
             Issue.record("복구 화면의 조회가 저장소에 썼다")
         }
 
-        func archiveAndReset(_ command: VerseDrawingArchiveCommand, chapter: BibleChapter) async throws -> VerseDrawingArchiveOutcome {
+        func archiveAndReset(_ command: VerseDrawingArchiveCommand, page: NotebookChapter) async throws -> VerseDrawingArchiveOutcome {
             Issue.record("복구 화면의 조회가 저장소에 썼다")
             return .alreadyEmpty
         }
@@ -109,7 +109,7 @@ struct VerseDraftRecoveryInventoryTesting {
         let chapter = chapter ?? genesis1
         let row = BibleDrawingRowID(raw: rowID ?? "row-\(verse)")
         return VerseDraft(
-            key: VerseDraftKey(sessionID: session, chapter: chapter, verse: verse),
+            key: VerseDraftKey(sessionID: session, page: chapter.inDefaultNotebook, verse: verse),
             revision: 1,
             rowID: row,
             lineData: ink.map { Data($0.utf8) },
@@ -150,7 +150,7 @@ struct VerseDraftRecoveryInventoryTesting {
             let inventory = try await query.inventory(in: accountA, environment: environment(accountA))
 
             #expect(inventory.comparedWithStore)
-            #expect(inventory.unreadChapters.isEmpty)
+            #expect(inventory.unreadPages.isEmpty)
             #expect(inventory.summary.draftCount == 4)
             // 3절(1_800) → 1절의 밀린 초안(1_000). 보이는 초안(1절 newer)과 역할이 끝난 초안(2절)은 없다.
             #expect(inventory.entries.map { ($0.draft.key.verse, $0.reason) }.map { "\($0.0):\($0.1.rawValue)" }
@@ -213,7 +213,7 @@ struct VerseDraftRecoveryInventoryTesting {
             #expect(inventory.inaccessibleCount == 2)
             #expect(inventory.summary.draftCount == 2)
             #expect(inventory.summary.draftBytes > 0)
-            #expect(inventory.unreadChapters.isEmpty)
+            #expect(inventory.unreadPages.isEmpty)
             #expect(await repository.loadCount == 0)
         }
     }
@@ -263,7 +263,7 @@ struct VerseDraftRecoveryInventoryTesting {
 
                 // 편집 화면이 판정하는 입력 · 규칙 그대로(`ChapterCanvasFeature.loadDrafts` · `recoverDrafts`). 새로 연 장이라 세션 초안은 없다.
                 let screen = try await VerseDraftRecoveryRule.screenDrafts(environment: current) { scope in
-                    try await writer.drafts(in: scope, chapter: genesis1, translation: .NKRV)
+                    try await writer.drafts(in: scope, page: genesis1.inDefaultNotebook)
                 }
                 let view = VerseDraftStoreView(snapshots: snapshots)
                 let canvas = VerseDraftRecoveryRule.plan(
@@ -322,7 +322,7 @@ struct VerseDraftRecoveryInventoryTesting {
 
             let inventory = try await query.inventory(in: accountA, environment: environment(accountA))
 
-            #expect(inventory.unreadChapters == [genesis2])
+            #expect(inventory.unreadPages == [genesis2.inDefaultNotebook])
             #expect(inventory.entries.map(\.draft.key.verse) == [1])
             // 파일은 그대로다 — 개수 · 용량은 깨진 것까지 센다.
             #expect(inventory.summary.draftCount == 2)

@@ -37,12 +37,12 @@ struct VerseDraftImporterTesting {
 
         func seed(verse: Int, ink: Data) async throws -> BibleDrawingRowID {
             let rowID = BibleDrawingRowID.issue()
-            try await store.apply([.create(verse: verse, rowID: rowID, data: ink, metadata: store.metadata(verse: verse))], chapter: chapter)
+            try await store.apply([.create(verse: verse, rowID: rowID, data: ink, metadata: store.metadata(verse: verse))], page: chapter.inDefaultNotebook)
             return rowID
         }
 
         func current(verse: Int) async throws -> VerseDrawingSnapshot? {
-            try await store.load(chapter: chapter).representativesByVerse()[verse]
+            try await store.load(chapter.inDefaultNotebook).representativesByVerse()[verse]
         }
 
         func draft(
@@ -51,7 +51,7 @@ struct VerseDraftImporterTesting {
         ) -> VerseDraft {
             let blob = ink == nil ? nil : try? store.metadata(verse: verse).encodedBlob()
             return VerseDraft(
-                key: VerseDraftKey(sessionID: session, chapter: chapter, verse: verse), revision: 1, rowID: BibleDrawingRowID(raw: "draft-row-\(verse)"),
+                key: VerseDraftKey(sessionID: session, page: chapter.inDefaultNotebook, verse: verse), revision: 1, rowID: BibleDrawingRowID(raw: "draft-row-\(verse)"),
                 lineData: ink, drawingVersion: ink == nil ? nil : 3, layoutMetadataData: blob, base: .empty, baseFingerprint: nil,
                 account: account, knownEpochs: [], storeOwnership: nil, eraseGeneration: 0, savedAt: Date(timeIntervalSince1970: savedAt),
                 storeState: storeState, sentFingerprints: sent
@@ -128,7 +128,7 @@ struct VerseDraftImporterTesting {
             earlier.rowID = row
             _ = try await harness.writer.saveDraft(earlier)
             // 그 뒤 그 절을 이어 고쳤다(다음 세션의 저장).
-            try await harness.store.apply([.replace(verse: 1, rowID: row, data: importInk(3), metadata: harness.metadata)], chapter: harness.chapter)
+            try await harness.store.apply([.replace(verse: 1, rowID: row, data: importInk(3), metadata: harness.metadata)], page: harness.chapter.inDefaultNotebook)
 
             let inventory = try await harness.query.inventory(in: accountA, environment: owned(accountA))
             #expect(inventory.entries.map(\.reason) == [.savedEarlier])
@@ -156,7 +156,7 @@ struct VerseDraftImporterTesting {
             #expect(now.lineData == importInk(2))
             #expect(now.rowID != previous)
             // 지금까지의 필기는 지우지 않았다 — 대표에서 내려와 이전 필사 기록으로 남는다.
-            let history = try await harness.store.load(chapter: harness.chapter).first { $0.rowID == previous }
+            let history = try await harness.store.load(harness.chapter.inDefaultNotebook).first { $0.rowID == previous }
             #expect(history?.lineData == importInk(1))
             #expect(history?.isPresent == false)
             // 초안은 지우지 않고 무엇을 · 어느 계정의 어느 행으로 · 언제 가져왔는지 남긴다.
@@ -170,7 +170,7 @@ struct VerseDraftImporterTesting {
             #expect(await harness.query.beforeConnectionCount(environment: environment) == 0)
 
             // 그 절을 이어 고쳐도(편집 화면의 저장) 가져온 초안은 다시 오르지 않는다.
-            try await harness.store.apply([.replace(verse: 1, rowID: now.rowID, data: importInk(3), metadata: harness.metadata)], chapter: harness.chapter)
+            try await harness.store.apply([.replace(verse: 1, rowID: now.rowID, data: importInk(3), metadata: harness.metadata)], page: harness.chapter.inDefaultNotebook)
             #expect(try await harness.query.inventory(in: .localOnly, environment: environment).entries.isEmpty)
         }
     }
@@ -211,7 +211,7 @@ struct VerseDraftImporterTesting {
     func clearedVerseNeedsAcknowledgement() async throws {
         try await withHarness { harness in
             let cleared = try await harness.seed(verse: 1, ink: importInk(1))
-            try await harness.store.apply([.clear(verse: 1, rowID: cleared)], chapter: harness.chapter)
+            try await harness.store.apply([.clear(verse: 1, rowID: cleared)], page: harness.chapter.inDefaultNotebook)
             let local = harness.draft(verse: 1, session: "logged-out", ink: importInk(2), account: .localOnly, savedAt: 1_000)
             _ = try await harness.writer.saveDraft(local)
             let environment = owned(accountA)

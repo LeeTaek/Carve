@@ -16,13 +16,13 @@ import Foundation
 /// 1. 시작할 때 환경(`DrawingEditEnvironmentClient.current()`)의 **계정 상태 · 저장소 소유 · 여는 초안 묶음**(`readableDraftScopes ∪
 ///    beforeConnectionDraftScopes`)을 적어 둔다.
 /// 2. 장 목록 = 행이 있는 장(`backupListing` — **모든 필사책**, 필사책 목록 · 그때의 저장소 세대와 함께) ∪ 여는 묶음에 초안이 있는
-///    기본 필사책의 장(`draftSummary(in:).chapters`)을 **필사책 · 권 · 장 자리**로 줄인 것(`NotebookChapter.backupPlaces`) — 같은 필사책의
+///    장(`draftSummary(in:).pages` — **모든 필사책**)을 **필사책 · 권 · 장 자리**로 줄인 것(`NotebookChapter.backupPlaces`) — 같은 필사책의
 ///    같은 권 · 장이 번역본별로 여러 번 와도 한 번이다.
 /// 3. 자리마다: 환경을 다시 읽어 1 과 다르면 `accountChanged` → 번역본마다(`Translation.allCases` — 그 필사책 · 번역본의 장):
-///    `backupRows(page:)` 의 세대가 장 목록 때와 다르면 `generationChanged` → 기본 필사책 장이면 그 장의 초안을 「확인이 필요한 필기」 와
-///    같은 규칙으로 고른다(`BackupExportDraftSelection` — 그 번역본 초안만 읽는다) → 항목 · blob 을 준비 폴더에 쓴다. 자리를 마치면 진행.
-///    번역본마다 따로 읽으므로 초안 요약이 장을 번역본별로 나누든(KJV 초안이 KJV 장으로 오든) 아니든 같은 초안을 한 번씩만 담는다.
-///    **초안은 지금 기본 필사책 것만 담는다**(초안 읽기의 옛 API) — 다른 필사책의 초안 내보내기는 t4 가 잇는다.
+///    `backupRows(page:)` 의 세대가 장 목록 때와 다르면 `generationChanged` → 그 장의 초안을 「확인이 필요한 필기」 와 같은 규칙으로 고른다
+///    (`BackupExportDraftSelection` — 그 필사책 · 번역본 초안만 읽는다) → 항목 · blob 을 준비 폴더에 쓴다. 자리를 마치면 진행.
+///    필사책 · 번역본마다 따로 읽으므로 초안 요약이 장을 번역본별로 나누든(KJV 초안이 KJV 장으로 오든) 아니든 같은 초안을 한 번씩만 담는다.
+///    다른 필사책의 초안도 그 필사책의 장에서 담는다(2.2) — 항목의 필사책 토큰 · id 원본 키가 그 필사책이다(`BackupItemID.draftSourceKey`).
 /// 4. manifest(필사책 목록 포함) · items 를 쓰고 `BackupArchive.write` 로 암호화 파일을 만든 뒤 평문 준비 폴더를 지운다.
 /// 5. 그 파일을 같은 암호 · 같은 상한으로 다시 풀어 대조한다(`BackupExportVerification`). 맞을 때만 성공이다.
 ///
@@ -190,7 +190,7 @@ public struct LiveBackupExporter: BackupExporting {
 
     /// 필사책 · 번역본 장 하나의 행 · 초안을 읽어 준비 폴더에 담는다 — 행과 세대는 같은 actor 구간에서 읽는다(장 단위 일관성).
     ///
-    /// 초안은 기본 필사책 장에서만 고른다 — 초안 읽기의 옛 API(`drafts(in:chapter:translation:)` — 기본 필사책)를 쓴다. 다른 필사책 장은 행만 담는다(t4).
+    /// 초안은 그 필사책 · 번역본의 것만 고른다(`drafts(in:page:)`) — 다른 필사책의 같은 장 초안은 그 필사책의 자리에서 담는다.
     /// - Parameters:
     ///   - page: 필사책 · 번역본 장.
     ///   - environment: 그 자리를 읽기 전에 다시 읽은 편집 환경.
@@ -215,23 +215,21 @@ public struct LiveBackupExporter: BackupExporting {
             Log.error("백업 — 장 사이에 저장소 세대가 바뀌어(모든 필사 삭제) 멈춘다", "목록 세대=\(generation.raw)", "지금 세대=\(load.generation.raw)")
             throw BackupExportError.generationChanged
         }
-        var selected: [BackupExportDraft] = []
-        if page.notebook.isDefault {
-            do {
-                selected = try await BackupExportDraftSelection.select(chapter: page.chapter, environment: current, rows: load.rows, reader: drafts)
-            } catch let error as CancellationError {
-                throw error
-            } catch {
-                Log.error("백업 — 이 장의 초안을 읽지 못해 멈춘다(조용히 빼지 않는다)", label, "\(error)")
-                throw BackupExportError.draftsUnreadable
-            }
+        let selected: [BackupExportDraft]
+        do {
+            selected = try await BackupExportDraftSelection.select(page: page, environment: current, rows: load.rows, reader: drafts)
+        } catch let error as CancellationError {
+            throw error
+        } catch {
+            Log.error("백업 — 이 장의 초안을 읽지 못해 멈춘다(조용히 빼지 않는다)", label, "\(error)")
+            throw BackupExportError.draftsUnreadable
         }
         for candidate in BackupExportItems.candidates(page: page, rows: load.rows, drafts: selected) {
             try staging.add(candidate)
         }
     }
 
-    /// 장 목록 — 행이 있는 장(모든 필사책) ∪ 여는 묶음에 초안이 있는 기본 필사책의 장을 필사책 · 권 · 장 자리로 줄인 것(번역본은 개역개정으로
+    /// 장 목록 — 행이 있는 장 ∪ 여는 묶음에 초안이 있는 장(둘 다 모든 필사책)을 필사책 · 권 · 장 자리로 줄인 것(번역본은 개역개정으로
     /// 맞춘다), 필사책 → 권 → 장 순서. 필사책 목록 · 세대는 행이 있는 장을 읽은 때(같은 actor 구간)의 것이다.
     /// - Parameter scopes: 여는 초안 묶음.
     /// - Returns: `pages` 가 자리 목록인 저장소 목록.
@@ -247,8 +245,8 @@ public struct LiveBackupExporter: BackupExporting {
         var pages = stored.pages
         for scope in scopes {
             do {
-                // 초안 요약의 기본 필사책 장만 — 초안은 옛 API(기본 필사책)로 읽는다. 다른 필사책 초안은 t4.
-                pages += try await drafts.draftSummary(in: scope).chapters.map { NotebookChapter(notebook: .default, chapter: $0) }
+                // 초안 요약의 page — 모든 필사책(초안 파일 이름의 필사책 접두로 가른다).
+                pages += try await drafts.draftSummary(in: scope).pages
             } catch {
                 Log.error("백업 — 초안 묶음을 읽지 못했다", "\(error)")
                 throw BackupExportError.draftsUnreadable

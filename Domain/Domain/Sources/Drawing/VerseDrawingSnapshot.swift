@@ -136,9 +136,6 @@ public enum VerseDrawingMutation: Equatable, Sendable {
 // MARK: - 저장 실패
 
 /// `DrawingRepository.apply` 의 실패. batch 는 전부 성공하거나 전부 실패한다 (P8).
-///
-/// - Note: 과도기 값 `unsupportedNotebook` 은 case 가 아니라 `DrawingRepository.swift` 확장의 고정 값(`persistenceFailed`)이다 —
-///   과도기 기본 구현과 함께 t4 에서 지우므로 여기에 case 로 더하지 않는다.
 public enum DrawingRepositoryError: Error, Equatable, Sendable {
     /// `replace` 가 가리킨 행이 없다.
     case rowNotFound(BibleDrawingRowID)

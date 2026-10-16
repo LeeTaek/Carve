@@ -40,7 +40,7 @@ struct LocalPreservationReadFailureTesting {
 
     private func draft(verse: Int = 1, revision: Int = 1, session: String = "session-1", chapter: BibleChapter? = nil) -> VerseDraft {
         VerseDraft(
-            key: VerseDraftKey(sessionID: session, chapter: chapter ?? self.chapter, verse: verse),
+            key: VerseDraftKey(sessionID: session, page: (chapter ?? self.chapter).inDefaultNotebook, verse: verse),
             revision: revision,
             rowID: BibleDrawingRowID(raw: "row-\(verse)"),
             lineData: Data("획-\(verse)".utf8),
@@ -90,7 +90,7 @@ struct LocalPreservationReadFailureTesting {
             let summary = try await writer.draftSummary(in: account)
             #expect(summary.draftCount == 2)
             #expect(summary.unreadableCount == 0)
-            #expect(try await writer.drafts(in: account, chapter: chapter).map(\.key.verse) == [1, 2])
+            #expect(try await writer.drafts(in: account, page: chapter.inDefaultNotebook).map(\.key.verse) == [1, 2])
         }
     }
 
@@ -140,7 +140,7 @@ struct LocalPreservationReadFailureTesting {
             #expect(fileManager.fileExists(atPath: misnamed.path))
             #expect(fileManager.fileExists(atPath: outsideAside.path))
             // 초안은 그대로다.
-            #expect(try await writer.drafts(in: account, chapter: chapter).map(\.key.verse) == [2])
+            #expect(try await writer.drafts(in: account, page: chapter.inDefaultNotebook).map(\.key.verse) == [2])
         }
     }
 
@@ -175,7 +175,7 @@ struct LocalPreservationReadFailureTesting {
             for (name, bytes) in broken {
                 try bytes.write(to: url)
                 await #expect(throws: (any Error).self, "\(name) 을 읽고도 넘어갔다") {
-                    try await writer.drafts(in: account, chapter: chapter)
+                    try await writer.drafts(in: account, page: chapter.inDefaultNotebook)
                 }
                 await #expect(throws: (any Error).self, "\(name) — 묶음 전체 읽기") {
                     try await writer.drafts(in: account)
@@ -184,7 +184,7 @@ struct LocalPreservationReadFailureTesting {
 
             // 되돌리면 다시 읽힌다 — 막는 것은 "읽지 못하는 동안" 뿐이다.
             try original.write(to: url)
-            #expect(try await writer.drafts(in: account, chapter: chapter).map(\.key.verse) == [1, 2])
+            #expect(try await writer.drafts(in: account, page: chapter.inDefaultNotebook).map(\.key.verse) == [1, 2])
         }
     }
 
@@ -196,14 +196,14 @@ struct LocalPreservationReadFailureTesting {
             // 파일 이름 자리에 폴더가 있다(쓰다 끊긴 자리 · 잘못된 복원).
             let asDirectory = fileURL(areas, draft(verse: 2))
             try FileManager.default.createDirectory(at: asDirectory, withIntermediateDirectories: true)
-            await #expect(throws: (any Error).self) { try await writer.drafts(in: account, chapter: chapter) }
+            await #expect(throws: (any Error).self) { try await writer.drafts(in: account, page: chapter.inDefaultNotebook) }
             try FileManager.default.removeItem(at: asDirectory)
 
             // 파일을 열 권한이 없다.
             let locked = fileURL(areas, draft(verse: 1))
             try permissions(locked, 0o000)
             defer { try? permissions(locked, 0o644) }
-            await #expect(throws: (any Error).self) { try await writer.drafts(in: account, chapter: chapter) }
+            await #expect(throws: (any Error).self) { try await writer.drafts(in: account, page: chapter.inDefaultNotebook) }
         }
     }
 
@@ -219,24 +219,24 @@ struct LocalPreservationReadFailureTesting {
 
             try permissions(session, 0o000)
             await #expect(throws: LocalPreservationWriter.WriterError.draftsUnreadable(account.key)) {
-                try await writer.drafts(in: account, chapter: chapter)
+                try await writer.drafts(in: account, page: chapter.inDefaultNotebook)
             }
             try permissions(session, 0o755)
 
             try permissions(bucket, 0o000)
             await #expect(throws: LocalPreservationWriter.WriterError.draftsUnreadable(account.key)) {
-                try await writer.drafts(in: account, chapter: chapter)
+                try await writer.drafts(in: account, page: chapter.inDefaultNotebook)
             }
             try permissions(bucket, 0o755)
 
             // 묶음 폴더의 부모를 보지 못해도 "없음" 이 아니다.
             try permissions(areas.preservation.draftsDirectory, 0o000)
             await #expect(throws: LocalPreservationWriter.WriterError.draftsUnreadable(account.key)) {
-                try await writer.drafts(in: account, chapter: chapter)
+                try await writer.drafts(in: account, page: chapter.inDefaultNotebook)
             }
             try permissions(areas.preservation.draftsDirectory, 0o755)
 
-            #expect(try await writer.drafts(in: account, chapter: chapter).count == 1)
+            #expect(try await writer.drafts(in: account, page: chapter.inDefaultNotebook).count == 1)
         }
     }
 
@@ -244,13 +244,13 @@ struct LocalPreservationReadFailureTesting {
     func missingBucketIsEmptyButFileIsUnreadable() async throws {
         try await withAreas { areas in
             let writer = LocalPreservationWriter(area: areas.preservation, eraseState: areas.eraseState)
-            #expect(try await writer.drafts(in: account, chapter: chapter).isEmpty)
+            #expect(try await writer.drafts(in: account, page: chapter.inDefaultNotebook).isEmpty)
 
             let bucket = areas.preservation.draftsDirectory.appendingPathComponent(account.key, isDirectory: true)
             try FileManager.default.createDirectory(at: areas.preservation.draftsDirectory, withIntermediateDirectories: true)
             try Data("파일이 폴더 자리에 있다".utf8).write(to: bucket)
             await #expect(throws: LocalPreservationWriter.WriterError.draftsUnreadable(account.key)) {
-                try await writer.drafts(in: account, chapter: chapter)
+                try await writer.drafts(in: account, page: chapter.inDefaultNotebook)
             }
         }
     }
@@ -265,8 +265,8 @@ struct LocalPreservationReadFailureTesting {
             _ = try await writer.saveDraft(otherDraft)
             try Data("깨짐".utf8).write(to: fileURL(areas, otherDraft))
 
-            #expect(try await writer.drafts(in: account, chapter: chapter).map(\.key.verse) == [1])
-            await #expect(throws: (any Error).self) { try await writer.drafts(in: account, chapter: other) }
+            #expect(try await writer.drafts(in: account, page: chapter.inDefaultNotebook).map(\.key.verse) == [1])
+            await #expect(throws: (any Error).self) { try await writer.drafts(in: account, page: other.inDefaultNotebook) }
         }
     }
 
@@ -292,7 +292,7 @@ struct LocalPreservationReadFailureTesting {
             try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
             try Data(legacy.utf8).write(to: url)
 
-            let read = try #require(try await writer.drafts(in: account, chapter: BibleChapter(title: .genesis, chapter: 1)).first)
+            let read = try #require(try await writer.drafts(in: account, page: BibleChapter(title: .genesis, chapter: 1).inDefaultNotebook).first)
             #expect(read.key.sessionID == "legacy-session")
             #expect(read.revision == 4)
             #expect(read.lineData == Data([1, 2, 3]))
@@ -309,7 +309,7 @@ struct LocalPreservationReadFailureTesting {
             next.revision = 5
             next.storeState = .sending
             #expect(try await writer.saveDraft(next) == .written)
-            #expect(try await writer.drafts(in: account, chapter: BibleChapter(title: .genesis, chapter: 1)).first?.storeState == .sending)
+            #expect(try await writer.drafts(in: account, page: BibleChapter(title: .genesis, chapter: 1).inDefaultNotebook).first?.storeState == .sending)
         }
     }
 
@@ -327,7 +327,7 @@ struct LocalPreservationReadFailureTesting {
 
             #expect(try await writer.saveDraft(draft(verse: 1, revision: 2)) == .written)
 
-            let remaining = try await writer.drafts(in: account, chapter: chapter)
+            let remaining = try await writer.drafts(in: account, page: chapter.inDefaultNotebook)
             #expect(remaining.map(\.revision) == [2])
             let sessionDirectory = url.deletingLastPathComponent()
             let files = try FileManager.default.contentsOfDirectory(at: sessionDirectory, includingPropertiesForKeys: nil)
@@ -360,7 +360,7 @@ struct LocalPreservationReadFailureTesting {
             #expect(summary.draftBytes > 0)
             #expect(summary.unreadableCount == 1)
             #expect(summary.unreadableBytes == Int64(Data("깨짐".utf8).count))
-            #expect(summary.chapters == [chapter, other])
+            #expect(summary.pages == [chapter.inDefaultNotebook, other.inDefaultNotebook])
 
             let unverifiedSummary = try await writer.draftSummary(in: .unverified)
             #expect(unverifiedSummary.draftCount == 1)
@@ -385,9 +385,9 @@ struct LocalPreservationReadFailureTesting {
 
             let summary = try await writer.draftSummary(in: account)
             #expect(summary.draftCount == 2)
-            #expect(summary.chapters == [chapter])
+            #expect(summary.pages == [chapter.inDefaultNotebook])
             // 그 장을 읽으려 하면 여전히 막는다.
-            await #expect(throws: (any Error).self) { try await writer.drafts(in: account, chapter: chapter) }
+            await #expect(throws: (any Error).self) { try await writer.drafts(in: account, page: chapter.inDefaultNotebook) }
         }
     }
 

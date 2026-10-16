@@ -18,6 +18,7 @@ import Testing
 /// - 필사책 이름 · 상태 · 예약 필드를 내보내기 · 불러오기에서 잃는 것
 /// - 형식 1 파일(2.1)을 거부하거나 기본 필사책 밖에 넣는 것, 형식 3(뒤 버전)을 읽는 것
 /// - 알 수 없는 필사책 토큰의 항목을 기본 필사책에 넣거나, 그 항목 때문에 파일 전체를 거부하는 것
+/// - 다른 필사책의 초안이 내보내기에서 빠지거나, 같은 세션 · 절 · revision · 내용의 두 필사책 초안 id 가 겹쳐 내보낸 파일이 깨지는 것
 @Suite("필사 백업 — 필사책(형식 2)")
 struct BackupNotebookRoundTripTesting {
     private typealias Sample = BackupRestoreSample
@@ -162,6 +163,79 @@ struct BackupNotebookRoundTripTesting {
         #expect(try harness.storedNotebooks() == Fixture.sorted([infoDefault, infoA, infoB]))
         // Then: 바뀐 장마다 필사책과 함께 알린다 — 같은 내용이라 쓰지 않은 기본 필사책 장은 알리지 않는다.
         #expect(Set(harness.changes.posted.map(\.page)) == [pageA, pageAKJV, pageB, pageBExodus])
+    }
+
+    @Test("다른 필사책 초안도 그 필사책으로 담는다 — 기본 필사책 초안의 id 는 2.1 과 같고, 세션 · 절 · revision · 잉크가 같은 두 필사책 초안의 id 는 겹치지 않는다")
+    func otherNotebookDraftsAreExported() async throws {
+        // Given: 내보내는 기기(로그인하지 않음) — A 창세기 1장 2절에 행 하나. 초안 셋(이 기기 전용 묶음, 빈 절에 써서 화면에 겹친다) —
+        //   기본 창세기 1:3 · A 창세기 1:3(세션 · revision · 잉크가 같고 필사책만 다르다) · B 출애굽기 3:2(B 에는 행이 없다 — 자리는 초안 요약에서 온다).
+        let source = try BackupExportHarness()
+        defer { source.remove() }
+        var rowA = BackupExportRowSeed(
+            verse: 2, rowUUID: "A-2", creationDate: Sample.sep(3), updateDate: Sample.sep(4),
+            lineData: Sample.ink("a-2"), layoutMetadataData: Sample.metadata
+        )
+        rowA.notebook = Fixture.notebookA
+        try source.seed([rowA])
+        let sameInk = Sample.ink("같은 초안")
+        let inkB = Sample.ink("b-초안")
+        try await source.save([
+            BackupExportSample.draft(verse: 3, ink: sameInk, account: .localOnly),
+            BackupExportSample.draft(notebook: Fixture.notebookA, verse: 3, ink: sameInk, account: .localOnly),
+            BackupExportSample.draft(chapter: Sample.exodus3, notebook: Fixture.notebookB, verse: 2, ink: inkB, account: .localOnly)
+        ])
+        let progress = BackupProgressRecorder()
+
+        // When: 내보낸다.
+        let exported = try await source.exporter(StubDrawingEditEnvironment(BackupExportSample.signedOut))
+            .export(password: BackupExportSample.password) { progress.record($0) }
+        let payload = try source.open(exported)
+
+        // Then: 자리는 기본 창세기 1 · A 창세기 1 · B 출애굽기 3 — B 는 초안만 있는 자리다.
+        #expect(progress.events.last == BackupProgress(done: 3, total: 3))
+        #expect(payload.manifest.counts.rows == 1 && payload.manifest.counts.drafts == 3)
+        // 초안 항목의 필사책 토큰 — 기본은 키 없음, 다른 필사책은 그 토큰. 모두 화면에 겹치던 초안이라 현재이고, A 2절의 행도 그대로 현재다.
+        let drafts = payload.items.filter { $0.kind == .draft }
+        #expect(drafts.map(\.verse) == [
+            BackupVerseKey(translation: "NKRV", book: "GEN", chapter: 1, verse: 3),
+            BackupVerseKey(translation: "NKRV", book: "GEN", chapter: 1, verse: 3, notebook: Fixture.notebookA.rawValue),
+            BackupVerseKey(translation: "NKRV", book: "EXO", chapter: 3, verse: 2, notebook: Fixture.notebookB.rawValue)
+        ])
+        let allCurrent = drafts.allSatisfy(\.isCurrent)
+        #expect(allCurrent)
+        #expect(payload.row("A-2")?.isCurrent == true)
+        // id — 기본 필사책 초안은 2.1 과 같은 원본 키, 다른 필사책 초안은 끝에 필사책 토큰을 더한다. 지문이 같아도 id 는 겹치지 않는다.
+        let fingerprint = BackupExportSample.fingerprint(sameInk)
+        let draftID: (String?) -> String = { notebook in
+            let sourceKey = BackupItemID.draftSourceKey(
+                draftScope: "local", sessionID: "session-1", translation: "NKRV", title: BibleTitle.genesis.rawValue, chapter: 1, verse: 3,
+                revision: 3, notebook: notebook
+            )
+            return BackupItemID.make(kind: .draft, sourceKey: sourceKey, fingerprint: fingerprint)
+        }
+        #expect(drafts.first?.id == draftID(nil))
+        #expect(drafts.dropFirst().first?.id == draftID(Fixture.notebookA.rawValue))
+        #expect(drafts.prefix(2).map(\.fingerprint) == [fingerprint, fingerprint])
+
+        // Given: 불러오는 기기 — 비어 있다.
+        let harness = try BackupRestoreHarness()
+        defer { harness.remove() }
+        let importer = harness.importer(StubDrawingEditEnvironment(Sample.confirmed(Sample.accountA)))
+
+        // When: 불러온다.
+        let inspection = try await importer.inspect(fileURL: exported.fileURL, password: BackupExportSample.password)
+        let report = try await importer.apply(inspection) { _ in }
+
+        // Then: 초안은 그 필사책의 장으로 — 같은 잉크의 기본 · A 초안이 각자의 필사책에 현재로 하나씩 들어가고, B 초안은 B 의 행이다.
+        #expect(report == .completed(BackupImportTally(new: 4)))
+        let pageA = Sample.page(Sample.genesis1, notebook: Fixture.notebookA)
+        let pageB = Sample.page(Sample.exodus3, notebook: Fixture.notebookB)
+        #expect(try await harness.rows().map(\.lineData) == [sameInk])
+        #expect(try await harness.representative(page: pageA, verse: 3)?.lineData == sameInk)
+        #expect(try await harness.representative(page: pageA, verse: 2)?.lineData == Sample.ink("a-2"))
+        let rowsB = try await harness.rows(page: pageB)
+        #expect(rowsB.map(\.lineData) == [inkB])
+        #expect(rowsB.map(\.titleName) == ["nb_\(Fixture.notebookB.rawValue)~1-02Exodus.txt"])
     }
 
     // MARK: - 형식 버전

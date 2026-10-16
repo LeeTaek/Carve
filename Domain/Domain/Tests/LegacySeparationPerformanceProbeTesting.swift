@@ -110,7 +110,7 @@ struct LegacySeparationPerformanceProbeTesting {
         let chapter = BibleChapter(title: .psalms, chapter: 119)
         for index in 0 ..< count {
             let bytes = Data((0 ..< ink).map { UInt8(truncatingIfNeeded: ($0 &* 31) &+ index) })
-            context.insert(BibleDrawing(bibleTitle: chapter, verse: index + 1, lineData: bytes, rowUUID: "perf-\(index)"))
+            context.insert(BibleDrawing(page: chapter.inDefaultNotebook, verse: index + 1, lineData: bytes, rowUUID: "perf-\(index)"))
             if index % 2_000 == 1_999 { try context.save() }
         }
         try context.save()

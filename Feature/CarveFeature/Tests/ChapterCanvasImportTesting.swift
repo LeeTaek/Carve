@@ -141,7 +141,7 @@ struct ChapterCanvasImportTesting: DraftTestSamples {
         #expect(representative(store)?.lineData == Data([1]))
 
         importIntoVerseOne(on: spy, previous: Data([1]), previousVersion: 1, previousMetadata: nil)
-        changes.post(LocalDrawingChange(chapter: CanvasTestSupport.chapter, date: Date(timeIntervalSince1970: 2_000)))
+        changes.post(LocalDrawingChange(page: CanvasTestSupport.chapter.inDefaultNotebook, date: Date(timeIntervalSince1970: 2_000)))
         await store.receive(\.localDrawingChanged)
         await store.receive(\.arrivalChecked)
         await store.receive(\.drawingsLoaded)
@@ -169,7 +169,7 @@ struct ChapterCanvasImportTesting: DraftTestSamples {
 
         // 설정이 1절에 넣었다 — 내가 저장한 필기는 옛 행 그대로 이전 필사 기록으로 남는다.
         importIntoVerseOne(on: spy, previous: Data("mine".utf8), previousVersion: 3, previousMetadata: CanvasTestSupport.metadata())
-        changes.post(LocalDrawingChange(chapter: CanvasTestSupport.chapter, date: Date(timeIntervalSince1970: 2_000)))
+        changes.post(LocalDrawingChange(page: CanvasTestSupport.chapter.inDefaultNotebook, date: Date(timeIntervalSince1970: 2_000)))
         await store.receive(\.localDrawingChanged)
         await store.receive(\.arrivalChecked)
         // 「다른 필사가 도착했어요 · 확인하기」 를 묻지 않는다 — 사용자가 이 장에 넣으라고 골랐다.
@@ -195,7 +195,7 @@ struct ChapterCanvasImportTesting: DraftTestSamples {
         await openWithLocalChanges(store, environment, changes)
         let loadsBefore = spy.loadedChapters.value.count
 
-        changes.post(LocalDrawingChange(chapter: BibleChapter(title: .genesis, chapter: 1), date: Date(timeIntervalSince1970: 2_000)))
+        changes.post(LocalDrawingChange(page: BibleChapter(title: .genesis, chapter: 1).inDefaultNotebook, date: Date(timeIntervalSince1970: 2_000)))
         await store.receive(\.localDrawingChanged)
 
         #expect(store.state.arrival.phase == .idle)

@@ -54,7 +54,7 @@ struct VerseDraftImportRuleTesting {
     ) -> VerseDraft {
         let row = BibleDrawingRowID(raw: "row-\(verse)")
         return VerseDraft(
-            key: VerseDraftKey(sessionID: session, chapter: chapter, verse: verse),
+            key: VerseDraftKey(sessionID: session, page: chapter.inDefaultNotebook, verse: verse),
             revision: 1,
             rowID: row,
             lineData: ink.map { Data($0.utf8) },

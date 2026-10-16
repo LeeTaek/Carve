@@ -253,7 +253,7 @@ struct TranslationFavoriteWidgetTesting {
         ]
         for seed in seeds {
             let row = BibleDrawing(
-                bibleTitle: seed.chapter, verse: 1, lineData: seed.ink,
+                page: seed.chapter.inDefaultNotebook, verse: 1, lineData: seed.ink,
                 updateDate: Date(timeIntervalSince1970: seed.updatedAt), rowUUID: seed.key
             )
             row.isPresent = seed.isPresent
@@ -265,7 +265,7 @@ struct TranslationFavoriteWidgetTesting {
 
     /// 그 장 · 절에서 `isPresent` 인 행의 키.
     private static func presentKeys(_ storeActor: SwiftDatabaseActor, chapter: BibleChapter) async throws -> [String] {
-        try await storeActor.verseDrawingSnapshots(chapter: chapter, verse: 1).filter(\.isPresent).map(\.rowID.raw)
+        try await storeActor.verseDrawingSnapshots(page: chapter.inDefaultNotebook, verse: 1).filter(\.isPresent).map(\.rowID.raw)
     }
 
     @Test("이전 필사는 그 장의 번역본 행만 보이고, 회차를 고르면 그 번역본 행의 대표만 바꾼다 — 개역개정 대표는 그대로다")

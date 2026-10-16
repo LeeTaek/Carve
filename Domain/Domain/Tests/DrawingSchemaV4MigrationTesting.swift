@@ -367,7 +367,7 @@ struct DrawingSchemaV4MigrationTesting {
             let container = try V4StoreHarness.openV4(at: directory)
             let context = ModelContext(container)
             let row = BibleDrawing(
-                bibleTitle: Self.chapter,
+                page: Self.chapter.inDefaultNotebook,
                 verse: 3,
                 lineData: RealLegacyLineData.data,
                 layoutMetadataData: try JSONEncoder().encode(metadata),
@@ -393,17 +393,17 @@ struct DrawingSchemaV4MigrationTesting {
 
     @Test("신규 행은 rowUUID 를 발급받고, 선발급한 값을 넘기면 그 값을 쓴다 (§8-7)")
     func newRowsGetRowUUID() {
-        let auto = BibleDrawing(bibleTitle: Self.chapter, verse: 1)
+        let auto = BibleDrawing(page: Self.chapter.inDefaultNotebook, verse: 1)
         #expect(auto.rowUUID != nil)
         #expect(UUID(uuidString: auto.rowUUID ?? "") != nil)
 
         // Phase 3 은 저장 전에 rowID 를 발급해 pending 큐 키로 쓴다. 그 값이 그대로 실려야 한다.
         let preIssued = UUID().uuidString
-        let explicit = BibleDrawing(bibleTitle: Self.chapter, verse: 1, rowUUID: preIssued)
+        let explicit = BibleDrawing(page: Self.chapter.inDefaultNotebook, verse: 1, rowUUID: preIssued)
         #expect(explicit.rowUUID == preIssued)
 
         // 서로 다른 행은 서로 다른 UUID 를 받는다 (초 단위 business id 충돌 회피가 목적, §8-7).
-        let other = BibleDrawing(bibleTitle: Self.chapter, verse: 1)
+        let other = BibleDrawing(page: Self.chapter.inDefaultNotebook, verse: 1)
         #expect(auto.rowUUID != other.rowUUID)
     }
 
@@ -557,13 +557,13 @@ struct LegacyPathOnV4StoreTesting {
 
     // MARK: fetch 경로
 
-    @Test("fetchVerseSnapshots(chapter:verse:) + representative() 이 대표 행을 고른다")
+    @Test("fetchVerseSnapshots(page:verse:) + representative() 이 대표 행을 고른다")
     func fetchVerseAndMainDrawing() async throws {
         let directory = try V4StoreHarness.makeStoreDirectory()
         defer { V4StoreHarness.removeStoreDirectory(directory) }
         let database = try Self.makeMigratedDatabase(at: directory)
 
-        let rows = try await database.fetchVerseSnapshots(chapter: Self.chapter, verse: 1)
+        let rows = try await database.fetchVerseSnapshots(page: Self.chapter.inDefaultNotebook, verse: 1)
         #expect(rows.count == 2)
         let main = try #require(rows.representative())
         #expect(main.isPresent == true)
@@ -597,11 +597,11 @@ struct LegacyPathOnV4StoreTesting {
         defer { V4StoreHarness.removeStoreDirectory(directory) }
         let database = try Self.makeMigratedDatabase(at: directory)
 
-        let rows = try await database.fetchVerseSnapshots(chapter: Self.chapter, verse: 1)
+        let rows = try await database.fetchVerseSnapshots(page: Self.chapter.inDefaultNotebook, verse: 1)
         let older = try #require(rows.first { !$0.isPresent })
-        await database.updatePresentDrawing(chapter: Self.chapter, verse: 1, presentRowID: older.rowID)
+        await database.updatePresentDrawing(page: Self.chapter.inDefaultNotebook, verse: 1, presentRowID: older.rowID)
 
-        let reloaded = try await database.fetchVerseSnapshots(chapter: Self.chapter, verse: 1)
+        let reloaded = try await database.fetchVerseSnapshots(page: Self.chapter.inDefaultNotebook, verse: 1)
         let present = reloaded.filter(\.isPresent)
         #expect(reloaded.count == 2)
         #expect(present.count == 1)
@@ -645,14 +645,14 @@ struct LegacyPathOnV4StoreTesting {
             let repository = SwiftDataDrawingRepository(
                 actor: SwiftDatabaseActor(modelContainer: try V4StoreHarness.openV4(at: directory))
             )
-            let load = try await repository.load(chapter: Self.chapter)
+            let load = try await repository.load(Self.chapter.inDefaultNotebook)
             let main = try #require(load.snapshots.filter { $0.verse == 1 }.representative())
             try await repository.apply(
                 [.replace(verse: 1, rowID: main.rowID, data: replacement, metadata: metadata)],
-                chapter: Self.chapter,
+                page: Self.chapter.inDefaultNotebook,
                 generation: load.generation
             )
-            let reloaded = try await repository.load(chapter: Self.chapter).snapshots
+            let reloaded = try await repository.load(Self.chapter.inDefaultNotebook).snapshots
             written = try #require(reloaded.first { $0.rowID == main.rowID })
         }
 

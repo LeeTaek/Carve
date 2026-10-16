@@ -53,16 +53,16 @@ struct VerseDrawingImportTransactionTesting {
 
     private func seed(_ harness: RepositoryHarness, verse: Int = 1, ink: Data) async throws -> BibleDrawingRowID {
         let rowID = BibleDrawingRowID.issue()
-        try await harness.apply([.create(verse: verse, rowID: rowID, data: ink, metadata: harness.metadata(verse: verse))], chapter: harness.chapter)
+        try await harness.apply([.create(verse: verse, rowID: rowID, data: ink, metadata: harness.metadata(verse: verse))], page: harness.chapter.inDefaultNotebook)
         return rowID
     }
 
     private func current(_ harness: RepositoryHarness, verse: Int = 1) async throws -> VerseDrawingSnapshot? {
-        try await harness.load(chapter: harness.chapter).representativesByVerse()[verse]
+        try await harness.load(harness.chapter.inDefaultNotebook).representativesByVerse()[verse]
     }
 
     private func generation(_ harness: RepositoryHarness) async throws -> DrawingStoreGeneration {
-        try await harness.repository.load(chapter: harness.chapter).generation
+        try await harness.repository.load(harness.chapter.inDefaultNotebook).generation
     }
 
     @Test("빈 절에는 가져온 필기가 새 대표 행으로 들어간다 — v3 · 좌표 정보 · isPresent")
@@ -70,7 +70,7 @@ struct VerseDrawingImportTransactionTesting {
         let harness = try RepositoryHarness()
         let request = command(harness, ink: importInk(1), expected: nil)
 
-        let outcome = try await harness.repository.importVerse(request, chapter: harness.chapter, generation: try await generation(harness))
+        let outcome = try await harness.repository.importVerse(request, generation: try await generation(harness))
 
         #expect(outcome == .imported(previousKept: false))
         let rows = try await harness.rows(verse: 1)
@@ -89,10 +89,10 @@ struct VerseDrawingImportTransactionTesting {
         let before = try #require(try await current(harness))
         let request = command(harness, ink: importInk(2), expected: before.contentFingerprint)
 
-        let outcome = try await harness.repository.importVerse(request, chapter: harness.chapter, generation: try await generation(harness))
+        let outcome = try await harness.repository.importVerse(request, generation: try await generation(harness))
 
         #expect(outcome == .imported(previousKept: true))
-        let snapshots = try await harness.load(chapter: harness.chapter)
+        let snapshots = try await harness.load(harness.chapter.inDefaultNotebook)
         #expect(snapshots.count == 2)
         let kept = try #require(snapshots.first { $0.rowID == previous })
         #expect(kept.isPresent == false)
@@ -111,7 +111,7 @@ struct VerseDrawingImportTransactionTesting {
         // 사용자는 빈 절이라고 보고 골랐다 — 그 사이 필기가 들어왔다.
         let request = command(harness, ink: importInk(2), expected: nil)
 
-        let outcome = try await harness.repository.importVerse(request, chapter: harness.chapter, generation: try await generation(harness))
+        let outcome = try await harness.repository.importVerse(request, generation: try await generation(harness))
 
         #expect(outcome == .currentChanged)
         let rows = try await harness.rows(verse: 1)
@@ -127,14 +127,14 @@ struct VerseDrawingImportTransactionTesting {
         let request = command(harness, ink: importInk(2), expected: before.contentFingerprint)
         let generation = try await generation(harness)
 
-        #expect(try await harness.repository.importVerse(request, chapter: harness.chapter, generation: generation) == .imported(previousKept: true))
+        #expect(try await harness.repository.importVerse(request, generation: generation) == .imported(previousKept: true))
         // 저장 뒤 결과를 잃고 다시 보냈다.
-        #expect(try await harness.repository.importVerse(request, chapter: harness.chapter, generation: generation) == .alreadyApplied)
+        #expect(try await harness.repository.importVerse(request, generation: generation) == .alreadyApplied)
         #expect(try await harness.rows(verse: 1).count == 2)
 
         // 다른 새 행으로 같은 내용을 가져와도 쓰지 않는다.
         let again = command(harness, ink: importInk(2), expected: before.contentFingerprint)
-        #expect(try await harness.repository.importVerse(again, chapter: harness.chapter, generation: generation) == .alreadyApplied)
+        #expect(try await harness.repository.importVerse(again, generation: generation) == .alreadyApplied)
         #expect(try await harness.rows(verse: 1).count == 2)
     }
 
@@ -146,7 +146,7 @@ struct VerseDrawingImportTransactionTesting {
 
         await #expect(throws: DrawingRepositoryError.staleStoreGeneration) {
             try await harness.repository.importVerse(
-                command(harness, ink: importInk(1), expected: nil), chapter: harness.chapter, generation: generation
+                command(harness, ink: importInk(1), expected: nil), generation: generation
             )
         }
         #expect(try await harness.rows(verse: 1).isEmpty)
@@ -158,14 +158,14 @@ struct VerseDrawingImportTransactionTesting {
         let previous = try await seed(harness, ink: importInk(1))
         let before = try #require(try await current(harness))
         let request = command(harness, ink: importInk(2), expected: before.contentFingerprint)
-        _ = try await harness.repository.importVerse(request, chapter: harness.chapter, generation: try await generation(harness))
+        _ = try await harness.repository.importVerse(request, generation: try await generation(harness))
 
         // 열려 있던 화면은 아직 옛 행을 대표로 알고 그 행에 획을 더해 저장한다.
-        try await harness.apply([.replace(verse: 1, rowID: previous, data: importInk(3), metadata: harness.metadata(verse: 1))], chapter: harness.chapter)
+        try await harness.apply([.replace(verse: 1, rowID: previous, data: importInk(3), metadata: harness.metadata(verse: 1))], page: harness.chapter.inDefaultNotebook)
 
         #expect(try await current(harness)?.rowID == request.rowID)
         #expect(try await current(harness)?.lineData == importInk(2))
-        let history = try await harness.load(chapter: harness.chapter).first { $0.rowID == previous }
+        let history = try await harness.load(harness.chapter.inDefaultNotebook).first { $0.rowID == previous }
         #expect(history?.lineData == importInk(3))
         #expect(history?.isPresent == false)
     }
@@ -188,7 +188,7 @@ struct VerseDraftImportRecordTesting {
 
     private func draft(revision: Int, ink: String) -> VerseDraft {
         VerseDraft(
-            key: VerseDraftKey(sessionID: "logged-out", chapter: chapter, verse: 1), revision: revision, rowID: BibleDrawingRowID(raw: "row-1"),
+            key: VerseDraftKey(sessionID: "logged-out", page: chapter.inDefaultNotebook, verse: 1), revision: revision, rowID: BibleDrawingRowID(raw: "row-1"),
             lineData: Data(ink.utf8), drawingVersion: 3, layoutMetadataData: nil, base: .empty, baseFingerprint: nil, account: .localOnly,
             knownEpochs: [], storeOwnership: nil, eraseGeneration: 0, savedAt: Date(timeIntervalSince1970: 1_000)
         )

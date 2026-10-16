@@ -29,12 +29,6 @@ public struct LocalDrawingChange: Equatable, Sendable {
         self.page = page
         self.date = date
     }
-
-    /// **기본 필사책**의 장이 바뀌었다.
-    /// - Note: 뜻은 「기본 필사책」 이다 — 새 코드는 `init(page:date:)` 를 쓴다. t4 에서 지운다.
-    public init(chapter: BibleChapter, date: Date) {
-        self.init(page: NotebookChapter(notebook: .default, chapter: chapter), date: date)
-    }
 }
 
 public protocol LocalDrawingChangeClient: Sendable {

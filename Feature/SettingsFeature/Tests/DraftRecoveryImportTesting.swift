@@ -30,13 +30,6 @@ private struct FailingImporter: DrawingVerseImporting {
     func importVerse(_ command: VerseDrawingImportCommand, generation: DrawingStoreGeneration) async throws -> VerseDrawingImportOutcome {
         throw DrawingRepositoryError.persistenceFailed("디스크가 가득 찼다")
     }
-
-    /// 옛 요구 — 과도기 동안 경계가 요구한다. page 판으로 넘긴다.
-    func importVerse(
-        _ command: VerseDrawingImportCommand, chapter: BibleChapter, generation: DrawingStoreGeneration
-    ) async throws -> VerseDrawingImportOutcome {
-        try await importVerse(command, generation: generation)
-    }
 }
 
 /// 실제 stroke 가 있는 필기 — 한 번만 만든다(`dataRepresentation()` 은 부를 때마다 다른 바이트를 낸다).

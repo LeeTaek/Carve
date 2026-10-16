@@ -93,10 +93,9 @@ enum NotebookFixture {
 
 /// page 마다 행을 따로 두는 필사 저장소 대역 — 저장(`apply`)한 명령을 그 page 의 행으로 남기고, 조회(`load`)는 그 page 의 행만 돌려준다.
 ///
-/// 필사 화면은 page 요구만 불러야 한다 — 옛 `chapter:` 요구가 불리면 `legacyCalls` 에 남기고 실패한다. 저장 실패 · 붙잡기는 필요한 시험만 켠다.
+/// 저장소 계약에는 page 요구만 있다(옛 `chapter:` 요구는 2.2 t4 에서 지웠다 — 필사 화면이 옛 요구를 부르면 컴파일되지 않는다).
+/// 저장 실패 · 붙잡기는 필요한 시험만 켠다.
 final class PageStoreRepository: DrawingRepository {
-    struct LegacyRequirement: Error {}
-
     /// page 마다 저장된 행(저장 순서).
     let stored = LockIsolated<[NotebookChapter: [VerseDrawingSnapshot]]>([:])
     /// 조회한 page(순서대로).
@@ -105,8 +104,6 @@ final class PageStoreRepository: DrawingRepository {
     let appliedPages = LockIsolated<[NotebookChapter]>([])
     /// 보관(지우기)한 page.
     let archivedPages = LockIsolated<[NotebookChapter]>([])
-    /// 옛 `chapter:` 요구가 불린 횟수 — 0 이어야 한다.
-    let legacyCalls = LockIsolated(0)
     /// 남은 저장 실패 수.
     let applyFailures = LockIsolated(0)
     private let holdApply = LockIsolated(false)
@@ -163,23 +160,6 @@ final class PageStoreRepository: DrawingRepository {
         return .archived
     }
 
-    // 옛 `chapter:` 요구 — 필사 화면은 부르지 않는다(L2 뒤의 새 코드는 옛 API 를 부르지 않는다).
-
-    func load(chapter: BibleChapter) async throws -> DrawingChapterLoad {
-        legacyCalls.withValue { $0 += 1 }
-        throw LegacyRequirement()
-    }
-
-    func apply(_ mutations: [VerseDrawingMutation], chapter: BibleChapter, generation: DrawingStoreGeneration) async throws {
-        legacyCalls.withValue { $0 += 1 }
-        throw LegacyRequirement()
-    }
-
-    func archiveAndReset(_ command: VerseDrawingArchiveCommand, chapter: BibleChapter) async throws -> VerseDrawingArchiveOutcome {
-        legacyCalls.withValue { $0 += 1 }
-        throw LegacyRequirement()
-    }
-
     /// 저장 명령이 저장소에 남기는 행 — 그 page 의 번역본 · 필사책을 든다.
     private static func snapshot(of mutation: VerseDrawingMutation, in page: NotebookChapter) -> VerseDrawingSnapshot {
         switch mutation {
@@ -227,10 +207,9 @@ final class NotebookListStub: NotebookRepository {
     func delete(_ id: NotebookID) async throws {}
 }
 
-/// 초안을 page 로 읽는 초안 저장소 대역 — 읽기는 늘 빈 목록이고, 어느 page 를 읽었는지 남긴다. 옛 요구가 불리면 센다.
+/// 초안을 page 로 읽는 초안 저장소 대역 — 읽기는 늘 빈 목록이고, 어느 page 를 읽었는지 남긴다.
 final class PageDraftStore: VerseDraftStore {
     let requested = LockIsolated<[NotebookChapter]>([])
-    let legacyCalls = LockIsolated(0)
     let generation: UInt64
 
     init(generation: UInt64) {
@@ -243,11 +222,6 @@ final class PageDraftStore: VerseDraftStore {
 
     func drafts(in scope: AccountScope, page: NotebookChapter) async throws -> [VerseDraft] {
         requested.withValue { $0.append(page) }
-        return []
-    }
-
-    func drafts(in scope: AccountScope, chapter: BibleChapter, translation: Translation) async throws -> [VerseDraft] {
-        legacyCalls.withValue { $0 += 1 }
         return []
     }
 
