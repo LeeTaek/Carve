@@ -27,9 +27,7 @@ private final class RecordingChanges: LocalDrawingChangeClient, @unchecked Senda
 
 /// 저장에 실패하는 쓰기.
 private struct FailingImporter: DrawingVerseImporting {
-    func importVerse(
-        _ command: VerseDrawingImportCommand, chapter: BibleChapter, generation: DrawingStoreGeneration
-    ) async throws -> VerseDrawingImportOutcome {
+    func importVerse(_ command: VerseDrawingImportCommand, generation: DrawingStoreGeneration) async throws -> VerseDrawingImportOutcome {
         throw DrawingRepositoryError.persistenceFailed("디스크가 가득 찼다")
     }
 }
@@ -65,6 +63,8 @@ struct DraftRecoveryImportTesting {
     private nonisolated static let accountA = AccountScope(key: "acct-a")
     // nonisolated 인 `Fixture` 가 await 없이 읽는다.
     private nonisolated static let chapter = BibleChapter(title: .genesis, chapter: 1)
+    /// 필기가 있는 page — 기본 필사책의 창세기 1장.
+    private nonisolated static let page = NotebookChapter(notebook: .default, chapter: chapter)
     private nonisolated static let metadata = DrawingLayoutMetadata(
         baseWritingWidth: 372, baseWritingHeight: 60, baseUnderlineAnchors: [0, 30], layoutSignature: "cl1-settings-import"
     )
@@ -80,18 +80,18 @@ struct DraftRecoveryImportTesting {
         }
 
         func apply(_ mutations: [VerseDrawingMutation]) async throws {
-            let generation = try await repository.load(chapter: DraftRecoveryImportTesting.chapter).generation
-            try await repository.apply(mutations, chapter: DraftRecoveryImportTesting.chapter, generation: generation)
+            let generation = try await repository.load(DraftRecoveryImportTesting.page).generation
+            try await repository.apply(mutations, page: DraftRecoveryImportTesting.page, generation: generation)
         }
 
         func current(verse: Int = 1) async throws -> VerseDrawingSnapshot? {
-            try await repository.load(chapter: DraftRecoveryImportTesting.chapter).snapshots.representativesByVerse()[verse]
+            try await repository.load(DraftRecoveryImportTesting.page).snapshots.representativesByVerse()[verse]
         }
 
         /// 로그인하지 않은 동안 쓴 필기.
         func saveLoggedOutDraft(verse: Int = 1, ink: Data) async throws -> VerseDraft {
             let draft = VerseDraft(
-                key: VerseDraftKey(sessionID: "logged-out", chapter: DraftRecoveryImportTesting.chapter, verse: verse), revision: 1,
+                key: VerseDraftKey(sessionID: "logged-out", page: DraftRecoveryImportTesting.page, verse: verse), revision: 1,
                 rowID: BibleDrawingRowID(raw: "draft-row-\(verse)"), lineData: ink, drawingVersion: 3,
                 layoutMetadataData: try DraftRecoveryImportTesting.metadata.encodedBlob(), base: .empty, baseFingerprint: nil,
                 account: .localOnly, knownEpochs: [], storeOwnership: nil, eraseGeneration: 0, savedAt: Date(timeIntervalSince1970: 1_000)
@@ -186,8 +186,8 @@ struct DraftRecoveryImportTesting {
             await store.receive(\.loaded)
             // 넣은 필기는 이미 반영된 것이라 목록에서 빠진다.
             #expect(store.state.pendingCount == 0)
-            // 그 아래 열린 필사 화면이 그 장을 다시 읽게 알렸다.
-            #expect(changes.posted.value == [LocalDrawingChange(chapter: Self.chapter, date: Date(timeIntervalSince1970: 5_000))])
+            // 그 아래 열린 필사 화면이 그 page(필사책 + 장)를 다시 읽게 알렸다.
+            #expect(changes.posted.value == [LocalDrawingChange(page: Self.page, date: Date(timeIntervalSince1970: 5_000))])
             #expect(try await fixture.current()?.lineData == settingsInks[2])
             // 남겨 둔 필기는 지우지 않고 가져온 기록을 남긴다.
             #expect(try await fixture.writer.drafts(in: .localOnly).first?.imported?.account == Self.accountA)
@@ -299,7 +299,7 @@ struct DraftRecoveryImportTesting {
             let row = try await fixture.seed(ink: settingsInks[1])
             let sent = try #require(try await fixture.current()?.contentFingerprint)
             let earlier = VerseDraft(
-                key: VerseDraftKey(sessionID: "earlier", chapter: Self.chapter, verse: 1), revision: 1, rowID: row, lineData: settingsInks[1],
+                key: VerseDraftKey(sessionID: "earlier", page: Self.page, verse: 1), revision: 1, rowID: row, lineData: settingsInks[1],
                 drawingVersion: 3, layoutMetadataData: try Self.metadata.encodedBlob(), base: .empty, baseFingerprint: nil,
                 account: .confirmed(AccountServerWorkToken(scope: Self.accountA, generation: 1)), knownEpochs: [], storeOwnership: Self.accountA,
                 eraseGeneration: 0, savedAt: Date(timeIntervalSince1970: 1_000), storeState: .stored, sentFingerprints: [sent]

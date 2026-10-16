@@ -139,6 +139,12 @@ public struct CarveNavigationView: View {
                 HStack(spacing: CarveSpacing.xSmall) {
                     // 번역본 고르기는 헤더 제목 메뉴로 옮겼다(영어 현지화 결정 19).
                     Spacer(minLength: 0)
+                    // 즐겨찾기 바로 왼쪽(2.2 필사책 결정 9). 책장도 즐겨찾기 · 차트처럼 앱 스택에 올린다.
+                    // ⚠️ 책 모양 선 아이콘이 아직 없어 서재 아이콘(`library` — 책등이 있는 사각)을 쓴다. 전용 아이콘은 UIComponents 에 더할 때 바꾼다.
+                    CarveIconButton(.library, accessibilityLabel: CarveFeatureCatalog.string("책장", locale: locale)) {
+                        send(.moveToNotebooks)
+                    }
+                    .accessibilityIdentifier("notebookShelfButton")
                     // 차트 바로 왼쪽(시안 N3). 목록은 차트와 같이 앱 스택에 올린다.
                     CarveIconButton(.star, accessibilityLabel: CarveFeatureCatalog.string("즐겨찾기", locale: locale)) {
                         send(.moveToFavorites)

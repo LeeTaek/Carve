@@ -18,7 +18,7 @@ import ComposableArchitecture
 
 // MARK: - 스텁
 
-/// 호출을 기록하고, 필요하면 저장을 게이트로 붙잡아 두는 저장소.
+/// 호출을 기록하고, 필요하면 저장을 게이트로 붙잡아 두는 저장소 — 기본 필사책 시험용이라 page 의 장(`page.chapter`)만 기록한다.
 final class RepositorySpy: DrawingRepository, @unchecked Sendable {
     let loadedChapters = LockIsolated<[BibleChapter]>([])
     let applied = LockIsolated<[(chapter: BibleChapter, mutations: [VerseDrawingMutation])]>([])
@@ -34,16 +34,16 @@ final class RepositorySpy: DrawingRepository, @unchecked Sendable {
     /// 도착한 저장의 세대. 거절된 저장도 남는다 — `applied` 는 **실제로 쓴** 저장만 남긴다.
     let appliedGenerations = LockIsolated<[DrawingStoreGeneration]>([])
 
-    func load(chapter: BibleChapter) async throws -> DrawingChapterLoad {
+    func load(_ page: NotebookChapter) async throws -> DrawingChapterLoad {
         if let (stream, continuation) = makeLoadGateIfNeeded() {
             loadGate.setValue(continuation)
             for await _ in stream { break }
         }
-        loadedChapters.withValue { $0.append(chapter) }
+        loadedChapters.withValue { $0.append(page.chapter) }
         if let message = loadFailures.withValue({ $0.isEmpty ? nil : $0.removeFirst() }) {
             throw LoadBoom(description: message)
         }
-        return DrawingChapterLoad(snapshots: snapshots(chapter), generation: generation.value)
+        return DrawingChapterLoad(snapshots: snapshots(page.chapter), generation: generation.value)
     }
 
     /// 다음 `load` 를 `releaseLoad()` 까지 붙잡는다 — 늦게 도착하는 조회 결과를 재현하기 위함.
@@ -58,7 +58,7 @@ final class RepositorySpy: DrawingRepository, @unchecked Sendable {
         return AsyncStream<Void>.makeStream()
     }
 
-    func apply(_ mutations: [VerseDrawingMutation], chapter: BibleChapter, generation: DrawingStoreGeneration) async throws {
+    func apply(_ mutations: [VerseDrawingMutation], page: NotebookChapter, generation: DrawingStoreGeneration) async throws {
         if let (stream, continuation) = makeGateIfNeeded() {
             applyGate.setValue(continuation)
             for await _ in stream { break }
@@ -68,7 +68,7 @@ final class RepositorySpy: DrawingRepository, @unchecked Sendable {
         guard generation == self.generation.value else {
             throw DrawingRepositoryError.staleStoreGeneration
         }
-        applied.withValue { $0.append((chapter, mutations)) }
+        applied.withValue { $0.append((page.chapter, mutations)) }
         if let failure = applyFailures.withValue({ $0.isEmpty ? nil : $0.removeFirst() }) {
             throw failure
         }
@@ -83,15 +83,12 @@ final class RepositorySpy: DrawingRepository, @unchecked Sendable {
     /// 보관 결과. 기본은 `.archived`.
     let archiveOutcomes = LockIsolated<[VerseDrawingArchiveOutcome]>([])
 
-    func archiveAndReset(
-        _ command: VerseDrawingArchiveCommand,
-        chapter: BibleChapter
-    ) async throws -> VerseDrawingArchiveOutcome {
+    func archiveAndReset(_ command: VerseDrawingArchiveCommand, page: NotebookChapter) async throws -> VerseDrawingArchiveOutcome {
         if let (stream, continuation) = makeArchiveGateIfNeeded() {
             archiveGate.setValue(continuation)
             for await _ in stream { break }
         }
-        archived.withValue { $0.append((chapter, command)) }
+        archived.withValue { $0.append((page.chapter, command)) }
         if let failure = archiveFailures.withValue({ $0.isEmpty ? nil : $0.removeFirst() }) {
             throw failure
         }
@@ -125,6 +122,8 @@ final class RepositorySpy: DrawingRepository, @unchecked Sendable {
 
 enum CanvasTestSupport {
     static let chapter = BibleChapter(title: .jonah, chapter: 2)
+    /// `chapter` 의 기본 필사책 page.
+    static let page = chapter.inDefaultNotebook
     static let layout = OwnershipTestSupport.uniformLayout(verseCount: 3, lineSpace: 30)
     static let otherLayout = OwnershipTestSupport.uniformLayout(verseCount: 3, lineSpace: 40)
     static let rowA = BibleDrawingRowID(raw: "row-a")
@@ -198,7 +197,7 @@ enum CanvasTestSupport {
         results: LockIsolated<[DrawingEditResult]> = LockIsolated([]),
         composeInputs: LockIsolated<[[VerseDrawingSnapshot]]>? = nil
     ) -> TestStoreOf<ChapterCanvasFeature> {
-        let store = TestStore(initialState: ChapterCanvasFeature.State(chapter: chapter)) {
+        let store = TestStore(initialState: ChapterCanvasFeature.State(page: page)) {
             ChapterCanvasFeature()
         } withDependencies: {
             $0.drawingCodec = codec(results: results, composeInputs: composeInputs)
@@ -213,7 +212,7 @@ enum CanvasTestSupport {
     /// load + layout 을 마쳐 합성된 상태로 만든다. 세대는 `composedGeneration`.
     @MainActor
     static func compose(_ store: TestStoreOf<ChapterCanvasFeature>) async {
-        await store.send(.load(chapter: chapter, expectedVerseCount: 3))
+        await store.send(.load(page: page, expectedVerseCount: 3))
         await store.receive(\.drawingsLoaded)
         await store.send(.layoutCompleted(layout))
     }
@@ -230,7 +229,7 @@ struct ChapterCanvasComposeTesting {
         spy.snapshots = { _ in [CanvasTestSupport.snapshot(verse: 1, rowID: CanvasTestSupport.rowA)] }
 
         let drawingsFirst = CanvasTestSupport.makeStore(spy: spy)
-        await drawingsFirst.send(.load(chapter: CanvasTestSupport.chapter, expectedVerseCount: 3)) {
+        await drawingsFirst.send(.load(page: CanvasTestSupport.page, expectedVerseCount: 3)) {
             $0.expectedVerseCount = 3
             $0.loadRequestID = UUID(0)
             // 장 진입은 세대를 올린다 — 뷰가 빈 캔버스를 즉시 표시하도록.
@@ -252,7 +251,7 @@ struct ChapterCanvasComposeTesting {
         let layoutFirst = CanvasTestSupport.makeStore(spy: spy)
         await layoutFirst.send(.layoutCompleted(CanvasTestSupport.layout))
         #expect(!layoutFirst.state.isInputEnabled)
-        await layoutFirst.send(.load(chapter: CanvasTestSupport.chapter, expectedVerseCount: 3))
+        await layoutFirst.send(.load(page: CanvasTestSupport.page, expectedVerseCount: 3))
         // load 는 이전 레이아웃을 버린다 — 새 장의 레이아웃은 다시 와야 한다.
         await layoutFirst.receive(\.drawingsLoaded)
         #expect(!layoutFirst.state.isInputEnabled)
@@ -267,7 +266,7 @@ struct ChapterCanvasComposeTesting {
     func mismatchedVerseCountKeepsGateClosed() async {
         let spy = RepositorySpy()
         let store = CanvasTestSupport.makeStore(spy: spy)
-        await store.send(.load(chapter: CanvasTestSupport.chapter, expectedVerseCount: 4))
+        await store.send(.load(page: CanvasTestSupport.page, expectedVerseCount: 4))
         await store.receive(\.drawingsLoaded)
         await store.send(.layoutCompleted(CanvasTestSupport.layout))   // 3절짜리
 
@@ -286,9 +285,9 @@ struct ChapterCanvasComposeTesting {
 
         // 첫 장의 조회를 붙잡아 두고, 그 사이 다음 장으로 넘어간다.
         spy.holdNextLoadCall()
-        await store.send(.load(chapter: CanvasTestSupport.chapter, expectedVerseCount: 3)) { $0.loadRequestID = UUID(0) }
-        await store.send(.load(chapter: second, expectedVerseCount: 3)) {
-            $0.chapter = second
+        await store.send(.load(page: CanvasTestSupport.page, expectedVerseCount: 3)) { $0.loadRequestID = UUID(0) }
+        await store.send(.load(page: second.inDefaultNotebook, expectedVerseCount: 3)) {
+            $0.page = second.inDefaultNotebook
             $0.loadRequestID = UUID(1)
         }
         await store.receive(\.drawingsLoaded) {
@@ -299,7 +298,7 @@ struct ChapterCanvasComposeTesting {
         spy.releaseLoad()
         await store.receive(\.drawingsLoaded)
 
-        #expect(store.state.chapter == second)
+        #expect(store.state.page == second.inDefaultNotebook)
         #expect(store.state.loadRequestID == UUID(1))
         #expect(store.state.loadedDrawings == [CanvasTestSupport.snapshot(verse: 2, rowID: BibleDrawingRowID(raw: "second"))])
     }
@@ -310,7 +309,7 @@ struct ChapterCanvasComposeTesting {
         spy.loadFailures.setValue(["boom"])
         let store = CanvasTestSupport.makeStore(spy: spy)
 
-        await store.send(.load(chapter: CanvasTestSupport.chapter, expectedVerseCount: 3))
+        await store.send(.load(page: CanvasTestSupport.page, expectedVerseCount: 3))
         await store.receive(\.drawingsLoaded) {
             $0.loadedDrawings = nil
             $0.loadFailure = DrawingLoadFailure(message: "boom")
@@ -332,8 +331,8 @@ struct ChapterCanvasComposeTesting {
             $0.scrollRequest = .init(verse: 3, token: 1)
         }
         let next = BibleChapter(title: .jonah, chapter: 3)
-        await store.send(.load(chapter: next, expectedVerseCount: 3)) {
-            $0.chapter = next
+        await store.send(.load(page: next.inDefaultNotebook, expectedVerseCount: 3)) {
+            $0.page = next.inDefaultNotebook
             $0.renderedData = nil
             $0.renderedRevision = 3
             $0.scrollRequest = nil
@@ -375,18 +374,18 @@ struct ChapterCanvasEditTesting {
             $0.editQueue = []
             $0.baselineData = CanvasTestSupport.edit("1").drawingData
             $0.activeRowIDs[2] = self.newRow
-            $0.pendingMutations = [self.newRow: PendingDrawingMutation(revision: 1, chapter: CanvasTestSupport.chapter, mutation: self.createResult("1").mutations[0])]
+            $0.pendingMutations = [self.newRow: PendingDrawingMutation(revision: 1, page: CanvasTestSupport.page, mutation: self.createResult("1").mutations[0])]
             $0.saveStatus = .saving(revision: 1, requestID: UUID(1))
             $0.inFlightBatch = [self.newRow: 1]
             $0.inFlightMutations = self.createResult("1").mutations
-            $0.inFlightChapter = CanvasTestSupport.chapter
+            $0.inFlightPage = CanvasTestSupport.page
         }
         await store.receive(\.saveFinished) {
             $0.pendingMutations = [:]
             $0.saveStatus = .idle
             $0.inFlightBatch = [:]
             $0.inFlightMutations = []
-            $0.inFlightChapter = nil
+            $0.inFlightPage = nil
             $0.persistedRevision = 1
         }
         #expect(store.state.isFullyPersisted)
@@ -589,8 +588,8 @@ struct ChapterCanvasEditTesting {
 
         let next = BibleChapter(title: .jonah, chapter: 3)
         spy.holdNextLoadCall()
-        await store.send(.load(chapter: next, expectedVerseCount: 3)) {
-            $0.chapter = next
+        await store.send(.load(page: next.inDefaultNotebook, expectedVerseCount: 3)) {
+            $0.page = next.inDefaultNotebook
             $0.renderedData = nil
             // 장 전환은 flush 지점이다 — 이전 장의 batch 가 곧바로 다시 나간다.
             $0.saveStatus = .saving(revision: 1, requestID: UUID(3))
@@ -624,12 +623,12 @@ struct ChapterCanvasGenerationTesting {
 
         let next = BibleChapter(title: .jonah, chapter: 3)
         spy.holdNextLoadCall()
-        await store.send(.load(chapter: next, expectedVerseCount: 3)) {
-            $0.chapter = next
+        await store.send(.load(page: next.inDefaultNotebook, expectedVerseCount: 3)) {
+            $0.page = next.inDefaultNotebook
             $0.renderedRevision = previousGeneration + 1
         }
         #expect(store.state.retiredSession?.generation == previousGeneration)
-        #expect(store.state.retiredSession?.chapter == CanvasTestSupport.chapter)
+        #expect(store.state.retiredSession?.page == CanvasTestSupport.page)
 
         // 장 전환 직전의 마지막 획 — 컨트롤러가 이전 세대 번호로 늦게 보고한다.
         await store.send(.editEnded(CanvasTestSupport.edit("late", generation: previousGeneration))) {
@@ -641,7 +640,7 @@ struct ChapterCanvasGenerationTesting {
             $0.isPreparingEdit = false
             $0.editQueue = []
             $0.pendingMutations = [self.newRow: PendingDrawingMutation(
-                revision: 1, chapter: CanvasTestSupport.chapter, mutation: CanvasTestSupport.createResult("late").mutations[0]
+                revision: 1, page: CanvasTestSupport.page, mutation: CanvasTestSupport.createResult("late").mutations[0]
             )]
             $0.saveStatus = .saving(revision: 1, requestID: UUID(2))
         }
@@ -653,7 +652,7 @@ struct ChapterCanvasGenerationTesting {
         // 새 장의 문맥은 손대지 않았다 — 기준·소유권·활성 행이 비어 있고 입력은 여전히 닫혀 있다.
         #expect(store.state.baselineData == nil)
         #expect(store.state.activeRowIDs.isEmpty)
-        #expect(store.state.chapter == next)
+        #expect(store.state.page == next.inDefaultNotebook)
         #expect(!store.state.isInputEnabled)
 
         spy.releaseLoad()
@@ -777,13 +776,13 @@ struct ChapterCanvasGenerationTesting {
 
         let other = BibleChapter(title: .jonah, chapter: 3)
         spy.holdNextLoadCall()
-        await store.send(.load(chapter: other, expectedVerseCount: 3))
+        await store.send(.load(page: other.inDefaultNotebook, expectedVerseCount: 3))
         await store.receive(\.saveFinished)   // 장 전환 flush — 실패 2
         spy.releaseLoad()
         await store.receive(\.drawingsLoaded)
 
         spy.holdNextLoadCall()
-        await store.send(.load(chapter: CanvasTestSupport.chapter, expectedVerseCount: 3))
+        await store.send(.load(page: CanvasTestSupport.page, expectedVerseCount: 3))
         await store.receive(\.saveFinished)   // 실패 3
         spy.releaseLoad()
         await store.receive(\.drawingsLoaded)

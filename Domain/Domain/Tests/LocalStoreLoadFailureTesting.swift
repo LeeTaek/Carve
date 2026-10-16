@@ -18,17 +18,17 @@ import Testing
 
 // MARK: - fixture
 
-/// 테스트 전용 V7 — 필사 행에 optional 필드 하나를 더한 **앱이 모르는 더 새 스키마**다(앱의 실제 V6 보다 새 버전을 흉내 낸다).
-/// 2026-09-17 수행 당시에는 이름이 V6 였다(테스트 계획 §5-1 MIG-F1). 앱이 V6 를 갖게 되면서 V7 로 옮겼다.
+/// 테스트 전용 V8 — 필사 행에 optional 필드 하나를 더한 **앱이 모르는 더 새 스키마**다(앱의 실제 V7 보다 새 버전을 흉내 낸다).
+/// 2026-09-17 수행 당시에는 이름이 V6 였다(테스트 계획 §5-1 MIG-F1). 앱이 V6 를 갖게 되면서 V7 로, 2026-10-15 앱이 V7(필사책)을 갖게 되면서 V8 로 옮겼다.
 /// 2.0.0 뒤의 빌드가 만든 저장소를 2.0.0 이 여는 경우(TestFlight 에서 예전 빌드를 다시 까는 경우)를 흉내 낸다.
-enum NewerStoreSchemaV7: VersionedSchema {
-    static let versionIdentifier = Schema.Version(7, 0, 0)
+enum NewerStoreSchemaV8: VersionedSchema {
+    static let versionIdentifier = Schema.Version(8, 0, 0)
 
     static var models: [any PersistentModel.Type] {
         [BibleDrawing.self, DrawingSchemaV4.BiblePageDrawing.self, DrawingSchemaV5.FavoriteVerse.self]
     }
 
-    /// V4 `BibleDrawing` 의 필드 그대로에 `addedInV7` 하나를 더했다.
+    /// V4 `BibleDrawing` 의 필드 그대로에 `addedInV8` 하나를 더했다.
     @Model
     final class BibleDrawing {
         var id: String!
@@ -43,7 +43,7 @@ enum NewerStoreSchemaV7: VersionedSchema {
         @Attribute(.externalStorage) var lineData: Data?
         @Attribute(.externalStorage) var layoutMetadataData: Data?
         var rowUUID: String?
-        var addedInV7: String?
+        var addedInV8: String?
 
         init() { }
     }
@@ -97,17 +97,17 @@ enum UnversionedShape: CaseIterable, Sendable, CustomTestStringConvertible {
 private enum StoreFixture {
     static let chapter = BibleChapter(title: .genesis, chapter: 1)
 
-    /// V7 저장소에서 읽은 필사 행. 컨테이너가 닫힌 뒤에도 비교할 수 있게 값으로 옮긴다.
-    struct V7Row: Equatable {
+    /// V8 저장소에서 읽은 필사 행. 컨테이너가 닫힌 뒤에도 비교할 수 있게 값으로 옮긴다.
+    struct V8Row: Equatable {
         let rowUUID: String?
         let lineData: Data?
-        let addedInV7: String?
+        let addedInV8: String?
     }
 
-    static func seedV7Store(at url: URL) throws {
-        let container = try ModelContainer(for: Schema(NewerStoreSchemaV7.models), configurations: ModelConfiguration(url: url))
+    static func seedV8Store(at url: URL) throws {
+        let container = try ModelContainer(for: Schema(NewerStoreSchemaV8.models), configurations: ModelConfiguration(url: url))
         let context = ModelContext(container)
-        let row = NewerStoreSchemaV7.BibleDrawing()
+        let row = NewerStoreSchemaV8.BibleDrawing()
         row.id = "\(chapter.title.rawValue).\(chapter.chapter).1.1750000000"
         row.titleName = chapter.title.rawValue
         row.titleChapter = chapter.chapter
@@ -115,19 +115,19 @@ private enum StoreFixture {
         row.isPresent = true
         row.drawingVersion = 3
         row.lineData = RealLegacyLineData.data
-        row.rowUUID = "row-v7"
-        row.addedInV7 = "v7"
+        row.rowUUID = "row-v8"
+        row.addedInV8 = "v8"
         context.insert(row)
         try context.save()
         try V4StoreHarness.settleWAL(at: url)
     }
 
-    /// V7 스키마로 다시 열어 필사 행을 읽는다.
-    static func v7Rows(at url: URL) throws -> [V7Row] {
-        let container = try ModelContainer(for: Schema(NewerStoreSchemaV7.models), configurations: ModelConfiguration(url: url))
+    /// V8 스키마로 다시 열어 필사 행을 읽는다.
+    static func v8Rows(at url: URL) throws -> [V8Row] {
+        let container = try ModelContainer(for: Schema(NewerStoreSchemaV8.models), configurations: ModelConfiguration(url: url))
         return try ModelContext(container)
-            .fetch(FetchDescriptor<NewerStoreSchemaV7.BibleDrawing>())
-            .map { V7Row(rowUUID: $0.rowUUID, lineData: $0.lineData, addedInV7: $0.addedInV7) }
+            .fetch(FetchDescriptor<NewerStoreSchemaV8.BibleDrawing>())
+            .map { V8Row(rowUUID: $0.rowUUID, lineData: $0.lineData, addedInV8: $0.addedInV8) }
     }
 
     /// 확인된 1.0.x 모양으로 저장소를 만들고 닫는다.
@@ -239,7 +239,7 @@ struct LocalStoreLoadFailureTesting {
     @Test("무조건 V1 폴백은 더 새 스키마 저장소에서도 성공해 필사를 지운다 — 이 파일이 막는 결함")
     func unconditionalV1FallbackWipesNewerStore() async throws {
         try await withStore { url in
-            try StoreFixture.seedV7Store(at: url)
+            try StoreFixture.seedV8Store(at: url)
 
             // 앱 스키마로는 열리지 않는다 — CoreData 134504는 OS에 따라 서로 다른 SwiftData 오류로 올라온다.
             do {
@@ -248,7 +248,7 @@ struct LocalStoreLoadFailureTesting {
                     migrationPlan: DrawingDataMigrationPlan.self,
                     configurations: ModelConfiguration(url: url)
                 )
-                Issue.record("앱 스키마가 더 새 V7 저장소를 열었다")
+                Issue.record("앱 스키마가 더 새 V8 저장소를 열었다")
             } catch let error as SwiftDataError {
                 let isUnknownDataStoreSchema: Bool
                 // `unknownDataStoreSchema` 는 iOS 27 부터 있다 — 제품 코드 `isLegacySchemaMismatch` 와 같은 조건.
@@ -266,7 +266,7 @@ struct LocalStoreLoadFailureTesting {
 
             // ★ 같은 파일이 V1 스키마로 바뀌었고 필사 행이 없다.
             #expect(LocalStoreLoader.storeKind(at: url) == .known(Schema.Version(1, 0, 0)))
-            #expect(try StoreFixture.v7Rows(at: url).isEmpty)
+            #expect(try StoreFixture.v8Rows(at: url).isEmpty)
         }
     }
 
@@ -286,15 +286,15 @@ struct LocalStoreLoadFailureTesting {
                 baseWritingWidth: 372, baseWritingHeight: 60, baseUnderlineAnchors: [0, 30], layoutSignature: "mig-f1"
             )
 
-            let generation = try await repository.load(chapter: chapter).generation
+            let generation = try await repository.load(chapter.inDefaultNotebook).generation
             await #expect(throws: Never.self) {
                 try await repository.apply(
                     [.create(verse: 1, rowID: .issue(), data: RealLegacyLineData.data, metadata: metadata)],
-                    chapter: chapter,
+                    page: chapter.inDefaultNotebook,
                     generation: generation
                 )
             }
-            #expect(try await repository.load(chapter: chapter).snapshots.isEmpty)
+            #expect(try await repository.load(chapter.inDefaultNotebook).snapshots.isEmpty)
         }
     }
 
@@ -303,7 +303,7 @@ struct LocalStoreLoadFailureTesting {
     @Test("더 새 스키마 저장소는 열지 않고 가려 막는다 — 파일 바이트와 필사가 그대로다")
     func newerStoreIsBlockedAndLeftUntouched() async throws {
         try await withStore { url in
-            try StoreFixture.seedV7Store(at: url)
+            try StoreFixture.seedV8Store(at: url)
             let before = try StoreFixture.storeBytes(at: url)
 
             let outcome = LocalStoreLoader.load(at: url, cloudKitDatabase: .none)
@@ -314,8 +314,8 @@ struct LocalStoreLoadFailureTesting {
             }
             #expect(failure == .unknownVersion)
             #expect(try StoreFixture.storeBytes(at: url) == before)
-            #expect(try StoreFixture.v7Rows(at: url) == [
-                StoreFixture.V7Row(rowUUID: "row-v7", lineData: RealLegacyLineData.data, addedInV7: "v7")
+            #expect(try StoreFixture.v8Rows(at: url) == [
+                StoreFixture.V8Row(rowUUID: "row-v8", lineData: RealLegacyLineData.data, addedInV8: "v8")
             ])
         }
     }
@@ -393,7 +393,7 @@ struct LocalStoreLoadFailureTesting {
                 migrationPlan: DrawingDataMigrationPlan.self,
                 configurations: ModelConfiguration(url: url)
             )
-            #expect(LocalStoreLoader.storeKind(at: url) == .known(Schema.Version(6, 0, 0)))
+            #expect(LocalStoreLoader.storeKind(at: url) == .known(Schema.Version(7, 0, 0)))
         }
         try await withStore { url in
             try StoreFixture.seedV1Store(at: url)
@@ -406,7 +406,7 @@ struct LocalStoreLoadFailureTesting {
             }
         }
         try await withStore { url in
-            try StoreFixture.seedV7Store(at: url)
+            try StoreFixture.seedV8Store(at: url)
             #expect(LocalStoreLoader.storeKind(at: url) == .unknown)
         }
         try await withStore { url in

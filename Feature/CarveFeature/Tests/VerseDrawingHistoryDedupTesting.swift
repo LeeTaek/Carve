@@ -76,7 +76,7 @@ struct VerseDrawingHistoryDedupTesting {
 
     /// 목록 상태에 들어오는 길목(`setDrawings`)으로 넣고, 목록에 보이는 행의 키를 순서대로 돌려준다.
     private static func listed(_ rows: [VerseDrawingSnapshot]) -> [String] {
-        let store = Store(initialState: VerseDrawingHistoryFeature.State(title: chapter, verse: verse)) {
+        let store = Store(initialState: VerseDrawingHistoryFeature.State(page: chapter.inDefaultNotebook, verse: verse)) {
             VerseDrawingHistoryFeature()
         }
         store.send(.setDrawings(rows))
@@ -91,7 +91,7 @@ struct VerseDrawingHistoryDedupTesting {
         let metadataBlob = try dedupMetadata.encodedBlob()
         for seed in rows {
             let row = BibleDrawing(
-                bibleTitle: chapter, verse: verse, lineData: seed.ink,
+                page: chapter.inDefaultNotebook, verse: verse, lineData: seed.ink,
                 updateDate: Date(timeIntervalSince1970: seed.updatedAt),
                 layoutMetadataData: metadataBlob, rowUUID: seed.key
             )
@@ -106,7 +106,7 @@ struct VerseDrawingHistoryDedupTesting {
     /// 그 저장소를 보는 이전 필사 기록 스토어. 쓰기 게이트는 소유가 확인된 환경이다.
     private static func makeHistoryStore(storeActor: SwiftDatabaseActor) -> StoreOf<VerseDrawingHistoryFeature> {
         let database = withDependencies { $0.createSwiftDataActor = storeActor } operation: { DrawingDatabase() }
-        return Store(initialState: VerseDrawingHistoryFeature.State(title: chapter, verse: verse)) {
+        return Store(initialState: VerseDrawingHistoryFeature.State(page: chapter.inDefaultNotebook, verse: verse)) {
             VerseDrawingHistoryFeature()
         } withDependencies: {
             $0.drawingData = database
@@ -116,7 +116,7 @@ struct VerseDrawingHistoryDedupTesting {
 
     /// 저장소에서 `isPresent` 인 행의 키.
     private static func presentKeys(in storeActor: SwiftDatabaseActor) async throws -> [String] {
-        try await storeActor.verseDrawingSnapshots(chapter: chapter, verse: verse).filter(\.isPresent).map(\.rowID.raw)
+        try await storeActor.verseDrawingSnapshots(page: chapter.inDefaultNotebook, verse: verse).filter(\.isPresent).map(\.rowID.raw)
     }
 
     /// 조건이 참이 될 때까지 기다린다 — 조회 · 저장 효과는 스토어 밖에서 돈다.
@@ -257,7 +257,7 @@ struct VerseDrawingHistoryDedupTesting {
         try await waitUntil { try await Self.presentKeys(in: storeActor) == ["row-copy-later"] }
 
         // then: 저장소의 대표가 남긴 행이다. 세 행은 그대로 있다 — 숨긴 행도 지우지 않았다.
-        let stored = try await storeActor.verseDrawingSnapshots(chapter: Self.chapter, verse: Self.verse)
+        let stored = try await storeActor.verseDrawingSnapshots(page: Self.chapter.inDefaultNotebook, verse: Self.verse)
         #expect(stored.representative()?.rowID.raw == "row-copy-later")
         #expect(Set(stored.map(\.rowID.raw)) == ["row-current", "row-copy-later", "row-copy-earlier"])
         #expect(history.drawings.filter(\.isPresent).map(\.rowID.raw) == ["row-copy-later"])

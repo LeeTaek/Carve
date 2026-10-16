@@ -121,15 +121,17 @@ final class RecordingDraftStore: VerseDraftStore, @unchecked Sendable {
         return .written
     }
 
-    func drafts(in scope: AccountScope, chapter: BibleChapter, translation: Translation) async throws -> [VerseDraft] {
+    func drafts(in scope: AccountScope, page: NotebookChapter) async throws -> [VerseDraft] {
         let shouldFail = readFailures.withValue { remaining -> Bool in
             guard remaining > 0 else { return false }
             remaining -= 1
             return true
         }
         if shouldFail { throw Unreadable() }
+        let chapter = page.chapter
         return stored(in: scope).filter {
-            $0.key.title == chapter.title.rawValue && $0.key.chapter == chapter.chapter && $0.key.translation == translation.rawValue
+            $0.key.notebook == page.notebook && $0.key.title == chapter.title.rawValue && $0.key.chapter == chapter.chapter
+                && $0.key.translation == chapter.translation.rawValue
         }
     }
 
@@ -212,7 +214,7 @@ extension EditSessionTestHelpers {
         clock: any Clock<Duration> = ImmediateClock(),
         composeInputs: LockIsolated<[[VerseDrawingSnapshot]]>? = nil
     ) -> TestStoreOf<ChapterCanvasFeature> {
-        let store = TestStore(initialState: ChapterCanvasFeature.State(chapter: CanvasTestSupport.chapter)) {
+        let store = TestStore(initialState: ChapterCanvasFeature.State(page: CanvasTestSupport.page)) {
             ChapterCanvasFeature()
         } withDependencies: {
             $0.drawingCodec = CanvasTestSupport.codec(results: LockIsolated(results), composeInputs: composeInputs)

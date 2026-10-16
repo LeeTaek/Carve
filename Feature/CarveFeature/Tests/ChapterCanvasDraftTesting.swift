@@ -43,7 +43,7 @@ extension DraftTestSamples {
         let base = verse == 1 ? (baseFingerprint ?? storedVerseOneFingerprint) : baseFingerprint
         let metadata = withMetadata ? try? CanvasTestSupport.metadata().encodedBlob() : nil
         return VerseDraft(
-            key: VerseDraftKey(sessionID: session, chapter: CanvasTestSupport.chapter, verse: verse),
+            key: VerseDraftKey(sessionID: session, page: CanvasTestSupport.chapter.inDefaultNotebook, verse: verse),
             revision: 3,
             rowID: rowID,
             lineData: lineData ?? Data(ink.utf8),
@@ -155,7 +155,7 @@ struct ChapterCanvasDraftTesting: DraftTestSamples {
         await composeAndSubscribe(store, environment)
 
         #expect(store.state.loadedDrawings?.first { $0.verse == 1 }?.lineData == Data("earlier".utf8))
-        #expect(store.state.drafts.adopted[DraftVerse(chapter: CanvasTestSupport.chapter, verse: 1)] == earlier.ref)
+        #expect(store.state.drafts.adopted[DraftVerse(page: CanvasTestSupport.page, verse: 1)] == earlier.ref)
 
         await draw(store)
         await store.receive(\.draftsSaved)

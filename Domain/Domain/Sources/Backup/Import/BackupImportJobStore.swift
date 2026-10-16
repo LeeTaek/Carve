@@ -25,16 +25,19 @@ struct BackupImportJobRecord: Codable, Equatable, Sendable {
         case stopped
     }
 
-    /// 기록 형식 버전 — 바꾸면 올린다.
-    var recordVersion = 1
+    /// 지금 쓰는 기록 형식 버전 — 2 는 끝난 장이 필사책 안의 장(`NotebookChapter`)이다(2.2).
+    static let currentRecordVersion = 2
+
+    /// 기록 형식 버전 — 바꾸면 올린다. 1(2.1)은 끝난 장이 `BibleChapter` 다.
+    var recordVersion = BackupImportJobRecord.currentRecordVersion
     /// 작업 id(UUID 문자열) — 폴더 이름이다.
     let jobID: String
     /// 대상 계정 범위. nil 이면 미리보기만 할 수 있던 작업이다.
     var targetScope: AccountScope?
     /// 상태.
     var status: Status
-    /// 끝난 장(쓴 순서).
-    var doneChapters: [BibleChapter]
+    /// 끝난 장(쓴 순서, 필사책 · 번역본 포함).
+    var doneChapters: [NotebookChapter]
     /// 끝난 장들의 실제 결정 수.
     var tally: BackupImportTally
     /// 적용할 장 수(지원 항목이 있는 장).
@@ -46,6 +49,64 @@ struct BackupImportJobRecord: Codable, Equatable, Sendable {
 
     /// 적용을 시작한 끝나지 않은 작업인가 — 이어 하기 대상.
     var isPending: Bool { status != .inspected }
+
+    init(
+        jobID: String,
+        targetScope: AccountScope?,
+        status: Status,
+        doneChapters: [NotebookChapter],
+        tally: BackupImportTally,
+        totalChapters: Int,
+        createdAt: Date,
+        updatedAt: Date
+    ) {
+        self.jobID = jobID
+        self.targetScope = targetScope
+        self.status = status
+        self.doneChapters = doneChapters
+        self.tally = tally
+        self.totalChapters = totalChapters
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case recordVersion, jobID, targetScope, status, doneChapters, tally, totalChapters, createdAt, updatedAt
+    }
+
+    /// 2.1 이 남긴 기록(끝난 장이 `BibleChapter`)도 읽는다 — 그 작업은 형식 1 파일이라 전부 기본 필사책이므로 기본 필사책의 장으로 읽는다.
+    /// 업데이트 뒤에도 멈춘 불러오기를 이어 할 수 있다. 읽은 기록은 지금 모양으로 들므로 `recordVersion` 은 지금 판이다(다시 쓰면 지금 모양이다).
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.recordVersion = Self.currentRecordVersion
+        self.jobID = try container.decode(String.self, forKey: .jobID)
+        self.targetScope = try container.decodeIfPresent(AccountScope.self, forKey: .targetScope)
+        self.status = try container.decode(Status.self, forKey: .status)
+        if let pages = try? container.decode([NotebookChapter].self, forKey: .doneChapters) {
+            self.doneChapters = pages
+        } else {
+            let chapters = try container.decode([BibleChapter].self, forKey: .doneChapters)
+            self.doneChapters = chapters.map { NotebookChapter(notebook: .default, chapter: $0) }
+        }
+        self.tally = try container.decode(BackupImportTally.self, forKey: .tally)
+        self.totalChapters = try container.decode(Int.self, forKey: .totalChapters)
+        self.createdAt = try container.decode(Date.self, forKey: .createdAt)
+        self.updatedAt = try container.decode(Date.self, forKey: .updatedAt)
+    }
+
+    /// 지금 형식(끝난 장은 `NotebookChapter`)으로 쓴다.
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(recordVersion, forKey: .recordVersion)
+        try container.encode(jobID, forKey: .jobID)
+        try container.encodeIfPresent(targetScope, forKey: .targetScope)
+        try container.encode(status, forKey: .status)
+        try container.encode(doneChapters, forKey: .doneChapters)
+        try container.encode(tally, forKey: .tally)
+        try container.encode(totalChapters, forKey: .totalChapters)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encode(updatedAt, forKey: .updatedAt)
+    }
 }
 
 /// 불러오기 작업 기록 저장소 — `Application Support/BackupImport/<jobID>/` 아래 `job.json` 과 고른 파일의 **암호화 사본**(`backup.carvebackup`).

@@ -107,7 +107,7 @@ struct ChapterCanvasVerseImageMenuTesting {
         let pending = Self.inkData(x: 40)
         initialState.pendingMutations[CanvasTestSupport.rowA] = PendingDrawingMutation(
             revision: 1,
-            chapter: CanvasTestSupport.chapter,
+            page: CanvasTestSupport.page,
             mutation: .replace(verse: 1, rowID: CanvasTestSupport.rowA, data: pending, metadata: CanvasTestSupport.metadata())
         )
         let inkInputs = LockIsolated<[VerseDrawingSnapshot]>([])

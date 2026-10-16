@@ -116,7 +116,7 @@ struct CanvasLightAppearanceTesting {
     /// 그려졌다(2026-09-15). SwiftUI 에 담긴 컨트롤러의 외관 고정은 환경에 덮이므로 캔버스 뷰에 직접 건다.
     @Test("다크 화면에서도 단일 캔버스는 라이트이고 검정 잉크를 검정으로 그린다", arguments: DarkSource.allCases)
     func singleCanvasDrawsStoredInkColorInDark(source: DarkSource) async throws {
-        var state = ChapterCanvasFeature.State(chapter: BibleChapter(title: .genesis, chapter: 1))
+        var state = ChapterCanvasFeature.State(page: BibleChapter(title: .genesis, chapter: 1).inDefaultNotebook)
         state.renderedData = Self.blackInkData()
         state.renderedRevision = 1
         let store = Store(initialState: state) { ChapterCanvasFeature() }

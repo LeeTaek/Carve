@@ -60,6 +60,8 @@ public struct AppCoordinatorFeature: Sendable {
                     return "Chart"
                 case .favorites:
                     return "Favorites"
+                case .notebooks:
+                    return "Notebooks"
                 }
             }
 
@@ -126,6 +128,8 @@ public struct AppCoordinatorFeature: Sendable {
         case chart(DrawingChartFeature)
         /// 즐겨찾기 목록 화면 흐름(시안 N4 · N5).
         case favorites(FavoriteListFeature)
+        /// 책장 — 필사책 고르기 · 관리(2.2 회차별 필사책).
+        case notebooks(NotebookShelfFeature)
     }
     
     /// 위젯이 넘긴 URL 의 절 — 링크의 번역본 장으로 연다(영어 현지화 설계 §7).
@@ -286,6 +290,9 @@ public struct AppCoordinatorFeature: Sendable {
             case .root(.presented(.carve(.view(.moveToFavorites)))):
                 state.path.append(.favorites(.initialState))
 
+            case .root(.presented(.carve(.view(.moveToNotebooks)))):
+                state.path.append(.notebooks(.initialState))
+
             case .settings(.presented(.view(.backToCarve))):
                 state.settings = nil
 
@@ -304,6 +311,18 @@ public struct AppCoordinatorFeature: Sendable {
                 // 목록이 떠 있는 동안 뒤의 필사 화면 표시를 맞춰 둔다 — 시스템 뒤로 가기로 닫혀도 따로 알릴 필요가 없다.
                 return .send(.root(.presented(.carve(.refreshFavorites))))
 
+            case let .path(.element(id: _, action: .notebooks(.delegate(.notebookChosen(notebook))))):
+                // 책장에서 필사책을 골랐다 — 책장을 닫고 필사 화면을 그 필사책으로 바꾼다.
+                state.path.removeAll()
+                return .send(.root(.presented(.carve(.switchNotebook(notebook)))))
+
+            case let .path(.element(id: _, action: .notebooks(.delegate(.currentNotebookChanged(notebook))))):
+                // 책장에 머문 채 지금 필사책이 바뀌었다(지금 필사책을 지움) — 책장은 둔 채 뒤의 필사 화면만 바꾼다.
+                return .send(.root(.presented(.carve(.switchNotebook(notebook)))))
+
+            case .path(.element(id: _, action: .notebooks(.delegate(.backToWriting)))):
+                state.path.removeLast()
+
             case .patchnote(.presented(.delegate(.close))):
                 state.patchnote = nil
 
@@ -315,13 +334,14 @@ public struct AppCoordinatorFeature: Sendable {
                 state.settings = nil
                 return .send(.root(.presented(.carve(.view(.restartFirstRunGuide)))))
                 
-            case let .path(.element(id: _, action: .chart(.drawingWeeklySummary(.openChapter(chapter))))):
+            case let .path(.element(id: _, action: .chart(.drawingWeeklySummary(.openChapter(page))))):
+                // 차트의 최근 장 · 절은 그 필사책으로 연다(2.2 결정 10) — 지금 필사책으로 여는 `moveToChapter` 가 아니다.
                 state.path.removeLast()
-                return .send(.root(.presented(.carve(.moveToChapter(chapter)))))
+                return .send(.root(.presented(.carve(.openPage(page, verse: nil)))))
                 
-            case let .path(.element(id: _, action: .chart(.drawingWeeklySummary(.openVerse(verse))))):
+            case let .path(.element(id: _, action: .chart(.drawingWeeklySummary(.openVerse(page, verse))))):
                 state.path.removeLast()
-                return .send(.root(.presented(.carve(.moveToVerse(verse)))))
+                return .send(.root(.presented(.carve(.openPage(page, verse: verse)))))
 
             default:
                 break
@@ -418,6 +438,7 @@ extension AppCoordinatorFeature {
     /// |---|---|
     /// | `navigation` | 성경 탐색 — 탐색 열을 모두 열고 지금 장을 고른 목록으로 시작한다(`CarveNavigationFeature.openNavigation`) |
     /// | `chart` · `favorites` | 기록 차트 · 즐겨찾기 목록을 필사 화면 위에 쌓는다 |
+    /// | `notebooks` | 책장(필사책 고르기 · 관리)을 필사 화면 위에 쌓는다 |
     /// | `settings` | 설정의 첫 화면(iCloud) |
     /// | `settings/<하위>` | 설정의 그 화면 — 하위 이름은 사이드바 행마다 하나(`routeName`): `icloud` · `backup` · `appearance` · `language` · `removeAds` 등 |
     /// | `verse/<절 번호>` | 시작 장(`-UITestChapter` 또는 마지막으로 연 장)의 그 절 |
@@ -427,6 +448,8 @@ extension AppCoordinatorFeature {
         case navigation
         case chart
         case favorites
+        /// 책장(2.2 회차별 필사책).
+        case notebooks
         /// 설정. nil 이면 설정의 첫 화면이다.
         case settings(SettingsFeature.SidebarItem?)
         /// 시작 장의 절 번호(1 이상).
@@ -439,6 +462,7 @@ extension AppCoordinatorFeature {
             case ["navigation"]: self = .navigation
             case ["chart"]: self = .chart
             case ["favorites"]: self = .favorites
+            case ["notebooks"]: self = .notebooks
             case ["settings"]: self = .settings(nil)
             default:
                 guard parts.count == 2 else { return nil }
@@ -466,6 +490,8 @@ extension AppCoordinatorFeature {
             state.path.append(.chart(.initialState))
         case .favorites:
             state.path.append(.favorites(.initialState))
+        case .notebooks:
+            state.path.append(.notebooks(.initialState))
         case .settings(let item):
             state.settings = item.map { SettingsFeature.State.initialState(path: $0.routePath) } ?? .initialState
         case .verse(let verse):

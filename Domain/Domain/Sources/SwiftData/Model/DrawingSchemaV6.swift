@@ -60,6 +60,7 @@ public enum DrawingSchemaV6: VersionedSchema {
 
         /// 새 즐겨찾기 행. 권 이름과 `translation` 열은 `StoredBookKey` 로 짓는다(영어 현지화 결정 1) —
         /// 개역개정은 지금처럼 `rawValue` · `.NKRV`, KJV · BSB 는 `"<번역본>-<rawValue>"` · nil 이다(열에는 영어 값을 쓰지 않는다).
+        /// 즐겨찾기는 필사책 공통이라 권 이름에 필사책 접두를 쓰지 않는다 — 기본 필사책 형식이다(2.2 결정 11 · 혼재 버전 규칙 ③).
         /// - Parameters:
         ///   - chapter: 권 · 장. 번역본은 `translation` 인자를 따른다.
         ///   - translation: 이 즐겨찾기의 번역본.
@@ -74,7 +75,7 @@ public enum DrawingSchemaV6: VersionedSchema {
             knownEraseEpochs: Set<String> = []
         ) {
             self.favoriteID = favoriteID
-            self.titleName = StoredBookKey.titleName(title: chapter.title, translation: translation)
+            self.titleName = StoredBookKey.titleName(title: chapter.title, translation: translation, notebook: .default)
             self.titleChapter = chapter.chapter
             self.verse = verse
             self.translation = StoredBookKey.translationColumn(for: translation)
@@ -189,11 +190,4 @@ public typealias VerseDrawingVersion = DrawingSchemaV6.VerseDrawingVersion
 /// 앱 코드가 쓰는 **현재 스키마**의 전체 삭제 기준점 모델.
 public typealias DrawingEraseEpoch = DrawingSchemaV6.DrawingEraseEpoch
 
-/// 앱이 저장소를 여는 스키마 — **현재 스키마 버전의 모델 전체**다.
-///
-/// 저장소를 여는 곳은 모두 이것을 쓴다. 모델 일부만 주면 마이그레이션 플랜의 마지막 버전과 맞지 않아 열리지 않거나,
-/// 시험이 앱과 다른 스키마를 검증하게 된다.
-public enum AppStoreSchema {
-    public static var models: [any PersistentModel.Type] { DrawingSchemaV6.models }
-    public static var schema: Schema { Schema(models) }
-}
+// 앱이 저장소를 여는 스키마(`AppStoreSchema`)는 V7 로 옮겼다 — `DrawingSchemaV7.swift`. V7 은 위 세 모델 클래스를 그대로 싣는다.

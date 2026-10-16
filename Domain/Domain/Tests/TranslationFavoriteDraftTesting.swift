@@ -153,7 +153,7 @@ struct TranslationFavoriteDraftTesting {
         chapter: BibleChapter, verse: Int, session: String = "s1", ink: Data, account: VerseEditAccountBasis = .localOnly
     ) -> VerseDraft {
         VerseDraft(
-            key: VerseDraftKey(sessionID: session, chapter: chapter, verse: verse),
+            key: VerseDraftKey(sessionID: session, page: chapter.inDefaultNotebook, verse: verse),
             revision: 1,
             rowID: BibleDrawingRowID(raw: "draft-row-\(chapter.translation.rawValue)-\(verse)"),
             lineData: ink,
@@ -184,26 +184,26 @@ struct TranslationFavoriteDraftTesting {
         )
     }
 
-    /// 장 조회만 답하는 빈 저장소 — 어느 장을 읽었는지 남긴다. 쓰기가 오면 시험이 깨진다.
+    /// 장 조회만 답하는 빈 저장소 — 어느 장(번역본 포함 — 읽은 page 의 장)을 읽었는지 남긴다. 쓰기가 오면 시험이 깨진다.
     private actor EmptyChapterRepository: DrawingRepository {
         private(set) var loadedChapters: [BibleChapter] = []
 
-        func load(chapter: BibleChapter) async throws -> DrawingChapterLoad {
-            loadedChapters.append(chapter)
+        func load(_ page: NotebookChapter) async throws -> DrawingChapterLoad {
+            loadedChapters.append(page.chapter)
             return DrawingChapterLoad(snapshots: [], generation: DrawingStoreGeneration(raw: 0))
         }
 
-        func apply(_ mutations: [VerseDrawingMutation], chapter: BibleChapter, generation: DrawingStoreGeneration) async throws {
+        func apply(_ mutations: [VerseDrawingMutation], page: NotebookChapter, generation: DrawingStoreGeneration) async throws {
             Issue.record("목록 · 가져오기 판정이 편집 저장 경로로 썼다")
         }
 
-        func archiveAndReset(_ command: VerseDrawingArchiveCommand, chapter: BibleChapter) async throws -> VerseDrawingArchiveOutcome {
+        func archiveAndReset(_ command: VerseDrawingArchiveCommand, page: NotebookChapter) async throws -> VerseDrawingArchiveOutcome {
             Issue.record("목록 · 가져오기 판정이 편집 저장 경로로 썼다")
             return .alreadyEmpty
         }
     }
 
-    /// 가져오기의 저장소 쓰기 한 번 — 받은 명령과 장.
+    /// 가져오기의 저장소 쓰기 한 번 — 받은 명령과 그 장(명령의 page 의 장).
     private struct ImportCall: Sendable {
         let command: VerseDrawingImportCommand
         let chapter: BibleChapter
@@ -213,10 +213,8 @@ struct TranslationFavoriteDraftTesting {
     private actor ImportSpy: DrawingVerseImporting {
         private(set) var calls: [ImportCall] = []
 
-        func importVerse(
-            _ command: VerseDrawingImportCommand, chapter: BibleChapter, generation: DrawingStoreGeneration
-        ) async throws -> VerseDrawingImportOutcome {
-            calls.append(ImportCall(command: command, chapter: chapter))
+        func importVerse(_ command: VerseDrawingImportCommand, generation: DrawingStoreGeneration) async throws -> VerseDrawingImportOutcome {
+            calls.append(ImportCall(command: command, chapter: command.page.chapter))
             return .imported(previousKept: false)
         }
     }
@@ -249,15 +247,15 @@ struct TranslationFavoriteDraftTesting {
             _ = try await writer.saveDraft(Self.unknownTranslationDraft(verse: 3, ink: importInk(4)))
             let scope = AccountScope.localOnly
 
-            #expect(try await writer.drafts(in: scope, chapter: Self.genesis1, translation: .NKRV).map(\.lineData) == [importInk(1)])
-            #expect(try await writer.drafts(in: scope, chapter: Self.genesis1KJV, translation: .KJV).map(\.key.verse) == [1, 2])
-            #expect(try await writer.drafts(in: scope, chapter: Self.genesis1KJV, translation: .BSB).isEmpty)
+            #expect(try await writer.drafts(in: scope, page: Self.genesis1.inDefaultNotebook).map(\.lineData) == [importInk(1)])
+            #expect(try await writer.drafts(in: scope, page: Self.genesis1KJV.inDefaultNotebook).map(\.key.verse) == [1, 2])
+            #expect(try await writer.drafts(in: scope, page: BibleChapter(title: .genesis, chapter: 1, translation: .BSB).inDefaultNotebook).isEmpty)
 
             let summary = try await writer.draftSummary(in: scope)
             // 모르는 번역본의 초안도 파일로는 센다 — 자리를 차지한다. 그 장은 어느 번역본에도 붙이지 않는다.
             #expect(summary.draftCount == 4)
             #expect(summary.draftCountByTranslation == [.NKRV: 1, .KJV: 2])
-            #expect(summary.chapters == [Self.genesis1, Self.genesis1KJV])
+            #expect(summary.pages == [Self.genesis1.inDefaultNotebook, Self.genesis1KJV.inDefaultNotebook])
         }
     }
 
@@ -273,7 +271,7 @@ struct TranslationFavoriteDraftTesting {
 
             let all = try await query.inventoryAcrossTranslations(in: .localOnly, environment: Self.owned)
             #expect(all.comparedWithStore)
-            #expect(all.unreadChapters.isEmpty)
+            #expect(all.unreadPages.isEmpty)
             #expect(Set(all.entries.map { "\($0.draft.key.translation)~\($0.draft.key.verse)" }) == ["NKRV~1", "KJV~1", "KJV~2"])
             #expect(all.entries.allSatisfy { $0.reason == .beforeConnection })
             // 영어 장은 영어 장으로 저장소와 견준다.
@@ -307,7 +305,7 @@ struct TranslationFavoriteDraftTesting {
             #expect(try await importer.importDraft(request, environment: Self.owned) == .imported(previousKept: false, recorded: true))
             let calls = await spy.calls
             #expect(calls.map(\.chapter) == [Self.genesis1KJV])
-            #expect(calls.first?.command.translation == .KJV)
+            #expect(calls.first?.command.page == NotebookChapter(notebook: .default, chapter: Self.genesis1KJV))
 
             let skipped = VerseDraftImportRequest(key: unknown.key, scope: .localOnly, revision: 1, expectedCurrentFingerprint: nil)
             #expect(skipped.chapter == nil)
@@ -324,15 +322,17 @@ struct TranslationFavoriteDraftTesting {
         let actor = SwiftDatabaseActor(modelContainer: container)
         let repository = SwiftDataDrawingRepository(actor: actor)
         let koreanRow = BibleDrawingRowID.issue()
-        let koreanGeneration = try await repository.load(chapter: Self.genesis1).generation
+        let koreanPage = Self.genesis1.inDefaultNotebook
+        let koreanGeneration = try await repository.load(koreanPage).generation
         try await repository.apply(
-            [.create(verse: 1, rowID: koreanRow, data: importInk(1), metadata: Self.metadata)], chapter: Self.genesis1, generation: koreanGeneration
+            [.create(verse: 1, rowID: koreanRow, data: importInk(1), metadata: Self.metadata)], page: koreanPage, generation: koreanGeneration
         )
         let command = VerseDrawingImportCommand(
-            verse: 1, rowID: .issue(), lineData: importInk(2), metadata: Self.metadata, expectedCurrentFingerprint: nil, translation: .KJV
+            verse: 1, rowID: .issue(), lineData: importInk(2), metadata: Self.metadata, expectedCurrentFingerprint: nil,
+            page: NotebookChapter(notebook: .default, chapter: Self.genesis1KJV)
         )
 
-        let outcome = try await repository.importVerse(command, chapter: Self.genesis1KJV, generation: koreanGeneration)
+        let outcome = try await repository.importVerse(command, generation: koreanGeneration)
 
         // 개역개정 행은 KJV 절의 지금 필기가 아니다 — 견줄 것이 없어 이전 기록으로 남길 것도 없다.
         #expect(outcome == .imported(previousKept: false))

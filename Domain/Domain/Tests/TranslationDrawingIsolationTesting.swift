@@ -42,7 +42,7 @@ struct TranslationDrawingIsolationTesting {
         }
         // 행이 없는 절의 clear 도 새 행을 만든다 — 그 경로도 같은 규칙이다.
         let clearedRowID = BibleDrawingRowID.issue()
-        try await harness.apply([.clear(verse: 9, rowID: clearedRowID)], chapter: Self.kjv)
+        try await harness.apply([.clear(verse: 9, rowID: clearedRowID)], page: Self.kjv.inDefaultNotebook)
 
         let rows = try harness.storedRows()
         #expect(rows.count == 4)
@@ -76,14 +76,14 @@ struct TranslationDrawingIsolationTesting {
         let harness = try TranslationIsolationHarness()
         let context = ModelContext(harness.actor.modelContainer)
 
-        let legacyCall = BibleDrawing(bibleTitle: BibleChapter(title: Self.title, chapter: 1), verse: 1)
-        let english = BibleDrawing(bibleTitle: BibleChapter(title: Self.title, chapter: 1, translation: .BSB), verse: 1)
+        let legacyCall = BibleDrawing(page: BibleChapter(title: Self.title, chapter: 1).inDefaultNotebook, verse: 1)
+        let english = BibleDrawing(page: BibleChapter(title: Self.title, chapter: 1, translation: .BSB).inDefaultNotebook, verse: 1)
         context.insert(legacyCall)
         context.insert(english)
 
         #expect(legacyCall.titleName == Self.title.rawValue)
         #expect(legacyCall.translation == .NKRV)
-        #expect(english.titleName == StoredBookKey.titleName(title: Self.title, translation: .BSB))
+        #expect(english.titleName == StoredBookKey.titleName(title: Self.title, translation: .BSB, notebook: .default))
         #expect(english.translation == nil)
     }
 
@@ -98,11 +98,11 @@ struct TranslationDrawingIsolationTesting {
         }
 
         for chapter in Self.allChapters {
-            let loaded = try await harness.repository.load(chapter: chapter).snapshots
+            let loaded = try await harness.repository.load(chapter.inDefaultNotebook).snapshots
             #expect(loaded.map(\.rowID) == [created[chapter.translation]].compactMap { $0 })
             #expect(loaded.allSatisfy { $0.translation == chapter.translation })
 
-            let listed = try await harness.database.fetchVerseSnapshots(chapter: chapter, verse: Self.verse)
+            let listed = try await harness.database.fetchVerseSnapshots(page: chapter.inDefaultNotebook, verse: Self.verse)
             #expect(listed.map(\.rowID) == [created[chapter.translation]].compactMap { $0 })
             #expect(listed.allSatisfy { $0.translation == chapter.translation })
         }
@@ -114,21 +114,21 @@ struct TranslationDrawingIsolationTesting {
         let columnNil = try harness.seed(Self.nkrv, rowUUID: nil, lineData: Self.inkData, at: Self.base, column: .some(nil))
         let columnNKRV = try harness.seed(Self.nkrv, lineData: Self.inkData, at: Self.base + 10, column: .some(.NKRV))
 
-        let nkrvLoad = try await harness.repository.load(chapter: Self.nkrv).snapshots
+        let nkrvLoad = try await harness.repository.load(Self.nkrv.inDefaultNotebook).snapshots
         #expect(Set(nkrvLoad.map(\.rowID.raw)) == [columnNil, columnNKRV])
         #expect(nkrvLoad.allSatisfy { $0.translation == .NKRV })
 
-        let nkrvListed = try await harness.database.fetchVerseSnapshots(chapter: Self.nkrv, verse: Self.verse)
+        let nkrvListed = try await harness.database.fetchVerseSnapshots(page: Self.nkrv.inDefaultNotebook, verse: Self.verse)
         #expect(nkrvListed.map(\.rowID.raw) == [columnNKRV, columnNil])   // updateDate 최신순
         #expect(nkrvListed.allSatisfy { $0.translation == .NKRV })
 
         for english in [Self.kjv, Self.bsb] {
-            #expect(try await harness.repository.load(chapter: english).snapshots.isEmpty)
-            #expect(try await harness.database.fetchVerseSnapshots(chapter: english, verse: Self.verse).isEmpty)
-            #expect(try await harness.database.fetchDrawingRecord(title: Self.title, translation: english.translation)
+            #expect(try await harness.repository.load(english.inDefaultNotebook).snapshots.isEmpty)
+            #expect(try await harness.database.fetchVerseSnapshots(page: english.inDefaultNotebook, verse: Self.verse).isEmpty)
+            #expect(try await harness.database.fetchDrawingRecord(notebook: .default, title: Self.title, translation: english.translation)
                     == BibleTitleDrawingRecord())
         }
-        #expect(try await harness.database.fetchDrawingRecord(title: Self.title)
+        #expect(try await harness.database.fetchDrawingRecord(notebook: .default, title: Self.title, translation: .NKRV)
                 == BibleTitleDrawingRecord(drawnChapters: [Self.chapterNumber], latestChapter: Self.chapterNumber))
 
         let activities = try await harness.activityRepository.activities(in: Self.window)
@@ -144,7 +144,7 @@ struct TranslationDrawingIsolationTesting {
         await #expect(throws: DrawingRepositoryError.rowNotFound(nkrvRowID)) {
             try await harness.apply(
                 [.replace(verse: Self.verse, rowID: nkrvRowID, data: Data([7]), metadata: TranslationIsolationHarness.metadata(verse: Self.verse))],
-                chapter: Self.kjv
+                page: Self.kjv.inDefaultNotebook
             )
         }
 
@@ -167,7 +167,7 @@ struct TranslationDrawingIsolationTesting {
         }
         let kjvOlder = try #require(older[.KJV])
 
-        await harness.database.updatePresentDrawing(chapter: Self.kjv, verse: Self.verse, presentRowID: BibleDrawingRowID(raw: kjvOlder))
+        await harness.database.updatePresentDrawing(page: Self.kjv.inDefaultNotebook, verse: Self.verse, presentRowID: BibleDrawingRowID(raw: kjvOlder))
 
         let presence = Dictionary(uniqueKeysWithValues: try harness.storedRows().map { ($0.rowKey, $0.isPresent ?? false) })
         #expect(presence[kjvOlder] == true)
@@ -177,9 +177,9 @@ struct TranslationDrawingIsolationTesting {
             #expect(presence[newer[translation] ?? ""] == true)
         }
 
-        let kjvListed = try await harness.database.fetchVerseSnapshots(chapter: Self.kjv, verse: Self.verse)
+        let kjvListed = try await harness.database.fetchVerseSnapshots(page: Self.kjv.inDefaultNotebook, verse: Self.verse)
         #expect(kjvListed.representative()?.rowID.raw == kjvOlder)
-        let nkrvListed = try await harness.database.fetchVerseSnapshots(chapter: Self.nkrv, verse: Self.verse)
+        let nkrvListed = try await harness.database.fetchVerseSnapshots(page: Self.nkrv.inDefaultNotebook, verse: Self.verse)
         #expect(nkrvListed.representative()?.rowID.raw == newer[.NKRV])
     }
 
@@ -195,13 +195,13 @@ struct TranslationDrawingIsolationTesting {
         try harness.seed(BibleChapter(title: Self.title, chapter: 2, translation: .BSB), lineData: nil, at: Self.base + 500)
 
         let database = harness.database
-        #expect(try await database.fetchDrawingRecord(title: Self.title)
+        #expect(try await database.fetchDrawingRecord(notebook: .default, title: Self.title, translation: .NKRV)
                 == BibleTitleDrawingRecord(drawnChapters: [2], latestChapter: 2))
-        #expect(try await database.fetchDrawingRecord(title: Self.title, translation: .NKRV)
+        #expect(try await database.fetchDrawingRecord(notebook: .default, title: Self.title, translation: .NKRV)
                 == BibleTitleDrawingRecord(drawnChapters: [2], latestChapter: 2))
-        #expect(try await database.fetchDrawingRecord(title: Self.title, translation: .KJV)
+        #expect(try await database.fetchDrawingRecord(notebook: .default, title: Self.title, translation: .KJV)
                 == BibleTitleDrawingRecord(drawnChapters: [1, 3], latestChapter: 3))
-        #expect(try await database.fetchDrawingRecord(title: Self.title, translation: .BSB) == BibleTitleDrawingRecord())
+        #expect(try await database.fetchDrawingRecord(notebook: .default, title: Self.title, translation: .BSB) == BibleTitleDrawingRecord())
     }
 
     // MARK: 지우기
@@ -218,7 +218,7 @@ struct TranslationDrawingIsolationTesting {
 
         let outcome = try await harness.repository.archiveAndReset(
             VerseDrawingArchiveCommand(verse: Self.verse, activeRowID: kjvActive, archiveRowID: archiveRowID),
-            chapter: Self.kjv
+            page: Self.kjv.inDefaultNotebook
         )
         #expect(outcome == .archived)
 
@@ -239,11 +239,11 @@ struct TranslationDrawingIsolationTesting {
             #expect(untouched.isPresent == true)
         }
 
-        let kjvLoad = try await harness.repository.load(chapter: Self.kjv).snapshots
+        let kjvLoad = try await harness.repository.load(Self.kjv.inDefaultNotebook).snapshots
         #expect(Set(kjvLoad.map(\.rowID)) == [kjvActive, archiveRowID])
         #expect(kjvLoad.allSatisfy { $0.translation == .KJV })
-        #expect(try await harness.repository.load(chapter: Self.nkrv).snapshots.map(\.rowID) == [created[.NKRV]].compactMap { $0 })
-        #expect(try await harness.repository.load(chapter: Self.bsb).snapshots.map(\.rowID) == [created[.BSB]].compactMap { $0 })
+        #expect(try await harness.repository.load(Self.nkrv.inDefaultNotebook).snapshots.map(\.rowID) == [created[.NKRV]].compactMap { $0 })
+        #expect(try await harness.repository.load(Self.bsb.inDefaultNotebook).snapshots.map(\.rowID) == [created[.BSB]].compactMap { $0 })
     }
 
     @Test("지우기 — 개역개정 보관 행은 원래 행의 열을 그대로 옮긴다(옛 행 nil · 새 행 .NKRV)")
@@ -257,11 +257,11 @@ struct TranslationDrawingIsolationTesting {
 
         #expect(try await harness.repository.archiveAndReset(
             VerseDrawingArchiveCommand(verse: Self.verse, activeRowID: BibleDrawingRowID(raw: legacyActive), archiveRowID: legacyArchive),
-            chapter: legacyChapter
+            page: legacyChapter.inDefaultNotebook
         ) == .archived)
         #expect(try await harness.repository.archiveAndReset(
             VerseDrawingArchiveCommand(verse: Self.verse, activeRowID: BibleDrawingRowID(raw: currentActive), archiveRowID: currentArchive),
-            chapter: Self.nkrv
+            page: Self.nkrv.inDefaultNotebook
         ) == .archived)
 
         let rows = try harness.storedRows()
@@ -296,8 +296,8 @@ struct TranslationDrawingIsolationTesting {
 
     @Test("필사 활동 값 — 장으로 지으면 저장 행과 같은 titleName 이고, 접두 없는 권 이름은 개역개정으로 풀린다")
     func activityValueDecodesTranslation() {
-        let english = DrawingActivity(updateDate: nil, chapter: Self.kjv, verse: 1)
-        #expect(english.titleName == StoredBookKey.titleName(for: Self.kjv))
+        let english = DrawingActivity(updateDate: nil, page: Self.kjv.inDefaultNotebook, verse: 1)
+        #expect(english.titleName == StoredBookKey.titleName(for: Self.kjv.inDefaultNotebook))
         #expect(english.chapter == Self.kjv)
         #expect(english.translation == .KJV)
 
@@ -357,15 +357,15 @@ private struct TranslationIsolationHarness {
     }
 
     /// 지금 세대로 저장 명령을 적용한다.
-    func apply(_ mutations: [VerseDrawingMutation], chapter: BibleChapter) async throws {
-        let generation = try await repository.load(chapter: chapter).generation
-        try await repository.apply(mutations, chapter: chapter, generation: generation)
+    func apply(_ mutations: [VerseDrawingMutation], page: NotebookChapter) async throws {
+        let generation = try await repository.load(page).generation
+        try await repository.apply(mutations, page: page, generation: generation)
     }
 
     /// 저장소 경로(`create`)로 새 행을 만든다.
     func create(_ chapter: BibleChapter, verse: Int, data: Data) async throws -> BibleDrawingRowID {
         let rowID = BibleDrawingRowID.issue()
-        try await apply([.create(verse: verse, rowID: rowID, data: data, metadata: Self.metadata(verse: verse))], chapter: chapter)
+        try await apply([.create(verse: verse, rowID: rowID, data: data, metadata: Self.metadata(verse: verse))], page: chapter.inDefaultNotebook)
         return rowID
     }
 
@@ -387,10 +387,10 @@ private struct TranslationIsolationHarness {
         titleName: String? = nil
     ) throws -> String {
         let context = ModelContext(actor.modelContainer)
-        let row = BibleDrawing(bibleTitle: chapter, verse: verse, lineData: lineData, updateDate: updateDate, rowUUID: rowUUID)
+        let row = BibleDrawing(page: chapter.inDefaultNotebook, verse: verse, lineData: lineData, updateDate: updateDate, rowUUID: rowUUID)
         if rowUUID == nil {
             // legacy business id 는 초 단위라 같은 초 두 행이 겹친다 — updateDate 의 초로 짓는다.
-            row.id = "\(StoredBookKey.titleName(for: chapter)).\(chapter.chapter).\(verse).\(Int(updateDate.timeIntervalSince1970))"
+            row.id = "\(StoredBookKey.titleName(for: chapter.inDefaultNotebook)).\(chapter.chapter).\(verse).\(Int(updateDate.timeIntervalSince1970))"
         }
         row.isPresent = isPresent
         if case .some(let value) = column {

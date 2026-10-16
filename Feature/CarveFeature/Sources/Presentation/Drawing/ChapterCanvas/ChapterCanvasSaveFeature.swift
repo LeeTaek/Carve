@@ -53,7 +53,7 @@ extension ChapterCanvasFeature.State {
         return editRevision > editRevisionAtClear ? .saved : .none
     }
 
-    /// 아직 저장하지 않은 변경이 있는가. **장과 무관하다** — 장을 바꿔도 남은 이전 장의 미저장분을 포함한다.
+    /// 아직 저장하지 않은 변경이 있는가. **page 와 무관하다** — 장 · 필사책을 바꿔도 남은 이전 page 의 미저장분을 포함한다.
     ///
     /// 획을 긋는 중(`isEditing`)도 포함한다. 그 획은 아직 보고되지도 않았으므로 저장됐다고 말할 수 없다. 닫은 세션의 늦은 편집도
     /// 초안이 될 때까지 포함한다.
@@ -119,16 +119,22 @@ extension ChapterCanvasFeature {
     }
 
     /// 저장 명령을 스냅샷 위에 겹친다 — 저장소의 `create`(upsert) · `replace` · `clear`(행 유지, 없으면 빈 행) 와 같은 의미다.
-    /// - Parameter translation: 겹쳐 만드는 행의 번역본 — 그 장(`State.chapter`)의 번역본이다. 이미 있는 행은 그 행의 번역본을 그대로 둔다.
-    ///   nil 이면 스냅샷의 번역본(없으면 개역개정)이다. KJV 장의 `loadedDrawings` 에 개역개정 행이 섞이지 않게 장의 번역본을 넘긴다.
+    /// - Parameters:
+    ///   - translation: 겹쳐 만드는 행의 번역본 — 그 page 의 장(`State.page.chapter`)의 번역본이다. 이미 있는 행은 그 행의 번역본을 그대로 둔다.
+    ///     nil 이면 스냅샷의 번역본(없으면 개역개정)이다. KJV 장의 `loadedDrawings` 에 개역개정 행이 섞이지 않게 장의 번역본을 넘긴다.
+    ///   - notebook: 겹쳐 만드는 행의 필사책 — 그 page 의 필사책이다(`State.page.notebook`). 이미 있는 행은 그 행의 필사책을 그대로 둔다.
+    ///     nil 이면 스냅샷의 필사책(없으면 기본 필사책)이다. 저장소가 읽어 준 행(`VerseDrawingSnapshot.notebook`)과 같은 값을 들게 한다 —
+    ///     합성에는 쓰이지 않는 표시 값이다.
     func overlay(
         _ snapshots: [VerseDrawingSnapshot],
         with mutations: [VerseDrawingMutation],
-        translation: Translation? = nil
+        translation: Translation? = nil,
+        notebook: NotebookID? = nil
     ) -> [VerseDrawingSnapshot] {
         guard !mutations.isEmpty else { return snapshots }
         let now = date.now
         let rowTranslation = translation ?? snapshots.first?.translation ?? .NKRV
+        let rowNotebook = notebook ?? snapshots.first?.notebook ?? .default
         var result = snapshots
         var indexByRow: [BibleDrawingRowID: Int] = [:]
         for (index, snapshot) in result.enumerated() { indexByRow[snapshot.rowID] = index }
@@ -149,13 +155,15 @@ extension ChapterCanvasFeature {
                 upsert(VerseDrawingSnapshot(
                     verse: verse, rowID: rowID, isPresent: existing?.isPresent ?? true, updateDate: now,
                     lineData: data, drawingVersion: 3, metadata: metadata,
-                    translation: existing?.translation ?? rowTranslation
+                    translation: existing?.translation ?? rowTranslation,
+                    notebook: existing?.notebook ?? rowNotebook
                 ))
             case .clear(let verse, let rowID):
                 upsert(VerseDrawingSnapshot(
                     verse: verse, rowID: rowID, isPresent: existing?.isPresent ?? true, updateDate: now,
                     lineData: nil, drawingVersion: existing?.drawingVersion ?? 3, metadata: existing?.metadata,
-                    translation: existing?.translation ?? rowTranslation
+                    translation: existing?.translation ?? rowTranslation,
+                    notebook: existing?.notebook ?? rowNotebook
                 ))
             }
         }
@@ -200,24 +208,25 @@ extension ChapterCanvasFeature {
             return drafts
         }
 
-        // 한 batch 는 한 장이다. 이전 장의 미저장분이 남아 있으면 그것부터 보낸다.
-        let chapter = storeBound.values
-            .map(\.chapter)
-            .min { lhs, rhs in lhs != state.chapter && rhs == state.chapter } ?? state.chapter
-        let batch = storeBound.filter { $0.value.chapter == chapter }
+        // 한 batch 는 한 page(필사책 + 장)다. 이전 page 의 미저장분이 남아 있으면 그것부터 보낸다 — 필사책을 바꾼 뒤에도 앞 필사책의
+        // 미저장분은 앞 필사책의 행으로 간다(장 바꾸기와 같은 원리).
+        let page = storeBound.values
+            .map(\.page)
+            .min { lhs, rhs in lhs != state.page && rhs == state.page } ?? state.page
+        let batch = storeBound.filter { $0.value.page == page }
         let revision = batch.values.map(\.revision).max() ?? state.editRevision
         let mutations = batch.values
             .sorted { $0.mutation.verse != $1.mutation.verse ? $0.mutation.verse < $1.mutation.verse : $0.mutation.rowID < $1.mutation.rowID }
             .map(\.mutation)
         state.inFlightBatch = batch.mapValues(\.revision)
         state.inFlightMutations = mutations
-        state.inFlightChapter = chapter
+        state.inFlightPage = page
         let requestID = uuid()
         state.saveStatus = .saving(revision: revision, requestID: requestID)
 
         return .merge(drafts, .run { [repository] send in
             do {
-                try await repository.apply(mutations, chapter: chapter, generation: generation)
+                try await repository.apply(mutations, page: page, generation: generation)
                 await send(.saveFinished(requestID: requestID, revision: revision, failure: nil))
             } catch let error as DrawingRepositoryError {
                 await send(.saveFinished(requestID: requestID, revision: revision, failure: error))
@@ -244,10 +253,10 @@ extension ChapterCanvasFeature {
         }
         let batch = state.inFlightBatch
         let mutations = state.inFlightMutations
-        let chapter = state.inFlightChapter
+        let page = state.inFlightPage
         state.inFlightBatch = [:]
         state.inFlightMutations = []
-        state.inFlightChapter = nil
+        state.inFlightPage = nil
 
         if let failure, state.pendingMutations.isEmpty, state.sessionEnd == nil {
             // 실패한 저장의 내용은 이미 격리했다 — 편집 세션을 닫으며 미저장분을 격리본으로 옮겼다(§12-6 구현 순서 ①).
@@ -288,12 +297,13 @@ extension ChapterCanvasFeature {
             state.drafts.draftOnlyRowIDs.remove(rowID)
         }
         // 저장된 내용을 DB 내용에 겹쳐 둔다 — 재조회가 실패해도 `loadedDrawings ⊕ pendingMutations` 가 현재 내용이 되게.
-        if chapter == state.chapter, let loaded = state.loadedDrawings {
-            state.loadedDrawings = overlay(loaded, with: mutations, translation: state.chapter.translation)
+        // 지금 page 의 저장만 겹친다 — 다른 필사책의 같은 장 저장은 이 page 의 내용이 아니다.
+        if page == state.page, let loaded = state.loadedDrawings {
+            state.loadedDrawings = overlay(loaded, with: mutations, translation: state.page.chapter.translation, notebook: state.page.notebook)
         }
         // 늦게 도착한 필사를 가릴 기준에도 겹친다 — 내 저장은 도착이 아니다. 그 행을 원격이 다시 바꾸면 기준과 달라져 도착으로 본다(P0-3).
-        if chapter == state.chapter, let baseline = state.arrival.storeBaseline {
-            state.arrival.storeBaseline = overlay(baseline, with: mutations, translation: state.chapter.translation)
+        if page == state.page, let baseline = state.arrival.storeBaseline {
+            state.arrival.storeBaseline = overlay(baseline, with: mutations, translation: state.page.chapter.translation, notebook: state.page.notebook)
         }
         state.persistedRevision = max(state.persistedRevision, revision)
         state.consecutiveSaveFailures = 0

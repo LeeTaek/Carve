@@ -62,13 +62,15 @@ public struct BackupRowInsertion: Equatable, Sendable {
     public let itemID: String
     /// `insertCurrent` · `insertArchived` · `protectCleared` 중 하나.
     public let decision: BackupImportDecision
-    /// 권 코드 · 번역본으로 찾은 장(`titleName` · `titleChapter`).
-    public let chapter: BibleChapter
+    /// 필사책 · 권 코드 · 번역본으로 찾은 장(`titleName` · `titleChapter`).
+    public let page: NotebookChapter
     /// 절.
     public let verse: Int
     /// 항목의 번역본 값 그대로(`Translation.rawValue`). nil 이면 nil — 개역개정 항목은 열에 이 값 그대로(nil 은 nil — NKRV 로 채우지 않는다),
     /// KJV · BSB 항목은 열에 nil 을 쓴다(`StoredBookKey.translationColumn` — 복원 쓰기가 정한다).
     public let translation: String?
+    /// 항목의 필사책 토큰 그대로(nil = 기본 필사책). 복원 쓰기가 장의 필사책과 같은지 다시 확인한다.
+    public let notebook: String?
     /// `isPresent` — `insertCurrent` 만 true.
     public let isPresent: Bool
     /// 좌표 형식 — 항목 값 그대로.
@@ -88,13 +90,14 @@ public struct BackupRowInsertion: Equatable, Sendable {
     /// - Parameters:
     ///   - item: 넣을 항목.
     ///   - decision: 새 행을 넣는 결정(`insertsRow`).
-    ///   - chapter: 항목의 권 코드 · 장 · 번역본으로 찾은 장(`BackupImportPlanner.chapter(of:)`).
-    public init(item: BackupItem, decision: BackupImportDecision, chapter: BibleChapter) {
+    ///   - page: 항목의 필사책 · 권 코드 · 장 · 번역본으로 찾은 장(`BackupImportPlanner.page(of:)`).
+    public init(item: BackupItem, decision: BackupImportDecision, page: NotebookChapter) {
         self.itemID = item.id
         self.decision = decision
-        self.chapter = chapter
+        self.page = page
         self.verse = item.verse.verse
         self.translation = item.verse.translation
+        self.notebook = item.verse.notebook
         self.isPresent = decision.insertsAsPresent
         self.drawingVersion = item.drawingVersion
         self.inkBlob = item.inkBlob
@@ -104,8 +107,9 @@ public struct BackupRowInsertion: Equatable, Sendable {
         self.updateDate = item.updatedAt
     }
 
-    /// `BibleDrawing.titleName` 에 넣을 값 — 장의 권 · 번역본으로 지은 `StoredBookKey.titleName(for:)`(개역개정 `BibleTitle.rawValue`, 영어 `KJV-…`).
-    public var titleName: String { StoredBookKey.titleName(for: chapter) }
+    /// `BibleDrawing.titleName` 에 넣을 값 — 장의 필사책 · 권 · 번역본으로 지은 `StoredBookKey.titleName(for: page)`
+    /// (기본 필사책은 개역개정 `BibleTitle.rawValue` · 영어 `KJV-…` 그대로, 다른 필사책은 그 앞에 `nb_<토큰>~`).
+    public var titleName: String { StoredBookKey.titleName(for: page) }
 }
 
 /// 대표 고정 — 적용할 때 이 지금 행의 `isPresent` 만 true 로 바꿔, 넣는 보관 행이 그 절의 대표를 바꾸지 못하게 한다(오케스트레이터 결정 2026-10-06).
@@ -127,10 +131,10 @@ public struct BackupRepresentativePin: Hashable, Sendable {
     }
 }
 
-/// 장 하나의 판정 결과 — 항목마다의 결정, 넣을 행, 대표 고정 (설계 §5-1). `BackupImportPlanner.plan` 이 만든다.
+/// 필사책 안의 장 하나의 판정 결과 — 항목마다의 결정, 넣을 행, 대표 고정 (설계 §5-1). `BackupImportPlanner.plan` 이 만든다.
 public struct BackupChapterPlan: Equatable, Sendable {
-    /// 판정한 장.
-    public let chapter: BibleChapter
+    /// 판정한 장(필사책 · 번역본 포함).
+    public let page: NotebookChapter
     /// 이 장 항목마다의 결정 — 절 오름차순, 절 안에서는 처리 순서(지원 안 됨 → 현재 후보 → 나머지, 각각 id 순).
     public let decisions: [BackupItemDecision]
     /// 넣을 행 — `decisions` 중 새 행을 넣는 결정만, 같은 순서로.
@@ -140,12 +144,12 @@ public struct BackupChapterPlan: Equatable, Sendable {
 
     /// 판정 결과를 묶는다.
     public init(
-        chapter: BibleChapter,
+        page: NotebookChapter,
         decisions: [BackupItemDecision],
         insertions: [BackupRowInsertion],
         pins: [BackupRepresentativePin] = []
     ) {
-        self.chapter = chapter
+        self.page = page
         self.decisions = decisions
         self.insertions = insertions
         self.pins = pins

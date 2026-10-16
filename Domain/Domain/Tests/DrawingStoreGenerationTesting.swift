@@ -22,7 +22,7 @@ struct DrawingStoreGenerationTesting {
         let harness = try RepositoryHarness()
         let eraser = SwiftDataDrawingDataEraser(actor: harness.actor)
         // 화면이 조회해 둔 세대. 이 조회를 기준으로 아래 명령들을 만들었다.
-        let before = try await harness.repository.load(chapter: harness.chapter).generation
+        let before = try await harness.repository.load(harness.chapter.inDefaultNotebook).generation
 
         #expect(await eraser.eraseAll() == .completed)
 
@@ -33,14 +33,14 @@ struct DrawingStoreGenerationTesting {
                     .create(verse: 4, rowID: .issue(), data: Data([4]), metadata: harness.metadata(verse: 4)),
                     .clear(verse: 5, rowID: .issue())
                 ],
-                chapter: harness.chapter,
+                page: harness.chapter.inDefaultNotebook,
                 generation: before
             )
         }
 
         // 다른 context 에서 읽는다 — 같은 context 는 저장하지 않은 변경도 보여 준다.
         let verifier = SwiftDatabaseActor(modelContainer: harness.actor.modelContainer)
-        #expect(try await verifier.loadDrawingSnapshots(chapter: harness.chapter).isEmpty)
+        #expect(try await verifier.loadDrawingSnapshots(page: harness.chapter.inDefaultNotebook).isEmpty)
     }
 
     @Test("지워진 행을 가리키는 replace 도 rowNotFound 가 아니라 세대 거절로 온다 — 화면이 실패 안내 대신 삭제 뒤처리를 하도록")
@@ -50,16 +50,16 @@ struct DrawingStoreGenerationTesting {
         let existing = BibleDrawingRowID.issue()
         try await harness.apply(
             [.create(verse: 3, rowID: existing, data: Data([3]), metadata: harness.metadata(verse: 3))],
-            chapter: harness.chapter
+            page: harness.chapter.inDefaultNotebook
         )
-        let before = try await harness.repository.load(chapter: harness.chapter).generation
+        let before = try await harness.repository.load(harness.chapter.inDefaultNotebook).generation
 
         #expect(await eraser.eraseAll() == .completed)
 
         await #expect(throws: DrawingRepositoryError.staleStoreGeneration) {
             try await harness.repository.apply(
                 [.replace(verse: 3, rowID: existing, data: Data([33]), metadata: harness.metadata(verse: 3))],
-                chapter: harness.chapter,
+                page: harness.chapter.inDefaultNotebook,
                 generation: before
             )
         }
@@ -69,43 +69,43 @@ struct DrawingStoreGenerationTesting {
     func freshGenerationIsAccepted() async throws {
         let harness = try RepositoryHarness()
         let eraser = SwiftDataDrawingDataEraser(actor: harness.actor)
-        let before = try await harness.repository.load(chapter: harness.chapter).generation
+        let before = try await harness.repository.load(harness.chapter.inDefaultNotebook).generation
         #expect(await eraser.eraseAll() == .completed)
 
-        let after = try await harness.repository.load(chapter: harness.chapter).generation
+        let after = try await harness.repository.load(harness.chapter.inDefaultNotebook).generation
         #expect(after != before)
         let rowID = BibleDrawingRowID.issue()
         try await harness.repository.apply(
             [.create(verse: 4, rowID: rowID, data: Data([4]), metadata: harness.metadata(verse: 4))],
-            chapter: harness.chapter,
+            page: harness.chapter.inDefaultNotebook,
             generation: after
         )
 
-        #expect(try await harness.load(chapter: harness.chapter).map(\.rowID) == [rowID])
+        #expect(try await harness.load(harness.chapter.inDefaultNotebook).map(\.rowID) == [rowID])
     }
 
     @Test("삭제보다 먼저 실행된 저장은 삭제가 지운다 — 삭제는 세대와 무관하게 전부 지운다")
     func saveBeforeEraseIsErased() async throws {
         let harness = try RepositoryHarness()
         let eraser = SwiftDataDrawingDataEraser(actor: harness.actor)
-        let generation = try await harness.repository.load(chapter: harness.chapter).generation
+        let generation = try await harness.repository.load(harness.chapter.inDefaultNotebook).generation
         try await harness.repository.apply(
             [.create(verse: 4, rowID: .issue(), data: Data([4]), metadata: harness.metadata(verse: 4))],
-            chapter: harness.chapter,
+            page: harness.chapter.inDefaultNotebook,
             generation: generation
         )
 
         #expect(await eraser.eraseAll() == .completed)
 
         let verifier = SwiftDatabaseActor(modelContainer: harness.actor.modelContainer)
-        #expect(try await verifier.loadDrawingSnapshots(chapter: harness.chapter).isEmpty)
+        #expect(try await verifier.loadDrawingSnapshots(page: harness.chapter.inDefaultNotebook).isEmpty)
     }
 
     @Test("삭제 전에 요청된 저장이 삭제와 어떤 순서로 실행돼도 남는 행이 없다")
     func anyInterleavingLeavesNothing() async throws {
         let harness = try RepositoryHarness()
         let eraser = SwiftDataDrawingDataEraser(actor: harness.actor)
-        let generation = try await harness.repository.load(chapter: harness.chapter).generation
+        let generation = try await harness.repository.load(harness.chapter.inDefaultNotebook).generation
         let repository = harness.repository
         let chapter = harness.chapter
         let metadata = harness.metadata(verse: 1)
@@ -119,7 +119,7 @@ struct DrawingStoreGenerationTesting {
                 group.addTask {
                     try? await repository.apply(
                         [.create(verse: index % 3 + 1, rowID: .issue(), data: Data([UInt8(index)]), metadata: metadata)],
-                        chapter: chapter,
+                        page: chapter.inDefaultNotebook,
                         generation: generation
                     )
                     return nil
@@ -134,7 +134,7 @@ struct DrawingStoreGenerationTesting {
 
         #expect(outcome == .completed)
         let verifier = SwiftDatabaseActor(modelContainer: harness.actor.modelContainer)
-        #expect(try await verifier.loadDrawingSnapshots(chapter: harness.chapter).isEmpty)
+        #expect(try await verifier.loadDrawingSnapshots(page: harness.chapter.inDefaultNotebook).isEmpty)
     }
 
     @Test("전체 삭제는 save 를 기다리지 않고 저장소에 반영된다 — 세대를 곧바로 올려도 되는 근거")
@@ -142,13 +142,13 @@ struct DrawingStoreGenerationTesting {
         let harness = try RepositoryHarness()
         try await harness.apply(
             [.create(verse: 4, rowID: .issue(), data: Data([1]), metadata: harness.metadata(verse: 4))],
-            chapter: harness.chapter
+            page: harness.chapter.inDefaultNotebook
         )
         let verifier = SwiftDatabaseActor(modelContainer: harness.actor.modelContainer)
-        #expect(try await verifier.loadDrawingSnapshots(chapter: harness.chapter).count == 1)
+        #expect(try await verifier.loadDrawingSnapshots(page: harness.chapter.inDefaultNotebook).count == 1)
 
         #expect(await SwiftDataDrawingDataEraser(actor: harness.actor).eraseAll() == .completed)
 
-        #expect(try await verifier.loadDrawingSnapshots(chapter: harness.chapter).isEmpty)
+        #expect(try await verifier.loadDrawingSnapshots(page: harness.chapter.inDefaultNotebook).isEmpty)
     }
 }

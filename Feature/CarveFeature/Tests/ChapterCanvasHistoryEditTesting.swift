@@ -36,7 +36,7 @@ struct ChapterCanvasHistoryEditTesting {
         private var redoVersion = 0
 
         init() {
-            var state = ChapterCanvasFeature.State(chapter: CanvasTestSupport.chapter)
+            var state = ChapterCanvasFeature.State(page: CanvasTestSupport.page)
             // 앞서 쓴 필사가 저장까지 끝난 상태 — 표시는 "이 기기에 저장됨".
             state.editRevision = 1
             state.persistedRevision = 1

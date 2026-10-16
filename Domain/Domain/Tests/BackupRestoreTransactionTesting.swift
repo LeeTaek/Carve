@@ -44,11 +44,11 @@ struct BackupRestoreTransactionTesting {
 
         // Then
         await #expect(throws: DrawingRepositoryError.staleStoreGeneration) {
-            _ = try await harness.restorer.restore(command, chapter: Sample.genesis1, generation: started)
+            _ = try await harness.restorer.restore(command, page: Sample.page(Sample.genesis1), generation: started)
         }
         #expect(try await harness.rows().isEmpty)
         // 지금 세대로는 쓴다.
-        let outcome = try await harness.restorer.restore(command, chapter: Sample.genesis1, generation: await harness.generation())
+        let outcome = try await harness.restorer.restore(command, page: Sample.page(Sample.genesis1), generation: await harness.generation())
         #expect(outcome.insertedCount == 1)
         #expect(try await harness.rows().count == 1)
     }
@@ -67,7 +67,7 @@ struct BackupRestoreTransactionTesting {
         try harness.seed([present])
 
         // When
-        let outcome = try await harness.restorer.restore(command, chapter: Sample.genesis1, generation: await harness.generation())
+        let outcome = try await harness.restorer.restore(command, page: Sample.page(Sample.genesis1), generation: await harness.generation())
 
         // Then: 보관으로만 넣었고, X 는 내용 · 시각 · isPresent 가 그대로이며 대표다.
         #expect(outcome.decisions.map(\.decision) == [.insertArchived])
@@ -106,17 +106,17 @@ struct BackupRestoreTransactionTesting {
 
         // When
         let outcome = try await harness.restorer.restore(
-            BackupChapterRestoreCommand(entries: entries), chapter: Sample.genesis1, generation: await harness.generation()
+            BackupChapterRestoreCommand(entries: entries), page: Sample.page(Sample.genesis1), generation: await harness.generation()
         )
 
         // Then: 1절 — (a) 현재(비운 행) · (b) 보관 → 대표는 비운 행.
-        #expect(outcome.counts(verse: 1) == BackupImportPreview(new: 1, archived: 1, chapters: [Sample.genesis1]))
+        #expect(outcome.counts(verse: 1) == BackupImportPreview(new: 1, archived: 1, chapters: [Sample.page(Sample.genesis1)]))
         #expect(try await harness.representative(verse: 1)?.lineData == nil)
         // 2절 — (a) 건너뜀(비우지 않는다) · (b) 보관 → X 그대로.
-        #expect(outcome.counts(verse: 2) == BackupImportPreview(archived: 1, skippedEmpty: 1, chapters: [Sample.genesis1]))
+        #expect(outcome.counts(verse: 2) == BackupImportPreview(archived: 1, skippedEmpty: 1, chapters: [Sample.page(Sample.genesis1)]))
         #expect(try await harness.representative(verse: 2)?.rowKey == "X-2")
         // 3절 — (a) 이미 비운 상태 · (b) 보관 → 비운 대표 그대로.
-        #expect(outcome.counts(verse: 3) == BackupImportPreview(same: 1, archived: 1, chapters: [Sample.genesis1]))
+        #expect(outcome.counts(verse: 3) == BackupImportPreview(same: 1, archived: 1, chapters: [Sample.page(Sample.genesis1)]))
         #expect(try await harness.representative(verse: 3)?.rowKey == "CLEARED-3")
         #expect(try await harness.rows().count == 2 + 4)
     }
@@ -146,7 +146,7 @@ struct BackupRestoreTransactionTesting {
 
         // When
         let outcome = try await harness.restorer.restore(
-            BackupChapterRestoreCommand(entries: entries), chapter: Sample.genesis1, generation: await harness.generation()
+            BackupChapterRestoreCommand(entries: entries), page: Sample.page(Sample.genesis1), generation: await harness.generation()
         )
 
         // Then: 1절은 지운 것을 되살리지 않고 기록으로만, 2절은 Y 가 대표가 된다.
@@ -170,7 +170,7 @@ struct BackupRestoreTransactionTesting {
         let command = BackupChapterRestoreCommand(entries: [backupCurrent, backupArchive])
 
         // When
-        let outcome = try await harness.restorer.restore(command, chapter: Sample.genesis1, generation: await harness.generation())
+        let outcome = try await harness.restorer.restore(command, page: Sample.page(Sample.genesis1), generation: await harness.generation())
 
         // Then: 둘 다 보관으로 넣고 L 을 고정했다.
         #expect(outcome.decisions.map(\.decision) == [.insertArchived, .insertArchived])
@@ -186,11 +186,11 @@ struct BackupRestoreTransactionTesting {
         #expect(pinned.drawingVersion == 1)
         #expect(rows.first { $0.rowKey == legacyM.rowKey } == legacyM.record)
         // 화면의 대표(장 조회)는 그대로 L 이다 — 고정하지 않았다면 9/25 의 Z 가 보였다.
-        let load = try await SwiftDataDrawingRepository(actor: harness.database).load(chapter: Sample.genesis1)
+        let load = try await SwiftDataDrawingRepository(actor: harness.database).load(Sample.genesis1.inDefaultNotebook)
         #expect(load.snapshots.representativesByVerse()[1]?.rowID.raw == legacyL.rowKey)
 
         // Then: 다시 불러오면 넣을 행도 고정도 없다.
-        let again = try await harness.restorer.restore(command, chapter: Sample.genesis1, generation: await harness.generation())
+        let again = try await harness.restorer.restore(command, page: Sample.page(Sample.genesis1), generation: await harness.generation())
         #expect(again.decisions.map(\.decision) == [.skipSame, .skipSame])
         #expect(again.pins.isEmpty)
         #expect(!again.changedStore)
@@ -210,7 +210,7 @@ struct BackupRestoreTransactionTesting {
 
         // When
         let outcome = try await harness.restorer.restore(
-            BackupChapterRestoreCommand(entries: [hiddenDraft, oldRow]), chapter: Sample.genesis1, generation: await harness.generation()
+            BackupChapterRestoreCommand(entries: [hiddenDraft, oldRow]), page: Sample.page(Sample.genesis1), generation: await harness.generation()
         )
 
         // Then
@@ -237,7 +237,7 @@ struct BackupRestoreTransactionTesting {
 
         // When / Then
         await #expect(throws: BackupChapterRestoreError.blobUnavailable(name: BackupFormat.sha256Hex(Sample.ink("Z")))) {
-            _ = try await harness.restorer.restore(command, chapter: Sample.genesis1, generation: await harness.generation())
+            _ = try await harness.restorer.restore(command, page: Sample.page(Sample.genesis1), generation: await harness.generation())
         }
         let rows = try await harness.rows()
         #expect(rows == [legacyL.record])
@@ -255,7 +255,7 @@ struct BackupRestoreTransactionTesting {
         let command = BackupChapterRestoreCommand(items: full.items, blobs: blobs)
 
         await #expect(throws: BackupChapterRestoreError.blobUnavailable(name: inkName)) {
-            _ = try await harness.restorer.restore(command, chapter: Sample.genesis1, generation: await harness.generation())
+            _ = try await harness.restorer.restore(command, page: Sample.page(Sample.genesis1), generation: await harness.generation())
         }
         #expect(try await harness.rows().isEmpty)
     }
@@ -278,12 +278,12 @@ struct BackupRestoreTransactionTesting {
 
         let outcome = try await harness.restorer.restore(
             BackupChapterRestoreCommand(entries: [here, otherChapter, unknownTranslation, brokenMetadata]),
-            chapter: Sample.genesis1,
+            page: Sample.page(Sample.genesis1),
             generation: await harness.generation()
         )
 
         #expect(outcome.counts == BackupImportPreview(
-            new: 1, unsupported: [.unknownTranslation: 1, .undecodableMetadata: 1], chapters: [Sample.genesis1]
+            new: 1, unsupported: [.unknownTranslation: 1, .undecodableMetadata: 1], chapters: [Sample.page(Sample.genesis1)]
         ))
         #expect(try await harness.rows().map(\.lineData) == [Sample.ink("here")])
         #expect(try await harness.rows(Sample.genesis2).isEmpty)

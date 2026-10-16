@@ -6,6 +6,8 @@
 //
 
 @testable import CarveFeature
+import Domain
+import Foundation
 import Testing
 
 struct HeaderFeatureTesting {
@@ -193,4 +195,55 @@ struct HeaderFeatureTesting {
         #expect(HeaderFeature.controlsTopPadding(collapseProgress: 0, safeAreaTop: 32) + 44 <= 118)
     }
 
+}
+
+/// 헤더 부제의 지금 필사책 이름 · 번역본 팝오버 끝 「책장 열기」(2.2 회차별 필사책 결정 9).
+@Suite("헤더 — 지금 필사책 이름 · 책장 열기")
+@MainActor
+struct HeaderNotebookTesting {
+    private static let korean = Locale(identifier: "ko")
+    private static let english = Locale(identifier: "en")
+
+    @Test("처음 헤더는 필사책 이름을 아직 읽지 않았다 — 부제에 필사책 칸이 없다")
+    func initialHeaderHasNoNotebookName() {
+        let state = HeaderFeature.State.initialState
+
+        #expect(!state.isNotebookNameLoaded)
+        #expect(state.notebookName.isEmpty)
+        #expect(HeaderView.notebookLabel(
+            name: state.notebookName, isDefault: state.isDefaultNotebook, isLoaded: state.isNotebookNameLoaded, locale: Self.korean
+        ) == nil)
+    }
+
+    @Test("번역본 팝오버의 「책장 열기」 는 팝오버만 닫는다 — 책장은 탐색 리듀서가 연다")
+    func notebooksTappedClosesPicker() {
+        var state = HeaderFeature.State.initialState
+        state.isTranslationPickerPresented = true
+        let title = state.currentTitle
+
+        _ = HeaderFeature().reduce(into: &state, action: .view(.notebooksTapped))
+
+        #expect(!state.isTranslationPickerPresented)
+        #expect(state.currentTitle == title)
+    }
+
+    @Test("부제 첫 칸은 지금 필사책 이름 — 사용자가 지은 이름은 옮기지 않고, 이름이 없으면 화면 언어의 기본 표시다")
+    func notebookLabelFollowsNameAndLanguage() {
+        #expect(HeaderView.notebookLabel(name: "", isDefault: true, isLoaded: true, locale: Self.korean) == "첫 번째 필사")
+        #expect(HeaderView.notebookLabel(name: "", isDefault: true, isLoaded: true, locale: Self.english) == "First Notebook")
+        #expect(HeaderView.notebookLabel(name: "", isDefault: false, isLoaded: true, locale: Self.korean) == "이름 없는 필사책")
+        #expect(HeaderView.notebookLabel(name: "", isDefault: false, isLoaded: true, locale: Self.english) == "Untitled Notebook")
+        #expect(HeaderView.notebookLabel(name: "두 번째 필사", isDefault: false, isLoaded: true, locale: Self.english) == "두 번째 필사")
+        #expect(HeaderView.notebookLabel(name: "두 번째 필사", isDefault: false, isLoaded: false, locale: Self.korean) == nil)
+    }
+
+    @Test("제목 VoiceOver 값은 지금 필사책 이름과 번역본 전체 이름이다 — 이름을 읽기 전에는 번역본만")
+    func titleAccessibilityValueIncludesNotebook() {
+        #expect(HeaderView.titleAccessibilityValue(notebookLabel: "두 번째 필사", translation: .NKRV, locale: Self.korean) == "두 번째 필사, 개역개정")
+        #expect(
+            HeaderView.titleAccessibilityValue(notebookLabel: "First Notebook", translation: .KJV, locale: Self.english)
+                == "First Notebook, King James Version"
+        )
+        #expect(HeaderView.titleAccessibilityValue(notebookLabel: nil, translation: .KJV, locale: Self.english) == "King James Version")
+    }
 }

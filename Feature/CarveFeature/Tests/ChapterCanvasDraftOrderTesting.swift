@@ -21,7 +21,7 @@ import ComposableArchitecture
 @MainActor
 struct ChapterCanvasDraftOrderTesting: DraftTestSamples {
 
-    private var place: DraftVerse { DraftVerse(chapter: CanvasTestSupport.chapter, verse: 1) }
+    private var place: DraftVerse { DraftVerse(page: CanvasTestSupport.page, verse: 1) }
 
     @Test("초안이 남기 전에는 저장소에 쓰지 않는다 — 초안이 남은 뒤에 보내고, 저장을 마치면 표식을 단다")
     func storeWaitsForDurableDraft() async throws {

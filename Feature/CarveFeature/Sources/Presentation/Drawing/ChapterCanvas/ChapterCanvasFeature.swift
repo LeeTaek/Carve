@@ -32,11 +32,11 @@ public struct CanvasEditSnapshot: Equatable, Sendable {
 
 public enum EditReason: Equatable, Sendable { case ink, erase, lasso, undo, redo }
 
-/// 저장 중 도착한 최신 편집을 보호하기 위해 revision 과 장을 함께 보관한다 (§8-3).
+/// 저장 중 도착한 최신 편집을 보호하기 위해 revision 과 page(필사책 + 장)를 함께 보관한다 (§8-3).
 struct PendingDrawingMutation: Equatable, Sendable {
     let revision: Int
-    /// 이 명령이 속한 장. 장 전환 직후에도 이전 장의 미저장분을 올바른 장에 저장하기 위함이다 (§8-5).
-    let chapter: BibleChapter
+    /// 이 명령이 속한 page(필사책 + 장). 장 · 필사책을 바꾼 직후에도 앞 page 의 미저장분을 그 page 에 저장하기 위함이다 (§8-5 · 필사책 결정 12).
+    let page: NotebookChapter
     let mutation: VerseDrawingMutation
 }
 
@@ -61,11 +61,12 @@ public struct DrawingLoadFailure: Error, Equatable, Sendable {
 
 /// 편집을 계산하는 문맥 — **합성 시점**의 레이아웃·`columnOrigin`·활성 행·소유권·기준 drawing.
 ///
-/// 큐에 남은 편집은 캔버스가 그 편집 당시 표시하던 내용(세대) 기준으로 계산해야 한다. 장이 바뀌면 현재 상태는 새 장으로
-/// 덮이므로, 이전 장의 문맥은 `retiredSession` 으로 물려 두어 늦게 도착한 편집(코덱 진행 중 · trailing 보고)을 자기 장으로 저장한다.
+/// 큐에 남은 편집은 캔버스가 그 편집 당시 표시하던 내용(세대) 기준으로 계산해야 한다. 장 · 필사책이 바뀌면 현재 상태는 새 page 로
+/// 덮이므로, 이전 page 의 문맥은 `retiredSession` 으로 물려 두어 늦게 도착한 편집(코덱 진행 중 · trailing 보고)을 자기 page 로 저장한다.
 struct EditSession: Equatable, Sendable {
     let generation: Int
-    let chapter: BibleChapter
+    /// 이 문맥의 page(필사책 + 장). 이 문맥으로 계산한 편집은 이 page 로 저장된다.
+    let page: NotebookChapter
     let layout: ChapterLayout
     let columnOrigin: CGPoint
     var activeRowIDs: [Int: BibleDrawingRowID]
@@ -103,7 +104,8 @@ struct EditSession: Equatable, Sendable {
 public struct ChapterCanvasFeature {
     @ObservableState
     public struct State: Equatable {
-        var chapter: BibleChapter
+        /// 지금 연 page — 필사책과 장(번역본 포함). 조회 · 저장 · 초안 · 지우기 · 도착 반영이 모두 이 값으로 행을 가린다(필사책 결정 12).
+        var page: NotebookChapter
 
         // §6-4 — 도착 순서가 보장되지 않는 두 입력과 게이트
         var expectedVerseCount: Int?
@@ -167,9 +169,9 @@ public struct ChapterCanvasFeature {
         var consecutiveSaveFailures = 0
         /// 지금 저장 중인 batch 의 rowID → revision. 성공 시 같은 revision 인 항목만 제거한다 (§8-3 5번).
         var inFlightBatch: [BibleDrawingRowID: Int] = [:]
-        /// 지금 저장 중인 batch 의 내용과 장. 성공하면 `loadedDrawings` 에 겹쳐 DB 내용을 따라가게 한다.
+        /// 지금 저장 중인 batch 의 내용과 page. 성공하면 `loadedDrawings` 에 겹쳐 DB 내용을 따라가게 한다.
         var inFlightMutations: [VerseDrawingMutation] = []
-        var inFlightChapter: BibleChapter?
+        var inFlightPage: NotebookChapter?
         /// 미저장분이 전부 저장되면 DB 에서 다시 합성한다 (레이아웃 변경 · 복원).
         var reloadWhenSettled = false
         var isReloading = false
@@ -236,8 +238,9 @@ public struct ChapterCanvasFeature {
             let token: Int
         }
 
-        init(chapter: BibleChapter) {
-            self.chapter = chapter
+        /// - Parameter page: 처음 page. 필사책에는 기본값이 없다 — 빠뜨리면 지금 필사책이 아닌 기본 필사책을 열게 된다(결정 12).
+        init(page: NotebookChapter) {
+            self.page = page
         }
 
         var isComposed: Bool { renderedData != nil }
@@ -275,7 +278,7 @@ public struct ChapterCanvasFeature {
                   let ownership,
                   let baselineData else { return nil }
             return EditSession(
-                generation: renderedRevision, chapter: chapter, layout: layout, columnOrigin: renderedColumnOrigin,
+                generation: renderedRevision, page: page, layout: layout, columnOrigin: renderedColumnOrigin,
                 activeRowIDs: activeRowIDs, ownership: ownership, baselineData: baselineData, draftEpoch: drafts.epoch
             )
         }
@@ -289,8 +292,8 @@ public struct ChapterCanvasFeature {
     }
 
     public enum Action: Equatable {
-        /// 장 진입. 이전 장의 미저장분은 버리지 않고 자기 장으로 저장된다.
-        case load(chapter: BibleChapter, expectedVerseCount: Int)
+        /// page(필사책 + 장) 진입 — 장 이동 · 번역본 바꾸기 · 필사책 바꾸기. 이전 page 의 미저장분은 버리지 않고 자기 page 로 저장된다.
+        case load(page: NotebookChapter, expectedVerseCount: Int)
         /// 조회 결과. `environment` 는 **조회할 때의** 편집 환경이다 — 결과가 어느 계정 · K 근거로 읽은 것인지 함께 든다.
         /// `drafts` 는 그 환경의 계정 근거 묶음에 남은 이 장의 초안이다.
         case drawingsLoaded(
@@ -395,8 +398,8 @@ public struct ChapterCanvasFeature {
     public var body: some Reducer<State, Action> {
         Reduce { state, action in
             switch action {
-            case .load(let chapter, let expectedVerseCount):
-                return beginLoad(state: &state, chapter: chapter, expectedVerseCount: expectedVerseCount)
+            case .load(let page, let expectedVerseCount):
+                return beginLoad(state: &state, page: page, expectedVerseCount: expectedVerseCount)
 
             case .drawingsLoaded(let requestID, let environment, let result, let drafts, let awaitingImport):
                 return finishLoad(state: &state, requestID: requestID, environment: environment, result: result, drafts: drafts, awaitingImport: awaitingImport)
@@ -426,7 +429,7 @@ public struct ChapterCanvasFeature {
                 // 그리던 획이 사라지지 않는다 (`layoutCompleted` / `columnOriginChanged` 와 다른 점).
                 let previous = state.layoutDelta
                 state.layoutDelta = verdict
-                LayoutDeltaVerdict.logIfNoteworthy(previous: previous, current: verdict, chapter: state.chapter)
+                LayoutDeltaVerdict.logIfNoteworthy(previous: previous, current: verdict, chapter: state.page.chapter)
                 return .none
 
             case .editBegan:
@@ -549,7 +552,7 @@ public struct ChapterCanvasFeature {
                 // 진행 중이거나 실패해 안내 중인 지우기가 있으면 새로 열지 않는다 (중복 지우기 방지).
                 guard state.eraseTask == nil, let verse = Self.verse(at: point, state: state) else { return .none }
                 // 확인창 문구는 띄우는 순간의 화면 언어로 만든다 — 떠 있는 동안 언어를 바꿔도 그대로다(즉시 전환 단계 3).
-                state.eraseAlert = Self.confirmEraseAlert(chapter: state.chapter, verse: verse, locale: AppLanguage.displayLocale())
+                state.eraseAlert = Self.confirmEraseAlert(chapter: state.page.chapter, verse: verse, locale: AppLanguage.displayLocale())
                 return .none
 
             case .verseMenuRequested, .verseMenuDismissed, .verseMenuFavoriteTapped, .verseMenuHistoryTapped, .verseMenuImageTapped,
@@ -594,14 +597,15 @@ extension ChapterCanvasFeature {
 // MARK: - 조회 · 합성 (§6-4)
 
 extension ChapterCanvasFeature {
-    private func beginLoad(state: inout State, chapter: BibleChapter, expectedVerseCount: Int) -> Effect<Action> {
-        // 이전 장의 편집 문맥을 물려 둔다 — 큐·코덱·trailing 보고에 남은 이전 장 편집을 자기 장 기준으로 마저 계산해 저장하기 위함 (§8-5).
-        // 이전 장이 합성되지 못했다면(빠른 연속 전환) 그 전 문맥을 그대로 둔다.
+    /// page 진입 — 장 이동 · 번역본 바꾸기 · 필사책 바꾸기가 모두 이 길이다. 필사책만 바뀐 같은 장도 다른 page 라 장 전환과 똑같이 다룬다.
+    private func beginLoad(state: inout State, page: NotebookChapter, expectedVerseCount: Int) -> Effect<Action> {
+        // 이전 page 의 편집 문맥을 물려 둔다 — 큐·코덱·trailing 보고에 남은 이전 page 편집을 자기 page 기준으로 마저 계산해 저장하기 위함 (§8-5).
+        // 이전 page 가 합성되지 못했다면(빠른 연속 전환) 그 전 문맥을 그대로 둔다.
         if let retiring = state.currentSession {
             state.retiredSession = retiring
         }
-        // 이전 장의 미저장분은 pendingMutations 에 장 정보와 함께 남아 있으므로 여기서 버리지 않는다. 큐의 편집도 세대로 골라내므로 남긴다.
-        state.chapter = chapter
+        // 이전 page 의 미저장분은 pendingMutations 에 page 와 함께 남아 있으므로 여기서 버리지 않는다. 큐의 편집도 세대로 골라내므로 남긴다.
+        state.page = page
         state.expectedVerseCount = expectedVerseCount
         state.layout = nil
         state.pendingLayout = nil
@@ -654,7 +658,7 @@ extension ChapterCanvasFeature {
         // 이 조회가 시작되기 전에 끝난 import 는 이 조회에 들어 있다. 도착 반영의 다시 읽기가 미뤄져 새로 나가는 조회면 그것을 따라간다.
         state.arrival.loadStartedAt = date.now
         followArrivalReload(state: &state, requestID: requestID)
-        let chapter = state.chapter
+        let page = state.page
         let knownEnvironment = state.editEnvironment
         return .run { [repository, editEnvironment, draftStore] send in
             // 불러오는 내용이 기댈 환경을 먼저 확인한다. 바뀐 경우에만 알린다 — 세션 판정은 리듀서가 한다.
@@ -663,15 +667,15 @@ extension ChapterCanvasFeature {
                 await send(.editEnvironmentChanged(environment))
             }
             do {
-                let loaded = try await repository.load(chapter: chapter)
+                let loaded = try await repository.load(page)
                 // 조회하는 사이 환경이 바뀌었으면 결과보다 **먼저** 알린다. 세션이 바뀌면 이 조회는 새 요청으로 대체돼 결과가 버려진다 —
                 // 옛 계정 · K 로 읽은 내용을 새 세션 아래 합성하지 않는다(6차 리뷰 4).
                 let after = await editEnvironment.current()
                 if after != environment {
                     await send(.editEnvironmentChanged(after))
                 }
-                let drafts = try await Self.loadDrafts(from: draftStore, environment: environment, chapter: chapter)
-                let awaiting = await Self.loadBeforeConnectionDrafts(from: draftStore, environment: environment, chapter: chapter)
+                let drafts = try await Self.loadDrafts(from: draftStore, environment: environment, page: page)
+                let awaiting = await Self.loadBeforeConnectionDrafts(from: draftStore, environment: environment, page: page)
                 await send(.drawingsLoaded(
                     requestID: requestID, environment: environment, .success(loaded), drafts: drafts, awaitingImport: awaiting
                 ))
@@ -793,8 +797,9 @@ extension ChapterCanvasFeature {
 
     /// §6-4 의 `composeIfReady`. 양쪽 입력이 모두 있고 §6-2 게이트를 통과할 때만 합성한다.
     ///
-    /// 합성 입력은 `DB 내용 ⊕ 이 장의 미저장분` 이다. 저장이 실패한 채 장을 떠났다 돌아와도, 재합성 중 저장이 실패해도
+    /// 합성 입력은 `DB 내용 ⊕ 이 page 의 미저장분` 이다. 저장이 실패한 채 장을 떠났다 돌아와도, 재합성 중 저장이 실패해도
     /// 미저장 잉크가 화면에서 사라지지 않는다. 미저장 행이 대표 행이 되므로 `activeRowIDs` 도 그 행을 가리킨다.
+    /// 다른 필사책의 같은 장 미저장분은 겹치지 않는다 — page 가 다르다.
     private func composeIfReady(state: inout State) {
         // 저장소 세대 없이 합성하지 않는다 — 합성이 입력을 열고, 그 입력의 필기는 세대가 있어야 저장된다.
         guard let layout = state.layout,
@@ -804,7 +809,7 @@ extension ChapterCanvasFeature {
               layout.satisfiesCompositionGate(expectedVerseCount: expected) else { return }
 
         let unsaved = state.pendingMutations.values
-            .filter { $0.chapter == state.chapter }
+            .filter { $0.page == state.page }
             .sorted { $0.revision < $1.revision }
             .map(\.mutation)
         let snapshots = overlay(loaded, with: unsaved)
@@ -827,7 +832,7 @@ extension ChapterCanvasFeature {
         state.isReloading = false
         if !composed.undecodableVerses.isEmpty {
             Log.error("단일 Canvas — 디코드할 수 없는 필사 행. 표시·활성 행에서 제외, 다음 편집은 새 행으로",
-                      "\(state.chapter.title.rawValue).\(state.chapter.chapter)",
+                      "\(state.page.chapter.title.rawValue).\(state.page.chapter.chapter)",
                       "verses=\(composed.undecodableVerses.sorted())")
         }
     }
@@ -896,14 +901,14 @@ extension ChapterCanvasFeature {
         let generation = processed.snapshot.generation
 
         // 결과를 자기 세대의 문맥에 반영한다 — §8-7 신규 행의 rowID 는 즉시 예약해 다음 편집이 같은 행으로 가게 한다.
-        let chapter: BibleChapter
+        let page: NotebookChapter
         if generation == state.renderedRevision {
             state.baselineData = processed.snapshot.drawingData
             state.ownership = result.ownership
             for (verse, rowID) in result.issuedRowIDs {
                 state.activeRowIDs[verse] = rowID
             }
-            chapter = state.chapter
+            page = state.page
         } else if var retired = state.retiredSession, retired.generation == generation {
             retired.baselineData = processed.snapshot.drawingData
             retired.ownership = result.ownership
@@ -911,9 +916,9 @@ extension ChapterCanvasFeature {
                 retired.activeRowIDs[verse] = rowID
             }
             state.retiredSession = retired
-            chapter = retired.chapter
-            if chapter == state.chapter {
-                // 같은 장의 이전 세대 편집 — 저장은 되지만 지금 화면(새 합성)에는 없다. 저장이 끝나면 다시 읽어 화면에 올린다.
+            page = retired.page
+            if page == state.page {
+                // 같은 page 의 이전 세대 편집 — 저장은 되지만 지금 화면(새 합성)에는 없다. 저장이 끝나면 다시 읽어 화면에 올린다.
                 state.reloadWhenSettled = true
             }
         } else if let index = state.closedDrafts.contexts.firstIndex(where: { $0.generation == generation }) {
@@ -932,7 +937,7 @@ extension ChapterCanvasFeature {
         for mutation in result.mutations {
             let key = mutation.rowID
             // 이 세션이 이 절을 처음 편집한다 — 지금 보던 기준을 초안에 붙여 둔다(§12-6 구현 순서 ②).
-            let place = DraftVerse(chapter: chapter, verse: mutation.verse)
+            let place = DraftVerse(page: page, verse: mutation.verse)
             if state.drafts.bases[place] == nil {
                 state.drafts.bases[place] = state.drafts.loadedBases[place] ?? .empty
             }
@@ -941,7 +946,7 @@ extension ChapterCanvasFeature {
                 if existing.revision > revision { continue }
                 merged = Self.coalesce(existing: existing.mutation, incoming: merged)
             }
-            state.pendingMutations[key] = PendingDrawingMutation(revision: revision, chapter: chapter, mutation: merged)
+            state.pendingMutations[key] = PendingDrawingMutation(revision: revision, page: page, mutation: merged)
         }
 
         return .merge(

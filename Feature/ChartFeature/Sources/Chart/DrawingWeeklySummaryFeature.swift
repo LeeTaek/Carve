@@ -20,9 +20,15 @@ public struct DrawingWeeklySummaryFeature {
         public var adSlotState: SponsorAdSlotFeature.State = .init(placement: .chartCard)
         public var scrollPosition: Date = Calendar.current.startOfDay(for: Date())
         public var dailyRecords: [DailyRecord] = []
+        /// 날짜(자정)별 · 장(번역본 포함)별 필사 수 — 모든 필사책을 합산한다(2.2 결정 10).
         public var chapterCountsByDay: [Date: [BibleChapter: Int]] = [:]
+        /// 날짜(자정)별 · 장(번역본 포함)별로 그날 그 장을 마지막으로 쓴 필사책 — `chapterCountsByDay` 와 같은 행 · 같은 키로 만든다.
+        /// 가장 많이 쓴 장을 열 필사책을 고른다(`topChapterPage`).
+        public var chapterNotebooksByDay: [Date: [BibleChapter: NotebookID]] = [:]
+        /// 최근에 고친 절 — 행마다 하나, 그 행의 필사책 · 번역본 장을 든다.
         public var recentVerses: [RecentVerseItem] = []
-        public var recentChapters: [BibleChapter] = []
+        /// 최근에 쓴 장 — 필사책을 합산해 장(번역본 포함)마다 한 줄이고, 그 장을 마지막으로 쓴 필사책의 장이다.
+        public var recentChapters: [NotebookChapter] = []
         
         public init() {}
         
@@ -114,7 +120,7 @@ public struct DrawingWeeklySummaryFeature {
             }
         }
 
-        /// 이번 주 가장 많이 쓴 장(번역본 포함) — 같은 권 · 장도 번역본이 다르면 따로 센다.
+        /// 이번 주 가장 많이 쓴 장(번역본 포함) — 모든 필사책을 합산하고(2.2 결정 10), 같은 권 · 장도 번역본이 다르면 따로 센다.
         public var topChapter: (chapter: BibleChapter, count: Int)? {
             var merged: [BibleChapter: Int] = [:]
 
@@ -132,22 +138,35 @@ public struct DrawingWeeklySummaryFeature {
             guard let best else { return nil }
             return (best.key, best.value)
         }
+
+        /// 이번 주 가장 많이 쓴 장을 여는 곳 — 필사책을 합산해 고른 장을, 이번 주에 그 장을 마지막으로 쓴 필사책으로 연다(「이어서 쓰기」).
+        /// 그 장을 쓴 필사책을 모르면(`chapterNotebooksByDay` 에 없으면) nil 이다 — 기본 필사책으로 바꿔 열지 않는다.
+        public var topChapterPage: NotebookChapter? {
+            guard let chapter = topChapter?.chapter else { return nil }
+            // 보이는 주의 마지막 날부터 거슬러 — 그 장이 든 가장 늦은 날의 필사책이 마지막으로 쓴 필사책이다.
+            for day in currentWeekDates.reversed() {
+                if let notebook = chapterNotebooksByDay[day]?[chapter] {
+                    return NotebookChapter(notebook: notebook, chapter: chapter)
+                }
+            }
+            return nil
+        }
     }
     
     public enum Action: ViewAction {
         case adSlot(SponsorAdSlotFeature.Action)
         case view(View)
-        /// 최근 절을 골랐다 — 코디네이터가 차트를 닫고 그 절을 연다. 절의 장(`BibleVerse.title`)에 번역본이 든다.
-        case openVerse(BibleVerse)
-        /// 최근 장 · 가장 많이 쓴 장을 골랐다 — 코디네이터가 차트를 닫고 그 번역본의 장을 연다.
-        case openChapter(BibleChapter)
+        /// 최근 절을 골랐다 — 코디네이터가 차트를 닫고 그 필사책 · 번역본의 장에서 그 절을 연다(2.2 결정 10).
+        case openVerse(NotebookChapter, verse: Int)
+        /// 최근 장 · 가장 많이 쓴 장을 골랐다 — 코디네이터가 차트를 닫고 그 필사책 · 번역본의 장을 연다.
+        case openChapter(NotebookChapter)
         
         public enum View {
             case onAppear
             /// 「최근」 의 절을 눌렀다.
             case recentVerseTapped(RecentVerseItem)
-            /// 「최근 장」 의 장을 눌렀다.
-            case recentChapterTapped(BibleChapter)
+            /// 「최근 장」 의 장을 눌렀다 — 그 장을 마지막으로 쓴 필사책의 장이다.
+            case recentChapterTapped(NotebookChapter)
             /// 가장 많이 쓴 장 · 「이어서 쓰기」 를 눌렀다.
             case topChapterTapped
         }
@@ -164,15 +183,17 @@ public struct DrawingWeeklySummaryFeature {
                 return .send(.adSlot(.startLoad))
                 
             case let .view(.recentVerseTapped(item)):
-                // 그 항목의 번역본 절로 연다 — 지금 필사 중인 번역본으로 바꾸지 않는다.
-                return .send(.openVerse(item.verse))
+                // 그 항목의 필사책 · 번역본 절로 연다 — 지금 필사 중인 필사책 · 번역본으로 바꾸지 않는다.
+                return .send(.openVerse(item.page, verse: item.verse.verse))
 
-            case let .view(.recentChapterTapped(chapter)):
-                return .send(.openChapter(chapter))
+            case let .view(.recentChapterTapped(page)):
+                // 그 장을 마지막으로 쓴 필사책 · 번역본의 장으로 연다 — 지금 필사책으로 바꾸지 않는다(2.2 결정 10).
+                return .send(.openChapter(page))
 
             case .view(.topChapterTapped):
-                guard let chapter = state.topChapter?.chapter else { return .none }
-                return .send(.openChapter(chapter))
+                // 필사책을 합산해 고른 장을 이번 주에 마지막으로 쓴 필사책으로 연다. 필사책을 모르면 아무 일도 하지 않는다.
+                guard let page = state.topChapterPage else { return .none }
+                return .send(.openChapter(page))
                 
             default:
                 return .none

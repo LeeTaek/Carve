@@ -224,7 +224,7 @@ struct ChapterCanvasEraseTesting {
         await store.receive(\.eraseFinished)
         #expect(store.state.eraseTask?.phase == .failed)
 
-        await store.send(.load(chapter: BibleChapter(title: .jonah, chapter: 3), expectedVerseCount: 3))
+        await store.send(.load(page: BibleChapter(title: .jonah, chapter: 3).inDefaultNotebook, expectedVerseCount: 3))
         #expect(store.state.eraseTask == nil)
         #expect(store.state.eraseAlert == nil)
         await store.receive(\.drawingsLoaded)

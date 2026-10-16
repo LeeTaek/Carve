@@ -91,8 +91,8 @@ struct BackupImporterCleanupTesting {
             _ = try await importer.inspect(fileURL: truncated, password: Sample.password)
         }
         // 뒤 버전 형식
-        let newer = try harness.writeBackup([entry], formatVersion: 2)
-        await #expect(throws: BackupImportError.unsupportedFormat(formatVersion: 2)) {
+        let newer = try harness.writeBackup([entry], formatVersion: 3)
+        await #expect(throws: BackupImportError.unsupportedFormat(formatVersion: 3)) {
             _ = try await importer.inspect(fileURL: newer, password: Sample.password)
         }
         // 고른 파일을 읽을 수 없다

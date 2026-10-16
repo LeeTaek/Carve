@@ -53,7 +53,7 @@ struct BackupImportPlanPinTesting {
         #expect(representative.rowKey == "1-01Genesis.txt.1.1.1700000100")
         #expect(representative.lineData == inkL)
         // 고정하지 않았다면 대표 규칙이 전체 행에서 골라 가장 늦은 Z 가 보였다
-        let unpinned = BackupChapterPlan(chapter: plan.chapter, decisions: plan.decisions, insertions: plan.insertions)
+        let unpinned = BackupChapterPlan(page: plan.page, decisions: plan.decisions, insertions: plan.insertions)
         #expect(Sample.representative(of: Sample.applying(unpinned, to: legacyRows, blobs: [inkY, inkZ]))?.lineData == inkZ)
 
         // Then — 다시 불러오면 넣을 행도 고정도 없다
@@ -156,7 +156,7 @@ struct BackupImportPlanPinTesting {
         #expect(representative.rowKey == "1-01Genesis.txt.1.1.1700000200")
         #expect(representative.lineData == nil)
         // 고정하지 않았다면 10/01 의 Z 가 대표로 올라가 지운 절에 필기가 보였다
-        let unpinned = BackupChapterPlan(chapter: plan.chapter, decisions: plan.decisions, insertions: plan.insertions)
+        let unpinned = BackupChapterPlan(page: plan.page, decisions: plan.decisions, insertions: plan.insertions)
         #expect(Sample.representative(of: Sample.applying(unpinned, to: rows, blobs: [inkY, inkZ]))?.lineData == inkZ)
     }
 }

@@ -58,7 +58,7 @@ struct BackupTranslationRoundTripTesting {
     /// 표본 초안을 다른 번역본의 같은 절 초안으로 옮긴다(키만 바꾼다).
     private func moved(_ draft: VerseDraft, to chapter: BibleChapter) -> VerseDraft {
         var draft = draft
-        draft.key = VerseDraftKey(sessionID: draft.key.sessionID, translation: chapter.translation, chapter: chapter, verse: draft.key.verse)
+        draft.key = VerseDraftKey(sessionID: draft.key.sessionID, page: chapter.inDefaultNotebook, verse: draft.key.verse)
         return draft
     }
 
@@ -95,7 +95,7 @@ struct BackupTranslationRoundTripTesting {
         let payload = try harness.open(result)
 
         // Then: 행이 있는 장은 번역본별이고, 진행은 권 · 장 자리 단위(창세기 1장 하나)다.
-        #expect(try await harness.database.backupChapters() == [Sample.genesis1, Self.kjvGenesis1, Self.bsbGenesis1])
+        #expect(try await harness.database.backupPages() == [Sample.genesis1, Self.kjvGenesis1, Self.bsbGenesis1].map { Sample.page($0) })
         #expect(progress.events == [BackupProgress(done: 0, total: 1), BackupProgress(done: 1, total: 1)])
 
         // Then: 개역개정 행 — 열 값 그대로(nil 은 null), 원래 권 이름.
@@ -191,9 +191,10 @@ struct BackupTranslationRoundTripTesting {
             Sample.genesis2, Self.kjvGenesis2, BibleChapter(title: .genesis, chapter: 2, translation: .BSB)
         ])
         #expect(Self.kjvGenesis2.backupPlace == Sample.genesis2)
-        #expect(BackupImportPlanner.ordered([Self.bsbGenesis1, Sample.genesis2, Self.kjvGenesis1, Sample.genesis1]) == [
+        let pages = [Self.bsbGenesis1, Sample.genesis2, Self.kjvGenesis1, Sample.genesis1].map { Sample.page($0) }
+        #expect(BackupImportPlanner.ordered(pages) == [
             Sample.genesis1, Self.kjvGenesis1, Self.bsbGenesis1, Sample.genesis2
-        ])
+        ].map { Sample.page($0) })
     }
 
     @Test("백업 키의 번역본 — titleName 접두가 먼저고, 접두 없는 행은 열 값 그대로(nil 은 null)")
@@ -219,30 +220,32 @@ struct BackupTranslationRoundTripTesting {
         let bsbItem = PlanSample.item("BSB", ink: ink, isCurrent: true, updatedAt: PlanSample.sep(2), translation: "BSB")
         let esvItem = PlanSample.item("ESV", ink: ink, isCurrent: true, updatedAt: PlanSample.sep(2), translation: "ESV")
 
-        // 장 — nil · NKRV 는 개역개정, KJV · BSB 는 그 번역본, 모르는 번역본은 개역개정 장(지원 안 됨으로만 센다).
-        #expect(BackupImportPlanner.chapter(of: nilItem) == Sample.genesis1)
-        #expect(BackupImportPlanner.chapter(of: kjvItem) == Self.kjvGenesis1)
-        #expect(BackupImportPlanner.chapter(of: bsbItem) == Self.bsbGenesis1)
-        #expect(BackupImportPlanner.chapter(of: esvItem) == Sample.genesis1)
-        #expect(BackupImportPlanner.chapters(of: [bsbItem, esvItem, kjvItem, nilItem]) == [Sample.genesis1, Self.kjvGenesis1, Self.bsbGenesis1])
+        // 장 — nil · NKRV 는 개역개정, KJV · BSB 는 그 번역본, 모르는 번역본은 개역개정 장(지원 안 됨으로만 센다). 필사책은 기본.
+        #expect(BackupImportPlanner.page(of: nilItem) == Sample.page(Sample.genesis1))
+        #expect(BackupImportPlanner.page(of: kjvItem) == Sample.page(Self.kjvGenesis1))
+        #expect(BackupImportPlanner.page(of: bsbItem) == Sample.page(Self.bsbGenesis1))
+        #expect(BackupImportPlanner.page(of: esvItem) == Sample.page(Sample.genesis1))
+        #expect(BackupImportPlanner.pages(of: [bsbItem, esvItem, kjvItem, nilItem]) == [
+            Sample.genesis1, Self.kjvGenesis1, Self.bsbGenesis1
+        ].map { Sample.page($0) })
 
         // 지금 행 — 같은 잉크의 KJV 행(열 nil · `KJV-` 접두)은 개역개정 장 판정에 들지 않는다.
         let kjvRow = record("ROW-KJV", titleName: "KJV-1-01Genesis.txt", translation: nil, ink: ink)
         let unsupported = [esvItem.id: BackupUnsupportedReason.unknownTranslation]
         let items = [nilItem, kjvItem, bsbItem, esvItem]
-        let nkrvPlan = BackupImportPlanner.plan(items: items, unsupported: unsupported, current: [kjvRow], chapter: Sample.genesis1)
+        let nkrvPlan = BackupImportPlanner.plan(items: items, unsupported: unsupported, current: [kjvRow], page: Sample.page(Sample.genesis1))
         #expect(nkrvPlan.decision(for: nilItem.id) == .insertCurrent)
         #expect(nkrvPlan.decision(for: esvItem.id) == .unsupported(.unknownTranslation))
         #expect(nkrvPlan.decision(for: kjvItem.id) == nil)
         #expect(nkrvPlan.insertions.map(\.titleName) == ["1-01Genesis.txt"])
 
         // KJV 장은 KJV 항목과 KJV 행만 본다 — 같은 내용이라 넣지 않는다.
-        let kjvPlan = BackupImportPlanner.plan(items: items, unsupported: unsupported, current: [kjvRow], chapter: Self.kjvGenesis1)
+        let kjvPlan = BackupImportPlanner.plan(items: items, unsupported: unsupported, current: [kjvRow], page: Sample.page(Self.kjvGenesis1))
         #expect(kjvPlan.decisions.map(\.itemID) == [kjvItem.id])
         #expect(kjvPlan.decision(for: kjvItem.id) == .skipSame)
 
         // BSB 장 — 같은 잉크의 KJV 행을 보지 않아 새 현재로, 넣는 행의 권 이름은 접두가 붙는다.
-        let bsbPlan = BackupImportPlanner.plan(items: items, unsupported: unsupported, current: [kjvRow], chapter: Self.bsbGenesis1)
+        let bsbPlan = BackupImportPlanner.plan(items: items, unsupported: unsupported, current: [kjvRow], page: Sample.page(Self.bsbGenesis1))
         #expect(bsbPlan.decision(for: bsbItem.id) == .insertCurrent)
         #expect(bsbPlan.insertions.map(\.titleName) == ["BSB-1-01Genesis.txt"])
     }
@@ -264,7 +267,7 @@ struct BackupTranslationRoundTripTesting {
         let report = try await importer.apply(inspection) { _ in }
 
         // Then: 장은 번역본별이고, 번역본마다 현재 하나씩(개역개정은 1 · 2절) · KJV 보관 하나.
-        #expect(inspection.preview.chapters == [Sample.genesis1, Self.kjvGenesis1, Self.bsbGenesis1])
+        #expect(inspection.preview.chapters == [Sample.genesis1, Self.kjvGenesis1, Self.bsbGenesis1].map { Sample.page($0) })
         #expect(inspection.preview.new == 4)
         #expect(inspection.preview.archived == 1)
         #expect(report.tally.insertCount == seeds.count)
@@ -362,7 +365,7 @@ struct BackupTranslationRoundTripTesting {
         // Then: ESV 는 지원 안 됨으로만 세고, 판정할 장은 KJV 창세기 1장뿐이다.
         #expect(inspection.preview.unsupported == [.unknownTranslation: 1])
         #expect(inspection.preview.new == 1)
-        #expect(inspection.preview.chapters == [Self.kjvGenesis1])
+        #expect(inspection.preview.chapters == [Sample.page(Self.kjvGenesis1)])
         #expect(report.tally.insertCount == 1)
         #expect(try await harness.rows(Sample.genesis1).isEmpty)
         let stored = try ModelContext(harness.container).fetch(FetchDescriptor<BibleDrawing>())

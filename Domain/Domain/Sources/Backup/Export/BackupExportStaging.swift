@@ -51,14 +51,15 @@ struct BackupExportStaging {
         items.append(candidate.item)
     }
 
-    /// 모은 항목 · blob 으로 manifest 를 만들고 `manifest.json` · `items.json` 을 백업 인코더(키 정렬 · 2001 기준 초)로 쓴다.
+    /// 모은 항목 · blob 과 필사책 목록으로 manifest 를 만들고 `manifest.json` · `items.json` 을 백업 인코더(키 정렬 · 2001 기준 초)로 쓴다.
     /// - Parameters:
     ///   - backupID: 이 백업의 UUID 문자열.
     ///   - createdAt: 만든 시각.
     ///   - appVersion: 만든 앱 버전.
+    ///   - notebooks: 필사책 목록(형식 2 — manifest 의 `notebooks`).
     /// - Returns: 쓴 manifest — 재검증이 파일에서 다시 읽은 것과 견준다.
     /// - Throws: 인코딩 · 쓰기 실패. 부작용: 파일 쓰기.
-    func finish(backupID: String, createdAt: Date, appVersion: String) throws -> BackupManifest {
+    func finish(backupID: String, createdAt: Date, appVersion: String, notebooks: [BackupNotebookRecord]) throws -> BackupManifest {
         let rows = items.filter { $0.kind == .row }.count
         let entries = blobs.values.sorted { $0.name < $1.name }
         let manifest = BackupManifest(
@@ -67,7 +68,8 @@ struct BackupExportStaging {
             appVersion: appVersion,
             scope: BackupScope(rows: true, drafts: true),
             counts: BackupCounts(rows: rows, drafts: items.count - rows, blobs: entries.count),
-            blobs: entries
+            blobs: entries,
+            notebooks: notebooks
         )
         try BackupFormat.encoder.encode(manifest)
             .write(to: directory.appendingPathComponent(BackupFormat.manifestFileName, isDirectory: false), options: [.withoutOverwriting])

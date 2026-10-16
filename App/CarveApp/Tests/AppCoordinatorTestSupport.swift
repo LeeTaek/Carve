@@ -47,6 +47,7 @@ enum RootScreen: Equatable {
 enum PathScreen: Equatable {
     case chart
     case favorites
+    case notebooks
 }
 
 extension AppCoordinatorFeature.State {
@@ -65,6 +66,7 @@ extension AppCoordinatorFeature.State {
             switch screen {
             case .chart: .chart
             case .favorites: .favorites
+            case .notebooks: .notebooks
             }
         }
     }
@@ -115,15 +117,15 @@ struct UnreadableBibleTextClient: BibleTextClient {
 struct UnusedDrawingRepository: DrawingRepository {
     struct Unused: Error {}
 
-    func load(chapter: BibleChapter) async throws -> DrawingChapterLoad {
+    func load(_ page: NotebookChapter) async throws -> DrawingChapterLoad {
         throw Unused()
     }
 
-    func apply(_ mutations: [VerseDrawingMutation], chapter: BibleChapter, generation: DrawingStoreGeneration) async throws {
+    func apply(_ mutations: [VerseDrawingMutation], page: NotebookChapter, generation: DrawingStoreGeneration) async throws {
         throw Unused()
     }
 
-    func archiveAndReset(_ command: VerseDrawingArchiveCommand, chapter: BibleChapter) async throws -> VerseDrawingArchiveOutcome {
+    func archiveAndReset(_ command: VerseDrawingArchiveCommand, page: NotebookChapter) async throws -> VerseDrawingArchiveOutcome {
         throw Unused()
     }
 }

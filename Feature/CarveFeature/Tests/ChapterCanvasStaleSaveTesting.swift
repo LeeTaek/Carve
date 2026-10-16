@@ -22,11 +22,11 @@ private final class OrderedApplySpy: DrawingRepository, @unchecked Sendable {
     private let nextIndex = LockIsolated(0)
     let applied = LockIsolated<[[VerseDrawingMutation]]>([])
 
-    func load(chapter: BibleChapter) async throws -> DrawingChapterLoad {
+    func load(_ page: NotebookChapter) async throws -> DrawingChapterLoad {
         DrawingChapterLoad(snapshots: [], generation: DrawingStoreGeneration(raw: 0))
     }
 
-    func apply(_ mutations: [VerseDrawingMutation], chapter: BibleChapter, generation: DrawingStoreGeneration) async throws {
+    func apply(_ mutations: [VerseDrawingMutation], page: NotebookChapter, generation: DrawingStoreGeneration) async throws {
         let index = nextIndex.withValue { value -> Int in
             defer { value += 1 }
             return value
@@ -37,7 +37,7 @@ private final class OrderedApplySpy: DrawingRepository, @unchecked Sendable {
         applied.withValue { $0.append(mutations) }
     }
 
-    func archiveAndReset(_ command: VerseDrawingArchiveCommand, chapter: BibleChapter) async throws -> VerseDrawingArchiveOutcome {
+    func archiveAndReset(_ command: VerseDrawingArchiveCommand, page: NotebookChapter) async throws -> VerseDrawingArchiveOutcome {
         .alreadyEmpty
     }
 
@@ -66,7 +66,7 @@ struct ChapterCanvasStaleSaveTesting {
     }
 
     private func makeStore(_ spy: OrderedApplySpy, results: [DrawingEditResult]) -> TestStoreOf<ChapterCanvasFeature> {
-        let store = TestStore(initialState: ChapterCanvasFeature.State(chapter: CanvasTestSupport.chapter)) {
+        let store = TestStore(initialState: ChapterCanvasFeature.State(page: CanvasTestSupport.page)) {
             ChapterCanvasFeature()
         } withDependencies: {
             $0.drawingCodec = CanvasTestSupport.codec(results: LockIsolated(results))

@@ -66,7 +66,7 @@ struct TranslationFavoriteWidgetTesting {
     private static func kjvState() -> CarveDetailFeature.State {
         var state = CarveDetailFeature.State.initialState
         state.sentenceWithDrawingState = [
-            SentencesWithDrawingFeature.State(sentence: BibleVerse(title: kjvChapter, verse: 1, sentence: kjvSentence))
+            SentencesWithDrawingFeature.State(sentence: BibleVerse(title: kjvChapter, verse: 1, sentence: kjvSentence), notebook: .default)
         ]
         state.favoriteChapter = kjvChapter
         return state
@@ -253,7 +253,7 @@ struct TranslationFavoriteWidgetTesting {
         ]
         for seed in seeds {
             let row = BibleDrawing(
-                bibleTitle: seed.chapter, verse: 1, lineData: seed.ink,
+                page: seed.chapter.inDefaultNotebook, verse: 1, lineData: seed.ink,
                 updateDate: Date(timeIntervalSince1970: seed.updatedAt), rowUUID: seed.key
             )
             row.isPresent = seed.isPresent
@@ -265,14 +265,14 @@ struct TranslationFavoriteWidgetTesting {
 
     /// 그 장 · 절에서 `isPresent` 인 행의 키.
     private static func presentKeys(_ storeActor: SwiftDatabaseActor, chapter: BibleChapter) async throws -> [String] {
-        try await storeActor.verseDrawingSnapshots(chapter: chapter, verse: 1).filter(\.isPresent).map(\.rowID.raw)
+        try await storeActor.verseDrawingSnapshots(page: chapter.inDefaultNotebook, verse: 1).filter(\.isPresent).map(\.rowID.raw)
     }
 
     @Test("이전 필사는 그 장의 번역본 행만 보이고, 회차를 고르면 그 번역본 행의 대표만 바꾼다 — 개역개정 대표는 그대로다")
     func verseHistoryIsPerTranslation() async throws {
         let (container, storeActor) = try Self.makeHistoryDatabase()
         let database = withDependencies { $0.createSwiftDataActor = storeActor } operation: { DrawingDatabase() }
-        let store = Store(initialState: VerseDrawingHistoryFeature.State(title: Self.kjvChapter, verse: 1)) {
+        let store = Store(initialState: VerseDrawingHistoryFeature.State(page: Self.kjvChapter.inDefaultNotebook, verse: 1)) {
             VerseDrawingHistoryFeature()
         } withDependencies: {
             $0.drawingData = database
@@ -293,8 +293,8 @@ struct TranslationFavoriteWidgetTesting {
 
     @Test("이전 필사 시트의 식별은 번역본마다 다르다 — 개역개정은 지금과 같다")
     func verseHistoryIdentityIncludesTranslation() {
-        let nkrv = VerseDrawingHistoryFeature.State(title: Self.nkrvChapter, verse: 1)
-        let kjv = VerseDrawingHistoryFeature.State(title: Self.kjvChapter, verse: 1)
+        let nkrv = VerseDrawingHistoryFeature.State(page: Self.nkrvChapter.inDefaultNotebook, verse: 1)
+        let kjv = VerseDrawingHistoryFeature.State(page: Self.kjvChapter.inDefaultNotebook, verse: 1)
 
         #expect(nkrv.id == "DrewHistory.1-19Psalms.txt.23.1")
         #expect(kjv.id != nkrv.id)

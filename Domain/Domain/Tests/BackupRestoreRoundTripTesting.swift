@@ -62,7 +62,7 @@ struct BackupRestoreRoundTripTesting {
         #expect(inspection.targetScope == Sample.accountA)
         #expect(inspection.preview.new == 7)
         #expect(inspection.preview.archived == 1)
-        #expect(inspection.preview.chapters == [Sample.genesis1])
+        #expect(inspection.preview.chapters == [Sample.page(Sample.genesis1)])
         #expect(report == .completed(BackupImportTally(new: 7, archived: 1)))
 
         // Then: 항목마다 원본 그대로인 행이 하나씩 있다.
@@ -86,7 +86,7 @@ struct BackupRestoreRoundTripTesting {
             #expect(representative.lineData == entry.ink, "\(entry.sourceKey)")
             #expect(representative.updateDate == entry.updatedAt, "\(entry.sourceKey)")
         }
-        #expect(harness.changes.posted == [LocalDrawingChange(chapter: Sample.genesis1, date: Sample.now)])
+        #expect(harness.changes.posted == [LocalDrawingChange(page: Sample.genesis1.inDefaultNotebook, date: Sample.now)])
     }
 
     @Test("「비운 현재 + 잉크 보관」 을 빈 저장소에 불러오면 비운 행이 대표로 남고, 지운 필기는 이전 필사 기록에만 있다")
@@ -114,7 +114,7 @@ struct BackupRestoreRoundTripTesting {
         #expect(rows.first { $0.lineData == Sample.ink("erased") }?.isPresent == false)
 
         // Then: 화면(장 조회의 대표)은 비운 행 — 절은 비어 보인다. 지운 필기는 「이전 필사 내용 보기」 에만 있다.
-        let load = try await SwiftDataDrawingRepository(actor: harness.database).load(chapter: Sample.genesis1)
+        let load = try await SwiftDataDrawingRepository(actor: harness.database).load(Sample.genesis1.inDefaultNotebook)
         let representative = try #require(load.snapshots.representativesByVerse()[2])
         #expect(representative.lineData == nil)
         #expect(load.snapshots.contains { $0.lineData == Sample.ink("erased") && !$0.isPresent })
@@ -176,7 +176,7 @@ struct BackupRestoreRoundTripTesting {
             #expect(match?.rowKey != original.rowKey)
         }
         // Then: 절마다 대표의 내용 · 시각이 내보낸 저장소와 같다(2절은 비운 행).
-        let exportedRows = try await source.database.backupRows(chapter: Sample.genesis1).rows
+        let exportedRows = try await source.database.backupRows(page: Sample.page(Sample.genesis1)).rows
         for verse in 1...4 {
             let before = DrawingRepresentativeRule.pick(exportedRows.filter { $0.verse == verse })
             let after = try await harness.representative(verse: verse)

@@ -59,6 +59,8 @@ public struct AppCoordinatorView: View {
                 DrawingChartView(store: store)
             case .favorites(let store):
                 FavoriteListView(store: store)
+            case .notebooks(let store):
+                NotebookShelfView(store: store)
             }
         }
         .allowsHitTesting(store.patchnote == nil && store.settings == nil)

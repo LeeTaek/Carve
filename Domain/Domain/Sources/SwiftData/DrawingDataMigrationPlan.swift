@@ -46,14 +46,19 @@ private struct V1DrawingMigrationValue: Sendable {
 }
 
 
-/// BibleDrawing 관련 SwiftData Schema(V1~V5) 마이그레이션 플랜
+/// BibleDrawing 관련 SwiftData Schema(V1~V7) 마이그레이션 플랜
 /// V1 -> V2: DrawingVO -> BibleDrawing 모델명 및 속성 변경 (Custom)
 /// V2 -> V3: BiblePageDrawing 추가(lightWeight)
 /// V3 -> V4: optional 필드 2개 추가(lightWeight). **데이터 변환 없음** — 설계 §10-2
 /// V4 -> V5: FavoriteVerse 엔티티 추가(lightWeight). 필사 행은 그대로
+/// V5 -> V6: VerseDrawingVersion · DrawingEraseEpoch 엔티티 · 즐겨찾기 K 필드 추가(lightWeight). 필사 행은 그대로
+/// V6 -> V7: DrawingNotebook(필사책 메타데이터) 엔티티 추가(lightWeight). 필사 행은 그대로
 enum DrawingDataMigrationPlan: SchemaMigrationPlan {
     static var schemas: [VersionedSchema.Type] {
-        [DrawingSchemaV1.self, DrawingSchemaV2.self, DrawingSchemaV3.self, DrawingSchemaV4.self, DrawingSchemaV5.self, DrawingSchemaV6.self]
+        [
+            DrawingSchemaV1.self, DrawingSchemaV2.self, DrawingSchemaV3.self, DrawingSchemaV4.self,
+            DrawingSchemaV5.self, DrawingSchemaV6.self, DrawingSchemaV7.self
+        ]
     }
 
     /// willMigrate 가 V1 행에서 뽑은 값을 didMigrate 까지 들고 있는 임시 보관. 두 단계 사이에만 값이 있다.
@@ -152,14 +157,26 @@ enum DrawingDataMigrationPlan: SchemaMigrationPlan {
         toVersion: DrawingSchemaV6.self
     )
 
-    /// 정의된 순서대로 마이그레이션 실행 (V1 -> V2, V2 -> V3, V3 -> V4, V4 -> V5, V5 -> V6)
+    /// 필사책 메타데이터(`DrawingNotebook`) 엔티티만 더한다(2.2 「회차별 필사책」). 필사 행 · 즐겨찾기 · 버전 · 기준점은 V6 클래스를 그대로 쓴다.
+    ///
+    /// 필사책은 행의 `titleName` 접두로 가르므로(`StoredBookKey`) 여기서 행을 고치지 않는다 — 지금까지의 모든 필사는 접두 없는 기본 필사책 행 그대로다.
+    /// 기본 필사책의 메타데이터 레코드도 만들지 않는다(이름을 바꾸거나 완료를 표시할 때만 생긴다).
+    ///
+    /// - Important: forward-only 다. 이 단계를 거친 store 는 V6 빌드로 열 수 없다.
+    static let migrationV6toV7 = MigrationStage.lightweight(
+        fromVersion: DrawingSchemaV6.self,
+        toVersion: DrawingSchemaV7.self
+    )
+
+    /// 정의된 순서대로 마이그레이션 실행 (V1 -> V2, V2 -> V3, V3 -> V4, V4 -> V5, V5 -> V6, V6 -> V7)
     static var stages: [MigrationStage] {
         [
             migrationV1toV2,
             migrationV2toV3,
             migrationV3toV4,
             migrationV4toV5,
-            migrationV5toV6
+            migrationV5toV6,
+            migrationV6toV7
         ]
     }
 }
@@ -169,7 +186,7 @@ enum DrawingDataMigrationPlan: SchemaMigrationPlan {
 /// 원본 버전을 찾지 못한다(134504). 확인된 V2 저장소부터 마지막 단계까지만 선언한다.
 enum DrawingDataMigrationPlanFromV2: SchemaMigrationPlan {
     static var schemas: [VersionedSchema.Type] {
-        [DrawingSchemaV2.self, DrawingSchemaV3.self, DrawingSchemaV4.self, DrawingSchemaV5.self, DrawingSchemaV6.self]
+        [DrawingSchemaV2.self, DrawingSchemaV3.self, DrawingSchemaV4.self, DrawingSchemaV5.self, DrawingSchemaV6.self, DrawingSchemaV7.self]
     }
 
     static var stages: [MigrationStage] {
@@ -177,7 +194,8 @@ enum DrawingDataMigrationPlanFromV2: SchemaMigrationPlan {
             DrawingDataMigrationPlan.migrationV2toV3,
             DrawingDataMigrationPlan.migrationV3toV4,
             DrawingDataMigrationPlan.migrationV4toV5,
-            DrawingDataMigrationPlan.migrationV5toV6
+            DrawingDataMigrationPlan.migrationV5toV6,
+            DrawingDataMigrationPlan.migrationV6toV7
         ]
     }
 }

@@ -195,7 +195,7 @@ struct ChapterCanvasArrivalTesting: DraftTestSamples {
         drafts.seed(previousDraft(verse: 2, ink: "earlier"))
         let store = makeArrivalStore(spy: spy, environment: environment, drafts: drafts, arrivals: arrivals)
         await open(store, environment, arrivals)
-        #expect(store.state.drafts.adopted[DraftVerse(chapter: CanvasTestSupport.chapter, verse: 2)] != nil)
+        #expect(store.state.drafts.adopted[DraftVerse(page: CanvasTestSupport.page, verse: 2)] != nil)
 
         importArrives(on: spy)
         arrivals.arrive()
@@ -498,19 +498,19 @@ extension ChapterCanvasArrivalTesting {
         await open(store, environment, arrivals)
         await draw(store, "other-chapter")
         await store.receive(\.draftsSaved)
-        let edited = DraftVerse(chapter: CanvasTestSupport.chapter, verse: 2)
+        let edited = DraftVerse(page: CanvasTestSupport.page, verse: 2)
         let editedBase = try #require(store.state.drafts.bases[edited])
 
         let next = BibleChapter(title: .jonah, chapter: 3)
         // 다음 장 1절에는 확인 전(힌트 A)에 쓴 보이기만 하는 초안이 겹쳐 보인다.
         var shown = previousDraft(verse: 1, ink: "shown-only", account: .unverified(hint: accountA))
-        shown.key = VerseDraftKey(sessionID: shown.key.sessionID, chapter: next, verse: 1)
+        shown.key = VerseDraftKey(sessionID: shown.key.sessionID, page: next.inDefaultNotebook, verse: 1)
         drafts.seed(shown)
         spy.snapshots = { chapter in chapter == next ? [CanvasTestSupport.snapshot(verse: 1, rowID: CanvasTestSupport.rowA)] : [] }
-        await store.send(.load(chapter: next, expectedVerseCount: 3))
+        await store.send(.load(page: next.inDefaultNotebook, expectedVerseCount: 3))
         await store.receive(\.drawingsLoaded)
         await store.send(.layoutCompleted(CanvasTestSupport.otherLayout))
-        let shownPlace = DraftVerse(chapter: next, verse: 1)
+        let shownPlace = DraftVerse(page: next.inDefaultNotebook, verse: 1)
         let adopted = try #require(store.state.drafts.adopted[shownPlace])
         let inherited = try #require(store.state.drafts.inherited[shownPlace])
 

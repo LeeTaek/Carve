@@ -61,24 +61,29 @@ struct DraftRecoveryTranslationTesting {
         let writer: LocalPreservationWriter
         let repository: SwiftDataDrawingRepository
 
+        /// 기본 필사책에서 그 장(번역본 포함) — 번역본만 다르고 필사책은 같다.
+        static func page(_ chapter: BibleChapter) -> NotebookChapter {
+            NotebookChapter(notebook: .default, chapter: chapter)
+        }
+
         /// 그 장(번역본 포함)의 1절에 필기를 둔다.
         func seed(_ chapter: BibleChapter, ink: Data) async throws {
-            let generation = try await repository.load(chapter: chapter).generation
+            let generation = try await repository.load(Self.page(chapter)).generation
             let mutation = VerseDrawingMutation.create(
                 verse: 1, rowID: BibleDrawingRowID.issue(), data: ink, metadata: DraftRecoveryTranslationTesting.metadata
             )
-            try await repository.apply([mutation], chapter: chapter, generation: generation)
+            try await repository.apply([mutation], page: Self.page(chapter), generation: generation)
         }
 
         /// 그 장(번역본 포함) 1절의 지금 필기.
         func current(_ chapter: BibleChapter) async throws -> Data? {
-            try await repository.load(chapter: chapter).snapshots.representativesByVerse()[1]?.lineData
+            try await repository.load(Self.page(chapter)).snapshots.representativesByVerse()[1]?.lineData
         }
 
         /// 로그인하지 않은 동안 그 장(번역본 포함)의 1절에 쓴 필기.
         func saveLoggedOutDraft(_ chapter: BibleChapter, ink: Data) async throws {
             let draft = VerseDraft(
-                key: VerseDraftKey(sessionID: "logged-out", chapter: chapter, verse: 1), revision: 1,
+                key: VerseDraftKey(sessionID: "logged-out", page: Self.page(chapter), verse: 1), revision: 1,
                 rowID: BibleDrawingRowID(raw: "draft-row-\(chapter.translation.rawValue)"), lineData: ink, drawingVersion: 3,
                 layoutMetadataData: try DraftRecoveryTranslationTesting.metadata.encodedBlob(), base: .empty, baseFingerprint: nil,
                 account: .localOnly, knownEpochs: [], storeOwnership: nil, eraseGeneration: 0, savedAt: Date(timeIntervalSince1970: 1_000)
@@ -185,7 +190,7 @@ struct DraftRecoveryTranslationTesting {
             ))
             #expect(try await fixture.current(Self.english) == translationInks[2])
             #expect(try await fixture.current(Self.korean) == translationInks[3])
-            #expect(changes.posted.value == [LocalDrawingChange(chapter: Self.english, date: Date(timeIntervalSince1970: 5_000))])
+            #expect(changes.posted.value == [LocalDrawingChange(page: Fixture.page(Self.english), date: Date(timeIntervalSince1970: 5_000))])
             await store.receive(\.loaded)
             #expect(store.state.pendingCount == 0)
         }

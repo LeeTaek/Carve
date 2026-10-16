@@ -130,8 +130,8 @@ struct DrawingChartFetchTesting {
                 recentVerse(john, verse: 16, at: middle),
                 recentVerse(psalms, verse: 1, at: .distantFuture)
             ]
-            // 장 목록도 권 · 장 · 번역본을 알 수 있는 항목만 담는다
-            $0.drawingWeeklySummary.recentChapters = [romans, john, psalms]
+            // 장 목록도 권 · 장 · 번역본을 알 수 있는 항목만 담는다 — 접두 없는 행이라 기본 필사책의 장이다
+            $0.drawingWeeklySummary.recentChapters = [romans, john, psalms].map(defaultPage)
         }
     }
 
@@ -143,9 +143,9 @@ struct DrawingChartFetchTesting {
         let johnKJV = BibleChapter(title: .john, chapter: 3, translation: .KJV)
         let today = fixedChartDay(0)
         let activities = [
-            DrawingActivity(updateDate: today.addingTimeInterval(3_600), chapter: johnKJV, verse: 16),
-            DrawingActivity(updateDate: today.addingTimeInterval(2_400), chapter: john, verse: 17),
-            DrawingActivity(updateDate: today.addingTimeInterval(1_200), chapter: john, verse: 16)
+            DrawingActivity(updateDate: today.addingTimeInterval(3_600), page: defaultPage(johnKJV), verse: 16),
+            DrawingActivity(updateDate: today.addingTimeInterval(2_400), page: defaultPage(john), verse: 17),
+            DrawingActivity(updateDate: today.addingTimeInterval(1_200), page: defaultPage(john), verse: 16)
         ]
         let store = TestStore(initialState: DrawingChartFeature.State()) {
             DrawingChartFeature()
@@ -168,7 +168,7 @@ struct DrawingChartFetchTesting {
                 recentVerse(john, verse: 17, at: today.addingTimeInterval(2_400)),
                 recentVerse(john, verse: 16, at: today.addingTimeInterval(1_200))
             ]
-            $0.drawingWeeklySummary.recentChapters = [johnKJV, john]
+            $0.drawingWeeklySummary.recentChapters = [johnKJV, john].map(defaultPage)
         }
         // 주간 요약의 가장 많이 쓴 장도 번역본마다 따로 센 값이다
         #expect(store.state.drawingWeeklySummary.chapterCountsByDay[today] == [john: 2, johnKJV: 1])
@@ -198,7 +198,12 @@ private final class RecordingDrawingActivityRepository: DrawingActivityRepositor
     }
 }
 
-/// 장 · 절 · 시각으로 최근 항목 하나를 만든다.
+/// 장 · 절 · 시각으로 기본 필사책의 최근 항목 하나를 만든다.
 private func recentVerse(_ chapter: BibleChapter, verse: Int, at date: Date) -> RecentVerseItem {
-    RecentVerseItem(verse: BibleVerse(title: chapter, verse: verse, sentence: ""), updatedAt: date)
+    RecentVerseItem(verse: BibleVerse(title: chapter, verse: verse, sentence: ""), updatedAt: date, notebook: .default)
+}
+
+/// 기본 필사책의 장 — 접두 없는 행(지금까지의 모든 필사)이 놓이는 곳.
+private func defaultPage(_ chapter: BibleChapter) -> NotebookChapter {
+    NotebookChapter(notebook: .default, chapter: chapter)
 }

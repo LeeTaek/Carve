@@ -64,19 +64,19 @@ struct BackupFormatValidatorTesting {
 
     // MARK: - 디코딩
 
-    @Test("formatVersion 2 는 load 에서 unsupportedFormat")
-    func loadRejectsFormatVersionTwo() throws {
+    @Test("formatVersion 3 은 load 에서 unsupportedFormat")
+    func loadRejectsFormatVersionThree() throws {
         let fixture = try BackupFormatFixture()
         defer { fixture.remove() }
         try fixture.writeSample()
-        try fixture.writeFile(Data(#"{"formatVersion":2}"#.utf8), name: BackupFormat.manifestFileName)
+        try fixture.writeFile(Data(#"{"formatVersion":3}"#.utf8), name: BackupFormat.manifestFileName)
 
-        #expect(throws: BackupFormatError.unsupportedFormat(formatVersion: 2)) {
+        #expect(throws: BackupFormatError.unsupportedFormat(formatVersion: 3)) {
             try BackupPayload.load(rootDirectory: fixture.root, limits: .default)
         }
         // 값으로 만든 manifest 도 같다.
-        #expect(throws: BackupFormatError.unsupportedFormat(formatVersion: 2)) {
-            try validate { $0.formatVersion = 2 }
+        #expect(throws: BackupFormatError.unsupportedFormat(formatVersion: 3)) {
+            try validate { $0.formatVersion = 3 }
         }
     }
 

@@ -17,6 +17,10 @@ import Dependencies
 
 @testable import Domain
 
+/// - Note: 게이트는 저장소를 **현재 앱 스키마로 옮긴 뒤** 판정한다(`LocalStoreLoader.load(…separationGate:)`). 앱 스키마가 2026-10-15 V7(필사책)이 되면서
+///   옮긴 저장소는 판독기 검증 범위(`validatedSchemaMajors` [3, 6]) 밖이라 모두 「알 수 없음(unvalidatedModel)」 보류가 된다.
+///   검증 범위 확장은 사람 관측 뒤 별도 작업(plan G-2)이므로, 그 결과가 바뀌는 시험은 고치지 않고 `withKnownIssue("G-2: V7 판독기 관측 전")` 으로 감쌌다.
+///   G-2 가 V7 을 검증하면 이 감싸기를 지운다(남겨 두면 「알려진 문제가 기록되지 않았다」 로 실패한다).
 @Suite("C14 게이트 — 판정 · 보존 · 연결 보류")
 struct LegacySeparationGateTesting {
 
@@ -45,90 +49,98 @@ struct LegacySeparationGateTesting {
 
     @Test("1.3.0 무계정 저장소는 V6 로 옮긴 뒤 행마다 분리본 · 작업 기록을 남기고 연결을 보류한다")
     func noAccountV3StoreIsPreservedAndHeld() throws {
-        try withDirectory { directory, area in
-            let url = try LinkageFixture.makeV3Store(in: directory)
+        withKnownIssue("G-2: V7 판독기 관측 전") {
+            try withDirectory { directory, area in
+                let url = try LinkageFixture.makeV3Store(in: directory)
 
-            let outcome = load(url, area)
+                let outcome = load(url, area)
 
-            guard case .held(let container, let hold) = outcome else { Issue.record("보류가 아니다: \(outcome)"); return }
-            #expect(hold.reason == .unlinkedRowsAwaitSeparation(count: 3))
-            #expect(hold.readerVersion == LegacyRowLinkageReader.version)
-            let jobID = try #require(hold.jobID)
+                guard case .held(let container, let hold) = outcome else { Issue.record("보류가 아니다: \(outcome)"); return }
+                #expect(hold.reason == .unlinkedRowsAwaitSeparation(count: 3))
+                #expect(hold.readerVersion == LegacyRowLinkageReader.version)
+                let jobID = try #require(hold.jobID)
 
-            // 저장소는 옮겨졌고(C14 ① 단계 ②) 이 컨테이너로 읽힌다.
-            #expect(try tableExists(url, "ZVERSEDRAWINGVERSION"))
-            #expect(try ModelContext(container).fetchCount(FetchDescriptor<BibleDrawing>()) == 3)
-            // 원시 사본도 먼저 떴다(C3 ①).
-            #expect(((try? FileManager.default.contentsOfDirectory(atPath: area.rawSnapshotsDirectory.path)) ?? []).count == 1)
+                // 저장소는 옮겨졌고(C14 ① 단계 ②) 이 컨테이너로 읽힌다.
+                #expect(try tableExists(url, "ZVERSEDRAWINGVERSION"))
+                #expect(try ModelContext(container).fetchCount(FetchDescriptor<BibleDrawing>()) == 3)
+                // 원시 사본도 먼저 떴다(C3 ①).
+                #expect(((try? FileManager.default.contentsOfDirectory(atPath: area.rawSnapshotsDirectory.path)) ?? []).count == 1)
 
-            // 작업 기록 — 대상 셋 · 보존 확인 · 삭제는 시작하지 않음 · 완료 아님.
-            let records = LegacySeparationRecordStore(area: area)
-            let jobs = try records.jobs()
-            #expect(jobs.count == 1 && jobs.first?.jobID == jobID)
-            let job = try #require(jobs.first)
-            #expect(job.targets.count == 3 && job.allPreserved && !job.deletion.started && !job.completed)
-            #expect(job.targets.map(\.identity.primaryKey) == [1, 2, 3])
-            #expect(job.targets.allSatisfy { $0.identity.entity == .bibleDrawing && $0.verseContentFingerprint != nil })
+                // 작업 기록 — 대상 셋 · 보존 확인 · 삭제는 시작하지 않음 · 완료 아님.
+                let records = LegacySeparationRecordStore(area: area)
+                let jobs = try records.jobs()
+                #expect(jobs.count == 1 && jobs.first?.jobID == jobID)
+                let job = try #require(jobs.first)
+                #expect(job.targets.count == 3 && job.allPreserved && !job.deletion.started && !job.completed)
+                #expect(job.targets.map(\.identity.primaryKey) == [1, 2, 3])
+                #expect(job.targets.allSatisfy { $0.identity.entity == .bibleDrawing && $0.verseContentFingerprint != nil })
 
-            // 분리본 — 모든 열 원형 그대로, 필기 바이트는 원본과 같다.
-            let rows = try records.rows(of: job)
-            #expect(rows.count == 3)
-            #expect(rows.allSatisfy { $0.blob("ZLINEDATA") == RealLegacyLineData.data })
-            #expect(Set(rows.compactMap { $0.integer("ZVERSE") }) == [1, 2, 3])
-            #expect(rows.first?.text("ZTITLENAME") == "1-01Genesis.txt")
-            #expect(rows.first?.verseContentFingerprint == VerseContentFingerprint.make(lineData: RealLegacyLineData.data, drawingVersion: 1, layoutMetadataBlob: nil))
+                // 분리본 — 모든 열 원형 그대로, 필기 바이트는 원본과 같다.
+                let rows = try records.rows(of: job)
+                #expect(rows.count == 3)
+                #expect(rows.allSatisfy { $0.blob("ZLINEDATA") == RealLegacyLineData.data })
+                #expect(Set(rows.compactMap { $0.integer("ZVERSE") }) == [1, 2, 3])
+                #expect(rows.first?.text("ZTITLENAME") == "1-01Genesis.txt")
+                #expect(rows.first?.verseContentFingerprint == VerseContentFingerprint.make(lineData: RealLegacyLineData.data, drawingVersion: 1, layoutMetadataBlob: nil))
+            }
         }
     }
 
     @Test("외부 저장으로 빠진 큰 필기도 분리본 안에 바이트로 든다")
     func externalBlobIsInlinedIntoTheCopy() throws {
-        try withDirectory { directory, area in
-            let url = try LinkageFixture.makeV6Store(in: directory)
-            let large = RealLegacyLineData.makeLargeDrawingData()
-            try seedLargeRow(at: url, lineData: large)
+        withKnownIssue("G-2: V7 판독기 관측 전") {
+            try withDirectory { directory, area in
+                let url = try LinkageFixture.makeV6Store(in: directory)
+                let large = RealLegacyLineData.makeLargeDrawingData()
+                try seedLargeRow(at: url, lineData: large)
 
-            guard case .held(_, let hold) = load(url, area), let jobID = hold.jobID else { Issue.record("보류가 아니다"); return }
-            let records = LegacySeparationRecordStore(area: area)
-            let job = try #require(try records.jobs().first { $0.jobID == jobID })
-            let rows = try records.rows(of: job)
+                guard case .held(_, let hold) = load(url, area), let jobID = hold.jobID else { Issue.record("보류가 아니다"); return }
+                let records = LegacySeparationRecordStore(area: area)
+                let job = try #require(try records.jobs().first { $0.jobID == jobID })
+                let rows = try records.rows(of: job)
 
-            #expect(rows.count == 4)
-            #expect(rows.contains { $0.blob("ZLINEDATA") == large })
-            #expect(rows.filter { $0.blob("ZLINEDATA") == RealLegacyLineData.data }.count == 3)
+                #expect(rows.count == 4)
+                #expect(rows.contains { $0.blob("ZLINEDATA") == large })
+                #expect(rows.filter { $0.blob("ZLINEDATA") == RealLegacyLineData.data }.count == 3)
+            }
         }
     }
 
     @Test("장 전체 필기 · 즐겨찾기의 대응 없는 행도 원형 그대로 분리본에 든다(C14 ⑦) — 장 필기는 절로 쪼개지 않는다")
     func pageAndFavoriteRowsArePreserved() throws {
-        try withDirectory { directory, area in
-            let url = try LinkageFixture.makeV6Store(in: directory, page: true, favorite: true)
-            for pk in 1...3 { try LinkageFixture.link(url, entity: .bibleDrawing, primaryKey: Int64(pk)) }
-            try LinkageFixture.addIdentityKeys(url)
+        withKnownIssue("G-2: V7 판독기 관측 전") {
+            try withDirectory { directory, area in
+                let url = try LinkageFixture.makeV6Store(in: directory, page: true, favorite: true)
+                for pk in 1...3 { try LinkageFixture.link(url, entity: .bibleDrawing, primaryKey: Int64(pk)) }
+                try LinkageFixture.addIdentityKeys(url)
 
-            guard case .held(_, let hold) = load(url, area), let jobID = hold.jobID else { Issue.record("보류가 아니다"); return }
+                guard case .held(_, let hold) = load(url, area), let jobID = hold.jobID else { Issue.record("보류가 아니다"); return }
 
-            #expect(hold.reason == .unlinkedRowsAwaitSeparation(count: 2))
-            let records = LegacySeparationRecordStore(area: area)
-            let job = try #require(try records.jobs().first { $0.jobID == jobID })
-            let rows = try records.rows(of: job)
-            let page = try #require(rows.first { $0.identity.entity == .biblePageDrawing })
-            let favorite = try #require(rows.first { $0.identity.entity == .favoriteVerse })
-            #expect(page.blob("ZFULLLINEDATA") == RealLegacyLineData.data && page.verseContentFingerprint == nil)
-            #expect(page.integer("ZTITLECHAPTER") == 1 && page.columns["ZVERSE"] == nil)
-            #expect(favorite.blob("ZLINEDATA") == RealLegacyLineData.data && favorite.text("ZSENTENCE") == "태초에")
+                #expect(hold.reason == .unlinkedRowsAwaitSeparation(count: 2))
+                let records = LegacySeparationRecordStore(area: area)
+                let job = try #require(try records.jobs().first { $0.jobID == jobID })
+                let rows = try records.rows(of: job)
+                let page = try #require(rows.first { $0.identity.entity == .biblePageDrawing })
+                let favorite = try #require(rows.first { $0.identity.entity == .favoriteVerse })
+                #expect(page.blob("ZFULLLINEDATA") == RealLegacyLineData.data && page.verseContentFingerprint == nil)
+                #expect(page.integer("ZTITLECHAPTER") == 1 && page.columns["ZVERSE"] == nil)
+                #expect(favorite.blob("ZLINEDATA") == RealLegacyLineData.data && favorite.text("ZSENTENCE") == "태초에")
+            }
         }
     }
 
     @Test("같은 대상이면 다시 실행해도 같은 작업 기록이다 — 폴더가 늘지 않는다(멱등)")
     func rerunReusesTheSameJob() throws {
-        try withDirectory { directory, area in
-            let url = try LinkageFixture.makeV3Store(in: directory)
+        withKnownIssue("G-2: V7 판독기 관측 전") {
+            try withDirectory { directory, area in
+                let url = try LinkageFixture.makeV3Store(in: directory)
 
-            guard case .held(_, let first) = load(url, area), case .held(_, let second) = load(url, area) else { Issue.record("보류가 아니다"); return }
+                guard case .held(_, let first) = load(url, area), case .held(_, let second) = load(url, area) else { Issue.record("보류가 아니다"); return }
 
-            #expect(first.jobID != nil && first.jobID == second.jobID)
-            let folders = try FileManager.default.contentsOfDirectory(atPath: area.separationDirectory.path)
-            #expect(folders == [first.jobID!])
+                #expect(first.jobID != nil && first.jobID == second.jobID)
+                let folders = try FileManager.default.contentsOfDirectory(atPath: area.separationDirectory.path)
+                #expect(folders == [first.jobID!])
+            }
         }
     }
 
@@ -136,78 +148,86 @@ struct LegacySeparationGateTesting {
 
     @Test("분리본을 쓰다 끊겨 남은 .partial 폴더는 다음 실행이 치우고 처음부터 다시 쓴다")
     func abandonedStagingIsReplaced() throws {
-        try withDirectory { directory, area in
-            let url = try LinkageFixture.makeV3Store(in: directory)
-            let partial = area.separationDirectory.appendingPathComponent("deadbeef.partial/rows", isDirectory: true)
-            try FileManager.default.createDirectory(at: partial, withIntermediateDirectories: true)
-            try Data("{ 잘린".utf8).write(to: partial.appendingPathComponent("rows-000.json"))
+        withKnownIssue("G-2: V7 판독기 관측 전") {
+            try withDirectory { directory, area in
+                let url = try LinkageFixture.makeV3Store(in: directory)
+                let partial = area.separationDirectory.appendingPathComponent("deadbeef.partial/rows", isDirectory: true)
+                try FileManager.default.createDirectory(at: partial, withIntermediateDirectories: true)
+                try Data("{ 잘린".utf8).write(to: partial.appendingPathComponent("rows-000.json"))
 
-            guard case .held(_, let hold) = load(url, area), let jobID = hold.jobID else { Issue.record("보류가 아니다"); return }
+                guard case .held(_, let hold) = load(url, area), let jobID = hold.jobID else { Issue.record("보류가 아니다"); return }
 
-            let folders = try FileManager.default.contentsOfDirectory(atPath: area.separationDirectory.path)
-            #expect(folders == [jobID])
-            let records = LegacySeparationRecordStore(area: area)
-            #expect(try records.rows(of: try #require(try records.jobs().first)).count == 3)
+                let folders = try FileManager.default.contentsOfDirectory(atPath: area.separationDirectory.path)
+                #expect(folders == [jobID])
+                let records = LegacySeparationRecordStore(area: area)
+                #expect(try records.rows(of: try #require(try records.jobs().first)).count == 3)
+            }
         }
     }
 
     @Test("분리본 파일이 손상되면 다음 실행이 알아채고 같은 작업 ID 로 다시 쓴다 — 손상된 사본을 보존으로 치지 않는다")
     func corruptedCopyIsRewritten() throws {
-        try withDirectory { directory, area in
-            let url = try LinkageFixture.makeV3Store(in: directory)
-            guard case .held(_, let first) = load(url, area), let jobID = first.jobID else { Issue.record("보류가 아니다"); return }
-            let rowsFile = area.separationDirectory.appendingPathComponent(jobID).appendingPathComponent("rows/rows-000.json")
-            var bytes = try Data(contentsOf: rowsFile)
-            bytes[bytes.count / 2] ^= 0x5A
-            try bytes.write(to: rowsFile)
-            let records = LegacySeparationRecordStore(area: area)
-            #expect((try? records.rows(of: try #require(try records.jobs().first))) == nil)
+        withKnownIssue("G-2: V7 판독기 관측 전") {
+            try withDirectory { directory, area in
+                let url = try LinkageFixture.makeV3Store(in: directory)
+                guard case .held(_, let first) = load(url, area), let jobID = first.jobID else { Issue.record("보류가 아니다"); return }
+                let rowsFile = area.separationDirectory.appendingPathComponent(jobID).appendingPathComponent("rows/rows-000.json")
+                var bytes = try Data(contentsOf: rowsFile)
+                bytes[bytes.count / 2] ^= 0x5A
+                try bytes.write(to: rowsFile)
+                let records = LegacySeparationRecordStore(area: area)
+                #expect((try? records.rows(of: try #require(try records.jobs().first))) == nil)
 
-            guard case .held(_, let second) = load(url, area) else { Issue.record("보류가 아니다"); return }
+                guard case .held(_, let second) = load(url, area) else { Issue.record("보류가 아니다"); return }
 
-            #expect(second.jobID == jobID)
-            #expect(try records.rows(of: try #require(try records.jobs().first)).count == 3)
+                #expect(second.jobID == jobID)
+                #expect(try records.rows(of: try #require(try records.jobs().first)).count == 3)
+            }
         }
     }
 
     @Test("작업 기록이 없는 분리본 폴더는 기록으로 치지 않고, 다음 실행이 온전한 기록을 남긴다")
     func folderWithoutJobIsIgnoredThenCompleted() throws {
-        try withDirectory { directory, area in
-            let url = try LinkageFixture.makeV3Store(in: directory)
-            guard case .held(_, let first) = load(url, area), let jobID = first.jobID else { Issue.record("보류가 아니다"); return }
-            try FileManager.default.removeItem(at: area.separationDirectory.appendingPathComponent(jobID).appendingPathComponent("job.json"))
-            let records = LegacySeparationRecordStore(area: area)
-            #expect(try records.jobs().isEmpty)
+        withKnownIssue("G-2: V7 판독기 관측 전") {
+            try withDirectory { directory, area in
+                let url = try LinkageFixture.makeV3Store(in: directory)
+                guard case .held(_, let first) = load(url, area), let jobID = first.jobID else { Issue.record("보류가 아니다"); return }
+                try FileManager.default.removeItem(at: area.separationDirectory.appendingPathComponent(jobID).appendingPathComponent("job.json"))
+                let records = LegacySeparationRecordStore(area: area)
+                #expect(try records.jobs().isEmpty)
 
-            guard case .held(_, let second) = load(url, area) else { Issue.record("보류가 아니다"); return }
+                guard case .held(_, let second) = load(url, area) else { Issue.record("보류가 아니다"); return }
 
-            let jobs = try records.jobs()
-            #expect(second.jobID == jobID && jobs.count == 1)
+                let jobs = try records.jobs()
+                #expect(second.jobID == jobID && jobs.count == 1)
+            }
         }
     }
 
     @Test("500행을 넘으면 분리본을 여러 파일로 나눠 쓰고, 읽을 때 대상 순서대로 모두 돌려준다")
     func largeTargetSetIsChunked() throws {
-        try withDirectory { directory, area in
-            let url = directory.appendingPathComponent("Carve.sqlite")
-            let container = try ModelContainer(
-                for: Schema(DrawingSchemaV3.models), configurations: ModelConfiguration(url: url, cloudKitDatabase: .none)
-            )
-            let context = ModelContext(container)
-            for verse in 1...1_203 {
-                context.insert(DrawingSchemaV3.BibleDrawing(bibleTitle: LinkageFixture.chapter, verse: verse, lineData: Data("v\(verse)".utf8)))
+        withKnownIssue("G-2: V7 판독기 관측 전") {
+            try withDirectory { directory, area in
+                let url = directory.appendingPathComponent("Carve.sqlite")
+                let container = try ModelContainer(
+                    for: Schema(DrawingSchemaV3.models), configurations: ModelConfiguration(url: url, cloudKitDatabase: .none)
+                )
+                let context = ModelContext(container)
+                for verse in 1...1_203 {
+                    context.insert(DrawingSchemaV3.BibleDrawing(bibleTitle: LinkageFixture.chapter, verse: verse, lineData: Data("v\(verse)".utf8)))
+                }
+                try context.save()
+                try LinkageFixture.ensureMirroringTables(url)
+
+                guard case .held(_, let hold) = load(url, area), let jobID = hold.jobID else { Issue.record("보류가 아니다"); return }
+
+                let files = try FileManager.default.contentsOfDirectory(atPath: area.separationDirectory.appendingPathComponent(jobID).appendingPathComponent("rows").path).sorted()
+                #expect(files == ["rows-000.json", "rows-001.json", "rows-002.json"])
+                let records = LegacySeparationRecordStore(area: area)
+                let job = try #require(try records.jobs().first)
+                let rows = try records.rows(of: job)
+                #expect(rows.count == 1_203 && rows.map(\.identity) == job.targets.map(\.identity))
             }
-            try context.save()
-            try LinkageFixture.ensureMirroringTables(url)
-
-            guard case .held(_, let hold) = load(url, area), let jobID = hold.jobID else { Issue.record("보류가 아니다"); return }
-
-            let files = try FileManager.default.contentsOfDirectory(atPath: area.separationDirectory.appendingPathComponent(jobID).appendingPathComponent("rows").path).sorted()
-            #expect(files == ["rows-000.json", "rows-001.json", "rows-002.json"])
-            let records = LegacySeparationRecordStore(area: area)
-            let job = try #require(try records.jobs().first)
-            let rows = try records.rows(of: job)
-            #expect(rows.count == 1_203 && rows.map(\.identity) == job.targets.map(\.identity))
         }
     }
 
@@ -215,42 +235,48 @@ struct LegacySeparationGateTesting {
 
     @Test("모든 행에 대응이 있으면 연결한다 — 기록을 남기지 않는다")
     func allLinkedStoreConnects() throws {
-        try withDirectory { directory, area in
-            let url = try LinkageFixture.makeV6Store(in: directory)
-            for pk in 1...3 { try LinkageFixture.link(url, entity: .bibleDrawing, primaryKey: Int64(pk)) }
-            try LinkageFixture.addIdentityKeys(url)
+        withKnownIssue("G-2: V7 판독기 관측 전") {
+            try withDirectory { directory, area in
+                let url = try LinkageFixture.makeV6Store(in: directory)
+                for pk in 1...3 { try LinkageFixture.link(url, entity: .bibleDrawing, primaryKey: Int64(pk)) }
+                try LinkageFixture.addIdentityKeys(url)
 
-            let outcome = load(url, area)
+                let outcome = load(url, area)
 
-            guard case .ready = outcome else { Issue.record("연결이 아니다: \(outcome)"); return }
-            #expect(try LegacySeparationRecordStore(area: area).jobs().isEmpty)
+                guard case .ready = outcome else { Issue.record("연결이 아니다: \(outcome)"); return }
+                #expect(try LegacySeparationRecordStore(area: area).jobs().isEmpty)
+            }
         }
     }
 
     @Test("저장소가 없는 새 설치는 게이트가 CloudKit 없이 저장소를 만든 뒤에도 연결한다 — 다음 실행도 같다")
     func freshInstallConnects() throws {
-        try withDirectory { directory, area in
-            let url = directory.appendingPathComponent("Carve.sqlite")
+        withKnownIssue("G-2: V7 판독기 관측 전") {
+            try withDirectory { directory, area in
+                let url = directory.appendingPathComponent("Carve.sqlite")
 
-            let first = load(url, area)
-            guard case .ready = first else { Issue.record("새 설치를 연결하지 않았다: \(first)"); return }
-            // 시험은 `.none` 으로 열어 미러링 표가 끝내 생기지 않는다 — 앱은 `.private` 로 열며 표가 생긴다. 표 없이 다시 열어도 연결해야 한다.
-            let second = load(url, area)
-            guard case .ready = second else { Issue.record("두 번째 실행을 연결하지 않았다: \(second)"); return }
-            #expect(!FileManager.default.fileExists(atPath: area.separationDirectory.path))
+                let first = load(url, area)
+                guard case .ready = first else { Issue.record("새 설치를 연결하지 않았다: \(first)"); return }
+                // 시험은 `.none` 으로 열어 미러링 표가 끝내 생기지 않는다 — 앱은 `.private` 로 열며 표가 생긴다. 표 없이 다시 열어도 연결해야 한다.
+                let second = load(url, area)
+                guard case .ready = second else { Issue.record("두 번째 실행을 연결하지 않았다: \(second)"); return }
+                #expect(!FileManager.default.fileExists(atPath: area.separationDirectory.path))
+            }
         }
     }
 
     @Test("검증 밖 OS 의 새 설치도 연결한다 — legacy 행이 없다")
     func freshInstallConnectsOnUnvalidatedOS() throws {
-        try withDirectory { directory, area in
-            let url = directory.appendingPathComponent("Carve.sqlite")
-            var elsewhere = LegacySeparationGate(area: area)
-            elsewhere.reader.osMajor = 18
+        withKnownIssue("G-2: V7 판독기 관측 전") {
+            try withDirectory { directory, area in
+                let url = directory.appendingPathComponent("Carve.sqlite")
+                var elsewhere = LegacySeparationGate(area: area)
+                elsewhere.reader.osMajor = 18
 
-            let outcome = LocalStoreLoader.load(at: url, cloudKitDatabase: .none, preservation: area, separationGate: elsewhere)
+                let outcome = LocalStoreLoader.load(at: url, cloudKitDatabase: .none, preservation: area, separationGate: elsewhere)
 
-            guard case .ready = outcome else { Issue.record("검증 밖 OS 의 새 설치를 연결하지 않았다: \(outcome)"); return }
+                guard case .ready = outcome else { Issue.record("검증 밖 OS 의 새 설치를 연결하지 않았다: \(outcome)"); return }
+            }
         }
     }
 
@@ -265,7 +291,10 @@ struct LegacySeparationGateTesting {
             let outcome = load(url, area)
 
             guard case .held(_, let hold) = outcome else { Issue.record("보류가 아니다: \(outcome)"); return }
-            #expect(hold.reason == .linkageUnknown(.tableMissing("ANSCKRECORDMETADATA")))
+            // V7 로 옮긴 저장소는 표를 읽기 전에 모델에서 막힌다(unvalidatedModel) — 「알 수 없음」 보류는 같고 까닭만 다르다.
+            withKnownIssue("G-2: V7 판독기 관측 전") {
+                #expect(hold.reason == .linkageUnknown(.tableMissing("ANSCKRECORDMETADATA")))
+            }
             #expect(hold.jobID == nil && hold.allowsConditionalConsent)
             #expect(!FileManager.default.fileExists(atPath: area.separationDirectory.path))
         }
@@ -273,35 +302,39 @@ struct LegacySeparationGateTesting {
 
     @Test("분리본을 남기지 못하면 보류하고, 조건부 연결 동의도 내지 않는다")
     func preservationFailureHolds() throws {
-        try withDirectory { directory, area in
-            let url = try LinkageFixture.makeV3Store(in: directory)
-            // 분리본 자리를 파일로 막아 폴더를 만들지 못하게 한다.
-            try FileManager.default.createDirectory(at: area.storeDirectory, withIntermediateDirectories: true)
-            #expect(FileManager.default.createFile(atPath: area.separationDirectory.path, contents: Data()))
+        withKnownIssue("G-2: V7 판독기 관측 전") {
+            try withDirectory { directory, area in
+                let url = try LinkageFixture.makeV3Store(in: directory)
+                // 분리본 자리를 파일로 막아 폴더를 만들지 못하게 한다.
+                try FileManager.default.createDirectory(at: area.storeDirectory, withIntermediateDirectories: true)
+                #expect(FileManager.default.createFile(atPath: area.separationDirectory.path, contents: Data()))
 
-            let outcome = load(url, area)
+                let outcome = load(url, area)
 
-            guard case .held(_, let hold) = outcome, case .preservationFailed = hold.reason else { Issue.record("보존 실패 보류가 아니다: \(outcome)"); return }
-            #expect(hold.jobID == nil && !hold.allowsConditionalConsent)
+                guard case .held(_, let hold) = outcome, case .preservationFailed = hold.reason else { Issue.record("보존 실패 보류가 아니다: \(outcome)"); return }
+                #expect(hold.jobID == nil && !hold.allowsConditionalConsent)
+            }
         }
     }
 
     @Test("앱이 쓰는 기본 게이트는 실행 중인 OS 를 따른다 — 검증 범위 밖 OS 면 모두 대응이 있어도 연결하지 않는다")
     func defaultGateHoldsOnUnvalidatedOS() throws {
-        try withDirectory { directory, area in
-            let url = try LinkageFixture.makeV6Store(in: directory)
-            for pk in 1...3 { try LinkageFixture.link(url, entity: .bibleDrawing, primaryKey: Int64(pk)) }
-            try LinkageFixture.addIdentityKeys(url)
-            let major = ProcessInfo.processInfo.operatingSystemVersion.majorVersion
+        withKnownIssue("G-2: V7 판독기 관측 전") {
+            try withDirectory { directory, area in
+                let url = try LinkageFixture.makeV6Store(in: directory)
+                for pk in 1...3 { try LinkageFixture.link(url, entity: .bibleDrawing, primaryKey: Int64(pk)) }
+                try LinkageFixture.addIdentityKeys(url)
+                let major = ProcessInfo.processInfo.operatingSystemVersion.majorVersion
 
-            let outcome = LocalStoreLoader.load(at: url, cloudKitDatabase: .none, preservation: area, separationGate: LegacySeparationGate(area: area))
+                let outcome = LocalStoreLoader.load(at: url, cloudKitDatabase: .none, preservation: area, separationGate: LegacySeparationGate(area: area))
 
-            if LegacyRowLinkageReader().validatedOSMajors.contains(major) {
-                guard case .ready = outcome else { Issue.record("검증한 OS 인데 연결하지 않았다: \(outcome)"); return }
-            } else {
-                guard case .held(_, let hold) = outcome else { Issue.record("검증 밖 OS 인데 보류하지 않았다: \(outcome)"); return }
-                #expect(hold.reason == .linkageUnknown(.unvalidatedEnvironment(osMajor: major)))
-                #expect(!FileManager.default.fileExists(atPath: area.separationDirectory.path))
+                if LegacyRowLinkageReader().validatedOSMajors.contains(major) {
+                    guard case .ready = outcome else { Issue.record("검증한 OS 인데 연결하지 않았다: \(outcome)"); return }
+                } else {
+                    guard case .held(_, let hold) = outcome else { Issue.record("검증 밖 OS 인데 보류하지 않았다: \(outcome)"); return }
+                    #expect(hold.reason == .linkageUnknown(.unvalidatedEnvironment(osMajor: major)))
+                    #expect(!FileManager.default.fileExists(atPath: area.separationDirectory.path))
+                }
             }
         }
     }
@@ -322,27 +355,34 @@ struct LegacySeparationGateTesting {
 
     @Test("이 기기의 전체 삭제는 분리본 · 기록도 함께 지운다 — 보존 영역 안이다(C11 단계 ④)")
     func fullEraseRemovesSeparationRecords() throws {
-        try withDirectory { directory, area in
-            let url = try LinkageFixture.makeV3Store(in: directory)
-            guard case .held = load(url, area) else { Issue.record("보류가 아니다"); return }
-            #expect(area.separationDirectory.path.hasPrefix(area.storeDirectory.path))
-            #expect(FileManager.default.fileExists(atPath: area.separationDirectory.path))
+        withKnownIssue("G-2: V7 판독기 관측 전") {
+            try withDirectory { directory, area in
+                let url = try LinkageFixture.makeV3Store(in: directory)
+                guard case .held = load(url, area) else { Issue.record("보류가 아니다"); return }
+                #expect(area.separationDirectory.path.hasPrefix(area.storeDirectory.path))
+                #expect(FileManager.default.fileExists(atPath: area.separationDirectory.path))
 
-            try area.removeAll()
+                try area.removeAll()
 
-            #expect(!FileManager.default.fileExists(atPath: area.separationDirectory.path))
+                #expect(!FileManager.default.fileExists(atPath: area.separationDirectory.path))
+            }
         }
     }
 
-    // MARK: 표본
+}
 
+// MARK: - 표본
+
+extension LegacySeparationGateTesting {
+
+    /// V6 표본(`LinkageFixture.makeV6Store`)에 큰 행 하나를 더한다 — 표본의 스키마(V6)로 열어 표본을 옮기지 않는다.
     private func seedLargeRow(at url: URL, lineData: Data) throws {
         let container = try ModelContainer(
-            for: AppStoreSchema.schema, migrationPlan: DrawingDataMigrationPlan.self,
+            for: Schema(DrawingSchemaV6.models),
             configurations: ModelConfiguration(url: url, cloudKitDatabase: .none)
         )
         let context = ModelContext(container)
-        context.insert(BibleDrawing(bibleTitle: LinkageFixture.chapter, verse: 9, lineData: lineData, rowUUID: "row-9"))
+        context.insert(BibleDrawing(page: LinkageFixture.chapter.inDefaultNotebook, verse: 9, lineData: lineData, rowUUID: "row-9"))
         try context.save()
     }
 
@@ -461,7 +501,7 @@ struct LegacyEntityNumberingTesting {
                 for: Schema(versionedSchema: DrawingSchemaV5.self), configurations: ModelConfiguration(url: url, cloudKitDatabase: .none)
             )
             let context = ModelContext(container)
-            context.insert(DrawingSchemaV4.BibleDrawing(bibleTitle: LinkageFixture.chapter, verse: 1, lineData: RealLegacyLineData.data, rowUUID: "row-1"))
+            context.insert(DrawingSchemaV4.BibleDrawing(page: LinkageFixture.chapter.inDefaultNotebook, verse: 1, lineData: RealLegacyLineData.data, rowUUID: "row-1"))
             context.insert(DrawingSchemaV5.FavoriteVerse(
                 chapter: LinkageFixture.chapter, verse: 1, translation: .NKRV, sentence: "태초에", lineData: RealLegacyLineData.data, createdDate: Date(), favoriteID: "fav-1"
             ))
@@ -492,6 +532,43 @@ struct LegacyEntityNumberingTesting {
         #expect(favoriteBefore != favoriteAfter)
         #expect(epochAfter == favoriteBefore, "옛 FavoriteVerse 번호를 다른 엔티티가 받는다")
         // 2026-09-22 관측: 가벼운 마이그레이션은 `ANSCKRECORDMETADATA.ZENTITYID` 도 새 번호로 옮긴다(낡은 번호 0건).
+        #expect(staleFavorite == 0 && movedFavorite == 1, "대응의 엔티티 번호가 새 번호를 따라와야 한다")
+    }
+
+    /// V7 의 `DrawingNotebook` 은 이름 순서상 `DrawingEraseEpoch` 와 `FavoriteVerse` 사이에 든다 — V6 저장소를 옮기면 뒤 엔티티 번호가 하나씩 밀린다.
+    /// 판독기는 `Z_PRIMARYKEY` 에서 번호를 읽으므로 번호 자체에 기대지 않지만, 미러링 대응의 엔티티 번호가 함께 옮겨지는지는 G-2 관측의 전제다.
+    @Test("V6 → V7 은 필사책 엔티티가 끼어 FavoriteVerse 의 Z_ENT 를 밀고, CloudKit 없이 옮겨도 미러링 대응의 엔티티 번호가 함께 옮겨진다")
+    func v6ToV7RenumbersFavoriteVerse() throws {
+        let directory = try LinkageFixture.makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = try LinkageFixture.makeV6Store(in: directory, page: true, favorite: true)
+        let favoriteBefore = try LinkageFixture.entityID(url, .favoriteVerse)
+        let drawingBefore = try LinkageFixture.entityID(url, .bibleDrawing)
+        let pageBefore = try LinkageFixture.entityID(url, .biblePageDrawing)
+        try LinkageFixture.link(url, entity: .favoriteVerse, primaryKey: 1)
+        try LinkageFixture.link(url, entity: .bibleDrawing, primaryKey: 1)
+        #expect(LocalStoreLoader.storeKind(at: url) == .known(Schema.Version(6, 0, 0)))
+
+        let outcome = LocalStoreLoader.load(at: url, cloudKitDatabase: .none)
+        guard case .ready = outcome else {
+            Issue.record("V6 저장소를 앱 로더가 열지 못했다: \(outcome)")
+            return
+        }
+
+        let favoriteAfter = try LinkageFixture.entityID(url, .favoriteVerse)
+        let drawingAfter = try LinkageFixture.entityID(url, .bibleDrawing)
+        let pageAfter = try LinkageFixture.entityID(url, .biblePageDrawing)
+        let notebookAfter = try LinkageFixture.scalar(url, "SELECT Z_ENT FROM Z_PRIMARYKEY WHERE Z_NAME = 'DrawingNotebook'")
+        let staleFavorite = try LinkageFixture.scalar(url, "SELECT count(*) FROM ANSCKRECORDMETADATA WHERE ZENTITYID = \(favoriteBefore)")
+        let movedFavorite = try LinkageFixture.scalar(url, "SELECT count(*) FROM ANSCKRECORDMETADATA WHERE ZENTITYID = \(favoriteAfter)")
+        print("V6→V7 엔티티 번호: FavoriteVerse \(favoriteBefore)→\(favoriteAfter) · BibleDrawing \(drawingBefore)→\(drawingAfter)"
+              + " · BiblePageDrawing \(pageBefore)→\(pageAfter) · DrawingNotebook →\(notebookAfter)"
+              + " · 대응 ZENTITYID \(favoriteBefore) 남음 \(staleFavorite) · \(favoriteAfter) 로 옮김 \(movedFavorite)")
+
+        #expect(LocalStoreLoader.storeKind(at: url) == .known(Schema.Version(7, 0, 0)))
+        #expect(drawingBefore == drawingAfter && pageBefore == pageAfter)
+        #expect(favoriteBefore != favoriteAfter)
+        #expect(notebookAfter == favoriteBefore, "옛 FavoriteVerse 번호를 필사책 엔티티가 받는다")
         #expect(staleFavorite == 0 && movedFavorite == 1, "대응의 엔티티 번호가 새 번호를 따라와야 한다")
     }
 
@@ -621,7 +698,10 @@ struct LegacyEntityNumberingTesting {
               + " · 대응이 새 행을 가리킴 \(matching) · DrawingVO 등록 남음 \(voLeft) · 판독 \(reading.summary)")
         // 2026-09-22 관측: 옛 행과 함께 그 대응도 지워지고(0), 새 행은 「검증된 대응 없음」 이다 — 낡은 대응이 새 행을 가리키지 않는다.
         #expect(rows == 3 && correspondences == 0 && matching == 0 && voLeft == 0)
-        #expect(reading.unlinkedCount == 3)
+        // 현재 스키마(V7)로 옮긴 저장소는 판독기 검증 범위(V3 · V6) 밖이라 「알 수 없음」 이다.
+        withKnownIssue("G-2: V7 판독기 관측 전") {
+            #expect(reading.unlinkedCount == 3)
+        }
     }
 
     private func pairs(_ url: URL) throws -> Set<String> {

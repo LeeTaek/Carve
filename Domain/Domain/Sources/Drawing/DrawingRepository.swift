@@ -18,10 +18,12 @@ import Dependencies
 /// > 한계 — 로컬 원자성 ≠ CloudKit 원자성 (§8-6). 로컬 트랜잭션이 절 3개를 한 번에 커밋해도 CloudKit 에는
 /// > CKRecord 3개로 개별 동기화된다. 다른 기기가 일시적으로 찢어진 상태를 볼 수 있다.
 public protocol DrawingRepository: Sendable {
-    /// 장의 **모든 행**을 읽는다 (히스토리 행 포함). 대표 행 선택은 호출부가 `representativesByVerse()` 로 한다.
-    /// - Parameter chapter: 대상 장.
+    /// 필사책 안의 장의 **모든 행**을 읽는다 (히스토리 행 포함). 대표 행 선택은 호출부가 `representativesByVerse()` 로 한다.
+    ///
+    /// 그 필사책 · 번역본의 행(`StoredBookKey.titleName(for: page)`)만 본다 — 다른 필사책 · 번역본의 같은 권 · 장 행은 섞이지 않는다(2.2 결정 1).
+    /// - Parameter page: 필사책과 대상 장(번역본 포함). **기본값이 없다** — 빠뜨리면 지금 필사책이 아닌 기본 필사책을 조용히 읽는다(결정 12).
     /// - Returns: 절 → 행 키 순으로 정렬된 스냅샷과 **그 조회 시점의** 저장소 세대.
-    func load(chapter: BibleChapter) async throws -> DrawingChapterLoad
+    func load(_ page: NotebookChapter) async throws -> DrawingChapterLoad
 
     /// 한 편집의 모든 절 저장을 단일 트랜잭션으로 적용한다.
     ///
@@ -29,9 +31,9 @@ public protocol DrawingRepository: Sendable {
     /// 조회한 뒤에 필사 데이터가 전부 지워졌다는 뜻이고, 그 조회를 기준으로 만든 명령을 쓰면 지운 필사가 되살아난다.
     /// - Parameters:
     ///   - mutations: 절별 저장 명령. 같은 rowID 가 둘 이상 있으면 안 된다 (coalescing 은 호출부 책임, §8-3).
-    ///   - chapter: 대상 장. `create` 가 행을 만들 때의 권·장이다.
+    ///   - page: 필사책과 대상 장. `create` 는 그 필사책의 행으로 만든다. **기본값이 없다**(결정 12).
     ///   - generation: 이 명령들이 기준으로 삼은 조회의 세대 (`DrawingChapterLoad.generation`).
-    func apply(_ mutations: [VerseDrawingMutation], chapter: BibleChapter, generation: DrawingStoreGeneration) async throws
+    func apply(_ mutations: [VerseDrawingMutation], page: NotebookChapter, generation: DrawingStoreGeneration) async throws
 
     /// 절의 현재 필사를 **보관 행**으로 남기고 활성 행을 빈 상태로 되돌린다 — 한 트랜잭션 (UI-2 "지우기").
     ///
@@ -45,6 +47,8 @@ public protocol DrawingRepository: Sendable {
     /// | 활성 행 | 행을 유지한 채 `lineData = nil`, **`isPresent = true`** (대표 유지), `updateDate` 갱신 |
     /// | 아무것도 안 함 | 활성 행이 없거나 이미 획이 없으면 `alreadyEmpty` — 쓰기 0건 |
     ///
+    /// 보관 행은 그 필사책의 행이다 — 다른 필사책의 같은 절 행은 건드리지 않는다.
+    ///
     /// - Important: **호출 전에 미저장분이 전부 저장돼 있어야 한다.** 이 메서드는 DB 의 활성 행 내용을 보관하므로,
     ///              진행 중 편집·대기 저장이 남아 있으면 "방금까지 쓴 내용" 이 아니라 그 이전 내용을 보관한다 (§8-5 flush).
     ///              `alreadyEmpty` 판정도 같은 이유로 flush 이후여야 한다 — DB 는 비었는데 미저장 획이 화면에 있을 수 있다.
@@ -55,12 +59,9 @@ public protocol DrawingRepository: Sendable {
     /// > 다른 기기가 둘 중 하나만 먼저 볼 수 있다.
     /// - Parameters:
     ///   - command: 대상 절·활성 행·보관 행 식별자. `archiveRowID` 는 **재시도에도 같은 값**이어야 한다.
-    ///   - chapter: 대상 장.
+    ///   - page: 필사책과 대상 장. **기본값이 없다**(결정 12).
     /// - Returns: 실제로 보관했는지 여부.
-    func archiveAndReset(
-        _ command: VerseDrawingArchiveCommand,
-        chapter: BibleChapter
-    ) async throws -> VerseDrawingArchiveOutcome
+    func archiveAndReset(_ command: VerseDrawingArchiveCommand, page: NotebookChapter) async throws -> VerseDrawingArchiveOutcome
 }
 
 /// 필사 저장소의 세대. 필사 행을 **전부 지울 때만** 바뀐다 (설정 → 「모든 필사 데이터 삭제」).

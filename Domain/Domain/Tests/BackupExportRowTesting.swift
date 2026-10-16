@@ -210,8 +210,8 @@ struct BackupExportRowTesting {
         ])
 
         // When
-        let chapters = try await harness.database.backupChapters()
-        let load = try await harness.database.backupRows(chapter: BackupExportSample.genesis1)
+        let chapters = try await harness.database.backupPages().map(\.chapter)
+        let load = try await harness.database.backupRows(page: NotebookChapter(notebook: .default, chapter: BackupExportSample.genesis1))
 
         // Then: 장은 권 → 장 순서, 절 키를 만들 수 없는 행은 담지 않는다.
         #expect(chapters == [BackupExportSample.genesis1, BackupExportSample.genesis2, BackupExportSample.exodus3])
@@ -224,9 +224,9 @@ struct BackupExportRowTesting {
 
         // 「모든 필사 삭제」 뒤에는 세대가 오르고 행이 없다.
         try await harness.database.eraseAllDrawingRows()
-        let erased = try await harness.database.backupRows(chapter: BackupExportSample.genesis1)
+        let erased = try await harness.database.backupRows(page: NotebookChapter(notebook: .default, chapter: BackupExportSample.genesis1))
         #expect(erased.generation == DrawingStoreGeneration(raw: 1))
         #expect(erased.rows.isEmpty)
-        #expect(try await harness.database.backupChapters().isEmpty)
+        #expect(try await harness.database.backupPages().isEmpty)
     }
 }

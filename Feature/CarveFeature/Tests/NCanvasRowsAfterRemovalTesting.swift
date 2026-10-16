@@ -100,7 +100,7 @@ struct NCanvasRowsAfterRemovalTesting {
         let context = ModelContext(container)
         for seed in rows {
             let row = BibleDrawing(
-                bibleTitle: chapter, verse: seed.verse, lineData: ink,
+                page: chapter.inDefaultNotebook, verse: seed.verse, lineData: ink,
                 updateDate: Date(timeIntervalSince1970: seed.updatedAt),
                 layoutMetadataData: try seed.metadata?.encodedBlob(), rowUUID: seed.key
             )
@@ -155,7 +155,7 @@ struct NCanvasRowsAfterRemovalTesting {
         let repository = SwiftDataDrawingRepository(actor: actor)
 
         // given: 장을 열어 합성한다 — N-Canvas 행은 writingRect 원점에 있다.
-        let loaded = try await repository.load(chapter: Self.chapter)
+        let loaded = try await repository.load(Self.chapter.inDefaultNotebook)
         let composed = codec.compose(snapshots: loaded.snapshots, layout: layout, columnOrigin: columnOrigin)
         let before = try PKDrawing(data: composed.data)
         let original = try #require(before.strokes.first.flatMap(Self.anchor))
@@ -181,10 +181,10 @@ struct NCanvasRowsAfterRemovalTesting {
         }
         #expect(verse == 2)
         #expect(rowID.raw == "ncanvas-2")
-        try await repository.apply(result.mutations, chapter: Self.chapter, generation: loaded.generation)
+        try await repository.apply(result.mutations, page: Self.chapter.inDefaultNotebook, generation: loaded.generation)
 
         // then: 같은 행이 v3 + metadata 로 올라갔다.
-        let after = try await repository.load(chapter: Self.chapter).snapshots
+        let after = try await repository.load(Self.chapter.inDefaultNotebook).snapshots
         #expect(after.count == 1)
         let saved = try #require(after.first)
         #expect(saved.rowID.raw == "ncanvas-2")
@@ -214,11 +214,11 @@ struct NCanvasRowsAfterRemovalTesting {
         ], ink: ink)
         defer { withExtendedLifetime(container) {} }
         let repository = SwiftDataDrawingRepository(actor: actor)
-        #expect(try await repository.load(chapter: Self.chapter).snapshots.representativesByVerse()[2]?.rowID.raw == "current-v3")
+        #expect(try await repository.load(Self.chapter.inDefaultNotebook).snapshots.representativesByVerse()[2]?.rowID.raw == "current-v3")
 
         // when: 이력 화면에서 v2 보관 행을 고른다 — 같은 저장소를 보는 `drawingData` 로.
         let database = withDependencies { $0.createSwiftDataActor = actor } operation: { DrawingDatabase() }
-        let history = Store(initialState: VerseDrawingHistoryFeature.State(title: Self.chapter, verse: 2)) {
+        let history = Store(initialState: VerseDrawingHistoryFeature.State(page: Self.chapter.inDefaultNotebook, verse: 2)) {
             VerseDrawingHistoryFeature()
         } withDependencies: {
             $0.drawingData = database
@@ -235,7 +235,7 @@ struct NCanvasRowsAfterRemovalTesting {
         var representative: VerseDrawingSnapshot?
         let pickDeadline = ContinuousClock.now + .seconds(2)
         repeat {
-            representative = try await repository.load(chapter: Self.chapter).snapshots.representativesByVerse()[2]
+            representative = try await repository.load(Self.chapter.inDefaultNotebook).snapshots.representativesByVerse()[2]
             if representative?.rowID.raw == "archived-v2" { break }
             try await Task.sleep(for: .milliseconds(10))
         } while ContinuousClock.now < pickDeadline
@@ -247,7 +247,7 @@ struct NCanvasRowsAfterRemovalTesting {
         #expect(picked.metadata == nil)
 
         // 단일 Canvas 는 그 행을 활성 행으로 writingRect 원점에 놓는다.
-        let loaded = try await repository.load(chapter: Self.chapter)
+        let loaded = try await repository.load(Self.chapter.inDefaultNotebook)
         let composed = codec.compose(snapshots: loaded.snapshots, layout: layout, columnOrigin: columnOrigin)
         #expect(composed.activeRowIDs[2]?.raw == "archived-v2")
         #expect(composed.legacyVerses.isEmpty)
@@ -271,9 +271,9 @@ struct NCanvasRowsAfterRemovalTesting {
             context: DrawingEditContext(layout: layout, columnOrigin: columnOrigin, activeRowIDs: composed.activeRowIDs)
         )
         #expect(result.mutations.map(\.rowID.raw) == ["archived-v2"])
-        try await repository.apply(result.mutations, chapter: Self.chapter, generation: loaded.generation)
+        try await repository.apply(result.mutations, page: Self.chapter.inDefaultNotebook, generation: loaded.generation)
 
-        let after = try await repository.load(chapter: Self.chapter).snapshots
+        let after = try await repository.load(Self.chapter.inDefaultNotebook).snapshots
         #expect(after.count == 2)
         let promoted = try #require(after.first { $0.rowID.raw == "archived-v2" })
         #expect(promoted.drawingVersion == 3)

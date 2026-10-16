@@ -30,7 +30,7 @@ struct CarveDetailWidgetTesting {
     private static func state() -> CarveDetailFeature.State {
         var state = CarveDetailFeature.State.initialState
         state.sentenceWithDrawingState = [
-            SentencesWithDrawingFeature.State(sentence: BibleVerse(title: chapter, verse: 1, sentence: sentence))
+            SentencesWithDrawingFeature.State(sentence: BibleVerse(title: chapter, verse: 1, sentence: sentence), notebook: .default)
         ]
         state.favoriteChapter = chapter
         return state

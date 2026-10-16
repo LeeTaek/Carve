@@ -46,6 +46,7 @@ UI 테스트 · 시뮬레이터 확인은 화면을 탭으로 찾아가지 않�
 |---|---|
 | `navigation` | 성경 탐색 — 헤더 제목을 누른 것처럼 탐색 열을 모두 연다. 세로에서는 시스템이 성경 목록 열을 접어 둘 수 있다(「사이드바 보기」) |
 | `chart` · `favorites` | 기록 차트 · 즐겨찾기 목록을 필사 화면 위에 쌓는다 |
+| `notebooks` | 책장(필사책 고르기 · 관리, 2.2)을 필사 화면 위에 쌓는다 |
 | `settings` | 설정의 첫 화면(iCloud) |
 | `settings/<하위>` | 설정의 그 화면 — `icloud` · `draftRecovery` · `backup` · `widget` · `appearance` · `language` · `help` · `patchnote` · `sendFeedback` · `appVersion` · `removeAds` |
 | `verse/<절 번호>` | 시작 장의 그 절. 장은 `-UITestChapter`(없으면 마지막으로 연 장)로 정한다 |

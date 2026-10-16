@@ -29,47 +29,44 @@ public struct SwiftDataDrawingRepository: DrawingRepository {
         }
     }
 
-    public func load(chapter: BibleChapter) async throws -> DrawingChapterLoad {
-        try await actor.loadChapterDrawings(chapter: chapter)
+    // MARK: 필사책 저장 경로 (2.2 「회차별 필사책」)
+
+    public func load(_ page: NotebookChapter) async throws -> DrawingChapterLoad {
+        try await actor.loadChapterDrawings(page: page)
     }
 
-    public func apply(_ mutations: [VerseDrawingMutation], chapter: BibleChapter, generation: DrawingStoreGeneration) async throws {
-        try await actor.applyDrawingMutations(mutations, chapter: chapter, generation: generation, now: Date())
+    public func apply(_ mutations: [VerseDrawingMutation], page: NotebookChapter, generation: DrawingStoreGeneration) async throws {
+        try await actor.applyDrawingMutations(mutations, page: page, generation: generation, now: Date())
     }
 
-    public func archiveAndReset(
-        _ command: VerseDrawingArchiveCommand,
-        chapter: BibleChapter
-    ) async throws -> VerseDrawingArchiveOutcome {
-        try await actor.archiveAndResetVerseDrawing(command, chapter: chapter, now: Date())
+    public func archiveAndReset(_ command: VerseDrawingArchiveCommand, page: NotebookChapter) async throws -> VerseDrawingArchiveOutcome {
+        try await actor.archiveAndResetVerseDrawing(command, page: page, now: Date())
     }
 }
 
 extension SwiftDataDrawingRepository: DrawingVerseImporting {
-    public func importVerse(
-        _ command: VerseDrawingImportCommand,
-        chapter: BibleChapter,
-        generation: DrawingStoreGeneration
-    ) async throws -> VerseDrawingImportOutcome {
-        try await actor.importVerseDrawing(command, chapter: chapter, generation: generation, now: Date())
+    /// 가져온 내용을 `command.page`(필사책 + 장)의 새 대표 행으로 넣는다 — actor 의 한 트랜잭션(`importVerseDrawing(_:generation:now:)`).
+    public func importVerse(_ command: VerseDrawingImportCommand, generation: DrawingStoreGeneration) async throws -> VerseDrawingImportOutcome {
+        try await actor.importVerseDrawing(command, generation: generation, now: Date())
     }
 }
 
 // MARK: - actor 안의 트랜잭션
 
 extension SwiftDatabaseActor {
-    /// 장의 모든 `BibleDrawing` 행을 스냅샷으로 읽는다.
+    /// 필사책 안의 장의 모든 `BibleDrawing` 행을 스냅샷으로 읽는다.
     ///
     /// 행 키는 `rowUUID` 가 있으면 그것, 없으면(legacy) business `id` 다 (§8-7). 절 → 행 키 순으로 정렬해
     /// 호출 순서와 무관하게 같은 결과를 낸다.
     ///
-    /// 장의 번역본 행만 읽는다 — 술어의 `titleName` 은 `StoredBookKey.titleName(for:)` 다. 개역개정은 접두가 없으므로
-    /// `translation` 열이 nil 인 옛 행도 함께 읽힌다. 스냅샷의 번역본은 행의 `titleName` 을 `StoredBookKey.decode` 로 푼 값이다.
-    /// - Parameter chapter: 대상 장(번역본 포함).
+    /// 그 필사책 · 번역본의 행만 읽는다 — 술어의 `titleName` 은 `StoredBookKey.titleName(for: page)` 다. 기본 필사책의 개역개정은
+    /// 접두가 없으므로 `translation` 열이 nil 인 옛 행도 함께 읽힌다. 필사책은 `titleName` 접두로만 가르고 열로 가르지 않는다(혼재 버전 규칙 ②).
+    /// 스냅샷의 번역본 · 필사책은 행의 `titleName` 을 `StoredBookKey.decodeRow` 로 푼 값이다.
+    /// - Parameter page: 필사책과 대상 장(번역본 포함).
     /// - Returns: 스냅샷 배열.
-    public func loadDrawingSnapshots(chapter: BibleChapter) throws -> [VerseDrawingSnapshot] {
-        let titleName = StoredBookKey.titleName(for: chapter)
-        let chapterNumber = chapter.chapter
+    public func loadDrawingSnapshots(page: NotebookChapter) throws -> [VerseDrawingSnapshot] {
+        let titleName = StoredBookKey.titleName(for: page)
+        let chapterNumber = page.chapter.chapter
         let predicate = #Predicate<BibleDrawing> {
             $0.titleName == titleName && $0.titleChapter == chapterNumber
         }
@@ -81,10 +78,10 @@ extension SwiftDatabaseActor {
             }
     }
 
-    /// 장의 스냅샷과 지금 저장소 세대를 **한 actor 구간에서** 읽는다 (`DrawingChapterLoad`).
-    public func loadChapterDrawings(chapter: BibleChapter) throws -> DrawingChapterLoad {
+    /// 필사책 안의 장의 스냅샷과 지금 저장소 세대를 **한 actor 구간에서** 읽는다 (`DrawingChapterLoad`).
+    public func loadChapterDrawings(page: NotebookChapter) throws -> DrawingChapterLoad {
         DrawingChapterLoad(
-            snapshots: try loadDrawingSnapshots(chapter: chapter),
+            snapshots: try loadDrawingSnapshots(page: page),
             generation: DrawingStoreGeneration(raw: drawingStoreGeneration)
         )
     }
@@ -116,14 +113,17 @@ extension SwiftDatabaseActor {
     ///
     /// **세대가 다르면 아무것도 하지 않고 던진다** (`staleStoreGeneration`). 대조는 쓰기보다 먼저, 같은 actor 구간에서 한다 —
     /// 요청은 삭제 전에 왔어도 실행이 삭제 뒤라면 여기서 걸린다.
+    ///
+    /// 주소지정 · 새 행은 그 필사책의 행이다 — 다른 필사책 · 번역본의 같은 권 · 장 행은 rowID 가 같아도 찾지 않고(`rowNotFound`),
+    /// 새 행은 `BibleDrawing(page:…)` 로 그 필사책의 `titleName` 을 짓는다(기본 필사책은 지금 형식 그대로).
     /// - Parameters:
     ///   - mutations: 저장 명령.
-    ///   - chapter: 대상 장.
+    ///   - page: 필사책과 대상 장.
     ///   - generation: 명령이 기준으로 삼은 조회의 세대.
     ///   - now: `updateDate` 에 기록할 시각.
     public func applyDrawingMutations(
         _ mutations: [VerseDrawingMutation],
-        chapter: BibleChapter,
+        page: NotebookChapter,
         generation: DrawingStoreGeneration,
         now: Date
     ) throws {
@@ -144,7 +144,7 @@ extension SwiftDatabaseActor {
                 case .replace(let verse, let rowID, _, let metadata):
                     _ = try encode(metadata, verse: verse)
                     guard try introducedRowIDs.contains(rowID.raw)
-                            || drawingRow(rowID: rowID, chapter: chapter) != nil else {
+                            || drawingRow(rowID: rowID, page: page) != nil else {
                         throw DrawingRepositoryError.rowNotFound(rowID)
                     }
                     introducedRowIDs.insert(rowID.raw)
@@ -158,14 +158,14 @@ extension SwiftDatabaseActor {
                 switch mutation {
                 case .create(let verse, let rowID, let data, let metadata):
                     let blob = try encode(metadata, verse: verse)
-                    if let existing = try drawingRow(rowID: rowID, chapter: chapter) {
+                    if let existing = try drawingRow(rowID: rowID, page: page) {
                         existing.lineData = data
                         existing.layoutMetadataData = blob
                         existing.drawingVersion = 3
                         existing.updateDate = now
                     } else {
                         let row = BibleDrawing(
-                            bibleTitle: chapter, verse: verse, lineData: data, updateDate: now,
+                            page: page, verse: verse, lineData: data, updateDate: now,
                             layoutMetadataData: blob, rowUUID: rowID.raw
                         )
                         row.drawingVersion = 3
@@ -174,18 +174,18 @@ extension SwiftDatabaseActor {
                     }
 
                 case .replace(let verse, let rowID, let data, let metadata):
-                    let row = try requireDrawingRow(rowID: rowID, chapter: chapter)
+                    let row = try requireDrawingRow(rowID: rowID, page: page)
                     row.lineData = data
                     row.layoutMetadataData = try encode(metadata, verse: verse)
                     row.drawingVersion = 3
                     row.updateDate = now
 
                 case .clear(let verse, let rowID):
-                    if let row = try drawingRow(rowID: rowID, chapter: chapter) {
+                    if let row = try drawingRow(rowID: rowID, page: page) {
                         row.lineData = nil
                         row.updateDate = now
                     } else {
-                        let row = BibleDrawing(bibleTitle: chapter, verse: verse, lineData: nil, updateDate: now, rowUUID: rowID.raw)
+                        let row = BibleDrawing(page: page, verse: verse, lineData: nil, updateDate: now, rowUUID: rowID.raw)
                         row.drawingVersion = 3
                         row.isPresent = true
                         modelContext.insert(row)
@@ -211,8 +211,9 @@ extension SwiftDatabaseActor {
     /// | 보관 행 (`archiveRowID`) | 활성 행의 `lineData` · `layoutMetadataData` · `drawingVersion` 복제, **`isPresent = false`**, `updateDate` 는 원래 필사 시각 유지 |
     /// | 활성 행 (`activeRowID`) | 행 유지, `lineData = nil`, **`isPresent = true`**(대표 유지), `updateDate = now` |
     ///
-    /// 보관 행의 `titleName` · `translation` 열도 활성 행 그대로 옮긴다 — 번역본이 같은 행으로 남고(영어 현지화 결정 1),
-    /// 열이 nil 인 옛 개역개정 행의 보관본도 nil 이다.
+    /// 보관 행의 `titleName` · `translation` 열도 활성 행 그대로 옮긴다 — 번역본 · 필사책이 같은 행으로 남고(영어 현지화 결정 1 ·
+    /// 필사책 결정 1), 열이 nil 인 옛 개역개정 행의 보관본도 nil 이다. 활성 행 · 보관 행은 그 필사책의 행에서만 찾으므로
+    /// 다른 필사책의 같은 절 행(`isPresent` 포함)은 건드리지 않는다.
     ///
     /// **보관 행이 다시 대표로 뽑히지 않는 이유가 여기 있다.** `VerseDrawingMutation.clear` 는 기존 행의 `isPresent` 를
     /// 바꾸지 않으므로 대표 규칙(`DrawingRepresentativeRule`: `isPresent` 우선 → `updateDate` 최신)을 이 작업이 직접
@@ -226,33 +227,33 @@ extension SwiftDatabaseActor {
     /// - Important: 호출 전에 미저장분이 전부 저장돼 있어야 한다 (§8-5 flush). 이 메서드가 보관하는 것은 **DB 의 활성 행**이다.
     /// - Parameters:
     ///   - command: 대상 절 · 활성 행 · 보관 행 식별자.
-    ///   - chapter: 대상 장.
+    ///   - page: 필사책과 대상 장.
     ///   - now: 활성 행의 `updateDate` 에 기록할 시각.
     /// - Returns: 실제로 보관했으면 `.archived`, 비어 있어 아무것도 쓰지 않았으면 `.alreadyEmpty`.
     public func archiveAndResetVerseDrawing(
         _ command: VerseDrawingArchiveCommand,
-        chapter: BibleChapter,
+        page: NotebookChapter,
         now: Date
     ) throws -> VerseDrawingArchiveOutcome {
         do {
             // 획이 하나도 없으면 보관본을 만들지 않는다. 지우개로 전부 지운 절은 `lineData` 가 남아 있어도 stroke 가 0개다.
-            guard let active = try drawingRow(rowID: command.activeRowID, chapter: chapter),
+            guard let active = try drawingRow(rowID: command.activeRowID, page: page),
                   DrawingContentRule.hasStrokes(active.lineData) else {
                 return .alreadyEmpty
             }
 
             let archived: BibleDrawing
-            if let existing = try drawingRow(rowID: command.archiveRowID, chapter: chapter) {
+            if let existing = try drawingRow(rowID: command.archiveRowID, page: page) {
                 archived = existing
             } else {
                 let row = BibleDrawing(
-                    bibleTitle: chapter, verse: command.verse, lineData: nil, updateDate: now,
+                    page: page, verse: command.verse, lineData: nil, updateDate: now,
                     rowUUID: command.archiveRowID.raw
                 )
                 modelContext.insert(row)
                 archived = row
             }
-            // 권 이름 · 번역본 열은 원래 행 그대로 옮긴다 — 열이 nil 인 옛 개역개정 행의 보관본도 nil 이다(영어 행은 늘 nil).
+            // 권 이름(필사책 접두 포함) · 번역본 열은 원래 행 그대로 옮긴다 — 열이 nil 인 옛 개역개정 행의 보관본도 nil 이다(영어 행은 늘 nil).
             archived.titleName = active.titleName
             archived.translation = active.translation
             archived.verse = command.verse
@@ -279,11 +280,11 @@ extension SwiftDatabaseActor {
 
     // MARK: 내부
 
-    /// 장(번역본 포함)의 행 하나를 행 키로 찾는다 — 다른 번역본의 같은 권 · 장 행은 주소지정되지 않는다.
-    private func drawingRow(rowID: BibleDrawingRowID, chapter: BibleChapter) throws -> BibleDrawing? {
+    /// 필사책 안의 장(번역본 포함)의 행 하나를 행 키로 찾는다 — 다른 필사책 · 번역본의 같은 권 · 장 행은 주소지정되지 않는다.
+    private func drawingRow(rowID: BibleDrawingRowID, page: NotebookChapter) throws -> BibleDrawing? {
         let raw = rowID.raw
-        let titleName = StoredBookKey.titleName(for: chapter)
-        let chapterNumber = chapter.chapter
+        let titleName = StoredBookKey.titleName(for: page)
+        let chapterNumber = page.chapter.chapter
         let predicate = #Predicate<BibleDrawing> {
             $0.titleName == titleName && $0.titleChapter == chapterNumber
                 && ($0.rowUUID == raw || $0.id == raw)
@@ -293,8 +294,8 @@ extension SwiftDatabaseActor {
         return try modelContext.fetch(descriptor).first
     }
 
-    private func requireDrawingRow(rowID: BibleDrawingRowID, chapter: BibleChapter) throws -> BibleDrawing {
-        guard let row = try drawingRow(rowID: rowID, chapter: chapter) else {
+    private func requireDrawingRow(rowID: BibleDrawingRowID, page: NotebookChapter) throws -> BibleDrawing {
+        guard let row = try drawingRow(rowID: rowID, page: page) else {
             throw DrawingRepositoryError.rowNotFound(rowID)
         }
         return row

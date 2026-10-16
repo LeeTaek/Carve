@@ -19,7 +19,7 @@ import ComposableArchitecture
 @Suite("절 초안 — 시험용 소유 주입")
 @MainActor
 struct ChapterCanvasOwnershipInjectionTesting: DraftTestSamples {
-    private var verseOne: DraftVerse { DraftVerse(chapter: CanvasTestSupport.chapter, verse: 1) }
+    private var verseOne: DraftVerse { DraftVerse(page: CanvasTestSupport.page, verse: 1) }
 
     /// 주입된 환경 — 확인된 계정에 소유 근거를 **가정**하고 그 사실을 표식으로 남긴다.
     private func injected(_ scope: AccountScope, _ generation: UInt64) -> DrawingEditEnvironment {

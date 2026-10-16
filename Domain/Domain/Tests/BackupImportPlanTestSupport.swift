@@ -13,6 +13,8 @@ import Foundation
 enum BackupImportPlanSample {
     /// 판정하는 장 — 창세기 1장.
     static let chapter = BibleChapter(title: .genesis, chapter: 1)
+    /// 판정 단위 — 기본 필사책의 창세기 1장.
+    static let page = NotebookChapter(notebook: .default, chapter: chapter)
 
     /// `DrawingLayoutMetadata.decode` 로 풀리는 메타데이터. 비운 행에도 남는다(「지우기」 는 `lineData` 만 비운다).
     static let layoutMetadata = Data("""
@@ -127,13 +129,13 @@ enum BackupImportPlanSample {
         )
     }
 
-    /// 창세기 1장을 판정한다.
+    /// 기본 필사책의 창세기 1장을 판정한다.
     static func plan(
         _ items: [BackupItem],
         current: [BackupRowRecord] = [],
         unsupported: [String: BackupUnsupportedReason] = [:]
     ) -> BackupChapterPlan {
-        BackupImportPlanner.plan(items: items, unsupported: unsupported, current: current, chapter: chapter)
+        BackupImportPlanner.plan(items: items, unsupported: unsupported, current: current, page: page)
     }
 
     /// 판정 결과를 저장소에 넣은 모습 — 대표 고정(`pins`)한 지금 행은 `isPresent` 만 true 로 바꾸고, 넣을 행을 blob 바이트로 되살려 더한다.
@@ -154,7 +156,7 @@ enum BackupImportPlanSample {
                 rowUUID: "IMPORTED-\(offset)",
                 businessID: nil,
                 titleName: insertion.titleName,
-                chapter: insertion.chapter.chapter,
+                chapter: insertion.page.chapter.chapter,
                 verse: insertion.verse,
                 translation: insertion.translation,
                 isPresent: insertion.isPresent,

@@ -125,8 +125,9 @@ extension SwiftDatabaseActor {
     ///
     /// 번역본은 권 이름(`StoredBookKey`)으로 가린다 — 영어 행은 `"<번역본>-<rawValue>"`, 개역개정 행은 접두 없는 `rawValue` 다.
     /// `translation` 열은 보지 않는다: 영어 행은 늘 nil 이고, 접두 없는 행은 열이 nil 이든 `.NKRV` 든 개역개정이다(영어 현지화 결정 1).
+    /// 즐겨찾기는 필사책 공통이라 필사책 접두를 쓰지 않는다(2.2 결정 11 · 혼재 버전 규칙 ③) — 권 이름은 기본 필사책 형식이다.
     private func favoriteRows(title: BibleTitle, chapter: Int, translation: Translation) throws -> [FavoriteVerse] {
-        let titleName = StoredBookKey.titleName(title: title, translation: translation)
+        let titleName = StoredBookKey.titleName(title: title, translation: translation, notebook: .default)
         let chapterNumber = chapter
         let predicate = #Predicate<FavoriteVerse> {
             $0.titleName == titleName && $0.titleChapter == chapterNumber
@@ -146,9 +147,10 @@ extension SwiftDatabaseActor {
 extension FavoriteVerse {
     /// 권 · 장 · 절을 해석할 수 없는 행(알 수 없는 권 이름 · 모르는 번역본 접두 등)은 nil — 목록에 올리지 않는다.
     ///
-    /// 번역본은 권 이름의 접두로 정한다(`StoredBookKey.decode`). 모르는 접두를 개역개정에 붙이지 않는다.
+    /// 번역본은 권 이름의 접두로 정한다(`StoredBookKey.decodeRow`). 모르는 접두를 개역개정에 붙이지 않는다.
+    /// 즐겨찾기 행에는 필사책 접두가 없다(2.2 결정 11) — 접두가 붙은 행은 즐겨찾기 형식이 아니라 nil 이다(2.1 과 같다).
     var snapshot: FavoriteVerseSnapshot? {
-        guard let titleName, let book = StoredBookKey.decode(titleName),
+        guard let titleName, let book = StoredBookKey.decodeRow(titleName), book.notebook.isDefault,
               let titleChapter, let verse else { return nil }
         return FavoriteVerseSnapshot(
             key: FavoriteVerseKey(

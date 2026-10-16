@@ -64,7 +64,8 @@ struct BackupExportDraftTesting {
         // 초안 항목의 모양 — 만든 시각 없음 · 남긴 시각 · 묶음 종류 · revision · 원본 바이트.
         let fingerprint = BackupExportSample.fingerprint(BackupExportSample.ink("W"))
         let sourceKey = BackupItemID.draftSourceKey(
-            draftScope: "local", sessionID: "session-1", translation: "NKRV", title: BibleTitle.genesis.rawValue, chapter: 1, verse: 3, revision: 7
+            draftScope: "local", sessionID: "session-1", translation: "NKRV", title: BibleTitle.genesis.rawValue, chapter: 1, verse: 3, revision: 7,
+            notebook: nil
         )
         #expect(verse3.id == BackupItemID.make(kind: .draft, sourceKey: sourceKey, fingerprint: fingerprint))
         #expect(verse3.kind == .draft)
@@ -151,7 +152,7 @@ struct BackupExportDraftTesting {
         try harness.seed([
             BackupExportRowSeed(verse: 1, rowUUID: "ROW-1", lineData: BackupExportSample.ink("1"), layoutMetadataData: BackupExportSample.metadata)
         ])
-        let key = VerseDraftKey(sessionID: "broken-session", chapter: BackupExportSample.genesis1, verse: 9)
+        let key = VerseDraftKey(sessionID: "broken-session", page: BackupExportSample.genesis1.inDefaultNotebook, verse: 9)
         let session = harness.preservation.draftsDirectory
             .appendingPathComponent(AccountScope.localOnly.key, isDirectory: true)
             .appendingPathComponent(key.sessionID, isDirectory: true)

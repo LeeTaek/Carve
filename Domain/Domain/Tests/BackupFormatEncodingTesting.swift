@@ -16,7 +16,8 @@ struct BackupFormatEncodingTesting {
 
     @Test("형식 상수와 파일 형식 식별자")
     func formatConstantsMatchTheContract() {
-        #expect(BackupFormat.formatVersion == 1)
+        #expect(BackupFormat.formatVersion == 2)
+        #expect(BackupFormat.readableFormatVersions == [1, 2])
         #expect(BackupFormat.fileExtension == "carvebackup")
         #expect(BackupFormat.typeIdentifier == "kr.co.carve.leetaek.backup")
         #expect(UTType.carveBackup.identifier == BackupFormat.typeIdentifier)
@@ -144,20 +145,20 @@ struct BackupFormatEncodingTesting {
         #expect(items.first?.source.rowKey == "R")
     }
 
-    @Test("formatVersion 2 는 나머지 모양과 상관없이 unsupportedFormat 으로 거부한다")
-    func formatVersionTwoIsRejected() throws {
-        // Given — 같은 모양의 v2, 그리고 키가 바뀐 v2
+    @Test("formatVersion 3 은 나머지 모양과 상관없이 unsupportedFormat 으로 거부한다")
+    func formatVersionThreeIsRejected() throws {
+        // Given — 같은 모양의 v3, 그리고 키가 바뀐 v3(읽을 수 있는 1 · 2 다음의 뒤 버전)
         let sameShape = Data("""
-        {"formatVersion":2,"backupID":"B","createdAt":0,"appVersion":"3.0.0",\
-        "scope":{"rows":true,"drafts":true},"counts":{"rows":0,"drafts":0,"blobs":0},"blobs":[]}
+        {"formatVersion":3,"backupID":"B","createdAt":0,"appVersion":"3.0.0",\
+        "scope":{"rows":true,"drafts":true},"counts":{"rows":0,"drafts":0,"blobs":0},"blobs":[],"notebooks":[]}
         """.utf8)
-        let otherShape = Data(#"{"formatVersion":2,"entries":[]}"#.utf8)
+        let otherShape = Data(#"{"formatVersion":3,"entries":[]}"#.utf8)
 
         // When · Then
-        #expect(throws: BackupFormatError.unsupportedFormat(formatVersion: 2)) {
+        #expect(throws: BackupFormatError.unsupportedFormat(formatVersion: 3)) {
             try BackupFormat.decoder.decode(BackupManifest.self, from: sameShape)
         }
-        #expect(throws: BackupFormatError.unsupportedFormat(formatVersion: 2)) {
+        #expect(throws: BackupFormatError.unsupportedFormat(formatVersion: 3)) {
             try BackupFormat.decoder.decode(BackupManifest.self, from: otherShape)
         }
     }

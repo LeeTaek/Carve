@@ -10,80 +10,6 @@ import CarveToolkit
 import Dependencies
 import Foundation
 
-/// 초안 하나를 가리키는 키 — 세션 · 번역 · 권 · 장 · 절 (정책 §12-6 구현 순서 ②).
-///
-/// 초안은 동기화하지 않는 이 기기의 파일이라 `translation` 에 **실제 번역본**(`"NKRV"` · `"KJV"` · `"BSB"`)을 쓴다 — SwiftData 의
-/// `translation` 열과 달리 구버전 기기가 읽지 않는다(영어 현지화 결정 1). 파일 이름도 번역본으로 시작한다(`KJV~1-01Genesis.txt~1~1.json`).
-public struct VerseDraftKey: Hashable, Codable, Sendable {
-    public var sessionID: String
-    public var translation: String
-    public var title: String
-    public var chapter: Int
-    public var verse: Int
-
-    /// 장의 번역본 그대로의 키.
-    public init(sessionID: String, chapter: BibleChapter, verse: Int) {
-        self.init(sessionID: sessionID, translation: chapter.translation, chapter: chapter, verse: verse)
-    }
-
-    /// 번역본을 따로 주는 키 — 장의 번역본 대신 이 값을 적는다.
-    public init(sessionID: String, translation: Translation, chapter: BibleChapter, verse: Int) {
-        self.sessionID = sessionID
-        self.translation = translation.rawValue
-        self.title = chapter.title.rawValue
-        self.chapter = chapter.chapter
-        self.verse = verse
-    }
-
-    /// 키가 가리키는 장(번역본 포함). 이 판이 모르는 번역본 · 권이면 nil — 개역개정에 임의로 붙이지 않는다(정책 §8 「미상 판본을 임의 귀속하지 않음」).
-    public var bibleChapter: BibleChapter? {
-        guard let translation = Translation(rawValue: translation), let title = BibleTitle(rawValue: title) else { return nil }
-        return BibleChapter(title: title, chapter: chapter, translation: translation)
-    }
-
-    /// 파일 이름. 구성요소에 경로 구분자가 들어오지 않게 바꾼다.
-    var fileName: String {
-        Self.fileStem([translation, title, "\(chapter)", "\(verse)"]) + ".json"
-    }
-
-    /// 한 장의 초안 파일 이름이 모두 이것으로 시작한다 — 파일을 열지 않고 장으로 거른다.
-    static func chapterFilePrefix(translation: Translation, chapter: BibleChapter) -> String {
-        fileStem([translation.rawValue, chapter.title.rawValue, "\(chapter.chapter)"]) + "~"
-    }
-
-    private static func fileStem(_ components: [String]) -> String {
-        components.map { $0.replacingOccurrences(of: "/", with: "_") }.joined(separator: "~")
-    }
-
-    /// 파일 이름이 가리키는 장(번역본 포함) — 파일을 열지 않고 읽는다(깨진 초안도 어느 장인지는 안다).
-    /// 모양이 다르거나 이 판이 모르는 번역본이면 nil — 모르는 번역본을 개역개정 장으로 치지 않는다.
-    static func chapter(fromFileName name: String) -> BibleChapter? {
-        guard let parts = FileNameParts(name), let translation = Translation(rawValue: parts.translation) else { return nil }
-        return BibleChapter(title: parts.title, chapter: parts.chapter, translation: translation)
-    }
-
-    /// 파일 이름이 초안 파일의 모양(`번역~권~장~절`)인가 — 번역본은 이 판이 모르는 값이어도 된다(옆으로 옮긴 파일을 세고 지울 때 쓴다).
-    static func hasDraftFileShape(_ name: String) -> Bool {
-        FileNameParts(name) != nil
-    }
-
-    /// 파일 이름의 번역 · 권 · 장. 번역은 문자열 그대로 둔다.
-    private struct FileNameParts {
-        let translation: String
-        let title: BibleTitle
-        let chapter: Int
-
-        /// 모양(`번역~권~장~절[.json]`)이 다르면 nil.
-        init?(_ name: String) {
-            let parts = name.replacingOccurrences(of: ".json", with: "").split(separator: "~", omittingEmptySubsequences: false)
-            guard parts.count == 4, let title = BibleTitle(rawValue: String(parts[1])), let chapter = Int(parts[2]) else { return nil }
-            self.translation = String(parts[0])
-            self.title = title
-            self.chapter = chapter
-        }
-    }
-}
-
 /// 절 하나의 초안 — 그 절의 **완전한** 획 집합과, 그것을 쓴 편집 문맥의 근거를 함께 든다.
 public struct VerseDraft: Codable, Equatable, Sendable {
     public var key: VerseDraftKey
@@ -254,35 +180,6 @@ public extension VerseEditAccountBasis {
         case .unverified(let hint): hint
         case .localOnly: nil
         }
-    }
-}
-
-/// 복구 화면(④)이 쓰는 묶음 요약 — **파일만 보고 센다.** 저장소를 읽지 않으므로 깨진 초안이 있어도 개수 · 용량은 나온다.
-public struct DraftBucketSummary: Equatable, Sendable {
-    public let scope: AccountScope
-    /// 읽을 수 있는 초안 파일 수와 바이트.
-    public let draftCount: Int
-    public let draftBytes: Int64
-    /// 읽지 못해 옆으로 옮긴 파일(`*.unreadable-*`) — 되살릴 수 없고 내보내기만 한다.
-    public let unreadableCount: Int
-    public let unreadableBytes: Int64
-    /// 초안이 남아 있는 장(번역본 포함 — 같은 권 · 장의 KJV 와 개역개정은 따로다). 분류(저장소 대조)는 이 장만 읽으면 된다.
-    /// 이 판이 모르는 번역본의 파일은 장으로 올리지 않는다.
-    public let chapters: [BibleChapter]
-    /// 읽을 수 있는 초안 파일 수를 번역본별로 — 파일 이름으로 센다. 모르는 번역본의 파일은 `draftCount` 에만 든다.
-    public let draftCountByTranslation: [Translation: Int]
-
-    public init(
-        scope: AccountScope, draftCount: Int, draftBytes: Int64, unreadableCount: Int, unreadableBytes: Int64, chapters: [BibleChapter],
-        draftCountByTranslation: [Translation: Int] = [:]
-    ) {
-        self.scope = scope
-        self.draftCount = draftCount
-        self.draftBytes = draftBytes
-        self.unreadableCount = unreadableCount
-        self.unreadableBytes = unreadableBytes
-        self.chapters = chapters
-        self.draftCountByTranslation = draftCountByTranslation
     }
 }
 
@@ -466,24 +363,6 @@ public actor LocalPreservationWriter {
             .sorted(by: Self.bucketOrder)
     }
 
-    /// 한 묶음에서 한 장의 초안들. 파일 이름으로 먼저 거르므로 다른 장 · 다른 번역본의 초안은 열지 않는다. 지금 세대의 것만 준다.
-    ///
-    /// 번역본은 `translation` 인자로 고른다(장의 번역본이 아니다) — 부르는 쪽은 보통 `chapter.translation` 을 넘긴다.
-    ///
-    /// **그 장의 초안 파일을 하나라도 읽지 · 풀지 못하면 던진다.** 없는 것으로 치면 편집 화면이 그 초안을 보이지 않은 채 열리고, 같은 키 ·
-    /// 더 새 revision 의 초안이 그 위에 덮인다(초안 전용 세션에서는 그것이 유일한 사본이다). 묶음 폴더가 아예 없으면(초안을 쓴 적 없음) 빈 목록이다.
-    public func drafts(in scope: AccountScope, chapter: BibleChapter, translation: Translation = .NKRV) throws -> [VerseDraft] {
-        let current = try requireGeneration()
-        let prefix = VerseDraftKey.chapterFilePrefix(translation: translation, chapter: chapter)
-        return try draftFiles(in: scope) { $0.lastPathComponent.hasPrefix(prefix) }
-            .map { try readDraft(at: $0) }
-            .filter {
-                $0.eraseGeneration == current && $0.key.translation == translation.rawValue
-                    && $0.key.title == chapter.title.rawValue && $0.key.chapter == chapter.chapter
-            }
-            .sorted { ($0.key.verse, $0.key.sessionID) < ($1.key.verse, $1.key.sessionID) }
-    }
-
     // MARK: - 복구 화면(④)이 보는 것
 
     /// 이 기기에 초안이 남아 있는 묶음(계정 범위)들. 폴더가 없으면 빈 목록이다.
@@ -505,31 +384,32 @@ public actor LocalPreservationWriter {
         }
     }
 
-    /// 그 묶음의 개수 · 용량 · 남은 장. **지금 세대의 것만** 세지 않는다 — 옛 세대의 잔여도 자리를 차지하므로 함께 보인다.
+    /// 그 묶음의 개수 · 용량 · 남은 page(필사책 + 장). **지금 세대의 것만** 세지 않는다 — 옛 세대의 잔여도 자리를 차지하므로 함께 보인다.
+    /// 모든 필사책의 파일을 센다 — 필사책은 파일 이름으로 가른다(`VerseDraftKey.page(fromFileName:)`).
     public func draftSummary(in scope: AccountScope) throws -> DraftBucketSummary {
         let files = try draftEntries(in: scope)
         let bucket = bucketRoot(scope)
         var draftCount = 0, unreadableCount = 0
         var draftBytes: Int64 = 0, unreadableBytes: Int64 = 0
-        var chapters: Set<BibleChapter> = [], countByTranslation: [Translation: Int] = [:]
+        var pages: Set<NotebookChapter> = [], countByTranslation: [Translation: Int] = [:]
         for url in files {
             let size = Int64((try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
-            let chapter = VerseDraftKey.chapter(fromFileName: url.lastPathComponent)
+            let page = VerseDraftKey.page(fromFileName: url.lastPathComponent)
             if Self.isUnreadableFile(url, bucketRoot: bucket) {
                 unreadableCount += 1
                 unreadableBytes += size
             } else if url.pathExtension == "json" {
                 draftCount += 1
                 draftBytes += size
-                if let chapter { countByTranslation[chapter.translation, default: 0] += 1 }
+                if let page { countByTranslation[page.chapter.translation, default: 0] += 1 }
             } else {
                 continue
             }
-            if let chapter { chapters.insert(chapter) }
+            if let page { pages.insert(page) }
         }
         return DraftBucketSummary(
             scope: scope, draftCount: draftCount, draftBytes: draftBytes, unreadableCount: unreadableCount,
-            unreadableBytes: unreadableBytes, chapters: chapters.sorted(by: Self.summaryOrder), draftCountByTranslation: countByTranslation
+            unreadableBytes: unreadableBytes, pages: pages.sorted(by: Self.pageOrder), draftCountByTranslation: countByTranslation
         )
     }
 
@@ -691,14 +571,87 @@ public actor LocalPreservationWriter {
     }
 }
 
+// MARK: - 필사책별 초안 (2.2)
+
+extension LocalPreservationWriter {
+    /// 한 묶음에서 필사책 안의 한 장의 초안들. 파일 이름으로 먼저 거르므로 다른 필사책 · 다른 장 · 다른 번역본의 초안은 열지 않는다.
+    /// 지금 세대의 것만 준다. 번역본은 `page.chapter.translation` 이다.
+    ///
+    /// **그 장의 초안 파일을 하나라도 읽지 · 풀지 못하면 던진다.** 없는 것으로 치면 편집 화면이 그 초안을 보이지 않은 채 열리고, 같은 키 ·
+    /// 더 새 revision 의 초안이 그 위에 덮인다(초안 전용 세션에서는 그것이 유일한 사본이다). 묶음 폴더가 아예 없으면(초안을 쓴 적 없음) 빈 목록이다.
+    public func drafts(in scope: AccountScope, page: NotebookChapter) throws -> [VerseDraft] {
+        let current = try requireGeneration()
+        let chapter = page.chapter
+        let prefix = VerseDraftKey.chapterFilePrefix(notebook: page.notebook, translation: chapter.translation, chapter: chapter)
+        return try draftFiles(in: scope) { $0.lastPathComponent.hasPrefix(prefix) }
+            .map { try readDraft(at: $0) }
+            .filter {
+                $0.eraseGeneration == current && $0.key.notebook == page.notebook && $0.key.translation == chapter.translation.rawValue
+                    && $0.key.title == chapter.title.rawValue && $0.key.chapter == chapter.chapter
+            }
+            .sorted { ($0.key.verse, $0.key.sessionID) < ($1.key.verse, $1.key.sessionID) }
+    }
+
+    // MARK: 필사책 지우기
+
+    /// 필사책 하나의 초안을 **모든 묶음에서** 지운다 — 사용자가 확인한 뒤 그 필사책을 지울 때만 부른다(책장의 지우기, 2.2 결정 7).
+    ///
+    /// 그 필사책의 행은 이미 사용자가 지웠으므로, 초안을 남기면 「확인이 필요한 필기」 에 지운 필사책의 필기가 오른다. 파일 이름의 필사책 접두
+    /// (`nb_<토큰>~`)로만 가른다 — 초안(`.json`)과 읽지 못해 옆으로 옮긴 파일 모두, 이 판이 모르는 번역본의 파일도 지운다. 세대는 보지 않는다(옛 세대의
+    /// 잔여도 그 필사책의 것이다).
+    ///
+    /// - **기본 필사책은 지우지 않는다** — 기본 필사책은 지울 수 없고(`NotebookRepositoryError.cannotDeleteDefault`), 2.2 이전의 모든 초안이 여기 있다.
+    ///   잘못 불러도 아무것도 지우지 않고 0 을 돌려준다.
+    /// - 하나를 지우지 못해도 나머지는 지우고 지운 수만 돌려준다. 묶음 폴더를 읽지 못하면 다른 묶음은 지운 뒤 던진다 — 남은 것은 다시 부르면 지운다.
+    /// - Returns: 실제로 지운 파일 수.
+    @discardableResult
+    public func discardDrafts(notebook: NotebookID) throws -> Int {
+        guard !notebook.isDefault else {
+            Log.error("로컬 보존 — 기본 필사책의 초안은 필사책 지우기로 지우지 않는다")
+            return 0
+        }
+        var removed = 0
+        var unreadable: WriterError?
+        for scope in try draftBuckets() {
+            let bucket = bucketRoot(scope)
+            let entries: [URL]
+            do {
+                entries = try draftEntries(in: scope)
+            } catch {
+                unreadable = unreadable ?? WriterError.draftsUnreadable(scope.key)
+                continue
+            }
+            for url in entries where Self.belongs(url, to: notebook, bucketRoot: bucket) {
+                do {
+                    try fileManager.removeItem(at: url)
+                    removed += 1
+                } catch {
+                    Log.error("로컬 보존 — 지운 필사책의 초안을 지우지 못했다", url.lastPathComponent, "\(error)")
+                }
+            }
+        }
+        if let unreadable { throw unreadable }
+        return removed
+    }
+
+    /// 이 파일이 그 필사책의 초안(`.json`)이나 읽지 못해 옆으로 옮긴 파일인가 — 이름의 필사책 접두로만 본다.
+    private static func belongs(_ url: URL, to notebook: NotebookID, bucketRoot: URL) -> Bool {
+        if url.pathExtension == "json" {
+            return VerseDraftKey.notebook(fromFileName: url.lastPathComponent) == notebook
+        }
+        guard isUnreadableFile(url, bucketRoot: bucketRoot) else { return false }
+        return VerseDraftKey.notebook(fromFileName: url.deletingPathExtension().lastPathComponent) == notebook
+    }
+}
+
 // MARK: - 순서
 
 extension LocalPreservationWriter {
-    /// 한 묶음의 초안 순서 — 세션 → 장 → 절, 같으면 번역본 → 권 이름(같은 목록을 두 번 읽어도 순서가 같다).
+    /// 한 묶음의 초안 순서 — 세션 → 장 → 절, 같으면 번역본 → 권 이름 → 필사책(같은 목록을 두 번 읽어도 순서가 같다).
     static func bucketOrder(_ lhs: VerseDraft, _ rhs: VerseDraft) -> Bool {
         let left = lhs.key, right = rhs.key
-        return (left.sessionID, left.chapter, left.verse, left.translation, left.title)
-            < (right.sessionID, right.chapter, right.verse, right.translation, right.title)
+        return (left.sessionID, left.chapter, left.verse, left.translation, left.title, left.notebook.rawValue)
+            < (right.sessionID, right.chapter, right.verse, right.translation, right.title, right.notebook.rawValue)
     }
 
     /// 요약의 장 순서 — 번역본(`Translation.allCases` 순) → 권 이름 → 장. 개역개정만 있으면 예전 순서(권 이름 → 장) 그대로다.
@@ -706,6 +659,14 @@ extension LocalPreservationWriter {
         let left = Translation.allCases.firstIndex(of: lhs.translation) ?? 0
         let right = Translation.allCases.firstIndex(of: rhs.translation) ?? 0
         return (left, lhs.title.rawValue, lhs.chapter) < (right, rhs.title.rawValue, rhs.chapter)
+    }
+
+    /// 요약의 page 순서 — 기본 필사책 먼저, 그 밖은 토큰 순, 같은 필사책 안에서는 `summaryOrder`. 기본 필사책만 있으면 예전 순서 그대로다.
+    static func pageOrder(_ lhs: NotebookChapter, _ rhs: NotebookChapter) -> Bool {
+        if lhs.notebook != rhs.notebook {
+            return (lhs.notebook.isDefault ? 0 : 1, lhs.notebook.rawValue) < (rhs.notebook.isDefault ? 0 : 1, rhs.notebook.rawValue)
+        }
+        return summaryOrder(lhs.chapter, rhs.chapter)
     }
 }
 
@@ -731,7 +692,7 @@ extension LocalPreservationWriter {
         return session.deletingLastPathComponent().resolvingSymlinksInPath().path == bucketRoot.resolvingSymlinksInPath().path
     }
 
-    /// 이름이 옆으로 옮긴 파일의 형식인가 — 줄기는 초안 파일 이름(번역~권~장~절)이고 확장자는 `unreadable-<UUID>` 다.
+    /// 이름이 옆으로 옮긴 파일의 형식인가 — 줄기는 초안 파일 이름(`[nb_<토큰>~]번역~권~장~절`)이고 확장자는 `unreadable-<UUID>` 다.
     static func isUnreadableFileName(_ name: String) -> Bool {
         let url = URL(fileURLWithPath: name)
         let marker = url.pathExtension
@@ -768,7 +729,9 @@ public extension DependencyValues {
 /// 이 경계 밖이다.
 public protocol VerseDraftStore: Sendable {
     func saveDraft(_ draft: VerseDraft, superseding: [VerseDraftRef]) async throws -> LocalPreservationWriter.WriteOutcome
-    func drafts(in scope: AccountScope, chapter: BibleChapter, translation: Translation) async throws -> [VerseDraft]
+    /// 필사책 안의 한 장의 초안들(번역본은 `page.chapter.translation`). 그 장의 초안을 하나라도 읽지 못하면 던진다.
+    /// - Parameter page: 필사책과 장. **기본값이 없다**(결정 12) — 빠뜨리면 지금 필사책이 아닌 기본 필사책의 초안을 읽는다.
+    func drafts(in scope: AccountScope, page: NotebookChapter) async throws -> [VerseDraft]
     func removeDraft(_ key: VerseDraftKey, scope: AccountScope, ifRevision revision: Int) async throws
     /// 그 revision 까지의 초안 내용이 저장소에 들어갔다는 표식을 남긴다(지우지 않는다).
     /// - Parameter contentFingerprint: 저장소에 **실제로 넣은 내용**의 지문. 파일이 그 사이 더 새 revision 이어도 이 지문은 남긴다.

@@ -15,8 +15,9 @@ import ComposableArchitecture
 extension DraftRecoveryFeature {
     // MARK: - 견주기
 
-    /// 견줄 때 그 장만 읽는다 — 목록은 지금 필기의 바이트를 들고 있지 않다. 남겨 둔 필기도 **다시 읽어** 넣으면 무엇이 되는지 판정한다
-    /// (`VerseDraftImportRule`). 읽기 **전후로** 계정 근거가 목록의 것과 같은지 본다(P0-1). 실패 문구는 견주기를 시작할 때의 화면 언어로 만든다.
+    /// 견줄 때 그 page(필사책 + 장)만 읽는다 — 목록은 지금 필기의 바이트를 들고 있지 않다. 남겨 둔 필기도 **다시 읽어** 넣으면 무엇이 되는지
+    /// 판정한다(`VerseDraftImportRule`). 다른 필사책의 같은 절과는 견주지 않는다(2.2). 읽기 **전후로** 계정 근거가 목록의 것과 같은지 본다(P0-1).
+    /// 실패 문구는 견주기를 시작할 때의 화면 언어로 만든다.
     func compare(_ item: Item, stamp: Stamp) -> Effect<Action> {
         let locale = AppLanguage.displayLocale()
         return .run { [reader, repository, editEnvironment] send in
@@ -31,9 +32,9 @@ extension DraftRecoveryFeature {
             }
             do {
                 let current = try await VerseDraftRecoveryQuery(reader: reader, repository: repository)
-                    .currentVerse(chapter: item.chapter, verse: item.verse)
-                // 줄의 장이 곧 초안의 번역본 장이다(`Item.chapter` = `VerseDraftKey.bibleChapter`) — 개역개정으로 바꾸지 않는다.
-                let draft = try await reader.drafts(in: item.scope, chapter: item.chapter, translation: item.chapter.translation)
+                    .currentVerse(page: item.page, verse: item.verse)
+                // 줄의 page 가 곧 초안의 필사책 · 번역본 장이다(`Item.page` = `VerseDraftKey.page`) — 기본 필사책 · 개역개정으로 바꾸지 않는다.
+                let draft = try await reader.drafts(in: item.scope, page: item.page)
                     .first { $0.key == item.key }
                 let after = Stamp(await editEnvironment.current())
                 guard after == stamp else {
@@ -97,7 +98,8 @@ extension DraftRecoveryFeature {
         return ImportTarget(item: item, check: check, stamp: stamp)
     }
 
-    /// 넣는다 — 넣기 직전에 환경 · 필기 · 지금 필기를 다시 본다(`VerseDraftImporter`). 저장을 마치면 열린 필사 화면에 알린다.
+    /// 넣는다 — 넣기 직전에 환경 · 필기 · 지금 필기를 다시 본다(`VerseDraftImporter`). 초안의 page(필사책 + 장)로 넣고, 저장을 마치면 열린 필사 화면에
+    /// 그 page 로 알린다.
     private func startImport(_ state: inout State, target: ImportTarget, acknowledged: VerseDraftImportCheck.Caution?) -> Effect<Action> {
         let item = target.item, check = target.check, stamp = target.stamp
         state.importingItemID = item.id
@@ -122,9 +124,10 @@ extension DraftRecoveryFeature {
             )
             do {
                 let result = try await importer.importDraft(request, environment: environment)
-                if case .imported = result {
-                    // 필사 화면 위의 패널이다 — 그 아래 열린 장이 이 절을 다시 읽어 반영하게 알린다.
-                    localChanges.post(LocalDrawingChange(chapter: item.chapter, date: date.now))
+                if case .imported = result, let page = request.page {
+                    // 필사 화면 위의 패널이다 — 그 아래 열린 장이 같은 page(필사책 + 장)면 이 절을 다시 읽어 반영하게 알린다.
+                    // 다른 필사책의 같은 장은 지금 화면의 필기가 아니다(2.2).
+                    localChanges.post(LocalDrawingChange(page: page, date: date.now))
                 }
                 await send(.imported(itemID: item.id, place: item.place, .success(result)))
             } catch {

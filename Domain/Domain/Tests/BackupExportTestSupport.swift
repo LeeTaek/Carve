@@ -65,9 +65,10 @@ enum BackupExportSample {
 
     // MARK: - 초안
 
-    /// 초안 하나. 잉크에는 풀리는 메타데이터가 붙는다(화면에 겹칠 수 있는 초안).
+    /// 초안 하나. 잉크에는 풀리는 메타데이터가 붙는다(화면에 겹칠 수 있는 초안). 필사책을 주지 않으면 기본 필사책의 초안이다.
     static func draft(
         chapter: BibleChapter = genesis1,
+        notebook: NotebookID = .default,
         verse: Int,
         session: String = "session-1",
         ink: Data?,
@@ -82,7 +83,7 @@ enum BackupExportSample {
         case .empty, .version: nil
         }
         return VerseDraft(
-            key: VerseDraftKey(sessionID: session, chapter: chapter, verse: verse),
+            key: VerseDraftKey(sessionID: session, page: NotebookChapter(notebook: notebook, chapter: chapter), verse: verse),
             revision: revision,
             rowID: BibleDrawingRowID(raw: "draft-row-\(verse)"),
             lineData: ink,
@@ -101,9 +102,12 @@ enum BackupExportSample {
 
 /// 심을 행 하나 — `BibleDrawing` 의 원본 필드 그대로.
 ///
-/// 권 이름은 장의 번역본으로 짓는다(`StoredBookKey.titleName(for:)` — 영어 장은 `KJV-…`). 영어 행의 번역 열은 부르는 쪽이 nil 로 준다.
+/// 권 이름은 장의 필사책 · 번역본으로 짓는다(`StoredBookKey.titleName(title:translation:notebook:)` — 영어 장은 `KJV-…`,
+/// 다른 필사책은 `nb_<토큰>~…`). 영어 행의 번역 열은 부르는 쪽이 nil 로 준다.
 struct BackupExportRowSeed {
     var chapter: BibleChapter = BackupExportSample.genesis1
+    /// 행의 필사책 — 기본은 기본 필사책(접두 없음).
+    var notebook: NotebookID = .default
     var verse: Int?
     /// nil 이면 1.3.0 행(business id 가 행 키).
     var rowUUID: String?
@@ -149,8 +153,13 @@ struct BackupExportRowSeed {
     /// 행 키 — `rowUUID ?? business id`.
     var rowKey: String { rowUUID ?? businessID }
 
-    /// 심는 `titleName` — 바꿔 심지 않았으면 장의 번역본으로 지은 이름.
-    var titleName: String { titleNameOverride ?? StoredBookKey.titleName(for: chapter) }
+    /// 심는 `titleName` — 바꿔 심지 않았으면 장의 필사책 · 번역본으로 지은 이름.
+    var titleName: String {
+        titleNameOverride ?? StoredBookKey.titleName(title: chapter.title, translation: chapter.translation, notebook: notebook)
+    }
+
+    /// 이 행이 놓이는 필사책 안의 장.
+    var page: NotebookChapter { NotebookChapter(notebook: notebook, chapter: chapter) }
 
     /// 이 행이 백업 전용 조회에서 보일 원본.
     var record: BackupRowRecord {
@@ -173,7 +182,7 @@ struct BackupExportRowSeed {
     /// 모델을 만든다 — 컨테이너가 이미 있어야 한다(iOS 17).
     func makeRow() -> BibleDrawing {
         let row = BibleDrawing(
-            bibleTitle: chapter,
+            page: page,
             verse: verse ?? 0,
             lineData: lineData,
             updateDate: updateDate,
@@ -269,6 +278,15 @@ struct BackupExportHarness {
         let context = ModelContext(container)
         for seed in rows {
             context.insert(seed.makeRow())
+        }
+        try context.save()
+    }
+
+    /// 필사책 정보를 심는다 — 같은 컨테이너의 새 문맥에 넣고 저장한다. 레코드 값은 그대로다(같은 ID 둘 · 형식이 아닌 ID 도 심을 수 있다).
+    func seedNotebooks(_ records: [BackupNotebookRecord]) throws {
+        let context = ModelContext(container)
+        for record in records {
+            context.insert(BackupNotebookSeed.makeNotebook(record))
         }
         try context.save()
     }

@@ -91,7 +91,7 @@ struct LegacyStoreMigrationTesting {
         // 여기서 V3 → V4 → V5 가 실제로 돈다.
         let container = try Self.openWithAppSchema(at: directory)
         let repository = SwiftDataDrawingRepository(actor: SwiftDatabaseActor(modelContainer: container))
-        let snapshots = try await repository.load(chapter: OwnershipTestSupport.chapter).snapshots
+        let snapshots = try await repository.load(OwnershipTestSupport.chapter.inDefaultNotebook).snapshots
 
         // 마이그레이션은 좌표 형식을 건드리지 않는다 (§10-2). rowUUID 도 소급 발급하지 않는다 (§8-7).
         #expect(snapshots.count == 1)
@@ -131,7 +131,7 @@ struct LegacyStoreMigrationTesting {
 
         let container = try Self.openWithAppSchema(at: directory)
         let repository = SwiftDataDrawingRepository(actor: SwiftDatabaseActor(modelContainer: container))
-        let loaded = try await repository.load(chapter: OwnershipTestSupport.chapter)
+        let loaded = try await repository.load(OwnershipTestSupport.chapter.inDefaultNotebook)
         let composed = codec.compose(snapshots: loaded.snapshots, layout: layout, columnOrigin: columnOrigin)
         let before = try PKDrawing(data: composed.data)
 
@@ -145,10 +145,10 @@ struct LegacyStoreMigrationTesting {
             afterData: edited.dataRepresentation(), context: context(active: composed.activeRowIDs)
         )
         #expect(result.mutations.count == 1)
-        try await repository.apply(result.mutations, chapter: OwnershipTestSupport.chapter, generation: loaded.generation)
+        try await repository.apply(result.mutations, page: OwnershipTestSupport.chapter.inDefaultNotebook, generation: loaded.generation)
 
         // 저장 뒤 행은 v3 + metadata 를 갖는다. 라벨만 오르고 좌표가 그대로면 이 다음이 깨진다.
-        let after = try await repository.load(chapter: OwnershipTestSupport.chapter).snapshots
+        let after = try await repository.load(OwnershipTestSupport.chapter.inDefaultNotebook).snapshots
         let saved = try #require(after.first)
         #expect(after.count == 1)
         #expect(saved.drawingVersion == 3)
@@ -200,7 +200,7 @@ struct LegacyStoreMigrationTesting {
         let container = try Self.openWithAppSchema(at: directory)
         let repository = SwiftDataDrawingRepository(actor: SwiftDatabaseActor(modelContainer: container))
         let composed = codec.compose(
-            snapshots: try await repository.load(chapter: OwnershipTestSupport.chapter).snapshots,
+            snapshots: try await repository.load(OwnershipTestSupport.chapter.inDefaultNotebook).snapshots,
             layout: mixed, columnOrigin: columnOrigin
         )
         let displayed = try PKDrawing(data: composed.data)

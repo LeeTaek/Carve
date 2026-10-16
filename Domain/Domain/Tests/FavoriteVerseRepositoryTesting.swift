@@ -143,7 +143,7 @@ struct FavoriteVerseRepositoryTesting {
     @Test("해제는 즐겨찾기만 지운다 — 같은 절의 필사 행은 그대로다")
     func removingFavoriteKeepsDrawings() async throws {
         let harness = try FavoriteRepositoryHarness()
-        try await harness.actor.insert(BibleDrawing(bibleTitle: Self.psalm23, verse: 1, lineData: Data([1, 2, 3]), rowUUID: "row-1"))
+        try await harness.actor.insert(BibleDrawing(page: Self.psalm23.inDefaultNotebook, verse: 1, lineData: Data([1, 2, 3]), rowUUID: "row-1"))
         try await harness.repository.save(Self.favorite(1, createdAt: 100, lineData: Data([1, 2, 3])))
 
         try await harness.repository.remove(FavoriteVerseKey(chapter: Self.psalm23, verse: 1))

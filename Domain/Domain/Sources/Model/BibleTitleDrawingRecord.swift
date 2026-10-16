@@ -10,7 +10,7 @@ import Foundation
 
 /// 성경 한 권의 장별 필사 기록 요약. 탐색 장 목록이 필사한 장을 칠하고 기본 장을 고를 때 쓴다.
 ///
-/// 획이 있는지는 `DrawingContentRule` 로 판정한다. 조회는 `DrawingDatabase.fetchDrawingRecord(title:)` 다.
+/// 획이 있는지는 `DrawingContentRule` 로 판정한다. 조회는 `DrawingDatabase.fetchDrawingRecord(notebook:title:translation:)` 다(필사책마다 따로).
 public struct BibleTitleDrawingRecord: Sendable, Equatable {
     /// 획이 있는 필사 행이 하나라도 남은 장.
     public var drawnChapters: Set<Int>

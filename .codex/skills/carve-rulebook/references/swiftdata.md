@@ -41,7 +41,7 @@ lint 가 있는 규칙(`feature_no_swiftdata_import` · `feature_no_swiftdata_ap
 |---|---|
 | 공유 actor `createSwiftDataActor` 로 저장소가 비었는지 확인(`databaseIsEmpty(BibleDrawing.self)` · `FavoriteVerse.self`) | `iCloudSettingReducer`(전체 삭제 확인) |
 | @Model 타입(`BibleDrawing` · `FavoriteVerse`) 참조 — Feature 1파일 | `iCloudSettingReducer`(위 `databaseIsEmpty` 의 인자) |
-| 옛 클라이언트 `drawingData` 의 DTO 메서드 호출 — @Model 은 받지 않지만 저장소 의존성(`drawingRepository` 등)이 아니다 | `CarveNavigationFeature`(`fetchDrawingRecord`) · `VerseDrawingHistoryFeature`(`fetchVerseSnapshots` · `updatePresentDrawing(chapter:verse:presentRowID:)`) |
+| 옛 클라이언트 `drawingData` 의 DTO 메서드 호출 — @Model 은 받지 않지만 저장소 의존성(`drawingRepository` 등)이 아니다 | `CarveNavigationFeature`(`fetchDrawingRecord`) · `VerseDrawingHistoryFeature`(`fetchVerseSnapshots` · `updatePresentDrawing(page:verse:presentRowID:)`) |
 | App 리듀서의 공유 actor — 로컬 필사가 있는지(`hasAny(BibleDrawing.self)`) | `LaunchProgressFeature`(App) |
 
 ---
@@ -70,8 +70,8 @@ lint 가 있는 규칙(`feature_no_swiftdata_import` · `feature_no_swiftdata_ap
 - 호출자가 "쿼리 세부"를 알 필요 없게 만든다.
 
 예시(지금 코드):
-- `DrawingRepository.load(chapter:) -> DrawingChapterLoad` — 장의 스냅샷(`VerseDrawingSnapshot`)과 그 조회 시점의 저장소 세대
-- `DrawingRepository.apply(_:chapter:generation:)` — 한 편집의 절 저장 명령을 한 트랜잭션으로(전부 성공 또는 전부 실패)
+- `DrawingRepository.load(_ page: NotebookChapter) -> DrawingChapterLoad` — 필사책 안의 장의 스냅샷(`VerseDrawingSnapshot`)과 그 조회 시점의 저장소 세대
+- `DrawingRepository.apply(_:page:generation:)` — 한 편집의 절 저장 명령을 한 트랜잭션으로(전부 성공 또는 전부 실패). 저장 경로 인자 `page`(`NotebookChapter`)에는 기본값을 두지 않는다
 - `FavoriteVerseRepository.favorites() -> [FavoriteVerseSnapshot]`
 - `DrawingActivityRepository.activities(in:) -> [DrawingActivity]`
 

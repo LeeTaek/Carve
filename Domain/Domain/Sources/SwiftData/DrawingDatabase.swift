@@ -36,29 +36,29 @@ public struct DrawingDatabase: Sendable {
 
     // MARK: - 값으로 읽기 (모델은 actor 안에 둔다)
 
-    /// 해당 절의 필사 행을 스냅샷으로 모두 가져온다 — 이력 화면용.
+    /// 필사책 안의 해당 절의 필사 행을 스냅샷으로 모두 가져온다 — 이력 화면용.
     /// - Parameters:
-    ///   - chapter: 해당 성경의 이름과 장
+    ///   - page: 필사책과 성경의 이름 · 장(번역본 포함). 그 필사책 · 번역본의 행만 읽는다.
     ///   - verse: 절 번호
     /// - Returns: 행마다 하나, `updateDate` 최신순이고, 없으면 `[]`.
     /// - Note: 매핑은 actor 안에서 한다. 부작용 없음.
-    public func fetchVerseSnapshots(chapter: BibleChapter, verse: Int) async throws -> [VerseDrawingSnapshot] {
-        try await actor.verseDrawingSnapshots(chapter: chapter, verse: verse)
+    public func fetchVerseSnapshots(page: NotebookChapter, verse: Int) async throws -> [VerseDrawingSnapshot] {
+        try await actor.verseDrawingSnapshots(page: page, verse: verse)
     }
 
-    /// 특정 절에서 어떤 행이 대표(`isPresent`)인지 저장한다.
+    /// 필사책 안의 특정 절에서 어떤 행이 대표(`isPresent`)인지 저장한다.
     /// - Parameters:
-    ///   - chapter: 성경의 이름과 장
+    ///   - page: 필사책과 성경의 이름 · 장(번역본 포함). 다른 필사책 · 번역본의 같은 절 행은 그대로다.
     ///   - verse: 절 번호
-    ///   - presentRowID: `isPresent = true` 로 표시할 행의 키. 그 절의 나머지 행은 `false` 가 된다.
+    ///   - presentRowID: `isPresent = true` 로 표시할 행의 키. 그 필사책 · 번역본 절의 나머지 행은 `false` 가 된다.
     /// - Note: 실패하면 분석 이벤트와 로그만 남긴다(던지지 않는다).
     public func updatePresentDrawing(
-        chapter: BibleChapter,
+        page: NotebookChapter,
         verse: Int,
         presentRowID: BibleDrawingRowID
     ) async {
         do {
-            try await actor.markPresentDrawing(chapter: chapter, verse: verse, presentRowID: presentRowID)
+            try await actor.markPresentDrawing(page: page, verse: verse, presentRowID: presentRowID)
             Log.debug(" updatePresentDrawing verse:", verse)
         } catch {
             analyticsClient.trackErrorShown(
@@ -147,29 +147,32 @@ public struct DrawingDatabase: Sendable {
         return try await actor.recentDrawingActivities(limit: limit)
     }
 
-    /// 성경 한 권의 장별 필사 기록을 요약한다 — 탐색 장 목록이 필사한 장을 칠하고 기본 장을 고를 때 쓴다.
+    /// 필사책 안의 성경 한 권의 장별 필사 기록을 요약한다 — 탐색 장 목록이 필사한 장을 칠하고 기본 장을 고를 때 쓴다.
     /// - Parameters:
+    ///   - notebook: 대상 필사책. 그 필사책의 행만 센다.
     ///   - title: 대상 성경.
-    ///   - translation: 대상 번역본. 그 번역본의 행만 센다. 기본값은 개역개정이다.
+    ///   - translation: 대상 번역본. 그 번역본의 행만 센다.
     /// - Returns: 획이 남은 장과 그중 가장 최근에 필사한 장.
-    public func fetchDrawingRecord(title: BibleTitle, translation: Translation = .NKRV) async throws -> BibleTitleDrawingRecord {
-        try await actor.fetchDrawingRecord(title: title, translation: translation)
+    public func fetchDrawingRecord(notebook: NotebookID, title: BibleTitle, translation: Translation) async throws -> BibleTitleDrawingRecord {
+        try await actor.fetchDrawingRecord(notebook: notebook, title: title, translation: translation)
     }
 }
 
 extension SwiftDatabaseActor {
-    /// 성경 한 권의 행을 훑어 획이 있는 장과 가장 최근에 필사한 장을 구한다.
+    /// 필사책 안의 성경 한 권의 행을 훑어 획이 있는 장과 가장 최근에 필사한 장을 구한다.
     ///
     /// SwiftData 모델은 actor 밖으로 내보내지 않고 요약 값만 돌려준다. 획 판정은 `DrawingContentRule` 을 따른다 —
     /// 지우기로 비운 행과 지우개로 전부 지운 행은 기록이 아니고, 보관 행(`isPresent == false`)은 원래 필사 시각을 지닌 기록이다.
     /// 판정마다 `PKDrawing` 을 디코딩하므로 `updateDate` 최신순으로 훑으며 이미 기록을 확인한 장의 행은 건너뛴다.
-    /// 번역본은 행의 `titleName` 으로 가른다(`StoredBookKey.titleName(title:translation:)`) — 다른 번역본의 같은 권은 섞이지 않는다.
+    /// 필사책 · 번역본은 행의 `titleName` 으로 가른다(`StoredBookKey.titleName(title:translation:notebook:)`) —
+    /// 다른 필사책 · 번역본의 같은 권은 섞이지 않는다.
     /// - Parameters:
+    ///   - notebook: 대상 필사책.
     ///   - title: 대상 성경.
-    ///   - translation: 대상 번역본. 기본값은 개역개정이다.
+    ///   - translation: 대상 번역본.
     /// - Returns: 필사 기록 요약.
-    public func fetchDrawingRecord(title: BibleTitle, translation: Translation = .NKRV) throws -> BibleTitleDrawingRecord {
-        let titleName = StoredBookKey.titleName(title: title, translation: translation)
+    public func fetchDrawingRecord(notebook: NotebookID, title: BibleTitle, translation: Translation) throws -> BibleTitleDrawingRecord {
+        let titleName = StoredBookKey.titleName(title: title, translation: translation, notebook: notebook)
         let predicate = #Predicate<BibleDrawing> { $0.titleName == titleName }
         let descriptor = FetchDescriptor(
             predicate: predicate,

@@ -30,7 +30,7 @@ private struct TranslationTextStub: BibleTextClient {
     }
 }
 
-/// 초안을 어느 번역본으로 읽었는지 남기는 초안 저장소. 읽기는 늘 빈 목록이다.
+/// 초안을 어느 번역본(읽은 page 의 번역본)으로 읽었는지 남기는 초안 저장소. 읽기는 늘 빈 목록이다.
 private struct TranslationRecordingDraftStore: VerseDraftStore {
     let requested = LockIsolated<[Translation]>([])
 
@@ -38,8 +38,8 @@ private struct TranslationRecordingDraftStore: VerseDraftStore {
         .written
     }
 
-    func drafts(in scope: AccountScope, chapter: BibleChapter, translation: Translation) async throws -> [VerseDraft] {
-        requested.withValue { $0.append(translation) }
+    func drafts(in scope: AccountScope, page: NotebookChapter) async throws -> [VerseDraft] {
+        requested.withValue { $0.append(page.chapter.translation) }
         return []
     }
 
@@ -101,7 +101,7 @@ struct TranslationSwitchTesting {
     private static func oneLineGeometry(_ chapter: BibleChapter, verses: [Int]) -> [SentencesWithDrawingFeature.State.ID: VerseRowGeometry] {
         var batch: [SentencesWithDrawingFeature.State.ID: VerseRowGeometry] = [:]
         for verse in verses {
-            batch[SentencesWithDrawingFeature.State.rowID(chapter: chapter, verse: verse)] = VerseRowGeometry(underlineOffsets: [30])
+            batch[SentencesWithDrawingFeature.State.rowID(page: chapter.inDefaultNotebook, verse: verse)] = VerseRowGeometry(underlineOffsets: [30])
         }
         return batch
     }
@@ -246,7 +246,7 @@ struct TranslationSwitchTesting {
     @Test("이동할 절이 그 번역본에 없으면 바로 앞 절, 합쳐진 절의 뒤 번호면 그 행으로 간다")
     func scrollableVerseFallsBackToPreviousVerse() {
         let bsbRows = IdentifiedArray(uniqueElements: Self.sentences(Self.bsbMatthew17, verses: (1...27).filter { $0 != 21 })
-            .map(SentencesWithDrawingFeature.State.init(sentence:)))
+            .map { SentencesWithDrawingFeature.State(sentence: $0, notebook: .default) })
         #expect(CarveDetailFeature.scrollableVerse(for: 21, in: bsbRows) == 20)
         #expect(CarveDetailFeature.scrollableVerse(for: 22, in: bsbRows) == 22)
         #expect(CarveDetailFeature.scrollableVerse(for: 99, in: bsbRows) == 27)
@@ -256,7 +256,7 @@ struct TranslationSwitchTesting {
             BibleVerse(title: BibleChapter(title: .deuteronomy, chapter: 6), verse: 17, sentence: "17"),
             BibleVerse(title: BibleChapter(title: .deuteronomy, chapter: 6), verse: 18, verseEnd: 19, sentence: "18-19"),
             BibleVerse(title: BibleChapter(title: .deuteronomy, chapter: 6), verse: 20, sentence: "20")
-        ].map(SentencesWithDrawingFeature.State.init(sentence:)))
+        ].map { SentencesWithDrawingFeature.State(sentence: $0, notebook: .default) })
         #expect(CarveDetailFeature.scrollableVerse(for: 19, in: merged) == 18)
         // 앞 절이 없으면 첫 절, 행이 없으면 nil.
         #expect(CarveDetailFeature.scrollableVerse(for: 1, in: merged) == 17)
@@ -308,7 +308,7 @@ struct TranslationSwitchTesting {
                 #expect(detail.sentenceWithDrawingState.allSatisfy { $0.sentence.title == Self.bsbMatthew17 })
                 #expect(!detail.sentenceWithDrawingState.contains { $0.sentence.verse == 21 })
                 #expect(detail.chapterLayout.chapter == Self.bsbMatthew17)
-                #expect(detail.chapterCanvas.chapter == Self.bsbMatthew17)
+                #expect(detail.chapterCanvas.page == Self.bsbMatthew17.inDefaultNotebook)
                 #expect(detail.favoriteChapter == Self.bsbMatthew17)
                 #expect(detail.scrollTargetVerse == 21)
             }
@@ -384,17 +384,19 @@ struct TranslationSwitchTesting {
 
     @Test("번역본만 바뀐 장의 행 id 는 번역본마다 다르다 — 앱 언어와 무관한 rawValue 형식이다")
     func rowIDDiffersByTranslation() {
-        let nkrv = SentencesWithDrawingFeature.State.rowID(chapter: BibleChapter(title: .genesis, chapter: 1), verse: 1)
-        let kjv = SentencesWithDrawingFeature.State.rowID(chapter: BibleChapter(title: .genesis, chapter: 1, translation: .KJV), verse: 1)
-        let bsb = SentencesWithDrawingFeature.State.rowID(chapter: BibleChapter(title: .genesis, chapter: 1, translation: .BSB), verse: 1)
-        #expect(nkrv == "NKRV/1-01Genesis.txt/1/1")
-        #expect(kjv == "KJV/1-01Genesis.txt/1/1")
+        let nkrv = SentencesWithDrawingFeature.State.rowID(page: BibleChapter(title: .genesis, chapter: 1).inDefaultNotebook, verse: 1)
+        let kjv = SentencesWithDrawingFeature.State.rowID(page: BibleChapter(title: .genesis, chapter: 1, translation: .KJV).inDefaultNotebook, verse: 1)
+        let bsb = SentencesWithDrawingFeature.State.rowID(page: BibleChapter(title: .genesis, chapter: 1, translation: .BSB).inDefaultNotebook, verse: 1)
+        // 권 이름은 필사 행과 같은 키(`StoredBookKey.titleName(for:)`)다 — 2.2 에서 필사책을 담으며 이 형식으로 바뀌었다.
+        #expect(nkrv == "1-01Genesis.txt/1/1")
+        #expect(kjv == "KJV-1-01Genesis.txt/1/1")
         #expect(Set([nkrv, kjv, bsb]).count == 3)
 
         // 같은 권 · 장 · 절이라도 번역본이 다르면 다른 행이다 — 뷰가 행을 새로 만들고 장 전환 스크롤을 낸다.
-        let nkrvRow = SentencesWithDrawingFeature.State(sentence: BibleVerse(title: BibleChapter(title: .genesis, chapter: 1), verse: 1, sentence: "태초에"))
+        let nkrvRow = SentencesWithDrawingFeature.State(sentence: BibleVerse(title: BibleChapter(title: .genesis, chapter: 1), verse: 1, sentence: "태초에"), notebook: .default)
         let kjvRow = SentencesWithDrawingFeature.State(
-            sentence: BibleVerse(title: BibleChapter(title: .genesis, chapter: 1, translation: .KJV), verse: 1, sentence: "In the beginning")
+            sentence: BibleVerse(title: BibleChapter(title: .genesis, chapter: 1, translation: .KJV), verse: 1, sentence: "In the beginning"),
+            notebook: .default
         )
         #expect(nkrvRow != kjvRow)
     }
@@ -424,7 +426,7 @@ struct TranslationSwitchAttributionTesting: EditSessionTestHelpers {
 
         let kjv = BibleChapter(title: CanvasTestSupport.chapter.title, chapter: CanvasTestSupport.chapter.chapter, translation: .KJV)
         spy.holdNextLoadCall()
-        await store.send(.load(chapter: kjv, expectedVerseCount: 3))
+        await store.send(.load(page: kjv.inDefaultNotebook, expectedVerseCount: 3))
         await store.receive(\.saveFinished)
         // 미저장분은 쓴 장(개역개정)으로 갔다 — 새 번역본 장으로 옮겨 가지 않는다.
         #expect(spy.applied.value.last?.chapter == CanvasTestSupport.chapter)
@@ -436,7 +438,7 @@ struct TranslationSwitchAttributionTesting: EditSessionTestHelpers {
         spy.releaseLoad()
         await store.receive(\.drawingsLoaded)
         #expect(spy.loadedChapters.value == [CanvasTestSupport.chapter, kjv])
-        #expect(store.state.chapter == kjv)
+        #expect(store.state.page == kjv.inDefaultNotebook)
         #expect(store.state.loadedDrawings == [])
     }
 
@@ -448,13 +450,13 @@ struct TranslationSwitchAttributionTesting: EditSessionTestHelpers {
         let environment = confirmed(accountA, 0)
         let kjv = BibleChapter(title: .jonah, chapter: 2, translation: .KJV)
 
-        _ = try await ChapterCanvasFeature.loadDrafts(from: drafts, environment: environment, chapter: kjv)
-        _ = await ChapterCanvasFeature.loadBeforeConnectionDrafts(from: drafts, environment: environment, chapter: kjv)
+        _ = try await ChapterCanvasFeature.loadDrafts(from: drafts, environment: environment, page: kjv.inDefaultNotebook)
+        _ = await ChapterCanvasFeature.loadBeforeConnectionDrafts(from: drafts, environment: environment, page: kjv.inDefaultNotebook)
 
         #expect(!drafts.requested.value.isEmpty)
         #expect(drafts.requested.value.allSatisfy { $0 == .KJV })
         // 초안 키도 장의 번역본을 따른다.
-        #expect(VerseDraftKey(sessionID: "s", chapter: kjv, verse: 1).translation == "KJV")
+        #expect(VerseDraftKey(sessionID: "s", page: kjv.inDefaultNotebook, verse: 1).translation == "KJV")
     }
 
     @Test("저장 명령을 겹친 행은 장의 번역본이다 — KJV 장의 loadedDrawings 에 개역개정 행이 섞이지 않는다")
@@ -488,11 +490,11 @@ struct TranslationSwitchAttributionTesting: EditSessionTestHelpers {
     @Test("대기 중인 편집으로 만든 지금 필기 행은 그 편집의 장 번역본이다")
     func pendingInkSnapshotCarriesChapterTranslation() throws {
         let kjv = BibleChapter(title: .jonah, chapter: 2, translation: .KJV)
-        var state = ChapterCanvasFeature.State(chapter: kjv)
+        var state = ChapterCanvasFeature.State(page: kjv.inDefaultNotebook)
         state.loadedDrawings = []
         state.activeRowIDs = [2: CanvasTestSupport.newRow]
         state.pendingMutations = [CanvasTestSupport.newRow: PendingDrawingMutation(
-            revision: 1, chapter: kjv,
+            revision: 1, page: kjv.inDefaultNotebook,
             mutation: .create(verse: 2, rowID: CanvasTestSupport.newRow, data: Self.inkData(), metadata: CanvasTestSupport.metadata())
         )]
 

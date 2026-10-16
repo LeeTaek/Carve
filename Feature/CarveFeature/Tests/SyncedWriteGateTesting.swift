@@ -59,7 +59,7 @@ struct SyncedWriteGateTesting {
     private static func detailState(favorites: Set<Int> = []) -> CarveDetailFeature.State {
         var state = CarveDetailFeature.State.initialState
         state.sentenceWithDrawingState = [
-            SentencesWithDrawingFeature.State(sentence: BibleVerse(title: chapter, verse: 1, sentence: sentence))
+            SentencesWithDrawingFeature.State(sentence: BibleVerse(title: chapter, verse: 1, sentence: sentence), notebook: .default)
         ]
         state.favoriteChapter = chapter
         state.favoriteVerses = favorites
@@ -165,8 +165,8 @@ struct SyncedWriteGateTesting {
     /// 보이기만 하는 초안(다른 계정 · 확인 전)을 이어 보는 절이다. 환경은 소유가 확인됐어도 그 잉크는 이 계정의 것이 아니다.
     private static func detailStateWithInheritedInk() -> CarveDetailFeature.State {
         var state = detailState()
-        var canvas = ChapterCanvasFeature.State(chapter: chapter)
-        canvas.drafts.inherited[DraftVerse(chapter: chapter, verse: 1)] = VerseDraftProvenance(
+        var canvas = ChapterCanvasFeature.State(page: chapter.inDefaultNotebook)
+        canvas.drafts.inherited[DraftVerse(page: chapter.inDefaultNotebook, verse: 1)] = VerseDraftProvenance(
             account: .unverified(hint: nil), knownEpochs: [], storeOwnership: nil
         )
         state.chapterCanvas = canvas
@@ -279,7 +279,7 @@ struct SyncedWriteGateTesting {
         )
 
         // `State` 가 Equatable 이 아니라 실제 Store 로 본다.
-        let store = Store(initialState: VerseDrawingHistoryFeature.State(title: Self.chapter, verse: 1)) {
+        let store = Store(initialState: VerseDrawingHistoryFeature.State(page: Self.chapter.inDefaultNotebook, verse: 1)) {
             VerseDrawingHistoryFeature()
         } withDependencies: {
             $0.drawingEditEnvironment = Self.signedOut

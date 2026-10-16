@@ -36,9 +36,11 @@ private struct ReaderStub: VerseDraftRecoveryReading {
         return summary
     }
 
-    func drafts(in scope: AccountScope, chapter: BibleChapter, translation: Translation) async throws -> [VerseDraft] {
+    func drafts(in scope: AccountScope, page: NotebookChapter) async throws -> [VerseDraft] {
         reads.withValue { $0.append(scope) }
-        return (drafts[scope] ?? []).filter { $0.key.title == chapter.title.rawValue && $0.key.chapter == chapter.chapter }
+        return (drafts[scope] ?? []).filter {
+            $0.key.notebook == page.notebook && $0.key.title == page.chapter.title.rawValue && $0.key.chapter == page.chapter.chapter
+        }
     }
 
     func unreadableDraftFiles(in scope: AccountScope) async throws -> [URL] {
@@ -62,7 +64,7 @@ private final class RepositoryStub: DrawingRepository, @unchecked Sendable {
     func holdLoads() { hold.setValue(true) }
     func release() { gate.withValue { $0?.yield(); $0?.finish(); $0 = nil } }
 
-    func load(chapter: BibleChapter) async throws -> DrawingChapterLoad {
+    func load(_ page: NotebookChapter) async throws -> DrawingChapterLoad {
         if hold.value {
             let (stream, continuation) = AsyncStream<Void>.makeStream()
             gate.setValue(continuation)
@@ -76,11 +78,11 @@ private final class RepositoryStub: DrawingRepository, @unchecked Sendable {
         return DrawingChapterLoad(snapshots: snapshots, generation: DrawingStoreGeneration(raw: 0))
     }
 
-    func apply(_ mutations: [VerseDrawingMutation], chapter: BibleChapter, generation: DrawingStoreGeneration) async throws {
+    func apply(_ mutations: [VerseDrawingMutation], page: NotebookChapter, generation: DrawingStoreGeneration) async throws {
         Issue.record("남은 필기 화면이 저장소에 썼다")
     }
 
-    func archiveAndReset(_ command: VerseDrawingArchiveCommand, chapter: BibleChapter) async throws -> VerseDrawingArchiveOutcome {
+    func archiveAndReset(_ command: VerseDrawingArchiveCommand, page: NotebookChapter) async throws -> VerseDrawingArchiveOutcome {
         Issue.record("남은 필기 화면이 저장소에 썼다")
         return .alreadyEmpty
     }
@@ -144,6 +146,8 @@ struct DraftRecoveryFeatureTesting {
     private static let accountA = AccountScope(key: "acct-a")
     private static let accountB = AccountScope(key: "acct-b")
     private static let chapter = BibleChapter(title: .genesis, chapter: 1)
+    /// 초안이 남은 page — 기본 필사책의 창세기 1장.
+    private static let page = NotebookChapter(notebook: .default, chapter: chapter)
 
     private static func environment(_ scope: AccountScope, generation: UInt64 = 1) -> DrawingEditEnvironment {
         DrawingEditEnvironment(
@@ -155,13 +159,13 @@ struct DraftRecoveryFeatureTesting {
     private static func summary(_ scope: AccountScope, drafts: Int, bytes: Int64 = 1_024, unreadable: Int = 0) -> DraftBucketSummary {
         DraftBucketSummary(
             scope: scope, draftCount: drafts, draftBytes: bytes, unreadableCount: unreadable, unreadableBytes: unreadable == 0 ? 0 : 512,
-            chapters: [chapter]
+            pages: [page]
         )
     }
 
     private static func draft(verse: Int, account: AccountScope, savedAt: TimeInterval = 1_000) -> VerseDraft {
         VerseDraft(
-            key: VerseDraftKey(sessionID: "session-\(account.key)", chapter: chapter, verse: verse),
+            key: VerseDraftKey(sessionID: "session-\(account.key)", page: page, verse: verse),
             revision: 1,
             rowID: BibleDrawingRowID(raw: "row-\(verse)"),
             lineData: Data("획".utf8),

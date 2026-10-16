@@ -23,7 +23,7 @@ final class DrawingDatabaseTest: XCTestCase {
         // given
         // iOS 17 SwiftData 는 모델 초기화 전에 해당 스키마의 컨테이너가 만들어져 있어야 한다.
         let actor = self.actor
-        let drawing = BibleDrawing.init(bibleTitle: .initialState, verse: 1)
+        let drawing = BibleDrawing.init(page: BibleChapter.initialState.inDefaultNotebook, verse: 1)
         // 모델은 actor 로 넘긴 뒤 다시 만지지 않는다 — 넣은 행은 행 식별자(rowUUID)로 알아본다.
         let expectedRowUUID = drawing.rowUUID
         

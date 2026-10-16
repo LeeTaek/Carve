@@ -20,6 +20,11 @@ enum BackupRestoreSample {
     static let genesis2 = BibleChapter(title: .genesis, chapter: 2)
     static let exodus3 = BibleChapter(title: .exodus, chapter: 3)
 
+    /// 필사책 안의 장 — 판정 · 적용 · 작업 기록의 단위(`NotebookChapter`). 필사책을 주지 않으면 기본 필사책이다(시험 표본만의 편의).
+    static func page(_ chapter: BibleChapter, notebook: NotebookID = .default) -> NotebookChapter {
+        NotebookChapter(notebook: notebook, chapter: chapter)
+    }
+
     /// 불러오는 시각(작업 기록 · `LocalDrawingChange`).
     static let now = Date(timeIntervalSinceReferenceDate: 813_000_000.5)
     /// 2026-09-01T00:00:00Z — 설계 §5-1 의 예(9/25 · 9/30 · 10/01)를 날짜로 읽게 한다.
@@ -87,15 +92,21 @@ struct BackupRestoreEntry {
     var createdAt: Date?
     var updatedAt: Date?
     var translation: String? = "NKRV"
+    /// 절 키의 필사책 토큰(형식 2). nil 이면 기본 필사책.
+    var notebook: String?
 
     /// 원본 바이트로 만든 지문 — 잉크가 있을 때만.
     var fingerprint: String? {
         ink.map { VerseContentFingerprint.make(lineData: $0, drawingVersion: drawingVersion, layoutMetadataBlob: metadata) }
     }
 
-    /// 불러온 행의 `titleName` — 항목의 권 · 번역본으로 지은 이름(nil · 모르는 번역본은 개역개정 이름).
+    /// 불러온 행의 `titleName` — 항목의 필사책 · 권 · 번역본으로 지은 이름(nil · 모르는 번역본은 개역개정 이름, 다른 필사책은 `nb_<토큰>~` 접두).
     var storedTitleName: String {
-        StoredBookKey.titleName(title: chapter.title, translation: BackupImportPlanner.placementTranslation(translation))
+        StoredBookKey.titleName(
+            title: chapter.title,
+            translation: BackupImportPlanner.placementTranslation(translation),
+            notebook: notebook.flatMap(NotebookID.init(rawValue:)) ?? .default
+        )
     }
 
     /// 불러온 행의 `translation` 열 — 개역개정은 값 그대로(nil 은 nil), KJV · BSB 는 nil.
@@ -112,7 +123,7 @@ struct BackupRestoreEntry {
         return BackupItem(
             id: BackupItemID.make(kind: kind, sourceKey: sourceKey, fingerprint: fingerprint),
             kind: kind,
-            verse: BackupVerseKey(translation: translation, title: chapter.title, chapter: chapter.chapter, verse: verse),
+            verse: BackupVerseKey(translation: translation, title: chapter.title, chapter: chapter.chapter, verse: verse, notebook: notebook),
             drawingVersion: drawingVersion,
             inkBlob: ink.map(BackupFormat.sha256Hex),
             metadataBlob: metadata.map(BackupFormat.sha256Hex),
@@ -147,20 +158,20 @@ struct RecordingLocalDrawingChanges: LocalDrawingChangeClient {
 /// 한 장에서 한 번만 쓰기에 실패하는 복원 쓰기 — 중간 장 실패 뒤 재시도를 재현한다. 나머지는 실제 구현에 넘긴다.
 struct FailingOnceRestorer: DrawingBackupRestoring {
     let base: any DrawingBackupRestoring
-    let failing: BibleChapter
+    let failing: NotebookChapter
     private let failed = LockIsolated(false)
 
-    init(base: any DrawingBackupRestoring, failing: BibleChapter) {
+    init(base: any DrawingBackupRestoring, failing: NotebookChapter) {
         self.base = base
         self.failing = failing
     }
 
     func restore(
         _ command: BackupChapterRestoreCommand,
-        chapter: BibleChapter,
+        page: NotebookChapter,
         generation: DrawingStoreGeneration
     ) async throws -> BackupChapterRestoreOutcome {
-        if chapter == failing {
+        if page == failing {
             let firstTime = failed.withValue { alreadyFailed -> Bool in
                 let first = !alreadyFailed
                 alreadyFailed = true
@@ -170,7 +181,11 @@ struct FailingOnceRestorer: DrawingBackupRestoring {
                 throw DrawingRepositoryError.persistenceFailed("시험 — 이 장을 쓰지 못했다")
             }
         }
-        return try await base.restore(command, chapter: chapter, generation: generation)
+        return try await base.restore(command, page: page, generation: generation)
+    }
+
+    func restoreNotebooks(_ records: [BackupNotebookRecord], generation: DrawingStoreGeneration) async throws -> BackupNotebookRestoreOutcome {
+        try await base.restoreNotebooks(records, generation: generation)
     }
 }
 
@@ -229,12 +244,15 @@ struct BackupRestoreHarness {
     }
 
     /// 형식 타입으로 백업 파일을 만든다 — 준비 폴더에 manifest · items · blob 을 쓰고 `BackupArchive.write` 로 암호화한다.
-    /// - Parameter formatVersion: manifest 의 형식 버전(뒤 버전 파일 시험만 바꾼다).
+    /// - Parameters:
+    ///   - formatVersion: manifest 의 형식 버전(옛 · 뒤 버전 파일 시험만 바꾼다).
+    ///   - notebooks: manifest 의 필사책 목록(형식 2).
     /// - Returns: 백업 파일(사용자가 고른 파일 자리).
     func writeBackup(
         _ entries: [BackupRestoreEntry],
         password: String = BackupRestoreSample.password,
-        formatVersion: Int = BackupFormat.formatVersion
+        formatVersion: Int = BackupFormat.formatVersion,
+        notebooks: [BackupNotebookRecord] = []
     ) throws -> URL {
         let staged = root.appendingPathComponent("staged-\(UUID().uuidString)", isDirectory: true)
         let blobDirectory = staged.appendingPathComponent(BackupFormat.blobDirectoryName, isDirectory: true)
@@ -255,7 +273,8 @@ struct BackupRestoreHarness {
             appVersion: "2.1.0",
             scope: BackupScope(rows: true, drafts: true),
             counts: BackupCounts(rows: rows, drafts: items.count - rows, blobs: blobs.count),
-            blobs: blobs.values.sorted { $0.name < $1.name }
+            blobs: blobs.values.sorted { $0.name < $1.name },
+            notebooks: notebooks
         )
         try BackupFormat.encoder.encode(manifest).write(to: staged.appendingPathComponent(BackupFormat.manifestFileName, isDirectory: false))
         try BackupFormat.encoder.encode(items).write(to: staged.appendingPathComponent(BackupFormat.itemsFileName, isDirectory: false))
@@ -274,14 +293,39 @@ struct BackupRestoreHarness {
         try context.save()
     }
 
-    /// 그 장의 행 원본(백업 전용 조회 — 절 → 행 키 순).
+    /// **기본 필사책** 그 장의 행 원본(백업 전용 조회 — 절 → 행 키 순).
     func rows(_ chapter: BibleChapter = BackupRestoreSample.genesis1) async throws -> [BackupRowRecord] {
-        try await database.backupRows(chapter: chapter).rows
+        try await rows(page: BackupRestoreSample.page(chapter))
     }
 
-    /// 그 절의 대표 — 화면(`representativesByVerse`)과 같은 규칙.
+    /// 필사책 안의 그 장의 행 원본(백업 전용 조회 — 절 → 행 키 순).
+    func rows(page: NotebookChapter) async throws -> [BackupRowRecord] {
+        try await database.backupRows(page: page).rows
+    }
+
+    /// **기본 필사책** 그 절의 대표 — 화면(`representativesByVerse`)과 같은 규칙.
     func representative(_ chapter: BibleChapter = BackupRestoreSample.genesis1, verse: Int) async throws -> BackupRowRecord? {
-        DrawingRepresentativeRule.pick(try await rows(chapter).filter { $0.verse == verse })
+        try await representative(page: BackupRestoreSample.page(chapter), verse: verse)
+    }
+
+    /// 필사책 안의 그 절의 대표 — 화면(`representativesByVerse`)과 같은 규칙.
+    func representative(page: NotebookChapter, verse: Int) async throws -> BackupRowRecord? {
+        DrawingRepresentativeRule.pick(try await rows(page: page).filter { $0.verse == verse })
+    }
+
+    /// 필사책 정보를 심는다 — 같은 컨테이너의 새 문맥에 넣고 저장한다. 레코드 값은 그대로다(같은 ID 둘도 심을 수 있다).
+    func seedNotebooks(_ records: [BackupNotebookRecord]) throws {
+        let context = ModelContext(container)
+        for record in records {
+            context.insert(BackupNotebookSeed.makeNotebook(record))
+        }
+        try context.save()
+    }
+
+    /// 저장소의 필사책 정보 전부 — ID → 순서. 같은 ID 레코드가 둘이면 둘 다(ID → 이름 순).
+    func storedNotebooks() throws -> [BackupNotebookRecord] {
+        try ModelContext(container).fetch(FetchDescriptor<DrawingNotebook>()).map(BackupNotebookSeed.record)
+            .sorted { ($0.id, $0.name ?? "") < ($1.id, $1.name ?? "") }
     }
 
     /// 지금 저장소 세대.
@@ -324,5 +368,38 @@ extension BackupRowRecord {
             && titleName == entry.storedTitleName
             && chapter == entry.chapter.chapter
             && verse == entry.verse
+    }
+}
+
+/// 필사책 정보(`DrawingNotebook`)를 시험 레코드 값으로 만들고 읽는다 — 저장소 구현의 변환(`backupRecord` · `applyBackupRecord`)에 기대지 않고 필드를 하나씩 옮긴다.
+enum BackupNotebookSeed {
+    /// 모델을 만든다 — 컨테이너가 이미 있어야 한다(iOS 17).
+    static func makeNotebook(_ record: BackupNotebookRecord) -> DrawingNotebook {
+        let notebook = DrawingNotebook()
+        notebook.notebookID = record.id
+        notebook.name = record.name
+        notebook.status = record.status
+        notebook.createdAt = record.createdAt
+        notebook.updatedAt = record.updatedAt
+        notebook.completedAt = record.completedAt
+        notebook.kind = record.kind
+        notebook.scopeData = record.scopeData
+        notebook.linkData = record.linkData
+        return notebook
+    }
+
+    /// 모델의 값 그대로.
+    static func record(_ notebook: DrawingNotebook) -> BackupNotebookRecord {
+        BackupNotebookRecord(
+            id: notebook.notebookID ?? "",
+            name: notebook.name,
+            status: notebook.status,
+            createdAt: notebook.createdAt,
+            updatedAt: notebook.updatedAt,
+            completedAt: notebook.completedAt,
+            kind: notebook.kind,
+            scopeData: notebook.scopeData,
+            linkData: notebook.linkData
+        )
     }
 }

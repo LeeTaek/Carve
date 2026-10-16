@@ -127,25 +127,20 @@ public struct VerseDrawingImportCommand: Equatable, Sendable {
     public let metadata: DrawingLayoutMetadata?
     /// 사용자가 견준 지금 필기의 지문(비었으면 nil). 저장소가 이 내용 그대로일 때만 쓴다.
     public let expectedCurrentFingerprint: String?
-    /// 가져온 초안의 번역본 — 이 번역본의 행(`StoredBookKey`)으로 넣는다. nil 이면 `importVerse` 가 받은 장의 번역본이다.
-    public let translation: Translation?
+    /// 가져온 초안의 필사책과 장(번역본 포함) — 이 page 의 행(`StoredBookKey.titleName(for:)`)만 읽고 쓴다. **기본값이 없다**(결정 12) —
+    /// 빠뜨리면 지금 필사책이 아닌 기본 필사책에 조용히 써진다.
+    public let page: NotebookChapter
 
     public init(
         verse: Int, rowID: BibleDrawingRowID, lineData: Data?, metadata: DrawingLayoutMetadata?, expectedCurrentFingerprint: String?,
-        translation: Translation? = nil
+        page: NotebookChapter
     ) {
         self.verse = verse
         self.rowID = rowID
         self.lineData = lineData
         self.metadata = metadata
         self.expectedCurrentFingerprint = expectedCurrentFingerprint
-        self.translation = translation
-    }
-
-    /// 이 명령이 쓰는 장 — 받은 권 · 장에 이 명령의 번역본(없으면 장의 번역본)을 붙인다.
-    public func target(in chapter: BibleChapter) -> BibleChapter {
-        guard let translation else { return chapter }
-        return BibleChapter(title: chapter.title, chapter: chapter.chapter, translation: translation)
+        self.page = page
     }
 }
 
@@ -167,12 +162,11 @@ public enum VerseDrawingImportOutcome: Equatable, Sendable {
 /// 덮지도 않는다 — 그 행 그대로 「이전 필사 내용 보기」 에 남아 다시 고를 수 있다. 제자리에서 덮지 않으므로, 가져오기를 모르고 열려 있던
 /// 화면이 옛 행에 이어 써도 가져온 필기가 지워지지 않는다(그 획은 옛 행 — 이전 필사 기록에 남는다).
 public protocol DrawingVerseImporting: Sendable {
-    /// - Parameter generation: 견줄 때 읽은 저장소 세대. 그 뒤 전체 삭제가 있었으면 쓰지 않고 던진다(`staleStoreGeneration`).
-    func importVerse(
-        _ command: VerseDrawingImportCommand,
-        chapter: BibleChapter,
-        generation: DrawingStoreGeneration
-    ) async throws -> VerseDrawingImportOutcome
+    /// 가져온 내용을 `command.page`(필사책 + 장)의 새 대표 행으로 넣는다.
+    /// - Parameters:
+    ///   - command: 쓸 내용과 그 page — 필사책 · 번역본 · 권 · 장은 `command.page` 가 정한다.
+    ///   - generation: 견줄 때 읽은 저장소 세대. 그 뒤 전체 삭제가 있었으면 쓰지 않고 던진다(`staleStoreGeneration`).
+    func importVerse(_ command: VerseDrawingImportCommand, generation: DrawingStoreGeneration) async throws -> VerseDrawingImportOutcome
 }
 
 private enum DrawingVerseImporterKey: DependencyKey {
@@ -233,14 +227,23 @@ public struct VerseDraftImportRequest: Equatable, Sendable {
         self.acknowledgedCaution = acknowledgedCaution
     }
 
-    /// 초안 키가 가리키는 장(번역본 포함). 이 판이 모르는 권 · 번역본이면 nil — 개역개정에 임의로 붙이지 않고 가져오지 않는다
+    /// 초안 키가 가리키는 장(번역본 포함, 필사책은 담지 않는다). 이 판이 모르는 권 · 번역본이면 nil — 개역개정에 임의로 붙이지 않고 가져오지 않는다
     /// (정책 §8 「미상 판본을 임의 귀속하지 않음」).
     public var chapter: BibleChapter? {
         key.bibleChapter
     }
+
+    /// 초안 키가 가리키는 필사책 안의 장 — 가져오기는 이 page 의 대표와 견주고 이 page 의 행으로 넣는다. 끝나면 부르는 쪽이
+    /// `LocalDrawingChange(page:date:)` 로 알린다. 모르는 권 · 번역본이면 nil(`chapter` 와 같은 판정).
+    public var page: NotebookChapter? {
+        key.page
+    }
 }
 
 /// 「확인이 필요한 필기」 의 가져오기 — **넣기 직전에 모든 것을 다시 본다**(2026-09-29).
+///
+/// **필사책마다 따로다**(2.2) — 초안 키의 page(필사책 + 장)로 초안을 다시 읽고, 그 page 의 대표와 견주고, 그 page 의 행으로 넣는다.
+/// 다른 필사책의 같은 절은 읽지도 바꾸지도 않는다.
 ///
 /// 1. 지금 환경이 동기화 저장소에 써도 되는가(`SyncedWriteBlock`) — 로그아웃 · 확인 전 · 소유 근거 없음 · 연결 보류면 쓰지 않는다.
 /// 2. 이 환경이 **열어도 되는** 초안인가 — 지금 계정 · 연결 전 필기만(다른 계정 · 다른 계정을 참고하던 필기는 아니다, P0-1).
@@ -290,18 +293,18 @@ public struct VerseDraftImporter: Sendable {
 
     public func importDraft(_ request: VerseDraftImportRequest, environment: DrawingEditEnvironment) async throws -> Result {
         if let block = SyncedWriteBlock.check(environment) { return .blocked(block) }
-        guard let chapter = request.chapter else {
+        guard let page = request.page else {
             // 모르는 권 · 번역본의 초안은 어느 장으로도 가져오지 않는다 — 개역개정에 붙이지 않는다. 파일은 그대로 남는다.
             Log.error("가져오기 — 이 판이 모르는 권 · 번역본의 초안이라 건너뛴다", request.key.translation, request.key.title)
             return .draftChanged
         }
-        guard let draft = try await reader.drafts(in: request.scope, chapter: chapter, translation: chapter.translation)
+        guard let draft = try await reader.drafts(in: request.scope, page: page)
             .first(where: { $0.key == request.key }), draft.revision == request.revision else {
             return .draftChanged
         }
         guard Self.opens(draft, in: request.scope, environment: environment) else { return .blocked(.verseFromOtherSession) }
 
-        let load = try await repository.load(chapter: chapter)
+        let load = try await repository.load(page)
         let view = VerseDraftStoreView(snapshots: load.snapshots)
         if let imported = draft.imported, view.rows[imported.rowID] != nil { return .draftChanged }
         let verse = request.key.verse
@@ -324,9 +327,9 @@ public struct VerseDraftImporter: Sendable {
         }
         let command = VerseDrawingImportCommand(
             verse: verse, rowID: .issue(), lineData: draft.lineData, metadata: metadata, expectedCurrentFingerprint: check.currentFingerprint,
-            translation: chapter.translation
+            page: page
         )
-        switch try await writer.importVerse(command, chapter: chapter, generation: load.generation) {
+        switch try await writer.importVerse(command, generation: load.generation) {
         case .currentChanged:
             return .currentChanged
         case .alreadyApplied:

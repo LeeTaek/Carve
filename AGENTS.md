@@ -25,7 +25,7 @@
 | CarveFeature | `Feature/CarveFeature` | 성경 탐색 · 필사 화면과 캔버스 · 절 메뉴 · 즐겨찾기 · 팔레트 | ClientInterfaces, Domain, UIComponents, Resources |
 | ChartFeature | `Feature/ChartFeature` | 필사 기록 차트 · 주간 요약 | 위와 같음 |
 | SettingsFeature | `Feature/SettingsFeature` | 설정 화면 · 광고 제거 · 필기 가져오기 · iCloud | 위와 같음 |
-| Domain | `Domain/Domain` | 모델 · 본문(개역개정 · KJV · BSB) · SwiftData 스키마와 저장소 · 동기화 · 기기 안 초안 · 필사 백업 형식 | CarveToolkit, ClientInterfaces, Resources |
+| Domain | `Domain/Domain` | 모델 · 본문(개역개정 · KJV · BSB) · 필사책 · SwiftData 스키마와 저장소 · 동기화 · 기기 안 초안 · 필사 백업 형식 | CarveToolkit, ClientInterfaces, Resources |
 | UIComponents | `Supports/UIComponents` | 공용 뷰 · 디자인 시스템 · 광고 슬롯 | ClientInterfaces, CarveToolkit, Resources |
 | ClientInterfaces | `Supports/ClientInterfaces` | 외부 클라이언트 프로토콜 · 공유 키 | (TCA 만) |
 | CarveToolkit | `Supports/CarveToolkit` | Logger · 리듀서 액션 · UIKit 브리지 | Resources |
@@ -53,6 +53,7 @@
 | 필사 · 필기 | `BibleDrawing`(SwiftData 모델) · `DrawingDatabase` · 필사 화면 `CarveDetailFeature` |
 | 장 · 절 | `BibleChapter` · Verse(`BibleVerse` · 절 행 `SentencesWithDrawingFeature` 등) |
 | 번역본 (개역개정 · KJV · BSB) | `Translation`(`NKRV` · `KJV` · `BSB`) — 지금 번역본은 `BibleChapter.translation`. SwiftData 행의 권 이름 짓기 · 풀기는 `StoredBookKey` 만 쓴다(영어 행은 `KJV-` · `BSB-` 접두 · `translation` 열 nil). 참조 문자열은 `BibleReference.text(locale:)`, 권 이름은 `BibleTitle.localizedName(locale:)` |
+| 필사책 · 책장 (2.2 회차별 필사책) | 같은 말씀을 다시 쓰는 독립된 필기 묶음 — 코드 `Notebook`. `NotebookID`(`default` = 기본 필사책 「첫 번째 필사」 · 지금까지의 모든 필사) · 저장 경로의 `NotebookChapter`(필사책 + 장, 기본값 없는 인자) · 필사책 정보 V7 `DrawingNotebook` · `NotebookRepository`(`@Dependency(\.notebookRepository)`) · 책장 화면 `NotebookShelfFeature` · 지금 필사책 키 `currentNotebookID`(기기마다). 다른 필사책 행은 `titleName` 앞 `nb_<id>~` — 짓고 푸는 것은 `StoredBookKey` 만. 기존 문서의 「회차」 는 절의 보관 행(`isPresent`)이라 필사책을 「회차」 라 부르지 않는다. 설계 `docs/notebook-design.md`, 규칙은 룰북 `references/localization.md` 「필사책 귀속」 |
 | 현지화 · 영어 화면 | 모듈마다 `Resources/Localizable.xcstrings`(원문 ko, 키 = 한국어 문장) · 문구에 `bundle: .module`(앱 · 위젯은 `.main`). 규칙은 룰북 `references/localization.md` |
 | 앱 언어 고르기 · 즉시 전환 | 설정 › 화면 › 언어 `LanguageSettingsFeature` · `AppLanguage` · `AppLanguageSelection` · `AppLanguageClient`(저장 = 앱 도메인 `AppleLanguages`, 구현 `AppleLanguagesClient`). 화면 언어는 뷰 = 환경 `locale`, 뷰 밖 = `AppLanguage.displayLocale()`, 위젯 = App Group `VerseWidgetSharing.appLanguageKey`. 규칙은 룰북 `references/localization.md` 9 |
 | 필사 캔버스 · 단일 Canvas | `ChapterCanvasFeature`(리듀서 하나를 `ChapterCanvas*.swift` 여러 파일로 나눔) · `ChapterCanvasController`(PencilKit). 캔버스는 이것 하나뿐이다 — N-Canvas · `SingleCanvasFlag` 는 2.1 에서 지웠다 |
@@ -141,7 +142,7 @@ mise x -- swiftlint lint --quiet --config .swiftlint.yml <파일들>
 - ⚠️ **`-CanvasReuseStrokesOnApply` 는 D9 H 수정을 끄고 결함을 재현하는 opt-out 이다** — 기본 검증은 이 인자 **없이** 돈다.
 - **Instruments 기록 중에는 `pgrep`/`pkill` 로 프로세스를 건드리지 않는다** — 트레이스가 메타데이터 없이 저장돼 `xctrace export` 가 실패한다.
 - 광고 제거 구매 · 복원은 `CarveApp-StoreKit` 스킴의 `RemoveAdsStoreKitUITests` 로 본다. 표준 `Carve-Workspace` 실행에서는 건너뛴다.
-- **UI 테스트 · 시뮬레이터 확인은 화면을 탭으로 찾아가지 않고 실행 인자로 연다** — `-UITestRoute <경로>`(`navigation` · `chart` · `favorites` · `settings[/<하위>]` · `verse/<절>`)와
+- **UI 테스트 · 시뮬레이터 확인은 화면을 탭으로 찾아가지 않고 실행 인자로 연다** — `-UITestRoute <경로>`(`navigation` · `chart` · `favorites` · `notebooks` · `settings[/<하위>]` · `verse/<절>`)와
   억제 스위치 `-UITestSkipFirstRunGuide` · `-UITestSkipPatchnote` · `-UITestNoAds`(모두 Debug 전용). 전체 목록은 `LaunchArgument`, 쓰는 법은 위 문서의 「화면 바로 열기」 절.
 
 ## 변경 정책
