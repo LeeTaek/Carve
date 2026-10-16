@@ -184,12 +184,16 @@ public struct BackupImportView: View {
 
     // MARK: - 미리보기
 
-    /// 결정별 수 · 불러오기 안내(원문) · 「불러오기」 또는 미리보기만 하는 까닭(설계 §4-1 6 · 7단계).
+    /// 결정별 수 · 담긴 필사책 수 · 불러오기 안내(원문) · 「불러오기」 또는 미리보기만 하는 까닭(설계 §4-1 6 · 7단계, 2.2 필사책).
     private func preview(_ inspection: BackupInspection) -> some View {
         let preview = inspection.preview
         return VStack(alignment: .leading, spacing: CarveSpacing.medium) {
             if let manifest = inspection.manifest {
                 note(BackupCopy.backupSummary(manifest, locale: locale))
+            }
+            // 담긴 필사책 수 — 형식 1(2.1 백업)은 모두 기본 필사책이라 1권이다.
+            if let notebooks = BackupCopy.previewNotebooks(preview, locale: locale) {
+                note(notebooks)
             }
             VStack(alignment: .leading, spacing: CarveSpacing.xSmall) {
                 countRow(BackupCopy.previewNew(locale: locale), preview.new)
@@ -199,7 +203,8 @@ public struct BackupImportView: View {
                 countRow(
                     BackupCopy.previewUnsupported(locale: locale),
                     preview.unsupportedCount,
-                    detail: preview.unsupportedCount > 0 ? BackupCopy.unsupportedDetail(preview.unsupported, locale: locale) : nil
+                    // 수에는 알 수 없는 필사책도 든다(`unsupportedCount`) — 사유에도 그 줄을 함께 보인다.
+                    detail: preview.unsupportedCount > 0 ? BackupCopy.unsupportedDetail(preview, locale: locale) : nil
                 )
             }
             .padding(CarveSpacing.medium)

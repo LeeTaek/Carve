@@ -263,10 +263,41 @@ public enum DraftRecoveryCopy {
         SettingsCatalog.string("넣지 못했어요. 현재 필사와 남겨 둔 필기는 그대로예요. 다시 시도해 주세요.", locale: locale)
     }
 
+    // MARK: - 필사책 (2.2 회차별 필사책)
+
+    /// 기본이 아닌 필사책의 이름 — 사용자가 붙인 이름 그대로다(옮기지 않는다). 이름이 없으면(필사책 정보에 이름이 없거나 목록에 없는 필사책 —
+    /// 지운 필사책의 늦게 온 필기 · 정보보다 먼저 온 필기) 화면 언어의 「이름 없는 필사책」 이다. 숨기거나 기본 필사책에 합치지 않는다(혼재 버전 규칙 ⑥).
+    /// 공백뿐인 이름도 이름이 없는 것으로 본다.
+    /// - Parameters:
+    ///   - storedName: 필사책 정보의 이름(`NotebookSnapshot.name`). 목록에 없으면 nil.
+    ///   - locale: 문구 언어 — 리듀서 · effect 는 만들 때의 `AppLanguage.displayLocale()`.
+    public static func notebookName(storedName: String?, locale: Locale) -> String {
+        if let storedName, !storedName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return storedName }
+        return SettingsCatalog.string("이름 없는 필사책", locale: locale)
+    }
+
+    /// 자리 — 기본 필사책이 아니면 앞에 필사책 이름을 붙인다(「아침 필사 · 창세기 1장 3절 · KJV」). 기본 필사책은 `place(_:locale:)` 그대로다 —
+    /// 2.2 이전의 모든 필사가 기본 필사책이라 지금까지와 같게 보인다.
+    /// - Parameter notebookNames: 이름이 있는 필사책의 이름(`NotebookSnapshot.name`). 여기 없는 필사책은 「이름 없는 필사책」.
+    public static func place(_ key: VerseDraftKey, notebookNames: [NotebookID: String], locale: Locale) -> String {
+        withNotebook(key.notebook, place(key, locale: locale), notebookNames: notebookNames, locale: locale)
+    }
+
+    /// 읽지 못한 장 이름 — 자리와 같이 기본 필사책이 아니면 앞에 필사책 이름을 붙인다(「아침 필사 · 창세기 1장」).
+    public static func chapterName(_ page: NotebookChapter, notebookNames: [NotebookID: String], locale: Locale) -> String {
+        withNotebook(page.notebook, chapterName(page.chapter, locale: locale), notebookNames: notebookNames, locale: locale)
+    }
+
+    /// 기본이 아닌 필사책이면 문구 앞에 필사책 이름을 붙인다.
+    private static func withNotebook(_ notebook: NotebookID, _ text: String, notebookNames: [NotebookID: String], locale: Locale) -> String {
+        guard !notebook.isDefault else { return text }
+        return notebookName(storedName: notebookNames[notebook], locale: locale) + " · " + text
+    }
+
     // MARK: - 형식
 
     /// 「창세기 1장 3절 · KJV」 · 「창세기 1장 3절」 — 번역본이 섞이는 목록이라 KJV · BSB 는 약칭을 붙이고,
-    /// 개역개정은 생략한다(영어 현지화 결정 11 · 사용자 결정 17, `chapterName`).
+    /// 개역개정은 생략한다(영어 현지화 결정 11 · 사용자 결정 17, `chapterName`). 필사책 이름은 붙이지 않는다 — 목록의 줄은 `place(_:notebookNames:locale:)`.
     /// 권 · 번역본을 이 판이 모르면(모르는 원본 이름) 그 값을 그대로 보인다 — 어디인지 숨기지 않는다.
     public static func place(_ key: VerseDraftKey, locale: Locale) -> String {
         guard let chapter = key.bibleChapter else {
@@ -276,6 +307,7 @@ public enum DraftRecoveryCopy {
     }
 
     /// 읽지 못한 장 이름(「창세기 1장 · KJV」 · 「창세기 1장」) — 자리 표기와 같은 약칭 규칙이다(사용자 결정 17).
+    /// 필사책 이름은 붙이지 않는다 — 목록은 `chapterName(_:notebookNames:locale:)`.
     public static func chapterName(_ chapter: BibleChapter, locale: Locale) -> String {
         reference(chapter, verses: .wholeChapter, locale: locale)
     }
