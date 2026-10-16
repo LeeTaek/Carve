@@ -130,11 +130,12 @@ public struct DrawingWeeklySummaryView: View {
                 let items = Array(store.recentChapters.prefix(3))
 
                 ForEach(items.indices, id: \.self) { index in
+                    // 필사책을 합산한 목록이라 필사책 이름은 적지 않는다 — 누르면 그 장을 마지막으로 쓴 필사책으로 연다(2.2 결정 10).
                     let item = items[index]
                     Button {
                         send(.recentChapterTapped(item))
                     } label: {
-                        Text(verbatim: "• \(BibleReference(chartChapter: item).text(locale: locale))")
+                        Text(verbatim: "• \(BibleReference(chartChapter: item.chapter).text(locale: locale))")
                     }
                     .font(CarveTypography.label)
                     .foregroundStyle(CarveColor.ink)

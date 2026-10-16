@@ -43,13 +43,15 @@ struct DrawingChartFeatureTesting {
         let records = chartRecords(from: fixedChartDay(-29), counts: Array(repeating: 0, count: 29) + [3])
         let chapter = BibleChapter(title: .john, chapter: 3)
         let counts: [Date: [BibleChapter: Int]] = [fixedChartDay(0): [chapter: 3]]
+        let notebooks: [Date: [BibleChapter: NotebookID]] = [fixedChartDay(0): [chapter: .default]]
         let store = TestStore(initialState: fixedState()) {
             DrawingChartFeature()
         } withDependencies: { fixedTimeDependencies(&$0) }
 
         // When / Then: 스크롤은 마지막 날 6일 전, 선택은 마지막 날
-        await store.send(.setFetchedDailyData(dailyRecords: records, chapterCountsByDay: counts)) {
+        await store.send(.setFetchedDailyData(dailyRecords: records, chapterCountsByDay: counts, chapterNotebooksByDay: notebooks)) {
             $0.chapterCountsByDay = counts
+            $0.chapterNotebooksByDay = notebooks
             $0.earliestFetchedDate = fixedChartDay(-29)
             $0.selectedRecord = records.last
             $0.dailyRecordChart.records = records
@@ -58,9 +60,11 @@ struct DrawingChartFeatureTesting {
             $0.drawingWeeklySummary.dailyRecords = records
             $0.drawingWeeklySummary.scrollPosition = fixedChartDay(-6)
             $0.drawingWeeklySummary.chapterCountsByDay = counts
+            $0.drawingWeeklySummary.chapterNotebooksByDay = notebooks
         }
         #expect(store.state.drawingWeeklySummary.weekTotalCount == 3)
         #expect(store.state.drawingWeeklySummary.topChapter?.chapter == chapter)
+        #expect(store.state.drawingWeeklySummary.topChapterPage == NotebookChapter(notebook: .default, chapter: chapter))
     }
 
     @Test("빈 일별 기록이 오면 선택을 지우고 스크롤 위치와 가장 이른 날은 그대로 둔다")
@@ -78,7 +82,7 @@ struct DrawingChartFeatureTesting {
         } withDependencies: { fixedTimeDependencies(&$0) }
 
         // When / Then
-        await store.send(.setFetchedDailyData(dailyRecords: [], chapterCountsByDay: [:])) {
+        await store.send(.setFetchedDailyData(dailyRecords: [], chapterCountsByDay: [:], chapterNotebooksByDay: [:])) {
             $0.dailyRecordChart.records = []
             $0.dailyRecordChart.selectedDate = nil
             $0.selectedRecord = nil
@@ -90,19 +94,21 @@ struct DrawingChartFeatureTesting {
     @MainActor
     func setRecentItemsForwardsToWeeklySummary() async {
         let chapter = BibleChapter(title: .genesis, chapter: 1)
+        let page = NotebookChapter(notebook: .default, chapter: chapter)
         let verses = [
             RecentVerseItem(
                 verse: BibleVerse(title: chapter, verse: 2, sentence: ""),
-                updatedAt: Date(timeIntervalSince1970: 3_600)
+                updatedAt: Date(timeIntervalSince1970: 3_600),
+                notebook: .default
             )
         ]
         let store = TestStore(initialState: fixedState()) {
             DrawingChartFeature()
         } withDependencies: { fixedTimeDependencies(&$0) }
 
-        await store.send(.setRecentItems(recentVerses: verses, recentChapters: [chapter])) {
+        await store.send(.setRecentItems(recentVerses: verses, recentChapters: [page])) {
             $0.drawingWeeklySummary.recentVerses = verses
-            $0.drawingWeeklySummary.recentChapters = [chapter]
+            $0.drawingWeeklySummary.recentChapters = [page]
         }
     }
 
@@ -237,13 +243,17 @@ struct DrawingChartFeatureTesting {
         var counts: [Date: [BibleChapter: Int]] = Dictionary(uniqueKeysWithValues: records.map { ($0.date, [:]) })
         counts[fixedChartDay(-2)] = [genesis: 1]
         counts[fixedChartDay(0)] = [john: 2]
+        var notebooks: [Date: [BibleChapter: NotebookID]] = Dictionary(uniqueKeysWithValues: records.map { ($0.date, [:]) })
+        notebooks[fixedChartDay(-2)] = [genesis: .default]
+        notebooks[fixedChartDay(0)] = [john: .default]
 
         // When
         await store.send(.view(.fetchData))
 
-        // Then: 기간 안의 필사만 날짜별로 세고, 마지막 날을 고른다
+        // Then: 기간 안의 필사만 날짜별로 세고, 마지막 날을 고른다. 접두 없는 행이라 장별 필사책은 기본 필사책이다
         await store.receive(\.setFetchedDailyData) {
             $0.chapterCountsByDay = counts
+            $0.chapterNotebooksByDay = notebooks
             $0.dailyRecordChart.records = records
             $0.dailyRecordChart.selectedDate = fixedChartDay(0)
             $0.selectedRecord = records.last
@@ -251,7 +261,7 @@ struct DrawingChartFeatureTesting {
         // Then: 최근 항목은 최신순, 장은 겹치지 않게 (limit 5 라 기간 밖 절도 들어온다)
         await store.receive(\.setRecentItems) {
             $0.drawingWeeklySummary.recentVerses = activities.map(recentItem)
-            $0.drawingWeeklySummary.recentChapters = [john, genesis]
+            $0.drawingWeeklySummary.recentChapters = [john, genesis].map { NotebookChapter(notebook: .default, chapter: $0) }
         }
     }
 
@@ -357,7 +367,7 @@ private func chartActivity(_ date: Date, _ chapter: BibleChapter, verse: Int) ->
     DrawingActivity(updateDate: date, titleName: chapter.title.rawValue, titleChapter: chapter.chapter, verse: verse)
 }
 
-/// 필사 활동이 최근 항목으로 보일 모양.
+/// 필사 활동이 최근 항목으로 보일 모양 — 접두 없는 개역개정 행이라 기본 필사책의 절이다.
 private func recentItem(_ activity: DrawingActivity) -> RecentVerseItem {
     RecentVerseItem(
         verse: BibleVerse(
@@ -365,6 +375,7 @@ private func recentItem(_ activity: DrawingActivity) -> RecentVerseItem {
             verse: activity.verse!,
             sentence: ""
         ),
-        updatedAt: activity.updateDate!
+        updatedAt: activity.updateDate!,
+        notebook: .default
     )
 }
