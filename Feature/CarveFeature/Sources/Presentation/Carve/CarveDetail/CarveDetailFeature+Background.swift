@@ -7,6 +7,7 @@
 //
 
 import CoreGraphics
+import Domain
 
 import ComposableArchitecture
 
@@ -54,9 +55,10 @@ extension CarveDetailFeature {
     ///
     /// 분할 화면이 compact 로 접혔다 펴지며 필사 화면이 사라졌다 다시 나타나면 `onAppear` 가 본문을 다시 읽는다.
     /// 그대로 두면 측정과 캔버스가 처음부터 다시 시작해 돌아왔을 때 잉크가 비었다가 다시 그려진다.
-    /// 장이 바뀌었으면 행의 장과 지금 장이 달라 그대로 읽는다. 장 이동 · 딥링크는 `fetchSentence` 를 직접 보내 이 판정을 지나지 않는다.
+    /// 장이 바뀌었으면 행의 장과 지금 장이 달라 그대로 읽는다. 지금 필사책이 캔버스의 필사책과 달라도(그사이 필사책이 바뀜) 그대로 읽는다.
+    /// 장 이동 · 딥링크 · 필사책 바꾸기는 `fetchSentence` 를 직접 보내 이 판정을 지나지 않는다.
     static func isRedundantBackgroundFetch(_ state: State) -> Bool {
         guard state.isInBackground, let shown = state.sentenceWithDrawingState.first?.sentence.title else { return false }
-        return shown == state.headerState.currentTitle
+        return shown == state.headerState.currentTitle && state.chapterCanvas.page.notebook == state.currentNotebook
     }
 }

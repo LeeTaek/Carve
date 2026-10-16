@@ -23,8 +23,8 @@ import ComposableArchitecture
 /// **순서를 맞춘다** — flush 로 큐를 비운 뒤(`flushing`) 보관 트랜잭션을 돌리고(`archiving`), 그동안 입력을 잠근다.
 struct VerseEraseTask: Equatable, Sendable {
     let verse: Int
-    /// 이 작업이 속한 장. 장이 바뀌면 활성 행 문맥이 사라지므로 접는다.
-    let chapter: BibleChapter
+    /// 이 작업이 속한 page(필사책 + 장). 보관 트랜잭션은 이 page 의 행에만 쓴다 — 장 · 필사책이 바뀌면 활성 행 문맥이 사라지므로 접는다.
+    let page: NotebookChapter
     /// 이 작업이 **한 번만** 발급한 보관 행 rowID. 재시도에도 같은 값을 써서 보관 행이 늘지 않게 한다.
     let archiveRowID: BibleDrawingRowID
     var phase: Phase
@@ -76,7 +76,7 @@ extension ChapterCanvasFeature {
         }
         state.eraseTask = VerseEraseTask(
             verse: verse,
-            chapter: state.chapter,
+            page: state.page,
             archiveRowID: BibleDrawingRowID(raw: uuid().uuidString),
             phase: .flushing
         )
@@ -109,8 +109,8 @@ extension ChapterCanvasFeature {
             state.eraseAlert = nil
             return .none
         }
-        guard task.chapter == state.chapter else {
-            // 장이 바뀌었다 — 이 작업의 활성 행 문맥이 없다. 조용히 접는다 (장 전환은 `beginLoad` 에서도 접는다).
+        guard task.page == state.page else {
+            // 장 · 필사책이 바뀌었다 — 이 작업의 활성 행 문맥이 없다. 조용히 접는다 (page 전환은 `beginLoad` 에서도 접는다).
             state.eraseTask = nil
             return .none
         }
@@ -124,10 +124,10 @@ extension ChapterCanvasFeature {
         let command = VerseDrawingArchiveCommand(
             verse: task.verse, activeRowID: activeRowID, archiveRowID: task.archiveRowID
         )
-        let chapter = task.chapter
+        let page = task.page
         return .run { [repository] send in
             do {
-                let outcome = try await repository.archiveAndReset(command, chapter: chapter)
+                let outcome = try await repository.archiveAndReset(command, page: page)
                 await send(.eraseFinished(outcome: outcome, failure: nil))
             } catch let error as DrawingRepositoryError {
                 await send(.eraseFinished(outcome: nil, failure: error))
@@ -165,7 +165,7 @@ extension ChapterCanvasFeature {
         task.phase = .failed
         state.eraseTask = task
         // 알림 문구는 띄우는 순간의 화면 언어로 만든다 — 떠 있는 동안 언어를 바꿔도 그대로다(즉시 전환 단계 3).
-        state.eraseAlert = Self.eraseFailureAlert(chapter: task.chapter, verse: task.verse, locale: AppLanguage.displayLocale())
+        state.eraseAlert = Self.eraseFailureAlert(chapter: task.page.chapter, verse: task.verse, locale: AppLanguage.displayLocale())
         return .none
     }
 

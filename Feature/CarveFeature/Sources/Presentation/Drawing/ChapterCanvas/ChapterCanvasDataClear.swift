@@ -37,7 +37,7 @@ extension ChapterCanvasFeature {
         state.pendingMutations = [:]
         state.inFlightBatch = [:]
         state.inFlightMutations = []
-        state.inFlightChapter = nil
+        state.inFlightPage = nil
         state.editQueue = []
         state.isPreparingEdit = false
         state.saveStatus = .idle

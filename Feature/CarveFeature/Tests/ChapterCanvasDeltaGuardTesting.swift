@@ -102,7 +102,7 @@ struct ChapterCanvasDeltaGuardTesting {
         #expect(!store.state.isDrawingInputEnabled)
 
         let next = BibleChapter(title: .jonah, chapter: 3)
-        await store.send(.load(chapter: next, expectedVerseCount: 3)) { $0.layoutDelta = nil }
+        await store.send(.load(page: next.inDefaultNotebook, expectedVerseCount: 3)) { $0.layoutDelta = nil }
         await store.receive(\.drawingsLoaded)
         await store.send(.layoutCompleted(CanvasTestSupport.layout))
 
@@ -185,7 +185,7 @@ struct ChapterCanvasDeltaGuardWiringTesting {
     // MARK: 경로 — 판정이 캔버스까지 간다
 
     private func rowID(_ verse: Int) -> SentencesWithDrawingFeature.State.ID {
-        SentencesWithDrawingFeature.State.rowID(chapter: chapter, verse: verse)
+        SentencesWithDrawingFeature.State.rowID(page: chapter.inDefaultNotebook, verse: verse)
     }
 
     private func sentences(count: Int) -> [BibleVerse] {

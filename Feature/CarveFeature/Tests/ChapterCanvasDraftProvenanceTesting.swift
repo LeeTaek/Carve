@@ -22,7 +22,7 @@ import ComposableArchitecture
 @Suite("절 초안 — 복구한 초안의 출처")
 @MainActor
 struct ChapterCanvasDraftProvenanceTesting: DraftTestSamples {
-    private var verseOne: DraftVerse { DraftVerse(chapter: CanvasTestSupport.chapter, verse: 1) }
+    private var verseOne: DraftVerse { DraftVerse(page: CanvasTestSupport.page, verse: 1) }
 
     @Test("보존만 초안을 이어 보인 뒤 소유가 확인된 유효 세션에서 한 획을 더해도 원 초안의 출처를 잇고 저장소에 쓰지 않는다 — 다른 절은 쓴다")
     func showOnlyDraftKeepsProvenanceInValidSession() async throws {
@@ -242,7 +242,7 @@ struct ChapterCanvasDraftProvenanceTesting: DraftTestSamples {
         #expect(store.state.drafts.inherited[verseOne] == mine.provenance)
         // 다른 힌트의 초안은 화면에 없고, 그 절의 기준도 이어받지 않는다.
         #expect(store.state.loadedDrawings?.contains { $0.verse == 2 } == false)
-        #expect(store.state.drafts.adopted[DraftVerse(chapter: CanvasTestSupport.chapter, verse: 2)] == nil)
+        #expect(store.state.drafts.adopted[DraftVerse(page: CanvasTestSupport.page, verse: 2)] == nil)
         // 파일은 그대로 남는다 — 보존만 한다.
         #expect(drafts.stored(in: .unverified).count == 2)
         await end(store, environment)

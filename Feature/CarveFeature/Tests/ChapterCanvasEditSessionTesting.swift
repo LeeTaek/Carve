@@ -212,7 +212,7 @@ extension EditSessionTestHelpers {
         clock: any Clock<Duration> = ImmediateClock(),
         composeInputs: LockIsolated<[[VerseDrawingSnapshot]]>? = nil
     ) -> TestStoreOf<ChapterCanvasFeature> {
-        let store = TestStore(initialState: ChapterCanvasFeature.State(chapter: CanvasTestSupport.chapter)) {
+        let store = TestStore(initialState: ChapterCanvasFeature.State(page: CanvasTestSupport.page)) {
             ChapterCanvasFeature()
         } withDependencies: {
             $0.drawingCodec = CanvasTestSupport.codec(results: LockIsolated(results), composeInputs: composeInputs)

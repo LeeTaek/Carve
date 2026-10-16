@@ -90,11 +90,11 @@ struct ChapterCanvasControllerTesting {
 
         /// 컬럼을 컨트롤러에 붙인다 — **뷰가 쓰는 조합 그대로**(`ChapterCanvasView.hostedColumn`).
         @MainActor
-        func setColumn(_ column: some View, chapter: BibleChapter? = BibleChapter(title: .genesis, chapter: 1)) {
+        func setColumn(_ column: some View, page: NotebookChapter? = BibleChapter(title: .genesis, chapter: 1).inDefaultNotebook) {
             let hosted = ChapterCanvasView.hostedColumn(AnyView(column)) { [unowned self] height in
                 self.controller.setColumnHeight(height)
             }
-            controller.setColumn(hosted, chapter: chapter)
+            controller.setColumn(hosted, page: page)
         }
 
         /// 회전을 폭 변경으로 재현한다 — 창과 컨트롤러 뷰를 함께 바꾼다 (`viewDidLayoutSubviews` 의 `lastBounds` 경로를 태운다).
@@ -763,10 +763,10 @@ extension ChapterCanvasControllerTesting {
     @Test("같은 장으로 컬럼을 다시 넣으면 이전 컬럼을 놓지 않는다 — 매번 놓으면 깜빡인다 (R26)")
     func sameChapterKeepsHostedColumn() {
         let harness = Harness()
-        let chapter = BibleChapter(title: .genesis, chapter: 1)
-        harness.setColumn(Color.clear, chapter: chapter)
-        harness.setColumn(Color.clear, chapter: chapter)
-        harness.setColumn(Color.clear, chapter: chapter)
+        let page = BibleChapter(title: .genesis, chapter: 1).inDefaultNotebook
+        harness.setColumn(Color.clear, page: page)
+        harness.setColumn(Color.clear, page: page)
+        harness.setColumn(Color.clear, page: page)
         #expect(harness.controller.columnReleaseCount == 0)
     }
 
@@ -774,13 +774,13 @@ extension ChapterCanvasControllerTesting {
     @Test("장이 바뀌면 새 컬럼을 넣기 전에 이전 컬럼을 놓는다 (R26)")
     func chapterChangeReleasesPreviousColumn() {
         let harness = Harness()
-        harness.setColumn(Color.clear, chapter: BibleChapter(title: .psalms, chapter: 119))
+        harness.setColumn(Color.clear, page: BibleChapter(title: .psalms, chapter: 119).inDefaultNotebook)
         #expect(harness.controller.columnReleaseCount == 0)   // 첫 장에는 놓을 것이 없다
 
-        harness.setColumn(Color.clear, chapter: BibleChapter(title: .psalms, chapter: 120))
+        harness.setColumn(Color.clear, page: BibleChapter(title: .psalms, chapter: 120).inDefaultNotebook)
         #expect(harness.controller.columnReleaseCount == 1)
 
-        harness.setColumn(Color.clear, chapter: BibleChapter(title: .psalms, chapter: 121))
+        harness.setColumn(Color.clear, page: BibleChapter(title: .psalms, chapter: 121).inDefaultNotebook)
         #expect(harness.controller.columnReleaseCount == 2)
     }
 

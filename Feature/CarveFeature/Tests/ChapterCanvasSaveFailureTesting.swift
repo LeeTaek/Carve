@@ -43,13 +43,13 @@ struct ChapterCanvasSaveFailureTesting {
             $0.baselineData = CanvasTestSupport.edit("1").drawingData
             $0.activeRowIDs[2] = self.newRow
             $0.pendingMutations = [self.newRow: PendingDrawingMutation(
-                revision: 1, chapter: CanvasTestSupport.chapter,
+                revision: 1, page: CanvasTestSupport.page,
                 mutation: CanvasTestSupport.createResult("1").mutations[0]
             )]
             $0.saveStatus = .saving(revision: 1, requestID: UUID(1))
             $0.inFlightBatch = [self.newRow: 1]
             $0.inFlightMutations = CanvasTestSupport.createResult("1").mutations
-            $0.inFlightChapter = CanvasTestSupport.chapter
+            $0.inFlightPage = CanvasTestSupport.page
         }
 
         // 실패 — 큐는 남고 상태는 failed 가 된다.
@@ -57,7 +57,7 @@ struct ChapterCanvasSaveFailureTesting {
             $0.saveStatus = .failed(revision: 1, retryCount: 1)
             $0.inFlightBatch = [:]
             $0.inFlightMutations = []
-            $0.inFlightChapter = nil
+            $0.inFlightPage = nil
         }
         #expect(store.state.saveRetryCount == 1)
         #expect(!store.state.isFullyPersisted)
@@ -69,14 +69,14 @@ struct ChapterCanvasSaveFailureTesting {
             $0.saveStatus = .saving(revision: 1, requestID: UUID(2))
             $0.inFlightBatch = [self.newRow: 1]
             $0.inFlightMutations = CanvasTestSupport.createResult("1").mutations
-            $0.inFlightChapter = CanvasTestSupport.chapter
+            $0.inFlightPage = CanvasTestSupport.page
         }
         await store.receive(\.saveFinished) {
             $0.pendingMutations = [:]
             $0.saveStatus = .idle
             $0.inFlightBatch = [:]
             $0.inFlightMutations = []
-            $0.inFlightChapter = nil
+            $0.inFlightPage = nil
             $0.persistedRevision = 1
         }
 
@@ -99,7 +99,7 @@ struct ChapterCanvasSaveFailureTesting {
     ///              누적은 `failureNoticeAndQueueSurviveChapterSwitch` · `successResetsFailureCount` 가 흐름으로 확인한다.
     @Test("실패 횟수는 상태에서 그대로 읽힌다")
     func retryCountIsReadable() {
-        var state = ChapterCanvasFeature.State(chapter: CanvasTestSupport.chapter)
+        var state = ChapterCanvasFeature.State(page: CanvasTestSupport.page)
 
         state.saveStatus = .idle
         #expect(state.saveRetryCount == nil)
@@ -149,13 +149,13 @@ struct ChapterCanvasSaveFailureTesting {
 
         await drawInChapterA(store)
         #expect(store.state.saveRetryCount == 1)
-        #expect(store.state.pendingMutations[rowInA]?.chapter == chapterA)
+        #expect(store.state.pendingMutations[rowInA]?.page == chapterA.inDefaultNotebook)
 
         // 장 전환은 flush 지점이다 — 실패한 batch 를 다시 시도한다 (§8-5).
-        await store.send(.load(chapter: chapterB, expectedVerseCount: 3))
+        await store.send(.load(page: chapterB.inDefaultNotebook, expectedVerseCount: 3))
         await store.receive(\.saveFinished)
 
-        #expect(store.state.chapter == chapterB)
+        #expect(store.state.page == chapterB.inDefaultNotebook)
         // ★ 재시도가 **이전 장**으로 갔다. 현재 장(B)으로 가면 필사가 다른 장에 붙는다.
         #expect(spy.applied.value.map(\.chapter) == [chapterA, chapterA])
         #expect(spy.applied.value.last?.mutations.map(\.rowID) == [rowInA])
@@ -171,15 +171,15 @@ struct ChapterCanvasSaveFailureTesting {
         await CanvasTestSupport.compose(store)
 
         await drawInChapterA(store)
-        await store.send(.load(chapter: chapterB, expectedVerseCount: 3))
+        await store.send(.load(page: chapterB.inDefaultNotebook, expectedVerseCount: 3))
         await store.receive(\.saveFinished)
 
-        #expect(store.state.chapter == chapterB)
+        #expect(store.state.page == chapterB.inDefaultNotebook)
         // 안내가 남아 있어야 사용자가 새 장에서도 저장되지 않은 필사가 있다는 것을 안다.
         #expect(store.state.saveRetryCount == 2)
         // 미저장분은 버려지지 않았고, 여전히 **장 A** 의 것이다.
         #expect(store.state.pendingMutations.count == 1)
-        #expect(store.state.pendingMutations[rowInA]?.chapter == chapterA)
+        #expect(store.state.pendingMutations[rowInA]?.page == chapterA.inDefaultNotebook)
         #expect(spy.applied.value.map(\.chapter) == [chapterA, chapterA])
     }
 
@@ -197,15 +197,15 @@ struct ChapterCanvasSaveFailureTesting {
         #expect(store.state.saveStatus == .saving(revision: 1, requestID: UUID(1)))
 
         // 저장이 붙잡힌 채로 장을 바꾼다. 도는 저장이 있으므로 장 전환의 flush 는 새 저장을 시작하지 않는다.
-        await store.send(.load(chapter: chapterB, expectedVerseCount: 3))
-        #expect(store.state.chapter == chapterB)
-        #expect(store.state.inFlightChapter == chapterA)
+        await store.send(.load(page: chapterB.inDefaultNotebook, expectedVerseCount: 3))
+        #expect(store.state.page == chapterB.inDefaultNotebook)
+        #expect(store.state.inFlightPage == chapterA.inDefaultNotebook)
 
         spy.releaseApply()
         await store.receive(\.saveFinished)
         #expect(store.state.saveRetryCount == 1)
-        #expect(store.state.inFlightChapter == nil)
-        #expect(store.state.pendingMutations[rowInA]?.chapter == chapterA)
+        #expect(store.state.inFlightPage == nil)
+        #expect(store.state.pendingMutations[rowInA]?.page == chapterA.inDefaultNotebook)
 
         // 사용자가 새 장에서 「다시 시도」 를 눌러도 이전 장으로 저장된다.
         await store.send(.flushPending)
@@ -227,7 +227,7 @@ struct ChapterCanvasSaveFailureTesting {
 
         // 장 B 조회를 붙잡아, 장 전환의 재시도가 먼저 끝나게 순서를 고정한다.
         spy.holdNextLoadCall()
-        await store.send(.load(chapter: chapterB, expectedVerseCount: 3))
+        await store.send(.load(page: chapterB.inDefaultNotebook, expectedVerseCount: 3))
         await store.receive(\.saveFinished)
         #expect(store.state.saveRetryCount == 2)
         spy.releaseLoad()
@@ -376,7 +376,7 @@ struct LocalSaveIndicatorTesting {
         await store.receive(\.mutationsPrepared)
         #expect(store.state.localSaveIndicator == .saving)
 
-        await store.send(.load(chapter: BibleChapter(title: .jonah, chapter: 3), expectedVerseCount: 3))
+        await store.send(.load(page: BibleChapter(title: .jonah, chapter: 3).inDefaultNotebook, expectedVerseCount: 3))
         // 도는 저장이 있어 새 장에서도 "저장 중" 이다 — 장이 바뀌었다고 조용해지지 않는다.
         #expect(store.state.localSaveIndicator == .saving)
 

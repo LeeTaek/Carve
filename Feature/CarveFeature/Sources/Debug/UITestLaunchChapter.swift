@@ -24,6 +24,9 @@ import ComposableArchitecture
 ///
 /// 번역본은 JSON 의 `translation` 키(`"NKRV"` · `"KJV"` · `"BSB"`)로 정한다. 키가 없으면 개역개정이다(`BibleChapter` Codable) —
 /// 예: `{"title":"2-01Matthew.txt","chapter":17,"translation":"BSB"}`. 모르는 번역본 값이면 장으로 읽지 못해 무시한다.
+///
+/// 필사책은 정하지 않는다(2.2 「회차별 필사책」) — 시작 장은 그 기기의 지금 필사책(`@Shared(.currentNotebookID)`)으로 열린다.
+/// UI 테스트 기기는 새로 만들므로 기본 필사책이다.
 public enum UITestLaunchChapter {
     public static let argument = LaunchArgument.uiTestChapter
 

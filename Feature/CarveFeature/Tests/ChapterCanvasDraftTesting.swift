@@ -155,7 +155,7 @@ struct ChapterCanvasDraftTesting: DraftTestSamples {
         await composeAndSubscribe(store, environment)
 
         #expect(store.state.loadedDrawings?.first { $0.verse == 1 }?.lineData == Data("earlier".utf8))
-        #expect(store.state.drafts.adopted[DraftVerse(chapter: CanvasTestSupport.chapter, verse: 1)] == earlier.ref)
+        #expect(store.state.drafts.adopted[DraftVerse(page: CanvasTestSupport.page, verse: 1)] == earlier.ref)
 
         await draw(store)
         await store.receive(\.draftsSaved)

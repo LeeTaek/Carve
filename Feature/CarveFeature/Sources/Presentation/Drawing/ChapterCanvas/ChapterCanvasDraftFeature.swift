@@ -11,9 +11,12 @@ import Foundation
 
 import ComposableArchitecture
 
-/// 어느 장의 어느 절 — 초안 기준 · 이어받은 초안을 절마다 기억하는 키.
+/// 어느 page(필사책 + 장)의 어느 절 — 초안 기준 · 이어받은 초안을 절마다 기억하는 키.
+///
+/// 필사책을 담는다 — 초안 세션은 장 · 필사책을 바꿔도 이어지므로, 장만으로 키를 지으면 같은 장의 다른 필사책 절이 앞 필사책의 기준 ·
+/// 이어받은 초안을 물려받는다.
 public struct DraftVerse: Hashable, Sendable {
-    let chapter: BibleChapter
+    let page: NotebookChapter
     let verse: Int
 }
 
@@ -150,7 +153,7 @@ extension ChapterCanvasFeature.State {
     /// 그런 미저장분은 초안이 곧 보존이라 초안이 되면 큐에서 내린다(`dropDraftedPending`).
     func mayReachStore(_ entry: PendingDrawingMutation) -> Bool {
         guard sessionEnd == nil, persistsToStore || holdsForStore else { return false }
-        return drafts.inherited[DraftVerse(chapter: entry.chapter, verse: entry.mutation.verse)] == nil
+        return drafts.inherited[DraftVerse(page: entry.page, verse: entry.mutation.verse)] == nil
     }
 
     /// 지금 저장소에 쓸 미저장분인가.
@@ -161,12 +164,12 @@ extension ChapterCanvasFeature.State {
     /// 그 절의 지금 필기가 **다른 출처**인가 — 보이기만 하는 초안(다른 계정 · 확인 전)을 이어 보고 있다. 그 잉크를 즐겨찾기 · 위젯처럼
     /// 동기화되는 다른 저장소로 옮기면 계정 간 가져오기가 된다(11차 리뷰 P0-2).
     func inheritsOtherSessionInk(verse: Int) -> Bool {
-        drafts.inherited[DraftVerse(chapter: chapter, verse: verse)] != nil
+        drafts.inherited[DraftVerse(page: page, verse: verse)] != nil
     }
 
-    /// 이 장의 그 절을 지금 저장소에 쓰는가 — 지우기 · 기록 복원처럼 저장소 행을 바로 바꾸는 일의 게이트.
+    /// 이 page 의 그 절을 지금 저장소에 쓰는가 — 지우기 · 기록 복원처럼 저장소 행을 바로 바꾸는 일의 게이트.
     func writesStore(verse: Int) -> Bool {
-        persistsToStore && sessionEnd == nil && drafts.inherited[DraftVerse(chapter: chapter, verse: verse)] == nil
+        persistsToStore && sessionEnd == nil && drafts.inherited[DraftVerse(page: page, verse: verse)] == nil
     }
 
     /// 그 revision 까지 초안이 됐는가.
@@ -257,7 +260,7 @@ extension ChapterCanvasFeature {
         let drafts = state.drafts
         let current = state
         return waiting.values.sorted(by: Self.draftOrder).map { entry in
-            let place = DraftVerse(chapter: entry.chapter, verse: entry.mutation.verse)
+            let place = DraftVerse(page: entry.page, verse: entry.mutation.verse)
             let inherited = drafts.inherited[place]
             // 저장소로 갈 수 있는 revision 은 "보내는 중" 표식과 함께 남긴다 — 저장소 쓰기는 이 초안이 남은 뒤에만 한다.
             let draft = Self.makeDraft(
@@ -286,7 +289,7 @@ extension ChapterCanvasFeature {
             let sessionID = closed.sessionID ?? uuid().uuidString
             closed.sessionID = sessionID
             state.closedDrafts.sessions[key.epoch] = closed
-            let place = DraftVerse(chapter: entry.chapter, verse: entry.mutation.verse)
+            let place = DraftVerse(page: entry.page, verse: entry.mutation.verse)
             let draft = Self.makeDraft(
                 entry, sessionID: sessionID, base: closed.bases[place] ?? .empty,
                 provenance: closed.inherited[place] ?? closed.environment.draftProvenance,
@@ -297,8 +300,13 @@ extension ChapterCanvasFeature {
         return requests
     }
 
+    /// 초안을 남기는 순서 — 권 · 장 · 절, 같으면 번역본 · 필사책(같은 장의 다른 page 끼리도 순서가 정해지게).
     private static func draftOrder(_ lhs: PendingDrawingMutation, _ rhs: PendingDrawingMutation) -> Bool {
-        (lhs.chapter.title.rawValue, lhs.chapter.chapter, lhs.mutation.verse) < (rhs.chapter.title.rawValue, rhs.chapter.chapter, rhs.mutation.verse)
+        let left = (lhs.page.chapter.title.rawValue, lhs.page.chapter.chapter, lhs.mutation.verse,
+                    lhs.page.chapter.translation.rawValue, lhs.page.notebook.rawValue)
+        let right = (rhs.page.chapter.title.rawValue, rhs.page.chapter.chapter, rhs.mutation.verse,
+                     rhs.page.chapter.translation.rawValue, rhs.page.notebook.rawValue)
+        return left < right
     }
 
     /// 초안 저장의 결과. 지금 도는 저장의 응답만 받는다.
@@ -389,8 +397,8 @@ extension ChapterCanvasFeature {
         for (rowID, entry) in state.pendingMutations where state.isDrafted(rowID, entry) && !state.mayReachStore(entry) {
             state.pendingMutations[rowID] = nil
             if case .create = entry.mutation { state.drafts.draftOnlyRowIDs.insert(rowID) }
-            if entry.chapter == state.chapter, let loaded = state.loadedDrawings {
-                state.loadedDrawings = overlay(loaded, with: [entry.mutation], translation: state.chapter.translation)
+            if entry.page == state.page, let loaded = state.loadedDrawings {
+                state.loadedDrawings = overlay(loaded, with: [entry.mutation], translation: state.page.chapter.translation, notebook: state.page.notebook)
             }
         }
     }
@@ -415,7 +423,8 @@ extension ChapterCanvasFeature {
             metadataBlob = draftMetadataBlob(metadata, verse: verse)
         }
         return VerseDraft(
-            key: VerseDraftKey(sessionID: sessionID, chapter: entry.chapter, verse: entry.mutation.verse),
+            // 키는 편집의 page 그대로다 — 필사책 · 번역본이 초안 파일 이름과 다시 읽을 때의 page 를 정한다.
+            key: VerseDraftKey(sessionID: sessionID, page: entry.page, verse: entry.mutation.verse),
             revision: entry.revision,
             rowID: entry.mutation.rowID,
             lineData: lineData,
@@ -509,7 +518,7 @@ extension ChapterCanvasFeature {
         for mutation in result.mutations {
             let key = LateDraftKey(epoch: context.draftEpoch, rowID: mutation.rowID)
             if let existing = state.closedDrafts.pending[key], existing.revision > revision { continue }
-            state.closedDrafts.pending[key] = PendingDrawingMutation(revision: revision, chapter: context.chapter, mutation: mutation)
+            state.closedDrafts.pending[key] = PendingDrawingMutation(revision: revision, page: context.page, mutation: mutation)
         }
         Log.info("단일 Canvas — 닫은 세션의 세대로 늦게 온 편집을 그 세션의 초안으로 남긴다",
                  "generation=\(context.generation)", "count=\(result.mutations.count)")
@@ -519,12 +528,13 @@ extension ChapterCanvasFeature {
 
     // MARK: - 복구
 
-    /// 그 환경의 계정 근거 묶음에 남은 이 장의 초안. **읽지 못하면 조회 실패(`.drafts`)다** — 빈 목록으로 두면 보이지 않는 초안 위에 같은
+    /// 그 환경의 계정 근거 묶음에 남은 이 page 의 초안. **읽지 못하면 조회 실패(`.drafts`)다** — 빈 목록으로 두면 보이지 않는 초안 위에 같은
     /// 키 · 더 새 revision 의 초안을 써서 덮는다(초안 전용 세션에서는 그것이 유일한 사본이다). 조회 실패처럼 입력을 막고 다시 시도를 기다린다.
+    /// - Parameter page: 필사책과 장(번역본 포함). 그 필사책 · 번역본의 초안만 읽는다 — 기본값이 없다(결정 12).
     static func loadDrafts(
         from store: (any VerseDraftStore)?,
         environment: DrawingEditEnvironment,
-        chapter: BibleChapter
+        page: NotebookChapter
     ) async throws -> [VerseDraft] {
         guard let store else { return [] }
         // 확인 전 묶음의 초안은 **그때 참고하던 계정(힌트)이 지금 참고하는 계정과 같을 때만** 화면에 올린다(사용자 결정 2026-09-21,
@@ -533,9 +543,10 @@ extension ChapterCanvasFeature {
         // 목록에도 없다(2026-09-21 후속 리뷰 P0-2a).
         let drafts: [VerseDraft]
         do {
-            // 장의 번역본으로 읽는다 — 초안 키(`VerseDraftKey(sessionID:chapter:verse:)`)도 장의 번역본을 따르므로 KJV 장의 초안은 KJV 로 쓰고 읽는다.
+            // page 로 읽는다 — 초안 키(`VerseDraftKey(sessionID:page:verse:)`)도 page 의 필사책 · 번역본을 따르므로 다른 필사책 · KJV 장의 초안은
+            // 그 page 로 쓰고 읽는다.
             drafts = try await VerseDraftRecoveryRule.screenDrafts(environment: environment) { scope in
-                try await store.drafts(in: scope, chapter: chapter, translation: chapter.translation)
+                try await store.drafts(in: scope, page: page)
             }.map(\.draft)
         } catch {
             Log.error("단일 Canvas — 이 장의 초안을 읽지 못했다. 입력을 막고 다시 시도를 기다린다", "\(error)")
@@ -555,15 +566,16 @@ extension ChapterCanvasFeature {
     ///
     /// **읽지 못해도 장을 막지 않는다.** 이 묶음에는 이 환경이 쓰지 않으므로(편집은 지금 계정 · 이어 보인 초안의 출처로만 남는다) 보이지 않는
     /// 초안 위에 덮일 일이 없다 — 절 메뉴 수에서만 빠지고, 설정 화면이 그 실패를 따로 알린다.
+    /// - Parameter page: 필사책과 장(번역본 포함). 그 page 의 연결 전 필기만 읽는다.
     static func loadBeforeConnectionDrafts(
         from store: (any VerseDraftStore)?,
         environment: DrawingEditEnvironment,
-        chapter: BibleChapter
+        page: NotebookChapter
     ) async -> [VerseDraft] {
         guard let store, !environment.beforeConnectionDraftScopes.isEmpty else { return [] }
         do {
             return try await VerseDraftRecoveryRule.beforeConnectionDrafts(environment: environment) { scope in
-                try await store.drafts(in: scope, chapter: chapter, translation: chapter.translation)
+                try await store.drafts(in: scope, page: page)
             }.map(\.draft)
         } catch {
             Log.error("단일 Canvas — 연결 전 필기를 읽지 못했다. 절 메뉴 수에서만 빠진다", "\(error)")
@@ -581,11 +593,11 @@ extension ChapterCanvasFeature {
         drafts: [VerseDraft],
         awaitingImport: [VerseDraft] = []
     ) -> [VerseDrawingSnapshot] {
-        let chapter = state.chapter
-        // 이 장에서 이 세션이 아직 편집하지 않은 절의 기준 · 이어 보인 초안은 이번 조회로 다시 정한다. 앞선 조회의 것이 남으면 이제 보이지 않는
-        // 초안을 이어받아 지우거나 그 출처를 잇는다.
+        let page = state.page
+        // 이 page 에서 이 세션이 아직 편집하지 않은 절의 기준 · 이어 보인 초안은 이번 조회로 다시 정한다. 앞선 조회의 것이 남으면 이제 보이지 않는
+        // 초안을 이어받아 지우거나 그 출처를 잇는다. 다른 필사책 · 번역본의 같은 장 기준은 건드리지 않는다.
         let edited = Set(state.drafts.bases.keys)
-        func isFresh(_ place: DraftVerse) -> Bool { place.chapter == chapter && !edited.contains(place) }
+        func isFresh(_ place: DraftVerse) -> Bool { place.page == page && !edited.contains(place) }
         state.drafts.loadedBases = state.drafts.loadedBases.filter { !isFresh($0.key) }
         state.drafts.adopted = state.drafts.adopted.filter { !isFresh($0.key) }
         state.drafts.inherited = state.drafts.inherited.filter { !isFresh($0.key) }
@@ -596,7 +608,7 @@ extension ChapterCanvasFeature {
         // 저장소 내용 그대로의 기준 — 아직 편집하지 않은 절이 편집을 시작하면 이것을 든다.
         for (verse, representative) in representatives {
             let fingerprint = view.verseContent[verse]
-            state.drafts.loadedBases[DraftVerse(chapter: chapter, verse: verse)] = fingerprint.map {
+            state.drafts.loadedBases[DraftVerse(page: page, verse: verse)] = fingerprint.map {
                 DraftBase(base: .legacy(rowID: representative.rowID, contentFingerprint: $0), fingerprint: $0)
             } ?? .empty
         }
@@ -614,7 +626,7 @@ extension ChapterCanvasFeature {
         var mutations: [VerseDrawingMutation] = []
         for draft in plan.shown {
             let verse = draft.key.verse
-            let place = DraftVerse(chapter: chapter, verse: verse)
+            let place = DraftVerse(page: page, verse: verse)
             let representative = representatives[verse]
             let rowID = representative?.rowID ?? draft.rowID
             var metadata: DrawingLayoutMetadata?
@@ -645,10 +657,10 @@ extension ChapterCanvasFeature {
             }
         }
         if !plan.kept.isEmpty || !plan.settled.isEmpty {
-            Log.info("단일 Canvas — 보이지 않고 남긴 초안", "chapter=\(chapter.title.rawValue).\(chapter.chapter)",
+            Log.info("단일 Canvas — 보이지 않고 남긴 초안", "chapter=\(page.chapter.title.rawValue).\(page.chapter.chapter)",
                      "kept=\(plan.kept.count)", "uncertain=\(plan.uncertain.count)", "undisplayable=\(plan.undisplayable.count)",
                      "settled=\(plan.settled.count)")
         }
-        return overlay(snapshots, with: mutations, translation: state.chapter.translation)
+        return overlay(snapshots, with: mutations, translation: state.page.chapter.translation, notebook: state.page.notebook)
     }
 }

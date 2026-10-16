@@ -35,7 +35,7 @@ private func makeFlushStore(
     clock: TestClock<Duration>,
     answers: LockIsolated<[FlushAnswer]>
 ) -> TestStoreOf<ChapterCanvasFeature> {
-    let store = TestStore(initialState: ChapterCanvasFeature.State(chapter: CanvasTestSupport.chapter)) {
+    let store = TestStore(initialState: ChapterCanvasFeature.State(page: CanvasTestSupport.page)) {
         // TestStore 의 reducer 인자는 결과 빌더가 아니다 — 둘을 묶는다.
         CombineReducers {
             ChapterCanvasFeature()

@@ -33,11 +33,12 @@ struct CarveDetailHistoryWiringTesting {
     func historyRequestOpensSheetAndSelectionRecomposes() async throws {
         let spy = RepositorySpy()
         let store = makeStore(spy: spy)
-        let chapter = store.chapterCanvas.chapter
+        let page = store.chapterCanvas.page
 
         store.send(.scope(.chapterCanvasAction(.delegate(.showHistory(verse: 2)))))
         #expect(store.chapterHistory?.verse == 2)
-        #expect(store.chapterHistory?.title == chapter)
+        // 시트는 캔버스가 연 page(필사책 + 장) 그대로 연다.
+        #expect(store.chapterHistory?.page == page)
 
         // 시트가 isPresent 를 옮긴 뒤 알린다 (②). 여기서는 ③ 만 확인한다.
         let restored = VerseDrawingSnapshot(
@@ -49,7 +50,7 @@ struct CarveDetailHistoryWiringTesting {
         // verseRowRestored → 미저장분 없음 → 곧바로 DB 재조회 (재합성 대기).
         #expect(store.chapterCanvas.isReloading)
         try await Task.sleep(for: .milliseconds(100))
-        #expect(spy.loadedChapters.value == [chapter])
+        #expect(spy.loadedChapters.value == [page.chapter])
         #expect(spy.applied.value.isEmpty)   // 복원은 저장 명령을 만들지 않는다
     }
 
@@ -107,7 +108,7 @@ struct VerseDrawingHistoryListWiringTesting {
                               updateDate: Date(timeIntervalSince1970: 900), isPresent: true)
         let archived = Self.row(rowUUID: "row-archive", lineData: Self.inkData(),
                                 updateDate: Date(timeIntervalSince1970: 100), isPresent: false)
-        let store = Store(initialState: VerseDrawingHistoryFeature.State(title: Self.chapter, verse: Self.verse)) {
+        let store = Store(initialState: VerseDrawingHistoryFeature.State(page: Self.chapter.inDefaultNotebook, verse: Self.verse)) {
             VerseDrawingHistoryFeature()
         }
 
@@ -122,7 +123,7 @@ struct VerseDrawingHistoryListWiringTesting {
                              updateDate: Date(timeIntervalSince1970: 900), isPresent: true)
         let older = Self.row(rowUUID: "row-older", lineData: Self.inkData(),
                              updateDate: Date(timeIntervalSince1970: 100), isPresent: false)
-        let store = Store(initialState: VerseDrawingHistoryFeature.State(title: Self.chapter, verse: Self.verse)) {
+        let store = Store(initialState: VerseDrawingHistoryFeature.State(page: Self.chapter.inDefaultNotebook, verse: Self.verse)) {
             VerseDrawingHistoryFeature()
         }
 

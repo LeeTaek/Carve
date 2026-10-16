@@ -71,7 +71,7 @@ struct ChapterCanvasDraftRetentionTesting: DraftTestSamples {
         await store.receive(\.drawingsLoaded)
 
         // 저장소에 넣었던 행이 사라졌다 — 되살릴 수 있게 보이되, 근거가 A 의 소유 근거여도 이어 쓰지 않고 보이기만 한다.
-        let place = DraftVerse(chapter: CanvasTestSupport.chapter, verse: 2)
+        let place = DraftVerse(page: CanvasTestSupport.page, verse: 2)
         let kept = try #require(drafts.stored(in: accountA).first)
         #expect(store.state.loadedDrawings?.contains { $0.verse == 2 && $0.lineData == Data("create-a".utf8) } == true)
         #expect(store.state.drafts.adopted[place] == kept.ref)
@@ -106,7 +106,7 @@ struct ChapterCanvasDraftRetentionTesting: DraftTestSamples {
         let second = makeStore(spy: spy, results: [], environment: secondEnvironment, drafts: drafts)
         await composeAndSubscribe(second, secondEnvironment)
 
-        let place = DraftVerse(chapter: CanvasTestSupport.chapter, verse: 2)
+        let place = DraftVerse(page: CanvasTestSupport.page, verse: 2)
         #expect(second.state.drafts.adopted[place] == nil)
         #expect(second.state.loadedDrawings?.first { $0.rowID == CanvasTestSupport.newRow }?.lineData == nil)
         #expect(drafts.stored(in: accountA).count == 1)
@@ -147,7 +147,7 @@ struct ChapterCanvasDraftRetentionTesting: DraftTestSamples {
         drafts.generation.setValue(1)
         let store = makeStore(spy: spy, results: [], environment: environment, drafts: drafts)
 
-        await store.send(.load(chapter: CanvasTestSupport.chapter, expectedVerseCount: 3))
+        await store.send(.load(page: CanvasTestSupport.page, expectedVerseCount: 3))
         await store.receive(\.drawingsLoaded)
         await store.send(.layoutCompleted(CanvasTestSupport.layout))
         while environment.subscriberCount == 0 { await Task.yield() }
@@ -173,7 +173,7 @@ struct ChapterCanvasDraftRetentionTesting: DraftTestSamples {
         drafts.readFailures.setValue(1)
         let store = makeStore(spy: spy, results: [], environment: environment, drafts: drafts)
 
-        await store.send(.load(chapter: CanvasTestSupport.chapter, expectedVerseCount: 3))
+        await store.send(.load(page: CanvasTestSupport.page, expectedVerseCount: 3))
         await store.receive(\.drawingsLoaded)
         await store.send(.layoutCompleted(CanvasTestSupport.layout))
         while environment.subscriberCount == 0 { await Task.yield() }
@@ -247,13 +247,13 @@ struct ChapterCanvasDraftRetentionTesting: DraftTestSamples {
         await store.receive(\.draftsSaved)
 
         let next = BibleChapter(title: .jonah, chapter: 3)
-        await store.send(.load(chapter: next, expectedVerseCount: 3))
+        await store.send(.load(page: next.inDefaultNotebook, expectedVerseCount: 3))
         await store.receive(\.drawingsLoaded)
         await store.send(.layoutCompleted(CanvasTestSupport.layout))
         #expect(store.state.isInputEnabled)
 
         drafts.readFailures.setValue(1)
-        await store.send(.load(chapter: CanvasTestSupport.chapter, expectedVerseCount: 3))
+        await store.send(.load(page: CanvasTestSupport.page, expectedVerseCount: 3))
         await store.receive(\.drawingsLoaded)
         await store.send(.layoutCompleted(CanvasTestSupport.layout))
 

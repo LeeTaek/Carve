@@ -76,7 +76,7 @@ struct VerseDrawingHistoryDedupTesting {
 
     /// 목록 상태에 들어오는 길목(`setDrawings`)으로 넣고, 목록에 보이는 행의 키를 순서대로 돌려준다.
     private static func listed(_ rows: [VerseDrawingSnapshot]) -> [String] {
-        let store = Store(initialState: VerseDrawingHistoryFeature.State(title: chapter, verse: verse)) {
+        let store = Store(initialState: VerseDrawingHistoryFeature.State(page: chapter.inDefaultNotebook, verse: verse)) {
             VerseDrawingHistoryFeature()
         }
         store.send(.setDrawings(rows))
@@ -106,7 +106,7 @@ struct VerseDrawingHistoryDedupTesting {
     /// 그 저장소를 보는 이전 필사 기록 스토어. 쓰기 게이트는 소유가 확인된 환경이다.
     private static func makeHistoryStore(storeActor: SwiftDatabaseActor) -> StoreOf<VerseDrawingHistoryFeature> {
         let database = withDependencies { $0.createSwiftDataActor = storeActor } operation: { DrawingDatabase() }
-        return Store(initialState: VerseDrawingHistoryFeature.State(title: chapter, verse: verse)) {
+        return Store(initialState: VerseDrawingHistoryFeature.State(page: chapter.inDefaultNotebook, verse: verse)) {
             VerseDrawingHistoryFeature()
         } withDependencies: {
             $0.drawingData = database
