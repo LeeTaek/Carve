@@ -166,7 +166,7 @@ struct ChapterCanvasVerseMenuTesting {
         let pending = Self.inkData(x: 40)
         state.pendingMutations[CanvasTestSupport.rowA] = PendingDrawingMutation(
             revision: 1,
-            chapter: CanvasTestSupport.chapter,
+            page: CanvasTestSupport.page,
             mutation: .replace(verse: 1, rowID: CanvasTestSupport.rowA, data: pending, metadata: CanvasTestSupport.metadata())
         )
         #expect(ChapterCanvasFeature.currentInk(verse: 1, state: state) == pending)
@@ -174,7 +174,7 @@ struct ChapterCanvasVerseMenuTesting {
         // 대기 중인 명령이 비우기면 저장분이 남아 있어도 보존할 필기가 없다.
         state.pendingMutations[CanvasTestSupport.rowA] = PendingDrawingMutation(
             revision: 2,
-            chapter: CanvasTestSupport.chapter,
+            page: CanvasTestSupport.page,
             mutation: .clear(verse: 1, rowID: CanvasTestSupport.rowA)
         )
         #expect(ChapterCanvasFeature.currentInk(verse: 1, state: state) == nil)

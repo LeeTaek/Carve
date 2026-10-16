@@ -101,7 +101,7 @@ struct ChapterCanvasStoreGenerationTesting {
         // 재시도의 거절과 새 장 조회 중 무엇이 먼저 도착해도 결과가 같아야 한다. 거절 정리(`finishSave`)와 조회 세대 대조
         // (`finishLoad`) 중 하나만 있어도 통과하고, 둘 다 없으면 미저장분이 새 세대의 기준으로 남아 실패한다.
         spy.eraseWithoutNotice()
-        await store.send(.load(chapter: chapterB, expectedVerseCount: 3))
+        await store.send(.load(page: chapterB.inDefaultNotebook, expectedVerseCount: 3))
         await settle(store)
 
         // ★ 재시도는 삭제 전 세대로 갔다. 새 장 조회의 세대로 보냈다면 지운 장의 필사가 저장됐다.
@@ -109,7 +109,7 @@ struct ChapterCanvasStoreGenerationTesting {
         #expect(spy.applied.value.count == attemptsBeforeErase)
         #expect(store.state.pendingMutations.isEmpty)
         #expect(store.state.saveRetryCount == nil)
-        #expect(store.state.chapter == chapterB)
+        #expect(store.state.page == chapterB.inDefaultNotebook)
         #expect(store.state.storeGeneration == after)
     }
 
@@ -123,7 +123,7 @@ struct ChapterCanvasStoreGenerationTesting {
 
         // 설정에서 전부 지웠고 화면은 아직 모른다. 그 사이 장을 넘긴다 — 이전 장의 편집 문맥은 물러나 남는다.
         spy.eraseWithoutNotice()
-        await store.send(.load(chapter: chapterB, expectedVerseCount: 3))
+        await store.send(.load(page: chapterB.inDefaultNotebook, expectedVerseCount: 3))
         await settle(store)
 
         // 세대가 달라 그 결과로 합성하지 않고, 지운 데이터 기준의 문맥을 버린 뒤 다시 조회했다.
@@ -205,7 +205,7 @@ struct ChapterCanvasLoadFailureTesting {
         let spy = RepositorySpy()
         spy.loadFailures.setValue(["디스크 오류"])
         let store = CanvasTestSupport.makeStore(spy: spy)
-        await store.send(.load(chapter: CanvasTestSupport.chapter, expectedVerseCount: 3))
+        await store.send(.load(page: CanvasTestSupport.page, expectedVerseCount: 3))
         await store.receive(\.drawingsLoaded)
         await store.send(.layoutCompleted(CanvasTestSupport.layout))
         #expect(!store.state.isInputEnabled)

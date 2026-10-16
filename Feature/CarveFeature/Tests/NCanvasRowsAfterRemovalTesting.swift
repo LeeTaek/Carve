@@ -218,7 +218,7 @@ struct NCanvasRowsAfterRemovalTesting {
 
         // when: 이력 화면에서 v2 보관 행을 고른다 — 같은 저장소를 보는 `drawingData` 로.
         let database = withDependencies { $0.createSwiftDataActor = actor } operation: { DrawingDatabase() }
-        let history = Store(initialState: VerseDrawingHistoryFeature.State(title: Self.chapter, verse: 2)) {
+        let history = Store(initialState: VerseDrawingHistoryFeature.State(page: Self.chapter.inDefaultNotebook, verse: 2)) {
             VerseDrawingHistoryFeature()
         } withDependencies: {
             $0.drawingData = database

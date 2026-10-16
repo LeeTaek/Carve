@@ -112,18 +112,21 @@ extension ChapterCanvasFeature.State {
     /// 이 장이 **저장소 내용 그대로**인가 — 이 세션이 편집하지 않았고(펜을 뗀 뒤도 편집이다) 앞선 세션의 초안도 겹쳐 보이지 않는다.
     /// 그래야 도착한 필사로 자동 갱신한다 — 겹쳐 보이던 초안을 조용히 감추지 않는다.
     var showsOnlyStore: Bool {
-        let chapter = chapter
-        return !drafts.bases.keys.contains { $0.chapter == chapter }
-            && !pendingMutations.values.contains { $0.chapter == chapter }
-            && !drafts.adopted.keys.contains { $0.chapter == chapter }
-            && !drafts.inherited.keys.contains { $0.chapter == chapter }
+        let page = page
+        return !drafts.bases.keys.contains { $0.page == page }
+            && !pendingMutations.values.contains { $0.page == page }
+            && !drafts.adopted.keys.contains { $0.page == page }
+            && !drafts.inherited.keys.contains { $0.page == page }
     }
 
-    /// 이 장에 지금 보이는 초안 — 이 세션이 쓴 것과 이어 보인 앞선 세션의 것.
+    /// 이 page 에 지금 보이는 초안 — 이 세션이 쓴 것과 이어 보인 앞선 세션의 것.
+    ///
+    /// 초안 키의 page(필사책 · 번역본 · 권 · 장)가 지금 page 와 같은 것만 센다. 같은 장이라도 다른 번역본 · 다른 필사책의 초안은 이 화면에
+    /// 보이는 초안이 아니다 — 세면 「확인하기」 뒤 감춰진 초안 수(`ArrivalNotice.draftsHidden`)가 부풀거나 줄어든다.
     var displayedDraftKeys: Set<VerseDraftKey> {
-        let chapter = chapter
-        let own = drafts.records.values.map(\.key).filter { $0.title == chapter.title.rawValue && $0.chapter == chapter.chapter }
-        let adopted = drafts.adopted.filter { $0.key.chapter == chapter }.map(\.value.key)
+        let page = page
+        let own = drafts.records.values.map(\.key).filter { $0.page == page }
+        let adopted = drafts.adopted.filter { $0.key.page == page }.map(\.value.key)
         return Set(own).union(adopted)
     }
 
@@ -173,9 +176,10 @@ extension ChapterCanvasFeature {
         .cancellable(id: CanvasArrivalCancelID.localChanges, cancelInFlight: true)
     }
 
-    /// 설정에서 한 장에 필기를 넣었다 — 이 장이면 도착한 필사처럼 다시 읽어 반영한다. 다른 장은 열 때 저장소를 읽으므로 할 일이 없다.
+    /// 설정에서 한 page 에 필기를 넣었다 — 이 page 면 도착한 필사처럼 다시 읽어 반영한다. 다른 장 · 다른 필사책의 같은 장은 열 때 저장소를
+    /// 읽으므로 할 일이 없다 — 지금 화면의 필기가 아니다.
     func localDrawingChanged(state: inout State, change: LocalDrawingChange) -> Effect<Action> {
-        guard change.chapter == state.chapter else { return .none }
+        guard change.page == state.page else { return .none }
         state.arrival.localImport = true
         return importArrived(state: &state, at: change.date)
     }
@@ -228,10 +232,10 @@ extension ChapterCanvasFeature {
         case .check:
             let requestID = uuid()
             state.arrival.phase = .checking(requestID: requestID, persisted: state.persistedRevision)
-            let chapter = state.chapter
+            let page = state.page
             return .run { [repository] send in
                 do {
-                    await send(.arrivalChecked(requestID: requestID, .success(try await repository.load(chapter: chapter))))
+                    await send(.arrivalChecked(requestID: requestID, .success(try await repository.load(page))))
                 } catch {
                     await send(.arrivalChecked(requestID: requestID, .failure(DrawingLoadFailure(message: "\(error)"))))
                 }
@@ -287,7 +291,7 @@ extension ChapterCanvasFeature {
                     return continueArrival(state: &state)
                 }
                 // 편집했거나 초안이 겹쳐 보이는 장 — 자동으로 바꾸지 않는다(사용자 결정).
-                Log.info("도착 반영 — 편집한 장에 다른 필사가 도착했다. 바꾸지 않고 알린다", "\(state.chapter.title.rawValue).\(state.chapter.chapter)")
+                Log.info("도착 반영 — 편집한 장에 다른 필사가 도착했다. 바꾸지 않고 알린다", "\(state.page.chapter.title.rawValue).\(state.page.chapter.chapter)")
                 if state.arrival.notice != .confirming { state.arrival.notice = .arrived }
                 return .none
             }

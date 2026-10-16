@@ -92,8 +92,8 @@ struct CarveDetailFavoriteTesting {
     private static func state(favorites: Set<Int> = []) -> CarveDetailFeature.State {
         var state = CarveDetailFeature.State.initialState
         state.sentenceWithDrawingState = [
-            SentencesWithDrawingFeature.State(sentence: BibleVerse(title: chapter, verse: 1, sentence: firstVerse)),
-            SentencesWithDrawingFeature.State(sentence: BibleVerse(title: chapter, verse: 2, sentence: "그가 나를 푸른 초장에 누이시며"))
+            SentencesWithDrawingFeature.State(sentence: BibleVerse(title: chapter, verse: 1, sentence: firstVerse), notebook: .default),
+            SentencesWithDrawingFeature.State(sentence: BibleVerse(title: chapter, verse: 2, sentence: "그가 나를 푸른 초장에 누이시며"), notebook: .default)
         ]
         state.favoriteChapter = chapter
         state.favoriteVerses = favorites

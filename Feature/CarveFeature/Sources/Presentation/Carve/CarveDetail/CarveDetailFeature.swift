@@ -45,8 +45,9 @@ public struct CarveDetailFeature: Sendable {
 
         // MARK: 단일 Canvas (설계 §13 Phase 3 — 2.1 부터 필사 화면의 유일한 경로)
 
-        /// 단일 Canvas 상태 — 장 하나를 캔버스 하나로 읽고 쓴다.
-        var chapterCanvas = ChapterCanvasFeature.State(chapter: .initialState)
+        /// 단일 Canvas 상태 — page(필사책 + 장) 하나를 캔버스 하나로 읽고 쓴다.
+        /// 처음 값은 본문을 읽기 전의 자리표시다 — 조회 · 저장은 `setSentence` 가 지금 필사책의 page 로 `load(page:)` 를 보낸 뒤에야 시작한다.
+        var chapterCanvas = ChapterCanvasFeature.State(page: NotebookChapter(notebook: .default, chapter: .initialState))
         /// 외부 진입(차트 등) · 번역본 전환으로 이동할 절 번호. 새 장의 본문 행이 들어오면 캔버스가 이 절(없으면 바로 앞 절)로 스크롤한다(`scrollToVerse`).
         var scrollTargetVerse: Int?
         /// `scrollTargetVerse` 를 화면 어디에 둘지 — 외부 진입은 아래쪽(`.bottom`), 번역본 전환은 맨 위(`.top`, 보던 절을 같은 자리에 둬 밀리지 않게).
@@ -92,7 +93,15 @@ public struct CarveDetailFeature: Sendable {
         @Shared(.inMemory(DrawingDataRevision.key)) public var drawingDataRevision: Int = 0
         /// 이 화면이 마지막으로 반영한 세대. 뷰가 트리에서 빠졌다 돌아와도 놓치지 않도록 **값으로** 비교한다.
         public var seenDrawingDataRevision: Int = 0
-        
+        /// 지금 필사책의 `NotebookID.rawValue`(기기마다, 2.2 결정 13) — 탐색(`CarveNavigationFeature`)과 같은 키다. 본문을 읽을 때(`setSentence`)
+        /// 이 값으로 캔버스의 page 를 짓는다. 읽을 때는 `currentNotebook` 을 쓴다.
+        @Shared(.currentNotebookID) public var currentNotebookID: String
+
+        /// 지금 필사책. 저장값이 필사책 ID 형식이 아니면(깨진 값) 기본 필사책이다.
+        public var currentNotebook: NotebookID {
+            NotebookID(rawValue: currentNotebookID) ?? .default
+        }
+
         /// 지금 보던 절 — 번역본을 바꿀 때 같은 절로 돌아가는 기준이다(결정 9).
         ///
         /// 아직 옮기지 않은 이동 목표(`scrollTargetVerse`)가 있으면 그 절이다 — 새 장을 읽는 사이 다시 바꿔도 처음 보던 절을 잃지 않는다.
@@ -126,7 +135,7 @@ public struct CarveDetailFeature: Sendable {
     public enum Action: ViewAction, CarveToolkit.ScopeAction {
         /// 화면 최상단으로 스크롤
         case scrollToTop
-        /// 장 본문을 읽었다 — 본문 행 · 레이아웃 측정 · 즐겨찾기를 새로 시작하고 단일 Canvas 에 장을 연다.
+        /// 장 본문을 읽었다 — 본문 행 · 레이아웃 측정 · 즐겨찾기를 새로 시작하고 단일 Canvas 에 지금 필사책의 page 를 연다.
         case setSentence([BibleVerse])
         /// 외부 진입(차트 등)이 이동할 절을 정했다.
         case setScrollTarget(BibleVerse)
@@ -262,10 +271,11 @@ public struct CarveDetailFeature: Sendable {
                 guard state.seenDrawingDataRevision != state.drawingDataRevision else { return .none }
                 state.seenDrawingDataRevision = state.drawingDataRevision
                 // 즐겨찾기 표시도 함께 지워졌다. 캔버스는 미저장분까지 버리고 DB 에서 다시 합성한다 — 레이아웃은 그대로라 다시 재지 않는다.
-                return .merge(
+                let cleared: Effect<Action> = .merge(
                     .send(.reloadFavorites),
                     .send(.scope(.chapterCanvasAction(.drawingDataCleared)))
                 )
+                return .concatenate(cleared, reopenInCurrentNotebookIfNeeded(state: &state))
 
             case .view(.appeared):
                 // 백그라운드 배치에서 화면이 다시 나타난 것은 사용자의 이동이 아니다 — 보고 있던 장을 다시 읽지 않는다.
@@ -282,28 +292,31 @@ public struct CarveDetailFeature: Sendable {
                 )
                 
             case .setSentence(let sentences):
-                // 본문 행만 만든다 — 필사는 단일 Canvas 가 장 단위로 읽는다(아래 `.load`).
+                let chapter = sentences.first?.title ?? state.headerState.currentTitle
+                // 지금 page = 지금 필사책 + 이 장. 필사책 바꾸기는 키를 먼저 쓰고 본문을 다시 읽으므로 여기서 새 필사책을 읽는다.
+                let page = NotebookChapter(notebook: state.currentNotebook, chapter: chapter)
+                // 본문 행만 만든다 — 필사는 단일 Canvas 가 page 단위로 읽는다(아래 `.load`). 행 ID 에 필사책이 들어 있어, 필사책만 바뀐
+                // 같은 장도 행을 새로 만들고 다시 잰다.
                 var sentenceState: IdentifiedArrayOf<SentencesWithDrawingFeature.State> = []
                 for sentence in sentences {
-                    sentenceState.append(SentencesWithDrawingFeature.State(sentence: sentence))
+                    sentenceState.append(SentencesWithDrawingFeature.State(sentence: sentence, notebook: page.notebook))
                 }
                 state.sentenceWithDrawingState = sentenceState
                 beginLayoutMeasurement(state: &state, sentences: sentences)
                 state.chapterHistory = nil
-                let chapter = sentences.first?.title ?? state.headerState.currentTitle
-                // 절 번호 아래 즐겨찾기 표시는 본문 컬럼에 그린다.
+                // 절 번호 아래 즐겨찾기 표시는 본문 컬럼에 그린다. 즐겨찾기는 필사책 공통이라 장으로 읽는다(필사책 결정 11).
                 let favorites = loadFavorites(state: &state, chapter: chapter)
                 // 본문이 확정된 시점에 조회를 시작한다 (§6-4). 레이아웃은 실측이 끝나면 따로 들어간다.
                 return .merge(
                     favorites,
-                    .send(.scope(.chapterCanvasAction(.load(chapter: chapter, expectedVerseCount: sentences.count))))
+                    .send(.scope(.chapterCanvasAction(.load(page: page, expectedVerseCount: sentences.count))))
                 )
 
             case .scope(.chapterCanvasAction(.drawingsLoaded)):
                 // HUD slack 진단(설계 §6-3 `N_saved`) — 캔버스가 방금 읽은 장의 행에서 절별 저장 band 수를 채운다.
                 // 캔버스 리듀서(`Scope`)가 먼저 돌았으므로 `loadedDrawings` 는 이번 조회 결과다. 레이아웃 입력이 아니라 다시 짓지 않는다.
                 if let loaded = state.chapterCanvas.loadedDrawings {
-                    state.chapterLayout.updateSavedBandCounts(Self.savedBandCounts(from: loaded), chapter: state.chapterCanvas.chapter)
+                    state.chapterLayout.updateSavedBandCounts(Self.savedBandCounts(from: loaded), chapter: state.chapterCanvas.page.chapter)
                 }
                 return .none
 
@@ -397,7 +410,8 @@ public struct CarveDetailFeature: Sendable {
                 return .send(.scope(.headerAction(.view(.expandPalette))))
 
             case .scope(.chapterCanvasAction(.delegate(.showHistory(let verse)))):
-                var history = VerseDrawingHistoryFeature.State(title: state.chapterCanvas.chapter, verse: verse)
+                // 이전 필사는 지금 page 의 필사책 안에서만 보인다(필사책 §7).
+                var history = VerseDrawingHistoryFeature.State(page: state.chapterCanvas.page, verse: verse)
                 history.anchorFrame = state.chapterCanvas.historyAnchorFrame
                 state.chapterHistory = history
                 return .none
@@ -589,7 +603,8 @@ extension CarveDetailFeature {
     /// 성경 본문을 읽어 `setSentence` 로 넘긴다. 필사는 단일 Canvas 가 `setSentence` 뒤 장 단위로 읽는다.
     ///
     /// 본문은 지금 장의 번역본(`BibleChapter.translation`)으로 읽는다 — 로더가 번역본의 리소스 파일 · 인코딩을 고른다.
-    /// 번역본만 바뀐 장도 다른 장이라 본문 행 · 레이아웃 측정 · 캔버스 조회 · 즐겨찾기 표시를 새로 시작한다.
+    /// 번역본만 바뀐 장도 다른 장이라 본문 행 · 레이아웃 측정 · 캔버스 조회 · 즐겨찾기 표시를 새로 시작한다. 필사책만 바뀐 같은 장도
+    /// 다른 page 라 본문 행 · 레이아웃 측정 · 캔버스 조회를 새로 시작한다(필사책은 `setSentence` 가 그때의 키로 정한다).
     /// - Parameter state: Feature 상태(지금 장).
     /// - Returns: 본문을 읽는 효과. 장이 바뀌면 이전 장의 읽기는 취소된다. 실패하면 로그만 남긴다.
     private func handleFetchSentence(state: inout State) -> Effect<Action> {
@@ -607,6 +622,21 @@ extension CarveDetailFeature {
         .cancellable(id: CancelID.fetchBible(title: title), cancelInFlight: true)
     }
 
+
+    /// 역할: 캔버스가 연 page 의 필사책이 지금 필사책 키와 다르면, 같은 본문을 지금 필사책의 page 로 다시 연다(보던 절 유지).
+    ///
+    /// 설정의 「모든 필사 데이터 삭제」 는 지금 필사책 키를 기본 필사책으로 돌린 **뒤** 세대를 올린다. 캔버스가 지운 필사책의 page 를 든 채
+    /// 다시 읽으면 그 뒤 필기가 지운 필사책의 접두 행으로 써져 「이름 없는 필사책」 이 생긴다. 그래서 캔버스 정리(`drawingDataCleared`) 바로 뒤에
+    /// 같은 본문으로 `setSentence` 를 다시 보내 행 · 측정 · 캔버스를 키의 page 로 시작한다 — 정리가 시작한 앞 page 의 다시 읽기는 새 요청으로
+    /// 대체돼 그 결과가 버려진다(`finishLoad` 의 요청 ID).
+    /// 입력 · 출력: 상태 → 다시 열 `setSentence`. 필사책이 같거나 아직 본문이 없으면 없음.
+    /// 부작용: 없음(상태의 이동 목표만 정한다).
+    func reopenInCurrentNotebookIfNeeded(state: inout State) -> Effect<Action> {
+        guard state.chapterCanvas.page.notebook != state.currentNotebook, !state.sentenceWithDrawingState.isEmpty else { return .none }
+        state.scrollTargetVerse = state.viewingVerse
+        state.scrollTargetAnchor = .top
+        return .send(.setSentence(state.sentenceWithDrawingState.map(\.sentence)))
+    }
 
     /// 외부 진입 · 번역본 전환으로 정한 절(없으면 첫 절)로 캔버스를 스크롤한다.
     private func scrollToTop(state: inout State) -> Effect<Action> {

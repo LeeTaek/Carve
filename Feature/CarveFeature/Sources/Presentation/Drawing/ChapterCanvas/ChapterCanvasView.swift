@@ -31,6 +31,8 @@ struct ChapterCanvasView: UIViewControllerRepresentable {
         var layout: ChapterLayout?
         /// 인계 요청 토큰 — 바뀌면 컨트롤러가 미보고 편집을 보고하고 끝났다고 알린다(정책 §12-6 구현 순서 ②).
         var handoffToken: Int
+        /// 지금 연 page(필사책 + 장). 컬럼 호스트가 page 가 바뀔 때 이전 컬럼을 놓는 기준이다(R26).
+        var page: NotebookChapter
 
         init(_ state: ChapterCanvasFeature.State) {
             renderedData = state.renderedData
@@ -42,6 +44,7 @@ struct ChapterCanvasView: UIViewControllerRepresentable {
             scrollRequest = state.scrollRequest
             layout = state.layout
             handoffToken = state.handoffToken
+            page = state.page
         }
     }
 
@@ -109,7 +112,8 @@ struct ChapterCanvasView: UIViewControllerRepresentable {
                 }
                 .environment(\.locale, context.environment.locale)
             ),
-            chapter: display.layout?.chapter
+            // 레이아웃 전에는 판정하지 않는다 — 레이아웃이 온 뒤의 컬럼이 그 page 의 컬럼이다. 필사책만 바뀌어도 다른 page 다.
+            page: display.layout == nil ? nil : display.page
         )
         controller.apply(ChapterCanvasController.Configuration(
             renderedData: display.renderedData,

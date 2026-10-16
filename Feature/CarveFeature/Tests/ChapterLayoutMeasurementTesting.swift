@@ -489,7 +489,7 @@ struct CarveDetailLayoutMeasurementTesting {
     }
 
     private func rowID(_ verse: Int, chapter: BibleChapter? = nil) -> SentencesWithDrawingFeature.State.ID {
-        SentencesWithDrawingFeature.State.rowID(chapter: chapter ?? self.chapter, verse: verse)
+        SentencesWithDrawingFeature.State.rowID(page: (chapter ?? self.chapter).inDefaultNotebook, verse: verse)
     }
 
     /// `reduce(into:)` 를 직접 호출한다 — 상태 전이만 보고 효과는 버린다.

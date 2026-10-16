@@ -111,7 +111,7 @@ struct ChapterCanvasMenuAvailabilityTesting {
         // DB 에는 아직 없고 큐에만 있는 획.
         state.pendingMutations[CanvasTestSupport.rowA] = PendingDrawingMutation(
             revision: 1,
-            chapter: CanvasTestSupport.chapter,
+            page: CanvasTestSupport.page,
             mutation: .replace(verse: Self.verse, rowID: CanvasTestSupport.rowA,
                                data: Self.inkData(), metadata: CanvasTestSupport.metadata())
         )
@@ -129,7 +129,7 @@ struct ChapterCanvasMenuAvailabilityTesting {
         ])
         state.pendingMutations[CanvasTestSupport.rowA] = PendingDrawingMutation(
             revision: 1,
-            chapter: CanvasTestSupport.chapter,
+            page: CanvasTestSupport.page,
             mutation: .clear(verse: Self.verse, rowID: CanvasTestSupport.rowA)
         )
 

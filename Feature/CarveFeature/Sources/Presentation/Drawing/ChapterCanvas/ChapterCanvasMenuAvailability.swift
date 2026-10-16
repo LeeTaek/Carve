@@ -124,11 +124,12 @@ extension ChapterCanvasFeature {
             case .clear:
                 snapshot = nil
             case let .replace(_, pendingRowID, pendingData, metadata), let .create(_, pendingRowID, pendingData, metadata):
-                // 행의 번역본은 그 편집의 장이다 — KJV 장의 대기 중인 편집이 개역개정 행으로 보이지 않게.
+                // 행의 번역본 · 필사책은 그 편집의 page 다 — KJV 장의 대기 중인 편집이 개역개정 행으로, 다른 필사책의 편집이 기본 필사책 행으로
+                // 보이지 않게.
                 snapshot = VerseDrawingSnapshot(
                     verse: verse, rowID: pendingRowID, isPresent: true, updateDate: nil,
                     lineData: pendingData, drawingVersion: 3, metadata: metadata,
-                    translation: pending.chapter.translation
+                    translation: pending.page.chapter.translation, notebook: pending.page.notebook
                 )
             }
         } else {

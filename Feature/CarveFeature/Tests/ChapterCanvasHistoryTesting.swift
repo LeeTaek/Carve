@@ -66,7 +66,7 @@ struct ChapterCanvasHistoryTesting {
         await store.receive(\.saveFinished)
 
         let next = BibleChapter(title: .jonah, chapter: 3)
-        await store.send(.load(chapter: next, expectedVerseCount: 3)) {
+        await store.send(.load(page: next.inDefaultNotebook, expectedVerseCount: 3)) {
             $0.lastDirtyBounds = nil
             $0.lastEditedVerse = nil
         }

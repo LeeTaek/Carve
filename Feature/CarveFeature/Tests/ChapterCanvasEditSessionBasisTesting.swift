@@ -30,7 +30,7 @@ struct ChapterCanvasEditSessionBasisTesting: EditSessionTestHelpers {
         let environment = ControlledEditEnvironment(confirmed(accountA, 1))
         let store = makeStore(spy: spy, results: [], environment: environment, drafts: RecordingDraftStore())
         spy.holdNextLoadCall()
-        await store.send(.load(chapter: CanvasTestSupport.chapter, expectedVerseCount: 3))
+        await store.send(.load(page: CanvasTestSupport.page, expectedVerseCount: 3))
         await store.receive(\.editEnvironmentChanged)
         #expect(store.state.editEnvironment == confirmed(accountA, 1))
         while environment.subscriberCount == 0 { await Task.yield() }
