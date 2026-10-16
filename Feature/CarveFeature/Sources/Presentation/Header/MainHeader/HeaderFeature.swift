@@ -61,6 +61,14 @@ public struct HeaderFeature {
         @Presents public var sentenceSettings: SentenceSettingsFeature.State?
         /// 헤더 제목을 눌러 연 번역본 고르기 팝오버(영어 현지화 결정 19). 고르거나 바깥을 누르면 닫힌다.
         public var isTranslationPickerPresented: Bool = false
+        /// 지금 필사책 이름 — 헤더 부제 첫 칸(「두 번째 필사 · 개역개정 · 구약 / 시편」, 2.2 결정 9). 사용자가 지은 이름 그대로다(옮기지 않는다).
+        /// 빈 문자열은 필사책 정보에 이름이 없다는 뜻 — 뷰가 환경 locale 로 「첫 번째 필사」(기본 필사책) · 「이름 없는 필사책」(그 밖)을 보인다.
+        /// 탐색(`CarveNavigationFeature`)이 시작 · 필사책 바꾸기 · iCloud 도착 때 필사책 목록을 읽어 채운다.
+        public var notebookName: String = ""
+        /// 지금 필사책이 기본 필사책인가 — 이름이 없을 때 어느 기본 표시를 쓸지 고른다.
+        public var isDefaultNotebook: Bool = true
+        /// 지금 필사책 이름을 한 번이라도 읽었는가. 읽기 전(시작 직후)에는 부제에 필사책 칸을 두지 않는다 — 다른 이름이 잠깐 보이지 않게.
+        public var isNotebookNameLoaded: Bool = false
         /// 필기 열을 왼쪽에 둘지. 헤더 버튼 위치는 바꾸지 않는다 — 서재 쪽에 버튼이 늘면 헤더 광고 자리가 사라진다.
         @Shared(.appStorage("isLeftHanded")) public var isLeftHanded: Bool = false
         /// 탭으로 전환한 축소 헤더 상태. 광고 영역이 생겨도 헤더는 항상 남는다.
@@ -106,6 +114,8 @@ public struct HeaderFeature {
             case translationPickerDismissed
             /// 번역본 고르기에서 번역본을 고름 — 탐색 리듀서가 같은 권 · 장 · 지금 보던 절로 바꾼다(영어 현지화 결정 9 · 19)
             case translationSelected(Translation)
+            /// 번역본 고르기 팝오버 끝의 「책장 열기」 — 팝오버를 닫고, 탐색 리듀서가 책장을 연다(2.2 결정 9)
+            case notebooksTapped
             case setHeaderHeight(CGFloat)
             /// 하단 접힘 팔레트를 탭해 도구 목록을 펼친다.
             case expandPalette
@@ -194,6 +204,10 @@ public struct HeaderFeature {
 
             case .view(.translationSelected):
                 // 번역본 전환은 탐색 리듀서가 한다(`CarveNavigationFeature.switchTranslation`). 헤더는 고르기 팝오버만 닫는다.
+                state.isTranslationPickerPresented = false
+
+            case .view(.notebooksTapped):
+                // 책장 열기는 탐색 리듀서가 코디네이터에 알린다(`CarveNavigationFeature` → `.view(.moveToNotebooks)`). 헤더는 팝오버만 닫는다.
                 state.isTranslationPickerPresented = false
 
             case .toggleCompact:

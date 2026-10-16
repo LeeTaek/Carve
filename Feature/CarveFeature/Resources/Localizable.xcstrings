@@ -1,6 +1,23 @@
 {
   "sourceLanguage" : "ko",
   "strings" : {
+    "%@ 시작" : {
+      "comment" : "책장 카드의 시작 월(2026년 10월 시작) — 형식 문자열(%@ 는 연 · 월, 2.2 필사책)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Started %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 시작"
+          }
+        }
+      }
+    },
     "%@ 추가" : {
       "comment" : "즐겨찾기 카드의 추가 날짜(9월 15일 추가)",
       "localizations" : {
@@ -132,6 +149,23 @@
         }
       }
     },
+    "%lld번째 필사" : {
+      "comment" : "새 필사책 이름 제안 — 열한 번째부터(11번째 필사) — 형식 문자열(%lld 는 서수, 2.2 필사책)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notebook %lld"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld번째 필사"
+          }
+        }
+      }
+    },
     "%lld장" : {
       "comment" : "고른 권의 장 수 — 사이드바 권 행 오른쪽(50장)",
       "localizations" : {
@@ -195,6 +229,35 @@
         }
       }
     },
+    "%lld절 필사" : {
+      "comment" : "책장 카드의 쓴 절 수(모든 번역본 합산) — 형식 문자열(%lld 는 수, 2.2 필사책)",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld verse written"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld verses written"
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld절 필사"
+          }
+        }
+      }
+    },
     "%lld회" : {
       "comment" : "이전 필사 회차 수",
       "localizations" : {
@@ -220,6 +283,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld회"
+          }
+        }
+      }
+    },
+    "2.2 이전 버전을 쓰는 기기에서는 처음부터 있던 필사책만 보여요" : {
+      "comment" : "책장 아래 · 새 필사책 시트의 옛 기기 안내(2.2 필사책 결정 14)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Devices on versions earlier than 2.2 show only the original notebook"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "2.2 이전 버전을 쓰는 기기에서는 처음부터 있던 필사책만 보여요"
           }
         }
       }
@@ -258,6 +338,23 @@
         }
       }
     },
+    "『%@』 과 그 필기를 모두 지울까요?" : {
+      "comment" : "필사책 지우기 확인창 제목 — 형식 문자열(%@ 는 필사책 이름, 2.2 필사책)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete “%@” and all its writing?"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "『%@』 과 그 필기를 모두 지울까요?"
+          }
+        }
+      }
+    },
     "갈색" : {
       "comment" : "색 이름(VoiceOver)",
       "localizations" : {
@@ -271,6 +368,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "갈색"
+          }
+        }
+      }
+    },
+    "같은 말씀을 필사책마다 따로 쓰고 간직해요" : {
+      "comment" : "책장 화면 머리 문장(2.2 필사책)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Write the same verses again — each notebook keeps its own writing"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "같은 말씀을 필사책마다 따로 쓰고 간직해요"
           }
         }
       }
@@ -530,6 +644,23 @@
         }
       }
     },
+    "네 번째 필사" : {
+      "comment" : "필사책 이름 — 네 번째(2.2 필사책: 기본 필사책의 기본 이름 · 새 필사책 이름 제안)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notebook 4"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "네 번째 필사"
+          }
+        }
+      }
+    },
     "노랑" : {
       "comment" : "색 이름(VoiceOver)",
       "localizations" : {
@@ -628,6 +759,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "다른 회차는 지워지지 않고 그대로 남아요."
+          }
+        }
+      }
+    },
+    "다섯 번째 필사" : {
+      "comment" : "필사책 이름 — 다섯 번째(2.2 필사책: 기본 필사책의 기본 이름 · 새 필사책 이름 제안)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notebook 5"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다섯 번째 필사"
           }
         }
       }
@@ -734,6 +882,40 @@
         }
       }
     },
+    "되돌릴 수 없어요." : {
+      "comment" : "필사책 지우기 확인창 본문(2.2 필사책)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This can't be undone."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "되돌릴 수 없어요."
+          }
+        }
+      }
+    },
+    "두 번째 필사" : {
+      "comment" : "필사책 이름 — 두 번째(2.2 필사책: 기본 필사책의 기본 이름 · 새 필사책 이름 제안)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notebook 2"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "두 번째 필사"
+          }
+        }
+      }
+    },
     "두 손가락으로 스크롤 · 손가락으로 필사" : {
       "comment" : "펼친 팔레트 아래 조작 안내 — 손가락 필사 허용",
       "localizations" : {
@@ -764,6 +946,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "마음에 남은 말씀과 필사를 모아봐요"
+          }
+        }
+      }
+    },
+    "만들기" : {
+      "comment" : "새 필사책 시트의 만들기 버튼(2.2 필사책)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Create"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "만들기"
           }
         }
       }
@@ -832,6 +1031,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "먹색"
+          }
+        }
+      }
+    },
+    "모두 지우기" : {
+      "comment" : "필사책 지우기 확인창의 지우기 버튼(2.2 필사책)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete All"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모두 지우기"
           }
         }
       }
@@ -1019,6 +1235,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "삭제 기록을 읽지 못했어요"
+          }
+        }
+      }
+    },
+    "새 필사책" : {
+      "comment" : "책장의 새 필사책 카드 · 새 필사책 시트 제목(2.2 필사책)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New Notebook"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "새 필사책"
           }
         }
       }
@@ -1227,6 +1460,23 @@
         }
       }
     },
+    "세 번째 필사" : {
+      "comment" : "필사책 이름 — 세 번째(2.2 필사책: 기본 필사책의 기본 이름 · 새 필사책 이름 제안)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notebook 3"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "세 번째 필사"
+          }
+        }
+      }
+    },
     "손가락 필사 허용" : {
       "comment" : "본문 설정 토글",
       "localizations" : {
@@ -1363,6 +1613,23 @@
         }
       }
     },
+    "아홉 번째 필사" : {
+      "comment" : "필사책 이름 — 아홉 번째(2.2 필사책: 기본 필사책의 기본 이름 · 새 필사책 이름 제안)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notebook 9"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "아홉 번째 필사"
+          }
+        }
+      }
+    },
     "앱 설정" : {
       "comment" : "사이드바 설정 버튼 VoiceOver 이름",
       "localizations" : {
@@ -1380,6 +1647,40 @@
         }
       }
     },
+    "여덟 번째 필사" : {
+      "comment" : "필사책 이름 — 여덟 번째(2.2 필사책: 기본 필사책의 기본 이름 · 새 필사책 이름 제안)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notebook 8"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "여덟 번째 필사"
+          }
+        }
+      }
+    },
+    "여섯 번째 필사" : {
+      "comment" : "필사책 이름 — 여섯 번째(2.2 필사책: 기본 필사책의 기본 이름 · 새 필사책 이름 제안)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notebook 6"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "여섯 번째 필사"
+          }
+        }
+      }
+    },
     "연필" : {
       "comment" : "필기 도구 — 연필",
       "localizations" : {
@@ -1393,6 +1694,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "연필"
+          }
+        }
+      }
+    },
+    "열 번째 필사" : {
+      "comment" : "필사책 이름 — 열 번째(2.2 필사책: 기본 필사책의 기본 이름 · 새 필사책 이름 제안)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notebook 10"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "열 번째 필사"
           }
         }
       }
@@ -1427,6 +1745,74 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "완료"
+          }
+        }
+      }
+    },
+    "완료 취소" : {
+      "comment" : "책장 카드 메뉴 — 완료 표시를 지운다(2.2 필사책)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mark as Incomplete"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "완료 취소"
+          }
+        }
+      }
+    },
+    "완료 표시를 바꾸지 못했어요" : {
+      "comment" : "책장 아래 안내 — 완료로 표시 · 완료 취소 실패(2.2 필사책)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't update the completion status"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "완료 표시를 바꾸지 못했어요"
+          }
+        }
+      }
+    },
+    "완료됨" : {
+      "comment" : "책장 카드 배지 — 완료로 표시한 필사책(2.2 필사책)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Completed"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "완료됨"
+          }
+        }
+      }
+    },
+    "완료로 표시" : {
+      "comment" : "책장 카드 메뉴 — 표시일 뿐 계속 쓸 수 있다(2.2 필사책)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mark as Completed"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "완료로 표시"
           }
         }
       }
@@ -1829,6 +2215,57 @@
         }
       }
     },
+    "이름 바꾸기" : {
+      "comment" : "책장 카드 메뉴 · 이름 바꾸기 시트 제목(2.2 필사책)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rename"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이름 바꾸기"
+          }
+        }
+      }
+    },
+    "이름 없는 필사책" : {
+      "comment" : "필사책 정보에 이름이 없는 필사책(지운 필사책의 늦은 필기 등) — 책장 카드 · 헤더 부제(2.2 필사책)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Untitled Notebook"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이름 없는 필사책"
+          }
+        }
+      }
+    },
+    "이름을 바꾸지 못했어요" : {
+      "comment" : "이름 바꾸기 시트 — 저장 실패(2.2 필사책)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't rename the notebook"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이름을 바꾸지 못했어요"
+          }
+        }
+      }
+    },
     "이미 위젯에 담긴 말씀이에요" : {
       "comment" : "이미 위젯에 있는 절 안내",
       "localizations" : {
@@ -1931,6 +2368,23 @@
         }
       }
     },
+    "일곱 번째 필사" : {
+      "comment" : "필사책 이름 — 일곱 번째(2.2 필사책: 기본 필사책의 기본 이름 · 새 필사책 이름 제안)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notebook 7"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "일곱 번째 필사"
+          }
+        }
+      }
+    },
     "자간" : {
       "comment" : "본문 설정 슬라이더",
       "localizations" : {
@@ -1961,6 +2415,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "잠시 후 다시 시도해 주세요."
+          }
+        }
+      }
+    },
+    "저장" : {
+      "comment" : "이름 바꾸기 시트의 저장 버튼(2.2 필사책)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "저장"
           }
         }
       }
@@ -2288,6 +2759,23 @@
         }
       }
     },
+    "지금 보던 장이 새 필사책의 빈 종이로 열려요" : {
+      "comment" : "새 필사책 시트 안내(2.2 필사책 결정 6)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The chapter you're reading opens as a blank page in the new notebook"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지금 보던 장이 새 필사책의 빈 종이로 열려요"
+          }
+        }
+      }
+    },
     "지금 보이는 회차" : {
       "comment" : "이전 필사 — 지금 보이는 회차 표시",
       "localizations" : {
@@ -2301,6 +2789,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "지금 보이는 회차"
+          }
+        }
+      }
+    },
+    "지금 쓰는 중" : {
+      "comment" : "책장 카드 배지 — 이 기기의 지금 필사책(2.2 필사책)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Current"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지금 쓰는 중"
           }
         }
       }
@@ -2335,6 +2840,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "지금은 iCloud 연결이 보류되어 이 기기에만 저장돼요"
+          }
+        }
+      }
+    },
+    "지금은 필사책을 만들거나 고칠 수 없어요. %@" : {
+      "comment" : "책장 · 이름 시트 — 동기화 저장소에 쓰지 않고 막은 관리 동작. 형식 문자열(%@ 는 막은 사유 — 로그인 안 함 · 연결 보류 등, 2.2 필사책)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can't create or change notebooks right now. %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지금은 필사책을 만들거나 고칠 수 없어요. %@"
           }
         }
       }
@@ -2386,6 +2908,57 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "짙은 초록"
+          }
+        }
+      }
+    },
+    "책장" : {
+      "comment" : "책장 화면 제목 · 서재 열 아래 책장 버튼 VoiceOver 이름(2.2 필사책)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notebooks"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "책장"
+          }
+        }
+      }
+    },
+    "책장 열기" : {
+      "comment" : "번역본 고르기 팝오버 끝 — 필사책을 고르는 책장으로 간다(2.2 필사책)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Notebooks"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "책장 열기"
+          }
+        }
+      }
+    },
+    "첫 번째 필사" : {
+      "comment" : "기본 필사책(처음부터 있던 필사책)의 기본 이름 — 이름을 바꾸지 않았을 때 책장 카드 · 헤더 부제에 보인다(2.2 필사책)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "First Notebook"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "첫 번째 필사"
           }
         }
       }
@@ -2806,6 +3379,91 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "필사를 지우지 못했습니다"
+          }
+        }
+      }
+    },
+    "필사책 이름" : {
+      "comment" : "새 필사책 · 이름 바꾸기 시트의 입력란 안내(2.2 필사책)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notebook name"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필사책 이름"
+          }
+        }
+      }
+    },
+    "필사책 지우기" : {
+      "comment" : "책장 카드 메뉴 — 확인 뒤 그 필사책과 필기를 모두 지운다. 기본 필사책에는 없다(2.2 필사책)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete Notebook"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필사책 지우기"
+          }
+        }
+      }
+    },
+    "필사책을 만들지 못했어요" : {
+      "comment" : "새 필사책 시트 — 저장 실패(2.2 필사책)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't create the notebook"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필사책을 만들지 못했어요"
+          }
+        }
+      }
+    },
+    "필사책을 불러오지 못했어요" : {
+      "comment" : "책장 — 필사책 목록을 읽지 못함(2.2 필사책)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't load notebooks"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필사책을 불러오지 못했어요"
+          }
+        }
+      }
+    },
+    "필사책을 지우지 못했어요" : {
+      "comment" : "책장 아래 안내 — 필사책 지우기 실패(2.2 필사책)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't delete the notebook"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필사책을 지우지 못했어요"
           }
         }
       }

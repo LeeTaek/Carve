@@ -310,20 +310,7 @@ struct CarveNavigationFeatureTesting {
     }
 }
 
-/// 책장의 화면 경계 — 지금은 뒤로 버튼만 위임으로 나간다. 고르기 · 지우기 위임은 책장 내용과 함께 시험한다.
-@MainActor
-struct NotebookShelfBoundaryTesting {
-    @Test("책장의 뒤로 버튼은 필사 화면으로 돌아가라고 알리고, 나타남은 아무것도 하지 않는다")
-    func backTappedDelegatesBackToWriting() async {
-        let store = TestStore(initialState: NotebookShelfFeature.State.initialState) {
-            NotebookShelfFeature()
-        }
-
-        await store.send(.view(.onAppear))
-        await store.send(.view(.backTapped))
-        await store.receive(\.delegate.backToWriting)
-    }
-}
+// 책장의 화면 경계(뒤로 · 고르기 · 지우기 위임)는 책장 내용과 함께 `NotebookShelfFeatureTesting.swift` 가 본다.
 
 /// 장 목록을 선택한 장으로 옮길 때 목록 끝을 넘지 않는다(iPadOS 27.2 가로에서 제목과 목록이 내려앉던 문제).
 @MainActor
@@ -348,5 +335,229 @@ struct ChapterListScrollTesting {
     @Test("목록이 한 화면에 들어오면 맨 위에 둔다")
     func shortListStaysAtTop() {
         #expect(CarveNavigationView.chapterListScroll(to: 50, lastChapter: 50, viewportHeight: 600) == .top)
+    }
+}
+
+// MARK: - 헤더의 지금 필사책 이름 · 책장 진입 (2.2 회차별 필사책 결정 9)
+
+/// 탐색이 보낸 화면 이동 요청을 모으는 시험용 부모 — 코디네이터처럼 `CarveNavigationFeature` 를 품는다.
+@Reducer
+struct NotebookEntryRecorder {
+    @ObservableState
+    struct State {
+        var carve: CarveNavigationFeature.State
+    }
+
+    enum Action {
+        case carve(CarveNavigationFeature.Action)
+    }
+
+    let moves: LockIsolated<[String]>
+
+    var body: some ReducerOf<Self> {
+        Scope(state: \.carve, action: \.carve) {
+            CarveNavigationFeature()
+        }
+        Reduce { _, action in
+            if case .carve(.view(.moveToNotebooks)) = action {
+                moves.withValue { $0.append("notebooks") }
+            }
+            return .none
+        }
+    }
+}
+
+/// 본문을 읽지 못하는 스텁 — 읽은 횟수를 센다. 필사책을 바꾼 뒤 본문 읽기가 캔버스 조회로 이어지지 않게 한다.
+final class NavigationUnreadableText: BibleTextClient {
+    struct Unreadable: Error {}
+
+    let fetches = LockIsolated(0)
+
+    func fetch(chapter: BibleChapter) throws -> [BibleVerse] {
+        fetches.withValue { $0 += 1 }
+        throw Unreadable()
+    }
+}
+
+@Suite("탐색 — 헤더의 지금 필사책 이름 · 책장 진입")
+@MainActor
+struct CarveNavigationNotebookNameTesting {
+    /// 이 시험만의 UserDefaults 로 돌린다 — 지금 필사책 · 지금 장 키(기기마다)가 다른 시험과 섞이지 않는다.
+    private func withDefaults(_ operation: @MainActor (UserDefaults) async throws -> Void) async throws {
+        let suite = "CarveNavigationNotebookNameTesting.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        try await operation(defaults)
+    }
+
+    /// 필사책 목록 · 도착 · 본문 대역을 넣은 탐색 Store. 처음 상태는 Store 의 의존성 안에서 만든다.
+    private func makeStore(
+        _ repository: ShelfRepositorySpy,
+        defaults: UserDefaults,
+        current: NotebookID = .default,
+        arrivals: any CloudImportArrivalClient = StubCloudImportArrivalClient(),
+        text: NavigationUnreadableText = NavigationUnreadableText()
+    ) -> StoreOf<CarveNavigationFeature> {
+        defaults.set(current.rawValue, forKey: "currentNotebookID")
+        return Store(initialState: CarveNavigationFeature.State.initialState) {
+            CarveNavigationFeature()
+        } withDependencies: {
+            $0.defaultAppStorage = defaults
+            $0.defaultInMemoryStorage = InMemoryStorage()
+            $0.notebookRepository = repository
+            $0.cloudImportArrivals = arrivals
+            $0.bibleTextClient = text
+        }
+    }
+
+    /// 효과가 끝나기를 기다린다. 제한 시간 안에 조건이 참이 되지 않으면 실패로 기록한다.
+    private func waitUntil(
+        timeout: Duration = .seconds(5),
+        sourceLocation: SourceLocation = #_sourceLocation,
+        _ condition: () -> Bool
+    ) async {
+        let deadline = ContinuousClock.now + timeout
+        while !condition() {
+            guard ContinuousClock.now < deadline else {
+                Issue.record("조건이 제한 시간 안에 참이 되지 않았다", sourceLocation: sourceLocation)
+                return
+            }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+    }
+
+    @Test("번역본 팝오버의 「책장 열기」 는 팝오버를 닫고, 서재 열 아래 「책장」 과 같이 코디네이터에 책장 열기를 알린다")
+    func headerOpenNotebooksMovesToShelf() async throws {
+        try await withDefaults { defaults in
+            let moves = LockIsolated<[String]>([])
+            let store = Store(initialState: {
+                var carve = CarveNavigationFeature.State.initialState
+                carve.carveDetailState.headerState.isTranslationPickerPresented = true
+                return NotebookEntryRecorder.State(carve: carve)
+            }()) {
+                NotebookEntryRecorder(moves: moves)
+            } withDependencies: {
+                $0.defaultAppStorage = defaults
+            }
+
+            store.send(.carve(.scope(.carveDetailAction(.scope(.headerAction(.view(.notebooksTapped)))))))
+
+            await waitUntil { moves.value == ["notebooks"] }
+            #expect(!store.carve.carveDetailState.headerState.isTranslationPickerPresented)
+        }
+    }
+
+    @Test("시작하면 필사책 목록을 한 번 읽어 헤더 부제에 지금 필사책 이름을 채운다 — 이름을 바꾼 기본 필사책은 그 이름이다")
+    func startFillsHeaderName() async throws {
+        try await withDefaults { defaults in
+            var renamedDefault = ShelfFixture.defaultNotebook
+            renamedDefault.name = "2026 시편"
+            let repository = ShelfRepositorySpy([renamedDefault, ShelfFixture.secondNotebook])
+            let store = makeStore(repository, defaults: defaults)
+            #expect(!store.carveDetailState.headerState.isNotebookNameLoaded)
+
+            store.send(.scope(.carveDetailAction(.view(.appeared))))
+
+            await waitUntil { store.carveDetailState.headerState.isNotebookNameLoaded }
+            #expect(store.carveDetailState.headerState.notebookName == "2026 시편")
+            #expect(store.carveDetailState.headerState.isDefaultNotebook)
+            #expect(repository.reads.value == 1)
+        }
+    }
+
+    @Test("지금 필사책이 목록에 없으면(다른 기기에서 지움) 기본 필사책으로 돌아가고, 같은 목록으로 기본 필사책 이름을 채운다 — 목록은 한 번만 읽는다")
+    func fallbackFillsDefaultNameWithoutExtraRead() async throws {
+        try await withDefaults { defaults in
+            let repository = ShelfRepositorySpy([ShelfFixture.defaultNotebook, ShelfFixture.thirdNotebook])
+            let store = makeStore(repository, defaults: defaults, current: ShelfFixture.second)
+            #expect(store.currentNotebook == ShelfFixture.second)
+
+            store.send(.scope(.carveDetailAction(.view(.appeared))))
+
+            await waitUntil { store.currentNotebook == .default && store.carveDetailState.headerState.isNotebookNameLoaded }
+            #expect(store.carveDetailState.headerState.notebookName.isEmpty)
+            #expect(store.carveDetailState.headerState.isDefaultNotebook)
+            #expect(repository.reads.value == 1)
+        }
+    }
+
+    @Test("iCloud 에서 받은 것이 들어오면 목록을 다시 읽어 이름을 고친다 — 다른 기기에서 지금 필사책 이름을 바꿨을 수 있다")
+    func arrivalRefreshesName() async throws {
+        try await withDefaults { defaults in
+            let repository = ShelfRepositorySpy([ShelfFixture.defaultNotebook])
+            let arrivals = ShelfArrivals()
+            let store = makeStore(repository, defaults: defaults, arrivals: arrivals)
+            store.send(.scope(.carveDetailAction(.view(.appeared))))
+            await waitUntil { store.carveDetailState.headerState.isNotebookNameLoaded }
+            #expect(store.carveDetailState.headerState.notebookName.isEmpty)
+
+            repository.listed.withValue { $0[0].name = "가족 필사" }
+            arrivals.continuation.yield(Date(timeIntervalSince1970: 2_000))
+
+            await waitUntil { store.carveDetailState.headerState.notebookName == "가족 필사" }
+            #expect(repository.reads.value == 2)
+            arrivals.continuation.finish()
+        }
+    }
+
+    @Test("필사책을 바꾸면 목록을 읽어 그 필사책 이름을 채운다 — 차트의 최근 기록으로 필사책과 장을 함께 열어도 같다")
+    func switchingNotebookReadsName() async throws {
+        try await withDefaults { defaults in
+            let repository = ShelfRepositorySpy([ShelfFixture.defaultNotebook, ShelfFixture.secondNotebook, ShelfFixture.thirdNotebook])
+            let store = makeStore(repository, defaults: defaults)
+
+            store.send(.switchNotebook(ShelfFixture.second))
+
+            await waitUntil { store.carveDetailState.headerState.notebookName == "두 번째 필사" }
+            #expect(!store.carveDetailState.headerState.isDefaultNotebook)
+            #expect(store.carveDetailState.headerState.isNotebookNameLoaded)
+
+            // 이름 없는 필사책(정보 없이 행만 있다)으로 차트의 최근 기록을 연다.
+            let page = NotebookChapter(notebook: ShelfFixture.third, chapter: BibleChapter(title: .john, chapter: 3))
+            store.send(.openPage(page, verse: 16))
+
+            await waitUntil { store.currentNotebook == ShelfFixture.third && store.carveDetailState.headerState.notebookName.isEmpty }
+            #expect(!store.carveDetailState.headerState.isDefaultNotebook)
+            #expect(repository.reads.value == 2)
+        }
+    }
+
+    @Test("지금 필사책의 이름을 바꾼 뒤 같은 필사책으로 알려 오면 장은 다시 열지 않고 이름만 다시 읽는다")
+    func sameNotebookSwitchOnlyRefreshesName() async throws {
+        try await withDefaults { defaults in
+            let repository = ShelfRepositorySpy([ShelfFixture.defaultNotebook])
+            let text = NavigationUnreadableText()
+            let store = makeStore(repository, defaults: defaults, text: text)
+            store.send(.scope(.carveDetailAction(.view(.appeared))))
+            await waitUntil { store.carveDetailState.headerState.isNotebookNameLoaded && text.fetches.value == 1 }
+
+            // 책장에서 지금 필사책(기본)의 이름을 바꿨다 — 코디네이터가 같은 필사책으로 `switchNotebook` 을 보낸다.
+            repository.listed.withValue { $0[0].name = "2026 사순절" }
+            store.send(.switchNotebook(.default))
+
+            await waitUntil { store.carveDetailState.headerState.notebookName == "2026 사순절" }
+            #expect(text.fetches.value == 1)
+            #expect(store.carveDetailState.chapterCanvas.page.notebook == .default)
+        }
+    }
+
+    @Test("전체 삭제(모든 필사 데이터 삭제) 뒤에는 헤더가 이름 없는 기본 필사책이다 — 모든 필사책 정보가 지워졌으므로 목록을 읽지 않는다")
+    func eraseAllResetsHeaderName() {
+        withDependencies {
+            $0.defaultInMemoryStorage = InMemoryStorage()
+        } operation: {
+            var state = CarveDetailFeature.State.initialState
+            state.headerState.notebookName = "두 번째 필사"
+            state.headerState.isDefaultNotebook = false
+            state.headerState.isNotebookNameLoaded = true
+            // 설정이 지금 필사책 키를 기본으로 돌린 뒤 세대를 올렸다(키는 처음부터 기본이다).
+            state.$drawingDataRevision.withLock { $0 += 1 }
+
+            _ = CarveDetailFeature().reduce(into: &state, action: .view(.drawingDataRevisionChanged))
+
+            #expect(state.headerState.notebookName.isEmpty)
+            #expect(state.headerState.isDefaultNotebook)
+            #expect(state.headerState.isNotebookNameLoaded)
+        }
     }
 }
