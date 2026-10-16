@@ -225,6 +225,31 @@ public struct PencilPalatteView: View {
     }
 }
 
+/// 도크 안(팔레트 유리 · 실행 취소 · 안내 줄)의 identity. 필사 화면을 떠났다가(앱 스택에 책장 · 차트 · 즐겨찾기가 올라와
+/// 창에서 빠짐) 다시 나타나면 새 값이 되어 `PencilPalatteDockView` 가 안을 새로 만든다. 처음 나타날 때는 그대로다.
+///
+/// 순수 상태라 UI 없이 시험한다(`PencilPalatteDockIdentityTesting`).
+struct PencilPalatteDockIdentity: Equatable {
+    /// 뷰의 `.id` 로 쓰는 값. 떠났다가 돌아올 때마다 하나씩 는다.
+    private(set) var generation = 0
+    /// 화면에서 사라진 뒤 아직 다시 나타나지 않았다.
+    private(set) var isAway = false
+
+    /// 화면에서 사라졌다.
+    mutating func disappeared() {
+        isAway = true
+    }
+
+    /// 화면에 나타났다. 떠났다가 돌아온 것이면 새 identity 로 바꾸고 true, 아니면(처음 나타남 · 거듭 불림) 그대로 두고 false.
+    @discardableResult
+    mutating func appeared() -> Bool {
+        guard isAway else { return false }
+        isAway = false
+        generation += 1
+        return true
+    }
+}
+
 /// 필사 화면 하단의 도구 팔레트. 펼침 상태는 전체 도구를, 접힘 상태는 현재 도구와 실행 취소를 남긴다.
 ///
 /// ⚠️ 유리 뷰를 상태마다 넣고 빼지 않는다. 펼침 캡슐과 접힘 원을 `if` 로 갈아 끼우던 구조(glassEffectID morph)는
@@ -244,6 +269,8 @@ public struct PencilPalatteDockView: View {
     @Shared(.appStorage("allowFingerDrawing")) private var allowFingerDrawing: Bool = false
     /// 화면에 그리는 펼침 상태. 리듀서가 바꾼 `isExpanded` 를 `withAnimation` 으로 옮겨 받아 폭 변화를 한 트랜잭션으로 묶는다.
     @State private var isShowingExpanded: Bool
+    /// 도크 안(팔레트 유리 · 실행 취소 · 안내 줄)의 identity — 필사 화면을 떠났다가 돌아오면 바뀐다(`body` 의 ⚠️).
+    @State private var identity = PencilPalatteDockIdentity()
 
     /// 접힌 도구 원 아래 「펜 · 0.5 mm」 줄 높이.
     private static let captionHeight: CGFloat = 16
@@ -278,7 +305,24 @@ public struct PencilPalatteDockView: View {
             .frame(maxWidth: .infinity, alignment: isShowingExpanded ? .center : Alignment(horizontal: sideAlignment, vertical: .center))
             .padding(.horizontal, CarveSpacing.large)
         }
+        // ⚠️ 필사 화면을 떠났다가 돌아오면 도크 안을 새로 만든다. 펼침 · 접힘 전환(폭 애니메이션)이 진행 중일 때 앱 스택에 책장이 올라가
+        //    필사 화면이 창에서 빠지고, 책장 위에 이름 시트가 떴다 닫힌 뒤(키보드와 무관) 돌아오면, 멈춰 있던 애니메이션이 이어지다
+        //    한 프레임에 폭이 ±1e18 로 튀었다(iOS 26.2 시뮬레이터, 2026-10-16 — docs/notebook-design.md §9-2). 음수 폭을 받은 유리 안쪽 뷰
+        //    (`UIPlatformGlassInteractionView`)는 그 폭을 bounds 원점에 쌓아, 폭이 504 로 돌아온 뒤에도 원점이 약 −5e18 에 남았다 —
+        //    유리와 도구가 다시 그려지지 않았다. 새 identity 는 멈춰 있던 애니메이션과 그 유리를 함께 버린다. 처음 나타날 때는 그대로다.
+        .id(identity.generation)
         .frame(height: Self.height)
+        .onDisappear {
+            identity.disappeared()
+        }
+        .onAppear {
+            // 옛 도크가 들어오는 화면 전환에 섞여 사라지는 애니메이션을 타지 않게, 애니메이션 없이 바꾼다.
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                identity.appeared()
+            }
+        }
         .onChange(of: isExpanded) { _, newValue in
             withAnimation(transitionAnimation) {
                 isShowingExpanded = newValue
