@@ -41,7 +41,7 @@ struct BackupImportPlanInkTesting {
         let current = try #require(plan.insertions.first)
         #expect(current.isPresent)
         #expect(current.titleName == BibleTitle.genesis.rawValue)
-        #expect(current.chapter == Sample.chapter)
+        #expect(current.page == Sample.page)
         #expect(current.verse == 1)
         #expect(current.translation == "NKRV")
         #expect(current.drawingVersion == 3)

@@ -11,7 +11,8 @@ import Foundation
 /// 백업 형식 · 검증 오류 — 모두 **파일 전체**를 거부한다 (설계 §4-2).
 ///
 /// 항목 하나만 해석할 수 없는 경우(모르는 번역본 · 권 · 범위 밖 장 · 절 · 좌표 형식 · 풀리지 않는 메타데이터)는 오류가 아니라
-/// `BackupItemSupport.reason` 의 `BackupUnsupportedReason` 으로 그 항목만 건너뛴다.
+/// `BackupItemSupport.reason` 의 `BackupUnsupportedReason` 으로 그 항목만 건너뛴다. 알 수 없는 필사책 토큰도 그 항목만 건너뛴다
+/// (`BackupItemSupport.hasUnknownNotebook`).
 public enum BackupFormatError: Error, Equatable, Sendable {
     /// 넘은 상한.
     public enum Limit: String, Equatable, Sendable {
@@ -33,7 +34,7 @@ public enum BackupFormatError: Error, Equatable, Sendable {
         case fingerprintMismatch
     }
 
-    /// `formatVersion` 이 `BackupFormat.formatVersion` 이 아니다.
+    /// `formatVersion` 이 읽을 수 있는 버전(`BackupFormat.readableFormatVersions` — 1 · 2)이 아니다.
     case unsupportedFormat(formatVersion: Int)
     /// `manifest.json` · `items.json` 이 없거나 읽지 못했거나 디코딩되지 않는다.
     case malformed(fileName: String)

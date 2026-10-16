@@ -27,6 +27,8 @@ public struct BackupPayload: Codable, Equatable, Sendable {
     }
 
     /// 풀린 루트에서 `manifest.json` · `items.json` 을 디코딩하고 `BackupPayloadValidator.validate` 로 검증한다.
+    ///
+    /// 형식 1 파일은 항목의 필사책 키를 읽지 않는다 — 있어도 버려 전부 기본 필사책으로 읽는다(형식 1 은 늘 nil).
     /// - Parameters:
     ///   - rootDirectory: 풀린 루트(`manifest.json` · `items.json` · `blobs/` 가 있는 폴더).
     ///   - limits: 상한.
@@ -37,7 +39,14 @@ public struct BackupPayload: Codable, Equatable, Sendable {
     public static func load(rootDirectory: URL, limits: BackupLimits) throws -> BackupPayload {
         // manifest 를 먼저 읽는다 — 형식 버전이 다르면 items 의 모양을 보기 전에 거부한다.
         let manifest = try decode(BackupManifest.self, in: rootDirectory, fileName: BackupFormat.manifestFileName, limits: limits)
-        let items = try decode([BackupItem].self, in: rootDirectory, fileName: BackupFormat.itemsFileName, limits: limits)
+        var items = try decode([BackupItem].self, in: rootDirectory, fileName: BackupFormat.itemsFileName, limits: limits)
+        if manifest.formatVersion < BackupFormat.notebookFormatVersion {
+            items = items.map { item in
+                var item = item
+                item.verse.notebook = nil
+                return item
+            }
+        }
         let blobDirectory = rootDirectory.appendingPathComponent(BackupFormat.blobDirectoryName, isDirectory: true)
         try BackupPayloadValidator.validate(manifest: manifest, items: items, blobDirectory: blobDirectory, limits: limits)
         return BackupPayload(manifest: manifest, items: items, blobDirectory: blobDirectory)

@@ -21,6 +21,11 @@ struct BackupImportPlanPreviewTesting {
     /// 풀리지 않는 메타데이터 — 뒤 버전의 형식일 수 있다.
     private let brokenMetadata = Data("깨진 메타데이터".utf8)
 
+    /// 기본 필사책의 장 — 판정 단위.
+    private func page(_ title: BibleTitle, _ chapter: Int) -> NotebookChapter {
+        NotebookChapter(notebook: .default, chapter: BibleChapter(title: title, chapter: chapter))
+    }
+
     /// 호출부가 하듯 항목마다 지원 판정을 한다 — 메타데이터 blob 은 표본 바이트에서 찾는다.
     private func reasons(_ items: [BackupItem]) -> [String: BackupUnsupportedReason] {
         let bytes = [
@@ -91,15 +96,15 @@ struct BackupImportPlanPreviewTesting {
             #expect(preview.chapters.isEmpty)
             #expect(preview.itemCount == items.count)
         }
-        #expect(BackupImportPlanner.chapters(of: items).isEmpty)
+        #expect(BackupImportPlanner.pages(of: items).isEmpty)
     }
 
     @Test("미리보기 — 장마다 판정한 수를 모으고, 수의 합은 항목 수와 같다")
     func previewCountsEveryItemOnce() {
         // Given — 장 셋과 어느 장에도 놓을 수 없는 항목 하나를 섞어 넘긴다
-        let genesis1 = BibleChapter(title: .genesis, chapter: 1)
-        let genesis2 = BibleChapter(title: .genesis, chapter: 2)
-        let exodus3 = BibleChapter(title: .exodus, chapter: 3)
+        let genesis1 = page(.genesis, 1)
+        let genesis2 = page(.genesis, 2)
+        let exodus3 = page(.exodus, 3)
         let inkStored = Sample.ink("stored")
         // 창세기 1장(빈 장) — 현재(new) · 보관(archived) · 현재 후보가 아닌 비운 항목(skippedEmpty)
         let newCurrent = Sample.item("G1-CURRENT", ink: Sample.ink("g1"), isCurrent: true, updatedAt: Sample.sep(20))
@@ -118,7 +123,7 @@ struct BackupImportPlanPreviewTesting {
         // 어느 장에도 놓을 수 없다(unsupported)
         let unknownBook = Sample.item("TOB", ink: Sample.ink("tob"), isCurrent: true, updatedAt: Sample.sep(1), book: "TOB")
         let items = [unknownTranslation, otherCurrent, unknownBook, newArchive, protectedItem, sameAsStored, emptyArchive, newCurrent]
-        let current: [BibleChapter: [BackupRowRecord]] = [
+        let current: [NotebookChapter: [BackupRowRecord]] = [
             genesis2: [Sample.row("G2-ROW", ink: inkStored, isPresent: true, updatedAt: Sample.sep(15), chapter: 2)],
             exodus3: [Sample.row("E3-CLEARED", ink: nil, isPresent: true, updatedAt: Sample.sep(29), title: .exodus, chapter: 3)]
         ]
@@ -139,12 +144,17 @@ struct BackupImportPlanPreviewTesting {
         // 장은 권 순서 → 장 순서
         #expect(preview.chapters == [genesis1, genesis2, exodus3])
 
-        // Then — 검사가 장마다 읽으며 하나씩 더해도 같다
-        var accumulated = BackupImportPreview(unsupported: BackupImportPlanner.unplaced(items: items, unsupported: unsupported))
-        let grouped = BackupImportPlanner.itemsByChapter(items)
-        for chapter in BackupImportPlanner.chapters(of: items) {
+        // Then — 필사책은 기본 하나(형식 1 과 같은 항목)
+        #expect(preview.notebooks == 1)
+        #expect(preview.unknownNotebook == 0)
+
+        // Then — 검사가 파일 수준 수에서 시작해 장마다 읽으며 하나씩 더해도 같다
+        var accumulated = BackupImportPlanner.filePreview(items: items, unsupported: unsupported, notebooks: [])
+        #expect(accumulated.unsupported == BackupImportPlanner.unplaced(items: items, unsupported: unsupported))
+        let grouped = BackupImportPlanner.itemsByPage(items)
+        for page in BackupImportPlanner.pages(of: items) {
             let plan = BackupImportPlanner.plan(
-                items: grouped[chapter] ?? [], unsupported: unsupported, current: current[chapter] ?? [], chapter: chapter
+                items: grouped[page] ?? [], unsupported: unsupported, current: current[page] ?? [], page: page
             )
             accumulated.add(plan)
         }
@@ -154,7 +164,7 @@ struct BackupImportPlanPreviewTesting {
     @Test("장은 권 순서 → 장 순서이고, 지원 항목이 없는 장은 미리보기의 장에 들지 않는다")
     func chaptersFollowBookOrder() {
         // Given — 권 · 장을 섞어 넘긴다. 마태복음 5장에는 모르는 번역본 항목뿐이다
-        let matthew5 = BibleChapter(title: .matthew, chapter: 5)
+        let matthew5 = page(.matthew, 5)
         let items = [
             Sample.item("REV-22", ink: Sample.ink("rev"), isCurrent: true, updatedAt: Sample.sep(1), book: "REV", chapter: 22),
             Sample.item("GEN-10", ink: Sample.ink("gen10"), isCurrent: true, updatedAt: Sample.sep(1), chapter: 10),
@@ -163,18 +173,18 @@ struct BackupImportPlanPreviewTesting {
             Sample.item("MAT-1", ink: Sample.ink("mat"), isCurrent: true, updatedAt: Sample.sep(1), book: "MAT")
         ]
         let ordered = [
-            BibleChapter(title: .genesis, chapter: 2),
-            BibleChapter(title: .genesis, chapter: 10),
-            BibleChapter(title: .matthew, chapter: 1),
+            page(.genesis, 2),
+            page(.genesis, 10),
+            page(.matthew, 1),
             matthew5,
-            BibleChapter(title: .revelation, chapter: 22)
+            page(.revelation, 22)
         ]
 
         // When
         let preview = BackupImportPlanner.preview(items: items, unsupported: reasons(items), current: [:])
 
         // Then — 장 번호는 숫자 순서다(2 → 10)
-        #expect(BackupImportPlanner.chapters(of: items) == ordered)
+        #expect(BackupImportPlanner.pages(of: items) == ordered)
         #expect(preview.chapters == ordered.filter { $0 != matthew5 })
         #expect(preview.unsupported == [.unknownTranslation: 1])
         #expect(preview.new == 4)

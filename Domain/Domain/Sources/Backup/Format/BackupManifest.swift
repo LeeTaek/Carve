@@ -12,8 +12,12 @@ import Foundation
 ///
 /// **넣지 않는 것:** 계정 식별자 · 계정 해시(`AccountScope`) · 기기 이름 · 설정 · 즐겨찾기 · 위젯 · 구매 상태 · CloudKit 메타데이터.
 /// 불러오기의 대상 계정 범위(`targetScope`)도 파일에는 없고 기기 안 작업 기록에만 있다.
+///
+/// **필사책 목록(형식 2)은 따로 파일을 두지 않고 이 manifest 의 `notebooks` 키에 담는다.** 2.1 의 풀기(`BackupArchiveEntry`)는
+/// `manifest.json` · `items.json` · `blobs/<hex>` 밖의 항목 이름을 만나면 형식 버전을 읽기 전에 파일을 「암호가 틀렸거나 손상」 으로 거부한다.
+/// 새 파일을 더하면 2.1 이 형식 2 파일을 업데이트 안내(`unsupportedFormat`) 대신 손상으로 알리게 된다(혼재 버전 규칙 ⑤를 어긴다).
 public struct BackupManifest: Codable, Equatable, Sendable {
-    /// 백업 형식 버전(`BackupFormat.formatVersion`). 디코딩할 때 1 이 아니면 `unsupportedFormat` 으로 거부한다.
+    /// 백업 형식 버전(`BackupFormat.formatVersion`). 디코딩할 때 `BackupFormat.readableFormatVersions`(1 · 2) 밖이면 `unsupportedFormat` 으로 거부한다.
     public var formatVersion: Int
     /// 이 백업의 UUID 문자열.
     public var backupID: String
@@ -27,6 +31,9 @@ public struct BackupManifest: Codable, Equatable, Sendable {
     public var counts: BackupCounts
     /// blob 목록. 읽을 때 실제 크기 · 해시가 맞아야 한다.
     public var blobs: [BackupBlobEntry]
+    /// 필사책 목록(형식 2) — `DrawingNotebook` 레코드를 필사책마다 하나씩(`BackupNotebookRecord.latestPerNotebook`).
+    /// 형식 1 은 늘 빈 목록이다 — 형식 1 파일에 이 키가 있어도 읽지 않는다(형식 1 은 전부 기본 필사책).
+    public var notebooks: [BackupNotebookRecord]
 
     /// manifest 를 만든다.
     public init(
@@ -36,7 +43,8 @@ public struct BackupManifest: Codable, Equatable, Sendable {
         appVersion: String,
         scope: BackupScope,
         counts: BackupCounts,
-        blobs: [BackupBlobEntry]
+        blobs: [BackupBlobEntry],
+        notebooks: [BackupNotebookRecord] = []
     ) {
         self.formatVersion = formatVersion
         self.backupID = backupID
@@ -45,18 +53,19 @@ public struct BackupManifest: Codable, Equatable, Sendable {
         self.scope = scope
         self.counts = counts
         self.blobs = blobs
+        self.notebooks = notebooks
     }
 
     private enum CodingKeys: String, CodingKey {
-        case formatVersion, backupID, createdAt, appVersion, scope, counts, blobs
+        case formatVersion, backupID, createdAt, appVersion, scope, counts, blobs, notebooks
     }
 
-    /// 형식 버전을 **먼저** 읽는다 — 다른 버전은 나머지 모양이 달라도 `unsupportedFormat` 으로 거부한다(디코딩 실패로 보이지 않게).
-    /// 모르는 키는 무시한다.
+    /// 형식 버전을 **먼저** 읽는다 — 읽을 수 없는 버전은 나머지 모양이 달라도 `unsupportedFormat` 으로 거부한다(디코딩 실패로 보이지 않게).
+    /// 모르는 키는 무시한다. 필사책 목록은 형식 2 부터만 읽는다(없으면 빈 목록).
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let version = try container.decode(Int.self, forKey: .formatVersion)
-        guard version == BackupFormat.formatVersion else {
+        guard BackupFormat.readableFormatVersions.contains(version) else {
             throw BackupFormatError.unsupportedFormat(formatVersion: version)
         }
         self.formatVersion = version
@@ -66,6 +75,26 @@ public struct BackupManifest: Codable, Equatable, Sendable {
         self.scope = try container.decode(BackupScope.self, forKey: .scope)
         self.counts = try container.decode(BackupCounts.self, forKey: .counts)
         self.blobs = try container.decode([BackupBlobEntry].self, forKey: .blobs)
+        if version >= BackupFormat.notebookFormatVersion {
+            self.notebooks = try container.decodeIfPresent([BackupNotebookRecord].self, forKey: .notebooks) ?? []
+        } else {
+            self.notebooks = []
+        }
+    }
+
+    /// 필사책 목록은 형식 2 부터만 쓴다 — 형식 1 manifest(시험이 옛 파일을 만들 때)는 2.1 이 쓰던 모양 그대로다.
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(formatVersion, forKey: .formatVersion)
+        try container.encode(backupID, forKey: .backupID)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encode(appVersion, forKey: .appVersion)
+        try container.encode(scope, forKey: .scope)
+        try container.encode(counts, forKey: .counts)
+        try container.encode(blobs, forKey: .blobs)
+        if formatVersion >= BackupFormat.notebookFormatVersion {
+            try container.encode(notebooks, forKey: .notebooks)
+        }
     }
 }
 

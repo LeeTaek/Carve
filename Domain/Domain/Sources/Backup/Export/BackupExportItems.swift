@@ -3,6 +3,7 @@
 //  Domain
 //
 //  내보내기의 한 장 — 저장소 행과 열 수 있는 초안을 백업 항목(`BackupItem`)으로 바꾼다 (설계 docs/backup-import-design.md §3-3 · §3-4).
+//  장은 필사책 안의 장(`NotebookChapter`)이다 — 항목의 절 키에 필사책 토큰을 담는다(형식 2).
 //  파일을 쓰지 않는다 — 항목과 그 항목이 가리키는 blob 바이트를 돌려주고, 쓰기는 `BackupExportStaging` 이 한다.
 //
 
@@ -52,20 +53,24 @@ enum BackupExportItems {
     ///
     /// - 행: 그 절(번역 · 절)의 `DrawingRepresentativeRule` 대표만 `isCurrent` — **비운 대표도 true**(지운 상태도 원본이다). 그 절에 shown 초안이
     ///   있으면 그 절의 행은 모두 false 다. 행의 번역은 `backupTranslation` 이다(영어 행은 `titleName` 접두).
+    /// - 절 키의 필사책은 그 장의 필사책이다(`BackupVerseKey.token(for:)` — 기본 필사책은 키를 쓰지 않는다). 초안은 지금 기본 필사책 장에서만 고른다
+    ///   (`LiveBackupExporter` — 다른 필사책 초안은 t4).
     /// - 같은 id(같은 행 키 · 같은 내용)의 행이 둘이면 하나만 담는다 — 대표였던 쪽, 없으면 앞의 것. 파일 안 id 는 겹칠 수 없다(설계 §4-2).
     /// - Parameters:
-    ///   - chapter: 그 장(번역본 포함).
-    ///   - rows: 그 장의 행 원본(`SwiftDatabaseActor.backupRows(chapter:)`).
+    ///   - page: 그 장(필사책 · 번역본 포함).
+    ///   - rows: 그 장의 행 원본(`SwiftDatabaseActor.backupRows(page:)`).
     ///   - drafts: 담기로 한 초안(`BackupExportDraftSelection.select`).
     /// - Returns: 항목과 blob. 부작용 없음.
-    static func candidates(chapter: BibleChapter, rows: [BackupRowRecord], drafts: [BackupExportDraft]) -> [BackupExportCandidate] {
+    static func candidates(page: NotebookChapter, rows: [BackupRowRecord], drafts: [BackupExportDraft]) -> [BackupExportCandidate] {
         let shownSlots = Set(drafts.filter(\.isCurrent).map { BackupExportVerseSlot(translation: $0.draft.key.translation, verse: $0.draft.key.verse) })
         let representatives = representativeIndices(rows)
+        let notebook = BackupVerseKey.token(for: page.notebook)
+        let title = page.chapter.title
         let rowCandidates = rows.enumerated().map { index, record in
             let slot = BackupExportVerseSlot(translation: record.backupTranslation, verse: record.verse)
-            return rowCandidate(record, title: chapter.title, isCurrent: representatives.contains(index) && !shownSlots.contains(slot))
+            return rowCandidate(record, title: title, notebook: notebook, isCurrent: representatives.contains(index) && !shownSlots.contains(slot))
         }
-        let draftCandidates = drafts.sorted(by: draftOrder).map { draftCandidate($0, title: chapter.title) }
+        let draftCandidates = drafts.sorted(by: draftOrder).map { draftCandidate($0, title: title, notebook: notebook) }
         return uniqueByID(rowCandidates) + draftCandidates
     }
 
@@ -87,15 +92,18 @@ enum BackupExportItems {
     /// 행 항목 — 바이트 · `drawingVersion` · 시각 · 번역 저장값을 원본 그대로 담는다. 지문은 원본 바이트로 만든 `contentFingerprint` 다.
     ///
     /// 절 키의 번역본은 `backupTranslation`(영어 행은 `titleName` 접두의 `"KJV"` · `"BSB"`, 개역개정 행은 열 값 그대로 — nil 은 null)이고,
-    /// 권은 `titleName` 을 `StoredBookKey.decode` 로 푼 권이다(풀 수 없으면 장의 권). 출처의 `titleName` 은 원문 그대로 남긴다.
-    static func rowCandidate(_ record: BackupRowRecord, title: BibleTitle, isCurrent: Bool) -> BackupExportCandidate {
+    /// 권은 `titleName` 을 `StoredBookKey.decodeRow` 로 푼 권이다(풀 수 없으면 장의 권). 필사책은 장의 필사책 토큰(기본은 nil)이다.
+    /// 출처의 `titleName` 은 원문 그대로 남긴다(다른 필사책 행은 `nb_<토큰>~` 접두 포함).
+    static func rowCandidate(_ record: BackupRowRecord, title: BibleTitle, notebook: String?, isCurrent: Bool) -> BackupExportCandidate {
         let ink = blob(record.lineData)
         let metadata = blob(record.layoutMetadataData)
-        let book = StoredBookKey.decode(record.titleName)?.title ?? title
+        let book = StoredBookKey.decodeRow(record.titleName)?.title ?? title
         let item = BackupItem(
             id: BackupItemID.make(kind: .row, sourceKey: record.rowKey, fingerprint: record.contentFingerprint),
             kind: .row,
-            verse: BackupVerseKey(translation: record.backupTranslation, title: book, chapter: record.chapter, verse: record.verse),
+            verse: BackupVerseKey(
+                translation: record.backupTranslation, title: book, chapter: record.chapter, verse: record.verse, notebook: notebook
+            ),
             drawingVersion: record.drawingVersion,
             inkBlob: ink?.entry.name,
             metadataBlob: metadata?.entry.name,
@@ -109,7 +117,8 @@ enum BackupExportItems {
     }
 
     /// 초안 항목 — 만든 시각은 없고(`createdAt` nil) `updatedAt` 은 초안을 남긴 시각이다. 묶음은 종류(local · unverified · account)로만 남긴다.
-    static func draftCandidate(_ selected: BackupExportDraft, title: BibleTitle) -> BackupExportCandidate {
+    /// 필사책은 장의 필사책 토큰(기본은 nil)이다.
+    static func draftCandidate(_ selected: BackupExportDraft, title: BibleTitle, notebook: String?) -> BackupExportCandidate {
         let draft = selected.draft
         let scope = BackupItemSource.DraftScope(scope: selected.scope)
         let fingerprint = draft.lineData.map {
@@ -129,7 +138,9 @@ enum BackupExportItems {
         let item = BackupItem(
             id: BackupItemID.make(kind: .draft, sourceKey: sourceKey, fingerprint: fingerprint),
             kind: .draft,
-            verse: BackupVerseKey(translation: draft.key.translation, title: title, chapter: draft.key.chapter, verse: draft.key.verse),
+            verse: BackupVerseKey(
+                translation: draft.key.translation, title: title, chapter: draft.key.chapter, verse: draft.key.verse, notebook: notebook
+            ),
             drawingVersion: draft.drawingVersion,
             inkBlob: ink?.entry.name,
             metadataBlob: metadata?.entry.name,
@@ -297,4 +308,29 @@ extension BibleChapter {
     private static let backupTranslationOrder: [Translation: Int] = Dictionary(
         uniqueKeysWithValues: Translation.allCases.enumerated().map { ($1, $0) }
     )
+}
+
+extension NotebookChapter {
+    /// 백업의 장 순서 — 필사책(기본 먼저 · 나머지 토큰 순) → 권 순서 → 장 순서 → 번역본 순서(`BibleChapter.backupOrder`).
+    static func backupOrder(_ lhs: NotebookChapter, _ rhs: NotebookChapter) -> Bool {
+        if lhs.notebook != rhs.notebook { return NotebookID.backupOrder(lhs.notebook, rhs.notebook) }
+        return BibleChapter.backupOrder(lhs.chapter, rhs.chapter)
+    }
+
+    /// 필사책 · 권 · 장 자리 — 번역본을 개역개정으로 맞춘 장. 내보내기는 이 자리마다 번역본을 모두 돈다.
+    var backupPlace: NotebookChapter {
+        NotebookChapter(notebook: notebook, chapter: chapter.backupPlace)
+    }
+
+    /// 이 자리의 번역본별 장 — `Translation.allCases` 순서, 필사책은 그대로.
+    var backupTranslationPages: [NotebookChapter] {
+        chapter.backupTranslationChapters.map { NotebookChapter(notebook: notebook, chapter: $0) }
+    }
+
+    /// 장 목록을 필사책 · 권 · 장 자리로 줄인다 — 같은 필사책의 같은 권 · 장이 번역본별로 여러 번 와도 한 번만, 필사책 → 권 → 장 순서.
+    /// - Parameter pages: 번역본이 섞인 장 목록.
+    /// - Returns: 자리 목록(번역본은 개역개정으로 맞춘다). 부작용 없음.
+    static func backupPlaces(_ pages: some Sequence<NotebookChapter>) -> [NotebookChapter] {
+        Set(pages.map(\.backupPlace)).sorted(by: backupOrder)
+    }
 }

@@ -19,7 +19,7 @@ public struct BackupItem: Codable, Equatable, Sendable {
     public var kind: BackupItemKind
     /// V6 계보의 자리. formatVersion 1 은 늘 `[]` 다.
     public var parents: [String]
-    /// 번역본 · 권 · 장 · 절.
+    /// 필사책 · 번역본 · 권 · 장 · 절.
     public var verse: BackupVerseKey
     /// 좌표 형식 원본(nil · 1 · 2 · 3).
     public var drawingVersion: Int?
@@ -79,7 +79,7 @@ public enum BackupItemKind: String, Codable, Sendable, CaseIterable {
     case draft
 }
 
-/// 절 식별 — 번역본 저장값 + USFM 권 코드 + 장 · 절 (설계 §2-4, 결정 9).
+/// 절 식별 — 필사책 + 번역본 저장값 + USFM 권 코드 + 장 · 절 (설계 §2-4, 결정 9 · 2.2 필사책 형식 2).
 public struct BackupVerseKey: Codable, Equatable, Hashable, Sendable {
     /// 행 · 초안의 번역본(`Translation.rawValue` — `NKRV` · `KJV` · `BSB`). 개역개정 행은 열에 저장된 값 그대로이고 없으면 nil — NKRV 로 채우지 않는다.
     /// 영어 행은 열이 늘 nil 이라 `titleName` 접두에서 온 값이다(`BackupRowRecord.backupTranslation`). 초안은 초안 키의 값 그대로다.
@@ -90,23 +90,43 @@ public struct BackupVerseKey: Codable, Equatable, Hashable, Sendable {
     public var chapter: Int
     /// 절.
     public var verse: Int
+    /// 필사책 토큰(`NotebookID.rawValue` 원문, 형식 2). nil 은 기본 필사책이다 — 내보내기는 기본 필사책에 키를 쓰지 않는다(nil 이면 키가 빠진다).
+    /// 형식 1 은 늘 nil 이다(`BackupPayload.load` 가 형식 1 항목의 값을 버린다). 형식이 아닌 토큰도 그대로 읽고, 불러오기가 그 항목만 건너뛴다
+    /// (`BackupItemSupport.hasUnknownNotebook` — 「알 수 없는 필사책」).
+    public var notebook: String?
 
     /// 값을 그대로 지정해 만든다.
-    public init(translation: String?, book: String, chapter: Int, verse: Int) {
+    /// - Parameter notebook: 필사책 토큰. 기본 필사책이면 nil.
+    public init(translation: String?, book: String, chapter: Int, verse: Int, notebook: String? = nil) {
         self.translation = translation
         self.book = book
         self.chapter = chapter
         self.verse = verse
+        self.notebook = notebook
     }
 
     /// `BibleTitle` 에서 권 코드를 찾아 만든다 — 내보내기의 단일 진입점.
-    public init(translation: String?, title: BibleTitle, chapter: Int, verse: Int) {
-        self.init(translation: translation, book: BibleBookCode(title: title).rawValue, chapter: chapter, verse: verse)
+    /// - Parameter notebook: 필사책 토큰. 기본 필사책이면 nil.
+    public init(translation: String?, title: BibleTitle, chapter: Int, verse: Int, notebook: String? = nil) {
+        self.init(translation: translation, book: BibleBookCode(title: title).rawValue, chapter: chapter, verse: verse, notebook: notebook)
+    }
+
+    /// 필사책의 키 값 — 기본 필사책은 nil(키를 쓰지 않는다), 그 밖은 `rawValue`.
+    /// - Parameter notebook: 필사책.
+    /// - Returns: 절 키의 `notebook` 에 넣을 값. 부작용 없음.
+    public static func token(for notebook: NotebookID) -> String? {
+        notebook.isDefault ? nil : notebook.rawValue
     }
 
     /// 권 코드가 가리키는 권. 모르는 코드면 nil.
     public var title: BibleTitle? {
         BibleBookCode(rawValue: book)?.title
+    }
+
+    /// 필사책 토큰이 가리키는 필사책 — nil 은 기본 필사책, `NotebookID` 형식이 아니면 nil(알 수 없는 필사책).
+    public var notebookID: NotebookID? {
+        guard let notebook else { return .default }
+        return NotebookID(rawValue: notebook)
     }
 }
 
@@ -123,7 +143,8 @@ public struct BackupItemSource: Codable, Equatable, Sendable {
     }
 
     /// 행의 `titleName` 원문(개역개정 `1-01Genesis.txt`, 영어 `KJV-1-01Genesis.txt`) · 초안 키의 권 이름 — 권 코드와 함께 원본을 보존한다.
-    /// 불러오기는 이 값이 아니라 `book` · `translation` 으로 권 이름을 다시 짓는다(`StoredBookKey.titleName(title:translation:)`).
+    /// 다른 필사책의 행은 접두가 붙은 원문 그대로다(`nb_<토큰>~KJV-1-19Psalms.txt`).
+    /// 불러오기는 이 값이 아니라 `book` · `translation` · `notebook` 으로 권 이름을 다시 짓는다(`StoredBookKey.titleName(title:translation:notebook:)`).
     public var titleName: String
     /// 행: `rowUUID ?? business id`. 초안: 식별 · 판정에 쓰지 않는다(nil 이어도 된다).
     public var rowKey: String?
