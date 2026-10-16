@@ -69,6 +69,24 @@ enum NotebookNaming {
         return ordinalName(first, locale: locale)
     }
 
+    /// 서수 꼴 이름 → 서수 표(한국어 · 영어, 1 ~ 99). `ordinalName` 의 카탈로그 문구로 만들어 문구를 고쳐도 따라온다.
+    private static let ordinalsByName: [String: Int] = {
+        var table: [String: Int] = [:]
+        for locale in [Locale(identifier: "ko"), Locale(identifier: "en")] {
+            for ordinal in 1...99 {
+                table[ordinalName(ordinal, locale: locale)] = ordinal
+            }
+        }
+        return table
+    }()
+
+    /// 역할: 이름이 서수 꼴(「세 번째 필사」 · 「11번째 필사」 · 「Notebook 3」 · 「First Notebook」)이면 그 서수 — 책장 표지의 번호(시안 P1).
+    /// 입력 · 출력: 보이는 이름 → 서수(1 ~ 99), 서수 꼴이 아니면 nil. 이름을 지은 언어와 화면 언어가 달라도 풀리도록 한국어 · 영어 꼴을 모두 본다.
+    /// 부작용: 없음.
+    static func ordinal(inName name: String) -> Int? {
+        ordinalsByName[name.trimmingCharacters(in: .whitespacesAndNewlines)]
+    }
+
     /// 역할: 입력한 이름을 저장할 이름으로 바꾼다 — 앞뒤 공백 · 줄바꿈을 자른다.
     /// 입력 · 출력: 입력 → 자른 이름. 비었거나 `maxLength` 글자를 넘으면 nil(받지 않는다).
     /// 부작용: 없음.
