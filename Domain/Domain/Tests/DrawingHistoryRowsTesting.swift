@@ -24,7 +24,7 @@ struct DrawingHistoryRowsTesting {
 
     /// 인메모리 컨테이너 하나에 actor 와 `DrawingDatabase` 를 함께 물린다.
     ///
-    /// 목록이 실제로 쓰는 조회(`DrawingDatabase.fetchVerseSnapshots(chapter:verse:)` — 한 절의 모든 행, `updateDate` 최신순)와
+    /// 목록이 실제로 쓰는 조회(`DrawingDatabase.fetchVerseSnapshots(page:verse:)` — 한 절의 모든 행, `updateDate` 최신순)와
     /// 지우기(`archiveAndResetVerseDrawing`)가 **같은 저장소**를 봐야 두 경로의 어긋남을 잡을 수 있다.
     private struct Harness {
         let actor: SwiftDatabaseActor
@@ -46,7 +46,7 @@ struct DrawingHistoryRowsTesting {
 
         func seed(rowID: BibleDrawingRowID, lineData: Data?, updateDate: Date, isPresent: Bool = false) async throws {
             let row = BibleDrawing(
-                bibleTitle: DrawingHistoryRowsTesting.chapter,
+                page: DrawingHistoryRowsTesting.chapter.inDefaultNotebook,
                 verse: DrawingHistoryRowsTesting.verse,
                 lineData: lineData,
                 updateDate: updateDate,
@@ -98,14 +98,14 @@ struct DrawingHistoryRowsTesting {
 
         let outcome = try await harness.actor.archiveAndResetVerseDrawing(
             VerseDrawingArchiveCommand(verse: Self.verse, activeRowID: activeRowID, archiveRowID: archiveRowID),
-            chapter: Self.chapter,
+            page: Self.chapter.inDefaultNotebook,
             now: erasedAt
         )
         #expect(outcome == .archived)
 
         // ① 저장소 조회는 그대로다 — 두 행 다 준다. 빈 활성 행이 `updateDate` 최신이라 **맨 위**에 온다.
         //    거르지 않으면 이 행이 "불러올 수 없는 필사 데이터입니다." 로 그려지던 자리다.
-        let listedSnapshots = try await harness.database.fetchVerseSnapshots(chapter: Self.chapter, verse: Self.verse)
+        let listedSnapshots = try await harness.database.fetchVerseSnapshots(page: Self.chapter.inDefaultNotebook, verse: Self.verse)
         let context = ModelContext(harness.actor.modelContainer)
         let rows = try harness.storedRows(in: context)
         #expect(rows.count == 2)
@@ -124,7 +124,7 @@ struct DrawingHistoryRowsTesting {
         // ③ 그래도 대표는 빈 활성 행이다 — 캔버스는 비어 보이고 지운 획이 되살아나지 않는다.
         #expect(rows.mainDrawing()?.rowKey == activeRowID.raw)
         #expect(rows.mainDrawing()?.lineData == nil)
-        let snapshots = try await harness.actor.loadDrawingSnapshots(chapter: Self.chapter)
+        let snapshots = try await harness.actor.loadDrawingSnapshots(page: Self.chapter.inDefaultNotebook)
             .filter { $0.verse == Self.verse }
         #expect(snapshots.count == 2)
         #expect(snapshots.representative()?.rowID == activeRowID)
@@ -155,7 +155,7 @@ struct DrawingHistoryRowsTesting {
         try await harness.seed(rowID: BibleDrawingRowID(raw: "row-nil"), lineData: nil,
                                updateDate: Date(timeIntervalSince1970: 100))
 
-        let listedSnapshots = try await harness.database.fetchVerseSnapshots(chapter: Self.chapter, verse: Self.verse)
+        let listedSnapshots = try await harness.database.fetchVerseSnapshots(page: Self.chapter.inDefaultNotebook, verse: Self.verse)
         let context = ModelContext(harness.actor.modelContainer)
         let rows = try harness.storedRows(in: context)
         #expect(rows.count == 5)

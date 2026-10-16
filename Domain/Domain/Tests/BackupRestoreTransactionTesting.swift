@@ -186,7 +186,7 @@ struct BackupRestoreTransactionTesting {
         #expect(pinned.drawingVersion == 1)
         #expect(rows.first { $0.rowKey == legacyM.rowKey } == legacyM.record)
         // 화면의 대표(장 조회)는 그대로 L 이다 — 고정하지 않았다면 9/25 의 Z 가 보였다.
-        let load = try await SwiftDataDrawingRepository(actor: harness.database).load(chapter: Sample.genesis1)
+        let load = try await SwiftDataDrawingRepository(actor: harness.database).load(Sample.genesis1.inDefaultNotebook)
         #expect(load.snapshots.representativesByVerse()[1]?.rowID.raw == legacyL.rowKey)
 
         // Then: 다시 불러오면 넣을 행도 고정도 없다.

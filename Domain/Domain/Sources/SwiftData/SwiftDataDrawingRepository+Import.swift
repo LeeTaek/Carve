@@ -87,26 +87,6 @@ extension SwiftDatabaseActor {
         }
     }
 
-    /// 옛 판 — `importVerseDrawing(_:generation:now:)` 로 넘긴다(`SwiftDataDrawingRepository` 의 `DrawingVerseImporting` 옛 판이 부른다).
-    /// - Parameter chapter: 과도기 인자 — 권 · 장이 `command.page` 와 다르면 아무것도 쓰지 않고 던진다(어느 장에 쓸지 엇갈린 명령).
-    ///   필사책 · 번역본은 `command.page` 가 정한다. t4 에서 지운다.
-    public func importVerseDrawing(
-        _ command: VerseDrawingImportCommand,
-        chapter: BibleChapter,
-        generation: DrawingStoreGeneration,
-        now: Date
-    ) throws -> VerseDrawingImportOutcome {
-        let page = command.page
-        guard chapter.title == page.chapter.title, chapter.chapter == page.chapter.chapter else {
-            Log.error("가져오기 거절 — 명령의 장과 받은 장이 다르다", page.chapter.title.rawValue, "\(page.chapter.chapter)", chapter.title.rawValue, "\(chapter.chapter)")
-            throw Self.importPageMismatch
-        }
-        return try importVerseDrawing(command, generation: generation, now: now)
-    }
-
-    /// 명령의 장과 받은 장이 다르다 — 아무것도 쓰지 않았다(과도기 인자 검사, t4 에서 지운다).
-    static let importPageMismatch = DrawingRepositoryError.persistenceFailed("importPageMismatch — 가져오기 명령의 장과 받은 장이 다르다")
-
     /// 그 절의 모든 행(대표 · 보관 · 빈 행) — 그 page(필사책 · 번역본)의 것만. 필사책 · 번역본은 권 이름(`StoredBookKey.titleName(for: page)`)으로 가린다.
     private func verseRows(page: NotebookChapter, verse: Int) throws -> [BibleDrawing] {
         let titleName = StoredBookKey.titleName(for: page)

@@ -23,7 +23,7 @@ struct DrawingSchemaV6MigrationTesting {
         )
         let context = ModelContext(container)
         let row = DrawingSchemaV4.BibleDrawing(
-            bibleTitle: chapter,
+            page: chapter.inDefaultNotebook,
             verse: 1,
             lineData: RealLegacyLineData.data,
             updateDate: Date(timeIntervalSince1970: 1_750_000_000),

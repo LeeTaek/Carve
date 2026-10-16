@@ -45,13 +45,6 @@ public struct DrawingActivity: Equatable, Sendable {
         )
     }
 
-    /// 역할: **기본 필사책**의 장(번역본 포함)으로 활동을 만든다 — `init(updateDate:page:verse:)` 로 넘긴다.
-    /// 입력 · 출력: 고친 시각 · 장 · 절 → 활동. 부작용 없음.
-    /// - Note: 뜻은 「기본 필사책」 이다. 새 코드는 `init(updateDate:page:verse:)` 를 쓴다. t4 에서 지운다.
-    public init(updateDate: Date?, chapter: BibleChapter, verse: Int?) {
-        self.init(updateDate: updateDate, page: NotebookChapter(notebook: .default, chapter: chapter), verse: verse)
-    }
-
     /// 행의 필사책 · 권 · 장 · 번역본 — `titleName` 을 `StoredBookKey.decodeRow` 로 푼다. 모든 필사책의 행이 풀린다.
     /// 권 이름을 모르거나 필사책 접두가 깨졌거나(`decodeRow` 가 nil) 장 번호가 없으면 nil 이다 — 호출부는 지금처럼 건너뛴다.
     public var page: NotebookChapter? {

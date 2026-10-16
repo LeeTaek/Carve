@@ -71,22 +71,6 @@ public struct DrawingDatabase: Sendable {
         }
     }
 
-    /// **기본 필사책**의 절 행을 읽는다 — `fetchVerseSnapshots(page:verse:)` 로 넘긴다.
-    /// - Note: 뜻은 「기본 필사책」 이다. 새 코드는 `page:` 를 쓴다. t4 에서 지운다.
-    public func fetchVerseSnapshots(chapter: BibleChapter, verse: Int) async throws -> [VerseDrawingSnapshot] {
-        try await fetchVerseSnapshots(page: NotebookChapter(notebook: .default, chapter: chapter), verse: verse)
-    }
-
-    /// **기본 필사책**의 절 대표를 옮긴다 — `updatePresentDrawing(page:verse:presentRowID:)` 로 넘긴다.
-    /// - Note: 뜻은 「기본 필사책」 이다. 새 코드는 `page:` 를 쓴다. t4 에서 지운다.
-    public func updatePresentDrawing(
-        chapter: BibleChapter,
-        verse: Int,
-        presentRowID: BibleDrawingRowID
-    ) async {
-        await updatePresentDrawing(page: NotebookChapter(notebook: .default, chapter: chapter), verse: verse, presentRowID: presentRowID)
-    }
-
     // MARK: - Page 단위 BibleDrawing
     
     /// 한 장 전체의 페이지 단위 필사 데이터(BiblePageDrawing)를 불러옴.
@@ -171,15 +155,6 @@ public struct DrawingDatabase: Sendable {
     /// - Returns: 획이 남은 장과 그중 가장 최근에 필사한 장.
     public func fetchDrawingRecord(notebook: NotebookID, title: BibleTitle, translation: Translation) async throws -> BibleTitleDrawingRecord {
         try await actor.fetchDrawingRecord(notebook: notebook, title: title, translation: translation)
-    }
-
-    /// **기본 필사책**의 권 기록을 요약한다 — `fetchDrawingRecord(notebook:title:translation:)` 로 넘긴다.
-    /// - Parameters:
-    ///   - title: 대상 성경.
-    ///   - translation: 대상 번역본. 기본값은 개역개정이다.
-    /// - Note: 뜻은 「기본 필사책」 이다. 새 코드는 `notebook:` 을 쓴다. t4 에서 지운다.
-    public func fetchDrawingRecord(title: BibleTitle, translation: Translation = .NKRV) async throws -> BibleTitleDrawingRecord {
-        try await fetchDrawingRecord(notebook: .default, title: title, translation: translation)
     }
 }
 

@@ -126,8 +126,10 @@ struct SettingsFeatureEnglishCopyTesting {
 
     @Test("자리 — 영어 기기도 KJV 필기는 「Genesis 1:3 · KJV」, 개역개정 필기는 약칭 없이 「Genesis 1:3」 이다(사용자 결정 17)")
     func draftPlaceUsesEnglishReference() {
-        let kjv = VerseDraftKey(sessionID: "s", chapter: BibleChapter(title: .genesis, chapter: 1, translation: .KJV), verse: 3)
-        let nkrv = VerseDraftKey(sessionID: "s", chapter: BibleChapter(title: .genesis, chapter: 1), verse: 3)
+        let kjv = VerseDraftKey(
+            sessionID: "s", page: NotebookChapter(notebook: .default, chapter: BibleChapter(title: .genesis, chapter: 1, translation: .KJV)), verse: 3
+        )
+        let nkrv = VerseDraftKey(sessionID: "s", page: NotebookChapter(notebook: .default, chapter: BibleChapter(title: .genesis, chapter: 1)), verse: 3)
         let english = Self.englishLocale
 
         #expect(DraftRecoveryCopy.place(kjv, locale: english) == "Genesis 1:3 · KJV")

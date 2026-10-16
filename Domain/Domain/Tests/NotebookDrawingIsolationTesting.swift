@@ -45,12 +45,13 @@ struct NotebookDrawingIsolationTesting {
         for page in Self.allPages {
             created[page.notebook] = try await harness.create(page, verse: Self.verse, data: Self.inkData)
         }
-        // 옛 장 경로(`chapter:`)로 만든 행 — 기본 필사책 행이 2.2 이전과 같은 형식인지 견줄 기준이다.
+        // 기본 필사책 page 로 저장 명령을 바로 보낸 행 — 옛 장 경로(`chapter:`, 2.2 t4 에서 지웠다)가 만들던 행과 같다.
+        // 기본 필사책 행이 2.2 이전과 같은 형식인지 견줄 기준이다.
         let legacyPathRowID = BibleDrawingRowID.issue()
-        let generation = try await harness.repository.load(chapter: Self.chapter).generation
+        let generation = try await harness.repository.load(Self.chapter.inDefaultNotebook).generation
         try await harness.repository.apply(
             [.create(verse: 7, rowID: legacyPathRowID, data: Self.inkData, metadata: NotebookIsolationHarness.metadata(verse: 7))],
-            chapter: Self.chapter, generation: generation
+            page: Self.chapter.inDefaultNotebook, generation: generation
         )
         // 행이 없는 절의 clear 도 새 행을 만든다 — 그 경로도 그 필사책의 행이다.
         let clearedRowID = BibleDrawingRowID.issue()
@@ -111,7 +112,7 @@ struct NotebookDrawingIsolationTesting {
         for page in Self.allPages {
             created[page.notebook] = try await harness.create(page, verse: Self.verse, data: Self.inkData)
         }
-        // 과도기 기본 구현(`unsupportedNotebook`)이 아니라 SwiftData 구현이 불려야 한다.
+        // 저장소 계약(any)으로 불러도 SwiftData 구현의 page 요구가 불린다.
         let contract: any DrawingRepository = harness.repository
 
         for page in Self.allPages {
@@ -125,13 +126,6 @@ struct NotebookDrawingIsolationTesting {
             #expect(listed.allSatisfy { $0.notebook == page.notebook })
         }
 
-        // 옛 장 경로는 기본 필사책이다.
-        let legacyLoad = try await harness.repository.load(chapter: Self.chapter)
-        let defaultLoad = try await harness.repository.load(Self.defaultPage)
-        #expect(legacyLoad == defaultLoad)
-        let legacyListed = try await harness.database.fetchVerseSnapshots(chapter: Self.chapter, verse: Self.verse)
-        let defaultListed = try await harness.database.fetchVerseSnapshots(page: Self.defaultPage, verse: Self.verse)
-        #expect(legacyListed == defaultListed)
     }
 
     @Test("다른 필사책의 같은 권 · 장 행은 저장 명령으로 주소지정되지 않는다")
@@ -253,7 +247,7 @@ struct NotebookDrawingIsolationTesting {
 
     // MARK: 권 기록 요약
 
-    @Test("권의 필사 기록 요약은 필사책마다 따로 세고, 옛 호출은 기본 필사책이다")
+    @Test("권의 필사 기록 요약은 필사책마다 따로 센다")
     func drawingRecordIsPerNotebook() async throws {
         let harness = try NotebookIsolationHarness()
         try harness.seed(Self.page(chapter: 1, notebook: .default), lineData: Self.inkData, at: Self.base)
@@ -272,8 +266,6 @@ struct NotebookDrawingIsolationTesting {
         // 필사책 A 의 개역개정 행은 A 의 KJV 기록이 아니다.
         #expect(try await database.fetchDrawingRecord(notebook: Self.notebookA, title: Self.title, translation: .KJV)
                 == BibleTitleDrawingRecord())
-        #expect(try await database.fetchDrawingRecord(title: Self.title)
-                == BibleTitleDrawingRecord(drawnChapters: [1], latestChapter: 1))
     }
 
     // MARK: 필사 활동
@@ -299,7 +291,7 @@ struct NotebookDrawingIsolationTesting {
         #expect(recent == activities)
     }
 
-    @Test("필사 활동 값 — page 로 지으면 저장 행과 같은 titleName 이고, 옛 장 이니셜라이저는 기본 필사책이다")
+    @Test("필사 활동 값 — page 로 지으면 저장 행과 같은 titleName 이고, 기본 필사책 page 는 접두 없는 2.2 이전 이름이다")
     func activityValueDecodesNotebook() {
         let activityA = DrawingActivity(updateDate: nil, page: Self.pageA, verse: 1)
         #expect(activityA.titleName == StoredBookKey.titleName(for: Self.pageA))
@@ -307,9 +299,9 @@ struct NotebookDrawingIsolationTesting {
         #expect(activityA.chapter == Self.chapter)
         #expect(activityA.translation == .NKRV)
 
-        let legacy = DrawingActivity(updateDate: nil, chapter: Self.chapter, verse: 1)
-        #expect(legacy.titleName == Self.title.rawValue)
-        #expect(legacy.page == Self.defaultPage)
+        let inDefault = DrawingActivity(updateDate: nil, page: Self.defaultPage, verse: 1)
+        #expect(inDefault.titleName == Self.title.rawValue)
+        #expect(inDefault.page == Self.defaultPage)
 
         #expect(DrawingActivity(updateDate: nil, titleName: StoredBookKey.titleName(for: Self.pageB), titleChapter: nil, verse: 1).page == nil)
         #expect(DrawingActivity(updateDate: nil, titleName: StoredBookKey.titleName(for: Self.pageB), titleChapter: nil, verse: 1).translation == .NKRV)

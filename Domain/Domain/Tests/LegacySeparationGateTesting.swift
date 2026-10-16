@@ -382,7 +382,7 @@ extension LegacySeparationGateTesting {
             configurations: ModelConfiguration(url: url, cloudKitDatabase: .none)
         )
         let context = ModelContext(container)
-        context.insert(BibleDrawing(bibleTitle: LinkageFixture.chapter, verse: 9, lineData: lineData, rowUUID: "row-9"))
+        context.insert(BibleDrawing(page: LinkageFixture.chapter.inDefaultNotebook, verse: 9, lineData: lineData, rowUUID: "row-9"))
         try context.save()
     }
 
@@ -501,7 +501,7 @@ struct LegacyEntityNumberingTesting {
                 for: Schema(versionedSchema: DrawingSchemaV5.self), configurations: ModelConfiguration(url: url, cloudKitDatabase: .none)
             )
             let context = ModelContext(container)
-            context.insert(DrawingSchemaV4.BibleDrawing(bibleTitle: LinkageFixture.chapter, verse: 1, lineData: RealLegacyLineData.data, rowUUID: "row-1"))
+            context.insert(DrawingSchemaV4.BibleDrawing(page: LinkageFixture.chapter.inDefaultNotebook, verse: 1, lineData: RealLegacyLineData.data, rowUUID: "row-1"))
             context.insert(DrawingSchemaV5.FavoriteVerse(
                 chapter: LinkageFixture.chapter, verse: 1, translation: .NKRV, sentence: "태초에", lineData: RealLegacyLineData.data, createdDate: Date(), favoriteID: "fav-1"
             ))

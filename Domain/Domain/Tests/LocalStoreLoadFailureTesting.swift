@@ -286,15 +286,15 @@ struct LocalStoreLoadFailureTesting {
                 baseWritingWidth: 372, baseWritingHeight: 60, baseUnderlineAnchors: [0, 30], layoutSignature: "mig-f1"
             )
 
-            let generation = try await repository.load(chapter: chapter).generation
+            let generation = try await repository.load(chapter.inDefaultNotebook).generation
             await #expect(throws: Never.self) {
                 try await repository.apply(
                     [.create(verse: 1, rowID: .issue(), data: RealLegacyLineData.data, metadata: metadata)],
-                    chapter: chapter,
+                    page: chapter.inDefaultNotebook,
                     generation: generation
                 )
             }
-            #expect(try await repository.load(chapter: chapter).snapshots.isEmpty)
+            #expect(try await repository.load(chapter.inDefaultNotebook).snapshots.isEmpty)
         }
     }
 

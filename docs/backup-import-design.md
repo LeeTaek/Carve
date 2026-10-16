@@ -1,6 +1,6 @@
-# 필사 백업 · 불러오기 설계 (2.1)
+# 필사 백업 · 불러오기 설계 (2.1 · 2.2 형식 2)
 
-작성: 2026-10-02 · 갱신: 2026-10-06(구현 반영 · 영어 현지화 번역본 규칙 — §1-1 4 · §2-4 · §4-3 · §5-1 · §5-3) · 2026-10-12(번역본 항목 순서 · 진행 단위를 구현에 맞춤 — §2-4 · §3-1 · §3-2 · §3-4 · §4-1 · §4-3 · §5-3) · 목표: **2.1** · 상태: **구현됨 / 기기 · 시뮬레이터 확인(시험 계획 단계 D · NCANVAS-U1) 남음** — 무엇이 어디 있고 어느 자동 시험이 보는지는 §9
+작성: 2026-10-02 · 갱신: 2026-10-06(구현 반영 · 영어 현지화 번역본 규칙 — §1-1 4 · §2-4 · §4-3 · §5-1 · §5-3) · 2026-10-12(번역본 항목 순서 · 진행 단위를 구현에 맞춤 — §2-4 · §3-1 · §3-2 · §3-4 · §4-1 · §4-3 · §5-3) · 2026-10-16(2.2 「회차별 필사책」 **형식 2** — §10, 바뀐 곳은 §2-2 · §2-3 · §2-4 · §2-5 · §3-2 · §4-2 · §6-3 · §7 에 줄을 더했다) · 목표: **2.1**(형식 1) · **2.2**(형식 2) · 상태: **구현됨 / 기기 · 시뮬레이터 확인(시험 계획 단계 D · NCANVAS-U1 · 필사책 설계 §9 M6 · C4) 남음** — 무엇이 어디 있고 어느 자동 시험이 보는지는 §9 · §10-7
 
 > 이 문서는 [iCloud 동기화·오프라인 사용·외부 백업 정책](./icloud-sync-and-backup-policy.md) §6 · §7 의 결정을 2.1 에서 구현하는 **계약**이다.
 > 정책 문서는 결정만, 이 문서는 파일 형식 · 흐름 · 판정 규칙 · 시험을 담는다. 「결정 n」 은 2026-10-02 사용자 결정(인터뷰 기록)의 번호이고
@@ -94,7 +94,8 @@ iCloud 는 기기 간 동기화라 잘못된 수정 · 삭제도 퍼진다(정�
 - 날짜는 `dateEncodingStrategy = .deferredToDate` — 2001-01-01T00:00:00Z 기준 초(Double)다. `Date` 를 손실 없이 왕복한다(ISO 8601 문자열은 소수 초를 잃는다).
 - Optional 은 nil 이면 키가 빠진다(JSONEncoder 기본). 읽을 때는 키 없음과 `null` 을 같게 nil 로 읽는다 — 이 문서의 「null」 은 둘을 함께 말한다.
 - 바이트(잉크 · 메타데이터)는 JSON 에 넣지 않고 blob 이름으로 가리킨다(§2-7).
-- 읽을 때 모르는 키는 무시한다 — 뒤 버전이 키를 더해도 읽힌다. 단 `formatVersion` 이 1 이 아니면 `unsupportedFormat` 으로 **파일 전체**를 거부한다.
+- 읽을 때 모르는 키는 무시한다 — 뒤 버전이 키를 더해도 읽힌다. 단 `formatVersion` 이 1 이 아니면 `unsupportedFormat` 으로 **파일 전체**를 거부한다
+  (2.2 는 1 · 2 를 읽는다 — `BackupFormat.readableFormatVersions`, §10).
   `manifest.json` 을 `items.json` 보다 먼저 읽고, manifest 안에서도 `formatVersion` 을 가장 먼저 읽는다 — 다른 버전은 나머지 모양이 달라도 디코딩 실패(`malformed`)가
   아니라 `unsupportedFormat(formatVersion:)` 으로 보인다.
 
@@ -102,13 +103,14 @@ iCloud 는 기기 간 동기화라 잘못된 수정 · 삭제도 퍼진다(정�
 
 | 키 | 타입 | 뜻 |
 |---|---|---|
-| `formatVersion` | Int | 백업 형식 버전 `BackupFormat.formatVersion` = 1. 앱 버전 · 스키마 버전과 별개다(정책 §6-3) |
+| `formatVersion` | Int | 백업 형식 버전 `BackupFormat.formatVersion` = 1(2.1). 앱 버전 · 스키마 버전과 별개다(정책 §6-3). **2.2 는 2 로 쓰고 1 · 2 를 읽는다(§10)** |
 | `backupID` | String | 이 백업의 UUID |
 | `createdAt` | Date | 만든 시각(내보내기를 시작한 시각) |
 | `appVersion` | String | 만든 앱 버전(예: `2.1.0` — `@Dependency(\.appVersion)`) |
 | `scope` | `BackupScope` | `rows` · `drafts` — 행 · 초안을 담았는가. 2.1 은 전체 백업만 만들어 둘 다 true 다. 선택 백업의 자리(정책 §9-2) |
 | `counts` | `BackupCounts` | `rows` · `drafts` · `blobs` 의 수 — 읽을 때 실제 수와 맞아야 한다 |
 | `blobs` | [`BackupBlobEntry`] | blob 마다 `name`(64자 hex) · `size`(바이트) · `sha256`(64자 hex), 이름순. 읽을 때 실제 크기 · 해시가 맞아야 한다 |
+| `notebooks` | [`BackupNotebookRecord`] | **형식 2 만**(2.2) — 필사책 목록(`DrawingNotebook` 필드 원본 그대로, 필사책마다 하나). 별도 파일이 아니라 이 키에 둔다(이유 §10-2). 형식 1 은 쓰지 않고, 형식 1 파일에 있어도 읽지 않는다 |
 
 **넣지 않는 것:** 계정 식별자 · 계정 해시(`AccountScope`) · 기기 이름 · 설정 · 즐겨찾기 · 위젯 · 구매 상태 · CloudKit 메타데이터. manifest 뿐 아니라 **파일 어디에도** 없다.
 작업 기록에 쓰는 대상 계정 범위(§6-2)도 파일에는 넣지 않는다.
@@ -137,12 +139,13 @@ iCloud 는 기기 간 동기화라 잘못된 수정 · 삭제도 퍼진다(정�
 | `translation` | String? — 행 · 초안에 저장된 값 그대로(`Translation.rawValue` — `NKRV` · `KJV` · `BSB`). 행에 값이 없으면 null — NKRV 로 채우지 않는다. **영어 행은 열이 nil 이므로 `titleName` 접두에서 온 값(`"KJV"` · `"BSB"`)을 쓴다**(2026-10-06 — `StoredBookKey.decode`). 접두가 없는 행만 열 값을 본다. 초안은 `VerseDraftKey.translation`(기기 안 파일이라 영어도 실제 값) |
 | `book` | USFM 권 코드 `GEN` … `REV` — Domain `BibleBookCode` 가 `BibleTitle` 66권과 1:1 양방향(§2-6). 영어 행은 `titleName` 을 `StoredBookKey.decode` 로 푼 권이다 — 번역본마다 같은 코드다 |
 | `chapter` · `verse` | Int |
+| `notebook` | String? — **형식 2 만**(2.2). 필사책 토큰(`NotebookID.rawValue` 원문). 기본 필사책은 키를 쓰지 않는다(null). 형식 1 은 읽을 때 늘 null 이다(값이 있어도 버린다). `NotebookID` 형식이 아니면 그 항목만 건너뛴다(「알 수 없는 필사책」 — §10-4) |
 
 `BackupItemSource`
 
 | 키 | 뜻 |
 |---|---|
-| `titleName` | 행의 `titleName` 원문 — 개역개정 `1-01Genesis.txt`, 영어 `KJV-1-01Genesis.txt`(2026-10-06). 권 코드와 함께 원본을 보존한다. 불러오기는 이 값이 아니라 `book` · `translation` 으로 권 이름을 다시 짓는다(§4-3) |
+| `titleName` | 행의 `titleName` 원문 — 개역개정 `1-01Genesis.txt`, 영어 `KJV-1-01Genesis.txt`(2026-10-06), 다른 필사책 행은 `nb_<토큰>~` 접두까지(2.2). 권 코드와 함께 원본을 보존한다. 불러오기는 이 값이 아니라 `book` · `translation` · `notebook` 으로 권 이름을 다시 짓는다(§4-3 · §10-4) |
 | `rowKey` | 행: `rowUUID ?? business id`. 초안: 식별 · 판정에 쓰지 않는다(null 이어도 된다) |
 | `draftScope` | 초안만. `"local"`(로그인하지 않은 동안 · `acct-local`) · `"unverified"`(계정을 확인하지 못한 동안 · `acct-unverified`) · `"account"`(확인된 계정 묶음) 중 하나. **계정 해시는 넣지 않는다** |
 | `draftRevision` | 초안만. 그 세션 · 절의 revision |
@@ -160,6 +163,7 @@ id          = ("row-" | "draft-") + SHA-256(정규 문자열) 소문자 hex 64�
 ```
 
 - `sourceKey` — 행: `rowKey`(`rowUUID ?? business id`). 초안: `"<draftScope>|<sessionID>|<translation>|<title>|<chapter>|<verse>|<revision>"`(`BackupItemID.draftSourceKey`).
+  **2.2:** 기본이 아닌 필사책의 초안은 끝에 `"|<필사책 토큰>"` 을 더한다 — 기본 필사책 초안은 2.1 과 같은 키다(이유 §10-3).
 - 구현: `BackupItemID.make(kind:sourceKey:fingerprint:)` · 이름공간 `BackupItemID.namespace` · 지문 자리 `BackupItemID.emptyFingerprint`(`"empty"`).
 - `LegacyVersionID` 와 같은 방식이고(길이 접두로 경계를 고정 · 종류와 내용 지문을 넣는다) 이름공간(`carve.backupItem/1`)만 다르다 — 같은 행이 다른 내용이 되면
   다른 id 다(정책 §12-5 C5).
@@ -345,6 +349,8 @@ id          = ("row-" | "draft-") + SHA-256(정규 문자열) 소문자 hex 64�
 2. 장 목록 = 행이 있는 장(`SwiftDatabaseActor.backupChapterList()` — `backupChapters()` 와 같은 목록을 **그때의 저장소 세대와 같은 actor 구간에서** 준다) ∪ 여는 묶음마다
    초안이 있는 장(`draftSummary(in:).chapters`)을 **권 · 장 자리**로 줄인 것(`BibleChapter.backupPlaces` — 같은 권 · 장이 번역본별로 여러 번 와도 한 번), 권 → 장 순서.
    진행은 `BackupProgress(done: 0, total: 자리 수)` 로 먼저 한 번 알린다.
+   **2.2(§10-3):** 자리는 **필사책 · 권 · 장**이고(`NotebookChapter.backupPlaces`), 행이 있는 장은 `backupListing()`(필사책 목록 · 세대와 같은 actor 구간), 초안이 있는 장은
+   `draftSummary(in:).pages`(모든 필사책) 에서 온다. 행 조회는 `backupRows(page:)`, 초안 고르기는 `BackupExportDraftSelection.select(page:…)` 다 — 아래 3 의 「번역본 장」 은 「필사책 · 번역본 장」 이다.
 3. 자리(권, 장)마다:
    1. `current()` 를 다시 읽는다. 계정 상태 · 저장소 소유 · 여는 묶음이 시작 때와 다르면 **`accountChanged` 로 실패**한다 — 다른 계정 초안이 한 파일에 섞이지 않게.
    2. 그 자리의 번역본 장마다(`backupTranslationChapters` — NKRV → KJV → BSB, `Translation.allCases` 순서) 아래 3 ~ 5 를 한다. 행 · 초안이 없는 번역본 장은 항목 없이 지나간다.
@@ -437,7 +443,7 @@ id          = ("row-" | "draft-") + SHA-256(정규 문자열) 소문자 hex 64�
 | 허용 밖 항목 이름 · 링크 · 일반 파일이 아닌 항목 · 종류 불일치 · 같은 이름 두 번 · DAT 밖 바이트 필드 | `BackupArchiveError.entryRejected(name:)` | `wrongPasswordOrDamaged`(「파일 거부」) |
 | 푸는 도중 항목 하나 · 합계 · 파일 수 상한 초과(§2-8) | `BackupArchiveError.tooLarge` | `tooLarge` |
 | 풀 공간 부족 · 입출력 실패 | `BackupArchiveError.insufficientSpace` · `.ioFailed` | `insufficientSpace` · `ioFailed` |
-| `formatVersion` ≠ 1 | `BackupFormatError.unsupportedFormat(formatVersion:)` | `unsupportedFormat(formatVersion:)` |
+| `formatVersion` ≠ 1 (2.2 는 1 · 2 밖 — §10) | `BackupFormatError.unsupportedFormat(formatVersion:)` | `unsupportedFormat(formatVersion:)` |
 | 색인 파일 · 항목 수 · blob 하나 · blob 합계 상한 초과 | `BackupFormatError.limitExceeded(.indexBytes · .items · .blobBytes · .totalBytes)` | `tooLarge` |
 | manifest · items 가 없거나 디코딩 실패 | `malformed(fileName:)` | `wrongPasswordOrDamaged` |
 | manifest blob 항목이 형식에 맞지 않음(이름 형식 · `name` ≠ `sha256` · 음수 크기) · 같은 blob 두 번 | `invalidBlobEntry(name:)` · `duplicateBlob(name:)` | `wrongPasswordOrDamaged` |
@@ -678,6 +684,8 @@ null 묶음(개역개정)에 섞이지 않는다. 장 단위 조회도 번역본
   계정인지 견줄 수 없어 다른 계정이라 단정하지 않고 「멈춘 불러오기를 지금은 이어서 할 수 없어요」 + 사유. 버리기는 「버리면 멈춘 불러오기의 기록과 이 iPad에 남겨
   둔 백업 사본만 지워요. 이미 넣은 필사는 그대로 있어요.」
 - 끝나거나(`.completed`) 버리면 암호화 사본과 기록을 지운다.
+- **2.2:** 기록 형식 `recordVersion` 2 — 끝난 장(`doneChapters`)이 필사책 안의 장(`NotebookChapter`)이다. 2.1 이 남긴 기록(1 — `BibleChapter`)은 기본 필사책의 장으로
+  읽어 업데이트 뒤에도 이어 한다(§10-5).
 
 ### 6-4. 내보내기의 계정
 
@@ -699,6 +707,7 @@ null 묶음(개역개정)에 섞이지 않는다. 장 단위 조회도 번역본
 | V6 미개방이라 계보 없음 | `parents` 가 비어 있다. 두 기기의 분기를 계보로 가리지 못하고 대표 규칙(`isPresent` → `updateDate`)이 정한다 — 현재 후보 선택 · 지운 절 보호도 기기 시각 비교라 시계가 크게 어긋나면 틀릴 수 있다(정책 §8 시계 차이). 버전 저장을 열면 이 행들은 legacy 원본으로 수용된다(정책 §12-6 C3) |
 | 즐겨찾기 스냅샷 제외 | 즐겨찾기 · 위젯은 추가할 때의 사본이라 담지 않는다. 즐겨찾기에만 남은 필사는 이 백업으로 되살릴 수 없다 — 안내 문구가 「즐겨찾기 · 설정 · 위젯은 담지 않아요」 라고 말한다(정책 §6-3) |
 | Files 앱에서 눌러 열기 없음 | 문서 타입 선언 · 「이 앱으로 열기」 는 2.1 범위 밖이다. 설정 → 필사 백업 → 「백업 불러오기」 에서 파일을 고른다 |
+| 2.1 은 2.2 백업(형식 2)을 읽지 못한다 | 2.1 은 형식이 다르면 파일 전체를 거부하고 업데이트를 안내한다(`unsupportedFormat` — 혼재 버전 규칙 ⑤). 다른 필사책이 기본 필사책에 합쳐지는 것보다 낫다. 2.1 기기에서 만든 백업에는 기본 필사책만 든다(2.1 은 필사책 접두 행을 풀지 못해 담지 않는다) — 다른 필사책까지 담으려면 2.2 기기에서 만든다(§10-6) |
 | 「모든 필사 삭제」 뒤의 옛 백업 | 전체 삭제는 기준점을 남기지 않으므로(V6 미개방) 그 뒤 옛 백업을 불러오면 지운 필사가 그대로 들어온다. 사용자가 고른 명시적 복구로 본다(정책 §8 「영구 삭제와 과거 백업」). 오프라인 기기가 옛 행을 다시 올리는 재등장(정책 §12-5 C11)과는 별개다 |
 
 ## 8. 시험
@@ -709,7 +718,7 @@ null 묶음(개역개정)에 섞이지 않는다. 장 단위 조회도 번역본
 
 | 영역 | 확인할 것 |
 |---|---|
-| 형식 | 인코딩 왕복(`sortedKeys` · 같은 내용 같은 바이트 · `Date` 소수 초 손실 없음), 모르는 키 무시, `formatVersion` ≠ 1 거부, 이름 허용 목록 · 경로 이탈, 상한, `counts` · blob 크기 · 해시 불일치 거부, `BibleBookCode` 66권 양방향, `BackupItemID` 의 안정성과 구성요소 경계(길이 접두) |
+| 형식 | 인코딩 왕복(`sortedKeys` · 같은 내용 같은 바이트 · `Date` 소수 초 손실 없음), 모르는 키 무시, `formatVersion` ≠ 1 거부(2.2: 1 · 2 밖 거부 — §10-7), 이름 허용 목록 · 경로 이탈, 상한, `counts` · blob 크기 · 해시 불일치 거부, `BibleBookCode` 66권 양방향, `BackupItemID` 의 안정성과 구성요소 경계(길이 접두) |
 | 컨테이너 | 암호 왕복, 잘못된 암호 · 변조 · 잘림 → `wrongPasswordOrDamaged`, 링크 · 이탈 항목 거부, 푸는 도중 상한, 작업 폴더 정리 · `removeStale()`, **iPadOS 17.5 에서 scrypt 프로필 동작** |
 | 내보내기 | 행 원본 보존(v1 · v2 · v3 · nil · 비운 · 보관), 대표 행 `isCurrent`(비운 대표 포함), 초안 분류 표(§3-4) 전 칸, 다른 계정 묶음 · `raw/` · `separation/` · `*.unreadable-*` 제외, 장 사이 세대 변경 → `generationChanged`, 장 사이 계정 변경 → `accountChanged`, 같은 바이트 blob 한 번, 다시 열어 대조 |
 | 판정기 | §5-1 표의 모든 칸, 「비운 현재 + 잉크 보관」 세 경우, 지운 절 보호의 앞뒤 시각, 현재 후보 여럿(시각 · id 동률), 같은 지문 항목 둘, 번역 null 과 NKRV 한 묶음, 지원하지 않는 항목 사유별 수 |
@@ -810,3 +819,83 @@ v1 · v2 · v3 · nil · 비운 · 보관 행 · 초안 → 내보내기 → 빈
 | 2.0.x(「필사 캔버스」 끔) → 2.1 덮어 설치 | NCANVAS-U1 | 실제 2.0.x 빌드와 업데이트가 필요하다 |
 | 상한 실측 — 큰 백업(행 · blob 수 · 크기)을 만들고 불러올 때의 시간 · 메모리 · 남은 공간 | D4(상한) · §2-8 | 초기값을 실측으로 조정하기로 했고(정책 §9-2) 아직 재지 않았다 |
 | 실사용 저장소의 「권 · 장을 알 수 없는 행」 로그 수 | — (§7) | 실사용 저장소 로그로만 안다 |
+
+## 10. 형식 2 — 필사책 (2.2)
+
+2026-10-16 · 2.2 「회차별 필사책」([필사책 설계](./notebook-design.md) §7 백업 줄 · §3-2 혼재 버전 규칙 ⑤)으로 형식을 **2** 로 올렸다.
+2.2 는 형식 2 로 쓰고 **1 · 2 를 모두 읽는다** — 형식 1(2.1 이 만든 파일)은 전부 기본 필사책이다. 2.1 은 형식 2 파일을 통째로 거부하고 업데이트를 안내한다.
+위 §1 ~ §9 는 형식 1(2.1) 기준으로 쓴 그대로 두고, 바뀐 곳에는 이 절을 가리키는 줄을 더했다.
+
+### 10-1. 무엇이 바뀌었나
+
+| 곳 | 형식 2 |
+|---|---|
+| manifest `formatVersion` | 2(`BackupFormat.formatVersion`). 읽는 판은 `BackupFormat.readableFormatVersions` = {1, 2} — 밖(3 이상)이면 파일 전체를 `unsupportedFormat` 으로 거부한다. 판은 지금처럼 manifest 에서 가장 먼저 읽는다 |
+| manifest `notebooks` | [`BackupNotebookRecord`] — `DrawingNotebook` 레코드의 필드(`id` · `name` · `status` · `createdAt` · `updatedAt` · `completedAt` · 예약 `kind` · `scopeData` · `linkData`)를 **원본 그대로**. `status` 는 문자열 그대로(모르는 값도 버리지 않는다 — 혼재 ④), 예약 필드는 해석하지 않고 옮긴다. 필사책마다 하나(같은 ID 가 둘이면 `updatedAt` 이 늦은 쪽, 같으면 이름 사전순 앞 — `latestPerNotebook`), 기본 필사책 먼저 · 나머지 ID 순. ID 가 `NotebookID` 형식이 아닌 레코드는 담지 않는다. 형식 1 은 늘 빈 목록이다(형식 1 파일에 키가 있어도 읽지 않고, 형식 1 manifest 를 쓸 때는 키를 쓰지 않는다 — 2.1 모양 그대로) |
+| 항목 `verse.notebook`(`BackupVerseKey.notebook`) | 필사책 토큰(`NotebookID.rawValue` 원문). 기본 필사책은 키를 쓰지 않는다(nil) — 기본 필사책 항목은 형식 1 항목과 같은 모양이다. 형식 1 파일은 읽을 때 늘 nil 이다(`BackupPayload.load` 가 버린다) |
+| 항목 `source.titleName` | 행의 원문 그대로 — 다른 필사책 행은 `nb_<토큰>~` 접두까지(예 `nb_0f3a…~KJV-1-19Psalms.txt`) |
+| 초안 항목 id 의 원본 키 | 기본 필사책 초안은 2.1 과 같다. 다른 필사책 초안은 끝에 `"\|<토큰>"`(§10-3) |
+
+### 10-2. 필사책 목록을 manifest 키에 둔 이유
+
+별도 파일(예: `notebooks.json`)을 두지 않고 `manifest.json` 의 `notebooks` 키에 담는다. 2.1 의 풀기는 `manifest.json` · `items.json` · `blobs` · `blobs/<hex>` 밖의 항목 이름을
+만나면 **형식 버전을 읽기 전에** `entryRejected` 로 거부하고(`BackupArchiveEntry` — §2-1), 불러오기는 그것을 「암호가 맞지 않거나 파일이 손상됐어요」 로 알린다(§4-2).
+파일을 더하면 2.1 이 형식 2 파일을 업데이트 안내(`unsupportedFormat`) 대신 손상으로 알려 혼재 버전 규칙 ⑤(형식이 다르면 파일 전체를 거부하고 **업데이트를 안내한다**)를 어긴다.
+manifest 는 2.1 도 가장 먼저 읽고 그 안에서 `formatVersion` 부터 읽으므로, 키를 더해도 2.1 은 `unsupportedFormat(formatVersion: 2)` 로 업데이트를 안내한다.
+같은 이유로 형식 2 도 컨테이너 항목 이름 허용 목록(§2-1)은 그대로다.
+
+### 10-3. 내보내기 — 모든 필사책
+
+- 자리는 **필사책 · 권 · 장**이다(`NotebookChapter.backupPlaces` — 번역본은 개역개정으로 맞춘다). 순서는 기본 필사책 먼저 · 나머지 토큰 순 → 권 → 장, 진행 단위도 이 자리다.
+- 자리 목록 = 행이 있는 장(`SwiftDatabaseActor.backupListing()` — 모든 필사책의 행을 `StoredBookKey.decodeRow` 로 풀고, 필사책 목록 · 저장소 세대를 **같은 actor 구간에서** 읽는다)
+  ∪ 여는 묶음에 초안이 남은 장(`draftSummary(in:).pages` — **모든 필사책**, 초안 파일 이름의 `nb_<토큰>~` 접두로 가른다).
+- 자리의 필사책 · 번역본 장마다 행은 그 장의 `titleName` 으로 읽고(`backupRows(page:)`), 초안은 그 필사책 · 번역본의 것만 §3-4 와 같은 규칙으로 고른다
+  (`BackupExportDraftSelection.select(page:environment:rows:reader:)` — `drafts(in:page:)`). 초안과 견주는 저장소 쪽 입력도 같은 page 의 행이다 — 「확인이 필요한 필기」 가
+  필사책마다 따로 견주는 것과 같다. **다른 필사책의 초안도 담는다**(2026-10-16 t4 — 형식 2 를 처음 낸 t1d 는 기본 필사책 초안만 담았다).
+- **다른 필사책 초안의 id 원본 키에 필사책 토큰을 더한다**(`BackupItemID.draftSourceKey(…, notebook:)` —
+  `"<draftScope>|<sessionID>|<translation>|<title>|<chapter>|<verse>|<revision>|<토큰>"`, 기본 필사책은 nil 이라 2.1 과 같은 7 구성요소).
+  - 이유: 초안 키(세션 · 번역본 · 권 · 장 · 절)와 revision 이 같은 초안이 두 필사책에 같은 내용(비운 절끼리 포함)으로 있으면, 토큰 없이는 지문까지 같아 id 가 겹친다.
+    파일 안 id 는 겹칠 수 없어(§4-2 `duplicateItemID`) 준비 폴더가 같은 id 의 항목을 하나만 담으므로(`BackupExportStaging.add` — 로그만 남긴다) **한 필사책의 초안이
+    백업에서 조용히 빠진다.** 필사책을 바꿔도 같은 편집 세션이 이어질 수 있어 세션 · revision 이 같은 일이 드물지 않다.
+  - 기본 필사책 초안의 키는 2.1 과 같게 둔다 — 같은 초안을 2.1 · 2.2 가 같은 id 로 담는다. id 는 파일 안 이름일 뿐 불러오기의 중복 판정은 지문으로 하므로(§2-5) 불러오기
+    결과는 바뀌지 않는다. 행 항목의 원본 키(`rowUUID ?? business id`)는 필사책마다 이미 다르다(business id 도 접두 `titleName` 으로 짓는다).
+- 필사책 목록은 manifest 에 담는다(§10-1) — 행이 하나도 없는 필사책의 이름 · 상태도 백업에 든다.
+
+### 10-4. 불러오기
+
+- 형식 1 항목은 전부 기본 필사책이다. 형식 2 항목이 놓일 장은 필사책까지 담는다(`BackupImportPlanner.page(of:)` → `NotebookChapter` — 토큰이 없으면 기본 필사책,
+  토큰 「default」 도 기본 필사책). **판정 단위에 필사책을 더한다** — 같은 지문이어도 필사책이 다르면 다른 절이라 `skipSame` 이 아니다. 장 순서는 기본 필사책 먼저 · 나머지
+  토큰 순 → 권 → 장 → 번역본이다.
+- 넣는 행의 `titleName` 은 `StoredBookKey.titleName(title:translation:notebook:)` 다 — 기본 필사책은 2.1 형식 그대로, 그 밖은 `nb_<토큰>~` 접두. `translation` 열은
+  필사책과 무관하게 번역본으로만 정한다(영어는 nil — 혼재 ②). 그 장의 지금 행도 같은 `titleName` 으로 고르므로 다른 필사책의 같은 권 · 장 행은 판정에 들지 않는다.
+- **알 수 없는 필사책** — 항목의 토큰이 `NotebookID` 형식이 아니면(대문자 · 길이 · 16진 밖 · 빈 값) 그 항목만 건너뛴다(`BackupItemSupport.hasUnknownNotebook`, 어느 장에도
+  놓지 않는다 — 기본 필사책에 넣지 않는다). 파일은 거부하지 않는다. 사유 열거형 `BackupUnsupportedReason` 에 경우를 더하지 않고 **미리보기 `unknownNotebook` 으로 따로
+  센다** — 설정 화면이 그 열거형을 빠짐없이 `switch` 하고 있어 경우를 더하면 화면 모듈이 컴파일되지 않는다. 「넣을 수 없는 것」 수(`unsupportedCount`)에는 든다.
+  번역본도 함께 모르는 항목은 알 수 없는 필사책으로 한 번만 센다.
+- 미리보기에 필사책 수(`notebooks` — 항목의 필사책 ∪ 목록 중 ID 형식이 맞는 것).
+- **필사책 목록은 장보다 먼저** 쓴다 — 장과 같은 쓰기 게이트 · 대상 계정 확인을 지난 뒤 한 트랜잭션(`DrawingBackupRestoring.restoreNotebooks`). 이 기기에 그 ID 의 레코드가
+  없으면 넣고, 있으면 백업 레코드의 `updatedAt` 이 **늦을 때만** 그 ID 의 레코드 전부를 바꾼다(같거나 이르면 그대로 — 다시 불러와도 멱등). 레코드를 지우지 않는다.
+  ID 형식이 아닌 레코드는 건너뛴다. 세대가 다르면 아무것도 쓰지 않는다(장과 같다). 행보다 먼저 써서 불러오는 동안 다른 필사책이 「이름 없는 필사책」 으로 보이는 틈을 줄인다.
+- 바뀐 장은 page 로 알린다(`LocalDrawingChange(page:date:)`) — 열린 필사 화면은 같은 page(필사책 · 장)일 때만 다시 읽는다.
+
+### 10-5. 작업 기록 — recordVersion 2
+
+`job.json`(`BackupImportJobRecord`)의 `recordVersion` 이 2 다(`currentRecordVersion`). 끝난 장(`doneChapters`)이 `[NotebookChapter]` 다. 2.1 이 남긴 기록(1 — 끝난 장이
+`[BibleChapter]`)도 읽고, 그 작업은 형식 1 파일이라 **기본 필사책의 장으로** 읽는다 — 업데이트 뒤에도 멈춘 불러오기를 이어 할 수 있다. 읽은 기록은 지금 모양으로 들고,
+다시 쓰면 recordVersion 2 다.
+
+### 10-6. 혼재 버전 · 한계
+
+- 2.1 은 형식 2 파일을 거부하고 업데이트를 안내한다(`unsupportedFormat`) — 다른 필사책이 기본 필사책에 합쳐지는 것보다 낫다(혼재 ⑤). 필사책 설계 §9 공존 C4 로 확인한다.
+- 2.1 기기에서 만든 백업(형식 1)에는 기본 필사책만 든다 — 2.1 은 필사책 접두 행을 `StoredBookKey.decode` 로 풀지 못해 담지 않고 수만 로그에 남긴다.
+- 지운 필사책의 행이 늦게 와서 남았거나 메타데이터보다 행이 먼저 온 필사책은 목록 레코드 없이 항목만 담긴다 — 불러온 기기에서도 「이름 없는 필사책」 으로 보인다(혼재 ⑥).
+- V6 버전 엔티티(`VerseDrawingVersion` · `DrawingEraseEpoch`)에는 여전히 아무것도 쓰지 않는다(혼재 ③).
+
+### 10-7. 자동 시험
+
+| 무엇 | 시험(`DomainTest` · `SettingsFeatureTest`) |
+|---|---|
+| 왕복 — 기본 · A · B 필사책의 행과 정보, 같은 내용이라도 필사책끼리 섞이지 않음, 형식 1 은 전부 기본 · 형식 3 거부 · manifest 의 필사책 키는 2 부터, 알 수 없는 필사책 항목만 건너뜀, **다른 필사책 초안 내보내기 · 같은 세션 · 절 · revision · 잉크 두 필사책 초안의 id**(t4) | `BackupNotebookRoundTripTesting` |
+| 필사책 정보 — 같은 ID 는 `updatedAt` 늦은 쪽 · 멱등 · 세대, 판정 단위에 필사책, 2.1 작업 기록 읽기 | `BackupNotebookInfoRestoreTesting` |
+| 미리보기 화면의 필사책 수 · 알 수 없는 필사책 수 | `SettingsFeatureTest` — `BackupImportNotebookTesting` |
+| 초안 id 의 원본 키(기본 필사책은 2.1 과 같은 알려진 값) | `BackupFormatItemIDTesting` · `BackupExportDraftTesting` |

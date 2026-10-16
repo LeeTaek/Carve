@@ -36,10 +36,10 @@ struct RawStoreSnapshotTesting {
             configurations: ModelConfiguration(url: url, cloudKitDatabase: .none)
         )
         let context = ModelContext(container)
-        context.insert(BibleDrawing(bibleTitle: chapter, verse: 1, lineData: RealLegacyLineData.data, rowUUID: "row-1"))
+        context.insert(BibleDrawing(page: chapter.inDefaultNotebook, verse: 1, lineData: RealLegacyLineData.data, rowUUID: "row-1"))
         if largeInk {
             let ink = Data((0..<1_048_576).map { UInt8($0 % 251) })
-            context.insert(BibleDrawing(bibleTitle: chapter, verse: 2, lineData: ink, rowUUID: "row-2"))
+            context.insert(BibleDrawing(page: chapter.inDefaultNotebook, verse: 2, lineData: ink, rowUUID: "row-2"))
         }
         try context.save()
         try V4StoreHarness.settleWAL(at: url)

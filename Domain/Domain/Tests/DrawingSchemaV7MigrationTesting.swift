@@ -23,7 +23,7 @@ struct DrawingSchemaV7MigrationTesting {
         )
         let context = ModelContext(container)
         let row = DrawingSchemaV4.BibleDrawing(
-            bibleTitle: chapter,
+            page: chapter.inDefaultNotebook,
             verse: 1,
             lineData: RealLegacyLineData.data,
             updateDate: Date(timeIntervalSince1970: 1_750_000_000),
@@ -32,7 +32,7 @@ struct DrawingSchemaV7MigrationTesting {
         row.isPresent = true
         context.insert(row)
         let english = DrawingSchemaV4.BibleDrawing(
-            bibleTitle: BibleChapter(title: .psalms, chapter: 23, translation: .KJV),
+            page: BibleChapter(title: .psalms, chapter: 23, translation: .KJV).inDefaultNotebook,
             verse: 1,
             lineData: RealLegacyLineData.data,
             updateDate: Date(timeIntervalSince1970: 1_750_000_050),

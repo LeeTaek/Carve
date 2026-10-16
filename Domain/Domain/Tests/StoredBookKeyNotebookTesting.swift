@@ -13,6 +13,7 @@ import Testing
 /// 필사책 행 귀속(2.2 「회차별 필사책」 결정 1 · 혼재 버전 규칙 ①) — 기본 필사책 행은 지금 형식 그대로, 그 밖은 `nb_<토큰>~` 접두.
 ///
 /// 옛 앱은 접두 행을 풀지 못해 건너뛴다 — 2.0.0 은 `BibleTitle(rawValue:)`, 2.1 은 `StoredBookKey.decode(_:)` 로 푼다. 그 동작을 흉내 내 고정한다.
+/// 2.1 의 공개 함수(`titleName(title:translation:)` · `decode(_:)`)는 2.2 t4 에서 지웠다 — 이 파일 아래의 `titleNameAs21` · `decodeAs21` 이 그 코드를 그대로 옮긴 것이다.
 struct StoredBookKeyNotebookTesting {
     private static let notebook = NotebookID.make(uuid: UUID(uuidString: "0F3A9C2E-7B41-4D6A-9E15-2C8B7D04A1F3")!)
 
@@ -21,11 +22,10 @@ struct StoredBookKeyNotebookTesting {
         for translation in Translation.allCases {
             for title in BibleTitle.allCases {
                 let chapter = BibleChapter(title: title, chapter: 1, translation: translation)
-                let legacy = StoredBookKey.titleName(title: title, translation: translation)
+                let legacy = Self.titleNameAs21(title: title, translation: translation)
 
                 #expect(StoredBookKey.titleName(title: title, translation: translation, notebook: .default) == legacy)
                 #expect(StoredBookKey.titleName(for: NotebookChapter(notebook: .default, chapter: chapter)) == legacy)
-                #expect(StoredBookKey.titleName(for: NotebookChapter(notebook: .default, chapter: chapter)) == StoredBookKey.titleName(for: chapter))
             }
         }
     }
@@ -70,7 +70,7 @@ struct StoredBookKeyNotebookTesting {
         for translation in Translation.allCases {
             for title in BibleTitle.allCases {
                 let titleName = StoredBookKey.titleName(title: title, translation: translation, notebook: Self.notebook)
-                #expect(StoredBookKey.decode(titleName) == nil, "\(titleName)")
+                #expect(Self.decodeAs21(titleName) == nil, "\(titleName)")
             }
         }
     }
@@ -152,10 +152,34 @@ struct StoredBookKeyNotebookTesting {
                 #expect(row.id.hasPrefix(StoredBookKey.titleName(for: page) + ".1.1."))
             }
         }
-        // 옛 이니셜라이저는 기본 필사책 행을 짓는다 — 2.2 이전과 같은 형식.
-        let legacy = BibleDrawing(bibleTitle: BibleChapter(title: .psalms, chapter: 23, translation: .KJV), verse: 4, rowUUID: "legacy")
+        // 기본 필사책 행은 2.2 이전과 같은 형식이다 — 지운 옛 이니셜라이저(`init(bibleTitle:…)`)가 짓던 행과 같다.
+        let legacy = BibleDrawing(page: BibleChapter(title: .psalms, chapter: 23, translation: .KJV).inDefaultNotebook, verse: 4, rowUUID: "legacy")
         #expect(legacy.titleName == "KJV-1-19Psalms.txt")
         #expect(legacy.translation == nil)
         #expect(legacy.id.hasPrefix("KJV-1-19Psalms.txt.23.4."))
+    }
+
+    // MARK: 2.1 흉내
+
+    /// 2.1 의 `StoredBookKey.titleName(title:translation:)` 을 그대로 옮긴 것 — 기본 필사책 행 형식의 기준이다.
+    private static func titleNameAs21(title: BibleTitle, translation: Translation) -> String {
+        switch translation {
+        case .NKRV: title.rawValue
+        case .KJV, .BSB: translation.rawValue + "-" + title.rawValue
+        }
+    }
+
+    /// 2.1 의 `StoredBookKey.decode(_:)` 를 그대로 옮긴 것 — 2.1 기기가 행의 `titleName` 을 푸는 방법이다.
+    private static func decodeAs21(_ titleName: String) -> (title: BibleTitle, translation: Translation)? {
+        if let title = BibleTitle(rawValue: titleName) {
+            return (title, .NKRV)
+        }
+        for translation in Translation.allCases where translation != .NKRV {
+            let prefix = translation.rawValue + "-"
+            guard titleName.hasPrefix(prefix) else { continue }
+            guard let title = BibleTitle(rawValue: String(titleName.dropFirst(prefix.count))) else { return nil }
+            return (title, translation)
+        }
+        return nil
     }
 }

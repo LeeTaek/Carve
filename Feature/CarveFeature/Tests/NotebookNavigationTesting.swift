@@ -93,7 +93,6 @@ struct NotebookSwitchNavigationTesting {
             try await measure(store, page: NotebookFixture.secondPage)
             #expect(store.carveDetailState.chapterCanvas.loadedDrawings == [])
             #expect(repository.loadedPages.value.last == NotebookFixture.secondPage)
-            #expect(repository.legacyCalls.value == 0)
 
             // 행이 바뀌면 뷰가 스크롤을 낸다(`CarveDetailView` 의 onChange) — 보던 절을 맨 위에.
             store.send(.scope(.carveDetailAction(.scrollToTop)))
@@ -324,7 +323,6 @@ struct NotebookFallbackTesting {
             try await eventually { repository.appliedPages.value.count == 2 && store.chapterCanvas.isFullyPersisted }
             #expect(repository.appliedPages.value == [NotebookFixture.secondPage, NotebookFixture.firstPage])
             #expect(repository.storedRowIDs(NotebookFixture.firstPage) == [NotebookFixture.rowInFirst])
-            #expect(repository.legacyCalls.value == 0)
         }
     }
 }

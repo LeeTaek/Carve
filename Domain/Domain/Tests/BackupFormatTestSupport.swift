@@ -74,7 +74,8 @@ enum BackupFormatSample {
             title: BibleTitle.genesis.rawValue,
             chapter: 1,
             verse: verse,
-            revision: revision
+            revision: revision,
+            notebook: nil
         )
         return BackupItem(
             id: BackupItemID.make(kind: .draft, sourceKey: sourceKey, fingerprint: fingerprint),

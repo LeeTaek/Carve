@@ -58,9 +58,9 @@ private final class HangingEditEnvironment: DrawingEditEnvironmentClient {
 private struct EmptyDraftReader: VerseDraftRecoveryReading {
     func draftBuckets() async throws -> [AccountScope] { [] }
     func draftSummary(in scope: AccountScope) async throws -> DraftBucketSummary {
-        DraftBucketSummary(scope: scope, draftCount: 0, draftBytes: 0, unreadableCount: 0, unreadableBytes: 0, chapters: [])
+        DraftBucketSummary(scope: scope, draftCount: 0, draftBytes: 0, unreadableCount: 0, unreadableBytes: 0, pages: [])
     }
-    func drafts(in scope: AccountScope, chapter: BibleChapter, translation: Translation) async throws -> [VerseDraft] { [] }
+    func drafts(in scope: AccountScope, page: NotebookChapter) async throws -> [VerseDraft] { [] }
     func unreadableDraftFiles(in scope: AccountScope) async throws -> [URL] { [] }
 }
 

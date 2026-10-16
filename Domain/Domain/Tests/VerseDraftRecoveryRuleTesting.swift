@@ -54,7 +54,7 @@ struct VerseDraftRecoveryRuleTesting {
         withMetadata: Bool = true
     ) -> VerseDraft {
         VerseDraft(
-            key: VerseDraftKey(sessionID: session, chapter: chapter, verse: verse),
+            key: VerseDraftKey(sessionID: session, page: chapter.inDefaultNotebook, verse: verse),
             revision: revision,
             rowID: BibleDrawingRowID(raw: "row-\(verse)"),
             lineData: ink.map { Data($0.utf8) },

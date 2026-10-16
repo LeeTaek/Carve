@@ -504,7 +504,7 @@ extension ChapterCanvasArrivalTesting {
         let next = BibleChapter(title: .jonah, chapter: 3)
         // 다음 장 1절에는 확인 전(힌트 A)에 쓴 보이기만 하는 초안이 겹쳐 보인다.
         var shown = previousDraft(verse: 1, ink: "shown-only", account: .unverified(hint: accountA))
-        shown.key = VerseDraftKey(sessionID: shown.key.sessionID, chapter: next, verse: 1)
+        shown.key = VerseDraftKey(sessionID: shown.key.sessionID, page: next.inDefaultNotebook, verse: 1)
         drafts.seed(shown)
         spy.snapshots = { chapter in chapter == next ? [CanvasTestSupport.snapshot(verse: 1, rowID: CanvasTestSupport.rowA)] : [] }
         await store.send(.load(page: next.inDefaultNotebook, expectedVerseCount: 3))

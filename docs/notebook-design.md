@@ -28,28 +28,30 @@
 
 제품 근거는 제품 로드맵 `docs/product-roadmap.md` §1 · §3(2026-10-13, 우선순위 높음 · 개인 기능 — 이 문서를 쓸 때 이 브랜치에는 커밋되지 않았다)과 보관함 결정 「새기다 후속 기능 우선순위와 챌린지 방향 결정」 이다.
 
-### 1-1. 구현 위치 (계획)
+### 1-1. 구현 위치
 
-구현 DAG(보관함 plan 의 plan JSON, slug `carve-reading-rounds`)의 태스크가 맡는 곳이다. 구현하며 이름이 바뀌면 여기를 고친다.
+구현 DAG(보관함 plan 의 plan JSON, slug `carve-reading-rounds`)의 태스크가 맡은 곳이다 — 2026-10-16 t4 가 구현된 파일 · 이름으로 고쳤다(t3a 의 책장 · 헤더 줄은
+같은 레이어라 병합 전 계획 그대로다). 이름이 바뀌면 여기를 고친다.
 
 | 모듈 | 위치 | 맡는 것 |
 |---|---|---|
-| Domain | `Sources/Notebook/` — `NotebookID` · `NotebookChapter` · `currentNotebookID` 키 · `NotebookStatus` · `NotebookSnapshot` · `NotebookRepository`(`\.notebookRepository`) | 필사책 식별 · 계약(t0) |
-| Domain | `Sources/Model/StoredBookKey.swift` | 행 `titleName` 짓기 · 풀기 — 필사책 접두(t0, §4) |
-| Domain (SwiftData) | `Model/DrawingSchemaV7.swift`(`DrawingNotebook`) · `DrawingDataMigrationPlan.swift` · `SwiftDataNotebookRepository.swift` | V7 · 마이그레이션(t0), 필사책 저장소 · 쓴 절 수(t1b) |
-| Domain (SwiftData) | `SwiftDataDrawingRepository` · `SwiftDatabaseActor+DrawingDatabase` · `DrawingDatabase` · 활동 저장소 | 필사 행 조회 · 저장 · 지우기를 page 로(t1a) |
-| Domain | `Drawing/LocalPreservationWriter.swift` · `LocalDrawingChangeClient.swift` · `VerseDraft*` · `+Import` | 초안 · 확인이 필요한 필기 · 가져오기(t1c) |
-| Domain | `Sources/Backup/` · `+BackupRestore` · `SwiftDatabaseActor+Backup` | 백업 형식 2(t1d) |
+| Domain | `Sources/Notebook/` — `NotebookID.swift`(`NotebookID` · `NotebookChapter` · 키 `SharedReaderKey.currentNotebookID`) · `NotebookSnapshot.swift`(`NotebookStatus` · `NotebookSnapshot`) · `NotebookRepository.swift`(`NotebookRepository` · `NotebookRepositoryError` · `\.notebookRepository`) | 필사책 식별 · 계약(t0) |
+| Domain | `Sources/Model/StoredBookKey.swift` — `titleName(for: NotebookChapter)` · `titleName(title:translation:notebook:)` · `decodeRow(_:)`(`StoredRowKey` · `page(chapter:)`) · `translationColumn(for:)` | 행 `titleName` 짓기 · 풀기 — 필사책 접두(t0, §4). 필사책 없는 옛 공개 함수는 t4 에서 지웠다 |
+| Domain (SwiftData) | `Model/DrawingSchemaV7.swift`(`DrawingNotebook`) · `DrawingDataMigrationPlan.swift`(V6 → V7) · `Model/DrawingSchemaV4.swift`(`BibleDrawing.init(page:…)`) · `SwiftDataNotebookRepository.swift`(목록 · 쓴 절 수 · 만들기 · 이름 · 완료 · 지우기) | V7 · 마이그레이션 · 새 행(t0), 필사책 저장소(t1b) |
+| Domain (SwiftData) | `SwiftDataDrawingRepository.swift`(`load(_:)` · `apply(_:page:generation:)` · `archiveAndReset(_:page:)`, actor `loadChapterDrawings(page:)` · `applyDrawingMutations(_:page:…)` · `archiveAndResetVerseDrawing(_:page:…)`) · `SwiftDatabaseActor+DrawingDatabase.swift`(`verseDrawingSnapshots(page:verse:)` · `markPresentDrawing(page:…)` · 활동 조회) · `DrawingDatabase.swift`(`fetchVerseSnapshots(page:verse:)` · `updatePresentDrawing(page:verse:presentRowID:)` · `fetchDrawingRecord(notebook:title:translation:)`) · `Drawing/VerseDrawingSnapshot.swift`(`notebook`) · `Drawing/DrawingActivityRepository.swift`(`DrawingActivity.page`) | 필사 행 조회 · 저장 · 지우기를 page 로(t1a) |
+| Domain | `Drawing/VerseDraftKey.swift`(`VerseDraftKey.notebook` · 파일 이름 `nb_<id>~` — t4 가 `LocalPreservationWriter.swift` 에서 떼어 냈다) · `Drawing/LocalPreservationWriter.swift`(`drafts(in:page:)` · `discardDrafts(notebook:)`) · `Drawing/VerseDraftRecoveryInventory.swift`(`DraftBucketSummary.pages` · `unreadPages` · `currentVerse(page:verse:)` · `NotebookDraftDiscarding`) · `Drawing/VerseDraftImport.swift`(`VerseDrawingImportCommand.page` · `importVerse(_:generation:)`) · `Drawing/LocalDrawingChangeClient.swift`(`LocalDrawingChange.page`) · `SwiftData/SwiftDataDrawingRepository+Import.swift` | 초안 · 확인이 필요한 필기 · 가져오기(t1c) |
+| Domain | `Sources/Backup/` — `Format/BackupNotebookRecord.swift` · `BackupManifest.notebooks` · `BackupVerseKey.notebook` · `BackupItemID.draftSourceKey(…notebook:)` · `Import/BackupImportJobStore.swift`(recordVersion 2), `SwiftData/SwiftDatabaseActor+Backup.swift`(`backupListing()` · `backupRows(page:)`) · `SwiftData/SwiftDataDrawingRepository+BackupRestore.swift`(`restoreNotebooks`) | 백업 형식 2(t1d · 다른 필사책 초안 t4) — [백업 설계](./backup-import-design.md) §10 |
 | Domain | `Drawing/DrawingDataEraser.swift` | 전체 삭제에 `DrawingNotebook`(t1b) |
 | CarveFeature | `Presentation/Notebook/` — `NotebookShelfFeature` · `NotebookShelfView` | 책장(t1e 뼈대 · t3a) |
-| CarveFeature | `ChapterCanvas*` · `CarveDetail/*` · `CarveNavigationFeature` · `VerseDrawingHistory/*` | 저장 경로를 page 로 · 필사책 바꾸기(t2a) |
-| CarveFeature | `Header/MainHeader/*` · `CarveNavigationView` | 헤더 부제 · 「책장 열기」 · 서재 아래 「책장」 아이콘(t3a) |
-| ChartFeature | `Chart/*` · `Model/RecentVerseItem.swift` | 합산 · 최근 기록은 그 필사책으로(t1e · t2b) |
-| SettingsFeature | `Details/DraftRecovery/*` · `Details/iCloud/*` · `Details/Backup/*` | 확인이 필요한 필기 · 전체 삭제 · 백업 화면(t2c) |
-| App | `AppCoordinatorFeature` | `Path.notebooks` · 위임 · `-UITestRoute notebooks`(t1e) |
+| CarveFeature | `Presentation/Drawing/ChapterCanvas/ChapterCanvas*`(`State.page` · `PendingDrawingMutation.page` · 초안 `loadDrafts(page:)` · 컨트롤러 `hostedPage`) · `Presentation/Carve/CarveDetail/CarveDetailFeature.swift`(`currentNotebook` · `reopenInCurrentNotebookIfNeeded`) · `Presentation/Carve/CarveNavigation/CarveNavigationFeature.swift`(`switchNotebook` · `openPage` · `View.moveToNotebooks`) · `Presentation/Drawing/VerseDrawingHistory/VerseDrawingHistoryFeature.swift`(`State(page:verse:)`) · `Presentation/Drawing/SentenceWithDrawing/SentencesWithDrawingFeature.swift`(절 행 id) | 저장 경로를 page 로 · 필사책 바꾸기(t1e 경계 · t2a) |
+| CarveFeature | `Presentation/Header/MainHeader/*` · `Presentation/Carve/CarveNavigation/CarveNavigationView.swift` | 헤더 부제 · 「책장 열기」 · 서재 아래 「책장」 아이콘(t3a) |
+| ChartFeature | `Chart/DrawingChartFeature.swift`(`chapterNotebooksByDay`) · `Chart/DrawingWeeklySummaryFeature.swift`(`recentChapters` · `topChapterPage` · 위임 `openChapter(NotebookChapter)` · `openVerse(NotebookChapter, verse:)`) · `Model/RecentVerseItem.swift`(`notebook` · `page`) | 합산 · 최근 기록은 그 필사책으로(t1e 위임 · t2b, §7) |
+| SettingsFeature | `Details/DraftRecovery/*`(`DraftRecoveryCopy.place(_:notebookNames:locale:)` · `chapterName(_:notebookNames:locale:)`) · `Details/iCloud/iCloudSettingReducer.swift`(`resetCurrentNotebook()`) · `Details/Backup/BackupImportFeature.swift` · `BackupImportView.swift` | 확인이 필요한 필기 · 전체 삭제 · 백업 미리보기(t2c, §7) |
+| App | `Coordinator/AppCoordinatorFeature.swift`(`Path.notebooks` · 책장 위임 셋 · 차트 위임을 `openPage` 로) · `AppCoordinatorView.swift` | 책장 경로 · `-UITestRoute notebooks`(t1e) |
 | ClientInterfaces | `Analytics/AnalyticsEvents.swift` | `AnalyticsFeatureName.notebook`(t3a) |
 
-저장 경로는 「추가 → 이전 → 제거」 로 옮긴다 — t0 이 새 계약을 과도기 기본 구현과 함께 더하고, L1 이 Domain 구현, L2 가 Feature 호출부를 옮기고, t4 가 옛 API 를 지운다(§4-1).
+저장 경로는 「추가 → 이전 → 제거」 로 옮겼다 — t0 이 새 계약을 과도기 기본 구현과 함께 더하고, L1 이 Domain 구현, L2 가 Feature 호출부를 옮기고,
+**t4 가 옛 API 와 과도기 기본 구현을 지웠다**(2026-10-16, §4-1).
 
 ## 2. 용어
 
@@ -139,13 +141,17 @@
   | `titleName(title:translation:notebook:) -> String` | 권 · 번역본 · 필사책으로 같은 것을 짓는다 |
   | `decodeRow(_ titleName: String) -> StoredRowKey?` | `StoredRowKey`(`title` · `translation` · `notebook`, `page(chapter:)`)로 푼다. 접두 형식이 틀리거나 권 · 번역본을 모르면 nil |
   | `translationColumn(for:)` | 그대로 — 필사책과 상관없다 |
-  | 옛 `titleName(for: BibleChapter)` · `titleName(title:translation:)` · `decode(_:)` | **뜻은 「기본 필사책」.** 옛 `decode` 는 접두 행에 nil 이다(2.1 과 같다). 과도기 동안만 남고 t4 가 지운다 — L2 이후의 새 코드는 부르지 않는다 |
+  | 옛 `titleName(for: BibleChapter)` · `titleName(title:translation:)` · `decode(_:)` | **t4 에서 공개 함수로는 지웠다**(2026-10-16). 뜻은 「기본 필사책」 이었고 옛 `decode` 는 접두 행에 nil 이었다(2.1 과 같다). 규칙은 `StoredBookKey` 안의 private 함수(`bookTitleName` · `decodeBook`)로 남아 접두 행의 뒷부분을 짓고 푼다. 기본 필사책도 `notebook: .default` 로 밝혀 짓는다(즐겨찾기 `FavoriteVerse` 권 이름 포함 — 접두를 쓰지 않는다, 혼재 ③) |
 
 - **저장 경로 계약**(결정 12): `DrawingRepository` 의 `load(_ page:)` · `apply(_:page:generation:)` · `archiveAndReset(_:page:)`, 옛 클라이언트 `DrawingDatabase` 의
   `fetchVerseSnapshots(page:verse:)` · `updatePresentDrawing(page:verse:presentRowID:)` · `fetchDrawingRecord(notebook:title:translation:)`, 초안 · 가져오기의
   `LocalDrawingChange.page` · `drafts(in:page:)` · `discardDrafts(notebook:)`. page · notebook 인자에는 **기본값을 두지 않는다.** DTO 에 더하는 필드
-  (`VerseDrawingSnapshot.notebook` · `DrawingActivity.page`)는 init 끝에 기본값을 둬도 된다. 과도기 기본 구현은 page 가 기본 필사책이면 옛 chapter 메서드로 위임하고,
-  아니면 `DrawingRepositoryError.unsupportedNotebook` 을 던진다(t4 가 지운다).
+  (`VerseDrawingSnapshot.notebook` · `DrawingActivity.page`)는 init 끝에 기본값을 둬도 된다. 과도기 기본 구현(page 가 기본 필사책이면 옛 chapter 메서드로 위임,
+  아니면 `DrawingRepositoryError.unsupportedNotebook`)과 옛 chapter 요구 · 메서드는 **t4 에서 지웠다**(2026-10-16) — 이제 저장 경로에는 page · notebook 판만 있고,
+  필사책을 빠뜨린 호출은 컴파일되지 않는다. 지운 것: `DrawingRepository` 의 `load(chapter:)` · `apply(_:chapter:generation:)` · `archiveAndReset(_:chapter:)`,
+  `DrawingVerseImporting.importVerse(_:chapter:generation:)`, `DrawingDatabase` 의 `fetchVerseSnapshots(chapter:verse:)` · `updatePresentDrawing(chapter:…)` ·
+  `fetchDrawingRecord(title:translation:)`, 초안의 `VerseDraftKey(sessionID:chapter:…)` · `drafts(in:chapter:translation:)` · `DraftBucketSummary.chapters` ·
+  `unreadChapters` · `currentVerse(chapter:verse:)`, `LocalDrawingChange(chapter:date:)` · `DrawingActivity(updateDate:chapter:verse:)` · `BibleDrawing.init(bibleTitle:…)`.
 
 ### 4-2. 옛 앱 동작 근거
 
@@ -351,11 +357,11 @@ G-2 가 관측 뒤 범위를 넓히며 지운다(§9 G-2). 판독기 시험의 �
 | **즐겨찾기 · 위젯** | **필사책 공통**(결정 11) — 키는 지금처럼 번역본 · 권 · 장 · 절, 추가할 때 **지금 필사책의 필기 사본**을 담는다. `FavoriteVerse` 에 접두를 쓰지 않는다(혼재 ③). 목록은 필사 행을 읽지 않아 키 · 스키마 변경이 없고 2.0 · 2.1 기기에도 그대로 보인다 |
 | **위젯 · 필사 알림 · 즐겨찾기에서 열기** | 지금 필사책으로 연다(결정 15) — `moveToChapter` · `moveToVerse` 그대로 |
 | **필사 알림**(2.2, `feat/2.2-reading-reminder`) | 알림을 누르면 필사 화면을 **지금 필사책**으로 연다. 필사책별 알림은 없다 |
-| **차트 · 주간 요약** | **모든 필사책 합산**(결정 10). 날짜별 · 주간 수는 지금처럼 행 수, 장별 수 · 최다 장은 `BibleChapter`(번역본 포함) 키로 필사책을 합산. 활동 `DrawingActivity.page` 가 `decodeRow` 로 모든 필사책의 행을 푼다(2.1 은 접두 행이 장별 수에서 빠진다). 최근 장 · 절은 그 행의 page 로 `openPage` — 같은 절이 두 필사책에 있으면 항목 id 가 다르다 |
-| **초안 · 확인이 필요한 필기** | `VerseDraftKey` 에 필사책(옛 초안 · 키 없음 = 기본). 파일 이름은 기본 필사책이면 지금 그대로 `<번역~권~장~절>.json`, 그 밖은 앞에 `nb_<id>~`. 복구 · 가져오기는 그 page 의 대표와 견준다. 확인이 필요한 필기 화면은 기본 필사책이 아니면 장 이름 앞에 필사책 이름(없으면 「이름 없는 필사책」). 필사책을 지우면 그 필사책 초안을 버린다(`discardDrafts(notebook:)`) |
+| **차트 · 주간 요약** | **모든 필사책 합산**(결정 10). 날짜별 · 주간 수는 지금처럼 행 수, 장별 수 · 최다 장은 `BibleChapter`(번역본 포함) 키로 필사책을 합산. 활동 `DrawingActivity.page` 가 `decodeRow` 로 모든 필사책의 행을 푼다(2.1 은 접두 행이 장별 수에서 빠진다 · 깨진 접두 행은 날짜별 수에만 든다). 누르면 여는 필사책(2026-10-16 t2b 구현 — 위임 `openChapter(NotebookChapter)` · `openVerse(NotebookChapter, verse:)` → 코디네이터가 carve `openPage`): **최근 장**은 필사책을 합산해 같은 장(번역본 포함)을 한 줄로 보이고 그 장의 **가장 최근 행의 필사책**으로 연다(`recentChapters`). **가장 많이 쓴 장**(「이어서 쓰기」)은 **보이는 주에서 그 장을 마지막으로 쓴 필사책**으로 연다(`topChapterPage` — 날마다 그 장을 마지막으로 쓴 필사책 `chapterNotebooksByDay` 를 주의 끝날부터 거슬러 찾는다). **그 필사책을 모르면 열지 않는다** — 기본 필사책으로 바꿔 열지 않는다. **최근 절**은 그 행의 필사책으로 연다(`RecentVerseItem.notebook` — 기본값이 없다). 같은 절이 두 필사책에 있으면 최근 절 항목 id 가 다르다 |
+| **초안 · 확인이 필요한 필기** | `VerseDraftKey` 에 필사책(옛 초안 · 키 없음 = 기본). 파일 이름은 기본 필사책이면 지금 그대로 `<번역~권~장~절>.json`, 그 밖은 앞에 `nb_<id>~`. 복구 · 가져오기는 그 page 의 대표와 견준다. 확인이 필요한 필기 화면(2026-10-16 t2c 구현)은 목록을 page 단위로 들고(항목 id 에 필사책), **기본 필사책이 아니면 절 · 장 이름 앞에 필사책 이름**을 붙인다(`DraftRecoveryCopy.place(_:notebookNames:locale:)` · `chapterName(_:notebookNames:locale:)` — 「<이름> · <자리>」). 이름이 없거나 지운 필사책이면 화면 언어의 「이름 없는 필사책」(혼재 ⑥ — 숨기거나 기본에 합치지 않는다). 이름은 기본이 아닌 필사책이 있을 때만 `notebooks()` 로 읽는다. 기본 필사책은 이름을 붙이지 않는다(2.1 과 같은 줄). 가져오기 뒤 알림은 page 로(`LocalDrawingChange(page:date:)`). 필사책을 지우면 그 필사책 초안을 버린다(`discardDrafts(notebook:)`) |
 | **가져오기 도착**(`LocalDrawingChange`) | `page` 를 든다 — 캔버스는 `change.page == state.page` 일 때만 반영한다(다른 필사책의 도착은 무시) |
-| **백업** | **형식 2**(혼재 ⑤): `BackupVerseKey.notebook`(nil = 기본 필사책, 형식 1 은 늘 nil) + 필사책 목록 파일(`DrawingNotebook` 의 필드 전부 — 예약 필드 포함). 내보내기는 `decodeRow` 로 모든 필사책의 행을 담고, 다른 필사책 초안도 담는다(t4). 불러오기는 1 · 2 를 읽고 1 은 전부 기본, 묶음 · 중복 판정 키에 필사책을 더한다. 필사책 목록은 같은 ID 가 있으면 `updatedAt` 이 늦은 쪽. 형식 2 항목의 필사책 토큰이 `NotebookID` 형식이 아니면 그 항목만 건너뛴다(「알 수 없는 필사책」). 미리보기에 필사책 수. 2.1 은 형식 2 파일을 거부하고 업데이트를 안내한다 — [백업 설계](./backup-import-design.md) |
-| **모든 필사 삭제**(`DrawingDataEraser.eraseAll`) | 모든 필사책의 행 + `DrawingNotebook` — 순서 `BibleDrawing` → `BiblePageDrawing` → `FavoriteVerse` → `DrawingNotebook` → 기기 보존 영역. 지금 필사책 키를 기본으로 되돌린다. 저장소 세대를 바꾼다(지금처럼) |
+| **백업** | **형식 2**(혼재 ⑤ — [백업 설계](./backup-import-design.md) §10): `BackupVerseKey.notebook`(nil = 기본 필사책, 형식 1 은 늘 nil) + **필사책 목록은 별도 파일이 아니라 `manifest.json` 의 `notebooks` 키**(`BackupNotebookRecord` — `DrawingNotebook` 의 필드 전부, 예약 필드 포함, 필사책마다 하나). 별도 파일로 두지 않은 이유: 2.1 의 풀기는 `manifest` · `items` · `blobs/<hex>` 밖의 항목 이름을 **형식 확인 전에** 「손상」 으로 거부해(`BackupArchiveEntry`) 업데이트 안내가 뜨지 않는다. 내보내기는 `decodeRow` 로 모든 필사책의 행을 담고, **다른 필사책 초안도 담는다**(2026-10-16 t4 — 자리는 필사책 · 권 · 장, 초안 요약의 `pages`). 다른 필사책 초안의 id 원본 키에는 필사책 토큰을 더한다(`draftSourceKey(…notebook:)` — 같은 세션 · 절 · revision · 내용의 두 필사책 초안 id 가 겹쳐 한쪽이 조용히 빠지는 것을 막는다. 기본 필사책 초안의 키는 2.1 과 같다). 불러오기는 1 · 2 를 읽고 1 은 전부 기본, 판정 단위 · 장에 필사책을 더한다(같은 내용이라도 필사책이 다르면 다른 절). 필사책 목록은 장보다 먼저 쓰고 같은 ID 가 있으면 `updatedAt` 이 늦은 쪽. 형식 2 항목의 필사책 토큰이 `NotebookID` 형식이 아니면 그 항목만 건너뛰고 **`BackupUnsupportedReason` 이 아니라 미리보기 `preview.unknownNotebook` 으로 센다**(설정 화면이 그 열거형을 빠짐없이 `switch` 한다 — 「넣을 수 없는 것」 수에는 든다). 미리보기에 필사책 수. 불러오기 작업 기록은 **recordVersion 2**(끝난 장이 `NotebookChapter` — 2.1 기록은 기본 필사책의 장으로 읽어 이어 한다). 2.1 은 형식 2 파일을 거부하고 업데이트를 안내한다 |
+| **모든 필사 삭제**(`DrawingDataEraser.eraseAll`) | 모든 필사책의 행 + `DrawingNotebook` — 순서 `BibleDrawing` → `BiblePageDrawing` → `FavoriteVerse` → `DrawingNotebook` → 기기 보존 영역. 저장소 세대를 바꾼다(지금처럼). 2026-10-16 t2c · t2a 구현: 설정이 지운 뒤 **지금 필사책 키를 기본(`default`)으로 되돌린다**(`iCloudSettingReducer.resetCurrentNotebook()` — 세대를 올리는 `DrawingDataRevision.bump` 보다 먼저). 지운 필사책을 가리킨 채 남으면 그 page 에 새로 쓴 행이 「이름 없는 필사책」 으로 다시 생긴다. **열린 필사 화면은 캔버스 정리 뒤 지금 키(기본)의 page 로 다시 연다**(`CarveDetailFeature.reopenInCurrentNotebookIfNeeded` — 보던 절 유지, 정리가 시작한 옛 page 의 다시 읽기는 새 요청으로 대체돼 버려진다). 확인 문구에 필사책 한 줄(「모든 필사책과 필사책 정보가 지워지고 처음부터 있던 필사책만 남는다」 뜻) |
 | **필사책 지우기** | 그 필사책의 행 + 메타데이터만, 한 트랜잭션, 세대는 바꾸지 않는다(§5-3 · §6-6) |
 | **iCloud 도착** | 열린 장을 다시 읽는다(지금처럼, page 로). 지금 필사책이 목록에 없으면 기본으로. 책장 · 헤더 이름을 다시 읽는다 |
 | **V6 `VerseDrawingVersion` · `DrawingEraseEpoch`** | 손대지 않는다(혼재 ③) |

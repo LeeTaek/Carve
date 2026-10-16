@@ -18,7 +18,7 @@ import ComposableArchitecture
 
 // MARK: - 스텁
 
-/// 호출을 기록하고, 필요하면 저장을 게이트로 붙잡아 두는 저장소.
+/// 호출을 기록하고, 필요하면 저장을 게이트로 붙잡아 두는 저장소 — 기본 필사책 시험용이라 page 의 장(`page.chapter`)만 기록한다.
 final class RepositorySpy: DrawingRepository, @unchecked Sendable {
     let loadedChapters = LockIsolated<[BibleChapter]>([])
     let applied = LockIsolated<[(chapter: BibleChapter, mutations: [VerseDrawingMutation])]>([])
@@ -34,16 +34,16 @@ final class RepositorySpy: DrawingRepository, @unchecked Sendable {
     /// 도착한 저장의 세대. 거절된 저장도 남는다 — `applied` 는 **실제로 쓴** 저장만 남긴다.
     let appliedGenerations = LockIsolated<[DrawingStoreGeneration]>([])
 
-    func load(chapter: BibleChapter) async throws -> DrawingChapterLoad {
+    func load(_ page: NotebookChapter) async throws -> DrawingChapterLoad {
         if let (stream, continuation) = makeLoadGateIfNeeded() {
             loadGate.setValue(continuation)
             for await _ in stream { break }
         }
-        loadedChapters.withValue { $0.append(chapter) }
+        loadedChapters.withValue { $0.append(page.chapter) }
         if let message = loadFailures.withValue({ $0.isEmpty ? nil : $0.removeFirst() }) {
             throw LoadBoom(description: message)
         }
-        return DrawingChapterLoad(snapshots: snapshots(chapter), generation: generation.value)
+        return DrawingChapterLoad(snapshots: snapshots(page.chapter), generation: generation.value)
     }
 
     /// 다음 `load` 를 `releaseLoad()` 까지 붙잡는다 — 늦게 도착하는 조회 결과를 재현하기 위함.
@@ -58,7 +58,7 @@ final class RepositorySpy: DrawingRepository, @unchecked Sendable {
         return AsyncStream<Void>.makeStream()
     }
 
-    func apply(_ mutations: [VerseDrawingMutation], chapter: BibleChapter, generation: DrawingStoreGeneration) async throws {
+    func apply(_ mutations: [VerseDrawingMutation], page: NotebookChapter, generation: DrawingStoreGeneration) async throws {
         if let (stream, continuation) = makeGateIfNeeded() {
             applyGate.setValue(continuation)
             for await _ in stream { break }
@@ -68,7 +68,7 @@ final class RepositorySpy: DrawingRepository, @unchecked Sendable {
         guard generation == self.generation.value else {
             throw DrawingRepositoryError.staleStoreGeneration
         }
-        applied.withValue { $0.append((chapter, mutations)) }
+        applied.withValue { $0.append((page.chapter, mutations)) }
         if let failure = applyFailures.withValue({ $0.isEmpty ? nil : $0.removeFirst() }) {
             throw failure
         }
@@ -83,15 +83,12 @@ final class RepositorySpy: DrawingRepository, @unchecked Sendable {
     /// 보관 결과. 기본은 `.archived`.
     let archiveOutcomes = LockIsolated<[VerseDrawingArchiveOutcome]>([])
 
-    func archiveAndReset(
-        _ command: VerseDrawingArchiveCommand,
-        chapter: BibleChapter
-    ) async throws -> VerseDrawingArchiveOutcome {
+    func archiveAndReset(_ command: VerseDrawingArchiveCommand, page: NotebookChapter) async throws -> VerseDrawingArchiveOutcome {
         if let (stream, continuation) = makeArchiveGateIfNeeded() {
             archiveGate.setValue(continuation)
             for await _ in stream { break }
         }
-        archived.withValue { $0.append((chapter, command)) }
+        archived.withValue { $0.append((page.chapter, command)) }
         if let failure = archiveFailures.withValue({ $0.isEmpty ? nil : $0.removeFirst() }) {
             throw failure
         }

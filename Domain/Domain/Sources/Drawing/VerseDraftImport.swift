@@ -167,23 +167,6 @@ public protocol DrawingVerseImporting: Sendable {
     ///   - command: 쓸 내용과 그 page — 필사책 · 번역본 · 권 · 장은 `command.page` 가 정한다.
     ///   - generation: 견줄 때 읽은 저장소 세대. 그 뒤 전체 삭제가 있었으면 쓰지 않고 던진다(`staleStoreGeneration`).
     func importVerse(_ command: VerseDrawingImportCommand, generation: DrawingStoreGeneration) async throws -> VerseDrawingImportOutcome
-
-    /// 옛 판 — `importVerse(_:generation:)` 와 같고 `chapter` 를 더 받는다.
-    /// - Parameter chapter: 과도기 인자 — `command.page.chapter` 와 같은 권 · 장이어야 한다(다르면 쓰지 않고 던진다).
-    /// - Note: 필사책 · 번역본은 `command.page` 가 정한다. 새 코드는 `importVerse(_:generation:)` 를 쓴다. t4 에서 지운다.
-    func importVerse(
-        _ command: VerseDrawingImportCommand,
-        chapter: BibleChapter,
-        generation: DrawingStoreGeneration
-    ) async throws -> VerseDrawingImportOutcome
-}
-
-/// page 판의 **과도기 기본 구현** — 옛 판만 구현한 구현(`SwiftDataDrawingRepository`) · 시험 대역이 그대로 컴파일 · 동작하게 한다.
-/// 명령의 장(`command.page.chapter`)을 옛 판에 넘긴다 — 필사책 · 번역본은 명령이 나른다. t4 에서 옛 판과 함께 정리한다.
-public extension DrawingVerseImporting {
-    func importVerse(_ command: VerseDrawingImportCommand, generation: DrawingStoreGeneration) async throws -> VerseDrawingImportOutcome {
-        try await importVerse(command, chapter: command.page.chapter, generation: generation)
-    }
 }
 
 private enum DrawingVerseImporterKey: DependencyKey {

@@ -53,8 +53,8 @@ enum BackupExportItems {
     ///
     /// - 행: 그 절(번역 · 절)의 `DrawingRepresentativeRule` 대표만 `isCurrent` — **비운 대표도 true**(지운 상태도 원본이다). 그 절에 shown 초안이
     ///   있으면 그 절의 행은 모두 false 다. 행의 번역은 `backupTranslation` 이다(영어 행은 `titleName` 접두).
-    /// - 절 키의 필사책은 그 장의 필사책이다(`BackupVerseKey.token(for:)` — 기본 필사책은 키를 쓰지 않는다). 초안은 지금 기본 필사책 장에서만 고른다
-    ///   (`LiveBackupExporter` — 다른 필사책 초안은 t4).
+    /// - 절 키의 필사책은 그 장의 필사책이다(`BackupVerseKey.token(for:)` — 기본 필사책은 키를 쓰지 않는다). 초안도 그 장(필사책 · 번역본)에서 고른 것이라
+    ///   행과 같은 필사책이다.
     /// - 같은 id(같은 행 키 · 같은 내용)의 행이 둘이면 하나만 담는다 — 대표였던 쪽, 없으면 앞의 것. 파일 안 id 는 겹칠 수 없다(설계 §4-2).
     /// - Parameters:
     ///   - page: 그 장(필사책 · 번역본 포함).
@@ -117,7 +117,7 @@ enum BackupExportItems {
     }
 
     /// 초안 항목 — 만든 시각은 없고(`createdAt` nil) `updatedAt` 은 초안을 남긴 시각이다. 묶음은 종류(local · unverified · account)로만 남긴다.
-    /// 필사책은 장의 필사책 토큰(기본은 nil)이다.
+    /// 필사책은 장의 필사책 토큰(기본은 nil)이고, id 의 원본 키에도 넣는다(`BackupItemID.draftSourceKey` — 기본 필사책 초안의 키는 2.1 과 같다).
     static func draftCandidate(_ selected: BackupExportDraft, title: BibleTitle, notebook: String?) -> BackupExportCandidate {
         let draft = selected.draft
         let scope = BackupItemSource.DraftScope(scope: selected.scope)
@@ -131,7 +131,8 @@ enum BackupExportItems {
             title: draft.key.title,
             chapter: draft.key.chapter,
             verse: draft.key.verse,
-            revision: draft.revision
+            revision: draft.revision,
+            notebook: notebook
         )
         let ink = blob(draft.lineData)
         let metadata = blob(draft.layoutMetadataData)
@@ -198,24 +199,25 @@ enum BackupExportItems {
 /// `beforeConnectionDrafts` → `importPlan` 으로 가른다. 다른 계정 묶음 · 다른 계정을 참고하던 확인 전 초안은 두 판정 어디에도 들지 않아 담지 않는다(P0-1).
 /// 원시 사본 · 분리본은 초안 폴더 밖이고, 읽지 못해 옆으로 옮긴 파일(`*.unreadable-*`)은 초안 읽기가 열지 않는다.
 ///
-/// 초안은 **장의 번역본 하나**로 읽는다(`drafts(in:chapter:translation: chapter.translation)`) — 저장소 쪽 입력(`rows`)도 그 번역본 장의 행이라
-/// 같은 번역본끼리 견준다. 모든 번역본의 초안을 담는 것은 부르는 쪽(`LiveBackupExporter`)이 권 · 장마다 `Translation.allCases` 를 돌며 한다.
+/// 초안은 **장의 필사책 · 번역본 하나**로 읽는다(`drafts(in:page:)`) — 저장소 쪽 입력(`rows`)도 그 필사책 · 번역본 장의 행이라 같은 page 끼리 견준다
+/// (「확인이 필요한 필기」 가 필사책마다 따로 견주는 것과 같다, 2.2). 모든 필사책 · 번역본의 초안을 담는 것은 부르는 쪽(`LiveBackupExporter`)이
+/// 필사책 · 권 · 장 자리마다 `Translation.allCases` 를 돌며 한다.
 enum BackupExportDraftSelection {
     /// - Parameters:
-    ///   - chapter: 그 장(번역본 포함 — 이 번역본의 초안만 읽는다).
+    ///   - page: 그 장(필사책 · 번역본 포함 — 이 필사책 · 번역본의 초안만 읽는다).
     ///   - environment: 그 장을 읽을 때의 편집 환경(장마다 다시 읽은 것).
-    ///   - rows: 그 장(같은 번역본)의 저장소 행 원본 — 판정의 저장소 쪽 입력(절마다 대표 내용 · 행 · 이력 지문)을 만든다.
+    ///   - rows: 그 장(같은 필사책 · 번역본)의 저장소 행 원본 — 판정의 저장소 쪽 입력(절마다 대표 내용 · 행 · 이력 지문)을 만든다.
     ///   - reader: 초안 읽기(`LocalPreservationWriter`).
     /// - Returns: 담을 초안. 부작용 없음(읽기만 한다).
     /// - Throws: 그 장의 초안 파일을 하나라도 읽지 못하면 그 오류 — 부르는 쪽이 내보내기를 실패로 끝낸다(조용히 빼지 않는다, 설계 §3-4).
     static func select(
-        chapter: BibleChapter,
+        page: NotebookChapter,
         environment: DrawingEditEnvironment,
         rows: [BackupRowRecord],
         reader: any VerseDraftRecoveryReading
     ) async throws -> [BackupExportDraft] {
         let read: (AccountScope) async throws -> [VerseDraft] = { scope in
-            try await reader.drafts(in: scope, chapter: chapter, translation: chapter.translation)
+            try await reader.drafts(in: scope, page: page)
         }
         let screen = try await VerseDraftRecoveryRule.screenDrafts(environment: environment, read: read)
         let beforeConnection = try await VerseDraftRecoveryRule.beforeConnectionDrafts(environment: environment, read: read)

@@ -58,7 +58,7 @@ struct BackupTranslationRoundTripTesting {
     /// 표본 초안을 다른 번역본의 같은 절 초안으로 옮긴다(키만 바꾼다).
     private func moved(_ draft: VerseDraft, to chapter: BibleChapter) -> VerseDraft {
         var draft = draft
-        draft.key = VerseDraftKey(sessionID: draft.key.sessionID, translation: chapter.translation, chapter: chapter, verse: draft.key.verse)
+        draft.key = VerseDraftKey(sessionID: draft.key.sessionID, page: chapter.inDefaultNotebook, verse: draft.key.verse)
         return draft
     }
 

@@ -35,7 +35,7 @@ struct BibleTitleDrawingRecordTesting {
         rows.forEach { context.insert($0) }
         try context.save()
 
-        let record = try await database.fetchDrawingRecord(title: .songOfSongs)
+        let record = try await database.fetchDrawingRecord(notebook: .default, title: .songOfSongs, translation: .NKRV)
 
         #expect(record == BibleTitleDrawingRecord(drawnChapters: [2, 4, 5], latestChapter: 5))
     }
@@ -44,7 +44,7 @@ struct BibleTitleDrawingRecordTesting {
     func recordIsEmptyWithoutDrawings() async throws {
         let (_, database) = try Self.makeDatabase()
 
-        let record = try await database.fetchDrawingRecord(title: .ruth)
+        let record = try await database.fetchDrawingRecord(notebook: .default, title: .ruth, translation: .NKRV)
 
         #expect(record == BibleTitleDrawingRecord())
     }
@@ -72,7 +72,7 @@ struct BibleTitleDrawingRecordTesting {
         isPresent: Bool = true
     ) -> BibleDrawing {
         let row = BibleDrawing(
-            bibleTitle: BibleChapter(title: title, chapter: chapter),
+            page: BibleChapter(title: title, chapter: chapter).inDefaultNotebook,
             verse: 1,
             lineData: lineData,
             updateDate: updateDate

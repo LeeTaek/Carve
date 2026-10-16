@@ -86,7 +86,7 @@ private enum NotebookDraftSample {
 
 // MARK: - 대역
 
-/// 필사책 안의 장 조회만 답하는 저장소 — 어느 page 를 읽었는지 남긴다. 필사책을 모르는 옛 조회나 쓰기가 오면 시험이 깨진다.
+/// 필사책 안의 장 조회만 답하는 저장소 — 어느 page 를 읽었는지 남긴다. 쓰기가 오면 시험이 깨진다.
 private actor NotebookPageRepository: DrawingRepository {
     private let pages: [NotebookChapter: [VerseDrawingSnapshot]]
     private let broken: Set<NotebookChapter>
@@ -103,16 +103,11 @@ private actor NotebookPageRepository: DrawingRepository {
         return DrawingChapterLoad(snapshots: pages[page] ?? [], generation: DrawingStoreGeneration(raw: 0))
     }
 
-    func load(chapter: BibleChapter) async throws -> DrawingChapterLoad {
-        Issue.record("필사책을 모르는 옛 조회를 불렀다")
-        return DrawingChapterLoad(snapshots: [], generation: DrawingStoreGeneration(raw: 0))
-    }
-
-    func apply(_ mutations: [VerseDrawingMutation], chapter: BibleChapter, generation: DrawingStoreGeneration) async throws {
+    func apply(_ mutations: [VerseDrawingMutation], page: NotebookChapter, generation: DrawingStoreGeneration) async throws {
         Issue.record("목록 · 가져오기 판정이 편집 저장 경로로 썼다")
     }
 
-    func archiveAndReset(_ command: VerseDrawingArchiveCommand, chapter: BibleChapter) async throws -> VerseDrawingArchiveOutcome {
+    func archiveAndReset(_ command: VerseDrawingArchiveCommand, page: NotebookChapter) async throws -> VerseDrawingArchiveOutcome {
         Issue.record("목록 · 가져오기 판정이 편집 저장 경로로 썼다")
         return .alreadyEmpty
     }
@@ -121,13 +116,12 @@ private actor NotebookPageRepository: DrawingRepository {
 /// 가져오기의 저장소 쓰기를 받아 적기만 하는 대역.
 private actor NotebookImportSpy: DrawingVerseImporting {
     private(set) var commands: [VerseDrawingImportCommand] = []
+    /// 쓰기가 놓일 장(번역본 포함) — 명령의 page 의 장이다.
     private(set) var chapters: [BibleChapter] = []
 
-    func importVerse(
-        _ command: VerseDrawingImportCommand, chapter: BibleChapter, generation: DrawingStoreGeneration
-    ) async throws -> VerseDrawingImportOutcome {
+    func importVerse(_ command: VerseDrawingImportCommand, generation: DrawingStoreGeneration) async throws -> VerseDrawingImportOutcome {
         commands.append(command)
-        chapters.append(chapter)
+        chapters.append(command.page.chapter)
         return .imported(previousKept: false)
     }
 }
@@ -169,7 +163,7 @@ struct NotebookDraftTesting {
         }
     }
 
-    @Test("같은 장 · 절이라도 필사책이 다르면 따로 읽힌다 — 옛 장 조회는 기본 필사책의 초안만 본다")
+    @Test("같은 장 · 절이라도 필사책이 다르면 따로 읽힌다")
     func chapterDraftsArePerNotebook() async throws {
         try await Sample.withWriter { writer, _ in
             let pageDefault = Sample.page(.default, Sample.genesis1KJV)
@@ -181,8 +175,6 @@ struct NotebookDraftTesting {
             #expect(try await writer.drafts(in: .localOnly, page: pageDefault).map(\.lineData) == [importInk(1)])
             #expect(try await writer.drafts(in: .localOnly, page: pageA).map(\.lineData) == [importInk(2)])
             #expect(try await writer.drafts(in: .localOnly, page: Sample.page(Sample.notebookA, Sample.genesis1)).isEmpty)
-            // 옛 시그니처는 기본 필사책이다.
-            #expect(try await writer.drafts(in: .localOnly, chapter: Sample.genesis1KJV, translation: .KJV).map(\.lineData) == [importInk(1)])
         }
     }
 
@@ -191,7 +183,6 @@ struct NotebookDraftTesting {
         #expect(VerseDraftKey.page(fromFileName: "KJV~1-01Genesis.txt~1~1.json") == Sample.page(.default, Sample.genesis1KJV))
         #expect(VerseDraftKey.page(fromFileName: "NKRV~1-01Genesis.txt~1~1.json") == Sample.page(.default, Sample.genesis1))
         #expect(VerseDraftKey.notebook(fromFileName: "NKRV~1-01Genesis.txt~1~1.json") == .default)
-        #expect(VerseDraftKey(sessionID: "s1", chapter: Sample.genesis1, verse: 1).fileName == "NKRV~1-01Genesis.txt~1~1.json")
         #expect(VerseDraftKey(sessionID: "s1", page: Sample.page(.default, Sample.genesis1), verse: 1).fileName == "NKRV~1-01Genesis.txt~1~1.json")
 
         let token = Sample.notebookA.rawValue
@@ -214,14 +205,14 @@ struct NotebookDraftTesting {
         // 2.2 이전 초안의 키 — `notebook` 이 없다.
         let legacy = #"{"chapter":1,"sessionID":"legacy","title":"1-01Genesis.txt","translation":"KJV","verse":3}"#
         let key = try JSONDecoder().decode(VerseDraftKey.self, from: Data(legacy.utf8))
-        #expect(key == VerseDraftKey(sessionID: "legacy", chapter: Sample.genesis1KJV, verse: 3))
+        #expect(key == VerseDraftKey(sessionID: "legacy", page: Sample.page(.default, Sample.genesis1KJV), verse: 3))
         #expect(key.notebook == .default)
         // 형식이 틀린 필사책은 기본 필사책으로 바꿔 읽지 않는다.
         let broken = #"{"chapter":1,"notebook":"NOT-A-TOKEN","sessionID":"s","title":"1-01Genesis.txt","translation":"KJV","verse":3}"#
         #expect(throws: DecodingError.self) { try JSONDecoder().decode(VerseDraftKey.self, from: Data(broken.utf8)) }
     }
 
-    @Test("묶음 요약은 필사책을 가른다 — page 목록은 기본 필사책 먼저, 옛 장 목록은 기본 필사책만")
+    @Test("묶음 요약은 필사책을 가른다 — page 목록은 기본 필사책 먼저, 기본 필사책 page 는 기본 필사책 초안의 장만")
     func summarySeparatesNotebooks() async throws {
         try await Sample.withWriter { writer, _ in
             _ = try await writer.saveDraft(Sample.draft(page: Sample.page(.default, Sample.genesis1KJV), verse: 1, ink: importInk(1)))
@@ -234,7 +225,7 @@ struct NotebookDraftTesting {
             #expect(summary.pages == [
                 Sample.page(.default, Sample.genesis1KJV), Sample.page(Sample.notebookA, Sample.genesis1), Sample.page(Sample.notebookA, Sample.genesis1KJV)
             ])
-            #expect(summary.chapters == [Sample.genesis1KJV])
+            #expect(summary.pages.filter(\.notebook.isDefault).map(\.chapter) == [Sample.genesis1KJV])
         }
     }
 
@@ -317,7 +308,7 @@ struct NotebookDraftRecoveryTesting {
             #expect(inventory.entries.map(\.draft.key) == [defaultDraft.key])
             #expect(inventory.entries.map(\.reason) == [.beforeConnection])
             #expect(inventory.unreadPages == [pageB])
-            #expect(inventory.unreadChapters == [Sample.genesis1KJV])
+            #expect(inventory.unreadPages.map(\.chapter) == [Sample.genesis1KJV])
             #expect(Set(await repository.loadedPages) == [pageDefault, pageA, pageB])
 
             #expect(try await query.currentVerse(page: pageA, verse: 1) == representative)
@@ -353,8 +344,7 @@ struct NotebookDraftRecoveryTesting {
 
             let arrival = LocalDrawingChange(page: pageA, date: Date(timeIntervalSince1970: 5_000))
             #expect(arrival.chapter == Sample.genesis1KJV)
-            #expect(arrival != LocalDrawingChange(chapter: Sample.genesis1KJV, date: Date(timeIntervalSince1970: 5_000)))
-            #expect(LocalDrawingChange(chapter: Sample.genesis1KJV, date: .distantPast).page == Sample.page(.default, Sample.genesis1KJV))
+            #expect(arrival != LocalDrawingChange(page: Sample.page(.default, Sample.genesis1KJV), date: Date(timeIntervalSince1970: 5_000)))
         }
     }
 
@@ -364,9 +354,10 @@ struct NotebookDraftRecoveryTesting {
         let actor = SwiftDatabaseActor(modelContainer: container)
         let repository = SwiftDataDrawingRepository(actor: actor)
         let defaultRow = BibleDrawingRowID.issue()
-        let generation = try await repository.load(chapter: Sample.genesis1).generation
+        let pageDefault = Sample.page(.default, Sample.genesis1)
+        let generation = try await repository.load(pageDefault).generation
         try await repository.apply(
-            [.create(verse: 1, rowID: defaultRow, data: importInk(1), metadata: Sample.metadata)], chapter: Sample.genesis1, generation: generation
+            [.create(verse: 1, rowID: defaultRow, data: importInk(1), metadata: Sample.metadata)], page: pageDefault, generation: generation
         )
         let pageA = Sample.page(Sample.notebookA, Sample.genesis1)
         let command = VerseDrawingImportCommand(
@@ -374,7 +365,7 @@ struct NotebookDraftRecoveryTesting {
         )
 
         // A 의 1절은 비었다 — 기본 필사책 행은 A 의 지금 필기가 아니다.
-        #expect(try await repository.importVerse(command, chapter: Sample.genesis1, generation: generation) == .imported(previousKept: false))
+        #expect(try await repository.importVerse(command, generation: generation) == .imported(previousKept: false))
         // A 에 한 번 더 가져오면 A 의 옛 행만 대표에서 내린다.
         let blob = try Sample.metadata.encodedBlob()
         let second = VerseDrawingImportCommand(
@@ -382,7 +373,7 @@ struct NotebookDraftRecoveryTesting {
             expectedCurrentFingerprint: VerseContentFingerprint.make(lineData: importInk(2), drawingVersion: 3, layoutMetadataBlob: blob),
             page: pageA
         )
-        #expect(try await repository.importVerse(second, chapter: Sample.genesis1, generation: generation) == .imported(previousKept: true))
+        #expect(try await repository.importVerse(second, generation: generation) == .imported(previousKept: true))
 
         let rows = try ModelContext(container).fetch(FetchDescriptor<BibleDrawing>())
         #expect(rows.count == 3)
@@ -398,21 +389,5 @@ struct NotebookDraftRecoveryTesting {
         #expect(latest.titleName == "nb_\(Sample.notebookA.rawValue)~1-01Genesis.txt")
         #expect(latest.isPresent == true)
         #expect(latest.lineData == importInk(3))
-    }
-
-    @Test("가져오기 명령의 장과 받은 장이 다르면 아무것도 쓰지 않는다")
-    func mismatchedChapterIsNotWritten() async throws {
-        let container = try ModelContainer(for: AppStoreSchema.schema, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
-        let repository = SwiftDataDrawingRepository(actor: SwiftDatabaseActor(modelContainer: container))
-        let generation = try await repository.load(chapter: Sample.genesis1).generation
-        let command = VerseDrawingImportCommand(
-            verse: 1, rowID: .issue(), lineData: importInk(1), metadata: Sample.metadata, expectedCurrentFingerprint: nil,
-            page: Sample.page(Sample.notebookA, Sample.genesis1)
-        )
-
-        await #expect(throws: SwiftDatabaseActor.importPageMismatch) {
-            try await repository.importVerse(command, chapter: BibleChapter(title: .exodus, chapter: 1), generation: generation)
-        }
-        #expect(try ModelContext(container).fetchCount(FetchDescriptor<BibleDrawing>()) == 0)
     }
 }

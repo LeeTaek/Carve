@@ -43,7 +43,7 @@ extension DraftTestSamples {
         let base = verse == 1 ? (baseFingerprint ?? storedVerseOneFingerprint) : baseFingerprint
         let metadata = withMetadata ? try? CanvasTestSupport.metadata().encodedBlob() : nil
         return VerseDraft(
-            key: VerseDraftKey(sessionID: session, chapter: CanvasTestSupport.chapter, verse: verse),
+            key: VerseDraftKey(sessionID: session, page: CanvasTestSupport.chapter.inDefaultNotebook, verse: verse),
             revision: 3,
             rowID: rowID,
             lineData: lineData ?? Data(ink.utf8),

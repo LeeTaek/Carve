@@ -145,37 +145,6 @@ public enum DrawingSchemaV4: VersionedSchema {
                 }
             }()
         }
-
-        /// **기본 필사책**의 장에 새 행을 만든다 — `init(page:…)` 에 기본 필사책으로 넘긴다.
-        ///
-        /// - Parameters:
-        ///   - bibleTitle: 성경 이름과 장(번역본 포함). 번역본은 `bibleTitle.translation` 이다 — 생략하면 `BibleChapter` 의 기본값 개역개정.
-        ///   - 나머지는 `init(page:verse:lineData:updateDate:layoutMetadataData:rowUUID:)` 와 같다.
-        /// - Note: 뜻은 「기본 필사책」 이다 — 행 형식은 2.2 이전과 같다. 새 코드는 `init(page:…)` 를 쓴다. t4 에서 지운다.
-        public convenience init(bibleTitle: BibleChapter,
-                                verse: Int,
-                                lineData: Data? = nil,
-                                updateDate: Date? = Date.now,
-                                layoutMetadataData: Data? = nil,
-                                rowUUID: String? = UUID().uuidString
-        ) {
-            self.init(
-                page: NotebookChapter(notebook: .default, chapter: bibleTitle),
-                verse: verse,
-                lineData: lineData,
-                updateDate: updateDate,
-                layoutMetadataData: layoutMetadataData,
-                rowUUID: rowUUID
-            )
-        }
-
-        public convenience init(bibleTitle: BibleChapter,
-                                section: Int,
-                                lineData: Data? = nil,
-                                updateDate: Date? = Date.now
-        ) {
-            self.init(bibleTitle: bibleTitle, verse: section, lineData: lineData, updateDate: updateDate)
-        }
     }
 
     /// 장에 해당하는 화면 전체 필사 데이터용 모델
