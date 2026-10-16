@@ -23,6 +23,9 @@ import ComposableArchitecture
 ///   내용이 이미 저장소에 있었던 예전 필기는 확인이 필요한 것과 나눠 접어 둔다(사용자 결정 2026-09-29).
 /// - 다른 계정 묶음은 **저장소와 대조하지 않고** 세어 보이기만 한다. 그 계정으로 돌아왔을 때 연다(P0-1). 연결 전 필기(로그인하지 않은 동안 ·
 ///   참고할 계정 없이 확인 전)는 확인된 계정에서 열어 가져올 수 있다.
+/// - **목록은 page(필사책 + 장) 단위다**(2.2 회차별 필사책). 같은 절이라도 필사책이 다르면 다른 줄이고, 견주기 · 넣기는 그 필사책의 page 로 간다.
+///   기본이 아닌 필사책은 자리 앞에 필사책 이름을 붙인다 — 이름이 없거나 목록에 없는 필사책(지운 필사책의 늦게 온 필기)은 「이름 없는 필사책」 이고,
+///   숨기거나 기본 필사책에 합치지 않는다(혼재 버전 규칙 ⑥).
 @Reducer
 public struct DraftRecoveryFeature {
     public init() { }
@@ -152,6 +155,8 @@ public struct DraftRecoveryFeature {
     @Dependency(\.drawingVerseImporter) var verseImporter
     @Dependency(\.verseDraftImportMarker) var importMarker
     @Dependency(\.localDrawingChanges) var localChanges
+    /// 기본이 아닌 필사책의 이름 — 그런 필사책의 필기가 목록에 오를 때만 읽는다.
+    @Dependency(\.notebookRepository) var notebookRepository
     @Dependency(\.date) var date
 
     enum CancelID {
@@ -305,9 +310,10 @@ public struct DraftRecoveryFeature {
     ///
     /// 조회 **전후로** 계정 근거를 본다 — 그 사이 바뀌었으면 결과를 내지 않고 새 근거로 다시 읽게 알린다(P0-1).
     /// 묶음 이름 · 자리 · 실패 문구는 조회를 시작할 때의 화면 언어(`AppLanguage.displayLocale()`)로 만든다 — 다시 읽으면 그때 언어로 새로 만든다.
+    /// 기본이 아닌 필사책의 필기가 처음 보이면 필사책 이름을 한 번 읽는다(`notebookNames`) — 기본 필사책뿐이면 읽지 않는다.
     private func load(sequence: Int) -> Effect<Action> {
         let locale = AppLanguage.displayLocale()
-        return .run { [reader, repository, editEnvironment] send in
+        return .run { [reader, repository, editEnvironment, notebookRepository] send in
             guard let reader else {
                 await send(.failed(sequence: sequence, SettingsCatalog.string("이 iPad의 보존 영역을 열지 못했어요. 앱을 다시 켜 보세요.", locale: locale)))
                 return
@@ -324,14 +330,19 @@ public struct DraftRecoveryFeature {
                 return
             }
             var buckets: [Bucket] = []
+            // 기본이 아닌 필사책의 이름 — 그런 필사책의 필기가 처음 보일 때 한 번 읽는다(nil 이면 아직 읽지 않았다).
+            var notebookNames: [NotebookID: String]?
             for scope in scopes {
                 do {
-                    // 모든 번역본의 초안을 한 목록으로 보인다 — 장마다 그 장의 번역본으로 저장소와 견준다(영어 현지화 결정 1 · 11).
+                    // 모든 번역본 · 모든 필사책의 초안을 한 목록으로 보인다 — page 마다 그 필사책 · 번역본으로 저장소와 견준다(영어 현지화 결정 1 · 11, 2.2).
                     let inventory = try await query.inventoryAcrossTranslations(in: scope, environment: environment)
                     // 내보낼 파일 자리는 목록과 함께 읽는다 — **대조한 묶음만.** 지금 계정에서 열어 보지 않는 묶음은 파일 자리도 들지 않는다(P0-1).
                     // 읽지 못하면 내보내기만 못 하고 나머지는 그대로 보인다.
                     let files = inventory.comparedWithStore ? (try? await reader.unreadableDraftFiles(in: scope)) ?? [] : []
-                    buckets.append(Bucket(inventory, files: files, environment: environment, locale: locale))
+                    if notebookNames == nil, Self.showsOtherNotebook(inventory) {
+                        notebookNames = await Self.notebookNames(notebookRepository)
+                    }
+                    buckets.append(Bucket(inventory, files: files, environment: environment, notebookNames: notebookNames ?? [:], locale: locale))
                 } catch {
                     Log.error("확인이 필요한 필기 — 이 묶음을 읽지 못했다", scope.key, "\(error)")
                     buckets.append(Bucket(unreadable: scope, environment: environment, locale: locale))
@@ -372,6 +383,26 @@ public struct DraftRecoveryFeature {
         if lhs.comparedWithStore != rhs.comparedWithStore { return lhs.comparedWithStore }
         return lhs.scope.key < rhs.scope.key
     }
+
+    /// 이 묶음의 줄 · 대조하지 못한 장에 기본이 아닌 필사책이 있는가 — 있으면 필사책 이름이 필요하다.
+    /// - 입력 · 출력: 묶음 조회 결과 → 기본이 아닌 필사책의 초안이나 대조하지 못한 장이 하나라도 있으면 true. 부작용: 없음.
+    private static func showsOtherNotebook(_ inventory: VerseDraftRecoveryInventory) -> Bool {
+        inventory.entries.contains { !$0.draft.key.notebook.isDefault } || inventory.unreadPages.contains { !$0.notebook.isDefault }
+    }
+
+    /// 필사책 이름 — 이름이 있는 필사책만 든다(기본 필사책은 자리에 이름을 붙이지 않는다).
+    /// - 입력 · 출력: 필사책 저장소 → 필사책 ID 별 사용자가 붙인 이름. **읽지 못하면 빈 사전**이다 — 그 필사책들은 「이름 없는 필사책」 으로 보이고,
+    ///   필기는 숨기지 않는다(이름 때문에 목록 전체를 막지 않는다).
+    /// - 부작용: 필사책 저장소를 읽는다.
+    private static func notebookNames(_ repository: any NotebookRepository) async -> [NotebookID: String] {
+        do {
+            let named = try await repository.notebooks().compactMap { notebook in notebook.name.map { (notebook.id, $0) } }
+            return Dictionary(named, uniquingKeysWith: { first, _ in first })
+        } catch {
+            Log.error("확인이 필요한 필기 — 필사책 이름을 읽지 못했다. 「이름 없는 필사책」 으로 보인다", "\(error)")
+            return [:]
+        }
+    }
 }
 
 // MARK: - 화면의 값
@@ -399,7 +430,7 @@ extension DraftRecoveryFeature {
         public var readFailed: Bool
         /// 자동으로 표시되지 않는 필기들. 최근에 쓴 것부터. 확인이 필요한 것과 보관만 하는 예전 필기가 함께 든다.
         public var items: [Item]
-        /// 대조하지 못한 장 이름 — 그 장의 필기는 세어졌지만 분류하지 못했다.
+        /// 대조하지 못한 장 이름 — 그 장의 필기는 세어졌지만 분류하지 못했다. 기본이 아닌 필사책의 장은 앞에 필사책 이름이 붙는다.
         public var unreadChapters: [String]
 
         /// 확인이 필요한 필기.
@@ -410,12 +441,13 @@ extension DraftRecoveryFeature {
 
     /// 목록의 한 줄.
     public struct Item: Hashable, Identifiable, Sendable {
-        /// 묶음 · 세션 · 번역본 · 권 · 장 · 절 — 같은 절이라도 번역본이 다르면 다른 줄이다.
+        /// 묶음 · 필사책 · 세션 · 번역본 · 권 · 장 · 절 — 같은 절이라도 필사책이나 번역본이 다르면 다른 줄이다.
         public var id: String
-        /// 「창세기 1장 3절 · KJV」 · 「창세기 1장 3절」 — 번역본이 섞이는 목록이라 KJV · BSB 만 약칭을 붙인다(`DraftRecoveryCopy.place`).
+        /// 「창세기 1장 3절 · KJV」 · 「아침 필사 · 창세기 1장 3절」 — 번역본이 섞이는 목록이라 KJV · BSB 만 약칭을 붙이고, 기본이 아닌 필사책은
+        /// 앞에 필사책 이름을 붙인다(`DraftRecoveryCopy.place(_:notebookNames:locale:)`).
         public var place: String
-        /// 비교할 때 이 장만 읽는다. 초안의 번역본 장이다 — 넣기도 이 번역본의 행으로 간다.
-        public var chapter: BibleChapter
+        /// 비교할 때 이 page 만 읽는다. 초안의 필사책 · 번역본 장이다 — 넣기도 이 page 의 행으로 간다.
+        public var page: NotebookChapter
         public var verse: Int
         /// 가져올 때 그 초안을 다시 찾는다 — 묶음 · 키 · 사용자가 본 revision.
         public var scope: AccountScope
@@ -436,6 +468,8 @@ extension DraftRecoveryFeature {
 
         /// 사용자가 확인해야 하는가. 아니면 보관만 하는 예전 필기다.
         public var needsConfirmation: Bool { reason.needsConfirmation }
+        /// 초안의 번역본 장 — 필사책은 담지 않는다(`page.chapter`).
+        public var chapter: BibleChapter { page.chapter }
     }
 
     /// 견주기 — 지금 필기와 남겨 둔 필기, 그리고 넣으면 무엇이 되는가.
@@ -468,9 +502,13 @@ extension DraftRecoveryFeature {
 
 extension DraftRecoveryFeature.Bucket {
     /// 조회 결과의 한 묶음을 화면의 값으로 옮긴다.
-    /// - 입력 · 출력: 묶음 조회 결과 · 내보낼 파일 자리 · 편집 환경 · 문구 언어(조회를 시작할 때의 화면 언어) → 이름 · 자리를 그 언어로 담은 묶음.
+    /// - 입력 · 출력: 묶음 조회 결과 · 내보낼 파일 자리 · 편집 환경 · 필사책 이름 · 문구 언어(조회를 시작할 때의 화면 언어) → 이름 · 자리를 그 언어로
+    ///   담은 묶음. 기본이 아닌 필사책의 자리 · 대조하지 못한 장은 앞에 필사책 이름이 붙는다.
     /// - 부작용: 없음.
-    init(_ inventory: VerseDraftRecoveryInventory, files: [URL], environment: DrawingEditEnvironment, locale: Locale) {
+    init(
+        _ inventory: VerseDraftRecoveryInventory, files: [URL], environment: DrawingEditEnvironment, notebookNames: [NotebookID: String],
+        locale: Locale
+    ) {
         self.init(
             scope: inventory.scope,
             title: DraftRecoveryCopy.bucketTitle(inventory.scope, environment: environment, locale: locale),
@@ -483,8 +521,10 @@ extension DraftRecoveryFeature.Bucket {
             inaccessibleCount: inventory.inaccessibleCount,
             readFailed: false,
             // 이 판이 모르는 권 · 번역본의 초안은 줄로 만들지 않는다(조회도 그런 장을 대조하지 않는다) — 수 · 용량에만 든다.
-            items: inventory.entries.compactMap { DraftRecoveryFeature.Item($0, scope: inventory.scope, environment: environment, locale: locale) },
-            unreadChapters: inventory.unreadChapters.map { DraftRecoveryCopy.chapterName($0, locale: locale) }
+            items: inventory.entries.compactMap {
+                DraftRecoveryFeature.Item($0, scope: inventory.scope, environment: environment, notebookNames: notebookNames, locale: locale)
+            },
+            unreadChapters: inventory.unreadPages.map { DraftRecoveryCopy.chapterName($0, notebookNames: notebookNames, locale: locale) }
         )
     }
 
@@ -500,16 +540,20 @@ extension DraftRecoveryFeature.Bucket {
 
 extension DraftRecoveryFeature.Item {
     /// 조회 결과의 한 줄을 화면의 값으로 옮긴다.
-    /// - 입력 · 출력: 초안 한 줄 · 묶음 · 편집 환경 · 문구 언어 → 그 초안의 번역본 장을 든 줄(자리 · 계정 근거는 그 언어로).
-    ///   키의 권 · 번역본을 이 판이 모르면 nil — 개역개정 · 창세기에 붙이지 않는다.
+    /// - 입력 · 출력: 초안 한 줄 · 묶음 · 편집 환경 · 필사책 이름 · 문구 언어 → 그 초안의 page(필사책 + 번역본 장)를 든 줄(자리 · 계정 근거는 그 언어로,
+    ///   기본이 아닌 필사책이면 자리 앞에 필사책 이름). 키의 권 · 번역본을 이 판이 모르면 nil — 개역개정 · 창세기에 붙이지 않는다.
     /// - 부작용: 없음.
-    init?(_ entry: VerseDraftRecoveryEntry, scope: AccountScope, environment: DrawingEditEnvironment, locale: Locale) {
+    init?(
+        _ entry: VerseDraftRecoveryEntry, scope: AccountScope, environment: DrawingEditEnvironment, notebookNames: [NotebookID: String],
+        locale: Locale
+    ) {
         let key = entry.draft.key
-        guard let chapter = key.bibleChapter else { return nil }
+        guard let page = key.page else { return nil }
         self.init(
-            id: "\(scope.key)/\(key.sessionID)/\(key.translation)/\(key.title)/\(key.chapter)/\(key.verse)",
-            place: DraftRecoveryCopy.place(key, locale: locale),
-            chapter: chapter,
+            // 필사책을 넣는다 — 두 필사책에 같은 키(세션 · 번역본 · 권 · 장 · 절)의 초안이 있어도 줄이 겹치지 않는다.
+            id: "\(scope.key)/\(key.notebook.rawValue)/\(key.sessionID)/\(key.translation)/\(key.title)/\(key.chapter)/\(key.verse)",
+            place: DraftRecoveryCopy.place(key, notebookNames: notebookNames, locale: locale),
+            page: page,
             verse: key.verse,
             scope: scope,
             key: key,

@@ -206,6 +206,9 @@ public struct CloudSettingsFeature: Sendable {
                 }
 
             case .drawingDataCleared:
+                // 모든 필사책의 행과 필사책 정보가 지워졌다 — 지금 필사책을 기본 필사책으로 **먼저** 돌린다. 열린 장이 아래 신호를 받고
+                // 다시 읽을 때 지운 필사책을 가리키지 않게 한다(2.2 회차별 필사책).
+                Self.resetCurrentNotebook()
                 // 열려 있는 장이 이 값을 보고 다시 조회한다 (`CarveDetailFeature`).
                 // 상태에 두지 않는 이유는 `State` 가 `Hashable` 이기 때문이다 — `@Shared` 는 그 합성을 깬다.
                 DrawingDataRevision.bump()
@@ -303,14 +306,26 @@ extension CloudSettingsFeature {
         }
     }
 
+    /// 모든 필사 삭제 뒤 지금 필사책(기기마다, `@Shared(.currentNotebookID)`)을 기본 필사책으로 돌린다.
+    ///
+    /// 전체 삭제는 모든 필사책의 행과 필사책 정보(`DrawingNotebook`)를 지운다. 지운 필사책을 가리킨 채 남으면 그 필사책이 「이름 없는 필사책」 으로
+    /// 다시 생기는 길(그 page 에 새로 쓴 행)이 열린다. 기본 필사책은 늘 있다.
+    /// - 부작용: 이 기기의 지금 필사책 키(`currentNotebookID`)를 쓴다.
+    static func resetCurrentNotebook() {
+        @Shared(.currentNotebookID) var currentNotebookID: String
+        $currentNotebookID.withLock { $0 = NotebookID.default.rawValue }
+    }
+
     /// 지워지는 범위를 적는다. **이 기기의 초안도 모두 지워진다** — 세지 못했으면 수 없이 말한다(정책 §12-5 C11 문구 규칙).
     ///
     /// 수는 `remainingDraftCount` 그대로 — **실제로 지워지는 초안 파일 수**다. 예전 문구는 "화면에 보이지 않게 남은 필기 N개" 라 해, 자동으로
     /// 표시되는 초안 · 다른 계정의 초안 · 읽지 못한 파일까지 센 수와 말이 달랐다(2026-09-21 후속 리뷰 P1-4).
+    /// 필사책(2.2)도 말한다 — 모든 필사책과 필사책 정보(이름 · 완료 표시)가 지워지고, 처음부터 있던 필사책만 기본 이름 「첫 번째 필사」 로 남는다.
     /// - Parameter locale: 문구 언어 — 리듀서는 확인 대화상자를 띄우는 순간의 `AppLanguage.displayLocale()` 를 넘긴다.
     static func eraseConfirmBody(remainingDrafts: Int?, locale: Locale) -> String {
         var lines = [
             SettingsCatalog.string("모든 장의 필기와 이전 필사 기록이 지워져요.", locale: locale),
+            SettingsCatalog.string("필사책도 모두 지워지고 「첫 번째 필사」만 남아요.", locale: locale),
             SettingsCatalog.string("즐겨찾기와 위젯에 담은 말씀도 함께 사라져요.", locale: locale)
         ]
         switch remainingDrafts {

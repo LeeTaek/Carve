@@ -132,7 +132,8 @@ struct BackupImportOutcomeTesting {
     @Test("잘못된 암호 · 손상 · 미지원 형식 · 상한 초과는 적용 전에 안내한다 — 고쳐질 수 있는 실패만 암호를 다시 받는다",
           arguments: [
             (BackupImportError.wrongPasswordOrDamaged, true),
-            (.unsupportedFormat(formatVersion: 2), false),
+            // 2.2 는 형식 1 · 2 를 읽는다 — 읽지 못하는 형식은 그 뒤 버전이다.
+            (.unsupportedFormat(formatVersion: 3), false),
             (.tooLarge, false),
             (.fileUnreadable, true),
             (.insufficientSpace, true)

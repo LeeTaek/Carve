@@ -628,6 +628,27 @@ extension BackupCopy {
             .joined(separator: " · ")
     }
 
+    /// 미리보기의 넣을 수 없는 것 — 사유별 수에 「알 수 없는 필사책」(필사책 토큰이 깨진 항목, 형식 2)을 더한다.
+    ///
+    /// 알 수 없는 필사책은 사유 열거형(`BackupUnsupportedReason`)의 경우가 아니라 따로 센다(`BackupImportPreview.unknownNotebook`).
+    /// 다른 사유보다 먼저 판정해 그 항목은 다른 사유로 세지 않으므로 맨 앞에 둔다 — 나머지는 판정 순서다.
+    static func unsupportedDetail(_ preview: BackupImportPreview, locale: Locale) -> String {
+        var parts: [String] = []
+        if preview.unknownNotebook > 0 {
+            parts.append("\(SettingsCatalog.string("알 수 없는 필사책", locale: locale)) \(preview.unknownNotebook)")
+        }
+        let reasons = unsupportedDetail(preview.unsupported, locale: locale)
+        if !reasons.isEmpty { parts.append(reasons) }
+        return parts.joined(separator: " · ")
+    }
+
+    /// 이 백업에 담긴 필사책 수(2.2 회차별 필사책) — 항목의 필사책과 필사책 목록(`BackupImportPreview.notebooks`).
+    /// 형식 1(2.1 백업)은 모두 기본 필사책이라 항목이 있으면 1권이다. 담긴 필사책이 없으면(빈 백업) nil — 줄을 보이지 않는다.
+    static func previewNotebooks(_ preview: BackupImportPreview, locale: Locale) -> String? {
+        guard preview.notebooks > 0 else { return nil }
+        return SettingsCatalog.string("필사책 \(preview.notebooks)권이 담겨 있어요.", locale: locale)
+    }
+
     /// 고른 백업 한 줄 — 만든 때와 담은 수(manifest). 만든 때도 같은 로케일의 서식이다.
     static func backupSummary(_ manifest: BackupManifest, locale: Locale) -> String {
         let created = DraftRecoveryCopy.dateText(manifest.createdAt, locale: locale)
