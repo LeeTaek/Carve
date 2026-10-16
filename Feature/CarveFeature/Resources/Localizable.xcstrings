@@ -372,23 +372,6 @@
         }
       }
     },
-    "같은 말씀을 필사책마다 따로 쓰고 간직해요" : {
-      "comment" : "책장 화면 머리 문장(2.2 필사책)",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Write the same verses again — each notebook keeps its own writing"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "같은 말씀을 필사책마다 따로 쓰고 간직해요"
-          }
-        }
-      }
-    },
     "건너뛰기" : {
       "comment" : "첫 실행 안내 — 건너뛰기",
       "localizations" : {
@@ -606,6 +589,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "나의 필사 · 절을 길게 눌러 더 보기"
+          }
+        }
+      }
+    },
+    "나의 필사책" : {
+      "comment" : "책장 표지 격자 위 묶음 제목 — 옆에 필사책 수(2.2 필사책 시안 P1)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "My Notebooks"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "나의 필사책"
           }
         }
       }
@@ -1018,6 +1018,23 @@
         }
       }
     },
+    "말씀을 쓰고, 나만의 기록으로 간직해요" : {
+      "comment" : "책장 화면 머리 문장(2.2 필사책 시안 P1)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Write the Word and keep it as your own record"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "말씀을 쓰고, 나만의 기록으로 간직해요"
+          }
+        }
+      }
+    },
     "먹색" : {
       "comment" : "색 이름(VoiceOver)",
       "localizations" : {
@@ -1320,6 +1337,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "색상 %lld"
+          }
+        }
+      }
+    },
+    "서재" : {
+      "comment" : "책장 화면 왼쪽 위 돌아가기 버튼 — 필사 화면(서재)으로(2.2 필사책 시안 P1)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Library"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "서재"
           }
         }
       }
@@ -3277,6 +3311,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "필기를 묶어 옮깁니다"
+          }
+        }
+      }
+    },
+    "필사" : {
+      "comment" : "책장 표지 번호 아래 글자 — 03 필사(2.2 필사책 표지)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Writing"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "필사"
           }
         }
       }

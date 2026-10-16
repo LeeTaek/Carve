@@ -9,22 +9,24 @@
 import Domain
 import SwiftUI
 
+import CarveToolkit
 import ComposableArchitecture
 import UIComponents
 
-/// 책장 화면(2.2 회차별 필사책, 설계 §6-1). 차트 · 즐겨찾기처럼 앱 스택에 올라가며 시스템 막대의 뒤로 가기도 그대로 쓴다.
+/// 책장 화면(2.2 회차별 필사책, 설계 §6-1 · 시안 `docs/design/assets/figma/p1-notebook-shelf.svg`). 차트 · 즐겨찾기처럼 앱 스택에 올라간다.
 ///
-/// 필사책 카드 격자(이름 · 시작 월 · 쓴 절 수 · 지금 쓰는 중 · 완료 배지)와 「새 필사책」 카드, 아래에 옛 기기 안내 한 줄(결정 14).
-/// 카드를 누르면 그 필사책으로 필사 화면에 돌아가고, 카드의 더보기 메뉴로 이름 바꾸기 · 완료 표시 · 지우기를 한다.
+/// 시스템 막대 대신 종이 위에 떠 있는 버튼 둘(「‹ 서재」 · 「+ 새 필사책」)을 두고, 큰 제목 · 머리 문장 · 「나의 필사책 N」 아래에
+/// 필사책 표지 격자(표지 · 이름 · 시작 월 · 쓴 절 수 · 지금 쓰는 중 · 완료 배지)와 점선 「새 필사책」, 맨 아래 옛 기기 안내(결정 14)를 둔다.
+/// 표지를 누르면 그 필사책으로 필사 화면에 돌아가고, 이름 옆 더보기 메뉴로 이름 바꾸기 · 완료 표시 · 지우기를 한다.
 @ViewAction(for: NotebookShelfFeature.self)
 public struct NotebookShelfView: View {
     @Bindable public var store: StoreOf<NotebookShelfFeature>
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     /// 화면 언어 — 미리 만드는 문구(이름 · 시작 월 · 쓴 절 수 · 안내 · 제안 이름)를 이 값으로 만든다.
     @Environment(\.locale) private var locale
-
-    /// 카드 격자 폭의 상한 — 즐겨찾기 목록과 같다(시안 1180pt 화면에서 좌우 64pt 안쪽).
-    private static let contentMaxWidth: CGFloat = 1052
+    /// 스크롤 영역의 보이는 높이 — 필사책이 적어도 옛 기기 안내를 화면 맨 아래에 둔다(시안).
+    @State private var visibleHeight: CGFloat = 0
 
     public init(store: StoreOf<NotebookShelfFeature>) {
         self.store = store
@@ -32,29 +34,29 @@ public struct NotebookShelfView: View {
 
     public var body: some View {
         ScrollView {
-            content
-                .frame(maxWidth: Self.contentMaxWidth, alignment: .leading)
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, CarveSpacing.xLarge)
-                .padding(.top, CarveSpacing.large)
-                // 아래 안내가 마지막 줄을 가리지 않게 비운다.
-                .padding(.bottom, CarveSpacing.xLarge * 3)
+            VStack(alignment: .leading, spacing: 0) {
+                content
+                Spacer(minLength: CarveSpacing.medium)
+                compatibilityNotice
+            }
+            .padding(.horizontal, horizontalInset)
+            .padding(.top, CarveSpacing.xSmall)
+            .padding(.bottom, CarveSpacing.small)
+            .frame(minHeight: visibleHeight, alignment: .top)
+        }
+        // 스크롤 영역의 배치 크기는 위 막대 · 홈 표시줄(안전 영역)을 뺀 보이는 높이다.
+        .onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.size.height
+        } action: { height in
+            visibleHeight = height
         }
         .background(CarveColor.canvas)
-        .navigationTitle(Text("책장", bundle: .module, comment: "책장 화면 제목 · 서재 열 아래 책장 버튼(2.2 필사책)"))
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                titleView
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    send(.backTapped)
-                } label: {
-                    Text("닫기", bundle: .module)
-                }
-                .accessibilityIdentifier("notebookShelfBack")
-            }
+        // 시안은 시스템 막대 없이 종이 위에 떠 있는 버튼 둘을 둔다 — 내용이 그 아래로 지나간다.
+        // 막대를 숨기면 UIKit 이 뒤로 쓸기를 막으므로 이 화면에서만 다시 켠다(즐겨찾기처럼 왼쪽 가장자리로 서재에 돌아간다).
+        .toolbar(.hidden, for: .navigationBar)
+        .edgeSwipeBackEnabled()
+        .safeAreaInset(edge: .top, spacing: 0) {
+            topBar
         }
         .overlay(alignment: .bottom) {
             noticeView
@@ -79,25 +81,59 @@ public struct NotebookShelfView: View {
         }
     }
 
-    /// 제목 — 책장 아이콘과 「책장」.
-    private var titleView: some View {
-        HStack(spacing: CarveSpacing.xSmall) {
-            CarveIcon.library.image
-                .foregroundStyle(CarveColor.accent)
-                .accessibilityHidden(true)
-            Text("책장", bundle: .module)
-                .font(CarveTypography.title)
+    /// 좌우 여백 — 시안 가로 화면은 80pt, 좁은 창(분할 화면)은 줄인다.
+    private var horizontalInset: CGFloat {
+        horizontalSizeClass == .compact ? CarveSpacing.large : 80
+    }
+
+    /// 위 막대 — 왼쪽 「‹ 서재」(필사 화면으로 돌아가기), 오른쪽 「+ 새 필사책」. 둘 다 종이 위에 떠 있는 버튼(iOS 26 은 유리)이다.
+    /// 안쪽 여백은 시안대로 보이는 그림 기준이다 — 꺾쇠 아이콘(24pt 틀 안 x 8 ~ 15)은 틀 안 빈 곳만큼 덜 띄운다.
+    private var topBar: some View {
+        HStack {
+            Button {
+                send(.backTapped)
+            } label: {
+                HStack(spacing: 6) {
+                    CarveIcon.chevronLeft.image
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 24, height: 24)
+                        .accessibilityHidden(true)
+                    Text("서재", bundle: .module, comment: "책장 화면 왼쪽 위 돌아가기 버튼 — 필사 화면(서재)으로(2.2 필사책 시안 P1)")
+                }
                 .foregroundStyle(CarveColor.ink)
+            }
+            .buttonStyle(NotebookShelfCapsuleButtonStyle(leading: 10))
+            .accessibilityIdentifier("notebookShelfBack")
+
+            Spacer(minLength: CarveSpacing.medium)
+
+            Button {
+                send(.newNotebookTapped)
+            } label: {
+                HStack(spacing: 13) {
+                    Image(systemName: "plus")
+                        .font(.body.weight(.regular))
+                        .foregroundStyle(CarveColor.accent)
+                        .accessibilityHidden(true)
+                    Text("새 필사책", bundle: .module)
+                        .fontWeight(.medium)
+                        .foregroundStyle(CarveColor.ink)
+                }
+            }
+            .buttonStyle(NotebookShelfCapsuleButtonStyle(leading: 13))
+            .disabled(store.isWorking)
+            .accessibilityIdentifier("newNotebookButton")
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isHeader)
+        .padding(.horizontal, CarveSpacing.xLarge)
+        .padding(.top, CarveSpacing.xSmall)
+        .padding(.bottom, CarveSpacing.xSmall)
     }
 
     private var content: some View {
-        VStack(alignment: .leading, spacing: CarveSpacing.large) {
-            Text("같은 말씀을 필사책마다 따로 쓰고 간직해요", bundle: .module, comment: "책장 화면 머리 문장(2.2 필사책)")
-                .font(.body)
-                .foregroundStyle(CarveColor.ink)
+        VStack(alignment: .leading, spacing: 0) {
+            heading
+                .padding(.bottom, CarveSpacing.large + CarveSpacing.xxSmall)
 
             if !store.hasLoaded {
                 // 조회 중 — 실패 화면으로 깜빡이지 않도록 자리만 둔다.
@@ -105,26 +141,59 @@ public struct NotebookShelfView: View {
             } else if store.loadFailed {
                 loadFailedState
             } else {
+                sectionHeader
+                    .padding(.bottom, 18)
                 grid
             }
+        }
+    }
 
-            // 옛 기기 안내(결정 14) — 2.2 이전 앱에는 처음부터 있던 필사책만 보인다(설계 §4-2).
-            Text("2.2 이전 버전을 쓰는 기기에서는 처음부터 있던 필사책만 보여요", bundle: .module, comment: "책장 아래 · 새 필사책 시트의 옛 기기 안내(2.2 필사책)")
-                .font(CarveTypography.label)
+    /// 큰 제목 「책장」 과 머리 문장 — 두 기준선 사이 27pt(시안).
+    private var heading: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("책장", bundle: .module, comment: "책장 화면 제목 · 서재 열 아래 책장 버튼 VoiceOver 이름(2.2 필사책)")
+                .font(.title.weight(.bold))
+                .foregroundStyle(CarveColor.ink)
+                .accessibilityAddTraits(.isHeader)
+            Text("말씀을 쓰고, 나만의 기록으로 간직해요", bundle: .module, comment: "책장 화면 머리 문장(2.2 필사책 시안 P1)")
+                .font(.subheadline)
                 .foregroundStyle(CarveColor.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
 
-    /// 필사책 카드 격자 — 필사책마다 카드 하나, 마지막에 「새 필사책」.
+    /// 「나의 필사책 N」 — 격자 위 묶음 제목과 필사책 수.
+    private var sectionHeader: some View {
+        HStack(alignment: .firstTextBaseline, spacing: CarveSpacing.large) {
+            Text("나의 필사책", bundle: .module, comment: "책장 표지 격자 위 묶음 제목 — 옆에 필사책 수(2.2 필사책 시안 P1)")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(CarveColor.ink)
+            Text(verbatim: store.notebooks.count.formatted(.number.locale(locale)))
+                .font(.subheadline)
+                .foregroundStyle(CarveColor.secondary)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+    }
+
+    /// 표지 격자 칸 — 표지는 칸 가운데에 놓인다. 시안 1180pt 가로 화면(좌우 80pt 안쪽 1020pt)에서 세 칸 · 표지 사이 170pt 가 되는
+    /// 최소 폭 250 · 칸 사이 54 이고(iPad mini 세로 두 칸 · 13형 가로 네 칸), 좁은 창(분할 화면)은 두 칸이 들어가도록 줄인다.
+    private var gridColumns: [GridItem] {
+        let isCompact = horizontalSizeClass == .compact
+        return [
+            GridItem(
+                .adaptive(minimum: isCompact ? NotebookCoverView.size.width : 250),
+                spacing: isCompact ? CarveSpacing.large : 54,
+                alignment: .top
+            )
+        ]
+    }
+
+    /// 필사책 표지 격자 — 필사책마다 표지 하나, 마지막에 점선 「새 필사책」. 줄 사이는 시안의 306pt 줄 간격(완료 배지가 있는 줄)에 맞춘다.
     private var grid: some View {
-        LazyVGrid(
-            columns: [GridItem(.adaptive(minimum: 220, maximum: 360), spacing: CarveSpacing.large, alignment: .top)],
-            alignment: .leading,
-            spacing: CarveSpacing.large
-        ) {
+        LazyVGrid(columns: gridColumns, alignment: .center, spacing: CarveSpacing.medium + CarveSpacing.xxSmall) {
             ForEach(store.notebooks) { notebook in
-                NotebookCard(
+                NotebookShelfItem(
                     notebook: notebook,
                     isCurrent: notebook.id == store.currentNotebook,
                     isDisabled: store.isWorking,
@@ -135,10 +204,26 @@ public struct NotebookShelfView: View {
                 )
                 .transition(.opacity)
             }
-            NewNotebookCard {
+            NewNotebookPlaceholder {
                 send(.newNotebookTapped)
             }
             .disabled(store.isWorking)
+        }
+    }
+
+    /// 맨 아래 옛 기기 안내(결정 14) — 구분선 아래 가운데. 2.2 이전 앱에는 처음부터 있던 필사책만 보인다(설계 §4-2).
+    private var compatibilityNotice: some View {
+        VStack(spacing: CarveSpacing.small) {
+            Rectangle()
+                .fill(CarveColor.divider)
+                .frame(height: 0.7)
+                .accessibilityHidden(true)
+            Text("2.2 이전 버전을 쓰는 기기에서는 처음부터 있던 필사책만 보여요", bundle: .module, comment: "책장 아래 · 새 필사책 시트의 옛 기기 안내(2.2 필사책)")
+                .font(.caption2)
+                .foregroundStyle(CarveColor.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity)
         }
     }
 
@@ -207,6 +292,15 @@ extension NotebookShelfView {
         CarveFeatureCatalog.string("\(count)절 필사", locale: locale)
     }
 
+    /// 역할: 표지 아래 기록 한 줄(「2026년 10월 시작 · 128절 필사」 · 「Started October 2026 · 128 verses written」, 시안 P1).
+    /// 입력 · 출력: 필사책 · 달력 · 로케일 → 시작 월과 쓴 절 수를 「 · 」 로 이은 문구. 만든 시각을 모르면 쓴 절 수만.
+    /// 부작용: 없음.
+    static func metadataText(of notebook: NotebookSnapshot, calendar: Calendar = .current, locale: Locale) -> String {
+        let verses = writtenVersesText(notebook.writtenVerseCount, locale: locale)
+        guard let createdAt = notebook.createdAt else { return verses }
+        return startedText(createdAt, calendar: calendar, locale: locale) + " · " + verses
+    }
+
     /// 역할: 관리 동작을 동기화 저장소에 쓰지 않고 막은 안내 — 「지금은 필사책을 만들거나 고칠 수 없어요. <사유>」.
     /// 입력 · 출력: 막은 사유 · 로케일 → 문구. 사유 문장은 즐겨찾기와 같은 것(`SyncedWriteBlock.reasonText`)이다.
     /// 부작용: 없음.
@@ -241,12 +335,12 @@ extension NotebookShelfView {
     }
 }
 
-// MARK: - 카드
+// MARK: - 표지 칸
 
-/// 필사책 카드 — 이름 · 시작 월 · 쓴 절 수 · 「지금 쓰는 중」 · 「완료됨」 배지와 더보기 메뉴(설계 §6-1).
-private struct NotebookCard: View {
+/// 책장 표지 칸 — 표지(「지금 쓰는 중」 배지)와 그 아래 이름 · 더보기 · 시작 월 · 쓴 절 수 · 「완료됨」 배지(시안 P1).
+private struct NotebookShelfItem: View {
     let notebook: NotebookSnapshot
-    /// 이 기기의 지금 필사책인가 — 배지와 강조 테두리.
+    /// 이 기기의 지금 필사책인가 — 표지 위 「지금 쓰는 중」 배지.
     let isCurrent: Bool
     /// 완료 표시 · 지우기를 저장하는 중 — 고르기 · 메뉴를 막는다.
     let isDisabled: Bool
@@ -254,12 +348,15 @@ private struct NotebookCard: View {
     let onRename: () -> Void
     let onToggleCompletion: () -> Void
     let onDelete: () -> Void
-    /// 화면 언어 — 이름이 없을 때의 기본 표시 · 시작 월 · 쓴 절 수를 이 값으로 만든다.
+    /// 화면 언어 — 이름이 없을 때의 기본 표시 · 시작 월 · 쓴 절 수 · 표지 번호를 이 값으로 만든다.
     @Environment(\.locale) private var locale
 
-    private var shape: RoundedRectangle {
-        RoundedRectangle(cornerRadius: CarveRadius.card, style: .continuous)
-    }
+    /// 이름 줄 오른쪽 더보기 자리 — 이름이 여기까지 오지 않는다.
+    private static let moreButtonReserve: CGFloat = 28
+    /// 표지와 이름 사이 — 이름 기준선이 표지 아래 24pt(시안).
+    private static let coverToNameSpacing: CGFloat = 10
+    /// 더보기 점 세 개의 가운데 — 표지 오른쪽 끝에서 1pt 안 · 표지 아래 19pt(시안 more x 187 · y 229, 이름 기준선보다 5pt 위).
+    private static let moreDotsCenter = CGPoint(x: NotebookCoverView.size.width - 1, y: NotebookCoverView.size.height + 19)
 
     private var isCompleted: Bool {
         notebook.status == .completed
@@ -267,74 +364,90 @@ private struct NotebookCard: View {
 
     var body: some View {
         Button(action: onChoose) {
-            VStack(alignment: .leading, spacing: CarveSpacing.small) {
-                badges
+            VStack(alignment: .leading, spacing: 0) {
+                NotebookCoverView(style: NotebookCoverStyle.make(for: notebook, locale: locale))
+                    .overlay(alignment: .topTrailing) {
+                        if isCurrent { currentBadge }
+                    }
+                    .padding(.bottom, Self.coverToNameSpacing)
                 // 사용자가 지은 이름은 옮기지 않는다(`NotebookNaming`).
                 Text(verbatim: NotebookNaming.displayName(of: notebook, locale: locale))
-                    .font(CarveTypography.title)
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(CarveColor.ink)
                     .multilineTextAlignment(.leading)
-                    .lineLimit(3)
-                Spacer(minLength: CarveSpacing.small)
-                VStack(alignment: .leading, spacing: CarveSpacing.xxSmall) {
-                    if let createdAt = notebook.createdAt {
-                        Text(verbatim: NotebookShelfView.startedText(createdAt, locale: locale))
-                    }
-                    Text(verbatim: NotebookShelfView.writtenVersesText(notebook.writtenVerseCount, locale: locale))
-                }
-                .font(CarveTypography.label)
-                .foregroundStyle(CarveColor.secondary)
-            }
-            // 오른쪽 위 더보기 버튼 자리를 비운다.
-            .padding(.trailing, CarveSize.minimumHitTarget - CarveSpacing.small)
-            .padding(CarveSpacing.large)
-            .frame(maxWidth: .infinity, minHeight: 176, alignment: .topLeading)
-            .carveSurface(.panel, in: shape)
-            .overlay {
-                if isCurrent {
-                    shape.strokeBorder(CarveColor.accent, lineWidth: 2)
+                    .lineLimit(2)
+                    .padding(.trailing, Self.moreButtonReserve)
+                    .padding(.bottom, 6)
+                Text(verbatim: NotebookShelfView.metadataText(of: notebook, locale: locale))
+                    .font(.caption2)
+                    .foregroundStyle(CarveColor.secondary)
+                    .lineLimit(2)
+                if isCompleted {
+                    completedBadge
+                        .padding(.top, CarveSpacing.xSmall)
                 }
             }
-            .contentShape(shape)
+            .frame(width: NotebookCoverView.size.width, alignment: .leading)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .disabled(isDisabled)
         .accessibilityAddTraits(isCurrent ? .isSelected : [])
-        .overlay(alignment: .topTrailing) {
+        .overlay(alignment: .topLeading) {
+            // 44pt 누름 자리의 가운데를 시안의 점 자리에 놓는다.
             moreMenu
+                .offset(
+                    x: Self.moreDotsCenter.x - CarveSize.minimumHitTarget / 2,
+                    y: Self.moreDotsCenter.y - CarveSize.minimumHitTarget / 2
+                )
         }
     }
 
-    /// 「지금 쓰는 중」 · 「완료됨」 배지 줄. 배지가 없어도 자리를 지켜 카드끼리 이름 높이가 맞는다.
-    private var badges: some View {
-        HStack(spacing: CarveSpacing.xxSmall) {
-            if isCurrent {
-                Text("지금 쓰는 중", bundle: .module, comment: "책장 카드 배지 — 이 기기의 지금 필사책(2.2 필사책)")
-                    .font(CarveTypography.caption)
-                    .foregroundStyle(CarveColor.accent)
-                    .padding(.horizontal, CarveSpacing.xSmall)
-                    .padding(.vertical, 2)
-                    .background(CarveColor.selected, in: Capsule())
-            }
-            if isCompleted {
-                HStack(spacing: 2) {
-                    CarveIcon.checkmark.image
-                        .resizable()
-                        .frame(width: 12, height: 12)
-                        .accessibilityHidden(true)
-                    Text("완료됨", bundle: .module, comment: "책장 카드 배지 — 완료로 표시한 필사책(2.2 필사책)")
-                        .font(CarveTypography.caption)
-                }
-                .foregroundStyle(CarveColor.ink)
-                .padding(.horizontal, CarveSpacing.xSmall)
-                .padding(.vertical, 2)
-                .background(CarveColor.fill, in: Capsule())
-            }
+    /// 「● 지금 쓰는 중」 — 표지 오른쪽 위에 걸친다(시안: 표지 오른쪽 끝보다 12pt 밖까지, 글자는 표지 안에서 끝난다).
+    private var currentBadge: some View {
+        HStack(spacing: 7.5) {
+            Circle()
+                .frame(width: 5, height: 5)
+                .accessibilityHidden(true)
+            Text("지금 쓰는 중", bundle: .module, comment: "책장 카드 배지 — 이 기기의 지금 필사책(2.2 필사책)")
+                .font(.system(size: 10, weight: .medium))
+                .lineLimit(1)
+                .fixedSize()
         }
-        .frame(minHeight: 22, alignment: .leading)
+        .foregroundStyle(CarveColor.canvas)
+        .padding(.leading, 9.5)
+        .padding(.trailing, 26)
+        .frame(height: 25)
+        .background(CarveColor.accent, in: Capsule())
+        .padding(.top, 10)
+        .offset(x: 12)
     }
 
-    /// 카드 더보기 — 이름 바꾸기 · 완료로 표시/완료 취소 · 필사책 지우기(기본 필사책에는 없다, 결정 7).
+    /// 「✓ 완료됨」 배지.
+    private var completedBadge: some View {
+        HStack(spacing: 5) {
+            ZStack {
+                Circle()
+                    .fill(CarveColor.accent)
+                Image(systemName: "checkmark")
+                    .font(.system(size: 6.5, weight: .bold))
+                    .foregroundStyle(CarveColor.canvas)
+            }
+            .frame(width: 12, height: 12)
+            .accessibilityHidden(true)
+            Text("완료됨", bundle: .module, comment: "책장 카드 배지 — 완료로 표시한 필사책(2.2 필사책)")
+                .font(.system(size: 10))
+                .foregroundStyle(CarveColor.accent)
+                .lineLimit(1)
+                .fixedSize()
+        }
+        .padding(.leading, 6)
+        .padding(.trailing, 17)
+        .frame(height: 21)
+        .background(CarveColor.selected, in: Capsule())
+    }
+
+    /// 더보기 — 이름 바꾸기 · 완료로 표시/완료 취소 · 필사책 지우기(기본 필사책에는 없다, 결정 7).
     private var moreMenu: some View {
         Menu {
             Button(action: onRename) {
@@ -366,40 +479,61 @@ private struct NotebookCard: View {
             }
         } label: {
             CarveIcon.more.image
+                .resizable()
+                .scaledToFit()
+                .frame(width: 20, height: 20)
                 .foregroundStyle(CarveColor.secondary)
                 .frame(width: CarveSize.minimumHitTarget, height: CarveSize.minimumHitTarget)
                 .contentShape(Rectangle())
         }
         .disabled(isDisabled)
-        .padding(.top, CarveSpacing.xSmall)
-        .padding(.trailing, CarveSpacing.xSmall)
         .accessibilityLabel(Text("더보기", bundle: .module))
         .accessibilityValue(Text(verbatim: NotebookNaming.displayName(of: notebook, locale: locale)))
     }
 }
 
-/// 「새 필사책」 카드 — 이름 시트를 연다.
-private struct NewNotebookCard: View {
+/// 점선 「새 필사책」 — 표지 크기의 빈 자리. 이름 시트를 연다.
+private struct NewNotebookPlaceholder: View {
     let action: () -> Void
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: CarveRadius.card, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: 5, style: .continuous)
         Button(action: action) {
             VStack(spacing: CarveSpacing.small) {
                 Image(systemName: "plus")
-                    .font(.title2.weight(.light))
+                    .font(.system(size: 24, weight: .light))
                     .accessibilityHidden(true)
                 Text("새 필사책", bundle: .module, comment: "책장의 새 필사책 카드 · 새 필사책 시트 제목(2.2 필사책)")
-                    .font(CarveTypography.title)
+                    .font(.subheadline)
             }
             .foregroundStyle(CarveColor.accent)
-            .frame(maxWidth: .infinity, minHeight: 176)
+            .frame(width: NotebookCoverView.size.width, height: NotebookCoverView.size.height)
             .background {
-                shape.strokeBorder(CarveColor.accent.opacity(0.45), style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
+                shape.strokeBorder(CarveColor.accent.opacity(0.35), style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
             }
             .contentShape(shape)
         }
         .buttonStyle(.plain)
+        .frame(width: NotebookCoverView.size.width, alignment: .leading)
         .accessibilityIdentifier("newNotebookCard")
+    }
+}
+
+/// 책장 위 막대의 캡슐 버튼 — 종이 위에 떠 있는 표면(iOS 26 은 유리, 그 밖은 불투명 `surface`)에 높이 44pt.
+/// 오른쪽 안쪽 여백은 시안의 18pt, 왼쪽은 아이콘 틀의 빈 곳을 뺀 값을 버튼마다 받는다.
+private struct NotebookShelfCapsuleButtonStyle: ButtonStyle {
+    let leading: CGFloat
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.subheadline)
+            .lineLimit(1)
+            .padding(.leading, leading)
+            .padding(.trailing, 18)
+            .frame(minHeight: CarveSize.minimumHitTarget)
+            .carveSurface(.floatingControl, in: Capsule())
+            .contentShape(Capsule())
+            .opacity(isEnabled ? (configuration.isPressed ? 0.6 : 1) : 0.4)
     }
 }
