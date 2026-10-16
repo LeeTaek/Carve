@@ -30,7 +30,10 @@ public struct DrawingChartFeature: Sendable {
         }()
         public var isAppendingPastData: Bool = false
         public var selectedRecord: DailyRecord?
+        /// 날짜(자정)별 · 장(번역본 포함)별 필사 수 — 모든 필사책을 합산한다(2.2 결정 10). 과거 주를 더 불러오면 그 날들을 더한다.
         public var chapterCountsByDay: [Date: [BibleChapter: Int]] = [:]
+        /// 날짜(자정)별 · 장(번역본 포함)별로 그날 그 장을 마지막으로 쓴 필사책 — `chapterCountsByDay` 와 같은 행 · 같은 키로 만든다.
+        public var chapterNotebooksByDay: [Date: [BibleChapter: NotebookID]] = [:]
         
         public init() {
             let cal = Calendar.current
@@ -42,6 +45,7 @@ public struct DrawingChartFeature: Sendable {
             self.isAppendingPastData = false
             self.selectedRecord = nil
             self.chapterCountsByDay = [:]
+            self.chapterNotebooksByDay = [:]
             self.dailyRecordChart = DailyRecordChartFeature.State(
                 records: [],
                 lowerBoundDate: lower,
@@ -60,8 +64,14 @@ public struct DrawingChartFeature: Sendable {
     public enum Action: ViewAction, BindableAction {
         case binding(BindingAction<State>)
         case view(View)
-        case setFetchedDailyData(dailyRecords: [DailyRecord], chapterCountsByDay: [Date: [BibleChapter: Int]])
-        case setRecentItems(recentVerses: [RecentVerseItem], recentChapters: [BibleChapter])
+        /// 첫 조회 · 과거 주 추가 조회가 날짜별 수와 장별 수 · 장별 마지막 필사책을 모았을 때 발생한다.
+        case setFetchedDailyData(
+            dailyRecords: [DailyRecord],
+            chapterCountsByDay: [Date: [BibleChapter: Int]],
+            chapterNotebooksByDay: [Date: [BibleChapter: NotebookID]]
+        )
+        /// 첫 조회가 최근 절 · 장(그 행의 필사책 · 번역본 장)을 모았을 때 발생한다.
+        case setRecentItems(recentVerses: [RecentVerseItem], recentChapters: [NotebookChapter])
         case endAppending
         case dailyRecordChart(DailyRecordChartFeature.Action)
         case drawingWeeklySummary(DrawingWeeklySummaryFeature.Action)
@@ -104,9 +114,11 @@ public struct DrawingChartFeature: Sendable {
                 case .view(.fetchData):
                     return handleFetchData()
                     
-                case let .setFetchedDailyData(dailyRecords, chapterCountsByDay):
+                case let .setFetchedDailyData(dailyRecords, chapterCountsByDay, chapterNotebooksByDay):
                     state.chapterCountsByDay = chapterCountsByDay
+                    state.chapterNotebooksByDay = chapterNotebooksByDay
                     state.drawingWeeklySummary.chapterCountsByDay = chapterCountsByDay
+                    state.drawingWeeklySummary.chapterNotebooksByDay = chapterNotebooksByDay
                     handleSetDailyRecords(&state, dailyRecords: dailyRecords)
                     return .none
                     
@@ -160,7 +172,7 @@ extension DrawingChartFeature {
         return .none
     }
     
-    /// 오늘(`date.now`)부터 30일치 기록과 최근 필사 항목을 불러온다.
+    /// 오늘(`date.now`)부터 30일치 기록과 최근 필사 항목을 불러온다 — 모든 필사책의 행을 합산한다(2.2 결정 10).
     private func handleFetchData() -> Effect<Action> {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: date.now)
@@ -174,6 +186,7 @@ extension DrawingChartFeature {
         
         return .run { send in
             let drawings = try await drawingActivityRepository.activities(in: range)
+            // 날짜별 수는 모든 필사책 · 번역본의 행 수다 — 필사책 · 권을 풀지 못하는 행도 센다.
             let groupedByDay: [Date: [DrawingActivity]] = Dictionary(grouping: drawings) { drawing in
                 calendar.startOfDay(for: drawing.updateDate ?? today)
             }
@@ -185,43 +198,65 @@ extension DrawingChartFeature {
                 }
             
             var chapterCountsByDay: [Date: [BibleChapter: Int]] = [:]
+            var chapterNotebooksByDay: [Date: [BibleChapter: NotebookID]] = [:]
             for day in days.map({ calendar.startOfDay(for: $0) }) {
-                let dayDrawings = groupedByDay[day] ?? []
-                var counts: [BibleChapter: Int] = [:]
-                
-                for drawing in dayDrawings {
-                    // 번역본까지 든 장으로 센다 — 같은 권 · 장도 번역본이 다르면 따로 센다.
-                    // 권 · 번역본을 모르거나(`StoredBookKey.decode` 가 nil) 장이 없는 행은 날짜별 수에만 들고 여기서는 건너뛴다.
-                    guard let chapter = drawing.chapter else { continue }
-                    counts[chapter, default: 0] += 1
-                }
-                chapterCountsByDay[day] = counts
+                let tally = Self.chapterTally(of: groupedByDay[day] ?? [])
+                chapterCountsByDay[day] = tally.counts
+                chapterNotebooksByDay[day] = tally.notebooks
             }
             
-            await send(.setFetchedDailyData(dailyRecords: dailyRecords, chapterCountsByDay: chapterCountsByDay))
+            await send(
+                .setFetchedDailyData(
+                    dailyRecords: dailyRecords,
+                    chapterCountsByDay: chapterCountsByDay,
+                    chapterNotebooksByDay: chapterNotebooksByDay
+                )
+            )
             
             let recentDrawings = try await drawingActivityRepository.recentActivities(limit: 5)
             let sorted = recentDrawings.sorted { ($0.updateDate ?? .distantPast) > ($1.updateDate ?? .distantPast) }
             
-            // 최근 절은 그 행의 번역본 장으로 담아 누르면 그 번역본 절로 연다.
-            // 권 · 번역본을 모르거나 장이 없는 행은 건너뛴다 — 창세기 등 다른 자리로 바꿔 보이지 않는다.
+            // 최근 절은 그 행의 필사책 · 번역본 장(`DrawingActivity.page`)으로 담아 누르면 그 필사책 · 번역본 절로 연다(2.2 결정 10).
+            // 필사책 · 권 · 번역본을 모르거나 장이 없는 행은 건너뛴다 — 창세기나 기본 필사책 등 다른 자리로 바꿔 보이지 않는다.
             let recentVerses: [RecentVerseItem] = sorted.compactMap { drawing in
-                guard let chapter = drawing.chapter else { return nil }
+                guard let page = drawing.page else { return nil }
                 return RecentVerseItem(
-                    verse: BibleVerse(title: chapter, verse: drawing.verse ?? 1, sentence: ""),
-                    updatedAt: drawing.updateDate ?? .distantFuture
+                    verse: BibleVerse(title: page.chapter, verse: drawing.verse ?? 1, sentence: ""),
+                    updatedAt: drawing.updateDate ?? .distantFuture,
+                    notebook: page.notebook
                 )
             }
             
-            // 장은 겹치지 않게 — 같은 권 · 장이라도 번역본이 다르면 다른 장이다.
+            // 장은 필사책을 합산해 겹치지 않게 — 같은 장을 여러 필사책에서 썼으면 한 줄이고, 가장 최근 행의 필사책으로 연다.
+            // 같은 권 · 장이라도 번역본이 다르면 다른 장이다.
             var seen = Set<BibleChapter>()
-            let recentChapters: [BibleChapter] = sorted.compactMap { drawing in
-                guard let chapter = drawing.chapter, seen.insert(chapter).inserted else { return nil }
-                return chapter
+            let recentChapters: [NotebookChapter] = sorted.compactMap { drawing in
+                guard let page = drawing.page, seen.insert(page.chapter).inserted else { return nil }
+                return page
             }
             
             await send(.setRecentItems(recentVerses: recentVerses, recentChapters: recentChapters))
         }
+    }
+    
+    /// 역할: 하루치 활동을 장(번역본 포함)별로 센다 — 모든 필사책을 합산하고(2.2 결정 10), 그날 그 장을 마지막으로 쓴 필사책을 함께 적는다.
+    /// 입력 · 출력: 하루치 활동 → 장별 수 · 장별 마지막 필사책(같은 키). 같은 권 · 장도 번역본이 다르면 따로 센다.
+    ///   필사책 · 권 · 번역본을 풀지 못하거나(`DrawingActivity.page` 가 nil — 모르는 권 · 깨진 필사책 접두) 장이 없는 행은
+    ///   날짜별 수에만 들고 여기서는 건너뛴다. 고친 시각이 같으면 먼저 온 행의 필사책을 둔다.
+    /// 부작용: 없음.
+    private static func chapterTally(
+        of drawings: [DrawingActivity]
+    ) -> (counts: [BibleChapter: Int], notebooks: [BibleChapter: NotebookID]) {
+        var counts: [BibleChapter: Int] = [:]
+        var latest: [BibleChapter: (notebook: NotebookID, updateDate: Date)] = [:]
+        for drawing in drawings {
+            guard let page = drawing.page else { continue }
+            counts[page.chapter, default: 0] += 1
+            let updateDate = drawing.updateDate ?? .distantPast
+            if let current = latest[page.chapter], current.updateDate >= updateDate { continue }
+            latest[page.chapter] = (page.notebook, updateDate)
+        }
+        return (counts, latest.mapValues { $0.notebook })
     }
     
     private func handleSetDailyRecords(_ state: inout State, dailyRecords: [DailyRecord]) {
@@ -246,6 +281,7 @@ extension DrawingChartFeature {
         state.drawingWeeklySummary.dailyRecords = state.dailyRecordChart.records
         state.drawingWeeklySummary.scrollPosition = state.dailyRecordChart.scrollPosition
         state.drawingWeeklySummary.chapterCountsByDay = state.chapterCountsByDay
+        state.drawingWeeklySummary.chapterNotebooksByDay = state.chapterNotebooksByDay
     }
     
     private func handleTapSymbol(_ state: inout State, date: Date) {
@@ -284,6 +320,7 @@ extension DrawingChartFeature {
         let drawingActivityRepository = self.drawingActivityRepository
         let existingRecords = state.dailyRecordChart.records
         let existingChapterCountsByDay = state.chapterCountsByDay
+        let existingChapterNotebooksByDay = state.chapterNotebooksByDay
         
         return .run { send in
             let weekEnd = cal.date(byAdding: .day, value: 7, to: previousWeekStart)!
@@ -301,29 +338,20 @@ extension DrawingChartFeature {
                     return DailyRecord(date: day, count: count)
                 }
             
-            var newChapterCountsByDay: [Date: [BibleChapter: Int]] = [:]
-            for day in daysToAppend.map({ cal.startOfDay(for: $0) }) {
-                let dayDrawings = groupedByDay[day] ?? []
-                var counts: [BibleChapter: Int] = [:]
-                
-                for drawing in dayDrawings {
-                    // 첫 조회와 같은 규칙 — 번역본까지 든 장으로 세고, 권 · 번역본을 모르는 행은 건너뛴다.
-                    guard let chapter = drawing.chapter else { continue }
-                    counts[chapter, default: 0] += 1
-                }
-                
-                newChapterCountsByDay[day] = counts
-            }
-            
+            // 첫 조회와 같은 규칙 — 필사책을 합산한 장(번역본 포함)으로 센다. 기존 날짜 값은 그대로 두고 붙인 날짜 값을 더한다.
             var mergedChapterCounts = existingChapterCountsByDay
-            for (day, counts) in newChapterCountsByDay {
-                mergedChapterCounts[day] = counts
+            var mergedChapterNotebooks = existingChapterNotebooksByDay
+            for day in daysToAppend.map({ cal.startOfDay(for: $0) }) {
+                let tally = Self.chapterTally(of: groupedByDay[day] ?? [])
+                mergedChapterCounts[day] = tally.counts
+                mergedChapterNotebooks[day] = tally.notebooks
             }
             
             await send(
                 .setFetchedDailyData(
                     dailyRecords: newRecords + existingRecords,
-                    chapterCountsByDay: mergedChapterCounts
+                    chapterCountsByDay: mergedChapterCounts,
+                    chapterNotebooksByDay: mergedChapterNotebooks
                 )
             )
             

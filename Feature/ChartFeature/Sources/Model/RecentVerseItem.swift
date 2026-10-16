@@ -29,8 +29,9 @@ public struct RecentVerseItem: Equatable, Identifiable, Sendable {
         NotebookChapter(notebook: notebook, chapter: verse.title)
     }
 
-    /// - Parameter notebook: 그 절을 고친 필사책. 활동 행에서 필사책을 아직 풀지 않는 곳은 기본 필사책이다.
-    public init(verse: BibleVerse, updatedAt: Date, drawingID: String? = nil, notebook: NotebookID = .default) {
+    /// - Parameter notebook: 그 절을 고친 필사책 — 활동 행의 `DrawingActivity.page` 에서 온다. 기본값을 두지 않는다 —
+    ///   빠뜨린 곳이 조용히 기본 필사책을 열지 않고 컴파일 오류로 드러나게(룰북 「필사책 귀속」 3).
+    public init(verse: BibleVerse, updatedAt: Date, notebook: NotebookID, drawingID: String? = nil) {
         self.verse = verse
         self.updatedAt = updatedAt
         self.drawingID = drawingID

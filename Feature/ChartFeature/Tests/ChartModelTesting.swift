@@ -22,7 +22,8 @@ struct ChartModelTesting {
                 verse: 16,
                 sentence: "하나님이 세상을 이처럼 사랑하사"
             ),
-            updatedAt: Date(timeIntervalSince1970: 1_800)
+            updatedAt: Date(timeIntervalSince1970: 1_800),
+            notebook: .default
         )
 
         #expect(item.message(locale: Self.korean) == "요한복음 3장 16절")
@@ -32,7 +33,8 @@ struct ChartModelTesting {
     func recentVerseItemMessageShowsKJVAbbreviation() {
         let item = RecentVerseItem(
             verse: BibleVerse(title: BibleChapter(title: .john, chapter: 3, translation: .KJV), verse: 16, sentence: ""),
-            updatedAt: Date(timeIntervalSince1970: 1_800)
+            updatedAt: Date(timeIntervalSince1970: 1_800),
+            notebook: .default
         )
 
         #expect(item.message(locale: Self.korean) == "요한복음 3장 16절 · KJV")
@@ -62,6 +64,7 @@ struct ChartModelTesting {
                 sentence: "여호와는 나의 목자시니"
             ),
             updatedAt: Date(timeIntervalSince1970: 2_400),
+            notebook: .default,
             drawingID: "drawing-1"
         )
 
@@ -72,14 +75,32 @@ struct ChartModelTesting {
     func recentVerseItemIDSeparatesTranslations() {
         let updatedAt = Date(timeIntervalSince1970: 2_400)
         let korean = RecentVerseItem(
-            verse: BibleVerse(title: BibleChapter(title: .psalms, chapter: 23), verse: 1, sentence: ""), updatedAt: updatedAt
+            verse: BibleVerse(title: BibleChapter(title: .psalms, chapter: 23), verse: 1, sentence: ""), updatedAt: updatedAt, notebook: .default
         )
         let english = RecentVerseItem(
-            verse: BibleVerse(title: BibleChapter(title: .psalms, chapter: 23, translation: .KJV), verse: 1, sentence: ""), updatedAt: updatedAt
+            verse: BibleVerse(title: BibleChapter(title: .psalms, chapter: 23, translation: .KJV), verse: 1, sentence: ""),
+            updatedAt: updatedAt,
+            notebook: .default
         )
 
         #expect(english.id == "KJV-1-19Psalms.txt|23|1|2400.0")
         #expect(korean.id != english.id)
+    }
+
+    @Test("같은 절 · 같은 시각이라도 필사책이 다르면 최근 필사 항목 식별자가 다르고, 기본 필사책 식별자는 2.1 과 같다")
+    func recentVerseItemIDSeparatesNotebooks() throws {
+        // Given: 시편 23장 1절을 같은 시각에 기본 필사책과 다른 필사책에서 고쳤다
+        let updatedAt = Date(timeIntervalSince1970: 2_400)
+        let psalm = BibleVerse(title: BibleChapter(title: .psalms, chapter: 23), verse: 1, sentence: "")
+        let notebook = try #require(NotebookID(rawValue: "0f3a1c2d00004000800000000000000a"))
+        let first = RecentVerseItem(verse: psalm, updatedAt: updatedAt, notebook: .default)
+        let second = RecentVerseItem(verse: psalm, updatedAt: updatedAt, notebook: notebook)
+
+        // Then: 다른 필사책 항목은 행 이름처럼 필사책 접두가 붙어 목록에서 겹치지 않는다
+        #expect(first.id == "1-19Psalms.txt|23|1|2400.0")
+        #expect(second.id == "nb_0f3a1c2d00004000800000000000000a~1-19Psalms.txt|23|1|2400.0")
+        #expect(first.id != second.id)
+        #expect(second.page == NotebookChapter(notebook: notebook, chapter: psalm.title))
     }
 
     @Test("일별 기록의 식별자는 날짜와 동일하다")

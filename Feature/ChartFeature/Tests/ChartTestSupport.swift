@@ -19,6 +19,7 @@ extension DrawingWeeklySummaryFeature.State: @retroactive Equatable {
             && lhs.scrollPosition == rhs.scrollPosition
             && lhs.dailyRecords == rhs.dailyRecords
             && lhs.chapterCountsByDay == rhs.chapterCountsByDay
+            && lhs.chapterNotebooksByDay == rhs.chapterNotebooksByDay
             && lhs.recentVerses == rhs.recentVerses
             && lhs.recentChapters == rhs.recentChapters
     }
@@ -33,6 +34,7 @@ extension DrawingChartFeature.State: @retroactive Equatable {
             && lhs.isAppendingPastData == rhs.isAppendingPastData
             && lhs.selectedRecord == rhs.selectedRecord
             && lhs.chapterCountsByDay == rhs.chapterCountsByDay
+            && lhs.chapterNotebooksByDay == rhs.chapterNotebooksByDay
     }
 }
 
